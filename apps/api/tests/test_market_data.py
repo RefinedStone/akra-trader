@@ -99,6 +99,33 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert lineage.sync_status == "synced"
 
 
+def test_binance_adapter_backfills_history_beyond_recent_window(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=45),
+    count=10,
+  )
+  exchange = FakeExchange({("BTC/USDT", "5m"): rows})
+  adapter = BinanceMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    exchange=exchange,
+    default_candle_limit=4,
+    historical_candle_limit=8,
+    exchange_batch_limit=4,
+    clock=lambda: now,
+  )
+
+  adapter.sync_tracked("5m")
+  status = adapter.get_status("5m")
+  candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m")
+
+  assert status.instruments[0].candle_count == 8
+  assert candles[0].timestamp == now - timedelta(minutes=35)
+  assert candles[-1].timestamp == now
+  assert len(exchange.calls) == 2
+
+
 def test_binance_adapter_reuses_persisted_candles_when_coverage_is_fresh(tmp_path: Path) -> None:
   now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
   rows = build_ohlcv_rows(
@@ -112,6 +139,7 @@ def test_binance_adapter_reuses_persisted_candles_when_coverage_is_fresh(tmp_pat
     tracked_symbols=("BTC/USDT",),
     exchange=first_exchange,
     default_candle_limit=6,
+    historical_candle_limit=6,
     clock=lambda: now,
   )
 
@@ -124,6 +152,7 @@ def test_binance_adapter_reuses_persisted_candles_when_coverage_is_fresh(tmp_pat
     tracked_symbols=("BTC/USDT",),
     exchange=second_exchange,
     default_candle_limit=6,
+    historical_candle_limit=6,
     clock=lambda: now + timedelta(minutes=5),
   )
 

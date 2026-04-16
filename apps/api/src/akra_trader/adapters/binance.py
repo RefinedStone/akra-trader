@@ -119,6 +119,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     tracked_symbols: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT"),
     venue: str = "binance",
     default_candle_limit: int = 500,
+    historical_candle_limit: int | None = None,
     exchange_batch_limit: int = 500,
     exchange: OhlcvExchange | None = None,
     clock: Callable[[], datetime] | None = None,
@@ -127,6 +128,10 @@ class BinanceMarketDataAdapter(MarketDataPort):
     self._tracked_symbols = tracked_symbols
     self._venue = venue
     self._default_candle_limit = default_candle_limit
+    self._historical_candle_limit = max(
+      historical_candle_limit or default_candle_limit,
+      default_candle_limit,
+    )
     self._exchange_batch_limit = exchange_batch_limit
     self._exchange = exchange or build_binance_exchange()
     self._clock = clock or (lambda: datetime.now(UTC))
@@ -191,7 +196,13 @@ class BinanceMarketDataAdapter(MarketDataPort):
 
   def sync_tracked(self, timeframe: str) -> None:
     for symbol in self._tracked_symbols:
-      self._sync_recent(symbol=symbol, timeframe=timeframe)
+      if not self._sync_recent(symbol=symbol, timeframe=timeframe):
+        continue
+      self._backfill_history(
+        symbol=symbol,
+        timeframe=timeframe,
+        target_candle_count=self._historical_candle_limit,
+      )
 
   def describe_lineage(
     self,
@@ -239,7 +250,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     symbol: str,
     timeframe: str,
     required_count: int | None = None,
-  ) -> None:
+  ) -> bool:
     coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
     timeframe_delta = self._timeframe_delta(timeframe)
     requested_count = required_count or self._default_candle_limit
@@ -247,29 +258,29 @@ class BinanceMarketDataAdapter(MarketDataPort):
       if coverage.last_timestamp is None or coverage.candle_count < requested_count:
         lookback_count = max(requested_count, self._default_candle_limit)
         start_at = self._clock() - (timeframe_delta * max(lookback_count - 1, 1))
-        self._sync_range(
+        return self._sync_range(
           symbol=symbol,
           timeframe=timeframe,
           start_at=start_at,
           end_at=None,
           limit=lookback_count,
         )
-      else:
-        raw = self._exchange.fetch_ohlcv(
-          symbol=symbol,
-          timeframe=timeframe,
-          since=self._to_exchange_milliseconds(coverage.last_timestamp + timeframe_delta),
-          limit=self._exchange_batch_limit,
-        )
-        candles = self._normalize_ohlcv(raw)
-        if candles:
-          self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
-        self._record_sync_state(
-          symbol=symbol,
-          timeframe=timeframe,
-          sync_status="synced",
-          last_error=None,
-        )
+      raw = self._exchange.fetch_ohlcv(
+        symbol=symbol,
+        timeframe=timeframe,
+        since=self._to_exchange_milliseconds(coverage.last_timestamp + timeframe_delta),
+        limit=self._exchange_batch_limit,
+      )
+      candles = self._normalize_ohlcv(raw)
+      if candles:
+        self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
+      self._record_sync_state(
+        symbol=symbol,
+        timeframe=timeframe,
+        sync_status="synced",
+        last_error=None,
+      )
+      return True
     except Exception as exc:
       self._record_sync_state(
         symbol=symbol,
@@ -277,6 +288,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="error",
         last_error=str(exc),
       )
+      return False
 
   def _sync_range(
     self,
@@ -286,7 +298,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     start_at: datetime | None,
     end_at: datetime | None,
     limit: int | None,
-  ) -> None:
+  ) -> bool:
     timeframe_delta = self._timeframe_delta(timeframe)
     if start_at is None:
       start_at = self._clock() - (timeframe_delta * max((limit or self._default_candle_limit) - 1, 1))
@@ -327,6 +339,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="synced",
         last_error=None,
       )
+      return True
     except Exception as exc:
       self._record_sync_state(
         symbol=symbol,
@@ -334,6 +347,60 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="error",
         last_error=str(exc),
       )
+      return False
+
+  def _backfill_history(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    target_candle_count: int,
+  ) -> bool:
+    coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
+    if coverage.first_timestamp is None or coverage.candle_count >= target_candle_count:
+      return True
+
+    timeframe_delta = self._timeframe_delta(timeframe)
+    try:
+      while coverage.first_timestamp is not None and coverage.candle_count < target_candle_count:
+        remaining = target_candle_count - coverage.candle_count
+        batch_limit = min(max(remaining, 1), self._exchange_batch_limit)
+        start_at = coverage.first_timestamp - (timeframe_delta * batch_limit)
+        raw = self._exchange.fetch_ohlcv(
+          symbol=symbol,
+          timeframe=timeframe,
+          since=self._to_exchange_milliseconds(start_at),
+          limit=batch_limit,
+        )
+        candles = [
+          candle
+          for candle in self._normalize_ohlcv(raw)
+          if candle.timestamp < coverage.first_timestamp
+        ]
+        if not candles:
+          break
+        previous_coverage = coverage
+        self._upsert_candles(symbol=symbol, timeframe=timeframe, candles=candles)
+        coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
+        if coverage.candle_count <= previous_coverage.candle_count:
+          break
+        if coverage.first_timestamp is None or coverage.first_timestamp >= previous_coverage.first_timestamp:
+          break
+      self._record_sync_state(
+        symbol=symbol,
+        timeframe=timeframe,
+        sync_status="synced",
+        last_error=None,
+      )
+      return True
+    except Exception as exc:
+      self._record_sync_state(
+        symbol=symbol,
+        timeframe=timeframe,
+        sync_status="error",
+        last_error=str(exc),
+      )
+      return False
 
   def _upsert_candles(self, *, symbol: str, timeframe: str, candles: list[Candle]) -> None:
     ingested_at = self._clock()

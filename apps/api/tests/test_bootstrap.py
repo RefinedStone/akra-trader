@@ -67,10 +67,18 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       self.database_url = database_url
 
   class FakeBinanceMarketDataAdapter:
-    def __init__(self, *, database_url: str, tracked_symbols: tuple[str, ...], default_candle_limit: int) -> None:
+    def __init__(
+      self,
+      *,
+      database_url: str,
+      tracked_symbols: tuple[str, ...],
+      default_candle_limit: int,
+      historical_candle_limit: int,
+    ) -> None:
       captured["database_url"] = database_url
       captured["tracked_symbols"] = ",".join(tracked_symbols)
       captured["default_candle_limit"] = str(default_candle_limit)
+      captured["historical_candle_limit"] = str(historical_candle_limit)
 
   class FakeMarketDataSyncJob:
     def __init__(self, market_data, *, timeframes: tuple[str, ...], interval_seconds: int) -> None:
@@ -96,6 +104,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       market_data_sync_timeframes=("5m", "1h"),
       market_data_sync_interval_seconds=120,
       market_data_default_candle_limit=144,
+      market_data_historical_candle_limit=720,
     )
   )
 
@@ -104,4 +113,5 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"
   assert captured["default_candle_limit"] == "144"
+  assert captured["historical_candle_limit"] == "720"
   assert len(container.background_jobs) == 1

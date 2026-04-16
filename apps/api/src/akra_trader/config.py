@@ -21,6 +21,7 @@ class Settings:
   market_data_sync_timeframes: tuple[str, ...] = ("5m",)
   market_data_sync_interval_seconds: int = 60
   market_data_default_candle_limit: int = 500
+  market_data_historical_candle_limit: int = 2_000
 
 
 def load_settings() -> Settings:
@@ -41,5 +42,8 @@ def load_settings() -> Settings:
     ),
     market_data_default_candle_limit=int(
       os.getenv("AKRA_TRADER_MARKET_DATA_DEFAULT_CANDLE_LIMIT", "500")
+    ),
+    market_data_historical_candle_limit=int(
+      os.getenv("AKRA_TRADER_MARKET_DATA_HISTORICAL_CANDLE_LIMIT", "2000")
     ),
   )

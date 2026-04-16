@@ -49,6 +49,7 @@ def build_market_data_adapter(settings: Settings, repo_root: Path):
       ),
       tracked_symbols=settings.market_data_symbols,
       default_candle_limit=settings.market_data_default_candle_limit,
+      historical_candle_limit=settings.market_data_historical_candle_limit,
     )
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 
