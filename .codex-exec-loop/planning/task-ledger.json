@@ -439,20 +439,38 @@
     {
       "id": "planning-reference-lanes-freqtrade-binary-export-inspection",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Inspect embedded Freqtrade feather and pickle exports for benchmark provenance",
-      "description": "Extend the Freqtrade zip-artifact enrichment path beyond export presence checks to inspect embedded binary `.feather` and `.pkl` benchmark exports themselves, extracting safe provenance signals such as schema, row counts, strategy/runtime metadata, and recognizable payload summaries so reference-lane artifact sections reflect the actual contents of packaged wallet and analysis bundles rather than only their filenames.",
-      "status": "ready",
+      "title": "Embedded Freqtrade feather and pickle exports now contribute structural provenance",
+      "description": "Completed the binary-export inspection follow-up by teaching the Freqtrade reference adapter to read embedded `*_market_change.feather`, `*_wallet.feather`, `*_signals.pkl`, `*_rejected.pkl`, and `*_exited.pkl` members inside benchmark zip snapshots, extract structural provenance such as row/frame counts, column lists, time ranges, strategy/pair counts, wallet currency summaries, and preview entries, keep parsing defensive when binary members are unreadable, add the required `joblib` and `pyarrow` runtime dependencies, and surface the new binary-export sections through control-room labels.",
+      "status": "done",
       "base_priority": 79,
-      "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply said nothing essential remains from direct zip inspection and named binary inspection of embedded `.feather` and `.pkl` exports as the next later refinement, so this should become the next immediately executable queue-head task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the embedded Freqtrade binary-export inspection, verified `apps/api` with `./.venv/bin/python -m pytest` (`37 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `0322740` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:20:00Z",
+      "updated_at": "2026-04-17T02:35:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-freqtrade-zip-artifact-inspection"
       ],
       "direction_relation_note": "Extends the reference benchmark lane from zip-level inventory into deeper benchmark-native provenance by reading the packaged binary exports that still remain opaque to operators and comparison views."
+    },
+    {
+      "id": "planning-reference-lanes-freqtrade-binary-export-semantic-breakdown",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Decode richer semantics from embedded Freqtrade binary exports",
+      "description": "Extend the new binary-export inspection beyond structural summaries so benchmark artifact sections expose deeper operator-meaningful semantics from embedded Freqtrade exports, such as per-tag signal distributions, wallet balance extrema grouped by currency, and richer rejected/exited event breakdowns instead of only high-level previews and counts.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply said nothing essential remains from binary-export inspection and directly named deeper semantic decoding of signals, wallet extrema, and rejected/exited breakdowns as the clear next refinement, so this becomes the next executable queue-head task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T02:35:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-freqtrade-binary-export-inspection"
+      ],
+      "direction_relation_note": "Advances the reference benchmark lane from structural binary-export provenance toward richer benchmark-native semantics that operators can compare directly without opening raw Freqtrade artifacts."
     }
   ]
 }
