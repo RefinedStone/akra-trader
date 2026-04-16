@@ -327,13 +327,58 @@ select {
   margin: 14px 0;
 }
 
+.run-lineage {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(88, 217, 255, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(88, 217, 255, 0.05), rgba(88, 217, 255, 0.01)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.run-lineage-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.run-lineage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-lineage-copy {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.run-lineage-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 @media (max-width: 960px) {
   .hero,
   .grid,
   .strategy-columns,
   .run-list,
   .run-form,
-  .run-metrics {
+  .run-metrics,
+  .run-lineage-grid {
     grid-template-columns: 1fr;
   }
 

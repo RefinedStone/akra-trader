@@ -39,6 +39,20 @@ type Run = {
     reference_version?: string | null;
     integration_mode?: string | null;
     external_command: string[];
+    market_data?: {
+      provider: string;
+      venue: string;
+      symbols: string[];
+      timeframe: string;
+      requested_start_at?: string | null;
+      requested_end_at?: string | null;
+      effective_start_at?: string | null;
+      effective_end_at?: string | null;
+      candle_count: number;
+      sync_status: string;
+      last_sync_at?: string | null;
+      issues: string[];
+    } | null;
   };
   metrics: Record<string, number>;
   notes: string[];
@@ -470,6 +484,7 @@ function RunSection({
               {run.provenance.external_command.length ? (
                 <p className="run-note">{run.provenance.external_command.join(" ")}</p>
               ) : null}
+              {run.provenance.market_data ? <RunMarketDataLineage lineage={run.provenance.market_data} /> : null}
               {onStop && run.status === "running" ? (
                 <button className="ghost-button" onClick={() => void onStop(run.config.run_id)}>
                   Stop
@@ -481,6 +496,36 @@ function RunSection({
       ) : (
         <p className="empty-state">No runs yet.</p>
       )}
+    </section>
+  );
+}
+
+function RunMarketDataLineage({
+  lineage,
+}: {
+  lineage: NonNullable<Run["provenance"]["market_data"]>;
+}) {
+  return (
+    <section className="run-lineage">
+      <div className="run-lineage-head">
+        <span>Data lineage</span>
+        <strong>{lineage.provider}</strong>
+      </div>
+      <div className="run-lineage-grid">
+        <Metric label="Provider" value={lineage.provider} />
+        <Metric label="Sync" value={lineage.sync_status} />
+        <Metric label="Candles" value={String(lineage.candle_count)} />
+        <Metric label="Timeframe" value={lineage.timeframe} />
+      </div>
+      <div className="run-lineage-copy">
+        <p>
+          {lineage.venue}:{lineage.symbols.join(", ")}
+        </p>
+        <p>Requested window: {formatRange(lineage.requested_start_at, lineage.requested_end_at)}</p>
+        <p>Effective window: {formatRange(lineage.effective_start_at, lineage.effective_end_at)}</p>
+        <p>Last sync: {formatTimestamp(lineage.last_sync_at)}</p>
+        <p>Issues: {lineage.issues.length ? lineage.issues.join(", ") : "none"}</p>
+      </div>
     </section>
   );
 }
@@ -499,4 +544,18 @@ function formatMetric(value?: number, suffix = "") {
     return "n/a";
   }
   return `${value}${suffix}`;
+}
+
+function formatTimestamp(value?: string | null) {
+  if (!value) {
+    return "n/a";
+  }
+  return value;
+}
+
+function formatRange(start?: string | null, end?: string | null) {
+  if (!start && !end) {
+    return "open-ended";
+  }
+  return `${formatTimestamp(start)} -> ${formatTimestamp(end)}`;
 }
