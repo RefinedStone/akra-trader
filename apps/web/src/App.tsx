@@ -116,6 +116,37 @@ type Run = {
   notes: string[];
 };
 
+type RunComparison = {
+  requested_run_ids: string[];
+  baseline_run_id: string;
+  runs: {
+    run_id: string;
+    mode: string;
+    status: string;
+    lane: string;
+    strategy_id: string;
+    strategy_name?: string | null;
+    strategy_version: string;
+    symbols: string[];
+    timeframe: string;
+    started_at: string;
+    ended_at?: string | null;
+    reference_id?: string | null;
+    reference_version?: string | null;
+    metrics: Record<string, number>;
+    notes: string[];
+  }[];
+  metric_rows: {
+    key: string;
+    label: string;
+    unit: string;
+    higher_is_better?: boolean | null;
+    values: Record<string, number | null>;
+    deltas_vs_baseline: Record<string, number | null>;
+    best_run_id?: string | null;
+  }[];
+};
+
 type MarketDataStatus = {
   provider: string;
   venue: string;
@@ -149,6 +180,7 @@ const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 1;
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const ALL_FILTER_VALUE = "__all__";
+const MAX_COMPARISON_RUNS = 4;
 
 type ControlRoomUiStateV1 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
@@ -196,6 +228,10 @@ export default function App() {
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
+  const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>([]);
+  const [runComparison, setRunComparison] = useState<RunComparison | null>(null);
+  const [runComparisonLoading, setRunComparisonLoading] = useState(false);
+  const [runComparisonError, setRunComparisonError] = useState<string | null>(null);
   const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
     loadExpandedGapRows,
   );
@@ -241,6 +277,51 @@ export default function App() {
     setBacktestRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
     setSandboxRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
   }, [strategies]);
+
+  useEffect(() => {
+    const availableRunIds = new Set(backtests.map((run) => run.config.run_id));
+    setSelectedComparisonRunIds((current) => {
+      const next = current.filter((runId) => availableRunIds.has(runId));
+      return next.length === current.length ? current : next;
+    });
+  }, [backtests]);
+
+  useEffect(() => {
+    if (selectedComparisonRunIds.length < 2) {
+      setRunComparison(null);
+      setRunComparisonError(null);
+      setRunComparisonLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setRunComparisonLoading(true);
+    setRunComparisonError(null);
+
+    void fetchJson<RunComparison>(buildRunComparisonPath(selectedComparisonRunIds))
+      .then((payload) => {
+        if (cancelled) {
+          return;
+        }
+        setRunComparison(payload);
+      })
+      .catch((error) => {
+        if (cancelled) {
+          return;
+        }
+        setRunComparison(null);
+        setRunComparisonError((error as Error).message);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setRunComparisonLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedComparisonRunIds]);
 
   useEffect(() => {
     persistExpandedGapRows(expandedGapRows);
@@ -345,6 +426,35 @@ export default function App() {
     } catch (error) {
       setStatusText(`Stop failed: ${(error as Error).message}`);
     }
+  }
+
+  function toggleComparisonRun(runId: string) {
+    setSelectedComparisonRunIds((current) => {
+      if (current.includes(runId)) {
+        return current.filter((value) => value !== runId);
+      }
+      if (current.length >= MAX_COMPARISON_RUNS) {
+        setStatusText(`Comparison supports up to ${MAX_COMPARISON_RUNS} backtests at once.`);
+        return current;
+      }
+      return [...current, runId];
+    });
+  }
+
+  function clearComparisonRuns() {
+    setSelectedComparisonRunIds([]);
+  }
+
+  function selectBenchmarkPair() {
+    const nativeRun = pickLatestBenchmarkRun(backtests, "native");
+    const referenceRun = pickLatestBenchmarkRun(backtests, "reference");
+
+    if (!nativeRun || !referenceRun) {
+      setStatusText("Benchmark comparison needs one native and one reference backtest.");
+      return;
+    }
+
+    setSelectedComparisonRunIds([nativeRun.config.run_id, referenceRun.config.run_id]);
   }
 
   return (
@@ -501,6 +611,15 @@ export default function App() {
           strategies={strategies}
           filter={backtestRunFilter}
           setFilter={setBacktestRunFilter}
+          comparison={{
+            selectedRunIds: selectedComparisonRunIds,
+            payload: runComparison,
+            loading: runComparisonLoading,
+            error: runComparisonError,
+            onToggleRunSelection: toggleComparisonRun,
+            onClearSelection: clearComparisonRuns,
+            onSelectBenchmarkPair: selectBenchmarkPair,
+          }}
         />
         <RunSection
           title="Sandbox runs"
@@ -780,6 +899,12 @@ function buildRunsPath(mode: string, filter: RunHistoryFilter) {
   return `/runs?${params.toString()}`;
 }
 
+function buildRunComparisonPath(runIds: string[]) {
+  const params = new URLSearchParams();
+  runIds.forEach((runId) => params.append("run_id", runId));
+  return `/runs/compare?${params.toString()}`;
+}
+
 function normalizeRunHistoryFilter(current: RunHistoryFilter, strategies: Strategy[]) {
   const availableStrategyIds = new Set(strategies.map((strategy) => strategy.strategy_id));
   if (
@@ -810,6 +935,14 @@ function getStrategyVersionOptions(strategies: Strategy[], strategyId: string) {
       ),
     ),
   ).sort();
+}
+
+function pickLatestBenchmarkRun(runs: Run[], lane: string) {
+  return (
+    runs.find((run) => run.provenance.lane === lane && run.status === "completed") ??
+    runs.find((run) => run.provenance.lane === lane) ??
+    null
+  );
 }
 
 function StrategyColumn({
@@ -979,12 +1112,23 @@ function RunForm({
   );
 }
 
+type RunSectionComparisonControls = {
+  selectedRunIds: string[];
+  payload: RunComparison | null;
+  loading: boolean;
+  error: string | null;
+  onToggleRunSelection: (runId: string) => void;
+  onClearSelection: () => void;
+  onSelectBenchmarkPair: () => void;
+};
+
 function RunSection({
   title,
   runs,
   strategies,
   filter,
   setFilter,
+  comparison,
   onStop,
 }: {
   title: string;
@@ -992,6 +1136,7 @@ function RunSection({
   strategies: Strategy[];
   filter: RunHistoryFilter;
   setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
+  comparison?: RunSectionComparisonControls;
   onStop?: (runId: string) => Promise<void>;
 }) {
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
@@ -1003,52 +1148,72 @@ function RunSection({
           <p className="kicker">Execution plane</p>
           <h2>{title}</h2>
         </div>
-        <div className="filter-bar">
-          <label>
-            Strategy
-            <select
-              value={filter.strategy_id}
-              onChange={(event) =>
-                setFilter((current) => {
-                  const strategyId = event.target.value;
-                  const nextVersionOptions = getStrategyVersionOptions(strategies, strategyId);
-                  const nextVersion = nextVersionOptions.includes(current.strategy_version)
-                    ? current.strategy_version
-                    : ALL_FILTER_VALUE;
-                  return {
-                    strategy_id: strategyId,
-                    strategy_version: nextVersion,
-                  };
-                })
-              }
-            >
-              <option value={ALL_FILTER_VALUE}>All strategies</option>
-              {strategies.map((strategy) => (
-                <option key={strategy.strategy_id} value={strategy.strategy_id}>
-                  {strategy.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Version
-            <select
-              value={filter.strategy_version}
-              onChange={(event) =>
-                setFilter((current) => ({
-                  ...current,
-                  strategy_version: event.target.value,
-                }))
-              }
-            >
-              <option value={ALL_FILTER_VALUE}>All versions</option>
-              {versionOptions.map((version) => (
-                <option key={version} value={version}>
-                  {version}
-                </option>
-              ))}
-            </select>
-          </label>
+        <div className="section-controls">
+          <div className="filter-bar">
+            <label>
+              Strategy
+              <select
+                value={filter.strategy_id}
+                onChange={(event) =>
+                  setFilter((current) => {
+                    const strategyId = event.target.value;
+                    const nextVersionOptions = getStrategyVersionOptions(strategies, strategyId);
+                    const nextVersion = nextVersionOptions.includes(current.strategy_version)
+                      ? current.strategy_version
+                      : ALL_FILTER_VALUE;
+                    return {
+                      strategy_id: strategyId,
+                      strategy_version: nextVersion,
+                    };
+                  })
+                }
+              >
+                <option value={ALL_FILTER_VALUE}>All strategies</option>
+                {strategies.map((strategy) => (
+                  <option key={strategy.strategy_id} value={strategy.strategy_id}>
+                    {strategy.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Version
+              <select
+                value={filter.strategy_version}
+                onChange={(event) =>
+                  setFilter((current) => ({
+                    ...current,
+                    strategy_version: event.target.value,
+                  }))
+                }
+              >
+                <option value={ALL_FILTER_VALUE}>All versions</option>
+                {versionOptions.map((version) => (
+                  <option key={version} value={version}>
+                    {version}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {comparison ? (
+            <div className="comparison-toolbar">
+              <span>
+                Compare {comparison.selectedRunIds.length} / {MAX_COMPARISON_RUNS}
+              </span>
+              <button className="ghost-button" onClick={comparison.onSelectBenchmarkPair} type="button">
+                Benchmark native vs NFI
+              </button>
+              <button
+                className="ghost-button"
+                disabled={!comparison.selectedRunIds.length}
+                onClick={comparison.onClearSelection}
+                type="button"
+              >
+                Clear compare
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
       {runs.length ? (
@@ -1094,17 +1259,171 @@ function RunSection({
                   lineageBySymbol={run.provenance.market_data_by_symbol}
                 />
               ) : null}
-              {onStop && run.status === "running" ? (
-                <button className="ghost-button" onClick={() => void onStop(run.config.run_id)}>
-                  Stop
-                </button>
-              ) : null}
+              <div className="run-card-actions">
+                {comparison ? (
+                  <button
+                    className="ghost-button"
+                    onClick={() => comparison.onToggleRunSelection(run.config.run_id)}
+                    type="button"
+                  >
+                    {comparison.selectedRunIds.includes(run.config.run_id)
+                      ? "Remove from compare"
+                      : "Add to compare"}
+                  </button>
+                ) : null}
+                {onStop && run.status === "running" ? (
+                  <button className="ghost-button" onClick={() => void onStop(run.config.run_id)} type="button">
+                    Stop
+                  </button>
+                ) : null}
+              </div>
             </article>
           ))}
         </div>
       ) : (
         <p className="empty-state">No runs yet.</p>
       )}
+      {comparison ? (
+        <RunComparisonPanel
+          comparison={comparison.payload}
+          error={comparison.error}
+          loading={comparison.loading}
+          selectedRunIds={comparison.selectedRunIds}
+        />
+      ) : null}
+    </section>
+  );
+}
+
+function RunComparisonPanel({
+  comparison,
+  error,
+  loading,
+  selectedRunIds,
+}: {
+  comparison: RunComparison | null;
+  error: string | null;
+  loading: boolean;
+  selectedRunIds: string[];
+}) {
+  if (!selectedRunIds.length) {
+    return null;
+  }
+
+  if (selectedRunIds.length < 2) {
+    return (
+      <section className="comparison-panel comparison-panel-empty">
+        <p className="kicker">Comparison deck</p>
+        <p className="empty-state">Select at least two backtests to compare them side by side.</p>
+      </section>
+    );
+  }
+
+  if (loading) {
+    return (
+      <section className="comparison-panel comparison-panel-empty">
+        <p className="kicker">Comparison deck</p>
+        <p className="empty-state">Preparing side-by-side benchmark view...</p>
+      </section>
+    );
+  }
+
+  if (error) {
+    return (
+      <section className="comparison-panel comparison-panel-empty">
+        <p className="kicker">Comparison deck</p>
+        <p className="empty-state">Comparison failed: {error}</p>
+      </section>
+    );
+  }
+
+  if (!comparison) {
+    return null;
+  }
+
+  return (
+    <section className="comparison-panel">
+      <div className="comparison-head">
+        <div>
+          <p className="kicker">Comparison deck</p>
+          <h3>Native and reference backtests, side by side</h3>
+        </div>
+        <p className="comparison-baseline">Baseline: {comparison.baseline_run_id}</p>
+      </div>
+      <div className="comparison-run-grid">
+        {comparison.runs.map((run) => (
+          <article
+            className={`comparison-run-card ${
+              run.run_id === comparison.baseline_run_id ? "baseline" : ""
+            }`}
+            key={run.run_id}
+          >
+            <div className="comparison-run-head">
+              <strong>{run.strategy_name ?? run.strategy_id}</strong>
+              <div className={`run-status ${run.status}`}>{run.status}</div>
+            </div>
+            <div className="strategy-badges">
+              <span className="meta-pill">{run.lane}</span>
+              <span className="meta-pill subtle">{run.strategy_version}</span>
+              {run.reference_id ? (
+                <span className="meta-pill subtle">{run.reference_id}</span>
+              ) : null}
+            </div>
+            <p className="run-note">
+              {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
+            </p>
+            <p className="run-note">
+              Started {formatTimestamp(run.started_at)}
+              {run.ended_at ? ` / Ended ${formatTimestamp(run.ended_at)}` : ""}
+            </p>
+          </article>
+        ))}
+      </div>
+      <div className="comparison-table-wrap">
+        <table className="comparison-table">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              {comparison.runs.map((run) => (
+                <th key={run.run_id}>{run.strategy_name ?? run.strategy_id}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.metric_rows.map((metricRow) => (
+              <tr key={metricRow.key}>
+                <th>{metricRow.label}</th>
+                {comparison.runs.map((run) => (
+                  <td
+                    className={metricRow.best_run_id === run.run_id ? "comparison-best" : undefined}
+                    key={`${metricRow.key}-${run.run_id}`}
+                  >
+                    <strong>
+                      {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
+                    </strong>
+                    <span className="comparison-delta">
+                      {run.run_id === comparison.baseline_run_id
+                        ? "baseline"
+                        : formatComparisonDelta(
+                            metricRow.deltas_vs_baseline[run.run_id],
+                            metricRow.unit,
+                          )}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+            <tr>
+              <th>Notes</th>
+              {comparison.runs.map((run) => (
+                <td key={`notes-${run.run_id}`}>
+                  <p className="comparison-note-copy">{summarizeRunNotes(run.notes)}</p>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </section>
   );
 }
@@ -1211,6 +1530,27 @@ function formatMetric(value?: number, suffix = "") {
   return `${value}${suffix}`;
 }
 
+function formatComparisonMetric(value: number | null | undefined, unit: string) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+  if (unit === "pct") {
+    return `${value}%`;
+  }
+  return String(value);
+}
+
+function formatComparisonDelta(value: number | null | undefined, unit: string) {
+  if (value === null || value === undefined) {
+    return "delta n/a";
+  }
+  const prefix = value > 0 ? "+" : "";
+  if (unit === "pct") {
+    return `${prefix}${value}% vs baseline`;
+  }
+  return `${prefix}${value} vs baseline`;
+}
+
 function formatLaneLabel(runtime: string) {
   switch (runtime) {
     case "freqtrade_reference":
@@ -1253,6 +1593,16 @@ function formatParameterValue(value: unknown): string {
     return JSON.stringify(value);
   }
   return String(value);
+}
+
+function summarizeRunNotes(notes: string[]) {
+  if (!notes.length) {
+    return "No notes recorded.";
+  }
+  if (notes.length === 1) {
+    return notes[0];
+  }
+  return `${notes[0]} | Final: ${notes[notes.length - 1]} | ${notes.length} notes`;
 }
 
 function formatTimestamp(value?: string | null) {

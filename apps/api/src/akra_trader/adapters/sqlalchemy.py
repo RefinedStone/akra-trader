@@ -69,6 +69,20 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       return None
     return self._adapter.validate_python(row["payload"])
 
+  def compare_runs(self, run_ids: list[str]) -> list[RunRecord]:
+    if not run_ids:
+      return []
+    statement = select(run_records.c.run_id, run_records.c.payload).where(
+      run_records.c.run_id.in_(run_ids)
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    run_map = {
+      row["run_id"]: self._adapter.validate_python(row["payload"])
+      for row in rows
+    }
+    return [run_map[run_id] for run_id in run_ids if run_id in run_map]
+
   def list_runs(
     self,
     mode: str | None = None,

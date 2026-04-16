@@ -95,6 +95,8 @@ class RunRepositoryPort(Protocol):
 
   def get_run(self, run_id: str) -> RunRecord | None: ...
 
+  def compare_runs(self, run_ids: list[str]) -> list[RunRecord]: ...
+
   def list_runs(
     self,
     mode: str | None = None,

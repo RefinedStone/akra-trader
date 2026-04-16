@@ -242,6 +242,54 @@ def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
   assert filtered[0].config.strategy_version == "1.0.0"
 
 
+def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = build_references()
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=references,
+    runs=runs,
+    freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+  )
+
+  native_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  reference_run = app.run_backtest(
+    strategy_id="nfi_x7_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  comparison = app.compare_runs(run_ids=[native_run.config.run_id, reference_run.config.run_id])
+
+  assert comparison.baseline_run_id == native_run.config.run_id
+  assert [run.lane for run in comparison.runs] == ["native", "reference"]
+  assert comparison.runs[1].reference_id == "nostalgia-for-infinity"
+  metric_rows = {row.key: row for row in comparison.metric_rows}
+  assert set(metric_rows) == {
+    "total_return_pct",
+    "max_drawdown_pct",
+    "win_rate_pct",
+    "trade_count",
+  }
+  assert metric_rows["total_return_pct"].values[native_run.config.run_id] == native_run.metrics["total_return_pct"]
+  assert reference_run.config.run_id in metric_rows["trade_count"].values
+  assert comparison.runs[1].notes
+
+
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(

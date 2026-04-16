@@ -4,8 +4,12 @@ from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC
 from datetime import datetime
+from numbers import Number
 from uuid import uuid4
 
+from akra_trader.domain.models import RunComparison
+from akra_trader.domain.models import RunComparisonMetricRow
+from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
@@ -30,6 +34,14 @@ from akra_trader.runtime import ExecutionEngine
 from akra_trader.runtime import ExecutionModeService
 from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
+
+
+COMPARISON_METRICS: tuple[tuple[str, str, str, bool], ...] = (
+  ("total_return_pct", "Total return", "pct", True),
+  ("max_drawdown_pct", "Max drawdown", "pct", False),
+  ("win_rate_pct", "Win rate", "pct", True),
+  ("trade_count", "Trades", "count", True),
+)
 
 
 class TradingApplication:
@@ -96,6 +108,36 @@ class TradingApplication:
 
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get_run(run_id)
+
+  def compare_runs(self, *, run_ids: list[str]) -> RunComparison:
+    normalized_run_ids = _normalize_run_ids(run_ids)
+    if len(normalized_run_ids) < 2:
+      raise ValueError("Run comparison requires at least two unique run IDs.")
+
+    runs = self._runs.compare_runs(normalized_run_ids)
+    run_by_id = {run.config.run_id: run for run in runs}
+    missing_run_ids = [run_id for run_id in normalized_run_ids if run_id not in run_by_id]
+    if missing_run_ids:
+      raise LookupError(f"Run not found: {', '.join(missing_run_ids)}")
+
+    ordered_runs = [run_by_id[run_id] for run_id in normalized_run_ids]
+    baseline_run = ordered_runs[0]
+    return RunComparison(
+      requested_run_ids=tuple(normalized_run_ids),
+      baseline_run_id=baseline_run.config.run_id,
+      runs=tuple(_serialize_comparison_run(run) for run in ordered_runs),
+      metric_rows=tuple(
+        _build_comparison_metric_row(
+          runs=ordered_runs,
+          baseline_run=baseline_run,
+          key=key,
+          label=label,
+          unit=unit,
+          higher_is_better=higher_is_better,
+        )
+        for key, label, unit, higher_is_better in COMPARISON_METRICS
+      ),
+    )
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
@@ -377,3 +419,109 @@ def serialize_strategy(strategy: StrategyMetadata) -> dict:
   payload["supported_timeframes"] = list(strategy.supported_timeframes)
   payload["version_lineage"] = list(strategy.version_lineage or (strategy.version,))
   return payload
+
+
+def serialize_run_comparison(comparison: RunComparison) -> dict:
+  payload = asdict(comparison)
+  payload["requested_run_ids"] = list(comparison.requested_run_ids)
+  payload["runs"] = [
+    {
+      **run_payload,
+      "symbols": list(run.symbols),
+      "notes": list(run.notes),
+    }
+    for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
+  ]
+  return payload
+
+
+def _normalize_run_ids(run_ids: list[str]) -> list[str]:
+  normalized_run_ids: list[str] = []
+  seen_run_ids: set[str] = set()
+  for run_id in run_ids:
+    if run_id in seen_run_ids:
+      continue
+    seen_run_ids.add(run_id)
+    normalized_run_ids.append(run_id)
+  return normalized_run_ids
+
+
+def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
+  return RunComparisonRun(
+    run_id=run.config.run_id,
+    mode=run.config.mode.value,
+    status=run.status.value,
+    lane=run.provenance.lane,
+    strategy_id=run.config.strategy_id,
+    strategy_name=run.provenance.strategy.name if run.provenance.strategy is not None else None,
+    strategy_version=run.config.strategy_version,
+    symbols=run.config.symbols,
+    timeframe=run.config.timeframe,
+    started_at=run.started_at,
+    ended_at=run.ended_at,
+    reference_id=run.provenance.reference_id,
+    reference_version=run.provenance.reference_version,
+    metrics=deepcopy(run.metrics),
+    notes=tuple(run.notes),
+  )
+
+
+def _build_comparison_metric_row(
+  *,
+  runs: list[RunRecord],
+  baseline_run: RunRecord,
+  key: str,
+  label: str,
+  unit: str,
+  higher_is_better: bool,
+) -> RunComparisonMetricRow:
+  baseline_value = _coerce_metric_value(baseline_run.metrics.get(key))
+  values = {
+    run.config.run_id: _coerce_metric_value(run.metrics.get(key))
+    for run in runs
+  }
+  deltas_vs_baseline = {
+    run_id: _calculate_metric_delta(value, baseline_value)
+    for run_id, value in values.items()
+  }
+  comparable_values = {
+    run_id: value
+    for run_id, value in values.items()
+    if value is not None
+  }
+  best_run_id: str | None = None
+  if comparable_values:
+    best_run_id = (
+      max(comparable_values, key=comparable_values.get)
+      if higher_is_better
+      else min(comparable_values, key=comparable_values.get)
+    )
+  return RunComparisonMetricRow(
+    key=key,
+    label=label,
+    unit=unit,
+    higher_is_better=higher_is_better,
+    values=values,
+    deltas_vs_baseline=deltas_vs_baseline,
+    best_run_id=best_run_id,
+  )
+
+
+def _coerce_metric_value(value: object) -> float | int | None:
+  if isinstance(value, bool) or not isinstance(value, Number):
+    return None
+  if isinstance(value, int):
+    return value
+  return round(float(value), 2)
+
+
+def _calculate_metric_delta(
+  value: float | int | None,
+  baseline_value: float | int | None,
+) -> float | int | None:
+  if value is None or baseline_value is None:
+    return None
+  delta = value - baseline_value
+  if isinstance(value, int) and isinstance(baseline_value, int):
+    return int(delta)
+  return round(float(delta), 2)

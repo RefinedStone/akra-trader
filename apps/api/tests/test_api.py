@@ -203,3 +203,51 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   assert len(payload) == 1
   assert payload[0]["config"]["strategy_id"] == "ma_cross_v1"
   assert payload[0]["config"]["strategy_version"] == "1.0.0"
+
+
+def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  native_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert native_response.status_code == 200
+  native_run_id = native_response.json()["config"]["run_id"]
+
+  reference_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "nfi_x7_reference",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert reference_response.status_code == 200
+  reference_run_id = reference_response.json()["config"]["run_id"]
+
+  comparison_response = client.get(
+    f"/api/runs/compare?run_id={native_run_id}&run_id={reference_run_id}"
+  )
+
+  assert comparison_response.status_code == 200
+  payload = comparison_response.json()
+  assert payload["baseline_run_id"] == native_run_id
+  assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
+  assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"
+  metric_rows = {row["key"]: row for row in payload["metric_rows"]}
+  assert metric_rows["total_return_pct"]["values"][native_run_id] is not None
+  assert reference_run_id in metric_rows["trade_count"]["values"]
+  assert payload["runs"][1]["notes"]

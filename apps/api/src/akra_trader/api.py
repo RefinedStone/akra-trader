@@ -8,10 +8,12 @@ from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import FastAPI
 from fastapi import HTTPException
+from fastapi import Query
 from pydantic import BaseModel
 from pydantic import Field
 
 from akra_trader.application import TradingApplication
+from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_strategy
 from akra_trader.bootstrap import Container
@@ -103,6 +105,19 @@ def create_router(container: Container) -> APIRouter:
         strategy_version=strategy_version,
       )
     ]
+
+  @router.get("/runs/compare")
+  def compare_runs(
+    run_id: list[str] = Query(default_factory=list),
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      comparison = app.compare_runs(run_ids=run_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_run_comparison(comparison)
 
   @router.post("/runs/backtests")
   def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:

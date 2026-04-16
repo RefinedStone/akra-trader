@@ -152,6 +152,9 @@ class InMemoryRunRepository(RunRepositoryPort):
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get(run_id)
 
+  def compare_runs(self, run_ids: list[str]) -> list[RunRecord]:
+    return [run for run_id in run_ids if (run := self._runs.get(run_id)) is not None]
+
   def list_runs(
     self,
     mode: str | None = None,

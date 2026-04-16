@@ -317,6 +317,44 @@ class RunRecord:
 
 
 @dataclass(frozen=True)
+class RunComparisonRun:
+  run_id: str
+  mode: str
+  status: str
+  lane: str
+  strategy_id: str
+  strategy_name: str | None
+  strategy_version: str
+  symbols: tuple[str, ...]
+  timeframe: str
+  started_at: datetime
+  ended_at: datetime | None = None
+  reference_id: str | None = None
+  reference_version: str | None = None
+  metrics: dict[str, Any] = field(default_factory=dict)
+  notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class RunComparisonMetricRow:
+  key: str
+  label: str
+  unit: str
+  higher_is_better: bool | None = None
+  values: dict[str, float | int | None] = field(default_factory=dict)
+  deltas_vs_baseline: dict[str, float | int | None] = field(default_factory=dict)
+  best_run_id: str | None = None
+
+
+@dataclass(frozen=True)
+class RunComparison:
+  requested_run_ids: tuple[str, ...]
+  baseline_run_id: str
+  runs: tuple[RunComparisonRun, ...]
+  metric_rows: tuple[RunComparisonMetricRow, ...]
+
+
+@dataclass(frozen=True)
 class InstrumentStatus:
   instrument_id: str
   timeframe: str
