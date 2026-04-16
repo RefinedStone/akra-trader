@@ -31,8 +31,11 @@ type Strategy = {
 type ReferenceSource = {
   reference_id: string;
   title: string;
+  kind?: string;
+  homepage?: string;
   license: string;
   integration_mode: string;
+  local_path?: string | null;
   runtime?: string | null;
   summary: string;
 };
@@ -55,7 +58,10 @@ type Run = {
     reference_id?: string | null;
     reference_version?: string | null;
     integration_mode?: string | null;
+    reference?: ReferenceSource | null;
+    working_directory?: string | null;
     external_command: string[];
+    artifact_paths: string[];
     strategy?: {
       strategy_id: string;
       name: string;
@@ -133,6 +139,11 @@ type RunComparison = {
     ended_at?: string | null;
     reference_id?: string | null;
     reference_version?: string | null;
+    integration_mode?: string | null;
+    reference?: ReferenceSource | null;
+    working_directory?: string | null;
+    external_command: string[];
+    artifact_paths: string[];
     metrics: Record<string, number>;
     notes: string[];
   }[];
@@ -1250,8 +1261,14 @@ function RunSection({
                   ? `Reference ${run.provenance.reference_id} (${run.provenance.reference_version ?? "unknown"})`
                   : run.notes[0] ?? "No notes recorded."}
               </p>
-              {run.provenance.external_command.length ? (
-                <p className="run-note">{run.provenance.external_command.join(" ")}</p>
+              {run.provenance.reference ? (
+                <ReferenceRunProvenanceSummary
+                  artifactPaths={run.provenance.artifact_paths}
+                  externalCommand={run.provenance.external_command}
+                  reference={run.provenance.reference}
+                  referenceVersion={run.provenance.reference_version}
+                  workingDirectory={run.provenance.working_directory}
+                />
               ) : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
@@ -1376,6 +1393,15 @@ function RunComparisonPanel({
               Started {formatTimestamp(run.started_at)}
               {run.ended_at ? ` / Ended ${formatTimestamp(run.ended_at)}` : ""}
             </p>
+            {run.reference ? (
+              <ReferenceRunProvenanceSummary
+                artifactPaths={run.artifact_paths}
+                externalCommand={run.external_command}
+                reference={run.reference}
+                referenceVersion={run.reference_version}
+                workingDirectory={run.working_directory}
+              />
+            ) : null}
           </article>
         ))}
       </div>
@@ -1423,6 +1449,42 @@ function RunComparisonPanel({
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
+  );
+}
+
+function ReferenceRunProvenanceSummary({
+  artifactPaths,
+  externalCommand,
+  reference,
+  referenceVersion,
+  workingDirectory,
+}: {
+  artifactPaths: string[];
+  externalCommand: string[];
+  reference: ReferenceSource;
+  referenceVersion?: string | null;
+  workingDirectory?: string | null;
+}) {
+  return (
+    <section className="reference-provenance">
+      <div className="reference-provenance-head">
+        <span>Reference provenance</span>
+        <strong>{reference.integration_mode}</strong>
+      </div>
+      <div className="reference-provenance-grid">
+        <Metric label="Reference" value={reference.title} />
+        <Metric label="License" value={reference.license} />
+        <Metric label="Version" value={referenceVersion ?? "unknown"} />
+        <Metric label="Runtime" value={reference.runtime ?? "n/a"} />
+      </div>
+      <div className="reference-provenance-copy">
+        <p>ID: {reference.reference_id}</p>
+        {reference.homepage ? <p>Homepage: {reference.homepage}</p> : null}
+        {workingDirectory ? <p>Working dir: {workingDirectory}</p> : null}
+        <p>Artifacts: {artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}</p>
+        {externalCommand.length ? <p>Command: {externalCommand.join(" ")}</p> : null}
       </div>
     </section>
   );

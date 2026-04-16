@@ -4,11 +4,13 @@ from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
 from pathlib import Path
+import os
 import shutil
 import subprocess
 
 from akra_trader.adapters.references import ReferenceCatalog
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -22,6 +24,8 @@ class PreparedCommand:
   reference_id: str
   reference_version: str | None
   integration_mode: str
+  reference: ReferenceSource
+  artifact_roots: tuple[str, ...]
 
 
 class FreqtradeReferenceAdapter:
@@ -59,6 +63,8 @@ class FreqtradeReferenceAdapter:
       reference_id=reference.reference_id,
       reference_version=self._resolve_reference_version(working_directory, metadata.version),
       integration_mode=reference.integration_mode,
+      reference=reference,
+      artifact_roots=self._default_artifact_roots(working_directory),
     )
 
   def execute_backtest(self, run: RunRecord, metadata: StrategyMetadata) -> RunRecord:
@@ -79,8 +85,10 @@ class FreqtradeReferenceAdapter:
     run.provenance.reference_id = prepared.reference_id
     run.provenance.reference_version = prepared.reference_version
     run.provenance.integration_mode = prepared.integration_mode
+    run.provenance.reference = prepared.reference
     run.provenance.working_directory = prepared.working_directory
     run.provenance.external_command = tuple(prepared.command)
+    run.provenance.artifact_paths = prepared.artifact_roots
     run.provenance.market_data = MarketDataLineage(
       provider="freqtrade_reference",
       venue=run.config.venue,
@@ -92,12 +100,17 @@ class FreqtradeReferenceAdapter:
     )
     run.provenance.market_data_by_symbol = market_data_by_symbol
     run.notes.append(f"Prepared NFI reference command: {' '.join(prepared.command)}")
+    existing_artifacts = self._collect_artifacts(prepared.artifact_roots)
 
     if shutil.which("freqtrade") is None:
       run.status = RunStatus.FAILED
       run.notes.append(
         "freqtrade runtime was not found in PATH. Install freqtrade and the NFI "
         "dependencies to execute this reference strategy."
+      )
+      run.notes.append(
+        "Reference artifacts would be written under: "
+        + ", ".join(prepared.artifact_roots)
       )
       return run
 
@@ -112,9 +125,49 @@ class FreqtradeReferenceAdapter:
     run.notes.append(process.stdout.strip())
     if process.stderr.strip():
       run.notes.append(process.stderr.strip())
+    run.provenance.artifact_paths = self._resolve_artifact_paths(
+      artifact_roots=prepared.artifact_roots,
+      existing_artifacts=existing_artifacts,
+    )
     run.status = RunStatus.COMPLETED if process.returncode == 0 else RunStatus.FAILED
     run.ended_at = datetime.now(UTC)
     return run
+
+  @staticmethod
+  def _default_artifact_roots(reference_root: Path) -> tuple[str, ...]:
+    return (
+      str(reference_root / "user_data" / "backtest_results"),
+      str(reference_root / "user_data" / "logs"),
+    )
+
+  @staticmethod
+  def _collect_artifacts(artifact_roots: tuple[str, ...]) -> set[str]:
+    artifacts: set[str] = set()
+    for artifact_root in artifact_roots:
+      root = Path(artifact_root)
+      if not root.exists():
+        continue
+      for current_root, _, filenames in os.walk(root):
+        for filename in filenames:
+          if filename == ".gitkeep":
+            continue
+          artifacts.add(str(Path(current_root) / filename))
+    return artifacts
+
+  def _resolve_artifact_paths(
+    self,
+    *,
+    artifact_roots: tuple[str, ...],
+    existing_artifacts: set[str],
+  ) -> tuple[str, ...]:
+    collected_artifacts = self._collect_artifacts(artifact_roots)
+    new_artifacts = sorted(collected_artifacts - existing_artifacts)
+    if new_artifacts:
+      return tuple(new_artifacts)
+    persisted_roots = [artifact_root for artifact_root in artifact_roots if Path(artifact_root).exists()]
+    if persisted_roots:
+      return tuple(persisted_roots)
+    return artifact_roots
 
   @staticmethod
   def _resolve_reference_version(reference_root: Path, fallback: str | None) -> str | None:

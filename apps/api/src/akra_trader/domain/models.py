@@ -292,6 +292,7 @@ class RunProvenance:
   reference_id: str | None = None
   reference_version: str | None = None
   integration_mode: str | None = None
+  reference: ReferenceSource | None = None
   working_directory: str | None = None
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
@@ -331,6 +332,11 @@ class RunComparisonRun:
   ended_at: datetime | None = None
   reference_id: str | None = None
   reference_version: str | None = None
+  integration_mode: str | None = None
+  reference: ReferenceSource | None = None
+  working_directory: str | None = None
+  external_command: tuple[str, ...] = ()
+  artifact_paths: tuple[str, ...] = ()
   metrics: dict[str, Any] = field(default_factory=dict)
   notes: tuple[str, ...] = ()
 

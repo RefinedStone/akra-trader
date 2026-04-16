@@ -578,6 +578,50 @@ select {
   line-height: 1.5;
 }
 
+.reference-provenance {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(88, 217, 255, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(88, 217, 255, 0.05), rgba(88, 217, 255, 0.01)),
+    rgba(255, 255, 255, 0.02);
+}
+
+.reference-provenance-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.reference-provenance-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reference-provenance-copy {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.reference-provenance-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-strategy {
   margin: 14px 0;
   padding: 16px;
@@ -710,6 +754,7 @@ select {
   .run-list,
   .run-form,
   .run-metrics,
+  .reference-provenance-grid,
   .run-lineage-grid,
   .run-strategy-grid,
   .run-lineage-symbol-grid {

@@ -428,6 +428,8 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
     {
       **run_payload,
       "symbols": list(run.symbols),
+      "external_command": list(run.external_command),
+      "artifact_paths": list(run.artifact_paths),
       "notes": list(run.notes),
     }
     for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
@@ -461,6 +463,11 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     ended_at=run.ended_at,
     reference_id=run.provenance.reference_id,
     reference_version=run.provenance.reference_version,
+    integration_mode=run.provenance.integration_mode,
+    reference=deepcopy(run.provenance.reference),
+    working_directory=run.provenance.working_directory,
+    external_command=tuple(run.provenance.external_command),
+    artifact_paths=tuple(run.provenance.artifact_paths),
     metrics=deepcopy(run.metrics),
     notes=tuple(run.notes),
   )

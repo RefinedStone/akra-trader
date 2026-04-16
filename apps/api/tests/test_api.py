@@ -247,6 +247,9 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["baseline_run_id"] == native_run_id
   assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
   assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"
+  assert payload["runs"][1]["integration_mode"] == "external_runtime"
+  assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"
+  assert payload["runs"][1]["artifact_paths"]
   metric_rows = {row["key"]: row for row in payload["metric_rows"]}
   assert metric_rows["total_return_pct"]["values"][native_run_id] is not None
   assert reference_run_id in metric_rows["trade_count"]["values"]

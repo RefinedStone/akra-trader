@@ -35,3 +35,7 @@ def test_reference_adapter_builds_nfi_command() -> None:
   assert "--strategy=NostalgiaForInfinityX7" in prepared.command
   assert prepared.working_directory.endswith("reference/NostalgiaForInfinity")
   assert prepared.reference_id == "nostalgia-for-infinity"
+  assert prepared.reference.title == "NostalgiaForInfinity"
+  assert prepared.integration_mode == "external_runtime"
+  assert any(path.endswith("user_data/backtest_results") for path in prepared.artifact_roots)
+  assert any(path.endswith("user_data/logs") for path in prepared.artifact_roots)

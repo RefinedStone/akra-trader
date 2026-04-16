@@ -162,7 +162,13 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert run.provenance.strategy.parameter_snapshot.requested == {}
   assert run.provenance.strategy.parameter_snapshot.resolved == {}
   assert run.provenance.reference_id == "nostalgia-for-infinity"
+  assert run.provenance.reference is not None
+  assert run.provenance.reference.title == "NostalgiaForInfinity"
+  assert run.provenance.reference.integration_mode == "external_runtime"
+  assert run.provenance.integration_mode == "external_runtime"
+  assert run.provenance.working_directory.endswith("reference/NostalgiaForInfinity")
   assert run.provenance.external_command
+  assert any(path.endswith("user_data/backtest_results") for path in run.provenance.artifact_paths)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
   assert run.provenance.market_data.sync_status == "delegated"
@@ -278,6 +284,9 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.baseline_run_id == native_run.config.run_id
   assert [run.lane for run in comparison.runs] == ["native", "reference"]
   assert comparison.runs[1].reference_id == "nostalgia-for-infinity"
+  assert comparison.runs[1].reference is not None
+  assert comparison.runs[1].reference.integration_mode == "external_runtime"
+  assert comparison.runs[1].artifact_paths
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
     "total_return_pct",
