@@ -962,20 +962,56 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-grouped-settings",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Group tooltip preset conflict rows by setting type",
-      "description": "Organize the inline tooltip preset conflict preview into meaningful groups such as timing-related versus threshold-related settings so imported preset differences are easier to scan as coherent tuning clusters instead of one flat parameter list.",
-      "status": "ready",
+      "title": "Tooltip preset conflict rows now grouped by setting type",
+      "description": "Completed the conflict-preview grouping follow-up by organizing preset comparison rows into explicit setting categories such as hover timing, sweep detection, row sweep, column sweep directions, and speed scaling, while preserving the existing changed-first flow within each category and adding section headers for both immediately visible changed rows and toggle-revealed unchanged rows.",
+      "status": "done",
       "base_priority": 79,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply said nothing essential remains from the completed diff-cue task and explicitly identified grouping related settings, such as hover timing versus sweep thresholds versus speed scaling, as the likeliest next refinement, making it the clearest executable queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the grouped conflict-preview refinement in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `8e991a1` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:20:00Z",
+      "updated_at": "2026-04-17T08:30:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-preview-diff-first"
       ],
       "direction_relation_note": "Extends the reference-lane conflict-preview usability work by restructuring tooltip preset parameters into operator-meaningful groups once the most immediate diff visibility refinement is in place."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-group-diff-summaries",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add group-level diff summaries to tooltip preset conflict categories",
+      "description": "Summarize each grouped conflict-preview section with compact diff counts or highlights so operators can see which setting categories changed most and jump straight to the most affected tooltip tuning cluster before inspecting individual rows.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains from the completed grouped-settings task and explicitly called out group-level diff summaries as a likely next refinement so operators can jump straight to the most affected setting category, making this the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:30:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-grouped-settings"
+      ],
+      "direction_relation_note": "Builds directly on the completed grouped conflict preview by adding section-level scanning cues that help operators prioritize the most materially changed tooltip tuning categories first."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-collapse-unchanged-groups",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Collapse unchanged tooltip conflict groups by default",
+      "description": "Keep grouped conflict-preview sections that contain only unchanged values collapsed by default so operators can focus on categories with real preset differences, while still allowing full group expansion when they need to inspect unchanged settings.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply explicitly identified collapsing whole unchanged groups by default as a plausible next refinement, but the summary-first improvement is the more direct queue-head follow-up now that setting categories already exist.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:30:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-grouped-settings"
+      ],
+      "direction_relation_note": "Extends the grouped tooltip conflict-preview flow by reducing noise at the category level once preset values are already organized into scan-friendly setting sections."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
