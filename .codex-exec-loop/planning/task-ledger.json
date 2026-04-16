@@ -981,14 +981,14 @@
       "id": "planning-reference-lanes-tooltip-import-conflict-group-diff-summaries",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Add group-level diff summaries to tooltip preset conflict categories",
-      "description": "Summarize each grouped conflict-preview section with compact diff counts or highlights so operators can see which setting categories changed most and jump straight to the most affected tooltip tuning cluster before inspecting individual rows.",
-      "status": "ready",
+      "description": "Completed the grouped-summary follow-up by adding compact category header summaries for tooltip preset conflict groups, surfacing changed counts plus higher/lower or match breakdowns where relevant across both immediately visible changed categories and unchanged categories revealed by the global toggle, and updating the grouped header styling for readable two-part labels.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains from the completed grouped-settings task and explicitly called out group-level diff summaries as a likely next refinement so operators can jump straight to the most affected setting category, making this the clearest executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the group-level diff summary refinement in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `6ee0bca` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:30:00Z",
+      "updated_at": "2026-04-17T08:45:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-grouped-settings"
@@ -998,20 +998,20 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-collapse-unchanged-groups",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Collapse unchanged tooltip conflict groups by default",
-      "description": "Keep grouped conflict-preview sections that contain only unchanged values collapsed by default so operators can focus on categories with real preset differences, while still allowing full group expansion when they need to inspect unchanged settings.",
-      "status": "proposed",
-      "base_priority": 78,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply explicitly identified collapsing whole unchanged groups by default as a plausible next refinement, but the summary-first improvement is the more direct queue-head follow-up now that setting categories already exist.",
+      "title": "Add per-category collapse controls for large unchanged tooltip conflict groups",
+      "description": "Introduce category-level collapse controls in the tooltip preset conflict preview so large unchanged setting groups can stay hidden independently of the global unchanged toggle, preserving group summaries while letting operators expand only the unchanged categories they want to inspect.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains from the completed group-summary task and explicitly called out category-level collapse controls for large unchanged groups as the likely next refinement, so this existing follow-up should become the next executable queue head.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:30:00Z",
+      "updated_at": "2026-04-17T08:45:00Z",
       "source_turn_id": null,
       "depends_on": [
-        "planning-reference-lanes-tooltip-import-conflict-grouped-settings"
+        "planning-reference-lanes-tooltip-import-conflict-group-diff-summaries"
       ],
-      "direction_relation_note": "Extends the grouped tooltip conflict-preview flow by reducing noise at the category level once preset values are already organized into scan-friendly setting sections."
+      "direction_relation_note": "Builds on the completed grouped-summary conflict preview by letting operators keep large unchanged categories collapsed independently, reducing noise without losing the category-level context added by the new summaries."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
