@@ -238,7 +238,6 @@ const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansio
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
-const COMPARISON_TOOLTIP_RELATIVE_TIME_REFRESH_MS = 15 * 1000;
 
 type ControlRoomUiStateV1 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
@@ -3035,6 +3034,15 @@ function ComparisonTooltipTuningPanel({
     conflictSessionKey,
     savedConflictSessionSummaryNowMs,
   );
+  const savedConflictSessionSummaryUpdatedAtTimestamps = Object.values(
+    conflictSessionUiStateMap,
+  ).reduce<number[]>((timestamps, session) => {
+    const timestamp = parseComparisonTooltipConflictSessionUpdatedAt(session.updated_at);
+    if (timestamp) {
+      timestamps.push(timestamp);
+    }
+    return timestamps;
+  }, []);
   const visibleSavedConflictSessionSummaries = savedConflictSessionSummaries.slice(
     0,
     MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES,
@@ -3046,9 +3054,11 @@ function ComparisonTooltipTuningPanel({
   const displayedSavedConflictSessionSummaries = showAllSavedConflictSessionSummaries
     ? savedConflictSessionSummaries
     : visibleSavedConflictSessionSummaries;
-  const hasTimestampedSavedConflictSessions = savedConflictSessionSummaries.some((summary) =>
-    summary.sessions.some((session) => Boolean(session.updated_at)),
-  );
+  const savedConflictSessionSummaryRefreshMs =
+    getComparisonTooltipConflictSessionRelativeTimeRefreshMs(
+      savedConflictSessionSummaryUpdatedAtTimestamps,
+      savedConflictSessionSummaryNowMs,
+    );
   const showUnchangedConflictRows =
     currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
   const collapsedUnchangedConflictGroups =
@@ -3084,16 +3094,15 @@ function ComparisonTooltipTuningPanel({
   }, [isConfirmingResetAllConflictViews]);
 
   useEffect(() => {
-    if (!isConfirmingResetAllConflictViews || !hasTimestampedSavedConflictSessions) {
+    if (!isConfirmingResetAllConflictViews || !savedConflictSessionSummaryRefreshMs) {
       return;
     }
-    setSavedConflictSessionSummaryNowMs(Date.now());
-    const intervalId = window.setInterval(
+    const timeoutId = window.setTimeout(
       () => setSavedConflictSessionSummaryNowMs(Date.now()),
-      COMPARISON_TOOLTIP_RELATIVE_TIME_REFRESH_MS,
+      savedConflictSessionSummaryRefreshMs,
     );
-    return () => window.clearInterval(intervalId);
-  }, [hasTimestampedSavedConflictSessions, isConfirmingResetAllConflictViews]);
+    return () => window.clearTimeout(timeoutId);
+  }, [isConfirmingResetAllConflictViews, savedConflictSessionSummaryRefreshMs]);
 
   const updateCurrentConflictSessionUiState = (
     updater: (
@@ -4412,6 +4421,43 @@ function formatComparisonTooltipConflictSessionRelativeTime(
     return formatRelative(Math.round(elapsedMs / monthMs), "month");
   }
   return formatRelative(Math.round(elapsedMs / yearMs), "year");
+}
+
+function getComparisonTooltipConflictSessionRelativeTimeRefreshMs(
+  timestamps: number[],
+  referenceNowMs: number,
+) {
+  if (!timestamps.length) {
+    return null;
+  }
+
+  const youngestAgeMs = timestamps.reduce((youngest, timestamp) => {
+    const ageMs = Math.abs(referenceNowMs - timestamp);
+    return Math.min(youngest, ageMs);
+  }, Number.POSITIVE_INFINITY);
+
+  const minuteMs = 60 * 1000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+  const weekMs = 7 * dayMs;
+  const monthMs = 30 * dayMs;
+
+  if (youngestAgeMs < minuteMs) {
+    return 5 * 1000;
+  }
+  if (youngestAgeMs < hourMs) {
+    return minuteMs;
+  }
+  if (youngestAgeMs < dayMs) {
+    return 5 * minuteMs;
+  }
+  if (youngestAgeMs < weekMs) {
+    return hourMs;
+  }
+  if (youngestAgeMs < monthMs) {
+    return 6 * hourMs;
+  }
+  return dayMs;
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {
