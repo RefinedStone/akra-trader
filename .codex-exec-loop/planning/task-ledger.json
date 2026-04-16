@@ -205,20 +205,38 @@
     {
       "id": "planning-control-room-binance-gap-window-expand-state-pruning",
       "direction_id": "control-room-and-ops",
-      "title": "Prune stale persisted Binance gap-window expansion keys",
-      "description": "Clean up obsolete `localStorage` entries for persisted gap-window expand/collapse state when the tracked Binance instrument or timeframe set changes, so refresh-safe row persistence does not accumulate dead keys over time.",
-      "status": "ready",
+      "title": "Stale persisted Binance gap-window expansion keys are pruned",
+      "description": "Completed the stale-key cleanup follow-up by filtering persisted Binance gap-window expand/collapse state against the current ops payload so removed or no-longer-rolled-up rows are dropped from `localStorage` during market-data status refreshes instead of accumulating obsolete keys.",
+      "status": "done",
       "base_priority": 81,
-      "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply marked refresh persistence complete and directly identified stale saved row-key pruning as the next reasonable follow-up, making it the clearest executable successor for auto-advance.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the stale-key pruning work in `apps/web`, verified it with `npm run typecheck` and `npm run build`, and committed the change as `a53a1a9` (`feat(ops): prune stale gap row state`).",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:10:00Z",
+      "updated_at": "2026-04-17T00:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-gap-window-expand-state-persistence"
       ],
       "direction_relation_note": "Keeps the control-room gap-window persistence trustworthy over time by ensuring operator-facing refresh state stays aligned with the currently tracked Binance rows."
+    },
+    {
+      "id": "planning-control-room-ui-state-storage-versioning",
+      "direction_id": "control-room-and-ops",
+      "title": "Version persisted control-room UI state before storage scope grows",
+      "description": "Introduce an explicit versioned wrapper for persisted control-room UI state so the current gap-window expansion map can evolve safely when more operator preferences share the same browser storage area, including migration or reset behavior for older payloads.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply marked stale-key pruning complete and directly called out storage versioning as the next reasonable follow-up if control-room preferences keep accumulating in the same persistence area, making it the clearest executable successor now that the prior queue head is done.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-gap-window-expand-state-pruning"
+      ],
+      "direction_relation_note": "Keeps control-room persistence maintainable as more operator-facing UI preferences become durable, so future state additions do not strand incompatible browser payloads."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
