@@ -11,6 +11,7 @@ class Settings:
   cors_origin: str = os.getenv("AKRA_TRADER_CORS_ORIGIN", "http://localhost:5173")
   market_data_provider: str = os.getenv("AKRA_TRADER_MARKET_DATA_PROVIDER", "seeded")
   default_quote_currency: str = os.getenv("AKRA_TRADER_DEFAULT_QUOTE", "USDT")
+  runs_database_url: str | None = os.getenv("AKRA_TRADER_RUNS_DATABASE_URL") or None
 
 
 def load_settings() -> Settings:

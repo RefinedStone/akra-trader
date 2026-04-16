@@ -185,10 +185,11 @@ class TradingApplication:
     )
 
   def stop_sandbox_run(self, run_id: str) -> RunRecord | None:
-    run = self._runs.update_status(run_id, RunStatus.STOPPED)
-    if run is not None:
-      self._run_supervisor.stop(run, reason="Sandbox run stopped by operator.")
-    return run
+    run = self._runs.get_run(run_id)
+    if run is None:
+      return None
+    self._run_supervisor.stop(run, reason="Sandbox run stopped by operator.")
+    return self._runs.save_run(run)
 
   def stop_paper_run(self, run_id: str) -> RunRecord | None:
     return self.stop_sandbox_run(run_id)

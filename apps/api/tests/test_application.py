@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
-from akra_trader.adapters.in_memory import InMemoryRunRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
+from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
 from akra_trader.domain.models import RunStatus
 
@@ -16,12 +16,17 @@ def build_references():
   return load_reference_catalog(repo_root / "reference" / "catalog.toml")
 
 
-def test_backtest_creates_completed_run_with_metrics() -> None:
+def build_runs_repository(tmp_path: Path) -> SqlAlchemyRunRepository:
+  return SqlAlchemyRunRepository(f"sqlite:///{tmp_path / 'runs.sqlite3'}")
+
+
+def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
-    runs=InMemoryRunRepository(),
+    runs=runs,
   )
 
   run = app.run_backtest(
@@ -39,13 +44,19 @@ def test_backtest_creates_completed_run_with_metrics() -> None:
   assert "total_return_pct" in run.metrics
   assert run.config.strategy_id == "ma_cross_v1"
 
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+  assert reloaded is not None
+  assert reloaded.status == RunStatus.COMPLETED
+  assert reloaded.metrics == run.metrics
 
-def test_sandbox_run_is_created_as_running() -> None:
+
+def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
-    runs=InMemoryRunRepository(),
+    runs=runs,
   )
 
   run = app.start_sandbox_run(
@@ -63,15 +74,55 @@ def test_sandbox_run_is_created_as_running() -> None:
   assert run.config.mode.value == "sandbox"
   assert run.notes
 
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+  assert reloaded is not None
+  assert reloaded.status == RunStatus.RUNNING
+  assert reloaded.notes == run.notes
 
-def test_reference_backtest_records_external_provenance() -> None:
+
+def test_stop_sandbox_run_persists_terminal_state(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  stopped = app.stop_sandbox_run(run.config.run_id)
+
+  assert stopped is not None
+  assert stopped.status == RunStatus.STOPPED
+  assert stopped.ended_at is not None
+  assert stopped.notes[-1] == "Sandbox run stopped by operator."
+
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+  assert reloaded is not None
+  assert reloaded.status == RunStatus.STOPPED
+  assert reloaded.ended_at is not None
+  assert reloaded.notes[-1] == "Sandbox run stopped by operator."
+
+
+def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   repo_root = Path(__file__).resolve().parents[3]
   references = build_references()
+  runs = build_runs_repository(tmp_path)
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=references,
-    runs=InMemoryRunRepository(),
+    runs=runs,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
   )
 
