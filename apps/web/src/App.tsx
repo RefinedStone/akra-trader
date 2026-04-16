@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
 
 type ParameterSchema = Record<
   string,
@@ -233,6 +233,15 @@ type RunHistoryFilter = {
 
 type ComparisonIntent = "benchmark_validation" | "execution_regression" | "strategy_tuning";
 type ComparisonCueKind = "mode" | "baseline" | "best" | "insight";
+type ComparisonTooltipTargetProps = {
+  "aria-describedby"?: string;
+  "data-tooltip-visible": "true" | "false";
+  onBlur: () => void;
+  onFocus: () => void;
+  onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
+  onMouseEnter: () => void;
+  onMouseLeave: () => void;
+};
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -1418,11 +1427,67 @@ function RunComparisonPanel({
   }
 
   const [primaryNarrative, ...secondaryNarratives] = comparison.narratives;
+  const tooltipScopeId = sanitizeComparisonTooltipId(useId());
+  const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
+  const [dismissedTooltipId, setDismissedTooltipId] = useState<string | null>(null);
   const intentClassName = getComparisonIntentClassName(comparison.intent);
   const intentTooltip = formatComparisonIntentTooltip(comparison.intent);
   const baselineTooltip = formatComparisonCueTooltip(comparison.intent, "baseline");
   const bestTooltip = formatComparisonCueTooltip(comparison.intent, "best");
   const insightTooltip = formatComparisonCueTooltip(comparison.intent, "insight");
+  const intentChipTooltipId = buildComparisonTooltipId(tooltipScopeId, "intent-chip");
+  const legendModeTooltipId = buildComparisonTooltipId(tooltipScopeId, "legend-mode");
+  const legendBaselineTooltipId = buildComparisonTooltipId(tooltipScopeId, "legend-baseline");
+  const legendBestTooltipId = buildComparisonTooltipId(tooltipScopeId, "legend-best");
+  const legendInsightTooltipId = buildComparisonTooltipId(tooltipScopeId, "legend-insight");
+  const baselineRunTooltipId = buildComparisonTooltipId(
+    tooltipScopeId,
+    "baseline-run",
+    comparison.baseline_run_id,
+  );
+  const topInsightTooltipId = buildComparisonTooltipId(tooltipScopeId, "top-insight");
+  const featuredNarrativeTooltipId = primaryNarrative
+    ? buildComparisonTooltipId(tooltipScopeId, "featured-narrative", primaryNarrative.run_id)
+    : undefined;
+
+  const showComparisonTooltip = (tooltipId: string) => {
+    setDismissedTooltipId((current) => (current === tooltipId ? null : current));
+    setActiveTooltipId(tooltipId);
+  };
+
+  const hideComparisonTooltip = (tooltipId: string) => {
+    setActiveTooltipId((current) => (current === tooltipId ? null : current));
+    setDismissedTooltipId((current) => (current === tooltipId ? null : current));
+  };
+
+  const dismissComparisonTooltip = (tooltipId: string) => {
+    setActiveTooltipId((current) => (current === tooltipId ? null : current));
+    setDismissedTooltipId(tooltipId);
+  };
+
+  const getComparisonTooltipTargetProps = (
+    tooltipId?: string,
+  ): ComparisonTooltipTargetProps | undefined => {
+    if (!tooltipId) {
+      return undefined;
+    }
+
+    return {
+      "aria-describedby": dismissedTooltipId === tooltipId ? undefined : tooltipId,
+      "data-tooltip-visible":
+        activeTooltipId === tooltipId && dismissedTooltipId !== tooltipId ? "true" : "false",
+      onBlur: () => hideComparisonTooltip(tooltipId),
+      onFocus: () => showComparisonTooltip(tooltipId),
+      onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+        if (event.key === "Escape") {
+          dismissComparisonTooltip(tooltipId);
+          event.stopPropagation();
+        }
+      },
+      onMouseEnter: () => showComparisonTooltip(tooltipId),
+      onMouseLeave: () => hideComparisonTooltip(tooltipId),
+    };
+  };
 
   return (
     <section className={`comparison-panel ${intentClassName}`}>
@@ -1438,51 +1503,51 @@ function RunComparisonPanel({
           <span>Baseline: {comparison.baseline_run_id}</span>
           <span
             className="comparison-intent-chip comparison-cue comparison-tooltip"
-            data-tooltip={intentTooltip}
-            title={intentTooltip}
             tabIndex={0}
+            {...getComparisonTooltipTargetProps(intentChipTooltipId)}
           >
             <span aria-hidden="true" className="comparison-intent-icon" />
             <span>{formatComparisonIntentLabel(comparison.intent)}</span>
+            <ComparisonTooltipBubble id={intentChipTooltipId} text={intentTooltip} />
           </span>
         </p>
       </div>
       <div aria-label="Comparison legend" className="comparison-legend">
         <span
           className="comparison-legend-item comparison-legend-item-mode comparison-cue comparison-tooltip"
-          data-tooltip={intentTooltip}
-          title={intentTooltip}
           tabIndex={0}
+          {...getComparisonTooltipTargetProps(legendModeTooltipId)}
         >
           <span aria-hidden="true" className="comparison-intent-icon" />
           <span>{formatComparisonIntentLegend(comparison.intent)}</span>
+          <ComparisonTooltipBubble id={legendModeTooltipId} text={intentTooltip} />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
-          data-tooltip={baselineTooltip}
-          title={baselineTooltip}
           tabIndex={0}
+          {...getComparisonTooltipTargetProps(legendBaselineTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch baseline" />
           <span>Baseline run</span>
+          <ComparisonTooltipBubble id={legendBaselineTooltipId} text={baselineTooltip} />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
-          data-tooltip={bestTooltip}
-          title={bestTooltip}
           tabIndex={0}
+          {...getComparisonTooltipTargetProps(legendBestTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch best" />
           <span>Best metric</span>
+          <ComparisonTooltipBubble id={legendBestTooltipId} text={bestTooltip} />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
-          data-tooltip={insightTooltip}
-          title={insightTooltip}
           tabIndex={0}
+          {...getComparisonTooltipTargetProps(legendInsightTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch insight" />
           <span>Top insight</span>
+          <ComparisonTooltipBubble id={legendInsightTooltipId} text={insightTooltip} />
         </span>
       </div>
       <div className="comparison-run-grid">
@@ -1494,9 +1559,10 @@ function RunComparisonPanel({
                 : ""
             }`}
             key={run.run_id}
-            data-tooltip={run.run_id === comparison.baseline_run_id ? baselineTooltip : undefined}
             tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
-            title={run.run_id === comparison.baseline_run_id ? baselineTooltip : undefined}
+            {...(run.run_id === comparison.baseline_run_id
+              ? getComparisonTooltipTargetProps(baselineRunTooltipId)
+              : {})}
           >
             <div className="comparison-run-head">
               <strong>{run.strategy_name ?? run.strategy_id}</strong>
@@ -1526,6 +1592,9 @@ function RunComparisonPanel({
                 workingDirectory={run.working_directory}
               />
             ) : null}
+            {run.run_id === comparison.baseline_run_id ? (
+              <ComparisonTooltipBubble id={baselineRunTooltipId} text={baselineTooltip} />
+            ) : null}
           </article>
         ))}
       </div>
@@ -1533,17 +1602,23 @@ function RunComparisonPanel({
         <div className="comparison-top-story">
           <p
             className="kicker comparison-top-kicker comparison-cue comparison-tooltip"
-            data-tooltip={insightTooltip}
-            title={insightTooltip}
             tabIndex={0}
+            {...getComparisonTooltipTargetProps(topInsightTooltipId)}
           >
             <span aria-hidden="true" className="comparison-legend-swatch insight" />
             <span>Top insight / {formatComparisonIntentLabel(comparison.intent)}</span>
+            <ComparisonTooltipBubble id={topInsightTooltipId} text={insightTooltip} />
           </p>
           <ComparisonNarrativeCard
             comparison={comparison}
             featured
             narrative={primaryNarrative}
+            tooltipId={featuredNarrativeTooltipId}
+            tooltipTargetProps={
+              featuredNarrativeTooltipId
+                ? getComparisonTooltipTargetProps(featuredNarrativeTooltipId)
+                : undefined
+            }
             tooltip={insightTooltip}
           />
         </div>
@@ -1582,6 +1657,9 @@ function RunComparisonPanel({
                       run.run_id === comparison.baseline_run_id,
                       metricRow.best_run_id === run.run_id,
                     ) || undefined;
+                  const cellTooltipId = cellTooltip
+                    ? buildComparisonTooltipId(tooltipScopeId, "metric", metricRow.key, run.run_id)
+                    : undefined;
                   const cellClassName =
                     [
                       metricRow.best_run_id === run.run_id ? "comparison-best" : "",
@@ -1594,10 +1672,9 @@ function RunComparisonPanel({
                   return (
                     <td
                       className={cellClassName}
-                      data-tooltip={cellTooltip}
                       key={`${metricRow.key}-${run.run_id}`}
                       tabIndex={cellTooltip ? 0 : undefined}
-                      title={cellTooltip}
+                      {...(cellTooltipId ? getComparisonTooltipTargetProps(cellTooltipId) : {})}
                     >
                       <strong>
                         {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
@@ -1610,6 +1687,9 @@ function RunComparisonPanel({
                               metricRow.unit,
                             )}
                       </span>
+                      {cellTooltipId && cellTooltip ? (
+                        <ComparisonTooltipBubble id={cellTooltipId} text={cellTooltip} />
+                      ) : null}
                     </td>
                   );
                 })}
@@ -1634,11 +1714,15 @@ function ComparisonNarrativeCard({
   comparison,
   narrative,
   featured = false,
+  tooltipId,
+  tooltipTargetProps,
   tooltip,
 }: {
   comparison: RunComparison;
   narrative: RunComparison["narratives"][number];
   featured?: boolean;
+  tooltipId?: string;
+  tooltipTargetProps?: ComparisonTooltipTargetProps;
   tooltip?: string;
 }) {
   const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
@@ -1649,9 +1733,8 @@ function ComparisonNarrativeCard({
       className={`comparison-story-card ${
         featured ? "featured comparison-cue-card comparison-tooltip" : ""
       }`}
-      data-tooltip={tooltip}
       tabIndex={tooltip ? 0 : undefined}
-      title={tooltip}
+      {...tooltipTargetProps}
     >
       <div className="comparison-story-head">
         <span>{formatComparisonNarrativeLabel(narrative.comparison_type)}</span>
@@ -1670,8 +1753,25 @@ function ComparisonNarrativeCard({
           ))}
         </ul>
       ) : null}
+      {tooltipId && tooltip ? <ComparisonTooltipBubble id={tooltipId} text={tooltip} /> : null}
     </article>
   );
+}
+
+function ComparisonTooltipBubble({ id, text }: { id: string; text: string }) {
+  return (
+    <span className="comparison-tooltip-bubble" id={id} role="tooltip">
+      {text}
+    </span>
+  );
+}
+
+function sanitizeComparisonTooltipId(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]+/g, "-");
+}
+
+function buildComparisonTooltipId(baseId: string, ...parts: Array<string | null | undefined>) {
+  return sanitizeComparisonTooltipId([baseId, ...parts].filter(Boolean).join("-"));
 }
 
 function ReferenceRunProvenanceSummary({

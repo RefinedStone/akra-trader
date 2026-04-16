@@ -572,31 +572,12 @@ select {
   outline-offset: -2px;
 }
 
-.comparison-tooltip::before,
-.comparison-tooltip::after {
+.comparison-tooltip-bubble {
+  left: 0;
+  top: calc(100% + 10px);
   position: absolute;
   opacity: 0;
   pointer-events: none;
-  transition:
-    opacity 140ms ease,
-    transform 140ms ease;
-  z-index: 3;
-}
-
-.comparison-tooltip::before {
-  content: "";
-  left: 18px;
-  top: calc(100% + 4px);
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 6px solid rgba(8, 14, 23, 0.96);
-  transform: translateY(-4px);
-}
-
-.comparison-tooltip::after {
-  content: attr(data-tooltip);
-  left: 0;
-  top: calc(100% + 10px);
   width: max-content;
   max-width: min(280px, calc(100vw - 72px));
   padding: 10px 12px;
@@ -614,12 +595,23 @@ select {
   text-transform: none;
   white-space: normal;
   transform: translateY(-4px);
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
+  z-index: 3;
 }
 
-.comparison-tooltip:hover::before,
-.comparison-tooltip:hover::after,
-.comparison-tooltip:focus-visible::before,
-.comparison-tooltip:focus-visible::after {
+.comparison-tooltip-bubble::before {
+  content: "";
+  left: 18px;
+  top: -6px;
+  position: absolute;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 6px solid rgba(8, 14, 23, 0.96);
+}
+
+.comparison-tooltip[data-tooltip-visible="true"] > .comparison-tooltip-bubble {
   opacity: 1;
   transform: translateY(0);
 }
