@@ -855,6 +855,24 @@ select {
   padding: 10px 14px;
 }
 
+.comparison-dev-conflict-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 193, 94, 0.22);
+  background: rgba(84, 57, 14, 0.14);
+}
+
+.comparison-dev-conflict-title {
+  margin: 0;
+  color: rgba(255, 222, 165, 0.94);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .comparison-dev-feedback {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);

@@ -306,6 +306,12 @@ type ComparisonTooltipPresetImportResolution = {
   renamed: boolean;
   overwritten: boolean;
 };
+type ComparisonTooltipPendingPresetImportConflict = {
+  imported_preset_name: string;
+  proposed_preset_name: string;
+  raw: string;
+  tuning: ComparisonTooltipTuning;
+};
 type ComparisonTooltipTuningShareImport =
   | {
       kind: "bundle";
@@ -1571,10 +1577,8 @@ function RunComparisonPanel({
   >({});
   const [selectedTooltipPresetName, setSelectedTooltipPresetName] = useState("");
   const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
-  const [tooltipPresetImportConflictPolicy, setTooltipPresetImportConflictPolicy] =
-    useState<ComparisonTooltipPresetImportConflictPolicy>(
-      DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY,
-    );
+  const [pendingTooltipPresetImportConflict, setPendingTooltipPresetImportConflict] =
+    useState<ComparisonTooltipPendingPresetImportConflict | null>(null);
   const [tooltipShareDraft, setTooltipShareDraft] = useState("");
   const [tooltipShareFeedback, setTooltipShareFeedback] = useState<string | null>(null);
   const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
@@ -1646,6 +1650,64 @@ function RunComparisonPanel({
     const nextSelectedPresetName = state.selected_preset_name ?? "";
     setSelectedTooltipPresetName(nextSelectedPresetName);
     setTooltipPresetDraftName(nextSelectedPresetName);
+    setPendingTooltipPresetImportConflict(null);
+  };
+
+  const updateTooltipShareDraft = (value: string) => {
+    setTooltipShareDraft(value);
+    setPendingTooltipPresetImportConflict(null);
+  };
+
+  const applySingleTooltipPresetImport = (
+    importedPresetName: string,
+    tuning: ComparisonTooltipTuning,
+    options?: {
+      policy?: ComparisonTooltipPresetImportConflictPolicy;
+      renamedPresetName?: string;
+      verb?: "Imported" | "Loaded";
+    },
+  ) => {
+    const mergedPreset = mergeComparisonTooltipSinglePresetIntoState(
+      createTooltipTuningPresetState(),
+      importedPresetName,
+      tuning,
+      options?.policy ?? "overwrite",
+      options?.renamedPresetName,
+    );
+    applyTooltipTuningPresetState(mergedPreset.state);
+    setTooltipShareDraft(
+      JSON.stringify(
+        createComparisonTooltipTuningSinglePresetShare(
+          mergedPreset.resolution.final_preset_name,
+          tuning,
+        ),
+        null,
+        2,
+      ),
+    );
+    setTooltipShareFeedback(
+      formatComparisonTooltipPresetImportFeedback(mergedPreset.resolution, {
+        verb: options?.verb,
+      }),
+    );
+  };
+
+  const beginPendingTooltipPresetImportConflict = (
+    importedShare: Extract<ComparisonTooltipTuningShareImport, { kind: "preset" }>,
+  ) => {
+    setPendingTooltipPresetImportConflict({
+      imported_preset_name: importedShare.preset_name,
+      proposed_preset_name: createAvailableComparisonTooltipPresetName(
+        tooltipTuningPresets,
+        importedShare.preset_name,
+      ),
+      raw: importedShare.raw,
+      tuning: importedShare.tuning,
+    });
+    setTooltipShareDraft(importedShare.raw);
+    setTooltipShareFeedback(
+      `Preset "${importedShare.preset_name}" already exists. Choose rename, overwrite, or skip.`,
+    );
   };
 
   const updateTooltipTuning = (
@@ -1661,6 +1723,7 @@ function RunComparisonPanel({
       [key]: nextValue,
     }));
     setSelectedTooltipPresetName("");
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const exportTooltipPresetBundle = () => {
@@ -1669,6 +1732,7 @@ function RunComparisonPanel({
     setTooltipShareFeedback(
       `Exported current tuning with ${Object.keys(nextState.presets).length} saved preset(s).`,
     );
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const exportSelectedTooltipPreset = () => {
@@ -1682,6 +1746,7 @@ function RunComparisonPanel({
     );
     setTooltipShareDraft(JSON.stringify(presetShare, null, 2));
     setTooltipShareFeedback(`Exported preset "${selectedTooltipPresetName}".`);
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const importTooltipPresetBundle = () => {
@@ -1700,24 +1765,66 @@ function RunComparisonPanel({
       );
       return;
     }
-    const mergedPreset = mergeComparisonTooltipSinglePresetIntoState(
-      createTooltipTuningPresetState(),
-      importedShare.preset_name,
-      importedShare.tuning,
-      tooltipPresetImportConflictPolicy,
+    if (tooltipTuningPresets[importedShare.preset_name]) {
+      beginPendingTooltipPresetImportConflict(importedShare);
+      return;
+    }
+    applySingleTooltipPresetImport(importedShare.preset_name, importedShare.tuning, {
+      policy: "overwrite",
+    });
+  };
+
+  const updatePendingTooltipPresetImportName = (value: string) => {
+    setPendingTooltipPresetImportConflict((current) =>
+      current
+        ? {
+            ...current,
+            proposed_preset_name: value,
+          }
+        : current,
     );
-    applyTooltipTuningPresetState(mergedPreset.state);
-    setTooltipShareDraft(
-      JSON.stringify(
-        createComparisonTooltipTuningSinglePresetShare(
-          mergedPreset.resolution.final_preset_name,
-          importedShare.tuning,
-        ),
-        null,
-        2,
-      ),
+  };
+
+  const resolvePendingTooltipPresetImportConflict = (
+    action: "overwrite" | "rename" | "skip",
+  ) => {
+    if (!pendingTooltipPresetImportConflict) {
+      return;
+    }
+    if (action === "skip") {
+      setPendingTooltipPresetImportConflict(null);
+      setTooltipShareFeedback(
+        `Skipped importing preset "${pendingTooltipPresetImportConflict.imported_preset_name}".`,
+      );
+      return;
+    }
+    if (action === "overwrite") {
+      applySingleTooltipPresetImport(
+        pendingTooltipPresetImportConflict.imported_preset_name,
+        pendingTooltipPresetImportConflict.tuning,
+        { policy: "overwrite" },
+      );
+      return;
+    }
+    const renamedPresetName = pendingTooltipPresetImportConflict.proposed_preset_name.trim();
+    if (!renamedPresetName) {
+      setTooltipShareFeedback("Enter a new preset name before importing with rename.");
+      return;
+    }
+    if (tooltipTuningPresets[renamedPresetName]) {
+      setTooltipShareFeedback(
+        `Preset "${renamedPresetName}" already exists. Choose a different rename target.`,
+      );
+      return;
+    }
+    applySingleTooltipPresetImport(
+      pendingTooltipPresetImportConflict.imported_preset_name,
+      pendingTooltipPresetImportConflict.tuning,
+      {
+        policy: "rename",
+        renamedPresetName,
+      },
     );
-    setTooltipShareFeedback(formatComparisonTooltipPresetImportFeedback(mergedPreset.resolution));
   };
 
   const copyTooltipShareUrl = async () => {
@@ -1763,6 +1870,7 @@ function RunComparisonPanel({
     }));
     setSelectedTooltipPresetName(presetName);
     setTooltipPresetDraftName(presetName);
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const loadTooltipPreset = (presetName: string) => {
@@ -1777,6 +1885,7 @@ function RunComparisonPanel({
     setTooltipTuning({ ...preset });
     setSelectedTooltipPresetName(presetName);
     setTooltipPresetDraftName(presetName);
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const deleteTooltipPreset = () => {
@@ -1790,11 +1899,13 @@ function RunComparisonPanel({
     });
     setSelectedTooltipPresetName("");
     setTooltipPresetDraftName("");
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const resetTooltipTuning = () => {
     setTooltipTuning(DEFAULT_COMPARISON_TOOLTIP_TUNING);
     setSelectedTooltipPresetName("");
+    setPendingTooltipPresetImportConflict(null);
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -2117,8 +2228,8 @@ function RunComparisonPanel({
         setTooltipShareDraft(sharedImport.raw);
         setTooltipShareFeedback(
           sharedImport.kind === "bundle"
-          ? "Loaded tooltip tuning presets from the share URL."
-          : `Loaded preset "${sharedImport.preset_name}" from the share URL.`,
+            ? "Loaded tooltip tuning presets from the share URL."
+            : `Loaded preset "${sharedImport.preset_name}" from the share URL.`,
         );
       }
     }
@@ -2312,9 +2423,9 @@ function RunComparisonPanel({
       </div>
       {SHOW_COMPARISON_TOOLTIP_TUNING_PANEL ? (
         <ComparisonTooltipTuningPanel
+          onChangePendingPresetImportName={updatePendingTooltipPresetImportName}
           onChangePresetDraftName={setTooltipPresetDraftName}
-          onChangePresetImportConflictPolicy={setTooltipPresetImportConflictPolicy}
-          onChangeShareDraft={setTooltipShareDraft}
+          onChangeShareDraft={updateTooltipShareDraft}
           onChangeValue={updateTooltipTuning}
           onCopyShareUrl={copyTooltipShareUrl}
           onCopySelectedPresetShareUrl={copySelectedTooltipPresetShareUrl}
@@ -2323,14 +2434,15 @@ function RunComparisonPanel({
           onExportSelectedPresetJson={exportSelectedTooltipPreset}
           onImportJson={importTooltipPresetBundle}
           onLoadPreset={loadTooltipPreset}
+          onResolvePendingPresetImportConflict={resolvePendingTooltipPresetImportConflict}
           onReset={resetTooltipTuning}
           onSavePreset={saveTooltipPreset}
+          pendingPresetImportConflict={pendingTooltipPresetImportConflict}
           presetDraftName={tooltipPresetDraftName}
           presets={tooltipTuningPresets}
           shareDraft={tooltipShareDraft}
           shareFeedback={tooltipShareFeedback}
           shareUrl={tooltipShareUrl}
-          presetImportConflictPolicy={tooltipPresetImportConflictPolicy}
           selectedPresetShareUrl={selectedTooltipPresetShareUrl}
           selectedPresetName={selectedTooltipPresetName}
           tuning={tooltipTuning}
@@ -2636,7 +2748,7 @@ const ComparisonTooltipBubble = forwardRef<
 });
 
 function ComparisonTooltipTuningPanel({
-  presetImportConflictPolicy,
+  pendingPresetImportConflict,
   presetDraftName,
   presets,
   shareDraft,
@@ -2644,7 +2756,7 @@ function ComparisonTooltipTuningPanel({
   shareUrl,
   selectedPresetShareUrl,
   selectedPresetName,
-  onChangePresetImportConflictPolicy,
+  onChangePendingPresetImportName,
   onChangePresetDraftName,
   onChangeShareDraft,
   tuning,
@@ -2656,10 +2768,11 @@ function ComparisonTooltipTuningPanel({
   onExportSelectedPresetJson,
   onImportJson,
   onLoadPreset,
+  onResolvePendingPresetImportConflict,
   onReset,
   onSavePreset,
 }: {
-  presetImportConflictPolicy: ComparisonTooltipPresetImportConflictPolicy;
+  pendingPresetImportConflict: ComparisonTooltipPendingPresetImportConflict | null;
   presetDraftName: string;
   presets: Record<string, ComparisonTooltipTuning>;
   shareDraft: string;
@@ -2667,9 +2780,7 @@ function ComparisonTooltipTuningPanel({
   shareUrl: string;
   selectedPresetShareUrl: string;
   selectedPresetName: string;
-  onChangePresetImportConflictPolicy: (
-    value: ComparisonTooltipPresetImportConflictPolicy,
-  ) => void;
+  onChangePendingPresetImportName: (value: string) => void;
   onChangePresetDraftName: (value: string) => void;
   onChangeShareDraft: (value: string) => void;
   tuning: ComparisonTooltipTuning;
@@ -2681,6 +2792,7 @@ function ComparisonTooltipTuningPanel({
   onExportSelectedPresetJson: () => void;
   onImportJson: () => void;
   onLoadPreset: (name: string) => void;
+  onResolvePendingPresetImportConflict: (action: "overwrite" | "rename" | "skip") => void;
   onReset: () => void;
   onSavePreset: () => void;
 }) {
@@ -2752,20 +2864,6 @@ function ComparisonTooltipTuningPanel({
             value={selectedPresetShareUrl}
           />
         </label>
-        <label className="comparison-dev-field comparison-dev-import-policy-field">
-          <span>Single preset conflict</span>
-          <select
-            onChange={(event) =>
-              onChangePresetImportConflictPolicy(
-                event.target.value as ComparisonTooltipPresetImportConflictPolicy,
-              )
-            }
-            value={presetImportConflictPolicy}
-          >
-            <option value="rename">Rename imported preset</option>
-            <option value="overwrite">Overwrite existing preset</option>
-          </select>
-        </label>
         <div className="comparison-dev-actions comparison-dev-actions-inline">
           <button
             className="ghost-button comparison-dev-reset"
@@ -2814,6 +2912,48 @@ function ComparisonTooltipTuningPanel({
             value={shareDraft}
           />
         </label>
+        {pendingPresetImportConflict ? (
+          <div className="comparison-dev-conflict-card">
+            <p className="comparison-dev-conflict-title">
+              Preset name collision: {pendingPresetImportConflict.imported_preset_name}
+            </p>
+            <p className="comparison-dev-feedback">
+              A preset with that name already exists. Rename the import, overwrite the local
+              preset, or skip this import.
+            </p>
+            <label className="comparison-dev-field">
+              <span>Renamed preset</span>
+              <input
+                onChange={(event) => onChangePendingPresetImportName(event.target.value)}
+                type="text"
+                value={pendingPresetImportConflict.proposed_preset_name}
+              />
+            </label>
+            <div className="comparison-dev-actions comparison-dev-actions-inline">
+              <button
+                className="ghost-button comparison-dev-reset"
+                onClick={() => onResolvePendingPresetImportConflict("rename")}
+                type="button"
+              >
+                Rename and import
+              </button>
+              <button
+                className="ghost-button comparison-dev-reset"
+                onClick={() => onResolvePendingPresetImportConflict("overwrite")}
+                type="button"
+              >
+                Overwrite existing
+              </button>
+              <button
+                className="ghost-button comparison-dev-reset"
+                onClick={() => onResolvePendingPresetImportConflict("skip")}
+                type="button"
+              >
+                Skip import
+              </button>
+            </div>
+          </div>
+        ) : null}
         {shareFeedback ? <p className="comparison-dev-feedback">{shareFeedback}</p> : null}
       </div>
       <div className="comparison-dev-grid">
@@ -3192,15 +3332,22 @@ function mergeComparisonTooltipSinglePresetIntoState(
   presetName: string,
   tuning: ComparisonTooltipTuning,
   presetImportConflictPolicy: ComparisonTooltipPresetImportConflictPolicy,
+  renamedPresetName?: string,
 ): {
   resolution: ComparisonTooltipPresetImportResolution;
   state: ComparisonTooltipTuningPresetStateV1;
 } {
   const importedPresetName = presetName.trim();
   const conflicted = Boolean(baseState.presets[importedPresetName]);
+  const requestedPresetName =
+    presetImportConflictPolicy === "rename" ? renamedPresetName?.trim() : undefined;
   const finalPresetName =
-    conflicted && presetImportConflictPolicy === "rename"
-      ? createAvailableComparisonTooltipPresetName(baseState.presets, importedPresetName)
+    presetImportConflictPolicy === "rename"
+      ? requestedPresetName && requestedPresetName !== importedPresetName
+        ? requestedPresetName
+        : conflicted
+          ? createAvailableComparisonTooltipPresetName(baseState.presets, importedPresetName)
+          : importedPresetName
       : importedPresetName;
 
   return {
