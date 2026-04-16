@@ -6,9 +6,11 @@ Accepted
 
 ## Context
 
-The current platform stores runs in memory and uses seeded data for the native demo flow. That is sufficient for proving architecture, but it is insufficient for research credibility.
+The current platform still relies on in-memory run storage and seeded market data for the native demo
+flow. That is sufficient for proving architecture, but it is insufficient for research credibility.
 
-Backtests, paper runs, and future live sessions must all be explainable after the fact.
+Backtests, sandbox runs, reference-runtime runs, and future live sessions must all be explainable after
+the fact.
 
 ## Decision
 
@@ -22,6 +24,7 @@ At run creation time, the platform must persist:
 - venue, symbol set, timeframe, and execution mode
 - dataset lineage or candle source metadata
 - fee and slippage settings
+- execution provenance such as reference id, external command, and artifact paths when applicable
 - resulting metrics and operator notes
 
 Run storage will move behind a persistent repository adapter, with Postgres as the default implementation target.
@@ -33,6 +36,7 @@ Positive:
 - research comparisons become credible
 - regressions can be diagnosed after restart
 - live actions can share the same audit-oriented storage model
+- external runtime delegation remains auditable instead of being a hidden subprocess detail
 
 Negative:
 
@@ -43,4 +47,6 @@ Negative:
 
 - reproducibility metadata is captured on creation, not inferred later
 - any future result export feature should point back to one canonical stored run record
-- paper and live runs should use the same persistence model with different execution-mode flags
+- sandbox and live runs should use the same persistence model with different execution-mode flags
+- native and reference lanes should share one run record model with provenance extensions instead of
+  separate storage shapes

@@ -19,7 +19,7 @@ The main weaknesses are:
 
 - in-memory persistence
 - seeded data instead of venue-backed ingestion
-- replay-only paper execution
+- replay-only sandbox execution
 - no long-running worker model
 - no live execution adapter or safety controls
 - no structured experiment metadata beyond the current run record
@@ -107,12 +107,12 @@ The main weaknesses are:
 
 ### Target state
 
-- backtest, paper, and live modes share the same orchestration and state transition model
+- backtest, sandbox, and live modes share the same orchestration and state transition model
 - differences between modes are adapter-level, not domain-level
 
 ### Milestones
 
-- move from replay-only paper mode to long-running worker execution
+- move from replay-only sandbox mode to long-running worker execution
 - add market stream or timed polling infrastructure
 - add order state machine support for real exchange responses
 - add exchange reconciliation on startup and after failures
@@ -125,7 +125,7 @@ The main weaknesses are:
 
 ### Technical decisions to preserve
 
-- live trading must use the same decision envelope and risk checks as paper mode
+- live trading must use the same decision envelope and risk checks as sandbox mode
 - operators can always force a safe stop
 
 ## Track E: Safety, Observability, and Operations
@@ -157,7 +157,7 @@ The main weaknesses are:
 At the end of the roadmap, the codebase should meet these technical checks:
 
 - no core user flow depends on in-memory-only state
-- real market data powers backtest, paper, and live lanes
+- real market data powers backtest, sandbox, and live lanes
 - native, reference, and decision-engine strategies all fit the same strategy contract
 - one exchange supports a guarded live path with reconciliation and auditability
 - operational health and recent failures are visible through the platform UI and API

@@ -33,8 +33,8 @@ The epic backlog answers:
 As of the current baseline, the codebase provides:
 
 - a FastAPI backend with hexagonal boundaries
-- a native backtest and paper replay demo engine
-- a strategy contract split into `feature frame -> decision context -> decision envelope`
+- a native backtest and sandbox replay demo engine
+- a strategy contract split into `feature frame -> decision context -> signal policy -> execution policy -> decision envelope`
 - direct NostalgiaForInfinity reference cataloging and delegated Freqtrade backtest execution
 - a lightweight React control room
 

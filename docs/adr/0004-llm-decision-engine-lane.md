@@ -16,7 +16,7 @@ The platform will not allow direct provider-specific logic to leak into domain o
 
 Initial rollout rules:
 
-- allowed in backtest and paper modes
+- allowed in backtest and sandbox modes
 - recorded with prompt/version/response metadata
 - paired with deterministic fallback or operator review path
 - not promoted to unattended live trading until replay and audit criteria are met
@@ -38,3 +38,5 @@ Negative:
 - prompt templates should be versioned like strategy code
 - decision traces should be stored as part of experiment history
 - any live usage should start in operator-reviewed mode
+- LLM decisions must still flow through the shared risk and execution pipeline rather than a provider-
+  specific shortcut

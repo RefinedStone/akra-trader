@@ -23,7 +23,7 @@ Dependencies:
 
 Acceptance criteria:
 
-- backtest and paper runs survive process restart
+- backtest and sandbox runs survive process restart
 - run config, metrics, orders, fills, positions, and notes are persisted
 - API endpoints continue to work without semantic regression
 
@@ -39,7 +39,7 @@ Goal:
 
 Why now:
 
-- all meaningful backtesting and paper execution depends on real venue data
+- all meaningful backtesting and sandbox execution depends on real venue data
 
 Dependencies:
 
@@ -101,7 +101,7 @@ Acceptance criteria:
 - comparison includes total return, drawdown, win rate, trade count, and notes
 - NFI reference runs appear as a separate runtime lane
 
-## Epic 5: Continuous Paper Execution Worker
+## Epic 5: Continuous Sandbox Execution Worker
 
 Priority:
 
@@ -109,11 +109,11 @@ Priority:
 
 Goal:
 
-- convert the current replay-based paper mode into a continuous real-time worker system
+- convert the current replay-based sandbox mode into a continuous real-time worker system
 
 Why now:
 
-- paper mode is the bridge between research and guarded live trading
+- sandbox mode is the bridge between research and guarded live trading
 
 Dependencies:
 
@@ -122,7 +122,7 @@ Dependencies:
 
 Acceptance criteria:
 
-- paper workers can start, stop, recover, and report heartbeat
+- sandbox workers can start, stop, recover, and report heartbeat
 - positions, orders, fills, and recent decisions are visible in the UI
 - stale data and worker failure trigger alerts
 
@@ -142,7 +142,7 @@ Why now:
 
 Dependencies:
 
-- continuous paper worker
+- continuous sandbox worker
 - secrets management
 - account synchronization
 
@@ -160,7 +160,7 @@ Priority:
 
 Goal:
 
-- make live and paper operation restart-safe and diagnosable
+- make live and sandbox operation restart-safe and diagnosable
 
 Why now:
 
@@ -200,7 +200,7 @@ Dependencies:
 Acceptance criteria:
 
 - `DecisionEnginePort` calls can be recorded with prompt and response metadata
-- LLM decisions can run in backtest and paper modes
+- LLM decisions can run in backtest and sandbox modes
 - human-review or fallback behavior exists before any live promotion
 
 ## Epic 9: Control Room Upgrade
@@ -220,7 +220,7 @@ Why now:
 Dependencies:
 
 - persistent run data
-- paper worker
+- sandbox worker
 - alerting and health data
 
 Acceptance criteria:
@@ -250,5 +250,5 @@ Dependencies:
 Acceptance criteria:
 
 - setup guide covers initial bootstrap and reference repo handling
-- operator runbook covers paper and live procedures
+- operator runbook covers sandbox and live procedures
 - incident notes cover stale data, worker crash, and exchange mismatch scenarios
