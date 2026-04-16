@@ -365,18 +365,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Upgrade reconciliation from local control-plane checks to venue-state verification",
       "description": "Add the first venue-facing guarded-live read path for balances, positions, orders, or account state, then use it to reconcile local runtime and control-plane state against real venue snapshots so live candidacy gates are backed by external truth rather than local consistency alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply explicitly lists venue-state reconciliation as the next gap after the guarded-live substrate landed, and it is the clearest executable follow-up that strengthens Gate 3 without requiring a full live order path first.",
+      "priority_reason": "Completed in main session commit 5f7b185, which added venue-state adapters, persisted internal and venue snapshots into reconciliation results, surfaced venue verification state in the control room, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-audit-and-reconciliation-substrate"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:10:00Z",
+      "updated_at": "2026-04-17T07:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Directly advances guarded-live execution by turning reconciliation into a real account-state safety check, which is a prerequisite for credible live candidacy and a safer foundation for any later live order adapter."
+      "direction_relation_note": "Closed the first venue-truth reconciliation gap for guarded-live execution by comparing local state against real venue balances and open orders, which now exposes restart recovery from venue snapshots and the eventual live write path as the remaining candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-venue-state-recovery",
+      "direction_id": "guarded-live-execution",
+      "title": "Recover guarded-live runtime state from venue snapshots after restart or fault",
+      "description": "Extend guarded-live beyond snapshot comparison so restart or fault handling can rebuild or quarantine runtime state from venue balances and open orders, letting venue verification drive safe recovery instead of ending at mismatch reporting alone.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply explicitly says venue verification still stops at snapshot comparison and does not recover live worker state after restart or fault, making venue-state recovery the clearest immediate executable follow-up before any live write path.",
+      "depends_on": [
+        "planning-guarded-live-venue-state-reconciliation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live execution from passive venue verification into recoverable operator-safe runtime behavior, which is needed before live candidacy can rely on restart handling instead of manual local repair."
     },
     {
       "id": "planning-guarded-live-live-venue-order-path",
@@ -386,15 +404,15 @@
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 2,
-      "priority_reason": "The latest main-session reply says no live venue adapter or actual live order path exists yet, but venue-state reconciliation is the safer immediate step before execution-capable write paths are promoted to the queue head.",
+      "priority_reason": "The latest main-session reply says no live venue adapter or actual live order path exists yet, but restart or fault recovery from venue state is now the safer immediate step before execution-capable write paths are promoted to the queue head.",
       "depends_on": [
-        "planning-guarded-live-venue-state-reconciliation"
+        "planning-guarded-live-venue-state-recovery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:10:00Z",
+      "updated_at": "2026-04-17T07:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Carries guarded-live execution from safety-readiness into tightly gated live write capability, but intentionally stays behind venue-state reconciliation so execution does not outrun verification."
+      "direction_relation_note": "Carries guarded-live execution from safety-readiness into tightly gated live write capability, but intentionally stays behind venue-state recovery so execution does not outrun verification and restart safety."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
