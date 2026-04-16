@@ -2195,7 +2195,7 @@ export default function App() {
                   ) : (
                     <p className="empty-state">No venue-native session lifecycle rows restored yet.</p>
                   )}
-                  <h3>Venue-native session handoff</h3>
+                  <h3>Venue-native session stream</h3>
                   <table className="data-table">
                     <tbody>
                       <tr>
@@ -2211,7 +2211,7 @@ export default function App() {
                         <td>{guardedLive.session_handoff.transport}</td>
                       </tr>
                       <tr>
-                        <th>Handed off at</th>
+                        <th>Stream started at</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.handed_off_at ?? null)}</td>
                       </tr>
                       <tr>
@@ -2223,7 +2223,7 @@ export default function App() {
                         <td>{formatTimestamp(guardedLive.session_handoff.last_event_at ?? null)}</td>
                       </tr>
                       <tr>
-                        <th>Last sync</th>
+                        <th>Last stream sync</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_sync_at ?? null)}</td>
                       </tr>
                       <tr>

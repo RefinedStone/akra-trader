@@ -1,10 +1,17 @@
 from __future__ import annotations
 
+import json
+from queue import Empty
+from queue import Queue
+import threading
 from datetime import UTC
 from datetime import datetime
 from typing import Any
 from typing import Callable
 from typing import Protocol
+from urllib import error as urllib_error
+from urllib import parse as urllib_parse
+from urllib import request as urllib_request
 
 import ccxt
 
@@ -15,6 +22,175 @@ from akra_trader.domain.models import GuardedLiveVenueSessionHandoff
 from akra_trader.domain.models import GuardedLiveVenueSessionRestore
 from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.ports import VenueExecutionPort
+
+
+class BinanceUserDataStreamSession(Protocol):
+  session_id: str
+  transport: str
+
+  def drain_events(self) -> tuple[dict[str, Any], ...]: ...
+
+  def close(self) -> None: ...
+
+
+class BinanceUserDataStreamClient(Protocol):
+  def open_session(self) -> BinanceUserDataStreamSession: ...
+
+
+class BinanceWebSocketUserDataStreamSession:
+  transport = "binance_user_data_websocket"
+
+  def __init__(
+    self,
+    *,
+    session_id: str,
+    websocket_url: str,
+    rest_base_url: str,
+    api_key: str,
+    clock: Callable[[], datetime],
+  ) -> None:
+    self.session_id = session_id
+    self._websocket_url = websocket_url.rstrip("/")
+    self._rest_base_url = rest_base_url.rstrip("/")
+    self._api_key = api_key
+    self._clock = clock
+    self._events: Queue[dict[str, Any]] = Queue()
+    self._closed = False
+    self._reader_stop = threading.Event()
+    self._last_keepalive_at = clock()
+    self._connect = self._resolve_connect()
+    self._connection = self._connect(f"{self._websocket_url}/{self.session_id}")
+    self._reader = threading.Thread(target=self._reader_loop, name=f"binance-user-stream-{session_id}", daemon=True)
+    self._reader.start()
+
+  def drain_events(self) -> tuple[dict[str, Any], ...]:
+    if self._closed:
+      return ()
+    self._maybe_keepalive()
+    events: list[dict[str, Any]] = []
+    while True:
+      try:
+        events.append(self._events.get_nowait())
+      except Empty:
+        break
+    return tuple(events)
+
+  def close(self) -> None:
+    if self._closed:
+      return
+    self._closed = True
+    self._reader_stop.set()
+    try:
+      self._connection.close()
+    except Exception:
+      pass
+    if self._reader.is_alive():
+      self._reader.join(timeout=1.0)
+    try:
+      self._request_listen_key("DELETE")
+    except Exception:
+      pass
+
+  def _reader_loop(self) -> None:
+    while not self._reader_stop.is_set():
+      try:
+        message = self._connection.recv()
+      except Exception as exc:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamError",
+            "message": str(exc),
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        return
+      if message is None:
+        return
+      try:
+        payload = json.loads(message)
+      except json.JSONDecodeError as exc:
+        self._events.put(
+          {
+            "e": "streamError",
+            "message": f"invalid_json:{exc}",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        continue
+      self._events.put(payload)
+
+  def _maybe_keepalive(self) -> None:
+    now = self._clock()
+    if (now - self._last_keepalive_at).total_seconds() < 30 * 60:
+      return
+    self._request_listen_key("PUT")
+    self._last_keepalive_at = now
+
+  def _request_listen_key(self, method: str) -> None:
+    body = urllib_parse.urlencode({"listenKey": self.session_id}).encode()
+    request = urllib_request.Request(
+      f"{self._rest_base_url}/api/v3/userDataStream",
+      data=body,
+      method=method,
+      headers={
+        "X-MBX-APIKEY": self._api_key,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+    )
+    with urllib_request.urlopen(request, timeout=10):
+      return None
+
+  @staticmethod
+  def _resolve_connect():
+    try:
+      from websockets.sync.client import connect
+    except ImportError as exc:
+      raise RuntimeError("websockets_dependency_missing") from exc
+    return connect
+
+
+class BinanceWebSocketUserDataStreamClient:
+  def __init__(
+    self,
+    *,
+    api_key: str,
+    rest_base_url: str = "https://api.binance.com",
+    websocket_url: str = "wss://stream.binance.com:9443/ws",
+    clock: Callable[[], datetime] | None = None,
+  ) -> None:
+    self._api_key = api_key
+    self._rest_base_url = rest_base_url
+    self._websocket_url = websocket_url
+    self._clock = clock or (lambda: datetime.now(UTC))
+
+  def open_session(self) -> BinanceUserDataStreamSession:
+    listen_key = self._create_listen_key()
+    return BinanceWebSocketUserDataStreamSession(
+      session_id=listen_key,
+      websocket_url=self._websocket_url,
+      rest_base_url=self._rest_base_url,
+      api_key=self._api_key,
+      clock=self._clock,
+    )
+
+  def _create_listen_key(self) -> str:
+    request = urllib_request.Request(
+      f"{self._rest_base_url.rstrip('/')}/api/v3/userDataStream",
+      data=b"",
+      method="POST",
+      headers={"X-MBX-APIKEY": self._api_key},
+    )
+    try:
+      with urllib_request.urlopen(request, timeout=10) as response:
+        payload = json.load(response)
+    except urllib_error.URLError as exc:
+      raise RuntimeError(f"binance_user_data_stream_unavailable:{exc}") from exc
+    listen_key = payload.get("listenKey")
+    if not isinstance(listen_key, str) or not listen_key:
+      raise RuntimeError("binance_user_data_stream_missing_listen_key")
+    return listen_key
 
 
 class VenueExecutionExchange(Protocol):
@@ -494,6 +670,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     api_key: str | None = None,
     api_secret: str | None = None,
     exchange: VenueExecutionExchange | None = None,
+    user_data_stream_client: BinanceUserDataStreamClient | None = None,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._venue = venue
@@ -501,13 +678,17 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self._api_secret = api_secret
     self._exchange = exchange
     self._clock = clock or (lambda: datetime.now(UTC))
+    self._user_data_stream_client = user_data_stream_client
+    self._active_stream_sessions: dict[str, BinanceUserDataStreamSession] = {}
+    self._order_states: dict[str, GuardedLiveVenueOrderResult] = {}
 
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
-    if self._exchange is not None:
-      return True, ()
-    if self._api_key and self._api_secret:
-      return True, ()
-    return False, ("binance_trade_credentials_missing",)
+    issues: list[str] = []
+    if self._exchange is None and not (self._api_key and self._api_secret):
+      issues.append("binance_trade_credentials_missing")
+    if self._resolve_stream_client() is None:
+      issues.append("binance_user_data_stream_unavailable")
+    return (len(issues) == 0), tuple(issues)
 
   def restore_session(
     self,
@@ -586,7 +767,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       state = "restored" if not issues else "partial"
     elif issues:
       state = "unavailable"
-    return GuardedLiveVenueSessionRestore(
+    restore = GuardedLiveVenueSessionRestore(
       state=state,
       restored_at=current_time,
       source="binance_exchange",
@@ -596,6 +777,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       synced_orders=tuple(synced_orders),
       issues=tuple(issues),
     )
+    self._record_restore_state(restore)
+    return restore
 
   def handoff_session(
     self,
@@ -607,18 +790,48 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> GuardedLiveVenueSessionHandoff:
     current_time = self._clock()
     restore = self.restore_session(symbol=symbol, owned_order_ids=owned_order_ids)
-    handoff_state = "active" if restore.state in {"restored", "partial", "not_found"} else "unavailable"
+    stream_client = self._resolve_stream_client()
+    if stream_client is None:
+      return GuardedLiveVenueSessionHandoff(
+        state="unavailable",
+        handed_off_at=current_time,
+        source="binance_user_data_stream",
+        venue=self._venue,
+        symbol=symbol,
+        owner_run_id=owner_run_id,
+        owner_session_id=owner_session_id,
+        transport="binance_user_data_websocket",
+        active_order_count=len(restore.open_orders),
+        issues=tuple(dict.fromkeys((*restore.issues, "binance_user_data_stream_unavailable"))),
+      )
+    try:
+      stream_session = stream_client.open_session()
+    except Exception as exc:
+      return GuardedLiveVenueSessionHandoff(
+        state="unavailable",
+        handed_off_at=current_time,
+        source="binance_user_data_stream",
+        venue=self._venue,
+        symbol=symbol,
+        owner_run_id=owner_run_id,
+        owner_session_id=owner_session_id,
+        transport="binance_user_data_websocket",
+        active_order_count=len(restore.open_orders),
+        issues=tuple(dict.fromkeys((*restore.issues, f"binance_user_data_stream_open_failed:{exc}"))),
+      )
+    session_id = stream_session.session_id
+    self._active_stream_sessions[session_id] = stream_session
     return GuardedLiveVenueSessionHandoff(
-      state=handoff_state,
+      state="active",
       handed_off_at=current_time,
-      source="binance_exchange",
+      source="binance_user_data_stream",
       venue=self._venue,
       symbol=symbol,
       owner_run_id=owner_run_id,
       owner_session_id=owner_session_id,
-      venue_session_id=f"binance-session:{symbol}:{int(current_time.timestamp())}",
-      transport="binance_rest_session",
-      cursor=current_time.isoformat(),
+      venue_session_id=session_id,
+      transport=stream_session.transport,
+      cursor="event-0",
       last_event_at=restore.restored_at,
       last_sync_at=current_time,
       active_order_count=len(restore.open_orders),
@@ -632,37 +845,77 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     order_ids: tuple[str, ...],
   ) -> GuardedLiveVenueSessionSync:
     current_time = self._clock()
-    symbol = handoff.symbol or ""
-    restore = self.restore_session(symbol=symbol, owned_order_ids=order_ids)
-    synced_orders = restore.synced_orders
-    open_orders = restore.open_orders
+    session_id = handoff.venue_session_id or ""
+    stream_session = self._active_stream_sessions.get(session_id)
+    if stream_session is None:
+      next_handoff = GuardedLiveVenueSessionHandoff(
+        state="unavailable",
+        handed_off_at=handoff.handed_off_at,
+        released_at=handoff.released_at,
+        source=handoff.source or "binance_user_data_stream",
+        venue=handoff.venue or self._venue,
+        symbol=handoff.symbol,
+        owner_run_id=handoff.owner_run_id,
+        owner_session_id=handoff.owner_session_id,
+        venue_session_id=handoff.venue_session_id,
+        transport=handoff.transport or "binance_user_data_websocket",
+        cursor=handoff.cursor,
+        last_event_at=handoff.last_event_at,
+        last_sync_at=current_time,
+        active_order_count=handoff.active_order_count,
+        issues=tuple(dict.fromkeys((*handoff.issues, "binance_user_data_stream_session_missing"))),
+      )
+      return GuardedLiveVenueSessionSync(
+        state="unavailable",
+        synced_at=current_time,
+        handoff=next_handoff,
+        synced_orders=tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids)),
+        open_orders=self._build_open_orders_from_state(symbol=handoff.symbol or ""),
+        issues=next_handoff.issues,
+      )
+
+    events = stream_session.drain_events()
+    issues: list[str] = list(handoff.issues)
+    last_event_at = handoff.last_event_at
+    event_count = 0
+    for event in events:
+      result, event_issues = self._build_order_result_from_stream_event(
+        event=event,
+        fallback_symbol=handoff.symbol or "",
+      )
+      if result is not None:
+        self._order_states[result.order_id] = result
+        event_count += 1
+        last_event_at = result.updated_at or result.submitted_at or last_event_at
+      issues.extend(event_issues)
+
+    synced_orders = tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids))
+    open_orders = self._build_open_orders_from_state(symbol=handoff.symbol or "")
     active_order_count = len(open_orders)
-    handoff_state = "active" if handoff.state != "released" else "released"
-    last_event_at = restore.restored_at or handoff.last_event_at
     next_handoff = GuardedLiveVenueSessionHandoff(
-      state=handoff_state,
+      state="active" if handoff.state != "released" else "released",
       handed_off_at=handoff.handed_off_at,
       released_at=handoff.released_at,
-      source=handoff.source or "binance_exchange",
+      source=handoff.source or "binance_user_data_stream",
       venue=handoff.venue or self._venue,
-      symbol=symbol or handoff.symbol,
+      symbol=handoff.symbol,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
       venue_session_id=handoff.venue_session_id,
-      transport=handoff.transport or "binance_rest_session",
-      cursor=current_time.isoformat(),
+      transport=handoff.transport or "binance_user_data_websocket",
+      cursor=self._advance_event_cursor(handoff.cursor, increment=event_count),
       last_event_at=last_event_at,
       last_sync_at=current_time,
       active_order_count=active_order_count,
-      issues=restore.issues,
+      issues=tuple(dict.fromkeys(issues)),
     )
     return GuardedLiveVenueSessionSync(
-      state=handoff_state,
+      state=next_handoff.state,
       synced_at=current_time,
       handoff=next_handoff,
       synced_orders=synced_orders,
       open_orders=open_orders,
-      issues=restore.issues,
+      issues=next_handoff.issues,
     )
 
   def release_session(
@@ -671,22 +924,30 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     handoff: GuardedLiveVenueSessionHandoff,
   ) -> GuardedLiveVenueSessionHandoff:
     current_time = self._clock()
+    session_id = handoff.venue_session_id or ""
+    stream_session = self._active_stream_sessions.pop(session_id, None)
+    issues: tuple[str, ...] = handoff.issues
+    if stream_session is not None:
+      try:
+        stream_session.close()
+      except Exception as exc:
+        issues = tuple(dict.fromkeys((*issues, f"binance_user_data_stream_close_failed:{exc}")))
     return GuardedLiveVenueSessionHandoff(
       state="released",
       handed_off_at=handoff.handed_off_at,
       released_at=current_time,
-      source=handoff.source or "binance_exchange",
+      source=handoff.source or "binance_user_data_stream",
       venue=handoff.venue or self._venue,
       symbol=handoff.symbol,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
       venue_session_id=handoff.venue_session_id,
-      transport=handoff.transport or "binance_rest_session",
-      cursor=current_time.isoformat(),
+      transport=handoff.transport or "binance_user_data_websocket",
+      cursor=handoff.cursor,
       last_event_at=handoff.last_event_at,
       last_sync_at=current_time,
       active_order_count=0,
-      issues=handoff.issues,
+      issues=issues,
     )
 
   def submit_market_order(
@@ -695,7 +956,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> GuardedLiveVenueOrderResult:
     exchange = self._resolve_exchange()
     row = exchange.create_order(request.symbol, "market", request.side, request.amount, None, {})
-    return _build_order_result_from_exchange_row(
+    result = _build_order_result_from_exchange_row(
       row,
       venue=self._venue,
       fallback_symbol=request.symbol,
@@ -704,6 +965,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       fallback_reference_price=request.reference_price,
       fallback_time=self._clock(),
     )
+    self._order_states[result.order_id] = result
+    return result
 
   def submit_limit_order(
     self,
@@ -720,7 +983,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       request.reference_price,
       {},
     )
-    return _build_order_result_from_exchange_row(
+    result = _build_order_result_from_exchange_row(
       row,
       venue=self._venue,
       fallback_symbol=request.symbol,
@@ -729,6 +992,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       fallback_reference_price=request.reference_price,
       fallback_time=self._clock(),
     )
+    self._order_states[result.order_id] = result
+    return result
 
   def cancel_order(
     self,
@@ -738,12 +1003,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> GuardedLiveVenueOrderResult:
     exchange = self._resolve_exchange()
     row = exchange.cancel_order(order_id, symbol, {})
-    return _build_order_result_from_exchange_row(
+    result = _build_order_result_from_exchange_row(
       row,
       venue=self._venue,
       fallback_symbol=symbol,
       fallback_time=self._clock(),
     )
+    self._order_states[result.order_id] = result
+    return result
 
   def sync_order_states(
     self,
@@ -776,6 +1043,9 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     for order_id in order_ids:
       row = rows_by_id.get(order_id)
       if row is None:
+        if cached := self._order_states.get(order_id):
+          results.append(cached)
+          continue
         results.append(
           GuardedLiveVenueOrderResult(
             order_id=order_id,
@@ -798,7 +1068,141 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
           fallback_time=current_time,
         )
       )
+    for result in results:
+      if result.status != "unknown":
+        self._order_states[result.order_id] = result
     return tuple(results)
+
+  def _resolve_stream_client(self) -> BinanceUserDataStreamClient | None:
+    if self._user_data_stream_client is not None:
+      return self._user_data_stream_client
+    if not self._api_key:
+      return None
+    try:
+      return BinanceWebSocketUserDataStreamClient(
+        api_key=self._api_key,
+        clock=self._clock,
+      )
+    except Exception:
+      return None
+
+  def _record_restore_state(self, restore: GuardedLiveVenueSessionRestore) -> None:
+    for result in restore.synced_orders:
+      if result.status == "unknown":
+        continue
+      self._order_states[result.order_id] = result
+
+  def _build_synced_orders_from_state(
+    self,
+    *,
+    symbol: str,
+    order_ids: tuple[str, ...],
+  ) -> list[GuardedLiveVenueOrderResult]:
+    current_time = self._clock()
+    results: list[GuardedLiveVenueOrderResult] = []
+    for order_id in order_ids:
+      state = self._order_states.get(order_id)
+      if state is None:
+        results.append(
+          GuardedLiveVenueOrderResult(
+            order_id=order_id,
+            venue=self._venue,
+            symbol=symbol,
+            side="unknown",
+            amount=0.0,
+            status="unknown",
+            submitted_at=current_time,
+            updated_at=current_time,
+            issues=("order_state_unavailable",),
+          )
+        )
+        continue
+      results.append(state)
+    return results
+
+  def _build_open_orders_from_state(
+    self,
+    *,
+    symbol: str,
+  ) -> tuple[GuardedLiveVenueOpenOrder, ...]:
+    return tuple(
+      sorted(
+        (
+          GuardedLiveVenueOpenOrder(
+            order_id=result.order_id,
+            symbol=result.symbol,
+            side=result.side,
+            amount=result.remaining_amount if result.remaining_amount is not None else result.amount,
+            status=result.status,
+            price=result.requested_price or result.average_fill_price,
+          )
+          for result in self._order_states.values()
+          if result.symbol == symbol
+          and result.status in {"open", "partially_filled"}
+          and (result.remaining_amount is None or result.remaining_amount > 0)
+        ),
+        key=lambda order: (order.symbol, order.order_id),
+      )
+    )
+
+  def _build_order_result_from_stream_event(
+    self,
+    *,
+    event: dict[str, Any],
+    fallback_symbol: str,
+  ) -> tuple[GuardedLiveVenueOrderResult | None, tuple[str, ...]]:
+    event_type = str(event.get("e") or "")
+    if event_type == "streamError":
+      return None, (f"binance_user_data_stream_error:{event.get('message', 'unknown')}",)
+    if event_type != "executionReport":
+      return None, ()
+    submitted_at = _coerce_datetime(None, event.get("O") or event.get("E")) or self._clock()
+    updated_at = _coerce_datetime(None, event.get("T") or event.get("E")) or submitted_at
+    requested_amount = _coerce_float(event.get("q")) or 0.0
+    filled_amount = _coerce_float(event.get("z")) or 0.0
+    remaining_amount = max(requested_amount - filled_amount, 0.0)
+    raw_status = str(event.get("X") or event.get("x") or "").lower()
+    price = _coerce_float(event.get("p"))
+    cumulative_quote = _coerce_float(event.get("Z"))
+    average_fill_price = None
+    if cumulative_quote is not None and filled_amount > 0:
+      average_fill_price = cumulative_quote / filled_amount
+    elif _coerce_float(event.get("L")) is not None and filled_amount > 0:
+      average_fill_price = _coerce_float(event.get("L"))
+    status = _normalize_order_status(
+      raw_status=raw_status,
+      requested_amount=requested_amount,
+      filled_amount=filled_amount,
+      remaining_amount=remaining_amount,
+    )
+    result = GuardedLiveVenueOrderResult(
+      order_id=str(event.get("i") or event.get("c") or f"binance-stream-order:{submitted_at.isoformat()}"),
+      venue=self._venue,
+      symbol=fallback_symbol,
+      side=str(event.get("S") or "unknown").lower(),
+      amount=filled_amount if status == "filled" else requested_amount,
+      status=status,
+      submitted_at=submitted_at,
+      updated_at=updated_at,
+      requested_price=price,
+      average_fill_price=average_fill_price,
+      fee_paid=_coerce_float(event.get("n")),
+      requested_amount=requested_amount,
+      filled_amount=filled_amount,
+      remaining_amount=remaining_amount,
+    )
+    return result, ()
+
+  @staticmethod
+  def _advance_event_cursor(cursor: str | None, *, increment: int) -> str:
+    if cursor is None or not cursor.startswith("event-"):
+      current = 0
+    else:
+      try:
+        current = int(cursor.split("-", 1)[1])
+      except (IndexError, ValueError):
+        current = 0
+    return f"event-{current + increment}"
 
   def _resolve_exchange(self) -> VenueExecutionExchange:
     exchange = self._exchange
