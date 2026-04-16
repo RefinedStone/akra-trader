@@ -585,19 +585,37 @@
       "id": "planning-reference-lanes-intent-aware-visual-emphasis",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Make comparison visual emphasis intent-aware",
-      "description": "Refine the comparison presentation so metric cell highlight colors, badges, or equivalent visual emphasis cues change with `benchmark_validation`, `execution_regression`, and `strategy_tuning`, reinforcing whether the operator should read a delta as benchmark drift, execution regression, or tuning edge/penalty, with deterministic backend/frontend mapping and regression coverage for the rendered emphasis states.",
-      "status": "ready",
+      "description": "Completed the intent-aware visual-emphasis follow-up by teaching the comparison panel to apply intent-specific visual systems for panel glow, border treatment, baseline badges, featured versus secondary narrative cards, baseline run-card emphasis, and comparison-table best-cell plus delta highlighting, while adding a frontend helper that maps `benchmark_validation`, `execution_regression`, and `strategy_tuning` to deterministic comparison CSS classes.",
+      "status": "done",
       "base_priority": 87,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed metric-annotation work and explicitly identified intent-aware visual emphasis such as comparison cell highlight colors or row badges by validation, regression, or tuning mode as the next likely refinement, making it the clearest executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the intent-aware visual-emphasis implementation in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `d637513` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T04:31:00Z",
+      "updated_at": "2026-04-17T04:35:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-intent-aware-metric-table-annotation"
       ],
       "direction_relation_note": "Builds on the intent-aware comparison copy by making the benchmark metric surface visually encode the comparison goal too, so operators do not have to rely on text alone to interpret drift versus optimization signals."
+    },
+    {
+      "id": "planning-reference-lanes-intent-aware-iconography-and-legend",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add intent-aware iconography and compact legend cues to comparison mode",
+      "description": "Extend the completed intent-aware comparison styling with lightweight iconography and a compact legend so `benchmark_validation`, `execution_regression`, and `strategy_tuning` remain recognizable at a glance even before an operator reads the narrative copy, while keeping the cues consistent with the existing intent-specific CSS classes and comparison emphasis system.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply said nothing essential remains for visual emphasis and directly identified intent-aware iconography or compact legends as the likely next refinement, making this the clearest executable follow-up for the queue head.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:36:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-intent-aware-visual-emphasis"
+      ],
+      "direction_relation_note": "Builds on the intent-aware comparison visual system by adding faster-recognition cues so benchmark-comparison mode stays legible even when operators scan the panel before reading detailed text."
     }
   ]
 }
