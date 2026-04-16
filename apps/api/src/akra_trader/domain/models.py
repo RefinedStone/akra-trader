@@ -266,6 +266,7 @@ class RunProvenance:
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   market_data: MarketDataLineage | None = None
+  market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
 
 
 @dataclass

@@ -10,6 +10,8 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
+from akra_trader.domain.models import RunConfig
+from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
 
 
@@ -150,6 +152,7 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
   assert run.provenance.market_data.sync_status == "delegated"
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_status == "delegated"
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:
@@ -176,3 +179,41 @@ def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.requested_start_at == datetime(2030, 1, 1, tzinfo=UTC)
   assert run.provenance.market_data.candle_count == 0
+
+
+def test_multi_symbol_run_records_market_lineage_per_symbol(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+  config = RunConfig(
+    run_id="multi-symbol-lineage",
+    mode=RunMode.BACKTEST,
+    strategy_id="ma_cross_v1",
+    strategy_version="1.0.0",
+    venue="binance",
+    symbols=("BTC/USDT", "ETH/USDT"),
+    timeframe="5m",
+    parameters={},
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+  )
+
+  run = app._simulate_run(config=config, active_bars=24)
+  runs.save_run(run)
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.symbols == ("BTC/USDT", "ETH/USDT")
+  assert run.provenance.market_data.candle_count == 48
+  assert run.provenance.market_data.sync_status == "fixture"
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].symbols == ("BTC/USDT",)
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].candle_count == 24
+  assert run.provenance.market_data_by_symbol["ETH/USDT"].symbols == ("ETH/USDT",)
+  assert run.provenance.market_data_by_symbol["ETH/USDT"].candle_count == 24
+  assert reloaded is not None
+  assert reloaded.provenance.market_data_by_symbol == run.provenance.market_data_by_symbol

@@ -53,6 +53,7 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["config"]["strategy_id"] == "ma_cross_v1"
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
+  assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
 
 
 def test_backtest_run_survives_app_restart(tmp_path: Path) -> None:

@@ -64,6 +64,18 @@ class FreqtradeReferenceAdapter:
 
   def execute_backtest(self, run: RunRecord, metadata: StrategyMetadata) -> RunRecord:
     prepared = self.prepare_backtest(run.config, metadata)
+    market_data_by_symbol = {
+      symbol: MarketDataLineage(
+        provider="freqtrade_reference",
+        venue=run.config.venue,
+        symbols=(symbol,),
+        timeframe=run.config.timeframe,
+        requested_start_at=run.config.start_at,
+        requested_end_at=run.config.end_at,
+        sync_status="delegated",
+      )
+      for symbol in run.config.symbols
+    }
     run.provenance = RunProvenance(
       lane="reference",
       reference_id=prepared.reference_id,
@@ -80,6 +92,7 @@ class FreqtradeReferenceAdapter:
         requested_end_at=run.config.end_at,
         sync_status="delegated",
       ),
+      market_data_by_symbol=market_data_by_symbol,
     )
     run.notes.append(f"Prepared NFI reference command: {' '.join(prepared.command)}")
 

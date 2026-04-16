@@ -199,6 +199,7 @@ class TradingApplication:
     loaded = self._data_engine.load_frame(config=config, active_bars=active_bars)
     run = self._run_supervisor.create_native_run(config=config)
     run.provenance.market_data = loaded.lineage
+    run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
     data = loaded.frame
     if data.empty:
       run.notes.append("No candles available for the requested range.")

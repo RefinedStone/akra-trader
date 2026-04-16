@@ -28,6 +28,7 @@ from akra_trader.ports import MarketDataPort
 class LoadedFrame(NamedTuple):
   frame: pd.DataFrame
   lineage: MarketDataLineage
+  lineage_by_symbol: dict[str, MarketDataLineage]
 
 
 def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
@@ -73,22 +74,88 @@ class DataEngine:
     self._market_data = market_data
 
   def load_frame(self, *, config: RunConfig, active_bars: int | None) -> LoadedFrame:
-    candles = self._market_data.get_candles(
-      symbol=config.symbols[0],
-      timeframe=config.timeframe,
-      start_at=config.start_at,
-      end_at=config.end_at,
-      limit=active_bars,
+    candles_by_symbol: dict[str, list[Candle]] = {}
+    lineage_by_symbol: dict[str, MarketDataLineage] = {}
+    for symbol in config.symbols:
+      candles = self._market_data.get_candles(
+        symbol=symbol,
+        timeframe=config.timeframe,
+        start_at=config.start_at,
+        end_at=config.end_at,
+        limit=active_bars,
+      )
+      candles_by_symbol[symbol] = candles
+      lineage_by_symbol[symbol] = self._market_data.describe_lineage(
+        symbol=symbol,
+        timeframe=config.timeframe,
+        candles=candles,
+        start_at=config.start_at,
+        end_at=config.end_at,
+        limit=active_bars,
+      )
+
+    primary_symbol = config.symbols[0]
+    return LoadedFrame(
+      frame=candles_to_frame(candles_by_symbol[primary_symbol]),
+      lineage=self._aggregate_lineage(config=config, lineage_by_symbol=lineage_by_symbol),
+      lineage_by_symbol=lineage_by_symbol,
     )
-    lineage = self._market_data.describe_lineage(
-      symbol=config.symbols[0],
-      timeframe=config.timeframe,
-      candles=candles,
-      start_at=config.start_at,
-      end_at=config.end_at,
-      limit=active_bars,
+
+  def _aggregate_lineage(
+    self,
+    *,
+    config: RunConfig,
+    lineage_by_symbol: dict[str, MarketDataLineage],
+  ) -> MarketDataLineage:
+    lineages = list(lineage_by_symbol.values())
+    if not lineages:
+      return MarketDataLineage(
+        provider="unknown",
+        venue=config.venue,
+        symbols=config.symbols,
+        timeframe=config.timeframe,
+        requested_start_at=config.start_at,
+        requested_end_at=config.end_at,
+        sync_status="unknown",
+      )
+
+    effective_starts = [lineage.effective_start_at for lineage in lineages if lineage.effective_start_at is not None]
+    effective_ends = [lineage.effective_end_at for lineage in lineages if lineage.effective_end_at is not None]
+    last_sync_times = [lineage.last_sync_at for lineage in lineages if lineage.last_sync_at is not None]
+    prefixed_issues = tuple(
+      dict.fromkeys(
+        f"{symbol}:{issue}"
+        for symbol, lineage in lineage_by_symbol.items()
+        for issue in lineage.issues
+      )
     )
-    return LoadedFrame(frame=candles_to_frame(candles), lineage=lineage)
+
+    return MarketDataLineage(
+      provider=lineages[0].provider,
+      venue=lineages[0].venue,
+      symbols=config.symbols,
+      timeframe=config.timeframe,
+      requested_start_at=config.start_at,
+      requested_end_at=config.end_at,
+      effective_start_at=min(effective_starts) if effective_starts else None,
+      effective_end_at=max(effective_ends) if effective_ends else None,
+      candle_count=sum(lineage.candle_count for lineage in lineages),
+      sync_status=self._aggregate_sync_status(lineages),
+      last_sync_at=max(last_sync_times) if last_sync_times else None,
+      issues=prefixed_issues,
+    )
+
+  def _aggregate_sync_status(self, lineages: list[MarketDataLineage]) -> str:
+    status_priority = {
+      "error": 5,
+      "stale": 4,
+      "empty": 3,
+      "delegated": 2,
+      "fixture": 1,
+      "synced": 0,
+      "unknown": -1,
+    }
+    return max(lineages, key=lambda lineage: status_priority.get(lineage.sync_status, -1)).sync_status
 
 
 class StateCache:
