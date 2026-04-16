@@ -891,7 +891,7 @@ export default function App() {
   }
 
   async function rerunPaper(rerunBoundaryId: string) {
-    setStatusText(`Launching paper replay for boundary ${rerunBoundaryId}...`);
+    setStatusText(`Starting paper session for boundary ${rerunBoundaryId}...`);
     try {
       const run = await fetchJson<Run>(`/runs/rerun-boundaries/${encodeURIComponent(rerunBoundaryId)}/paper`, {
         method: "POST",
@@ -899,11 +899,11 @@ export default function App() {
       await loadAll();
       setStatusText(
         run.provenance.rerun_match_status === "matched"
-          ? `Paper replay started and matched boundary ${rerunBoundaryId}.`
-          : `Paper replay started with expected boundary translation from ${rerunBoundaryId}.`,
+          ? `Paper session started and matched boundary ${rerunBoundaryId}.`
+          : `Paper session started with expected boundary translation from ${rerunBoundaryId}.`,
       );
     } catch (error) {
-      setStatusText(`Paper replay failed: ${(error as Error).message}`);
+      setStatusText(`Paper session failed: ${(error as Error).message}`);
     }
   }
 
@@ -1136,7 +1136,7 @@ export default function App() {
               onRerun: rerunSandbox,
             },
             {
-              label: "Replay in paper",
+              label: "Start paper session",
               onRerun: rerunPaper,
             },
           ]}
@@ -1153,7 +1153,7 @@ export default function App() {
               onRerun: rerunSandbox,
             },
             {
-              label: "Replay in paper",
+              label: "Start paper session",
               onRerun: rerunPaper,
             },
           ]}
@@ -1171,7 +1171,7 @@ export default function App() {
               onRerun: rerunSandbox,
             },
             {
-              label: "Replay in paper",
+              label: "Start paper session",
               onRerun: rerunPaper,
             },
           ]}

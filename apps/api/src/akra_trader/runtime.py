@@ -67,10 +67,7 @@ class ExecutionModeService:
         f"{suffix}"
       )
     if mode == RunMode.PAPER:
-      return (
-        "Paper run uses the shared native engine while remaining isolated from venue-backed live execution."
-        f"{suffix}"
-      )
+      return "Paper run starts from the latest simulated market snapshot and remains isolated from venue-backed live execution."
     if mode == RunMode.LIVE:
       return "Live mode is reserved for guarded venue-backed execution."
     return None

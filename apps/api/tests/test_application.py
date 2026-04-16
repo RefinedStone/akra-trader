@@ -293,6 +293,8 @@ def test_paper_run_is_created_as_running_with_separate_mode(tmp_path: Path) -> N
   assert run.status == RunStatus.RUNNING
   assert run.config.mode == RunMode.PAPER
   assert run.notes
+  assert run.notes[0] == "Paper session primed from the latest market snapshot using 36 candles."
+  assert all("Sandbox preview replayed" not in note for note in run.notes)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.candle_count == 36
 
@@ -707,7 +709,7 @@ def test_rerun_paper_from_boundary_uses_stored_effective_window_and_replays_same
   assert rerun.provenance.rerun_match_status == "matched"
   assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
   assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
-  assert rerun.notes[1] == "Paper rerun replay preserved the stored paper bar window."
+  assert rerun.notes[1] == "Paper rerun seeded the current paper session from the stored priming window."
   assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
 
 
@@ -745,7 +747,7 @@ def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path
   assert rerun.provenance.strategy is not None
   assert rerun.provenance.strategy.parameter_snapshot.resolved == {"short_window": 13, "long_window": 21}
   assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
-  assert rerun.notes[1] == "Paper rerun locked execution to the stored effective market-data window."
+  assert rerun.notes[1] == "Paper rerun seeded the current paper session from the stored effective market-data window."
   assert rerun.notes[-1] == (
     "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
   )

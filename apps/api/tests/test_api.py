@@ -152,6 +152,8 @@ def test_paper_alias_still_works(tmp_path: Path) -> None:
   assert response.status_code == 200
   payload = response.json()
   assert payload["config"]["mode"] == "paper"
+  assert payload["notes"][0].startswith("Paper session primed from the latest market snapshot using ")
+  assert all("Sandbox preview replayed" not in note for note in payload["notes"])
 
 
 def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> None:

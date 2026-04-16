@@ -54,7 +54,7 @@ The native runtime is already split into explicit services:
 - `RunSupervisor`
   - owns run status transitions and mode notes
 - `ExecutionModeService`
-  - normalizes mode naming such as the `paper` alias for `sandbox`
+  - normalizes user-facing mode names and keeps shared lifecycle notes around execution modes
 
 ## Strategy Abstraction
 
@@ -107,9 +107,9 @@ Run persistence is durable today.
 This is enough for restart-safe history, comparison, and stable dataset-boundary inspection, but not
 yet the final analytics-friendly schema.
 
-Stored rerun boundaries can also be used to launch explicit backtest reruns or sandbox/paper replay
-runs. Sandbox and paper now persist as separate execution modes, so their histories and filters do
-not collapse into one preview bucket. The rerun records the source run, the target boundary, and
+Stored rerun boundaries can also be used to launch explicit backtest reruns or sandbox/paper
+execution. Sandbox and paper now persist as separate execution modes, and paper sessions no longer
+reuse the sandbox preview replay loop. The rerun records the source run, the target boundary, and
 whether the new execution still matched that boundary.
 
 ## Market Data

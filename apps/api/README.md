@@ -1,6 +1,6 @@
 # Akra Trader API
 
-FastAPI backend for strategy cataloging, market-data access, durable run storage, native backtests, replay-based sandbox runs, and external reference backtest delegation.
+FastAPI backend for strategy cataloging, market-data access, durable run storage, native backtests, sandbox preview runs, paper-session priming, and external reference backtest delegation.
 
 ## Current Scope
 
@@ -10,13 +10,13 @@ Implemented now:
 - in-process custom strategy registration endpoint
 - durable run storage through SQLAlchemy
 - backtest execution and run lookup
-- replay-based sandbox and paper preview flows for native strategies
+- replay-based sandbox previews and paper-session priming for native strategies
 - native vs reference run comparison API
 - dataset identity and reproducibility state recorded in run market-data provenance
 - Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
   and status reporting
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
-  relaunch stored boundaries into backtest or sandbox flows
+  relaunch stored boundaries into backtest, sandbox, or paper flows
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -78,9 +78,11 @@ Defaults:
 - native candle-backed runs persist dataset identity fingerprints for the exact candles used
 - stored rerun boundaries can launch explicit backtest, sandbox, and paper reruns with
   match-or-drift notes
-- sandbox and paper previews now persist as separate modes, so history and filters no longer share
-  the same storage bucket
+- sandbox preview runs and paper sessions now persist as separate modes, so history and filters no
+  longer share the same storage bucket
 - sandbox runs currently replay the most recent bars and are then marked `running` for forward compatibility with a future worker model
+- paper runs now start from the latest simulated market snapshot instead of replaying the sandbox
+  preview loop
 - reference strategies are supported for backtest delegation only
 - the app lifespan starts background market-data sync jobs when the Binance provider is active
 

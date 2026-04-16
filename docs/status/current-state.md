@@ -43,7 +43,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ### Research workflow
 
 - backtest execution with durable run lookup
-- replay-based sandbox and paper preview flows for native strategies
+- replay-based sandbox previews and paper-session priming for native strategies
 - run history listing and filtering by mode, strategy id, and strategy version
 - run comparison API and control-room comparison UI
 - native vs reference benchmark provenance and artifact display
@@ -58,12 +58,12 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox runs
-- separate sandbox and paper histories with their own filters, stop controls, and rerun-boundary actions
+- separate sandbox previews and paper sessions with their own filters, stop controls, and rerun-boundary actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
 
-- sandbox runs are replay previews, not continuously advancing workers
+- sandbox runs are replay previews, and paper runs are snapshot-primed sessions rather than continuous workers
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic

@@ -445,8 +445,7 @@ class TradingApplication:
     start_at: datetime | None = None,
     end_at: datetime | None = None,
   ) -> RunRecord:
-    return self._start_preview_run(
-      target_mode=RunMode.PAPER,
+    return self._start_paper_session(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -514,6 +513,103 @@ class TradingApplication:
         mode_service=self._mode_service,
         replay_bars=replay_bars,
       )
+    return self._runs.save_run(run)
+
+  def _start_paper_session(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    config = RunConfig(
+      run_id=str(uuid4()),
+      mode=RunMode.PAPER,
+      strategy_id=metadata.strategy_id,
+      strategy_version=metadata.version,
+      venue="binance",
+      symbols=(symbol,),
+      timeframe=timeframe,
+      parameters=parameters,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      start_at=start_at,
+      end_at=end_at,
+    )
+    if metadata.runtime == "freqtrade_reference":
+      run = RunRecord(
+        config=config,
+        status=RunStatus.FAILED,
+        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+      )
+      run.notes.append(
+        "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
+        "Paper trading remains on the native engine for now."
+      )
+      return self._runs.save_run(run)
+
+    loaded = self._data_engine.load_frame(config=config, active_bars=replay_bars)
+    run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
+    run.provenance.market_data = loaded.lineage
+    run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
+    self._attach_rerun_boundary(run)
+    data = loaded.frame
+    if data.empty:
+      run.notes.append("No candles available for the requested range.")
+      run.status = RunStatus.FAILED
+      return self._runs.save_run(run)
+
+    enriched = strategy.build_feature_frame(data, config.parameters)
+    required_bars = max(strategy.warmup_spec().required_bars, 2)
+    if len(enriched) < required_bars:
+      run.status = RunStatus.FAILED
+      run.notes.append(
+        f"Paper session requires at least {required_bars} candles to prime the current strategy state."
+      )
+      return self._runs.save_run(run)
+
+    cache = StateCache(
+      instrument_id=f"{config.venue}:{config.symbols[0]}",
+      cash=config.initial_cash,
+    )
+    history = enriched.iloc[:]
+    latest_row = history.iloc[-1]
+    state = cache.snapshot(
+      timestamp=latest_row["timestamp"].to_pydatetime(),
+      parameters=config.parameters,
+    )
+    decision = strategy.evaluate(history, config.parameters, state)
+    self._execution_engine.apply_decision(
+      run=run,
+      config=config,
+      decision=decision,
+      cache=cache,
+      market_price=float(latest_row["close"]),
+    )
+    run.metrics = summarize_performance(
+      initial_cash=config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    self._run_supervisor.start_mode(
+      run=run,
+      mode=RunMode.PAPER,
+      mode_service=self._mode_service,
+    )
+    primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
+    run.notes.insert(
+      0,
+      f"Paper session primed from the latest market snapshot using {primed_candle_count} candles.",
+    )
     return self._runs.save_run(run)
 
   def stop_sandbox_run(self, run_id: str) -> RunRecord | None:
@@ -734,25 +830,43 @@ class TradingApplication:
     elif target_mode in {RunMode.SANDBOX, RunMode.PAPER}:
       preview_start_at, preview_end_at, preview_replay_bars = self._resolve_preview_rerun_window(source_run)
       preview_label = target_mode.value.capitalize()
-      if preview_replay_bars is None:
-        preview_window_note = f"{preview_label} rerun locked execution to the stored effective market-data window."
-      else:
-        preview_window_note = (
-          f"{preview_label} rerun replay preserved the stored {source_run.config.mode.value} bar window."
+      if target_mode == RunMode.SANDBOX:
+        if preview_replay_bars is None:
+          preview_window_note = f"{preview_label} rerun locked execution to the stored effective market-data window."
+        else:
+          preview_window_note = (
+            f"{preview_label} rerun replay preserved the stored {source_run.config.mode.value} bar window."
+          )
+        rerun = self._start_preview_run(
+          target_mode=target_mode,
+          strategy_id=source_run.config.strategy_id,
+          symbol=symbol,
+          timeframe=source_run.config.timeframe,
+          initial_cash=source_run.config.initial_cash,
+          fee_rate=source_run.config.fee_rate,
+          slippage_bps=source_run.config.slippage_bps,
+          parameters=rerun_parameters,
+          replay_bars=preview_replay_bars,
+          start_at=preview_start_at,
+          end_at=preview_end_at,
         )
-      rerun = self._start_preview_run(
-        target_mode=target_mode,
-        strategy_id=source_run.config.strategy_id,
-        symbol=symbol,
-        timeframe=source_run.config.timeframe,
-        initial_cash=source_run.config.initial_cash,
-        fee_rate=source_run.config.fee_rate,
-        slippage_bps=source_run.config.slippage_bps,
-        parameters=rerun_parameters,
-        replay_bars=preview_replay_bars,
-        start_at=preview_start_at,
-        end_at=preview_end_at,
-      )
+      else:
+        if preview_replay_bars is None:
+          preview_window_note = "Paper rerun seeded the current paper session from the stored effective market-data window."
+        else:
+          preview_window_note = "Paper rerun seeded the current paper session from the stored priming window."
+        rerun = self._start_paper_session(
+          strategy_id=source_run.config.strategy_id,
+          symbol=symbol,
+          timeframe=source_run.config.timeframe,
+          initial_cash=source_run.config.initial_cash,
+          fee_rate=source_run.config.fee_rate,
+          slippage_bps=source_run.config.slippage_bps,
+          parameters=rerun_parameters,
+          replay_bars=preview_replay_bars,
+          start_at=preview_start_at,
+          end_at=preview_end_at,
+        )
     else:
       raise ValueError(f"Unsupported rerun target mode: {target_mode.value}")
 
