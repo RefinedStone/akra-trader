@@ -638,20 +638,56 @@
     {
       "id": "planning-reference-lanes-comparison-cue-keyboard-focus-accessibility",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Add keyboard-focus tooltip and focus-ring treatment for comparison cues",
-      "description": "Extend the completed comparison hover/tooltip cue system with keyboard-focus behavior so the same intent, legend, featured insight, baseline card, and emphasized metric explanations are discoverable without mouse hover, including visible focus-ring treatment and any needed non-hover tooltip trigger wiring for comparison mode.",
-      "status": "ready",
+      "title": "Keyboard-focus tooltip and focus-ring treatment shipped for comparison cues",
+      "description": "Completed the keyboard accessibility follow-up by making comparison intent chips, legend items, featured insight cues, the baseline run card, and emphasized comparison cells focusable when they expose cue copy, extending the existing tooltip path so the same explanations appear on keyboard focus, and adding visible focus-ring treatment tuned separately for table-cell cues in the web app.",
+      "status": "done",
       "base_priority": 83,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the hover/tooltip task and directly identified keyboard-focus tooltip and focus-ring treatment for the same cues as the likely next refinement, making this the clearest executable next task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the keyboard-focus tooltip and focus-ring implementation in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `6084107` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T04:44:00Z",
+      "updated_at": "2026-04-17T04:47:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-intent-aware-hover-tooltips"
       ],
       "direction_relation_note": "Builds on the completed comparison cue hover system by making the same benchmark-comparison explanations and emphasis accessible from keyboard navigation, reducing reliance on mouse-only discovery for reference-lane comparisons."
+    },
+    {
+      "id": "planning-reference-lanes-accessible-tooltip-semantics",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Upgrade comparison cue tooltips to announced accessible tooltip semantics",
+      "description": "Completed the accessible-tooltip follow-up by replacing CSS/native-only comparison cue hints with explicit tooltip DOM nodes, linking cue triggers to stable `aria-describedby` targets across intent chips, legend items, baseline cards, featured insight cues, narrative cards, and emphasized comparison cells, and adding panel-local hover/focus/Escape tooltip state so assistive technology and keyboard users receive the same announced explanations.",
+      "status": "done",
+      "base_priority": 82,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the announced accessible tooltip semantics in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `b302c73` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:55:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-comparison-cue-keyboard-focus-accessibility"
+      ],
+      "direction_relation_note": "Builds on the completed keyboard-accessible comparison cue treatment by moving tooltip behavior from hover/focus styling alone to explicit assistive-technology-readable semantics, improving operator accessibility for reference-lane comparisons."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-placement-edge-awareness",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make comparison tooltips place intelligently near viewport and scroller edges",
+      "description": "Refine the newly semantic comparison tooltip system so long cue copy is less likely to clip on narrow layouts or inside the comparison table scroller, adding edge-aware placement or fallback alignment behavior for intent chips, legend cues, featured insight cues, baseline cards, narrative cards, and emphasized comparison cells while preserving the new accessible tooltip semantics.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains for accessible tooltip semantics and directly named smarter placement near viewport edges or inside the comparison table scroller as the likely next refinement, so this is now the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:55:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-accessible-tooltip-semantics"
+      ],
+      "direction_relation_note": "Builds on the completed accessible tooltip semantics by making reference-lane comparison explanations stay visible and readable at narrow viewport and scroller boundaries instead of trading accessibility gains for clipped presentation."
     }
   ]
 }
