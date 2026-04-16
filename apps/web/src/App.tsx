@@ -40,6 +40,15 @@ type ReferenceSource = {
   summary: string;
 };
 
+type BenchmarkArtifact = {
+  kind: string;
+  label: string;
+  path: string;
+  format?: string | null;
+  exists: boolean;
+  is_directory: boolean;
+};
+
 type Run = {
   config: {
     run_id: string;
@@ -62,6 +71,7 @@ type Run = {
     working_directory?: string | null;
     external_command: string[];
     artifact_paths: string[];
+    benchmark_artifacts: BenchmarkArtifact[];
     strategy?: {
       strategy_id: string;
       name: string;
@@ -144,6 +154,7 @@ type RunComparison = {
     working_directory?: string | null;
     external_command: string[];
     artifact_paths: string[];
+    benchmark_artifacts: BenchmarkArtifact[];
     metrics: Record<string, number>;
     notes: string[];
   }[];
@@ -1264,6 +1275,7 @@ function RunSection({
               {run.provenance.reference ? (
                 <ReferenceRunProvenanceSummary
                   artifactPaths={run.provenance.artifact_paths}
+                  benchmarkArtifacts={run.provenance.benchmark_artifacts}
                   externalCommand={run.provenance.external_command}
                   reference={run.provenance.reference}
                   referenceVersion={run.provenance.reference_version}
@@ -1396,6 +1408,7 @@ function RunComparisonPanel({
             {run.reference ? (
               <ReferenceRunProvenanceSummary
                 artifactPaths={run.artifact_paths}
+                benchmarkArtifacts={run.benchmark_artifacts}
                 externalCommand={run.external_command}
                 reference={run.reference}
                 referenceVersion={run.reference_version}
@@ -1456,12 +1469,14 @@ function RunComparisonPanel({
 
 function ReferenceRunProvenanceSummary({
   artifactPaths,
+  benchmarkArtifacts,
   externalCommand,
   reference,
   referenceVersion,
   workingDirectory,
 }: {
   artifactPaths: string[];
+  benchmarkArtifacts: BenchmarkArtifact[];
   externalCommand: string[];
   reference: ReferenceSource;
   referenceVersion?: string | null;
@@ -1483,8 +1498,27 @@ function ReferenceRunProvenanceSummary({
         <p>ID: {reference.reference_id}</p>
         {reference.homepage ? <p>Homepage: {reference.homepage}</p> : null}
         {workingDirectory ? <p>Working dir: {workingDirectory}</p> : null}
-        <p>Artifacts: {artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}</p>
         {externalCommand.length ? <p>Command: {externalCommand.join(" ")}</p> : null}
+        {benchmarkArtifacts.length ? (
+          <div className="reference-artifact-list">
+            {benchmarkArtifacts.map((artifact) => (
+              <article className="reference-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+                <div className="reference-artifact-head">
+                  <strong>{artifact.label}</strong>
+                  <span>{artifact.kind}</span>
+                </div>
+                <p>{artifact.path}</p>
+                <p>
+                  {artifact.is_directory ? "directory" : "file"}
+                  {artifact.format ? ` / ${artifact.format}` : ""}
+                  {artifact.exists ? "" : " / missing"}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p>Artifacts: {artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}</p>
+        )}
       </div>
     </section>
   );

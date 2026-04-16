@@ -9,6 +9,7 @@ import shutil
 import subprocess
 
 from akra_trader.adapters.references import ReferenceCatalog
+from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
@@ -89,6 +90,7 @@ class FreqtradeReferenceAdapter:
     run.provenance.working_directory = prepared.working_directory
     run.provenance.external_command = tuple(prepared.command)
     run.provenance.artifact_paths = prepared.artifact_roots
+    run.provenance.benchmark_artifacts = self._build_benchmark_artifacts(prepared.artifact_roots)
     run.provenance.market_data = MarketDataLineage(
       provider="freqtrade_reference",
       venue=run.config.venue,
@@ -125,10 +127,12 @@ class FreqtradeReferenceAdapter:
     run.notes.append(process.stdout.strip())
     if process.stderr.strip():
       run.notes.append(process.stderr.strip())
-    run.provenance.artifact_paths = self._resolve_artifact_paths(
+    resolved_artifact_paths = self._resolve_artifact_paths(
       artifact_roots=prepared.artifact_roots,
       existing_artifacts=existing_artifacts,
     )
+    run.provenance.artifact_paths = resolved_artifact_paths
+    run.provenance.benchmark_artifacts = self._build_benchmark_artifacts(resolved_artifact_paths)
     run.status = RunStatus.COMPLETED if process.returncode == 0 else RunStatus.FAILED
     run.ended_at = datetime.now(UTC)
     return run
@@ -168,6 +172,94 @@ class FreqtradeReferenceAdapter:
     if persisted_roots:
       return tuple(persisted_roots)
     return artifact_roots
+
+  def _build_benchmark_artifacts(
+    self,
+    artifact_paths: tuple[str, ...],
+  ) -> tuple[BenchmarkArtifact, ...]:
+    return tuple(
+      self._classify_artifact_path(artifact_path)
+      for artifact_path in artifact_paths
+    )
+
+  def _classify_artifact_path(self, artifact_path: str) -> BenchmarkArtifact:
+    path = Path(artifact_path)
+    exists = path.exists()
+    is_directory = path.is_dir()
+    lower_name = path.name.lower()
+    lower_parts = [part.lower() for part in path.parts]
+    suffixes = path.suffixes
+    format_name = suffixes[-1].lstrip(".") if suffixes else None
+
+    if lower_name == "backtest_results":
+      return BenchmarkArtifact(
+        kind="result_snapshot_root",
+        label="Backtest results root",
+        path=str(path),
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if lower_name == "logs":
+      return BenchmarkArtifact(
+        kind="runtime_log_root",
+        label="Runtime logs root",
+        path=str(path),
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if lower_name.endswith(".meta.json"):
+      return BenchmarkArtifact(
+        kind="result_manifest",
+        label="Backtest result manifest",
+        path=str(path),
+        format="json",
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if "signal" in lower_name:
+      return BenchmarkArtifact(
+        kind="signal_trace",
+        label="Signal trace export",
+        path=str(path),
+        format=format_name,
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if "logs" in lower_parts or lower_name.endswith(".log"):
+      return BenchmarkArtifact(
+        kind="runtime_log",
+        label="Runtime log",
+        path=str(path),
+        format=format_name,
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if "backtest_results" in lower_parts and any(suffix in {".json", ".zip"} for suffix in suffixes):
+      return BenchmarkArtifact(
+        kind="result_snapshot",
+        label="Backtest result snapshot",
+        path=str(path),
+        format=format_name,
+        exists=exists,
+        is_directory=is_directory,
+      )
+    if "backtest_results" in lower_parts and format_name == "csv":
+      return BenchmarkArtifact(
+        kind="result_table",
+        label="Benchmark result table",
+        path=str(path),
+        format=format_name,
+        exists=exists,
+        is_directory=is_directory,
+      )
+    return BenchmarkArtifact(
+      kind="reference_artifact",
+      label="Reference artifact",
+      path=str(path),
+      format=format_name,
+      exists=exists,
+      is_directory=is_directory,
+    )
 
   @staticmethod
   def _resolve_reference_version(reference_root: Path, fallback: str | None) -> str | None:

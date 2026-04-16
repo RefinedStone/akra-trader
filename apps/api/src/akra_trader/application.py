@@ -403,6 +403,10 @@ def serialize_run(run: RunRecord) -> dict:
   payload["status"] = run.status.value
   payload["provenance"]["external_command"] = list(run.provenance.external_command)
   payload["provenance"]["artifact_paths"] = list(run.provenance.artifact_paths)
+  payload["provenance"]["benchmark_artifacts"] = [
+    asdict(artifact)
+    for artifact in run.provenance.benchmark_artifacts
+  ]
   strategy_snapshot = payload["provenance"].get("strategy")
   if strategy_snapshot is not None:
     strategy_snapshot["version_lineage"] = list(
@@ -430,6 +434,7 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
       "symbols": list(run.symbols),
       "external_command": list(run.external_command),
       "artifact_paths": list(run.artifact_paths),
+      "benchmark_artifacts": [asdict(artifact) for artifact in run.benchmark_artifacts],
       "notes": list(run.notes),
     }
     for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
@@ -468,6 +473,7 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     working_directory=run.provenance.working_directory,
     external_command=tuple(run.provenance.external_command),
     artifact_paths=tuple(run.provenance.artifact_paths),
+    benchmark_artifacts=tuple(run.provenance.benchmark_artifacts),
     metrics=deepcopy(run.metrics),
     notes=tuple(run.notes),
   )

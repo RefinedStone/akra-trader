@@ -622,6 +622,45 @@ select {
   word-break: break-word;
 }
 
+.reference-artifact-list {
+  display: grid;
+  gap: 10px;
+}
+
+.reference-artifact-card {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(4, 10, 17, 0.48);
+}
+
+.reference-artifact-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.reference-artifact-head strong {
+  font-size: 0.92rem;
+}
+
+.reference-artifact-head span {
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.reference-artifact-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-strategy {
   margin: 14px 0;
   padding: 16px;

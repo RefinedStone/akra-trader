@@ -286,6 +286,16 @@ class StrategySnapshot:
   entrypoint: str | None = None
 
 
+@dataclass(frozen=True)
+class BenchmarkArtifact:
+  kind: str
+  label: str
+  path: str
+  format: str | None = None
+  exists: bool = True
+  is_directory: bool = False
+
+
 @dataclass
 class RunProvenance:
   lane: str = "native"
@@ -296,6 +306,7 @@ class RunProvenance:
   working_directory: str | None = None
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
+  benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
   strategy: StrategySnapshot | None = None
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
@@ -337,6 +348,7 @@ class RunComparisonRun:
   working_directory: str | None = None
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
+  benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
   metrics: dict[str, Any] = field(default_factory=dict)
   notes: tuple[str, ...] = ()
 
