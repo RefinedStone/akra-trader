@@ -6,6 +6,7 @@ from typing import Protocol
 import pandas as pd
 
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
@@ -107,3 +108,9 @@ class RunRepositoryPort(Protocol):
   ) -> list[RunRecord]: ...
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None: ...
+
+
+class GuardedLiveStatePort(Protocol):
+  def load_state(self) -> GuardedLiveState: ...
+
+  def save_state(self, state: GuardedLiveState) -> GuardedLiveState: ...

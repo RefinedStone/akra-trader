@@ -6,6 +6,7 @@ from typing import Protocol
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
+from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
@@ -85,11 +86,15 @@ def build_container(settings: Settings) -> Container:
   runs = SqlAlchemyRunRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
+  guarded_live_state = SqlAlchemyGuardedLiveStateRepository(
+    settings.runs_database_url or build_default_runs_database_url(repo_root)
+  )
   application = TradingApplication(
     market_data=market_data,
     strategies=strategies,
     references=references,
     runs=runs,
+    guarded_live_state=guarded_live_state,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
     sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,

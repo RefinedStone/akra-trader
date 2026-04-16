@@ -293,6 +293,49 @@ type OperatorVisibility = {
   }[];
 };
 
+type GuardedLiveStatus = {
+  generated_at: string;
+  candidacy_status: string;
+  blockers: string[];
+  kill_switch: {
+    state: string;
+    reason: string;
+    updated_at: string;
+    updated_by: string;
+    activation_count: number;
+    last_engaged_at?: string | null;
+    last_released_at?: string | null;
+  };
+  reconciliation: {
+    state: string;
+    checked_at?: string | null;
+    checked_by?: string | null;
+    scope: string;
+    summary: string;
+    findings: {
+      kind: string;
+      severity: string;
+      summary: string;
+      detail: string;
+    }[];
+  };
+  audit_events: {
+    event_id: string;
+    timestamp: string;
+    actor: string;
+    kind: string;
+    summary: string;
+    detail: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    source: string;
+  }[];
+  active_runtime_alert_count: number;
+  running_sandbox_count: number;
+  running_paper_count: number;
+  running_live_count: number;
+};
+
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
@@ -659,7 +702,9 @@ export default function App() {
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
+  const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
+  const [guardedLiveReason, setGuardedLiveReason] = useState("operator_safety_drill");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
@@ -677,7 +722,16 @@ export default function App() {
   async function loadAll() {
     setStatusText("Refreshing data plane...");
     try {
-      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, paperResponse, marketResponse, operatorResponse] = await Promise.all([
+      const [
+        strategiesResponse,
+        referencesResponse,
+        backtestsResponse,
+        sandboxResponse,
+        paperResponse,
+        marketResponse,
+        operatorResponse,
+        guardedLiveResponse,
+      ] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
         fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
@@ -685,6 +739,7 @@ export default function App() {
         fetchJson<Run[]>(buildRunsPath("paper", paperRunFilter)),
         fetchJson<MarketDataStatus>("/market-data/status"),
         fetchJson<OperatorVisibility>("/operator/visibility"),
+        fetchJson<GuardedLiveStatus>("/guarded-live"),
       ]);
       setStrategies(strategiesResponse);
       setReferences(referencesResponse);
@@ -693,6 +748,7 @@ export default function App() {
       setPaperRuns(paperResponse);
       setMarketStatus(marketResponse);
       setOperatorVisibility(operatorResponse);
+      setGuardedLive(guardedLiveResponse);
       setStatusText("Control room synchronized.");
     } catch (error) {
       setStatusText(`Load failed: ${(error as Error).message}`);
@@ -868,6 +924,22 @@ export default function App() {
     };
   }, [operatorVisibility]);
 
+  const guardedLiveSummary = useMemo(() => {
+    if (!guardedLive) {
+      return null;
+    }
+    return {
+      blockerCount: guardedLive.blockers.length,
+      latestAuditAt: guardedLive.audit_events[0]?.timestamp ?? null,
+      latestReconciliationAt: guardedLive.reconciliation.checked_at ?? null,
+    };
+  }, [guardedLive]);
+
+  function resolveGuardedLiveReason(fallback: string) {
+    const trimmed = guardedLiveReason.trim();
+    return trimmed.length ? trimmed : fallback;
+  }
+
   async function handleBacktestSubmit(event: FormEvent) {
     event.preventDefault();
     setStatusText("Running backtest...");
@@ -964,6 +1036,51 @@ export default function App() {
       );
     } catch (error) {
       setStatusText(`Paper session failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function engageGuardedLiveKillSwitch() {
+    const reason = resolveGuardedLiveReason("operator_safety_drill");
+    setStatusText("Engaging guarded-live kill switch...");
+    try {
+      await fetchJson<GuardedLiveStatus>("/guarded-live/kill-switch/engage", {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText("Guarded-live kill switch engaged.");
+    } catch (error) {
+      setStatusText(`Kill switch engagement failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function releaseGuardedLiveKillSwitch() {
+    const reason = resolveGuardedLiveReason("operator_resume_drill");
+    setStatusText("Releasing guarded-live kill switch...");
+    try {
+      await fetchJson<GuardedLiveStatus>("/guarded-live/kill-switch/release", {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText("Guarded-live kill switch released.");
+    } catch (error) {
+      setStatusText(`Kill switch release failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function runGuardedLiveReconciliation() {
+    const reason = resolveGuardedLiveReason("operator_reconciliation_drill");
+    setStatusText("Running guarded-live reconciliation...");
+    try {
+      await fetchJson<GuardedLiveStatus>("/guarded-live/reconciliation", {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText("Guarded-live reconciliation recorded.");
+    } catch (error) {
+      setStatusText(`Reconciliation failed: ${(error as Error).message}`);
     }
   }
 
@@ -1261,6 +1378,177 @@ export default function App() {
             </div>
           ) : (
             <p>No operator visibility loaded.</p>
+          )}
+        </section>
+
+        <section className="panel panel-wide">
+          <p className="kicker">Guarded live</p>
+          <h2>Kill switch and reconciliation</h2>
+          {guardedLive ? (
+            <div className="status-grid">
+              {guardedLiveSummary ? (
+                <>
+                  <div className="metric-tile">
+                    <span>Candidacy</span>
+                    <strong>{guardedLive.candidacy_status}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Kill switch</span>
+                    <strong>{guardedLive.kill_switch.state}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Runtime alerts</span>
+                    <strong>{guardedLive.active_runtime_alert_count}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Last reconciliation</span>
+                    <strong>{formatTimestamp(guardedLiveSummary.latestReconciliationAt)}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Blockers</span>
+                    <strong>{guardedLiveSummary.blockerCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Latest audit</span>
+                    <strong>{formatTimestamp(guardedLiveSummary.latestAuditAt)}</strong>
+                  </div>
+                </>
+              ) : null}
+              <div className="control-action-row">
+                <label className="control-action-field">
+                  <span>Operator reason</span>
+                  <input
+                    onChange={(event) => setGuardedLiveReason(event.target.value)}
+                    placeholder="operator_safety_drill"
+                    type="text"
+                    value={guardedLiveReason}
+                  />
+                </label>
+                <button className="ghost-button" onClick={() => void runGuardedLiveReconciliation()} type="button">
+                  Run reconciliation
+                </button>
+                <button className="ghost-button" onClick={() => void engageGuardedLiveKillSwitch()} type="button">
+                  Engage kill switch
+                </button>
+                <button className="ghost-button" onClick={() => void releaseGuardedLiveKillSwitch()} type="button">
+                  Release kill switch
+                </button>
+              </div>
+              <div className="status-grid-two-column">
+                <div>
+                  <h3>Current guardrails</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>Kill switch</th>
+                        <td>{guardedLive.kill_switch.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Updated by</th>
+                        <td>{guardedLive.kill_switch.updated_by}</td>
+                      </tr>
+                      <tr>
+                        <th>Updated at</th>
+                        <td>{formatTimestamp(guardedLive.kill_switch.updated_at)}</td>
+                      </tr>
+                      <tr>
+                        <th>Reason</th>
+                        <td>{guardedLive.kill_switch.reason}</td>
+                      </tr>
+                      <tr>
+                        <th>Running sandbox</th>
+                        <td>{guardedLive.running_sandbox_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Running paper</th>
+                        <td>{guardedLive.running_paper_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Running live</th>
+                        <td>{guardedLive.running_live_count}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <h3>Candidate blockers</h3>
+                  {guardedLive.blockers.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Blocker</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.blockers.map((blocker) => (
+                          <tr key={blocker}>
+                            <td>{blocker}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No guarded-live blockers recorded.</p>
+                  )}
+                </div>
+                <div>
+                  <h3>Reconciliation findings</h3>
+                  {guardedLive.reconciliation.findings.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Severity</th>
+                          <th>Finding</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.reconciliation.findings.map((finding) => (
+                          <tr key={`${finding.kind}-${finding.summary}`}>
+                            <td>{finding.severity}</td>
+                            <td>{finding.kind}</td>
+                            <td>
+                              <strong>{finding.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{finding.detail}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">{guardedLive.reconciliation.summary}</p>
+                  )}
+                  <h3>Guarded-live audit</h3>
+                  {guardedLive.audit_events.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>Actor</th>
+                          <th>Kind</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.audit_events.slice(0, 8).map((event) => (
+                          <tr key={event.event_id}>
+                            <td>{formatTimestamp(event.timestamp)}</td>
+                            <td>{event.actor}</td>
+                            <td>{event.kind}</td>
+                            <td>
+                              <strong>{event.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{event.detail}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No guarded-live audit events recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p>No guarded-live status loaded.</p>
           )}
         </section>
 

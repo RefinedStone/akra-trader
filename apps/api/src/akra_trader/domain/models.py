@@ -488,6 +488,56 @@ class OperatorVisibility:
 
 
 @dataclass(frozen=True)
+class GuardedLiveKillSwitch:
+  state: str = "released"
+  reason: str = "Guarded-live kill switch is released."
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_by: str = "system"
+  activation_count: int = 0
+  last_engaged_at: datetime | None = None
+  last_released_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveReconciliationFinding:
+  kind: str
+  severity: str
+  summary: str
+  detail: str
+
+
+@dataclass(frozen=True)
+class GuardedLiveReconciliation:
+  state: str = "not_started"
+  checked_at: datetime | None = None
+  checked_by: str | None = None
+  scope: str = "control_plane"
+  summary: str = "No guarded-live reconciliation has run yet."
+  findings: tuple[GuardedLiveReconciliationFinding, ...] = ()
+
+
+@dataclass(frozen=True)
+class GuardedLiveState:
+  kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
+  reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
+  audit_events: tuple[OperatorAuditEvent, ...] = ()
+
+
+@dataclass(frozen=True)
+class GuardedLiveStatus:
+  generated_at: datetime
+  candidacy_status: str
+  blockers: tuple[str, ...] = ()
+  kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
+  reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
+  audit_events: tuple[OperatorAuditEvent, ...] = ()
+  active_runtime_alert_count: int = 0
+  running_sandbox_count: int = 0
+  running_paper_count: int = 0
+  running_live_count: int = 0
+
+
+@dataclass(frozen=True)
 class GapWindow:
   start_at: datetime
   end_at: datetime

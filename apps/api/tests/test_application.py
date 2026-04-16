@@ -5,6 +5,8 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
+
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
@@ -640,6 +642,111 @@ def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
 
   assert stopped is not None
   assert any(event.kind == "sandbox_worker_stopped" for event in stopped_visibility.audit_events)
+
+
+def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  sandbox_run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  paper_run = app.start_paper_run(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  status = app.engage_guarded_live_kill_switch(
+    actor="operator",
+    reason="manual_safety_drill",
+  )
+
+  reloaded_sandbox = app.get_run(sandbox_run.config.run_id)
+  reloaded_paper = app.get_run(paper_run.config.run_id)
+
+  assert status.kill_switch.state == "engaged"
+  assert status.kill_switch.updated_by == "operator"
+  assert status.running_sandbox_count == 0
+  assert status.running_paper_count == 0
+  assert status.audit_events[0].kind == "guarded_live_kill_switch_engaged"
+  assert reloaded_sandbox is not None
+  assert reloaded_sandbox.status == RunStatus.STOPPED
+  assert "guarded-live kill switch" in reloaded_sandbox.notes[-1]
+  assert reloaded_paper is not None
+  assert reloaded_paper.status == RunStatus.STOPPED
+  assert "guarded-live kill switch" in reloaded_paper.notes[-1]
+
+  with pytest.raises(ValueError, match="kill switch"):
+    app.start_sandbox_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      replay_bars=24,
+    )
+
+
+def test_guarded_live_reconciliation_records_runtime_findings(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    sandbox_worker_heartbeat_interval_seconds=5,
+    sandbox_worker_heartbeat_timeout_seconds=15,
+  )
+
+  app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  clock.advance(timedelta(seconds=20))
+
+  status = app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="pre_live_reconciliation_drill",
+  )
+
+  assert status.reconciliation.state == "issues_detected"
+  assert status.reconciliation.checked_by == "operator"
+  assert any(
+    finding.kind == "runtime_alerts_present"
+    for finding in status.reconciliation.findings
+  )
+  assert status.audit_events[0].kind == "guarded_live_reconciliation_ran"
+  assert "Guarded-live reconciliation has not been cleared." in status.blockers
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

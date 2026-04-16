@@ -283,6 +283,78 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
   assert any(event["kind"] == "sandbox_worker_failed" for event in payload["audit_events"])
 
 
+def test_guarded_live_endpoints_manage_kill_switch_and_block_runtime_starts(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    initial = client.get("/api/guarded-live")
+    assert initial.status_code == 200
+    assert initial.json()["kill_switch"]["state"] == "released"
+
+    engage_response = client.post(
+      "/api/guarded-live/kill-switch/engage",
+      json={"actor": "operator", "reason": "manual_safety_drill"},
+    )
+
+    assert engage_response.status_code == 200
+    payload = engage_response.json()
+    assert payload["kill_switch"]["state"] == "engaged"
+    assert payload["kill_switch"]["updated_by"] == "operator"
+    assert payload["audit_events"][0]["kind"] == "guarded_live_kill_switch_engaged"
+
+    blocked_start = client.post(
+      "/api/runs/sandbox",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+      },
+    )
+
+    assert blocked_start.status_code == 400
+    assert "kill switch" in blocked_start.json()["detail"]
+
+    release_response = client.post(
+      "/api/guarded-live/kill-switch/release",
+      json={"actor": "operator", "reason": "drill_complete"},
+    )
+
+    assert release_response.status_code == 200
+    released_payload = release_response.json()
+    assert released_payload["kill_switch"]["state"] == "released"
+    assert released_payload["audit_events"][0]["kind"] == "guarded_live_kill_switch_released"
+
+
+def test_guarded_live_status_survives_app_restart(tmp_path: Path) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+
+  with build_client(database_path) as client:
+    reconcile_response = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "startup_drill"},
+    )
+    assert reconcile_response.status_code == 200
+
+    engage_response = client.post(
+      "/api/guarded-live/kill-switch/engage",
+      json={"actor": "operator", "reason": "startup_safety_latch"},
+    )
+    assert engage_response.status_code == 200
+
+  with build_client(database_path) as restarted_client:
+    response = restarted_client.get("/api/guarded-live")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["kill_switch"]["state"] == "engaged"
+  assert payload["reconciliation"]["checked_by"] == "operator"
+  assert any(event["kind"] == "guarded_live_reconciliation_ran" for event in payload["audit_events"])
+  assert any(event["kind"] == "guarded_live_kill_switch_engaged" for event in payload["audit_events"])
+
+
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 

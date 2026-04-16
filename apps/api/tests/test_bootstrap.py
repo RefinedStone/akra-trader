@@ -16,7 +16,12 @@ def test_build_container_uses_configured_runs_database_url(monkeypatch) -> None:
     def __init__(self, database_url: str) -> None:
       captured["database_url"] = database_url
 
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      captured["guarded_live_database_url"] = database_url
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
 
   build_container(
     Settings(
@@ -26,6 +31,7 @@ def test_build_container_uses_configured_runs_database_url(monkeypatch) -> None:
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
 
 
 def test_build_default_runs_database_url_points_to_local_sqlite() -> None:
@@ -51,6 +57,10 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
     def __init__(self, database_url: str) -> None:
       self.database_url = database_url
 
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
   class FakeSandboxWorkerSessionsJob:
     def __init__(self, application, *, interval_seconds: int) -> None:
       self._application = application
@@ -63,6 +73,7 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
       return None
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
 
   container = build_container(Settings(market_data_provider="seeded"))
@@ -77,6 +88,10 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   class FakeRunRepository:
     def __init__(self, database_url: str) -> None:
       self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      captured["guarded_live_database_url"] = database_url
 
   class FakeBinanceMarketDataAdapter:
     def __init__(
@@ -116,6 +131,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       return None
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
@@ -134,6 +150,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["tracked_symbols"] == "BTC/USDT"
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"

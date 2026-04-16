@@ -334,6 +334,30 @@ select {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
+.control-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.control-action-field {
+  display: grid;
+  gap: 6px;
+  min-width: 260px;
+  flex: 1 1 320px;
+  color: var(--muted);
+}
+
+.control-action-field input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
 .metric-tile {
   padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);

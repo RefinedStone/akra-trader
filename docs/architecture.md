@@ -30,11 +30,13 @@ The repository is organized around a small set of stable boundaries:
 - run lookup, listing, filtering, and comparison
 - market-data status queries
 - operator visibility queries for runtime alerts and audit events
+- guarded-live kill-switch and reconciliation orchestration
 
 ### Ports
 
 - `MarketDataPort`
 - `RunRepositoryPort`
+- `GuardedLiveStatePort`
 - `StrategyCatalogPort`
 - `DecisionEnginePort`
 - `ReferenceCatalogPort`
@@ -133,6 +135,10 @@ The application also derives operator visibility from sandbox runtime state. Fai
 and stale heartbeats surface as control-room alerts, and worker lifecycle notes are normalized into
 recent audit events for operator review.
 
+Guarded-live control state is persisted separately from run history. That state currently tracks a
+kill switch for operator-controlled runtime sessions, reconciliation results for local control-plane
+checks, and a guarded-live audit log of operator actions.
+
 ## Modes
 
 ### Backtest
@@ -164,6 +170,7 @@ The web app currently surfaces:
 - backtest launch
 - sandbox worker launch, stop, and rerun restore
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
+- guarded-live kill switch, candidacy blockers, reconciliation findings, and guarded-live audit history
 - run history
 - run comparison and benchmark narratives
 
@@ -172,7 +179,8 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 ## Known Limits
 
 - no venue-backed continuous execution worker yet
-- runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions; the
-  system still lacks durable alert delivery, wider operator event coverage, and reconciliation flows
+- runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
+  guarded-live reconciliation is still limited to local control-plane checks rather than venue state
+- the system still lacks durable alert delivery and wider operator event coverage
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

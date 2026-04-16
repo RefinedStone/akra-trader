@@ -13,6 +13,11 @@ from akra_trader.domain.models import RunComparison
 from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
+from akra_trader.domain.models import GuardedLiveKillSwitch
+from akra_trader.domain.models import GuardedLiveReconciliation
+from akra_trader.domain.models import GuardedLiveReconciliationFinding
+from akra_trader.domain.models import GuardedLiveState
+from akra_trader.domain.models import GuardedLiveStatus
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
@@ -31,6 +36,7 @@ from akra_trader.domain.models import StrategySnapshot
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.domain.services import summarize_performance
 from akra_trader.lineage import build_rerun_boundary_identity
+from akra_trader.ports import GuardedLiveStatePort
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
@@ -220,6 +226,17 @@ COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
 class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
 
+  class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
+    def __init__(self) -> None:
+      self._state = GuardedLiveState()
+
+    def load_state(self) -> GuardedLiveState:
+      return self._state
+
+    def save_state(self, state: GuardedLiveState) -> GuardedLiveState:
+      self._state = state
+      return state
+
   def __init__(
     self,
     *,
@@ -227,6 +244,7 @@ class TradingApplication:
     strategies: StrategyCatalogPort,
     references: ReferenceCatalogPort,
     runs: RunRepositoryPort,
+    guarded_live_state: GuardedLiveStatePort | None = None,
     freqtrade_reference: FreqtradeReferenceAdapter | None = None,
     mode_service: ExecutionModeService | None = None,
     data_engine: DataEngine | None = None,
@@ -240,6 +258,7 @@ class TradingApplication:
     self._strategies = strategies
     self._references = references
     self._runs = runs
+    self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
     self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
     self._data_engine = data_engine or DataEngine(market_data)
@@ -378,6 +397,155 @@ class TradingApplication:
       alerts=tuple(alerts),
       audit_events=tuple(audit_events),
     )
+
+  def get_guarded_live_status(self) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    runtime_visibility = self.get_operator_visibility()
+    running_sandbox_count = self._count_running_runs(RunMode.SANDBOX)
+    running_paper_count = self._count_running_runs(RunMode.PAPER)
+    running_live_count = self._count_running_runs(RunMode.LIVE)
+
+    blockers: list[str] = []
+    if state.kill_switch.state == "engaged":
+      blockers.append("Kill switch is engaged for operator-controlled runtime sessions.")
+    if state.reconciliation.state != "clear":
+      blockers.append("Guarded-live reconciliation has not been cleared.")
+    if runtime_visibility.alerts:
+      blockers.append("Unresolved runtime alerts remain in sandbox operations.")
+    blockers.append("Venue-backed live execution is not implemented.")
+
+    audit_events = tuple(
+      sorted(state.audit_events, key=lambda event: event.timestamp, reverse=True)
+    )
+    return GuardedLiveStatus(
+      generated_at=current_time,
+      candidacy_status="blocked" if blockers else "candidate",
+      blockers=tuple(dict.fromkeys(blockers)),
+      kill_switch=state.kill_switch,
+      reconciliation=state.reconciliation,
+      audit_events=audit_events,
+      active_runtime_alert_count=len(runtime_visibility.alerts),
+      running_sandbox_count=running_sandbox_count,
+      running_paper_count=running_paper_count,
+      running_live_count=running_live_count,
+    )
+
+  def engage_guarded_live_kill_switch(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    stopped_runs = self._stop_runs_for_kill_switch(actor=actor, reason=reason)
+    activation_count = state.kill_switch.activation_count
+    if state.kill_switch.state != "engaged":
+      activation_count += 1
+    kill_switch = GuardedLiveKillSwitch(
+      state="engaged",
+      reason=reason,
+      updated_at=current_time,
+      updated_by=actor,
+      activation_count=activation_count,
+      last_engaged_at=current_time,
+      last_released_at=state.kill_switch.last_released_at,
+    )
+    event = OperatorAuditEvent(
+      event_id=f"guarded-live-kill-switch-engaged:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_kill_switch_engaged",
+      summary="Guarded-live kill switch engaged.",
+      detail=(
+        f"Reason: {reason}. Stopped {len(stopped_runs)} operator-controlled runtime "
+        f"session(s): {', '.join(stopped_runs) if stopped_runs else 'none'}."
+      ),
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        kill_switch=kill_switch,
+        audit_events=(*state.audit_events, event),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def release_guarded_live_kill_switch(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    kill_switch = GuardedLiveKillSwitch(
+      state="released",
+      reason=reason,
+      updated_at=current_time,
+      updated_by=actor,
+      activation_count=state.kill_switch.activation_count,
+      last_engaged_at=state.kill_switch.last_engaged_at,
+      last_released_at=current_time,
+    )
+    event = OperatorAuditEvent(
+      event_id=f"guarded-live-kill-switch-released:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_kill_switch_released",
+      summary="Guarded-live kill switch released.",
+      detail=f"Reason: {reason}. Operator-controlled runtime sessions may start again.",
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        kill_switch=kill_switch,
+        audit_events=(*state.audit_events, event),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def run_guarded_live_reconciliation(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    findings = self._build_guarded_live_reconciliation_findings()
+    reconciliation = GuardedLiveReconciliation(
+      state="clear" if not findings else "issues_detected",
+      checked_at=current_time,
+      checked_by=actor,
+      scope="control_plane",
+      summary=(
+        "Guarded-live reconciliation found no local control-plane mismatches."
+        if not findings
+        else f"Guarded-live reconciliation found {len(findings)} control-plane issue(s)."
+      ),
+      findings=tuple(findings),
+    )
+    event = OperatorAuditEvent(
+      event_id=f"guarded-live-reconciliation-ran:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_reconciliation_ran",
+      summary="Guarded-live reconciliation recorded.",
+      detail=f"Reason: {reason}. {reconciliation.summary}",
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        reconciliation=reconciliation,
+        audit_events=(*state.audit_events, event),
+      )
+    )
+    return self.get_guarded_live_status()
 
   def run_backtest(
     self,
@@ -584,6 +752,7 @@ class TradingApplication:
       start_at=start_at,
       end_at=end_at,
     )
+    self._ensure_operator_control_runtime_allowed(target_mode)
     if metadata.runtime == "freqtrade_reference":
       run = RunRecord(
         config=config,
@@ -679,6 +848,109 @@ class TradingApplication:
       return None
     self._run_supervisor.stop(run, reason="Paper run stopped by operator.")
     return self._runs.save_run(run)
+
+  def _ensure_operator_control_runtime_allowed(self, mode: RunMode) -> None:
+    if mode not in {RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE}:
+      return
+    state = self._guarded_live_state.load_state()
+    if state.kill_switch.state == "engaged":
+      raise ValueError(
+        "Guarded-live kill switch is engaged. Release it before starting operator-controlled runtime sessions."
+      )
+
+  def _persist_guarded_live_state(self, state: GuardedLiveState) -> GuardedLiveState:
+    return self._guarded_live_state.save_state(state)
+
+  def _count_running_runs(self, mode: RunMode) -> int:
+    return sum(
+      1
+      for run in self._runs.list_runs(mode=mode.value)
+      if run.status == RunStatus.RUNNING
+    )
+
+  def _stop_runs_for_kill_switch(self, *, actor: str, reason: str) -> list[str]:
+    stopped_runs: list[str] = []
+    for mode, label in (
+      (RunMode.SANDBOX, "Sandbox worker"),
+      (RunMode.PAPER, "Paper session"),
+    ):
+      for run in self._runs.list_runs(mode=mode.value):
+        if run.status != RunStatus.RUNNING:
+          continue
+        self._run_supervisor.stop(
+          run,
+          reason=f"{label} stopped by guarded-live kill switch ({actor}: {reason}).",
+        )
+        self._runs.save_run(run)
+        stopped_runs.append(run.config.run_id)
+    return stopped_runs
+
+  def _build_guarded_live_reconciliation_findings(self) -> list[GuardedLiveReconciliationFinding]:
+    findings: list[GuardedLiveReconciliationFinding] = []
+    runtime_visibility = self.get_operator_visibility()
+    if runtime_visibility.alerts:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="runtime_alerts_present",
+          severity="warning",
+          summary=f"{len(runtime_visibility.alerts)} unresolved runtime alert(s) remain active.",
+          detail="Guarded-live candidacy stays blocked while sandbox runtime alerts remain unresolved.",
+        )
+      )
+
+    running_live_runs = [
+      run
+      for run in self._runs.list_runs(mode=RunMode.LIVE.value)
+      if run.status == RunStatus.RUNNING
+    ]
+    if running_live_runs:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="unexpected_live_runs",
+          severity="critical",
+          summary=f"{len(running_live_runs)} live run(s) are active before guarded-live support exists.",
+          detail="Live execution is not implemented, so any active live run indicates a control-plane mismatch.",
+        )
+      )
+
+    inconsistent_sandbox_runs = [
+      run
+      for run in self._runs.list_runs(mode=RunMode.SANDBOX.value)
+      if run.status == RunStatus.RUNNING and run.provenance.runtime_session is None
+    ]
+    if inconsistent_sandbox_runs:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="sandbox_runtime_session_missing",
+          severity="critical",
+          summary=(
+            f"{len(inconsistent_sandbox_runs)} sandbox run(s) are missing persisted runtime session state."
+          ),
+          detail="Continuous sandbox workers must keep runtime-session state for restart safety and auditability.",
+        )
+      )
+
+    stale_terminal_sessions = [
+      run
+      for run in self._runs.list_runs(mode=RunMode.SANDBOX.value)
+      if (
+        run.status in {RunStatus.STOPPED, RunStatus.FAILED, RunStatus.COMPLETED}
+        and run.provenance.runtime_session is not None
+        and run.provenance.runtime_session.lifecycle_state == "active"
+      )
+    ]
+    if stale_terminal_sessions:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="terminal_runtime_session_active",
+          severity="warning",
+          summary=(
+            f"{len(stale_terminal_sessions)} terminal sandbox run(s) still report an active runtime session."
+          ),
+          detail="Terminal runs should not keep active worker-session state after stop, failure, or completion.",
+        )
+      )
+    return findings
 
   def maintain_sandbox_worker_sessions(
     self,

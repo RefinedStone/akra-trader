@@ -19,12 +19,14 @@ Implemented now:
   relaunch stored boundaries into backtest, sandbox, or paper flows
 - operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts, and
   runtime audit events
+- guarded-live state endpoints persist kill-switch state, reconciliation status, and guarded-live
+  audit events in the control plane
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
 
 - live trading adapters
-- alerting and operator event storage
+- external alert delivery and wider operator event storage
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
 
@@ -75,6 +77,10 @@ Defaults:
 - `GET /api/runs/{run_id}/metrics`
 - `GET /api/market-data/status`
 - `GET /api/operator/visibility`
+- `GET /api/guarded-live`
+- `POST /api/guarded-live/kill-switch/engage`
+- `POST /api/guarded-live/kill-switch/release`
+- `POST /api/guarded-live/reconciliation`
 
 ## Runtime Notes
 
@@ -88,6 +94,8 @@ Defaults:
   persisted heartbeat and recovery state
 - operator visibility now surfaces stale sandbox heartbeats, worker failures, and runtime audit
   entries directly in the control room
+- guarded-live controls now persist kill-switch state, can stop running sandbox/paper sessions, and
+  record operator reconciliation drills before any live candidacy discussion
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

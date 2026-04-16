@@ -48,6 +48,11 @@ class SandboxRunRequest(BaseModel):
   parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class GuardedLiveActionRequest(BaseModel):
+  actor: str = "operator"
+  reason: str = "manual_operator_action"
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -188,16 +193,19 @@ def create_router(container: Container) -> APIRouter:
     request: SandboxRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    run = app.start_sandbox_run(
-      strategy_id=request.strategy_id,
-      symbol=request.symbol,
-      timeframe=request.timeframe,
-      initial_cash=request.initial_cash,
-      fee_rate=request.fee_rate,
-      slippage_bps=request.slippage_bps,
-      parameters=request.parameters,
-      replay_bars=request.replay_bars,
-    )
+    try:
+      run = app.start_sandbox_run(
+        strategy_id=request.strategy_id,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        initial_cash=request.initial_cash,
+        fee_rate=request.fee_rate,
+        slippage_bps=request.slippage_bps,
+        parameters=request.parameters,
+        replay_bars=request.replay_bars,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run(run)
 
   @router.post("/runs/sandbox/{run_id}/stop")
@@ -212,16 +220,19 @@ def create_router(container: Container) -> APIRouter:
     request: SandboxRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    run = app.start_paper_run(
-      strategy_id=request.strategy_id,
-      symbol=request.symbol,
-      timeframe=request.timeframe,
-      initial_cash=request.initial_cash,
-      fee_rate=request.fee_rate,
-      slippage_bps=request.slippage_bps,
-      parameters=request.parameters,
-      replay_bars=request.replay_bars,
-    )
+    try:
+      run = app.start_paper_run(
+        strategy_id=request.strategy_id,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        initial_cash=request.initial_cash,
+        fee_rate=request.fee_rate,
+        slippage_bps=request.slippage_bps,
+        parameters=request.parameters,
+        replay_bars=request.replay_bars,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run(run)
 
   @router.post("/runs/paper/{run_id}/stop")
@@ -261,6 +272,35 @@ def create_router(container: Container) -> APIRouter:
   def get_operator_visibility(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
     visibility = app.get_operator_visibility()
     return asdict(visibility)
+
+  @router.get("/guarded-live")
+  def get_guarded_live_status(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    status = app.get_guarded_live_status()
+    return asdict(status)
+
+  @router.post("/guarded-live/kill-switch/engage")
+  def engage_guarded_live_kill_switch(
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    status = app.engage_guarded_live_kill_switch(actor=request.actor, reason=request.reason)
+    return asdict(status)
+
+  @router.post("/guarded-live/kill-switch/release")
+  def release_guarded_live_kill_switch(
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    status = app.release_guarded_live_kill_switch(actor=request.actor, reason=request.reason)
+    return asdict(status)
+
+  @router.post("/guarded-live/reconciliation")
+  def run_guarded_live_reconciliation(
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    status = app.run_guarded_live_reconciliation(actor=request.actor, reason=request.reason)
+    return asdict(status)
 
   return router
 
