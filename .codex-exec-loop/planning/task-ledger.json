@@ -1215,19 +1215,37 @@
       "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-adaptive-refresh-cadence",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Adapt reset-summary relative time refresh cadence to session age",
-      "description": "Tune the `Reset all saved views` confirmation summary so very recent saved-session timestamps refresh more frequently while older sessions refresh less often, keeping relative-time chips perceptually accurate without paying the same timer cost for long-stale entries.",
-      "status": "ready",
+      "description": "Completed the age-aware cadence follow-up by replacing the fixed refresh interval for `Reset all saved views` summary recency chips with a saved-session-age-sensitive reschedule loop, refreshing very recent timestamps more often while letting older sessions update less frequently and keeping the timer scoped to the open confirmation summary.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply said nothing essential remains after shipping live relative-time refresh and directly identified adaptive refresh cadence by session age as the likeliest next refinement, making it the clearest executable follow-up to keep the queue moving.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the age-aware relative-time refresh cadence, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `e77f57c` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:20:00Z",
+      "updated_at": "2026-04-17T10:25:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-live-refresh"
       ],
       "direction_relation_note": "Builds on the shipped live-aging reset-summary chips by making their refresh policy more efficient and age-aware, preserving trustworthy recency cues without running an equally aggressive timer for every saved session."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-boundary-alignment",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Align reset-summary relative time refreshes to actual label boundaries",
+      "description": "Adjust the `Reset all saved views` confirmation summary so each saved-session relative-time chip schedules its next refresh at the next real label boundary, such as updating exactly when `59s ago` becomes `1m ago`, instead of waking on a coarser age bucket cadence.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed adaptive cadence task and directly identified next-boundary label alignment as the likeliest next refinement, making it the clearest executable follow-up to keep builtin next-task progression moving.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:25:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-adaptive-refresh-cadence"
+      ],
+      "direction_relation_note": "Builds on the shipped age-aware reset-summary cadence by making relative-time chips refresh exactly when their displayed label should change, improving recency precision without reverting to a globally aggressive timer."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-contextual-reset-scopes",
