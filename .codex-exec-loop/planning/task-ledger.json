@@ -223,20 +223,38 @@
     {
       "id": "planning-control-room-ui-state-storage-versioning",
       "direction_id": "control-room-and-ops",
-      "title": "Version persisted control-room UI state before storage scope grows",
-      "description": "Introduce an explicit versioned wrapper for persisted control-room UI state so the current gap-window expansion map can evolve safely when more operator preferences share the same browser storage area, including migration or reset behavior for older payloads.",
-      "status": "ready",
+      "title": "Persisted control-room UI state is now versioned before storage scope grows",
+      "description": "Completed the control-room persistence follow-up by wrapping stored UI state in a versioned `control-room-ui-state` envelope, preserving fallback reads from the legacy `akra-trader-gap-window-expansion` key, and writing only the versioned payload while removing the old key.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply marked stale-key pruning complete and directly called out storage versioning as the next reasonable follow-up if control-room preferences keep accumulating in the same persistence area, making it the clearest executable successor now that the prior queue head is done.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the control-room UI state versioning work, verified it with `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `b6fa551` (`feat(ops): version control room ui state`).",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:20:00Z",
+      "updated_at": "2026-04-17T00:30:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-gap-window-expand-state-pruning"
       ],
       "direction_relation_note": "Keeps control-room persistence maintainable as more operator-facing UI preferences become durable, so future state additions do not strand incompatible browser payloads."
+    },
+    {
+      "id": "planning-control-room-ui-state-explicit-migration-path",
+      "direction_id": "control-room-and-ops",
+      "title": "Add explicit migration handling when a second persisted control-room preference lands",
+      "description": "Once another control-room UI preference is introduced into the shared storage envelope, add an explicit version-to-version migration path and coverage so stored operator preferences upgrade intentionally instead of relying only on the current legacy fallback from the pre-envelope gap-row map.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 3,
+      "priority_reason": "The latest main-session reply said the remaining follow-up is explicit migration handling for a future second UI preference, but that work should stay a proposal until the broader persisted preference scope actually exists.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:30:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-ui-state-storage-versioning"
+      ],
+      "direction_relation_note": "Keeps the control-room persistence lane forward-compatible by reserving real migration work for the point where multiple durable operator preferences share one versioned browser payload."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
@@ -303,13 +321,13 @@
       "direction_id": "strategy-platform",
       "title": "Add strategy lifecycle and parameter snapshot metadata to the shared run model",
       "description": "Extend the current strategy and run contracts so strategy lifecycle state, version history, parameter snapshots, runtime lane selection, and queryable metadata are explicit across native, reference, and future decision-engine strategies, matching Track B/C and Epic 3 requirements.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 88,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest planning answer called out provenance and strategy contract normalization as next-tier foundation work, and current `StrategyMetadata` lacks lifecycle or promotion state even though the ADR and roadmap require it.",
+      "dynamic_priority_delta": 9,
+      "priority_reason": "With the control-room UI state versioning task now completed and no immediate executable follow-up in that lane, the next clearest ready backlog item is shared strategy lifecycle metadata because current `StrategyMetadata` still lacks the explicit version and promotion state required by the strategy-platform ADR and roadmap.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T13:47:58Z",
+      "updated_at": "2026-04-17T00:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Covers the strategy-platform success criteria around explicit runtime lane metadata and comparable version lifecycle."
     },
