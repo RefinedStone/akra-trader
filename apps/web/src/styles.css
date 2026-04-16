@@ -169,6 +169,31 @@ select {
   align-items: flex-start;
 }
 
+.strategy-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.meta-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(88, 217, 255, 0.12);
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.meta-pill.subtle {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+}
+
 .strategy-card p,
 .run-note,
 .empty-state,
@@ -242,6 +267,28 @@ select {
 .ghost-button:hover {
   transform: translateY(-1px);
   opacity: 0.96;
+}
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.filter-bar label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.filter-bar select {
+  min-width: 180px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
 }
 
 .status-grid {
@@ -391,6 +438,16 @@ select {
     rgba(255, 255, 255, 0.02);
 }
 
+.run-strategy {
+  margin: 14px 0;
+  padding: 16px;
+  border: 1px solid rgba(255, 191, 71, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 191, 71, 0.05), rgba(255, 191, 71, 0.01)),
+    rgba(255, 255, 255, 0.02);
+}
+
 .run-lineage-head {
   display: flex;
   justify-content: space-between;
@@ -404,7 +461,26 @@ select {
   color: var(--cyan);
 }
 
+.run-strategy-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 12px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
 .run-lineage-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-strategy-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
@@ -416,7 +492,22 @@ select {
   margin-top: 12px;
 }
 
+.run-strategy-copy {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
 .run-lineage-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.run-strategy-copy p {
   margin: 0;
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
@@ -480,6 +571,7 @@ select {
   .run-form,
   .run-metrics,
   .run-lineage-grid,
+  .run-strategy-grid,
   .run-lineage-symbol-grid {
     grid-template-columns: 1fr;
   }

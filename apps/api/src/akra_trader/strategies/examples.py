@@ -6,6 +6,7 @@ from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
+from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.strategies.base import FixedFractionExecutionPolicy
@@ -63,6 +64,8 @@ class MovingAverageCrossStrategy(PolicyBackedStrategy):
         "long_window": {"type": "integer", "default": 21, "minimum": 5},
       },
       description="Simple momentum crossover strategy intended as the starter SDK example.",
+      lifecycle=StrategyLifecycle(stage="active"),
+      version_lineage=("1.0.0",),
     )
 
   def warmup_spec(self) -> WarmupSpec:

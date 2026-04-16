@@ -69,7 +69,13 @@ class MarketDataPort(Protocol):
 
 
 class StrategyCatalogPort(Protocol):
-  def list_strategies(self) -> list[StrategyMetadata]: ...
+  def list_strategies(
+    self,
+    *,
+    runtime: str | None = None,
+    lifecycle_stage: str | None = None,
+    version: str | None = None,
+  ) -> list[StrategyMetadata]: ...
 
   def load(self, strategy_id: str) -> StrategyRuntime: ...
 
@@ -89,6 +95,12 @@ class RunRepositoryPort(Protocol):
 
   def get_run(self, run_id: str) -> RunRecord | None: ...
 
-  def list_runs(self, mode: str | None = None) -> list[RunRecord]: ...
+  def list_runs(
+    self,
+    mode: str | None = None,
+    *,
+    strategy_id: str | None = None,
+    strategy_version: str | None = None,
+  ) -> list[RunRecord]: ...
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None: ...

@@ -5,6 +5,7 @@ import pandas as pd
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyDecisionEnvelope
+from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.ports import DecisionEnginePort
@@ -27,6 +28,8 @@ class ExternalDecisionStrategy(Strategy):
         "prompt_profile": {"type": "string", "default": "balanced"},
       },
       description="Template strategy that delegates final trade selection to an external decision engine such as an LLM.",
+      lifecycle=StrategyLifecycle(stage="experimental"),
+      version_lineage=("0.1.0",),
     )
 
   def warmup_spec(self) -> WarmupSpec:

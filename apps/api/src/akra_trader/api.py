@@ -13,6 +13,7 @@ from pydantic import Field
 
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run
+from akra_trader.application import serialize_strategy
 from akra_trader.bootstrap import Container
 
 
@@ -56,8 +57,20 @@ def create_router(container: Container) -> APIRouter:
     return {"status": "ok"}
 
   @router.get("/strategies")
-  def list_strategies(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
-    return [asdict(strategy) for strategy in app.list_strategies()]
+  def list_strategies(
+    lane: str | None = None,
+    lifecycle_stage: str | None = None,
+    version: str | None = None,
+    app: TradingApplication = Depends(get_app),
+  ) -> list[dict[str, Any]]:
+    return [
+      serialize_strategy(strategy)
+      for strategy in app.list_strategies(
+        lane=lane,
+        lifecycle_stage=lifecycle_stage,
+        version=version,
+      )
+    ]
 
   @router.get("/references")
   def list_references(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
@@ -73,11 +86,23 @@ def create_router(container: Container) -> APIRouter:
       module_path=request.module_path,
       class_name=request.class_name,
     )
-    return asdict(metadata)
+    return serialize_strategy(metadata)
 
   @router.get("/runs")
-  def list_runs(mode: str | None = None, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
-    return [serialize_run(run) for run in app.list_runs(mode=mode)]
+  def list_runs(
+    mode: str | None = None,
+    strategy_id: str | None = None,
+    strategy_version: str | None = None,
+    app: TradingApplication = Depends(get_app),
+  ) -> list[dict[str, Any]]:
+    return [
+      serialize_run(run)
+      for run in app.list_runs(
+        mode=mode,
+        strategy_id=strategy_id,
+        strategy_version=strategy_version,
+      )
+    ]
 
   @router.post("/runs/backtests")
   def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:

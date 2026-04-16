@@ -1,11 +1,28 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
+type ParameterSchema = Record<
+  string,
+  {
+    default?: unknown;
+    minimum?: number;
+    type?: string;
+  }
+>;
+
 type Strategy = {
   strategy_id: string;
   name: string;
   version: string;
+  version_lineage: string[];
   runtime: string;
+  asset_types: string[];
+  supported_timeframes: string[];
+  parameter_schema: ParameterSchema;
   description: string;
+  lifecycle: {
+    stage: string;
+    registered_at?: string | null;
+  };
   reference_id?: string | null;
   reference_path?: string | null;
   entrypoint?: string | null;
@@ -39,6 +56,30 @@ type Run = {
     reference_version?: string | null;
     integration_mode?: string | null;
     external_command: string[];
+    strategy?: {
+      strategy_id: string;
+      name: string;
+      version: string;
+      version_lineage: string[];
+      runtime: string;
+      lifecycle: {
+        stage: string;
+        registered_at?: string | null;
+      };
+      parameter_snapshot: {
+        requested: Record<string, unknown>;
+        resolved: Record<string, unknown>;
+        schema: ParameterSchema;
+      };
+      supported_timeframes: string[];
+      warmup: {
+        required_bars: number;
+        timeframes: string[];
+      };
+      reference_id?: string | null;
+      reference_path?: string | null;
+      entrypoint?: string | null;
+    } | null;
     market_data?: {
       provider: string;
       venue: string;
@@ -107,10 +148,16 @@ const MAX_VISIBLE_GAP_WINDOWS = 3;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 1;
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
+const ALL_FILTER_VALUE = "__all__";
 
 type ControlRoomUiStateV1 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
   expandedGapRows: Record<string, boolean>;
+};
+
+type RunHistoryFilter = {
+  strategy_id: string;
+  strategy_version: string;
 };
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -133,6 +180,11 @@ const defaultRunForm = {
   slippage_bps: 3,
 };
 
+const defaultRunHistoryFilter: RunHistoryFilter = {
+  strategy_id: ALL_FILTER_VALUE,
+  strategy_version: ALL_FILTER_VALUE,
+};
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -142,6 +194,8 @@ export default function App() {
   const [statusText, setStatusText] = useState("Loading control room...");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
+  const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
+  const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
     loadExpandedGapRows,
   );
@@ -152,8 +206,8 @@ export default function App() {
       const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, marketResponse] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
-        fetchJson<Run[]>("/runs?mode=backtest"),
-        fetchJson<Run[]>("/runs?mode=sandbox"),
+        fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
+        fetchJson<Run[]>(buildRunsPath("sandbox", sandboxRunFilter)),
         fetchJson<MarketDataStatus>("/market-data/status"),
       ]);
       setStrategies(strategiesResponse);
@@ -169,7 +223,7 @@ export default function App() {
 
   useEffect(() => {
     void loadAll();
-  }, []);
+  }, [backtestRunFilter, sandboxRunFilter]);
 
   useEffect(() => {
     if (!strategies.length) {
@@ -178,6 +232,14 @@ export default function App() {
     const preferredNative = strategies.find((strategy) => strategy.runtime === "native") ?? strategies[0];
     setBacktestForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
     setSandboxForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
+  }, [strategies]);
+
+  useEffect(() => {
+    if (!strategies.length) {
+      return;
+    }
+    setBacktestRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
+    setSandboxRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
   }, [strategies]);
 
   useEffect(() => {
@@ -433,8 +495,21 @@ export default function App() {
           )}
         </section>
 
-        <RunSection title="Recent backtests" runs={backtests} />
-        <RunSection title="Sandbox runs" runs={sandboxRuns} onStop={stopSandboxRun} />
+        <RunSection
+          title="Recent backtests"
+          runs={backtests}
+          strategies={strategies}
+          filter={backtestRunFilter}
+          setFilter={setBacktestRunFilter}
+        />
+        <RunSection
+          title="Sandbox runs"
+          runs={sandboxRuns}
+          strategies={strategies}
+          filter={sandboxRunFilter}
+          setFilter={setSandboxRunFilter}
+          onStop={stopSandboxRun}
+        />
       </main>
     </div>
   );
@@ -694,6 +769,49 @@ function isControlRoomUiStateV1(value: unknown): value is ControlRoomUiStateV1 {
   );
 }
 
+function buildRunsPath(mode: string, filter: RunHistoryFilter) {
+  const params = new URLSearchParams({ mode });
+  if (filter.strategy_id !== ALL_FILTER_VALUE) {
+    params.set("strategy_id", filter.strategy_id);
+  }
+  if (filter.strategy_version !== ALL_FILTER_VALUE) {
+    params.set("strategy_version", filter.strategy_version);
+  }
+  return `/runs?${params.toString()}`;
+}
+
+function normalizeRunHistoryFilter(current: RunHistoryFilter, strategies: Strategy[]) {
+  const availableStrategyIds = new Set(strategies.map((strategy) => strategy.strategy_id));
+  if (
+    current.strategy_id !== ALL_FILTER_VALUE &&
+    !availableStrategyIds.has(current.strategy_id)
+  ) {
+    return defaultRunHistoryFilter;
+  }
+  const availableVersions = getStrategyVersionOptions(strategies, current.strategy_id);
+  if (
+    current.strategy_version !== ALL_FILTER_VALUE &&
+    !availableVersions.includes(current.strategy_version)
+  ) {
+    return { ...current, strategy_version: ALL_FILTER_VALUE };
+  }
+  return current;
+}
+
+function getStrategyVersionOptions(strategies: Strategy[], strategyId: string) {
+  const scopedStrategies =
+    strategyId === ALL_FILTER_VALUE
+      ? strategies
+      : strategies.filter((strategy) => strategy.strategy_id === strategyId);
+  return Array.from(
+    new Set(
+      scopedStrategies.flatMap((strategy) =>
+        strategy.version_lineage.length ? strategy.version_lineage : [strategy.version],
+      ),
+    ),
+  ).sort();
+}
+
 function StrategyColumn({
   title,
   strategies,
@@ -710,8 +828,15 @@ function StrategyColumn({
         strategies.map((strategy) => (
           <article className="strategy-card" key={strategy.strategy_id}>
             <div className="strategy-head">
-              <strong>{strategy.name}</strong>
-              <span>{strategy.version}</span>
+              <div>
+                <strong>{strategy.name}</strong>
+                <div className="strategy-badges">
+                  <span className="meta-pill">{formatLaneLabel(strategy.runtime)}</span>
+                  <span className="meta-pill subtle">{strategy.lifecycle.stage}</span>
+                  <span className="meta-pill subtle">{strategy.version}</span>
+                </div>
+              </div>
+              <span>{formatVersionLineage(strategy.version_lineage, strategy.version)}</span>
             </div>
             <p>{strategy.description}</p>
             <dl>
@@ -720,8 +845,16 @@ function StrategyColumn({
                 <dd>{strategy.strategy_id}</dd>
               </div>
               <div>
-                <dt>Runtime</dt>
-                <dd>{strategy.runtime}</dd>
+                <dt>Timeframes</dt>
+                <dd>{strategy.supported_timeframes.join(", ")}</dd>
+              </div>
+              <div>
+                <dt>Assets</dt>
+                <dd>{strategy.asset_types.join(", ")}</dd>
+              </div>
+              <div>
+                <dt>Defaults</dt>
+                <dd>{formatParameterMap(extractDefaultParameters(strategy.parameter_schema))}</dd>
               </div>
               {strategy.reference_path ? (
                 <div>
@@ -733,6 +866,12 @@ function StrategyColumn({
                 <div>
                   <dt>Reference ID</dt>
                   <dd>{strategy.reference_id}</dd>
+                </div>
+              ) : null}
+              {strategy.lifecycle.registered_at ? (
+                <div>
+                  <dt>Registered</dt>
+                  <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
                 </div>
               ) : null}
             </dl>
@@ -843,16 +982,75 @@ function RunForm({
 function RunSection({
   title,
   runs,
+  strategies,
+  filter,
+  setFilter,
   onStop,
 }: {
   title: string;
   runs: Run[];
+  strategies: Strategy[];
+  filter: RunHistoryFilter;
+  setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
   onStop?: (runId: string) => Promise<void>;
 }) {
+  const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
+
   return (
     <section className="panel panel-wide">
-      <p className="kicker">Execution plane</p>
-      <h2>{title}</h2>
+      <div className="section-heading">
+        <div>
+          <p className="kicker">Execution plane</p>
+          <h2>{title}</h2>
+        </div>
+        <div className="filter-bar">
+          <label>
+            Strategy
+            <select
+              value={filter.strategy_id}
+              onChange={(event) =>
+                setFilter((current) => {
+                  const strategyId = event.target.value;
+                  const nextVersionOptions = getStrategyVersionOptions(strategies, strategyId);
+                  const nextVersion = nextVersionOptions.includes(current.strategy_version)
+                    ? current.strategy_version
+                    : ALL_FILTER_VALUE;
+                  return {
+                    strategy_id: strategyId,
+                    strategy_version: nextVersion,
+                  };
+                })
+              }
+            >
+              <option value={ALL_FILTER_VALUE}>All strategies</option>
+              {strategies.map((strategy) => (
+                <option key={strategy.strategy_id} value={strategy.strategy_id}>
+                  {strategy.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Version
+            <select
+              value={filter.strategy_version}
+              onChange={(event) =>
+                setFilter((current) => ({
+                  ...current,
+                  strategy_version: event.target.value,
+                }))
+              }
+            >
+              <option value={ALL_FILTER_VALUE}>All versions</option>
+              {versionOptions.map((version) => (
+                <option key={version} value={version}>
+                  {version}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
       {runs.length ? (
         <div className="run-list">
           {runs.map((run) => (
@@ -860,18 +1058,28 @@ function RunSection({
               <div className="run-card-head">
                 <div>
                   <strong>{run.config.strategy_id}</strong>
-                  <span>{run.config.symbols.join(", ")}</span>
+                  <span>
+                    {run.config.symbols.join(", ")} / {run.config.strategy_version}
+                  </span>
                 </div>
                 <div className={`run-status ${run.status}`}>{run.status}</div>
               </div>
               <div className="run-metrics">
                 <Metric label="Mode" value={run.config.mode} />
                 <Metric label="Lane" value={run.provenance.lane} />
+                <Metric
+                  label="Lifecycle"
+                  value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
+                />
+                <Metric label="Version" value={run.config.strategy_version} />
                 <Metric label="Return" value={formatMetric(run.metrics.total_return_pct, "%")} />
                 <Metric label="Drawdown" value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
                 <Metric label="Win rate" value={formatMetric(run.metrics.win_rate_pct, "%")} />
                 <Metric label="Trades" value={formatMetric(run.metrics.trade_count)} />
               </div>
+              {run.provenance.strategy ? (
+                <RunStrategySnapshot strategy={run.provenance.strategy} />
+              ) : null}
               <p className="run-note">
                 {run.provenance.reference_id
                   ? `Reference ${run.provenance.reference_id} (${run.provenance.reference_version ?? "unknown"})`
@@ -897,6 +1105,37 @@ function RunSection({
       ) : (
         <p className="empty-state">No runs yet.</p>
       )}
+    </section>
+  );
+}
+
+function RunStrategySnapshot({
+  strategy,
+}: {
+  strategy: NonNullable<Run["provenance"]["strategy"]>;
+}) {
+  return (
+    <section className="run-strategy">
+      <div className="run-strategy-head">
+        <span>Strategy snapshot</span>
+        <strong>{formatLaneLabel(strategy.runtime)}</strong>
+      </div>
+      <div className="run-strategy-grid">
+        <Metric label="Version" value={strategy.version} />
+        <Metric label="Lifecycle" value={strategy.lifecycle.stage} />
+        <Metric label="Warmup" value={`${strategy.warmup.required_bars} bars`} />
+        <Metric label="TFs" value={strategy.warmup.timeframes.join(", ")} />
+      </div>
+      <div className="run-strategy-copy">
+        <p>Supported timeframes: {strategy.supported_timeframes.join(", ") || "n/a"}</p>
+        <p>Version lineage: {formatVersionLineage(strategy.version_lineage, strategy.version)}</p>
+        <p>Resolved params: {formatParameterMap(strategy.parameter_snapshot.resolved)}</p>
+        <p>Requested params: {formatParameterMap(strategy.parameter_snapshot.requested)}</p>
+        {strategy.entrypoint ? <p>Entrypoint: {strategy.entrypoint}</p> : null}
+        {strategy.lifecycle.registered_at ? (
+          <p>Registered: {formatTimestamp(strategy.lifecycle.registered_at)}</p>
+        ) : null}
+      </div>
     </section>
   );
 }
@@ -970,6 +1209,50 @@ function formatMetric(value?: number, suffix = "") {
     return "n/a";
   }
   return `${value}${suffix}`;
+}
+
+function formatLaneLabel(runtime: string) {
+  switch (runtime) {
+    case "freqtrade_reference":
+      return "reference";
+    case "decision_engine":
+      return "decision";
+    default:
+      return runtime;
+  }
+}
+
+function formatVersionLineage(versionLineage: string[], fallbackVersion: string) {
+  const values = versionLineage.length ? versionLineage : [fallbackVersion];
+  return values.join(" -> ");
+}
+
+function extractDefaultParameters(schema: ParameterSchema) {
+  return Object.fromEntries(
+    Object.entries(schema)
+      .filter(([, definition]) => definition.default !== undefined)
+      .map(([name, definition]) => [name, definition.default]),
+  );
+}
+
+function formatParameterMap(values: Record<string, unknown>) {
+  const entries = Object.entries(values);
+  if (!entries.length) {
+    return "none";
+  }
+  return entries
+    .map(([name, value]) => `${name}=${formatParameterValue(value)}`)
+    .join(", ");
+}
+
+function formatParameterValue(value: unknown): string {
+  if (Array.isArray(value)) {
+    return value.map((item) => formatParameterValue(item)).join("|");
+  }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
 }
 
 function formatTimestamp(value?: string | null) {

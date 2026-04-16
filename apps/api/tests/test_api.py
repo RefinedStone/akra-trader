@@ -22,6 +22,21 @@ def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
   assert response.status_code == 200
   payload = response.json()
   assert payload[0]["strategy_id"] == "ma_cross_v1"
+  assert payload[0]["lifecycle"]["stage"] == "active"
+  assert payload[0]["version_lineage"] == ["1.0.0"]
+  assert payload[0]["supported_timeframes"] == ["5m", "1h"]
+
+
+def test_list_strategies_can_filter_by_lane_and_lifecycle_stage(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  response = client.get("/api/strategies?lane=freqtrade_reference&lifecycle_stage=imported")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload
+  assert all(item["runtime"] == "freqtrade_reference" for item in payload)
+  assert all(item["lifecycle"]["stage"] == "imported" for item in payload)
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:
@@ -148,3 +163,43 @@ def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> N
   assert payload["instruments"][0]["backfill_contiguous_complete"] is None
   assert payload["instruments"][0]["backfill_contiguous_missing_candles"] is None
   assert payload["instruments"][0]["backfill_gap_windows"] == []
+
+
+def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  native_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert native_response.status_code == 200
+
+  reference_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "nfi_x7_reference",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert reference_response.status_code == 200
+
+  filtered = client.get("/api/runs?mode=backtest&strategy_id=ma_cross_v1&strategy_version=1.0.0")
+
+  assert filtered.status_code == 200
+  payload = filtered.json()
+  assert len(payload) == 1
+  assert payload[0]["config"]["strategy_id"] == "ma_cross_v1"
+  assert payload[0]["config"]["strategy_version"] == "1.0.0"

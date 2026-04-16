@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import OrderedDict
+from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
@@ -151,11 +152,22 @@ class InMemoryRunRepository(RunRepositoryPort):
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get(run_id)
 
-  def list_runs(self, mode: str | None = None) -> list[RunRecord]:
+  def list_runs(
+    self,
+    mode: str | None = None,
+    *,
+    strategy_id: str | None = None,
+    strategy_version: str | None = None,
+  ) -> list[RunRecord]:
     values = list(self._runs.values())
-    if mode is None:
-      return list(reversed(values))
-    return [run for run in reversed(values) if run.config.mode.value == mode]
+    runs = list(reversed(values))
+    if mode is not None:
+      runs = [run for run in runs if run.config.mode.value == mode]
+    if strategy_id is not None:
+      runs = [run for run in runs if run.config.strategy_id == strategy_id]
+    if strategy_version is not None:
+      runs = [run for run in runs if run.config.strategy_version == strategy_version]
+    return runs
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None:
     run = self._runs.get(run_id)
@@ -179,15 +191,31 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     self._references = {strategy.describe().strategy_id: strategy for strategy in build_reference_strategies()}
     self._registrations: dict[str, StrategyRegistration] = {}
 
-  def list_strategies(self) -> list[StrategyMetadata]:
-    metadata = []
-    for strategy_id, strategy in self._builtins.items():
-      if strategy_id in self._references:
-        metadata.append(self._references[strategy_id].describe())
-      else:
-        metadata.append(strategy().describe())
-    for registration in self._registrations.values():
-      metadata.append(self.load(registration.strategy_id).describe())
+  def list_strategies(
+    self,
+    *,
+    runtime: str | None = None,
+    lifecycle_stage: str | None = None,
+    version: str | None = None,
+  ) -> list[StrategyMetadata]:
+    metadata_by_strategy_id = {
+      strategy_id: self._describe_strategy(strategy_id)
+      for strategy_id in self._builtins
+    }
+    for strategy_id in self._registrations:
+      metadata_by_strategy_id[strategy_id] = self._describe_strategy(strategy_id)
+
+    metadata = list(metadata_by_strategy_id.values())
+    if runtime is not None:
+      metadata = [item for item in metadata if item.runtime == runtime]
+    if lifecycle_stage is not None:
+      metadata = [item for item in metadata if item.lifecycle.stage == lifecycle_stage]
+    if version is not None:
+      metadata = [
+        item
+        for item in metadata
+        if item.version == version or version in (item.version_lineage or (item.version,))
+      ]
     return sorted(metadata, key=lambda item: item.strategy_id)
 
   def load(self, strategy_id: str) -> Strategy:
@@ -205,10 +233,28 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     strategy_cls = getattr(module, registration.class_name)
     strategy = strategy_cls()
     self._registrations[registration.strategy_id] = registration
-    return strategy.describe()
+    return self._apply_registration_metadata(strategy.describe())
 
   def get_registration(self, strategy_id: str) -> StrategyRegistration | None:
     return self._registrations.get(strategy_id)
+
+  def _describe_strategy(self, strategy_id: str) -> StrategyMetadata:
+    if strategy_id in self._references:
+      metadata = self._references[strategy_id].describe()
+    elif strategy_id in self._builtins:
+      metadata = self._builtins[strategy_id]().describe()
+    else:
+      metadata = self.load(strategy_id).describe()
+    return self._apply_registration_metadata(metadata)
+
+  def _apply_registration_metadata(self, metadata: StrategyMetadata) -> StrategyMetadata:
+    registration = self._registrations.get(metadata.strategy_id)
+    if registration is None or metadata.lifecycle.registered_at is not None:
+      return metadata
+    return replace(
+      metadata,
+      lifecycle=replace(metadata.lifecycle, registered_at=registration.registered_at),
+    )
 
 
 def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:

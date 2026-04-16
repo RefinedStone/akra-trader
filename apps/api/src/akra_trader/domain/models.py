@@ -99,6 +99,12 @@ class ReferenceSource:
 
 
 @dataclass(frozen=True)
+class StrategyLifecycle:
+  stage: str = "active"
+  registered_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class StrategyMetadata:
   strategy_id: str
   name: str
@@ -108,6 +114,8 @@ class StrategyMetadata:
   supported_timeframes: tuple[str, ...]
   parameter_schema: dict[str, Any]
   description: str
+  lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+  version_lineage: tuple[str, ...] = ()
   reference_id: str | None = None
   reference_path: str | None = None
   entrypoint: str | None = None
@@ -255,13 +263,6 @@ class MarketDataLineage:
   last_sync_at: datetime | None = None
   issues: tuple[str, ...] = ()
 
-
-@dataclass(frozen=True)
-class StrategyLifecycle:
-  stage: str = "active"
-  registered_at: datetime | None = None
-
-
 @dataclass(frozen=True)
 class StrategyParameterSnapshot:
   requested: dict[str, Any] = field(default_factory=dict)
@@ -276,6 +277,7 @@ class StrategySnapshot:
   version: str
   runtime: str
   lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+  version_lineage: tuple[str, ...] = ()
   parameter_snapshot: StrategyParameterSnapshot = field(default_factory=StrategyParameterSnapshot)
   supported_timeframes: tuple[str, ...] = ()
   warmup: WarmupSpec = field(default_factory=lambda: WarmupSpec(required_bars=0))

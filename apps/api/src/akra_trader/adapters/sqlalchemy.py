@@ -69,7 +69,13 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       return None
     return self._adapter.validate_python(row["payload"])
 
-  def list_runs(self, mode: str | None = None) -> list[RunRecord]:
+  def list_runs(
+    self,
+    mode: str | None = None,
+    *,
+    strategy_id: str | None = None,
+    strategy_version: str | None = None,
+  ) -> list[RunRecord]:
     statement = select(run_records.c.payload).order_by(
       run_records.c.started_at.desc(),
       run_records.c.run_id.desc(),
@@ -79,7 +85,12 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
 
     with self._engine.connect() as connection:
       rows = connection.execute(statement).mappings().all()
-    return [self._adapter.validate_python(row["payload"]) for row in rows]
+    runs = [self._adapter.validate_python(row["payload"]) for row in rows]
+    if strategy_id is not None:
+      runs = [run for run in runs if run.config.strategy_id == strategy_id]
+    if strategy_version is not None:
+      runs = [run for run in runs if run.config.strategy_version == strategy_version]
+    return runs
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None:
     run = self.get_run(run_id)

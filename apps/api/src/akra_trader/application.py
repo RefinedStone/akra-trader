@@ -56,8 +56,18 @@ class TradingApplication:
     self._execution_engine = execution_engine or ExecutionEngine()
     self._run_supervisor = run_supervisor or RunSupervisor()
 
-  def list_strategies(self) -> list[StrategyMetadata]:
-    return self._strategies.list_strategies()
+  def list_strategies(
+    self,
+    *,
+    lane: str | None = None,
+    lifecycle_stage: str | None = None,
+    version: str | None = None,
+  ) -> list[StrategyMetadata]:
+    return self._strategies.list_strategies(
+      runtime=lane,
+      lifecycle_stage=lifecycle_stage,
+      version=version,
+    )
 
   def list_references(self) -> list[ReferenceSource]:
     return self._references.list_entries()
@@ -71,8 +81,18 @@ class TradingApplication:
     )
     return self._strategies.register(registration)
 
-  def list_runs(self, mode: str | None = None) -> list[RunRecord]:
-    return self._runs.list_runs(mode=self._mode_service.normalize(mode))
+  def list_runs(
+    self,
+    mode: str | None = None,
+    *,
+    strategy_id: str | None = None,
+    strategy_version: str | None = None,
+  ) -> list[RunRecord]:
+    return self._runs.list_runs(
+      mode=self._mode_service.normalize(mode),
+      strategy_id=strategy_id,
+      strategy_version=strategy_version,
+    )
 
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get_run(run_id)
@@ -299,15 +319,19 @@ class TradingApplication:
     schema = deepcopy(metadata.parameter_schema)
     requested = deepcopy(parameters)
     resolved = self._resolve_parameters(schema=schema, requested=requested)
+    lifecycle = metadata.lifecycle
+    if registration is not None and lifecycle.registered_at is None:
+      lifecycle = StrategyLifecycle(
+        stage=lifecycle.stage,
+        registered_at=registration.registered_at,
+      )
     return StrategySnapshot(
       strategy_id=metadata.strategy_id,
       name=metadata.name,
       version=metadata.version,
       runtime=metadata.runtime,
-      lifecycle=StrategyLifecycle(
-        stage="active",
-        registered_at=registration.registered_at if registration is not None else None,
-      ),
+      lifecycle=lifecycle,
+      version_lineage=metadata.version_lineage or (metadata.version,),
       parameter_snapshot=StrategyParameterSnapshot(
         requested=requested,
         resolved=resolved,
@@ -339,6 +363,17 @@ def serialize_run(run: RunRecord) -> dict:
   payload["provenance"]["artifact_paths"] = list(run.provenance.artifact_paths)
   strategy_snapshot = payload["provenance"].get("strategy")
   if strategy_snapshot is not None:
+    strategy_snapshot["version_lineage"] = list(
+      run.provenance.strategy.version_lineage or (run.provenance.strategy.version,)
+    )
     strategy_snapshot["supported_timeframes"] = list(run.provenance.strategy.supported_timeframes)
     strategy_snapshot["warmup"]["timeframes"] = list(run.provenance.strategy.warmup.timeframes)
+  return payload
+
+
+def serialize_strategy(strategy: StrategyMetadata) -> dict:
+  payload = asdict(strategy)
+  payload["asset_types"] = [asset_type.value for asset_type in strategy.asset_types]
+  payload["supported_timeframes"] = list(strategy.supported_timeframes)
+  payload["version_lineage"] = list(strategy.version_lineage or (strategy.version,))
   return payload

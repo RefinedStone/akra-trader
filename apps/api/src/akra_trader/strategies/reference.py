@@ -8,6 +8,7 @@ from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
+from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.strategies.base import PolicyBackedStrategy
@@ -49,6 +50,8 @@ class ReferenceFreqtradeStrategy(PolicyBackedStrategy):
       supported_timeframes=("5m",),
       parameter_schema={},
       description=self._definition.description,
+      lifecycle=StrategyLifecycle(stage="imported"),
+      version_lineage=(self._definition.version,),
       reference_id=self._definition.reference_id,
       reference_path=self._definition.reference_path,
       entrypoint=self._definition.entrypoint,

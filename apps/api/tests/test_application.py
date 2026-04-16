@@ -203,6 +203,45 @@ def test_registered_strategy_run_records_lifecycle_timestamp(tmp_path: Path) -> 
   }
 
 
+def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  app.run_backtest(
+    strategy_id="nfi_x7_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  filtered = app.list_runs(
+    mode="backtest",
+    strategy_id="ma_cross_v1",
+    strategy_version="1.0.0",
+  )
+
+  assert len(filtered) == 1
+  assert filtered[0].config.strategy_id == "ma_cross_v1"
+  assert filtered[0].config.strategy_version == "1.0.0"
+
+
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(
