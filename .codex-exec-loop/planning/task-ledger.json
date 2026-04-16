@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply says guarded-live audit coverage now exists but wider live-path alerting and audit coverage are still missing beyond the guarded-live audit trail, so operator-visible persistence and delivery remain a concrete follow-up once the live execution path broadens.",
+      "priority_reason": "The latest main-session reply says wider live-path alerting and audit coverage are still missing beyond the current guarded-live control trail, so durable alert history and operator-visible delivery remain a concrete executable follow-up after restart-safe live session ownership is addressed.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:01:23Z",
+      "updated_at": "2026-04-16T22:35:33Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -437,34 +437,52 @@
       "direction_id": "guarded-live-execution",
       "title": "Add guarded-live cancel or replace controls for active venue orders",
       "description": "Extend guarded-live beyond passive order-state syncing by adding explicit cancel or replace order-management flows, audit capture, and operator-facing controls for active venue orders so supervision can actively manage in-flight live exposure instead of only observing venue progression.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 78,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly says cancel or replace style active order management is still missing after lifecycle sync landed, making this the clearest immediate executable follow-up for the next queued task.",
+      "priority_reason": "Completed in main session commit 4f02c04, which added guarded-live cancel and replace APIs, recovery-seeded active-order controls in the control room, audit-visible local order-state updates, and API plus application test coverage.",
       "depends_on": [
         "planning-guarded-live-order-lifecycle-and-venue-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:00:00Z",
+      "updated_at": "2026-04-16T22:35:33Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live execution from venue-state observation into operator-controlled order supervision, which is required before live candidacy can manage in-flight exposure safely rather than relying on submit-and-watch behavior."
+      "direction_relation_note": "Closed the guarded-live active-order supervision gap by letting operators cancel or reprice in-flight venue orders from recovered run state, which now leaves restart-safe live session ownership, durable order-book sync, and broader live-path alert coverage as the next candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-venue-native-replace-flow",
+      "direction_id": "guarded-live-execution",
+      "title": "Decide whether guarded-live replace must use venue-native amend semantics",
+      "description": "Evaluate whether the current cancel-plus-new-limit replace flow is sufficient for guarded-live candidacy or whether venue-native atomic amend support is required, then implement the chosen contract with matching audit and operator wording if native amend semantics are mandatory.",
+      "status": "proposed",
+      "base_priority": 76,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply explicitly notes that replace is still implemented as cancel plus new limit submit rather than a venue-native atomic amend flow, but whether that gap should block immediate live-session resume work still needs guarded-live product and venue-contract judgment.",
+      "depends_on": [
+        "planning-guarded-live-active-order-management-controls"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T22:35:33Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
     {
       "id": "planning-guarded-live-full-venue-session-resume",
       "direction_id": "guarded-live-execution",
       "title": "Resume guarded-live with durable venue order-book sync and live session ownership",
       "description": "Upgrade guarded-live recovery and launch so restart or recovery does not just rebuild local state from snapshots, but durably syncs the venue order book and resumes or quarantines the live worker session with explicit ownership semantics for in-flight venue activity.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 77,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says durable venue order-book sync and restart-safe full live worker resume are still missing after lifecycle sync landed, but active order management is the more immediate next executable queue head.",
+      "priority_reason": "The latest main-session reply says durable venue order-book sync and restart-safe live worker resume are still missing after guarded-live active-order controls landed, making this the clearest immediate executable follow-up for the next queued task.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:00:00Z",
+      "updated_at": "2026-04-16T22:35:33Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy honest by requiring restart-safe venue order-book ownership and resumable live-session semantics, not just snapshot reconstruction plus periodic sync."
     },
