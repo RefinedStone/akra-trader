@@ -1052,6 +1052,27 @@ select {
   gap: 8px;
 }
 
+.comparison-dev-confirm-card {
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 193, 94, 0.18);
+  background: rgba(84, 57, 14, 0.12);
+}
+
+.comparison-dev-reset-danger {
+  border-color: rgba(255, 193, 94, 0.28);
+  background: rgba(255, 193, 94, 0.12);
+  color: rgba(255, 235, 191, 0.98);
+}
+
+.comparison-dev-reset-danger:hover,
+.comparison-dev-reset-danger:focus-visible {
+  border-color: rgba(255, 193, 94, 0.38);
+  background: rgba(255, 193, 94, 0.18);
+}
+
 .comparison-dev-feedback {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);

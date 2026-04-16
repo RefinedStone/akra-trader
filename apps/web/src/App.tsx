@@ -2974,6 +2974,8 @@ function ComparisonTooltipTuningPanel({
   const [conflictSessionUiStateMap, setConflictSessionUiStateMap] = useState<
     Record<string, ComparisonTooltipConflictSessionUiState>
   >({});
+  const [isConfirmingResetAllConflictViews, setIsConfirmingResetAllConflictViews] =
+    useState(false);
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -3017,6 +3019,12 @@ function ComparisonTooltipTuningPanel({
       version: COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION,
     });
   }, [conflictSessionUiStateMap]);
+
+  useEffect(() => {
+    if (!savedConflictSessionCount && isConfirmingResetAllConflictViews) {
+      setIsConfirmingResetAllConflictViews(false);
+    }
+  }, [isConfirmingResetAllConflictViews, savedConflictSessionCount]);
 
   const updateCurrentConflictSessionUiState = (
     updater: (
@@ -3091,12 +3099,27 @@ function ComparisonTooltipTuningPanel({
     onSetShareFeedback("Reset saved view state for the current conflict session.");
   };
 
+  const requestResetAllConflictSessionUiState = () => {
+    if (!savedConflictSessionCount) {
+      onSetShareFeedback("No saved conflict-view state exists to reset.");
+      return;
+    }
+    setIsConfirmingResetAllConflictViews(true);
+    onSetShareFeedback(null);
+  };
+
+  const cancelResetAllConflictSessionUiState = () => {
+    setIsConfirmingResetAllConflictViews(false);
+    onSetShareFeedback("Canceled clearing saved conflict-view state.");
+  };
+
   const resetAllConflictSessionUiState = () => {
     if (!savedConflictSessionCount) {
       onSetShareFeedback("No saved conflict-view state exists to reset.");
       return;
     }
     setConflictSessionUiStateMap({});
+    setIsConfirmingResetAllConflictViews(false);
     onSetShareFeedback("Reset all saved conflict-view state.");
   };
 
@@ -3230,12 +3253,37 @@ function ComparisonTooltipTuningPanel({
             <button
               className="ghost-button comparison-dev-reset"
               disabled={!savedConflictSessionCount}
-              onClick={resetAllConflictSessionUiState}
+              onClick={requestResetAllConflictSessionUiState}
               type="button"
             >
               Reset all saved views
             </button>
           </div>
+          {isConfirmingResetAllConflictViews ? (
+            <div className="comparison-dev-confirm-card">
+              <p className="comparison-dev-feedback">
+                Clear all saved conflict views? This removes {savedConflictSessionCount} remembered
+                {" "}
+                session{savedConflictSessionCount === 1 ? "" : "s"} for conflict preview layout.
+              </p>
+              <div className="comparison-dev-actions comparison-dev-actions-inline">
+                <button
+                  className="ghost-button comparison-dev-reset comparison-dev-reset-danger"
+                  onClick={resetAllConflictSessionUiState}
+                  type="button"
+                >
+                  Confirm clear all
+                </button>
+                <button
+                  className="ghost-button comparison-dev-reset"
+                  onClick={cancelResetAllConflictSessionUiState}
+                  type="button"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
         {pendingPresetImportConflict ? (
           <div className="comparison-dev-conflict-card">
