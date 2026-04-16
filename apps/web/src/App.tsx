@@ -103,6 +103,7 @@ type MarketDataStatus = {
 };
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
+const MAX_VISIBLE_GAP_WINDOWS = 3;
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -445,6 +446,7 @@ function BackfillQualityStatus({
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
+  const gapLines = summarizeGapWindows(instrument.backfill_gap_windows);
   return (
     <div className="progress-stack">
       <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
@@ -453,11 +455,14 @@ function BackfillQualityStatus({
           ? "gap-free"
           : `gaps: ${instrument.backfill_contiguous_missing_candles ?? 0}`}
       </span>
-      {instrument.backfill_gap_windows.length ? (
+      {gapLines.length ? (
         <div className="progress-detail-list">
-          {instrument.backfill_gap_windows.map((gap, index) => (
-            <span key={`${gap.start_at}-${gap.end_at}-${index}`}>
-              {formatRange(gap.start_at, gap.end_at)} ({gap.missing_candles})
+          {gapLines.map((line) => (
+            <span
+              className={line.kind === "summary" ? "progress-detail-summary" : undefined}
+              key={line.key}
+            >
+              {line.label}
             </span>
           ))}
         </div>
@@ -478,6 +483,42 @@ function formatCompletion(value: number | null) {
     return "n/a";
   }
   return `${Math.round(value * 100)}%`;
+}
+
+function summarizeGapWindows(
+  gapWindows: MarketDataStatus["instruments"][number]["backfill_gap_windows"],
+) {
+  if (gapWindows.length <= MAX_VISIBLE_GAP_WINDOWS) {
+    return gapWindows.map((gap, index) => ({
+      key: `${gap.start_at}-${gap.end_at}-${index}`,
+      kind: "exact" as const,
+      label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
+    }));
+  }
+
+  const recentWindows = gapWindows.slice(-(MAX_VISIBLE_GAP_WINDOWS - 1));
+  const collapsedWindows = gapWindows.slice(0, -(MAX_VISIBLE_GAP_WINDOWS - 1));
+  const collapsedMissing = collapsedWindows.reduce(
+    (total, gap) => total + gap.missing_candles,
+    0,
+  );
+  const lastCollapsedWindow = collapsedWindows[collapsedWindows.length - 1];
+
+  return [
+    {
+      key: `summary-${collapsedWindows[0].start_at}-${lastCollapsedWindow.end_at}`,
+      kind: "summary" as const,
+      label:
+        `${collapsedWindows.length} older windows | ` +
+        `${formatRange(collapsedWindows[0].start_at, lastCollapsedWindow.end_at)} | ` +
+        `${collapsedMissing} missing`,
+    },
+    ...recentWindows.map((gap, index) => ({
+      key: `${gap.start_at}-${gap.end_at}-${index}`,
+      kind: "exact" as const,
+      label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
+    })),
+  ];
 }
 
 function StrategyColumn({

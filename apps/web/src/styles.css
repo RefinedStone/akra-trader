@@ -311,6 +311,10 @@ select {
   gap: 3px;
 }
 
+.progress-detail-summary {
+  color: var(--cyan);
+}
+
 .progress-track {
   height: 6px;
   border-radius: 999px;
