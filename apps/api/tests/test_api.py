@@ -662,6 +662,123 @@ def test_live_run_payload_exposes_synced_order_lifecycle(tmp_path: Path) -> None
   assert live_run["orders"][0]["last_synced_at"] is not None
 
 
+def test_live_order_cancel_endpoint_marks_active_order_canceled(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 20, 30, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "cancel_payload_test",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+
+    cancel_response = client.post(
+      f"/api/runs/live/{run_id}/orders/venue-open-order-1/cancel",
+      json={"actor": "operator", "reason": "reduce_venue_risk"},
+    )
+
+  assert cancel_response.status_code == 200
+  payload = cancel_response.json()
+  assert payload["orders"][0]["order_id"] == "venue-open-order-1"
+  assert payload["orders"][0]["status"] == "canceled"
+
+
+def test_live_order_replace_endpoint_appends_repriced_limit_order(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 20, 45, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "replace_payload_test",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+
+    replace_response = client.post(
+      f"/api/runs/live/{run_id}/orders/venue-open-order-1/replace",
+      json={
+        "actor": "operator",
+        "reason": "reprice_remaining_order",
+        "price": 1985.0,
+        "quantity": 0.3,
+      },
+    )
+
+  assert replace_response.status_code == 200
+  payload = replace_response.json()
+  assert len(payload["orders"]) == 2
+  assert payload["orders"][0]["status"] == "canceled"
+  assert payload["orders"][1]["order_type"] == "limit"
+  assert payload["orders"][1]["status"] == "open"
+  assert payload["orders"][1]["requested_price"] == 1985.0
+  assert payload["orders"][1]["quantity"] == 0.3
+
+
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 

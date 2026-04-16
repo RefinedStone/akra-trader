@@ -22,6 +22,7 @@ from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import OrderStatus
+from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import Position
@@ -1175,6 +1176,142 @@ def test_guarded_live_worker_syncs_recovered_order_lifecycle_into_local_state(tm
   assert filled_synced.positions["binance:ETH/USDT"].quantity == pytest.approx(0.5)
   assert len(filled_synced.fills) == 2
   assert any(event.kind == "guarded_live_order_synced" for event in guarded_live_status.audit_events)
+
+
+def test_cancel_live_order_marks_recovered_order_canceled(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 20, 30, tzinfo=UTC))
+  recovered_order_id = "venue-open-order-1"
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id=recovered_order_id,
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+    operator_reason="cancel_open_order",
+  )
+
+  canceled = app.cancel_live_order(
+    run_id=run.config.run_id,
+    order_id=recovered_order_id,
+    actor="operator",
+    reason="reduce_venue_risk",
+  )
+  guarded_live_status = app.get_guarded_live_status()
+
+  assert canceled.orders[0].order_id == recovered_order_id
+  assert canceled.orders[0].status == OrderStatus.CANCELED
+  assert canceled.orders[0].remaining_quantity == pytest.approx(0.5)
+  assert any("guarded_live_order_canceled" in note for note in canceled.notes)
+  assert any(event.kind == "guarded_live_order_canceled" for event in guarded_live_status.audit_events)
+
+
+def test_replace_live_order_cancels_old_order_and_appends_limit_replacement(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 20, 45, tzinfo=UTC))
+  recovered_order_id = "venue-open-order-1"
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id=recovered_order_id,
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+    operator_reason="replace_open_order",
+  )
+
+  replaced = app.replace_live_order(
+    run_id=run.config.run_id,
+    order_id=recovered_order_id,
+    price=1_985.0,
+    quantity=0.3,
+    actor="operator",
+    reason="reprice_remaining_order",
+  )
+  guarded_live_status = app.get_guarded_live_status()
+  original_order, replacement_order = replaced.orders
+
+  assert original_order.order_id == recovered_order_id
+  assert original_order.status == OrderStatus.CANCELED
+  assert replacement_order.order_id == "seeded-live-order-1"
+  assert replacement_order.order_type == OrderType.LIMIT
+  assert replacement_order.status == OrderStatus.OPEN
+  assert replacement_order.quantity == pytest.approx(0.3)
+  assert replacement_order.requested_price == pytest.approx(1_985.0)
+  assert replacement_order.remaining_quantity == pytest.approx(0.3)
+  assert any("guarded_live_order_replaced" in note for note in replaced.notes)
+  assert any(event.kind == "guarded_live_order_replaced" for event in guarded_live_status.audit_events)
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

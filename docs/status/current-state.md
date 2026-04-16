@@ -55,6 +55,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - venue-backed guarded-live order submission with persisted live run history
 - guarded-live worker order lifecycle sync for recovered/open venue orders, including partial-fill
   and fill progression in local run state
+- guarded-live operator cancel/replace controls for active venue orders from the control room and API
 
 ### Control room
 
@@ -80,8 +81,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
   recovery/live launch currently rebuild persisted control-plane state before attaching a narrow
   guarded-live worker rather than reviving a full venue order book or session lifecycle
-- guarded-live order sync now persists lifecycle progression, but it still does not manage
-  cancel/replace flows or a durable venue order book
+- guarded-live order sync now persists lifecycle progression and supports cancel/replace controls,
+  but it still does not maintain a durable venue order book
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic
@@ -92,7 +93,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 - durable operator event storage and external alert delivery
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
-- full live order lifecycle management such as cancel/replace and durable venue order-book sync
+- full live order lifecycle management beyond cancel/replace, including durable venue order-book sync
 - reconciliation against live exchange state after restart or faults
 - live-worker restart recovery that resumes actual venue-backed execution from recovered state
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
@@ -102,5 +103,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from synced order lifecycle into cancel/replace, durable venue order-book state, and wider live-path audit coverage.
+4. Expand guarded-live controls from cancel/replace into durable venue order-book state and wider live-path audit coverage.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

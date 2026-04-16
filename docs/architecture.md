@@ -143,7 +143,8 @@ internal runtime exposure plus venue balance/open-order snapshots, persisted run
 projections rebuilt from verified venue snapshots, and a guarded-live audit log of operator
 actions. A separate venue execution adapter now submits guarded-live market orders once those gates
 are clear, and the guarded-live worker now syncs tracked venue order lifecycle changes back into
-local orders, fills, positions, and audit notes.
+local orders, fills, positions, and audit notes. Operator controls can now cancel active venue
+orders or replace them with repriced limit orders from persisted live run state.
 
 ## Modes
 
@@ -167,6 +168,7 @@ local orders, fills, positions, and audit notes.
 - launch is blocked until kill switch, reconciliation, recovery, and venue-execution gates are clear
 - the current live order path submits venue market orders, then keeps syncing open and partially
   filled venue orders into persisted run/session history
+- operator controls can cancel active venue orders and replace them with repriced limit orders
 
 ## Control Room
 
@@ -178,6 +180,7 @@ The web app currently surfaces:
 - backtest launch
 - sandbox worker launch, stop, and rerun restore
 - guarded-live worker launch, stop, and run history
+- guarded-live order cancel/replace controls for active venue orders
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
@@ -192,6 +195,6 @@ The UI is already useful for research inspection, but not yet an operator-grade 
   guarded-live recovery/live launch still stop short of a full venue order-book restore or durable
   live worker resume
 - the system still lacks durable alert delivery and wider operator event coverage
-- venue order lifecycle management is still limited: no cancel/replace path or durable venue-order-book sync
+- venue order lifecycle management is still limited beyond cancel/replace: no durable venue-order-book sync
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

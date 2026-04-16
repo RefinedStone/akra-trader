@@ -131,6 +131,18 @@ class VenueExecutionPort(Protocol):
     request: GuardedLiveVenueOrderRequest,
   ) -> GuardedLiveVenueOrderResult: ...
 
+  def submit_limit_order(
+    self,
+    request: GuardedLiveVenueOrderRequest,
+  ) -> GuardedLiveVenueOrderResult: ...
+
+  def cancel_order(
+    self,
+    *,
+    symbol: str,
+    order_id: str,
+  ) -> GuardedLiveVenueOrderResult: ...
+
   def sync_order_states(
     self,
     *,

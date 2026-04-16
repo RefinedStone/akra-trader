@@ -283,6 +283,20 @@ class TradingApplication:
     ) -> GuardedLiveVenueOrderResult:
       raise RuntimeError("Venue execution port is not configured.")
 
+    def submit_limit_order(
+      self,
+      request: GuardedLiveVenueOrderRequest,
+    ) -> GuardedLiveVenueOrderResult:
+      raise RuntimeError("Venue execution port is not configured.")
+
+    def cancel_order(
+      self,
+      *,
+      symbol: str,
+      order_id: str,
+    ) -> GuardedLiveVenueOrderResult:
+      raise RuntimeError("Venue execution port is not configured.")
+
     def sync_order_states(
       self,
       *,
@@ -1167,6 +1181,157 @@ class TradingApplication:
     )
     return saved_run
 
+  def cancel_live_order(
+    self,
+    *,
+    run_id: str,
+    order_id: str,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    run, order = self._prepare_guarded_live_order_action(
+      run_id=run_id,
+      order_id=order_id,
+      require_active=True,
+    )
+    venue_result = self._venue_execution.cancel_order(
+      symbol=run.config.symbols[0],
+      order_id=order.order_id,
+    )
+    self._apply_guarded_live_synced_order_state(run=run, order=order, synced_state=venue_result)
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    run.notes.append(
+      f"{self._clock().isoformat()} | guarded_live_order_canceled | "
+      f"Reason: {reason}. Operator requested cancel for {order.order_id} and venue returned {order.status.value}."
+    )
+    saved_run = self._runs.save_run(run)
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_order_canceled",
+      actor=actor,
+      summary=f"Guarded-live order canceled for {run.config.symbols[0]}.",
+      detail=(
+        f"Reason: {reason}. Operator canceled {order.order_id}; "
+        f"remaining quantity is {self._resolve_guarded_live_order_remaining_quantity(order):.8f} "
+        f"and venue state is {order.status.value}."
+      ),
+      run_id=saved_run.config.run_id,
+      session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
+    )
+    return saved_run
+
+  def replace_live_order(
+    self,
+    *,
+    run_id: str,
+    order_id: str,
+    price: float,
+    quantity: float | None,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    if price <= 0:
+      raise ValueError("Replacement price must be positive.")
+    self._ensure_guarded_live_live_order_replace_allowed()
+    run, order = self._prepare_guarded_live_order_action(
+      run_id=run_id,
+      order_id=order_id,
+      require_active=True,
+    )
+    remaining_quantity = self._resolve_guarded_live_order_remaining_quantity(order)
+    replacement_quantity = quantity if quantity is not None else remaining_quantity
+    if replacement_quantity <= self._guarded_live_balance_tolerance:
+      raise ValueError("Replacement quantity resolved to zero.")
+    if replacement_quantity - remaining_quantity > self._guarded_live_balance_tolerance:
+      raise ValueError("Replacement quantity cannot exceed the current remaining order quantity.")
+
+    cancel_result = self._venue_execution.cancel_order(
+      symbol=run.config.symbols[0],
+      order_id=order.order_id,
+    )
+    self._apply_guarded_live_synced_order_state(run=run, order=order, synced_state=cancel_result)
+    if order.status in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
+      raise RuntimeError(
+        f"Guarded-live order replacement requires the current order to be canceled first: {order.order_id}"
+      )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    run = self._runs.save_run(run)
+    order = self._get_guarded_live_order(run=run, order_id=order_id)
+
+    replacement_order = Order(
+      run_id=run.config.run_id,
+      instrument_id=order.instrument_id,
+      side=order.side,
+      quantity=replacement_quantity,
+      requested_price=price,
+      order_type=OrderType.LIMIT,
+    )
+    venue_result = self._submit_guarded_live_limit_order(
+      run=run,
+      order=replacement_order,
+      limit_price=price,
+    )
+    replacement_order.order_id = venue_result.order_id
+    replacement_order.created_at = venue_result.submitted_at
+    replacement_order.updated_at = venue_result.updated_at or venue_result.submitted_at
+    replacement_order.last_synced_at = venue_result.updated_at or venue_result.submitted_at
+    replacement_order.status = self._map_guarded_live_order_status(
+      venue_result.status,
+      filled_quantity=venue_result.filled_amount or 0.0,
+      remaining_quantity=venue_result.remaining_amount or 0.0,
+    )
+    if venue_result.average_fill_price is not None:
+      replacement_order.average_fill_price = venue_result.average_fill_price
+    replacement_order.fee_paid = venue_result.fee_paid or 0.0
+    replacement_order.filled_quantity = venue_result.filled_amount or 0.0
+    replacement_order.remaining_quantity = (
+      venue_result.remaining_amount
+      if venue_result.remaining_amount is not None
+      else max(replacement_order.quantity - replacement_order.filled_quantity, 0.0)
+    )
+    if replacement_order.status == OrderStatus.FILLED:
+      replacement_order.filled_at = venue_result.updated_at or venue_result.submitted_at
+    run.orders.append(replacement_order)
+    if replacement_order.filled_quantity > self._guarded_live_balance_tolerance:
+      self._materialize_guarded_live_fill_delta(
+        run=run,
+        order=replacement_order,
+        fill_quantity=replacement_order.filled_quantity,
+        fee_paid=replacement_order.fee_paid,
+        fill_price=venue_result.average_fill_price or replacement_order.requested_price,
+        fill_timestamp=replacement_order.filled_at or venue_result.submitted_at,
+      )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    run.notes.append(
+      f"{self._clock().isoformat()} | guarded_live_order_replaced | "
+      f"Reason: {reason}. Replaced {order.order_id} with {replacement_order.order_id} "
+      f"for {replacement_quantity:.8f} at {price:.8f}."
+    )
+    saved_run = self._runs.save_run(run)
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_order_replaced",
+      actor=actor,
+      summary=f"Guarded-live order replaced for {run.config.symbols[0]}.",
+      detail=(
+        f"Reason: {reason}. Operator replaced {order.order_id} with {replacement_order.order_id} "
+        f"for {replacement_quantity:.8f} at {price:.8f}; new venue state is {replacement_order.status.value}."
+      ),
+      run_id=saved_run.config.run_id,
+      session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
+    )
+    return saved_run
+
   def _ensure_operator_control_runtime_allowed(self, mode: RunMode) -> None:
     if mode not in {RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE}:
       return
@@ -1184,8 +1349,56 @@ class TradingApplication:
     if status.blockers:
       raise ValueError("Guarded-live launch is blocked: " + " ".join(status.blockers))
 
+  def _ensure_guarded_live_live_order_replace_allowed(self) -> None:
+    state = self._guarded_live_state.load_state()
+    if state.kill_switch.state == "engaged":
+      raise ValueError("Guarded-live kill switch is engaged. Cancel venue orders instead of replacing them.")
+    ready, issues = self._venue_execution.describe_capability()
+    if not ready:
+      raise RuntimeError(
+        "Venue order execution is unavailable: "
+        + (", ".join(issues) if issues else "adapter not ready")
+        + "."
+      )
+
   def _persist_guarded_live_state(self, state: GuardedLiveState) -> GuardedLiveState:
     return self._guarded_live_state.save_state(state)
+
+  def _prepare_guarded_live_order_action(
+    self,
+    *,
+    run_id: str,
+    order_id: str,
+    require_active: bool,
+  ) -> tuple[RunRecord, Order]:
+    run = self._runs.get_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    if run.config.mode != RunMode.LIVE:
+      raise ValueError("Guarded-live order controls are available only for live runs.")
+    if self._sync_guarded_live_orders(run) > 0:
+      run = self._runs.save_run(run)
+    order = self._get_guarded_live_order(run=run, order_id=order_id)
+    if require_active and order.status not in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
+      raise ValueError("Only active guarded-live venue orders can be controlled.")
+    return run, order
+
+  @staticmethod
+  def _get_guarded_live_order(
+    *,
+    run: RunRecord,
+    order_id: str,
+  ) -> Order:
+    for order in run.orders:
+      if order.order_id == order_id:
+        return order
+    raise LookupError("Order not found")
+
+  @staticmethod
+  def _resolve_guarded_live_order_remaining_quantity(order: Order) -> float:
+    if order.remaining_quantity is not None:
+      return max(order.remaining_quantity, 0.0)
+    return max(order.quantity - order.filled_quantity, 0.0)
 
   def _select_guarded_live_recovery_snapshot(
     self,
@@ -1371,6 +1584,10 @@ class TradingApplication:
           last_synced_at=state.recovery.recovered_at or self._clock(),
         )
       )
+      self._seed_guarded_live_execution_order_state(
+        order=run.orders[-1],
+        symbol=symbol,
+      )
 
     run.equity_curve.append(
       build_equity_point(
@@ -1384,6 +1601,28 @@ class TradingApplication:
       "Recovered guarded-live runtime state with "
       f"{1 if cache.position is not None and cache.position.is_open else 0} exposure(s) "
       f"and {recovered_order_count} open venue order(s)."
+    )
+
+  def _seed_guarded_live_execution_order_state(
+    self,
+    *,
+    order: Order,
+    symbol: str,
+  ) -> None:
+    setter = getattr(self._venue_execution, "set_order_state", None)
+    if not callable(setter):
+      return
+    setter(
+      order.order_id,
+      symbol=symbol,
+      side=order.side.value,
+      amount=order.quantity,
+      status=order.status.value,
+      updated_at=order.updated_at or order.created_at,
+      average_fill_price=order.average_fill_price,
+      fee_paid=order.fee_paid,
+      filled_amount=order.filled_quantity,
+      remaining_amount=self._resolve_guarded_live_order_remaining_quantity(order),
     )
 
   @staticmethod
@@ -2370,9 +2609,32 @@ class TradingApplication:
       symbol=run.config.symbols[0],
       side=order.side.value,
       amount=order.quantity,
+      order_type=OrderType.MARKET.value,
       reference_price=market_price,
     )
     return self._venue_execution.submit_market_order(request)
+
+  def _submit_guarded_live_limit_order(
+    self,
+    *,
+    run: RunRecord,
+    order: Order,
+    limit_price: float,
+  ) -> GuardedLiveVenueOrderResult:
+    session = run.provenance.runtime_session
+    if session is None:
+      raise RuntimeError("guarded_live_runtime_session_missing")
+    request = GuardedLiveVenueOrderRequest(
+      run_id=run.config.run_id,
+      session_id=session.session_id,
+      venue=run.config.venue,
+      symbol=run.config.symbols[0],
+      side=order.side.value,
+      amount=order.quantity,
+      order_type=OrderType.LIMIT.value,
+      reference_price=limit_price,
+    )
+    return self._venue_execution.submit_limit_order(request)
 
   def _build_operator_alerts_for_run(
     self,

@@ -779,6 +779,9 @@ export default function App() {
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
   const [guardedLiveReason, setGuardedLiveReason] = useState("operator_safety_drill");
+  const [liveOrderReplacementDrafts, setLiveOrderReplacementDrafts] = useState<
+    Record<string, LiveOrderReplacementDraft>
+  >({});
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [liveForm, setLiveForm] = useState(defaultRunForm);
@@ -1097,6 +1100,87 @@ export default function App() {
       await loadAll();
     } catch (error) {
       setStatusText(`Guarded-live stop failed: ${(error as Error).message}`);
+    }
+  }
+
+  function getLiveOrderReplacementDraft(runId: string, order: Run["orders"][number]): LiveOrderReplacementDraft {
+    const key = buildLiveOrderDraftKey(runId, order.order_id);
+    return liveOrderReplacementDrafts[key] ?? {
+      price: formatEditableNumber(order.requested_price),
+      quantity: "",
+    };
+  }
+
+  function setLiveOrderReplacementDraft(
+    runId: string,
+    orderId: string,
+    draft: LiveOrderReplacementDraft,
+  ) {
+    const key = buildLiveOrderDraftKey(runId, orderId);
+    setLiveOrderReplacementDrafts((current) => ({
+      ...current,
+      [key]: draft,
+    }));
+  }
+
+  async function cancelLiveOrder(runId: string, orderId: string) {
+    const reason = resolveGuardedLiveReason("manual_order_cancel");
+    setStatusText(`Canceling guarded-live order ${orderId}...`);
+    try {
+      await fetchJson<Run>(`/runs/live/${runId}/orders/${orderId}/cancel`, {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText(`Guarded-live order ${orderId} canceled.`);
+    } catch (error) {
+      setStatusText(`Guarded-live order cancel failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function replaceLiveOrder(
+    runId: string,
+    orderId: string,
+    draft: LiveOrderReplacementDraft,
+  ) {
+    const price = Number(draft.price);
+    if (!Number.isFinite(price) || price <= 0) {
+      setStatusText(`Replacement price for ${orderId} must be positive.`);
+      return;
+    }
+    const quantity = draft.quantity.trim().length ? Number(draft.quantity) : undefined;
+    if (quantity !== undefined && (!Number.isFinite(quantity) || quantity <= 0)) {
+      setStatusText(`Replacement quantity for ${orderId} must be positive when provided.`);
+      return;
+    }
+    const reason = resolveGuardedLiveReason("manual_order_replace");
+    setStatusText(`Replacing guarded-live order ${orderId}...`);
+    try {
+      const run = await fetchJson<Run>(`/runs/live/${runId}/orders/${orderId}/replace`, {
+        method: "POST",
+        body: JSON.stringify({
+          actor: "operator",
+          reason,
+          price,
+          quantity,
+        }),
+      });
+      setLiveOrderReplacementDrafts((current) => {
+        const next = { ...current };
+        delete next[buildLiveOrderDraftKey(runId, orderId)];
+        const replacementOrder = run.orders.at(-1);
+        if (replacementOrder) {
+          next[buildLiveOrderDraftKey(runId, replacementOrder.order_id)] = {
+            price: formatEditableNumber(replacementOrder.requested_price),
+            quantity: "",
+          };
+        }
+        return next;
+      });
+      await loadAll();
+      setStatusText(`Guarded-live order ${orderId} replaced.`);
+    } catch (error) {
+      setStatusText(`Guarded-live order replace failed: ${(error as Error).message}`);
     }
   }
 
@@ -1989,6 +2073,13 @@ export default function App() {
           filter={liveRunFilter}
           setFilter={setLiveRunFilter}
           onStop={stopLiveRun}
+          getOrderControls={(run) => ({
+            getReplacementDraft: (_orderId, order) => getLiveOrderReplacementDraft(run.config.run_id, order),
+            onChangeReplacementDraft: (orderId, draft) =>
+              setLiveOrderReplacementDraft(run.config.run_id, orderId, draft),
+            onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
+            onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
+          })}
         />
       </main>
     </div>
@@ -2538,6 +2629,18 @@ type RunSectionRerunAction = {
   onRerun: (rerunBoundaryId: string) => Promise<void>;
 };
 
+type LiveOrderReplacementDraft = {
+  price: string;
+  quantity: string;
+};
+
+type RunOrderControls = {
+  getReplacementDraft: (orderId: string, order: Run["orders"][number]) => LiveOrderReplacementDraft;
+  onChangeReplacementDraft: (orderId: string, draft: LiveOrderReplacementDraft) => void;
+  onCancelOrder: (orderId: string) => Promise<void>;
+  onReplaceOrder: (orderId: string, draft: LiveOrderReplacementDraft) => Promise<void>;
+};
+
 function RunSection({
   title,
   runs,
@@ -2547,6 +2650,7 @@ function RunSection({
   comparison,
   rerunActions,
   onStop,
+  getOrderControls,
 }: {
   title: string;
   runs: Run[];
@@ -2556,6 +2660,7 @@ function RunSection({
   comparison?: RunSectionComparisonControls;
   rerunActions?: RunSectionRerunAction[];
   onStop?: (runId: string) => Promise<void>;
+  getOrderControls?: (run: Run) => RunOrderControls | null;
 }) {
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
 
@@ -2649,8 +2754,10 @@ function RunSection({
       </div>
       {runs.length ? (
         <div className="run-list">
-          {runs.map((run) => (
-            <article className="run-card" key={run.config.run_id}>
+          {runs.map((run) => {
+            const orderControls = getOrderControls ? getOrderControls(run) : null;
+            return (
+              <article className="run-card" key={run.config.run_id}>
               <div className="run-card-head">
                 <div>
                   <strong>{run.config.strategy_id}</strong>
@@ -2694,7 +2801,9 @@ function RunSection({
               {run.provenance.runtime_session ? (
                 <RunRuntimeSessionSummary runtimeSession={run.provenance.runtime_session} />
               ) : null}
-              {run.orders.length ? <RunOrderLifecycleSummary orders={run.orders} /> : null}
+              {run.orders.length ? (
+                <RunOrderLifecycleSummary orders={run.orders} orderControls={orderControls} />
+              ) : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
                   lineage={run.provenance.market_data}
@@ -2736,8 +2845,9 @@ function RunSection({
                   </button>
                 ) : null}
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       ) : (
         <p className="empty-state">No runs yet.</p>
@@ -5869,8 +5979,10 @@ function RunRuntimeSessionSummary({
 
 function RunOrderLifecycleSummary({
   orders,
+  orderControls,
 }: {
   orders: Run["orders"];
+  orderControls?: RunOrderControls | null;
 }) {
   const openCount = orders.filter((order) => order.status === "open").length;
   const partialCount = orders.filter((order) => order.status === "partially_filled").length;
@@ -5883,6 +5995,18 @@ function RunOrderLifecycleSummary({
       .filter((value): value is string => Boolean(value))
       .sort()
       .at(-1) ?? null;
+  const previewOrders = [...orders]
+    .sort((left, right) => {
+      const leftActive = left.status === "open" || left.status === "partially_filled";
+      const rightActive = right.status === "open" || right.status === "partially_filled";
+      if (leftActive !== rightActive) {
+        return leftActive ? -1 : 1;
+      }
+      const leftTimestamp = left.last_synced_at ?? left.updated_at ?? left.created_at;
+      const rightTimestamp = right.last_synced_at ?? right.updated_at ?? right.created_at;
+      return rightTimestamp.localeCompare(leftTimestamp);
+    })
+    .slice(0, 4);
 
   return (
     <section className="run-lineage">
@@ -5901,7 +6025,7 @@ function RunOrderLifecycleSummary({
         <p>Last order sync: {formatTimestamp(latestSyncAt)}</p>
       </div>
       <div className="run-lineage-symbols">
-        {orders.slice(0, 4).map((order) => (
+        {previewOrders.map((order) => (
           <article className="run-lineage-symbol-card" key={order.order_id}>
             <div className="run-lineage-symbol-head">
               <strong>{order.order_id}</strong>
@@ -5918,14 +6042,84 @@ function RunOrderLifecycleSummary({
             </div>
             <p className="run-lineage-symbol-copy">Instrument: {order.instrument_id}</p>
             <p className="run-lineage-symbol-copy">
-              Avg fill: {order.average_fill_price === null || order.average_fill_price === undefined ? "n/a" : order.average_fill_price}
+              Avg fill:{" "}
+              {order.average_fill_price === null || order.average_fill_price === undefined
+                ? "n/a"
+                : order.average_fill_price}
             </p>
             <p className="run-lineage-symbol-copy">Updated: {formatTimestamp(order.updated_at ?? null)}</p>
             <p className="run-lineage-symbol-copy">Synced: {formatTimestamp(order.last_synced_at ?? null)}</p>
+            {orderControls && (order.status === "open" || order.status === "partially_filled") ? (
+              <RunOrderActionControls order={order} orderControls={orderControls} />
+            ) : null}
           </article>
         ))}
       </div>
     </section>
+  );
+}
+
+function RunOrderActionControls({
+  order,
+  orderControls,
+}: {
+  order: Run["orders"][number];
+  orderControls: RunOrderControls;
+}) {
+  const remainingQuantity = order.remaining_quantity ?? Math.max(order.quantity - order.filled_quantity, 0);
+  const draft = orderControls.getReplacementDraft(order.order_id, order);
+
+  return (
+    <div className="run-lineage-order-controls">
+      <div className="run-lineage-order-fields">
+        <label>
+          New px
+          <input
+            min="0"
+            onChange={(event) =>
+              orderControls.onChangeReplacementDraft(order.order_id, {
+                ...draft,
+                price: event.target.value,
+              })
+            }
+            step="any"
+            type="number"
+            value={draft.price}
+          />
+        </label>
+        <label>
+          Qty
+          <input
+            min="0"
+            onChange={(event) =>
+              orderControls.onChangeReplacementDraft(order.order_id, {
+                ...draft,
+                quantity: event.target.value,
+              })
+            }
+            placeholder={remainingQuantity.toFixed(8)}
+            step="any"
+            type="number"
+            value={draft.quantity}
+          />
+        </label>
+      </div>
+      <div className="run-lineage-order-actions">
+        <button className="ghost-button" onClick={() => void orderControls.onCancelOrder(order.order_id)} type="button">
+          Cancel order
+        </button>
+        <button
+          className="ghost-button"
+          onClick={() => void orderControls.onReplaceOrder(order.order_id, draft)}
+          type="button"
+        >
+          Replace order
+        </button>
+      </div>
+      <p className="run-lineage-symbol-copy">
+        Blank qty uses the current remaining amount: {remainingQuantity.toFixed(8)}
+      </p>
+    </div>
   );
 }
 
@@ -6021,6 +6215,17 @@ function formatMetric(value?: number, suffix = "") {
     return "n/a";
   }
   return `${value}${suffix}`;
+}
+
+function formatEditableNumber(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(8).replace(/\.?0+$/, "");
+}
+
+function buildLiveOrderDraftKey(runId: string, orderId: string) {
+  return `${runId}:${orderId}`;
 }
 
 function formatComparisonMetric(value: number | null | undefined, unit: string) {

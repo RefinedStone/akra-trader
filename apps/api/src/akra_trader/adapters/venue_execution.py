@@ -32,6 +32,13 @@ class VenueExecutionExchange(Protocol):
     params: dict[str, Any] | None = None,
   ) -> list[dict[str, Any]]: ...
 
+  def cancel_order(
+    self,
+    id: str,
+    symbol: str | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> dict[str, Any]: ...
+
   def fetch_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]: ...
 
   def fetch_closed_orders(
@@ -75,25 +82,62 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     self,
     request: GuardedLiveVenueOrderRequest,
   ) -> GuardedLiveVenueOrderResult:
-    submitted_at = self._clock()
-    result = GuardedLiveVenueOrderResult(
-      order_id=f"seeded-live-order-{len(self.submitted_orders) + 1}",
-      venue=self._venue,
-      symbol=request.symbol,
-      side=request.side,
-      amount=request.amount,
+    result = self._build_submitted_order_result(
+      request=request,
       status="filled",
-      submitted_at=submitted_at,
-      updated_at=submitted_at,
       average_fill_price=request.reference_price,
-      fee_paid=0.0,
-      requested_amount=request.amount,
       filled_amount=request.amount,
       remaining_amount=0.0,
     )
     self.submitted_orders.append(result)
     self._order_states[result.order_id] = result
     return result
+
+  def submit_limit_order(
+    self,
+    request: GuardedLiveVenueOrderRequest,
+  ) -> GuardedLiveVenueOrderResult:
+    result = self._build_submitted_order_result(
+      request=request,
+      status="open",
+      average_fill_price=None,
+      filled_amount=0.0,
+      remaining_amount=request.amount,
+    )
+    self.submitted_orders.append(result)
+    self._order_states[result.order_id] = result
+    return result
+
+  def cancel_order(
+    self,
+    *,
+    symbol: str,
+    order_id: str,
+  ) -> GuardedLiveVenueOrderResult:
+    current = self._order_states.get(order_id)
+    if current is None:
+      raise RuntimeError(f"seeded_order_not_found:{order_id}")
+    canceled_at = self._clock()
+    filled_amount = current.filled_amount or 0.0
+    requested_amount = current.requested_amount or current.amount
+    canceled = GuardedLiveVenueOrderResult(
+      order_id=current.order_id,
+      venue=current.venue,
+      symbol=symbol or current.symbol,
+      side=current.side,
+      amount=current.amount,
+      status="canceled",
+      submitted_at=current.submitted_at,
+      updated_at=canceled_at,
+      average_fill_price=current.average_fill_price,
+      fee_paid=current.fee_paid,
+      requested_amount=requested_amount,
+      filled_amount=filled_amount,
+      remaining_amount=max(requested_amount - filled_amount, 0.0),
+      issues=current.issues,
+    )
+    self._order_states[order_id] = canceled
+    return canceled
 
   def sync_order_states(
     self,
@@ -175,6 +219,32 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     self._order_states[order_id] = next_state
     return next_state
 
+  def _build_submitted_order_result(
+    self,
+    *,
+    request: GuardedLiveVenueOrderRequest,
+    status: str,
+    average_fill_price: float | None,
+    filled_amount: float,
+    remaining_amount: float,
+  ) -> GuardedLiveVenueOrderResult:
+    submitted_at = self._clock()
+    return GuardedLiveVenueOrderResult(
+      order_id=f"seeded-live-order-{len(self.submitted_orders) + 1}",
+      venue=self._venue,
+      symbol=request.symbol,
+      side=request.side,
+      amount=request.amount,
+      status=status,
+      submitted_at=submitted_at,
+      updated_at=submitted_at,
+      average_fill_price=average_fill_price,
+      fee_paid=0.0,
+      requested_amount=request.amount,
+      filled_amount=filled_amount,
+      remaining_amount=remaining_amount,
+    )
+
 
 class BinanceVenueExecutionAdapter(VenueExecutionPort):
   def __init__(
@@ -203,22 +273,31 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self,
     request: GuardedLiveVenueOrderRequest,
   ) -> GuardedLiveVenueOrderResult:
-    exchange = self._exchange
-    if exchange is None:
-      ready, issues = self.describe_capability()
-      if not ready:
-        raise RuntimeError(", ".join(issues))
-      exchange = build_binance_trade_exchange(
-        api_key=self._api_key,
-        api_secret=self._api_secret,
-      )
+    exchange = self._resolve_exchange()
+    row = exchange.create_order(request.symbol, "market", request.side, request.amount, None, {})
+    return _build_order_result_from_exchange_row(
+      row,
+      venue=self._venue,
+      fallback_symbol=request.symbol,
+      fallback_side=request.side,
+      fallback_amount=request.amount,
+      fallback_reference_price=request.reference_price,
+      fallback_time=self._clock(),
+    )
 
+  def submit_limit_order(
+    self,
+    request: GuardedLiveVenueOrderRequest,
+  ) -> GuardedLiveVenueOrderResult:
+    if request.reference_price is None or request.reference_price <= 0:
+      raise ValueError("Guarded-live limit replacement requires a positive reference price.")
+    exchange = self._resolve_exchange()
     row = exchange.create_order(
       request.symbol,
-      "market",
+      "limit",
       request.side,
       request.amount,
-      None,
+      request.reference_price,
       {},
     )
     return _build_order_result_from_exchange_row(
@@ -228,6 +307,21 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       fallback_side=request.side,
       fallback_amount=request.amount,
       fallback_reference_price=request.reference_price,
+      fallback_time=self._clock(),
+    )
+
+  def cancel_order(
+    self,
+    *,
+    symbol: str,
+    order_id: str,
+  ) -> GuardedLiveVenueOrderResult:
+    exchange = self._resolve_exchange()
+    row = exchange.cancel_order(order_id, symbol, {})
+    return _build_order_result_from_exchange_row(
+      row,
+      venue=self._venue,
+      fallback_symbol=symbol,
       fallback_time=self._clock(),
     )
 
@@ -285,6 +379,18 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         )
       )
     return tuple(results)
+
+  def _resolve_exchange(self) -> VenueExecutionExchange:
+    exchange = self._exchange
+    if exchange is not None:
+      return exchange
+    ready, issues = self.describe_capability()
+    if not ready:
+      raise RuntimeError(", ".join(issues))
+    return build_binance_trade_exchange(
+      api_key=self._api_key,
+      api_secret=self._api_secret,
+    )
 
   def _fetch_order_rows(
     self,
@@ -358,18 +464,16 @@ def _build_order_result_from_exchange_row(
   remaining_amount = _coerce_float(row.get("remaining"))
   if remaining_amount is None:
     remaining_amount = max(requested_amount - filled_amount, 0.0)
-  average_fill_price = (
-    _coerce_float(row.get("average"))
-    or _coerce_float(row.get("price"))
-    or fallback_reference_price
-  )
-  fee_paid = _extract_fee(row)
   status = _normalize_order_status(
     raw_status=str(row.get("status") or "").lower(),
     requested_amount=requested_amount,
     filled_amount=filled_amount,
     remaining_amount=remaining_amount,
   )
+  average_fill_price = _coerce_float(row.get("average"))
+  if average_fill_price is None and status in {"filled", "partially_filled"}:
+    average_fill_price = _coerce_float(row.get("price")) or fallback_reference_price
+  fee_paid = _extract_fee(row)
   return GuardedLiveVenueOrderResult(
     order_id=str(row.get("id") or row.get("clientOrderId") or f"live-order:{submitted_at.isoformat()}"),
     venue=venue,

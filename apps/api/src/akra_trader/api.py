@@ -65,6 +65,11 @@ class GuardedLiveActionRequest(BaseModel):
   reason: str = "manual_operator_action"
 
 
+class GuardedLiveOrderReplaceRequest(GuardedLiveActionRequest):
+  price: float = Field(gt=0)
+  quantity: float | None = Field(default=None, gt=0)
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -280,6 +285,48 @@ def create_router(container: Container) -> APIRouter:
     run = app.stop_live_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
+    return serialize_run(run)
+
+  @router.post("/runs/live/{run_id}/orders/{order_id}/cancel")
+  def cancel_live_order(
+    run_id: str,
+    order_id: str,
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.cancel_live_order(
+        run_id=run_id,
+        order_id=order_id,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
+
+  @router.post("/runs/live/{run_id}/orders/{order_id}/replace")
+  def replace_live_order(
+    run_id: str,
+    order_id: str,
+    request: GuardedLiveOrderReplaceRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.replace_live_order(
+        run_id=run_id,
+        order_id=order_id,
+        price=request.price,
+        quantity=request.quantity,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run(run)
 
   @router.get("/runs/{run_id}/orders")

@@ -1825,6 +1825,36 @@ select {
   word-break: break-word;
 }
 
+.run-lineage-order-controls {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.run-lineage-order-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-lineage-order-fields label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.run-lineage-order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 @media (max-width: 960px) {
   .hero,
   .grid,
@@ -1835,7 +1865,8 @@ select {
   .reference-provenance-grid,
   .run-lineage-grid,
   .run-strategy-grid,
-  .run-lineage-symbol-grid {
+  .run-lineage-symbol-grid,
+  .run-lineage-order-fields {
     grid-template-columns: 1fr;
   }
 
