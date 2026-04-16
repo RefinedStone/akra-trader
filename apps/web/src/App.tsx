@@ -2827,6 +2827,7 @@ function ComparisonTooltipTuningPanel({
   onReset: () => void;
   onSavePreset: () => void;
 }) {
+  const [showUnchangedConflictRows, setShowUnchangedConflictRows] = useState(false);
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -2838,8 +2839,14 @@ function ComparisonTooltipTuningPanel({
           pendingPresetImportConflict.tuning,
         )
       : [];
-  const changedConflictPreviewCount = conflictPreviewRows.filter((row) => row.changed).length;
-  const unchangedConflictPreviewCount = conflictPreviewRows.length - changedConflictPreviewCount;
+  const changedConflictPreviewRows = conflictPreviewRows.filter((row) => row.changed);
+  const unchangedConflictPreviewRows = conflictPreviewRows.filter((row) => !row.changed);
+  const changedConflictPreviewCount = changedConflictPreviewRows.length;
+  const unchangedConflictPreviewCount = unchangedConflictPreviewRows.length;
+
+  useEffect(() => {
+    setShowUnchangedConflictRows(false);
+  }, [pendingPresetImportConflict?.imported_preset_name, pendingPresetImportConflict?.raw]);
 
   return (
     <details className="comparison-dev-panel">
@@ -2977,7 +2984,7 @@ function ComparisonTooltipTuningPanel({
                     <span>Existing</span>
                     <span>Incoming</span>
                   </div>
-                  {conflictPreviewRows.map((row) => (
+                  {changedConflictPreviewRows.map((row) => (
                     <div
                       className={`comparison-dev-conflict-preview-row ${
                         row.changed ? "is-changed" : ""
@@ -2989,6 +2996,26 @@ function ComparisonTooltipTuningPanel({
                       <span>{formatComparisonTooltipTuningValue(row.incoming_value)}</span>
                     </div>
                   ))}
+                  {unchangedConflictPreviewCount ? (
+                    <button
+                      className="comparison-dev-conflict-toggle"
+                      onClick={() => setShowUnchangedConflictRows((current) => !current)}
+                      type="button"
+                    >
+                      {showUnchangedConflictRows
+                        ? `Hide ${unchangedConflictPreviewCount} unchanged value(s)`
+                        : `Show ${unchangedConflictPreviewCount} unchanged value(s)`}
+                    </button>
+                  ) : null}
+                  {showUnchangedConflictRows
+                    ? unchangedConflictPreviewRows.map((row) => (
+                        <div className="comparison-dev-conflict-preview-row" key={row.key}>
+                          <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+                          <span>{formatComparisonTooltipTuningValue(row.existing_value)}</span>
+                          <span>{formatComparisonTooltipTuningValue(row.incoming_value)}</span>
+                        </div>
+                      ))
+                    : null}
                 </div>
               </>
             ) : null}

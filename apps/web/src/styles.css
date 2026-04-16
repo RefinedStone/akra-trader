@@ -912,6 +912,24 @@ select {
   color: inherit;
 }
 
+.comparison-dev-conflict-toggle {
+  padding: 8px 10px;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  text-align: left;
+}
+
+.comparison-dev-conflict-toggle:hover,
+.comparison-dev-conflict-toggle:focus-visible {
+  background: rgba(255, 193, 94, 0.08);
+  color: rgba(255, 241, 214, 0.96);
+}
+
 .comparison-dev-feedback {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);
