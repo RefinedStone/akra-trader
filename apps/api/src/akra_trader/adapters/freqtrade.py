@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
+from io import BytesIO
 import json
 from pathlib import Path
 import os
+import re
 import shutil
 import subprocess
 from typing import Any
@@ -366,6 +368,27 @@ class FreqtradeReferenceAdapter:
             summary.get("strategy_name")
             or self._first_value(strategy_bundle.get("strategy_names")),
           )
+
+        market_change_section = self._summarize_zip_market_change_export(archive, members)
+        if market_change_section:
+          sections["zip_market_change"] = market_change_section
+
+        wallet_exports_section = self._summarize_zip_wallet_exports(archive, members)
+        if wallet_exports_section:
+          sections["zip_wallet_exports"] = wallet_exports_section
+
+        for suffix, section_key in (
+          ("signals.pkl", "zip_signal_exports"),
+          ("rejected.pkl", "zip_rejected_exports"),
+          ("exited.pkl", "zip_exited_exports"),
+        ):
+          pickle_section = self._summarize_zip_pickle_exports(
+            archive=archive,
+            members=members,
+            suffix=suffix,
+          )
+          if pickle_section:
+            sections[section_key] = pickle_section
 
         return summary, sections
     except (BadZipFile, OSError):
@@ -1052,6 +1075,271 @@ class FreqtradeReferenceAdapter:
       section["parameter_keys"] = parameter_keys
     return section
 
+  def _summarize_zip_market_change_export(
+    self,
+    archive: ZipFile,
+    members: list[str],
+  ) -> dict[str, Any]:
+    market_change_member = next(
+      (
+        member for member in members
+        if member.lower().endswith("_market_change.feather")
+      ),
+      None,
+    )
+    if market_change_member is None:
+      return {}
+    dataframe = self._read_zip_feather_frame(archive, market_change_member)
+    if dataframe is None:
+      return {
+        "entry": market_change_member,
+        "inspection_status": "unreadable",
+      }
+    section = self._summarize_dataframe(dataframe)
+    section["entry"] = market_change_member
+    non_temporal_columns = [
+      column
+      for column in dataframe.columns
+      if str(column) not in {"date", "open_date", "close_date", "timestamp"}
+    ]
+    if non_temporal_columns:
+      section["pair_count"] = len(non_temporal_columns)
+      section["pairs"] = non_temporal_columns[:8]
+    return section
+
+  def _summarize_zip_wallet_exports(
+    self,
+    archive: ZipFile,
+    members: list[str],
+  ) -> dict[str, Any]:
+    wallet_members = [
+      member for member in members
+      if member.lower().endswith("_wallet.feather")
+    ]
+    if not wallet_members:
+      return {}
+
+    entries: list[dict[str, Any]] = []
+    strategies: list[str] = []
+    currencies: set[str] = set()
+    total_row_count = 0
+    unreadable_entries: list[str] = []
+
+    for member in wallet_members:
+      dataframe = self._read_zip_feather_frame(archive, member)
+      if dataframe is None:
+        unreadable_entries.append(member)
+        continue
+      total_row_count += len(dataframe)
+      strategy_name = self._extract_strategy_name_from_export_member(member, "_wallet.feather")
+      if strategy_name is not None:
+        strategies.append(strategy_name)
+      if "currency" in dataframe.columns:
+        currencies.update(
+          str(value)
+          for value in dataframe["currency"].dropna().astype(str).unique().tolist()
+        )
+      entry = self._summarize_dataframe(dataframe)
+      entry["entry"] = member
+      if strategy_name is not None:
+        entry["strategy"] = strategy_name
+      if "currency" in dataframe.columns:
+        entry["currency_count"] = int(dataframe["currency"].nunique(dropna=True))
+      entries.append(entry)
+
+    section: dict[str, Any] = {
+      "export_count": len(wallet_members),
+      "total_row_count": total_row_count,
+      "entries": entries[:3],
+    }
+    if strategies:
+      section["strategies"] = strategies[:8]
+      section["strategy_count"] = len(set(strategies))
+    if currencies:
+      ordered_currencies = sorted(currencies)
+      section["currencies"] = ordered_currencies[:8]
+      section["currency_count"] = len(ordered_currencies)
+    if unreadable_entries:
+      section["unreadable_entries"] = unreadable_entries[:5]
+    return section
+
+  def _summarize_zip_pickle_exports(
+    self,
+    *,
+    archive: ZipFile,
+    members: list[str],
+    suffix: str,
+  ) -> dict[str, Any]:
+    pickle_members = [
+      member for member in members
+      if member.lower().endswith(suffix)
+    ]
+    if not pickle_members:
+      return {}
+
+    strategies: set[str] = set()
+    pairs: set[str] = set()
+    entries: list[dict[str, Any]] = []
+    total_row_count = 0
+    total_frame_count = 0
+    unreadable_entries: list[str] = []
+
+    for member in pickle_members:
+      payload = self._read_zip_pickle_payload(archive, member)
+      if payload is None:
+        unreadable_entries.append(member)
+        continue
+      payload_entries = self._summarize_pickle_payload_entries(payload, member)
+      if not payload_entries:
+        unreadable_entries.append(member)
+        continue
+      for payload_entry in payload_entries:
+        total_frame_count += 1
+        row_count = payload_entry.get("row_count")
+        if isinstance(row_count, int):
+          total_row_count += row_count
+        strategy_name = payload_entry.get("strategy")
+        pair_name = payload_entry.get("pair")
+        if isinstance(strategy_name, str):
+          strategies.add(strategy_name)
+        if isinstance(pair_name, str):
+          pairs.add(pair_name)
+      entries.extend(payload_entries)
+
+    section: dict[str, Any] = {
+      "export_count": len(pickle_members),
+      "frame_count": total_frame_count,
+      "row_count": total_row_count,
+      "entries": entries[:5],
+    }
+    if strategies:
+      ordered_strategies = sorted(strategies)
+      section["strategy_count"] = len(ordered_strategies)
+      section["strategies"] = ordered_strategies[:8]
+    if pairs:
+      ordered_pairs = sorted(pairs)
+      section["pair_count"] = len(ordered_pairs)
+      section["pairs"] = ordered_pairs[:8]
+    if unreadable_entries:
+      section["unreadable_entries"] = unreadable_entries[:5]
+    return section
+
+  def _summarize_pickle_payload_entries(
+    self,
+    payload: Any,
+    member: str,
+  ) -> list[dict[str, Any]]:
+    try:
+      import pandas as pd
+    except ImportError:
+      return [{"entry": member, "inspection_status": "dependency_missing"}]
+
+    entries: list[dict[str, Any]] = []
+
+    if isinstance(payload, dict):
+      for strategy_key, strategy_value in payload.items():
+        strategy_name = strategy_key if isinstance(strategy_key, str) else None
+        if isinstance(strategy_value, dict):
+          for pair_key, pair_value in strategy_value.items():
+            pair_name = pair_key if isinstance(pair_key, str) else None
+            if isinstance(pair_value, pd.DataFrame):
+              entry = self._summarize_dataframe(pair_value)
+              entry["entry"] = member
+              if strategy_name is not None:
+                entry["strategy"] = strategy_name
+              if pair_name is not None:
+                entry["pair"] = pair_name
+              entries.append(entry)
+        elif isinstance(strategy_value, pd.DataFrame):
+          entry = self._summarize_dataframe(strategy_value)
+          entry["entry"] = member
+          if strategy_name is not None:
+            entry["strategy"] = strategy_name
+          entries.append(entry)
+    elif isinstance(payload, pd.DataFrame):
+      entry = self._summarize_dataframe(payload)
+      entry["entry"] = member
+      entries.append(entry)
+
+    return entries
+
+  def _read_zip_feather_frame(
+    self,
+    archive: ZipFile,
+    member: str,
+  ) -> Any | None:
+    try:
+      import pandas as pd
+    except ImportError:
+      return None
+    try:
+      with archive.open(member, "r") as file_handle:
+        return pd.read_feather(BytesIO(file_handle.read()))
+    except Exception:
+      return None
+
+  def _read_zip_pickle_payload(
+    self,
+    archive: ZipFile,
+    member: str,
+  ) -> Any | None:
+    try:
+      import joblib
+    except ImportError:
+      return None
+    try:
+      with archive.open(member, "r") as file_handle:
+        return joblib.load(BytesIO(file_handle.read()))
+    except Exception:
+      return None
+
+  def _summarize_dataframe(self, dataframe: Any) -> dict[str, Any]:
+    summary: dict[str, Any] = {
+      "row_count": len(dataframe),
+      "column_count": len(dataframe.columns),
+      "columns": [str(column) for column in dataframe.columns[:8]],
+    }
+    date_start, date_end = self._extract_dataframe_time_range(dataframe)
+    self._set_summary_entry(summary, "date_start", date_start)
+    self._set_summary_entry(summary, "date_end", date_end)
+    return summary
+
+  def _extract_dataframe_time_range(self, dataframe: Any) -> tuple[str | None, str | None]:
+    candidate_columns = ("date", "open_date", "close_date", "timestamp")
+    for column in candidate_columns:
+      if column not in dataframe.columns:
+        continue
+      date_start, date_end = self._summarize_series_time_range(dataframe[column])
+      if date_start is not None or date_end is not None:
+        return date_start, date_end
+
+    try:
+      import pandas as pd
+    except ImportError:
+      return None, None
+
+    for column in dataframe.columns:
+      series = dataframe[column]
+      if pd.api.types.is_datetime64_any_dtype(series):
+        return self._summarize_series_time_range(series)
+    return None, None
+
+  def _summarize_series_time_range(self, series: Any) -> tuple[str | None, str | None]:
+    try:
+      import pandas as pd
+    except ImportError:
+      return None, None
+    try:
+      datetime_series = pd.to_datetime(series, utc=True, errors="coerce").dropna()
+    except (ValueError, TypeError):
+      return None, None
+    if datetime_series.empty:
+      return None, None
+    return (
+      datetime_series.min().isoformat(),
+      datetime_series.max().isoformat(),
+    )
+
   def _is_zip_strategy_parameter_member(self, archive: ZipFile, member: str) -> bool:
     if not member.lower().endswith(".json"):
       return False
@@ -1075,6 +1363,27 @@ class FreqtradeReferenceAdapter:
   @staticmethod
   def _zip_member_name(member: str) -> str:
     return Path(member).name
+
+  def _extract_strategy_name_from_export_member(
+    self,
+    member: str,
+    suffix: str,
+  ) -> str | None:
+    filename = self._zip_member_name(member)
+    if not filename.endswith(suffix):
+      return None
+    stem = filename[:-len(suffix)]
+    for pattern in (
+      r"^backtest-result-\d{8}_\d{6}_(.+)$",
+      r"^backtest-result-\d{4}(?:_\d{2}){5}_(.+)$",
+      r"^.+?_(.+)$",
+    ):
+      matched = re.match(pattern, stem)
+      if matched is not None:
+        strategy_name = matched.group(1)
+        if strategy_name:
+          return strategy_name
+    return None
 
   @staticmethod
   def _first_value(value: Any) -> Any:

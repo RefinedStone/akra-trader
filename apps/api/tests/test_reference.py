@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from io import BytesIO
 import json
 from pathlib import Path
 from zipfile import ZipFile
+
+import joblib
+import pandas as pd
 
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.references import load_reference_catalog
@@ -311,6 +315,84 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
   result_root = tmp_path / "user_data" / "backtest_results"
   result_root.mkdir(parents=True)
 
+  market_change_buffer = BytesIO()
+  pd.DataFrame(
+    {
+      "date": pd.to_datetime(["2026-04-01T00:00:00Z", "2026-04-02T00:00:00Z"], utc=True),
+      "BTC/USDT": [1.02, 1.05],
+      "ETH/USDT": [0.98, 1.01],
+    }
+  ).to_feather(market_change_buffer)
+  market_change_buffer.seek(0)
+
+  wallet_buffer = BytesIO()
+  pd.DataFrame(
+    {
+      "date": pd.to_datetime(["2026-04-01T00:00:00Z", "2026-04-02T12:00:00Z"], utc=True),
+      "currency": ["USDT", "BTC"],
+      "rate": [1.0, 68000.0],
+      "balance": [10500.0, 0.25],
+    }
+  ).to_feather(wallet_buffer)
+  wallet_buffer.seek(0)
+
+  signals_buffer = BytesIO()
+  joblib.dump(
+    {
+      "NostalgiaForInfinityX7": {
+        "BTC/USDT": pd.DataFrame(
+          {
+            "date": pd.to_datetime(
+              ["2026-04-01T00:00:00Z", "2026-04-01T01:00:00Z"],
+              utc=True,
+            ),
+            "enter_tag": ["dip_buy", "breakout"],
+          }
+        ),
+        "ETH/USDT": pd.DataFrame(
+          {
+            "date": pd.to_datetime(["2026-04-01T02:00:00Z"], utc=True),
+            "enter_tag": ["dip_buy"],
+          }
+        ),
+      }
+    },
+    signals_buffer,
+  )
+  signals_buffer.seek(0)
+
+  rejected_buffer = BytesIO()
+  joblib.dump(
+    {
+      "NostalgiaForInfinityX7": {
+        "BTC/USDT": pd.DataFrame(
+          {
+            "date": pd.to_datetime(["2026-04-01T03:00:00Z"], utc=True),
+            "reason": ["volume_limit"],
+          }
+        ),
+      }
+    },
+    rejected_buffer,
+  )
+  rejected_buffer.seek(0)
+
+  exited_buffer = BytesIO()
+  joblib.dump(
+    {
+      "NostalgiaForInfinityX7": {
+        "BTC/USDT": pd.DataFrame(
+          {
+            "date": pd.to_datetime(["2026-04-01T04:00:00Z"], utc=True),
+            "exit_reason": ["roi"],
+          }
+        ),
+      }
+    },
+    exited_buffer,
+  )
+  exited_buffer.seek(0)
+
   snapshot_path = result_root / "backtest-result-20260417_030000.zip"
   with ZipFile(snapshot_path, "w") as archive:
     archive.writestr(
@@ -403,11 +485,17 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
       ),
     )
     archive.writestr("backtest-result-20260417_030000_NostalgiaForInfinityX7.py", "# strategy")
-    archive.writestr("backtest-result-20260417_030000_market_change.feather", b"market-change")
-    archive.writestr("backtest-result-20260417_030000_NostalgiaForInfinityX7_wallet.feather", b"wallet")
-    archive.writestr("backtest-result-20260417_030000_signals.pkl", b"signals")
-    archive.writestr("backtest-result-20260417_030000_rejected.pkl", b"rejected")
-    archive.writestr("backtest-result-20260417_030000_exited.pkl", b"exited")
+    archive.writestr(
+      "backtest-result-20260417_030000_market_change.feather",
+      market_change_buffer.getvalue(),
+    )
+    archive.writestr(
+      "backtest-result-20260417_030000_NostalgiaForInfinityX7_wallet.feather",
+      wallet_buffer.getvalue(),
+    )
+    archive.writestr("backtest-result-20260417_030000_signals.pkl", signals_buffer.getvalue())
+    archive.writestr("backtest-result-20260417_030000_rejected.pkl", rejected_buffer.getvalue())
+    archive.writestr("backtest-result-20260417_030000_exited.pkl", exited_buffer.getvalue())
 
   artifacts = adapter._build_benchmark_artifacts((
     str(result_root),
@@ -435,6 +523,17 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
   assert snapshot_artifact.sections["zip_strategy_bundle"]["parameter_keys"][
     "backtest-result-20260417_030000_NostalgiaForInfinityX7.json"
   ] == ["buy_threshold", "sell_threshold"]
+  assert snapshot_artifact.sections["zip_market_change"]["row_count"] == 2
+  assert snapshot_artifact.sections["zip_market_change"]["pair_count"] == 2
+  assert snapshot_artifact.sections["zip_market_change"]["date_start"] == "2026-04-01T00:00:00+00:00"
+  assert snapshot_artifact.sections["zip_wallet_exports"]["export_count"] == 1
+  assert snapshot_artifact.sections["zip_wallet_exports"]["strategy_count"] == 1
+  assert snapshot_artifact.sections["zip_wallet_exports"]["currency_count"] == 2
+  assert snapshot_artifact.sections["zip_signal_exports"]["strategy_count"] == 1
+  assert snapshot_artifact.sections["zip_signal_exports"]["pair_count"] == 2
+  assert snapshot_artifact.sections["zip_signal_exports"]["row_count"] == 3
+  assert snapshot_artifact.sections["zip_rejected_exports"]["row_count"] == 1
+  assert snapshot_artifact.sections["zip_exited_exports"]["row_count"] == 1
   assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 18
   assert snapshot_artifact.sections["wallet_stats"]["sharpe"] == 1.2
 
