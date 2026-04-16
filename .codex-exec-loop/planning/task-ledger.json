@@ -890,20 +890,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-dialog",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Resolve tooltip preset import name conflicts interactively when a collision is detected",
-      "description": "Refine the dev-only tooltip tuning import flow so operators are prompted only when an imported preset name actually collides with an existing local preset, with per-conflict actions such as `rename`, `overwrite`, or `skip` replacing the current advance policy selection in the panel.",
-      "status": "ready",
+      "title": "Interactive tooltip preset import conflict resolution shipped",
+      "description": "Completed the dev-only tooltip tuning import refinement by replacing the advance conflict policy selector with inline conflict handling that appears only on actual preset-name collisions, offering `Rename and import`, `Overwrite existing`, and `Skip import`, prefilling an import-safe rename suggestion, and keeping shared preset URL loads on non-destructive safe-rename behavior outside the manual import flow.",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply marked the preset conflict policy task complete and explicitly identified per-import interactive resolution on actual collisions, including `rename`, `overwrite`, or `skip`, as the clearest next refinement.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the inline collision-resolution flow in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `30a1dfe` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:35:00Z",
+      "updated_at": "2026-04-17T07:45:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-merge-modes"
       ],
-      "direction_relation_note": "Builds on the completed conflict-policy import safety work by moving tooltip preset collision handling from a global preselection model to a more targeted, operator-driven decision at the moment an actual name collision occurs."
+      "direction_relation_note": "Closed the reference-lane tooltip preset import follow-up by moving collision handling from a global preselection model to a targeted operator decision at the moment an actual name collision occurs."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-preview",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Preview existing versus incoming preset values before resolving tooltip import conflicts",
+      "description": "Extend the inline tooltip preset conflict card so a collision shows the existing local preset values alongside the incoming preset values before the operator chooses `Rename and import` or `Overwrite existing`, making the conflict decision informed instead of name-only.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains from the completed task and explicitly named conflict previews comparing existing versus incoming preset values as the most likely next refinement, making it the clearest executable next task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:45:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-dialog"
+      ],
+      "direction_relation_note": "Builds directly on the completed interactive collision workflow by giving reference-lane operators the value-level context needed to choose rename or overwrite confidently when shared tooltip presets collide."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
