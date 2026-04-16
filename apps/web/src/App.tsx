@@ -1,4 +1,15 @@
-import { FormEvent, KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
+import {
+  CSSProperties,
+  FormEvent,
+  KeyboardEvent,
+  forwardRef,
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 type ParameterSchema = Record<
   string,
@@ -241,6 +252,14 @@ type ComparisonTooltipTargetProps = {
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+};
+type ComparisonTooltipLayout = {
+  tooltipId: string;
+  left: number;
+  top: number;
+  maxWidth: number;
+  arrowLeft: number;
+  side: "top" | "bottom";
 };
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -1428,7 +1447,12 @@ function RunComparisonPanel({
 
   const [primaryNarrative, ...secondaryNarratives] = comparison.narratives;
   const tooltipScopeId = sanitizeComparisonTooltipId(useId());
+  const tooltipTargetRefs = useRef(new Map<string, HTMLElement>());
+  const tooltipBubbleRefs = useRef(new Map<string, HTMLSpanElement>());
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
+  const [activeTooltipLayout, setActiveTooltipLayout] = useState<ComparisonTooltipLayout | null>(
+    null,
+  );
   const [dismissedTooltipId, setDismissedTooltipId] = useState<string | null>(null);
   const intentClassName = getComparisonIntentClassName(comparison.intent);
   const intentTooltip = formatComparisonIntentTooltip(comparison.intent);
@@ -1462,8 +1486,29 @@ function RunComparisonPanel({
 
   const dismissComparisonTooltip = (tooltipId: string) => {
     setActiveTooltipId((current) => (current === tooltipId ? null : current));
+    setActiveTooltipLayout((current) => (current?.tooltipId === tooltipId ? null : current));
     setDismissedTooltipId(tooltipId);
   };
+
+  const registerComparisonTooltipTargetRef = (tooltipId?: string) => (node: HTMLElement | null) => {
+    if (!tooltipId) {
+      return;
+    }
+    if (node) {
+      tooltipTargetRefs.current.set(tooltipId, node);
+      return;
+    }
+    tooltipTargetRefs.current.delete(tooltipId);
+  };
+
+  const registerComparisonTooltipBubbleRef =
+    (tooltipId: string) => (node: HTMLSpanElement | null) => {
+      if (node) {
+        tooltipBubbleRefs.current.set(tooltipId, node);
+        return;
+      }
+      tooltipBubbleRefs.current.delete(tooltipId);
+    };
 
   const getComparisonTooltipTargetProps = (
     tooltipId?: string,
@@ -1489,6 +1534,71 @@ function RunComparisonPanel({
     };
   };
 
+  useLayoutEffect(() => {
+    if (!activeTooltipId) {
+      setActiveTooltipLayout(null);
+      return;
+    }
+
+    const updateTooltipLayout = () => {
+      const target = tooltipTargetRefs.current.get(activeTooltipId);
+      const bubble = tooltipBubbleRefs.current.get(activeTooltipId);
+
+      if (!target || !bubble) {
+        setActiveTooltipLayout(null);
+        return;
+      }
+
+      const viewportPadding = 16;
+      const boundaryPadding = 12;
+      const gap = 14;
+      const targetRect = target.getBoundingClientRect();
+      const boundaryRect = getComparisonTooltipBoundaryRect(target);
+      const minLeft = Math.max(
+        viewportPadding,
+        boundaryRect ? boundaryRect.left + boundaryPadding : viewportPadding,
+      );
+      const maxRight = Math.min(
+        window.innerWidth - viewportPadding,
+        boundaryRect ? boundaryRect.right - boundaryPadding : window.innerWidth - viewportPadding,
+      );
+      const availableWidth = Math.max(180, maxRight - minLeft);
+      bubble.style.maxWidth = `${availableWidth}px`;
+      const bubbleRect = bubble.getBoundingClientRect();
+      const bubbleWidth = Math.min(bubbleRect.width, availableWidth);
+      const preferredLeft = targetRect.left + targetRect.width / 2 - bubbleWidth / 2;
+      const maxLeft = Math.max(minLeft, maxRight - bubbleWidth);
+      const left = clampComparisonNumber(preferredLeft, minLeft, maxLeft);
+      const spaceBelow = window.innerHeight - viewportPadding - (targetRect.bottom + gap);
+      const spaceAbove = targetRect.top - viewportPadding - gap;
+      const side =
+        spaceBelow >= bubbleRect.height || spaceBelow >= spaceAbove ? "bottom" : "top";
+      const top =
+        side === "bottom"
+          ? Math.min(targetRect.bottom + gap, window.innerHeight - viewportPadding - bubbleRect.height)
+          : Math.max(viewportPadding, targetRect.top - gap - bubbleRect.height);
+      const targetCenter = targetRect.left + targetRect.width / 2;
+      const arrowLeft = clampComparisonNumber(targetCenter - left, 18, bubbleWidth - 18);
+
+      setActiveTooltipLayout({
+        arrowLeft,
+        left,
+        maxWidth: availableWidth,
+        side,
+        tooltipId: activeTooltipId,
+        top,
+      });
+    };
+
+    updateTooltipLayout();
+    window.addEventListener("resize", updateTooltipLayout);
+    window.addEventListener("scroll", updateTooltipLayout, true);
+    return () => {
+      window.removeEventListener("resize", updateTooltipLayout);
+      window.removeEventListener("scroll", updateTooltipLayout, true);
+    };
+  }, [activeTooltipId]);
+
   return (
     <section className={`comparison-panel ${intentClassName}`}>
       <div className="comparison-head">
@@ -1503,51 +1613,93 @@ function RunComparisonPanel({
           <span>Baseline: {comparison.baseline_run_id}</span>
           <span
             className="comparison-intent-chip comparison-cue comparison-tooltip"
+            ref={registerComparisonTooltipTargetRef(intentChipTooltipId)}
             tabIndex={0}
             {...getComparisonTooltipTargetProps(intentChipTooltipId)}
           >
             <span aria-hidden="true" className="comparison-intent-icon" />
             <span>{formatComparisonIntentLabel(comparison.intent)}</span>
-            <ComparisonTooltipBubble id={intentChipTooltipId} text={intentTooltip} />
+            <ComparisonTooltipBubble
+              id={intentChipTooltipId}
+              layout={
+                activeTooltipLayout?.tooltipId === intentChipTooltipId ? activeTooltipLayout : null
+              }
+              ref={registerComparisonTooltipBubbleRef(intentChipTooltipId)}
+              text={intentTooltip}
+            />
           </span>
         </p>
       </div>
       <div aria-label="Comparison legend" className="comparison-legend">
         <span
           className="comparison-legend-item comparison-legend-item-mode comparison-cue comparison-tooltip"
+          ref={registerComparisonTooltipTargetRef(legendModeTooltipId)}
           tabIndex={0}
           {...getComparisonTooltipTargetProps(legendModeTooltipId)}
         >
           <span aria-hidden="true" className="comparison-intent-icon" />
           <span>{formatComparisonIntentLegend(comparison.intent)}</span>
-          <ComparisonTooltipBubble id={legendModeTooltipId} text={intentTooltip} />
+          <ComparisonTooltipBubble
+            id={legendModeTooltipId}
+            layout={
+              activeTooltipLayout?.tooltipId === legendModeTooltipId ? activeTooltipLayout : null
+            }
+            ref={registerComparisonTooltipBubbleRef(legendModeTooltipId)}
+            text={intentTooltip}
+          />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
+          ref={registerComparisonTooltipTargetRef(legendBaselineTooltipId)}
           tabIndex={0}
           {...getComparisonTooltipTargetProps(legendBaselineTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch baseline" />
           <span>Baseline run</span>
-          <ComparisonTooltipBubble id={legendBaselineTooltipId} text={baselineTooltip} />
+          <ComparisonTooltipBubble
+            id={legendBaselineTooltipId}
+            layout={
+              activeTooltipLayout?.tooltipId === legendBaselineTooltipId
+                ? activeTooltipLayout
+                : null
+            }
+            ref={registerComparisonTooltipBubbleRef(legendBaselineTooltipId)}
+            text={baselineTooltip}
+          />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
+          ref={registerComparisonTooltipTargetRef(legendBestTooltipId)}
           tabIndex={0}
           {...getComparisonTooltipTargetProps(legendBestTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch best" />
           <span>Best metric</span>
-          <ComparisonTooltipBubble id={legendBestTooltipId} text={bestTooltip} />
+          <ComparisonTooltipBubble
+            id={legendBestTooltipId}
+            layout={
+              activeTooltipLayout?.tooltipId === legendBestTooltipId ? activeTooltipLayout : null
+            }
+            ref={registerComparisonTooltipBubbleRef(legendBestTooltipId)}
+            text={bestTooltip}
+          />
         </span>
         <span
           className="comparison-legend-item comparison-cue comparison-tooltip"
+          ref={registerComparisonTooltipTargetRef(legendInsightTooltipId)}
           tabIndex={0}
           {...getComparisonTooltipTargetProps(legendInsightTooltipId)}
         >
           <span aria-hidden="true" className="comparison-legend-swatch insight" />
           <span>Top insight</span>
-          <ComparisonTooltipBubble id={legendInsightTooltipId} text={insightTooltip} />
+          <ComparisonTooltipBubble
+            id={legendInsightTooltipId}
+            layout={
+              activeTooltipLayout?.tooltipId === legendInsightTooltipId ? activeTooltipLayout : null
+            }
+            ref={registerComparisonTooltipBubbleRef(legendInsightTooltipId)}
+            text={insightTooltip}
+          />
         </span>
       </div>
       <div className="comparison-run-grid">
@@ -1559,6 +1711,11 @@ function RunComparisonPanel({
                 : ""
             }`}
             key={run.run_id}
+            ref={
+              run.run_id === comparison.baseline_run_id
+                ? registerComparisonTooltipTargetRef(baselineRunTooltipId)
+                : undefined
+            }
             tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
             {...(run.run_id === comparison.baseline_run_id
               ? getComparisonTooltipTargetProps(baselineRunTooltipId)
@@ -1593,7 +1750,16 @@ function RunComparisonPanel({
               />
             ) : null}
             {run.run_id === comparison.baseline_run_id ? (
-              <ComparisonTooltipBubble id={baselineRunTooltipId} text={baselineTooltip} />
+              <ComparisonTooltipBubble
+                id={baselineRunTooltipId}
+                layout={
+                  activeTooltipLayout?.tooltipId === baselineRunTooltipId
+                    ? activeTooltipLayout
+                    : null
+                }
+                ref={registerComparisonTooltipBubbleRef(baselineRunTooltipId)}
+                text={baselineTooltip}
+              />
             ) : null}
           </article>
         ))}
@@ -1602,17 +1768,28 @@ function RunComparisonPanel({
         <div className="comparison-top-story">
           <p
             className="kicker comparison-top-kicker comparison-cue comparison-tooltip"
+            ref={registerComparisonTooltipTargetRef(topInsightTooltipId)}
             tabIndex={0}
             {...getComparisonTooltipTargetProps(topInsightTooltipId)}
           >
             <span aria-hidden="true" className="comparison-legend-swatch insight" />
             <span>Top insight / {formatComparisonIntentLabel(comparison.intent)}</span>
-            <ComparisonTooltipBubble id={topInsightTooltipId} text={insightTooltip} />
+            <ComparisonTooltipBubble
+              id={topInsightTooltipId}
+              layout={
+                activeTooltipLayout?.tooltipId === topInsightTooltipId ? activeTooltipLayout : null
+              }
+              ref={registerComparisonTooltipBubbleRef(topInsightTooltipId)}
+              text={insightTooltip}
+            />
           </p>
           <ComparisonNarrativeCard
+            activeTooltipLayout={activeTooltipLayout}
             comparison={comparison}
             featured
             narrative={primaryNarrative}
+            registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
+            registerTooltipTargetRef={registerComparisonTooltipTargetRef}
             tooltipId={featuredNarrativeTooltipId}
             tooltipTargetProps={
               featuredNarrativeTooltipId
@@ -1626,7 +1803,14 @@ function RunComparisonPanel({
       {secondaryNarratives.length ? (
         <div className="comparison-story-grid">
           {secondaryNarratives.map((narrative) => (
-            <ComparisonNarrativeCard comparison={comparison} key={`${narrative.baseline_run_id}-${narrative.run_id}`} narrative={narrative} />
+            <ComparisonNarrativeCard
+              activeTooltipLayout={activeTooltipLayout}
+              comparison={comparison}
+              key={`${narrative.baseline_run_id}-${narrative.run_id}`}
+              narrative={narrative}
+              registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
+              registerTooltipTargetRef={registerComparisonTooltipTargetRef}
+            />
           ))}
         </div>
       ) : null}
@@ -1673,6 +1857,11 @@ function RunComparisonPanel({
                     <td
                       className={cellClassName}
                       key={`${metricRow.key}-${run.run_id}`}
+                      ref={
+                        cellTooltipId
+                          ? registerComparisonTooltipTargetRef(cellTooltipId)
+                          : undefined
+                      }
                       tabIndex={cellTooltip ? 0 : undefined}
                       {...(cellTooltipId ? getComparisonTooltipTargetProps(cellTooltipId) : {})}
                     >
@@ -1688,7 +1877,16 @@ function RunComparisonPanel({
                             )}
                       </span>
                       {cellTooltipId && cellTooltip ? (
-                        <ComparisonTooltipBubble id={cellTooltipId} text={cellTooltip} />
+                        <ComparisonTooltipBubble
+                          id={cellTooltipId}
+                          layout={
+                            activeTooltipLayout?.tooltipId === cellTooltipId
+                              ? activeTooltipLayout
+                              : null
+                          }
+                          ref={registerComparisonTooltipBubbleRef(cellTooltipId)}
+                          text={cellTooltip}
+                        />
                       ) : null}
                     </td>
                   );
@@ -1711,16 +1909,22 @@ function RunComparisonPanel({
 }
 
 function ComparisonNarrativeCard({
+  activeTooltipLayout,
   comparison,
   narrative,
   featured = false,
+  registerTooltipBubbleRef,
+  registerTooltipTargetRef,
   tooltipId,
   tooltipTargetProps,
   tooltip,
 }: {
+  activeTooltipLayout: ComparisonTooltipLayout | null;
   comparison: RunComparison;
   narrative: RunComparison["narratives"][number];
   featured?: boolean;
+  registerTooltipBubbleRef: (tooltipId: string) => (node: HTMLSpanElement | null) => void;
+  registerTooltipTargetRef: (tooltipId?: string) => (node: HTMLElement | null) => void;
   tooltipId?: string;
   tooltipTargetProps?: ComparisonTooltipTargetProps;
   tooltip?: string;
@@ -1733,6 +1937,7 @@ function ComparisonNarrativeCard({
       className={`comparison-story-card ${
         featured ? "featured comparison-cue-card comparison-tooltip" : ""
       }`}
+      ref={tooltipId ? registerTooltipTargetRef(tooltipId) : undefined}
       tabIndex={tooltip ? 0 : undefined}
       {...tooltipTargetProps}
     >
@@ -1753,18 +1958,42 @@ function ComparisonNarrativeCard({
           ))}
         </ul>
       ) : null}
-      {tooltipId && tooltip ? <ComparisonTooltipBubble id={tooltipId} text={tooltip} /> : null}
+      {tooltipId && tooltip ? (
+        <ComparisonTooltipBubble
+          id={tooltipId}
+          layout={activeTooltipLayout?.tooltipId === tooltipId ? activeTooltipLayout : null}
+          ref={registerTooltipBubbleRef(tooltipId)}
+          text={tooltip}
+        />
+      ) : null}
     </article>
   );
 }
 
-function ComparisonTooltipBubble({ id, text }: { id: string; text: string }) {
+const ComparisonTooltipBubble = forwardRef<
+  HTMLSpanElement,
+  { id: string; layout: ComparisonTooltipLayout | null; text: string }
+>(function ComparisonTooltipBubble({ id, layout, text }, ref) {
+  const style: CSSProperties & { "--comparison-tooltip-arrow-left"?: string } = {
+    left: layout?.left ?? 0,
+    maxWidth: layout ? `${layout.maxWidth}px` : undefined,
+    top: layout?.top ?? 0,
+    "--comparison-tooltip-arrow-left": layout ? `${layout.arrowLeft}px` : undefined,
+  };
+
   return (
-    <span className="comparison-tooltip-bubble" id={id} role="tooltip">
+    <span
+      className="comparison-tooltip-bubble"
+      data-tooltip-side={layout?.side ?? "bottom"}
+      id={id}
+      ref={ref}
+      role="tooltip"
+      style={style}
+    >
       {text}
     </span>
   );
-}
+});
 
 function sanitizeComparisonTooltipId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "-");
@@ -1772,6 +2001,17 @@ function sanitizeComparisonTooltipId(value: string) {
 
 function buildComparisonTooltipId(baseId: string, ...parts: Array<string | null | undefined>) {
   return sanitizeComparisonTooltipId([baseId, ...parts].filter(Boolean).join("-"));
+}
+
+function getComparisonTooltipBoundaryRect(target: HTMLElement) {
+  return target.closest(".comparison-table-wrap")?.getBoundingClientRect() ?? null;
+}
+
+function clampComparisonNumber(value: number, minimum: number, maximum: number) {
+  if (maximum < minimum) {
+    return minimum;
+  }
+  return Math.min(Math.max(value, minimum), maximum);
 }
 
 function ReferenceRunProvenanceSummary({

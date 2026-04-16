@@ -573,9 +573,7 @@ select {
 }
 
 .comparison-tooltip-bubble {
-  left: 0;
-  top: calc(100% + 10px);
-  position: absolute;
+  position: fixed;
   opacity: 0;
   pointer-events: none;
   width: max-content;
@@ -603,12 +601,23 @@ select {
 
 .comparison-tooltip-bubble::before {
   content: "";
-  left: 18px;
+  left: calc(var(--comparison-tooltip-arrow-left, 24px) - 6px);
   top: -6px;
   position: absolute;
   border-left: 6px solid transparent;
   border-right: 6px solid transparent;
   border-bottom: 6px solid rgba(8, 14, 23, 0.96);
+}
+
+.comparison-tooltip-bubble[data-tooltip-side="top"] {
+  transform: translateY(4px);
+}
+
+.comparison-tooltip-bubble[data-tooltip-side="top"]::before {
+  top: auto;
+  bottom: -6px;
+  border-top: 6px solid rgba(8, 14, 23, 0.96);
+  border-bottom: none;
 }
 
 .comparison-tooltip[data-tooltip-visible="true"] > .comparison-tooltip-bubble {
