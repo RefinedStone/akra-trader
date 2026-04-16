@@ -328,37 +328,73 @@
       "id": "planning-operator-trust-durable-alert-history-and-delivery",
       "direction_id": "operator-trust-and-discipline",
       "title": "Persist operator alert history and define external delivery hooks",
-      "description": "Move runtime-derived alerts and audit events beyond in-memory session-state derivation by adding durable storage for alert history and a clear delivery boundary for notifications or downstream incident handling, so operator visibility survives restarts and can expand beyond the control room.",
+      "description": "Move runtime-derived alerts and guarded-live audit events beyond in-memory or control-state-only derivation by adding durable alert history, broader operator event coverage, and a clear delivery boundary for notifications or downstream incident handling, so safety visibility survives restarts and can expand beyond the control room.",
       "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly says alerts and audit records are still derived from runtime session state and run notes without a durable event store or external alert delivery, but expanding safety-domain coverage is the more immediate executable follow-up.",
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply says guarded-live audit is now persisted but still lacks external alert delivery and wider operator event coverage, so this remains the main operator-trust follow-up after the guarded-live substrate landed.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:55:00Z",
+      "updated_at": "2026-04-17T07:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by making alert and audit visibility durable across restarts and ready for operator notification workflows instead of remaining an in-memory control-room derivation."
+      "direction_relation_note": "Advances operator trust by extending the new guarded-live audit and operator visibility surfaces into durable history and notification-ready delivery boundaries instead of leaving them confined to local control-state and control-room views."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
       "direction_id": "guarded-live-execution",
       "title": "Establish audit, kill-switch, and reconciliation primitives before live candidacy",
       "description": "Build the safety substrate that blocks live-affecting actions unless audit capture, operator-event logging, kill-switch controls, and reconciliation flows are present, keeping live readiness separate from sandbox worker readiness.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says operator coverage still stops at sandbox worker failure and stale heartbeat while risk breach, live-path fault, and reconciliation alerts or audit remain missing, making guarded-live safety coverage the clearest immediate executable next task now that the worker alert substrate is done.",
+      "priority_reason": "Completed in main session commit 7033ec7, which added guarded-live control state, kill-switch engage or release flows, local reconciliation runs, guarded-live audit history, candidacy blocker surfaces, and matching API, UI, test, and documentation coverage.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:55:00Z",
+      "updated_at": "2026-04-17T07:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Now becomes the queue head for guarded-live execution because the generic worker alert substrate is in place and the remaining safety gap is extending alert and audit coverage into risk breach, live-path fault, kill-switch, and reconciliation domains before any live candidacy work."
+      "direction_relation_note": "Closed the first guarded-live safety substrate by making kill-switch, guarded-live audit, and reconciliation first-class product flows, which now exposes venue-aware reconciliation and real live execution adapters as the remaining candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-venue-state-reconciliation",
+      "direction_id": "guarded-live-execution",
+      "title": "Upgrade reconciliation from local control-plane checks to venue-state verification",
+      "description": "Add the first venue-facing guarded-live read path for balances, positions, orders, or account state, then use it to reconcile local runtime and control-plane state against real venue snapshots so live candidacy gates are backed by external truth rather than local consistency alone.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply explicitly lists venue-state reconciliation as the next gap after the guarded-live substrate landed, and it is the clearest executable follow-up that strengthens Gate 3 without requiring a full live order path first.",
+      "depends_on": [
+        "planning-guarded-live-audit-and-reconciliation-substrate"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advances guarded-live execution by turning reconciliation into a real account-state safety check, which is a prerequisite for credible live candidacy and a safer foundation for any later live order adapter."
+    },
+    {
+      "id": "planning-guarded-live-live-venue-order-path",
+      "direction_id": "guarded-live-execution",
+      "title": "Introduce a guarded live venue adapter and real order path behind safety gates",
+      "description": "Implement the first real live execution adapter and order submission or cancellation path behind the new guarded-live controls, ensuring live-affecting actions remain blocked unless kill-switch, audit, and reconciliation preconditions are satisfied.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 2,
+      "priority_reason": "The latest main-session reply says no live venue adapter or actual live order path exists yet, but venue-state reconciliation is the safer immediate step before execution-capable write paths are promoted to the queue head.",
+      "depends_on": [
+        "planning-guarded-live-venue-state-reconciliation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Carries guarded-live execution from safety-readiness into tightly gated live write capability, but intentionally stays behind venue-state reconciliation so execution does not outrun verification."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
