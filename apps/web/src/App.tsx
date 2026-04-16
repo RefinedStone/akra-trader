@@ -104,6 +104,7 @@ type MarketDataStatus = {
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
+const GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -134,6 +135,9 @@ export default function App() {
   const [statusText, setStatusText] = useState("Loading control room...");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
+  const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
+    loadExpandedGapRows,
+  );
 
   async function loadAll() {
     setStatusText("Refreshing data plane...");
@@ -168,6 +172,10 @@ export default function App() {
     setBacktestForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
     setSandboxForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
   }, [strategies]);
+
+  useEffect(() => {
+    persistExpandedGapRows(expandedGapRows);
+  }, [expandedGapRows]);
 
   const strategyGroups = useMemo(() => {
     return {
@@ -389,7 +397,14 @@ export default function App() {
                         <BackfillCountStatus instrument={instrument} />
                       </td>
                       <td>
-                        <BackfillQualityStatus instrument={instrument} />
+                        <BackfillQualityStatus
+                          expanded={Boolean(expandedGapRows[instrumentGapRowKey(instrument)])}
+                          instrument={instrument}
+                          onToggle={() => {
+                            const key = instrumentGapRowKey(instrument);
+                            setExpandedGapRows((current) => toggleExpandedGapRow(current, key));
+                          }}
+                        />
                       </td>
                       <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
@@ -439,11 +454,14 @@ function BackfillCountStatus({
 }
 
 function BackfillQualityStatus({
+  expanded,
   instrument,
+  onToggle,
 }: {
+  expanded: boolean;
   instrument: MarketDataStatus["instruments"][number];
+  onToggle: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
@@ -474,7 +492,7 @@ function BackfillQualityStatus({
       {canToggleGapWindows ? (
         <button
           className="progress-toggle"
-          onClick={() => setExpanded((current) => !current)}
+          onClick={onToggle}
           type="button"
         >
           {expanded
@@ -536,6 +554,54 @@ function formatGapWindows(
     kind: "exact" as const,
     label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
   }));
+}
+
+function instrumentGapRowKey(instrument: MarketDataStatus["instruments"][number]) {
+  return `${instrument.instrument_id}:${instrument.timeframe}`;
+}
+
+function toggleExpandedGapRow(current: Record<string, boolean>, key: string) {
+  if (current[key]) {
+    const next = { ...current };
+    delete next[key];
+    return next;
+  }
+  return { ...current, [key]: true };
+}
+
+function loadExpandedGapRows() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(GAP_WINDOW_EXPANSION_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    return Object.fromEntries(
+      Object.entries(parsed).filter((entry): entry is [string, boolean] => entry[1] === true),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function persistExpandedGapRows(value: Record<string, boolean>) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      GAP_WINDOW_EXPANSION_STORAGE_KEY,
+      JSON.stringify(value),
+    );
+  } catch {
+    return;
+  }
 }
 
 function StrategyColumn({
