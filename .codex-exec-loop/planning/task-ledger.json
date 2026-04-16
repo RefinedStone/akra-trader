@@ -36,13 +36,10 @@
       "direction_id": "research-foundation",
       "title": "Smoke test Compose startup against Postgres-backed run storage",
       "description": "Run an end-to-end Docker Compose startup on a machine with Docker installed to confirm the API waits for Postgres health, boots successfully with `AKRA_TRADER_RUNS_DATABASE_URL` pointed at the `postgres` service, and persists run storage without SQLite fallback.",
-      "status": "blocked",
+      "status": "awaiting_user",
       "base_priority": 91,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply called this the only unresolved follow-up from the deployment-database work, but it cannot run in the current environment because Docker is unavailable.",
-      "blocked_by": [
-        "Docker-capable environment is required"
-      ],
+      "priority_reason": "The latest main-session reply called this the only unresolved follow-up from the deployment-database work, but execution still needs a Docker-capable environment outside the current workspace.",
       "created_by": "llm",
       "last_updated_by": "llm",
       "updated_at": "2026-04-16T13:51:20Z",
