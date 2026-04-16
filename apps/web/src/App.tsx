@@ -314,6 +314,8 @@ type ComparisonTooltipPendingPresetImportConflict = {
 };
 type ComparisonTooltipPresetConflictPreviewRow = {
   changed: boolean;
+  delta_direction: "higher" | "lower" | "same";
+  delta_label: string;
   existing_value: number;
   incoming_value: number;
   key: keyof ComparisonTooltipTuning;
@@ -2991,9 +2993,22 @@ function ComparisonTooltipTuningPanel({
                       }`}
                       key={row.key}
                     >
-                      <span className="comparison-dev-conflict-preview-label">{row.label}</span>
-                      <span>{formatComparisonTooltipTuningValue(row.existing_value)}</span>
-                      <span>{formatComparisonTooltipTuningValue(row.incoming_value)}</span>
+                      <span className="comparison-dev-conflict-preview-label-group">
+                        <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+                        <span
+                          className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                        >
+                          {row.delta_label}
+                        </span>
+                      </span>
+                      <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+                        {formatComparisonTooltipTuningValue(row.existing_value)}
+                      </span>
+                      <span
+                        className={`comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-${row.delta_direction}`}
+                      >
+                        {formatComparisonTooltipTuningValue(row.incoming_value)}
+                      </span>
                     </div>
                   ))}
                   {unchangedConflictPreviewCount ? (
@@ -3010,9 +3025,20 @@ function ComparisonTooltipTuningPanel({
                   {showUnchangedConflictRows
                     ? unchangedConflictPreviewRows.map((row) => (
                         <div className="comparison-dev-conflict-preview-row" key={row.key}>
-                          <span className="comparison-dev-conflict-preview-label">{row.label}</span>
-                          <span>{formatComparisonTooltipTuningValue(row.existing_value)}</span>
-                          <span>{formatComparisonTooltipTuningValue(row.incoming_value)}</span>
+                          <span className="comparison-dev-conflict-preview-label-group">
+                            <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+                            <span
+                              className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                            >
+                              {row.delta_label}
+                            </span>
+                          </span>
+                          <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+                            {formatComparisonTooltipTuningValue(row.existing_value)}
+                          </span>
+                          <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-same">
+                            {formatComparisonTooltipTuningValue(row.incoming_value)}
+                          </span>
                         </div>
                       ))
                     : null}
@@ -3494,13 +3520,20 @@ function buildComparisonTooltipPresetConflictPreviewRows(
 ): ComparisonTooltipPresetConflictPreviewRow[] {
   return (
     Object.keys(DEFAULT_COMPARISON_TOOLTIP_TUNING) as Array<keyof ComparisonTooltipTuning>
-  ).map((key) => ({
-    changed: existingTuning[key] !== incomingTuning[key],
-    existing_value: existingTuning[key],
-    incoming_value: incomingTuning[key],
-    key,
-    label: COMPARISON_TOOLTIP_TUNING_LABELS[key],
-  }));
+  ).map((key) => {
+    const existingValue = existingTuning[key];
+    const incomingValue = incomingTuning[key];
+    const delta = formatComparisonTooltipTuningDelta(existingValue, incomingValue);
+    return {
+      changed: existingValue !== incomingValue,
+      delta_direction: delta.direction,
+      delta_label: delta.label,
+      existing_value: existingValue,
+      incoming_value: incomingValue,
+      key,
+      label: COMPARISON_TOOLTIP_TUNING_LABELS[key],
+    };
+  });
 }
 
 function formatComparisonTooltipTuningValue(value: number) {
@@ -3508,6 +3541,20 @@ function formatComparisonTooltipTuningValue(value: number) {
     return String(value);
   }
   return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function formatComparisonTooltipTuningDelta(existingValue: number, incomingValue: number) {
+  const delta = incomingValue - existingValue;
+  if (delta === 0) {
+    return {
+      direction: "same" as const,
+      label: "match",
+    };
+  }
+  return {
+    direction: delta > 0 ? ("higher" as const) : ("lower" as const),
+    label: `${delta > 0 ? "higher " : "lower "}${delta > 0 ? "+" : ""}${formatComparisonTooltipTuningValue(delta)}`,
+  };
 }
 
 function formatComparisonTooltipPresetImportFeedback(

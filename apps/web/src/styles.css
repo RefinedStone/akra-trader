@@ -906,10 +906,74 @@ select {
 .comparison-dev-conflict-preview-row.is-changed {
   background: rgba(255, 193, 94, 0.08);
   color: rgba(255, 241, 214, 0.92);
+  box-shadow: inset 3px 0 0 rgba(255, 193, 94, 0.52);
+}
+
+.comparison-dev-conflict-preview-label-group {
+  display: grid;
+  gap: 4px;
 }
 
 .comparison-dev-conflict-preview-label {
   color: inherit;
+}
+
+.comparison-dev-conflict-delta {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.61rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-dev-conflict-delta-higher {
+  background: rgba(91, 202, 255, 0.16);
+  color: rgba(183, 233, 255, 0.96);
+}
+
+.comparison-dev-conflict-delta-lower {
+  background: rgba(255, 193, 94, 0.16);
+  color: rgba(255, 226, 169, 0.96);
+}
+
+.comparison-dev-conflict-delta-same {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.comparison-dev-conflict-preview-value {
+  display: inline-flex;
+  align-items: center;
+  min-height: 100%;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.comparison-dev-conflict-preview-value-existing {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.comparison-dev-conflict-preview-value-incoming {
+  font-weight: 600;
+}
+
+.comparison-dev-conflict-preview-value-higher {
+  background: rgba(91, 202, 255, 0.14);
+  color: rgba(206, 240, 255, 0.98);
+}
+
+.comparison-dev-conflict-preview-value-lower {
+  background: rgba(255, 193, 94, 0.14);
+  color: rgba(255, 235, 191, 0.98);
+}
+
+.comparison-dev-conflict-preview-value-same {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .comparison-dev-conflict-toggle {
