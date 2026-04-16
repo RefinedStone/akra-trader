@@ -346,10 +346,18 @@ type ComparisonTooltipConflictUiStateV1 = {
   version: typeof COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION;
 };
 type ComparisonTooltipConflictSessionSummary = {
+  group_key: string;
   includes_current: boolean;
   label: string;
   preset_name: string;
   session_count: number;
+  sessions: ComparisonTooltipConflictSessionSummarySession[];
+};
+type ComparisonTooltipConflictSessionSummarySession = {
+  hash: string | null;
+  includes_current: boolean;
+  label: string;
+  session_key: string;
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -2985,6 +2993,8 @@ function ComparisonTooltipTuningPanel({
     useState(false);
   const [showAllSavedConflictSessionSummaries, setShowAllSavedConflictSessionSummaries] =
     useState(false);
+  const [expandedSavedConflictSessionSummaryGroups, setExpandedSavedConflictSessionSummaryGroups] =
+    useState<Record<string, boolean>>({});
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -3055,6 +3065,12 @@ function ComparisonTooltipTuningPanel({
       setShowAllSavedConflictSessionSummaries(false);
     }
   }, [hiddenSavedConflictSessionSummaryCount, isConfirmingResetAllConflictViews]);
+
+  useEffect(() => {
+    if (!isConfirmingResetAllConflictViews) {
+      setExpandedSavedConflictSessionSummaryGroups({});
+    }
+  }, [isConfirmingResetAllConflictViews]);
 
   const updateCurrentConflictSessionUiState = (
     updater: (
@@ -3136,6 +3152,7 @@ function ComparisonTooltipTuningPanel({
     }
     setIsConfirmingResetAllConflictViews(true);
     setShowAllSavedConflictSessionSummaries(false);
+    setExpandedSavedConflictSessionSummaryGroups({});
     onSetShareFeedback(null);
   };
 
@@ -3303,12 +3320,49 @@ function ComparisonTooltipTuningPanel({
                   <ul className="comparison-dev-session-summary-list">
                     {displayedSavedConflictSessionSummaries.map((summary) => (
                       <li
-                        className="comparison-dev-session-summary-item"
-                        key={summary.label}
+                        className="comparison-dev-session-summary-group"
+                        key={summary.group_key}
                       >
-                        <span>{summary.label}</span>
-                        {summary.includes_current ? (
-                          <span className="comparison-dev-session-summary-badge">current</span>
+                        <div className="comparison-dev-session-summary-item">
+                          <div className="comparison-dev-session-summary-item-copy">
+                            <span>{summary.label}</span>
+                            {summary.includes_current ? (
+                              <span className="comparison-dev-session-summary-badge">current</span>
+                            ) : null}
+                          </div>
+                          <button
+                            className="comparison-dev-session-group-toggle"
+                            onClick={() =>
+                              setExpandedSavedConflictSessionSummaryGroups((current) => ({
+                                ...current,
+                                [summary.group_key]: !current[summary.group_key],
+                              }))
+                            }
+                            type="button"
+                          >
+                            {expandedSavedConflictSessionSummaryGroups[summary.group_key]
+                              ? "Hide sessions"
+                              : `Show ${summary.session_count} session${
+                                  summary.session_count === 1 ? "" : "s"
+                                }`}
+                          </button>
+                        </div>
+                        {expandedSavedConflictSessionSummaryGroups[summary.group_key] ? (
+                          <ul className="comparison-dev-session-detail-list">
+                            {summary.sessions.map((session) => (
+                              <li
+                                className="comparison-dev-session-detail-item"
+                                key={session.session_key}
+                              >
+                                <span>{session.label}</span>
+                                {session.includes_current ? (
+                                  <span className="comparison-dev-session-summary-badge">
+                                    current
+                                  </span>
+                                ) : null}
+                              </li>
+                            ))}
+                          </ul>
                         ) : null}
                       </li>
                     ))}
@@ -4108,12 +4162,21 @@ function buildComparisonTooltipConflictSessionSummaries(
     const parsed = parseComparisonTooltipConflictSessionKey(sessionKey);
     const presetName = parsed.preset_name || "Unnamed preset";
     const current = accumulator[presetName] ?? {
+      group_key: presetName,
       includes_current: false,
       preset_name: presetName,
       session_count: 0,
+      sessions: [],
     };
-    current.includes_current ||= sessionKey === currentConflictSessionKey;
+    const includesCurrent = sessionKey === currentConflictSessionKey;
+    current.includes_current ||= includesCurrent;
     current.session_count += 1;
+    current.sessions.push({
+      hash: parsed.hash,
+      includes_current: includesCurrent,
+      label: "",
+      session_key: sessionKey,
+    });
     accumulator[presetName] = current;
     return accumulator;
   }, {});
@@ -4131,6 +4194,21 @@ function buildComparisonTooltipConflictSessionSummaries(
     .map((summary) => ({
       ...summary,
       label: formatComparisonTooltipConflictSessionSummary(summary),
+      sessions: [...summary.sessions]
+        .sort((left, right) => {
+          if (left.includes_current !== right.includes_current) {
+            return left.includes_current ? -1 : 1;
+          }
+          return (left.hash ?? "").localeCompare(right.hash ?? "");
+        })
+        .map((session, index) => ({
+          ...session,
+          label: formatComparisonTooltipConflictSessionSummarySession(
+            session,
+            index,
+            summary.session_count,
+          ),
+        })),
     }));
 }
 
@@ -4155,6 +4233,20 @@ function formatComparisonTooltipConflictSessionSummary(
     return summary.preset_name;
   }
   return `${summary.preset_name} (${summary.session_count} saved sessions)`;
+}
+
+function formatComparisonTooltipConflictSessionSummarySession(
+  session: Omit<ComparisonTooltipConflictSessionSummarySession, "label">,
+  index: number,
+  totalSessions: number,
+) {
+  const hashLabel = session.hash ? session.hash.slice(0, 8) : null;
+  if (totalSessions === 1) {
+    return hashLabel ? `Saved session · ${hashLabel}` : "Saved session";
+  }
+  return hashLabel
+    ? `Saved session ${index + 1} · ${hashLabel}`
+    : `Saved session ${index + 1}`;
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {

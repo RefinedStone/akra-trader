@@ -1086,6 +1086,11 @@ select {
   list-style: none;
 }
 
+.comparison-dev-session-summary-group {
+  display: grid;
+  gap: 8px;
+}
+
 .comparison-dev-session-summary-item {
   display: flex;
   align-items: center;
@@ -1096,6 +1101,14 @@ select {
   font-size: 0.68rem;
 }
 
+.comparison-dev-session-summary-item-copy {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
 .comparison-dev-session-summary-badge {
   padding: 2px 8px;
   border-radius: 999px;
@@ -1104,6 +1117,44 @@ select {
   font-size: 0.58rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+.comparison-dev-session-group-toggle {
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.84);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.58rem;
+  white-space: nowrap;
+}
+
+.comparison-dev-session-group-toggle:hover,
+.comparison-dev-session-group-toggle:focus-visible {
+  border-color: rgba(255, 193, 94, 0.24);
+  background: rgba(255, 193, 94, 0.12);
+  color: rgba(255, 241, 214, 0.98);
+}
+
+.comparison-dev-session-detail-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 0 10px;
+  padding: 0 0 0 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  list-style: none;
+}
+
+.comparison-dev-session-detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.64rem;
 }
 
 .comparison-dev-session-summary-toggle {
