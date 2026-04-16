@@ -786,6 +786,12 @@ select {
   align-items: end;
 }
 
+.comparison-dev-share-block {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .comparison-dev-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -819,6 +825,21 @@ select {
   color: var(--text);
 }
 
+.comparison-dev-field textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+  resize: vertical;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.comparison-dev-share-url-field input {
+  font-size: 0.68rem;
+}
+
 .comparison-dev-actions {
   margin-top: 14px;
 }
@@ -831,6 +852,14 @@ select {
 
 .comparison-dev-reset {
   padding: 10px 14px;
+}
+
+.comparison-dev-feedback {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+  line-height: 1.5;
 }
 
 .comparison-legend-item {

@@ -231,6 +231,7 @@ const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
 const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
+const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
@@ -1542,6 +1543,8 @@ function RunComparisonPanel({
   >({});
   const [selectedTooltipPresetName, setSelectedTooltipPresetName] = useState("");
   const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
+  const [tooltipShareDraft, setTooltipShareDraft] = useState("");
+  const [tooltipShareFeedback, setTooltipShareFeedback] = useState<string | null>(null);
   const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
     !SHOW_COMPARISON_TOOLTIP_TUNING_PANEL,
   );
@@ -1580,6 +1583,30 @@ function RunComparisonPanel({
     hoverCloseDelayMs: tooltipTuning.column_up_sweep_close_ms,
     hoverOpenDelayMs: tooltipTuning.column_up_sweep_open_ms,
   };
+  const createTooltipTuningPresetState = (): ComparisonTooltipTuningPresetStateV1 => ({
+    current_tuning: { ...tooltipTuning },
+    presets: cloneComparisonTooltipPresetMap(tooltipTuningPresets),
+    selected_preset_name: selectedTooltipPresetName || null,
+    version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+  });
+  const tooltipShareUrl = useMemo(
+    () => buildComparisonTooltipTuningShareUrl(createTooltipTuningPresetState()),
+    [selectedTooltipPresetName, tooltipTuning, tooltipTuningPresets],
+  );
+
+  const applyTooltipTuningPresetState = (
+    state: ComparisonTooltipTuningPresetStateV1,
+    options?: { seedShareDraft?: boolean },
+  ) => {
+    setTooltipTuning({ ...state.current_tuning });
+    setTooltipTuningPresets(cloneComparisonTooltipPresetMap(state.presets));
+    const nextSelectedPresetName = state.selected_preset_name ?? "";
+    setSelectedTooltipPresetName(nextSelectedPresetName);
+    setTooltipPresetDraftName(nextSelectedPresetName);
+    if (options?.seedShareDraft) {
+      setTooltipShareDraft(JSON.stringify(state, null, 2));
+    }
+  };
 
   const updateTooltipTuning = (
     key: keyof ComparisonTooltipTuning,
@@ -1594,6 +1621,39 @@ function RunComparisonPanel({
       [key]: nextValue,
     }));
     setSelectedTooltipPresetName("");
+  };
+
+  const exportTooltipPresetBundle = () => {
+    const nextState = createTooltipTuningPresetState();
+    setTooltipShareDraft(JSON.stringify(nextState, null, 2));
+    setTooltipShareFeedback(
+      `Exported current tuning with ${Object.keys(nextState.presets).length} saved preset(s).`,
+    );
+  };
+
+  const importTooltipPresetBundle = () => {
+    const importedState = parseComparisonTooltipTuningPresetState(tooltipShareDraft);
+    if (!importedState) {
+      setTooltipShareFeedback("Import failed. Provide a valid tooltip tuning JSON bundle.");
+      return;
+    }
+    applyTooltipTuningPresetState(importedState, { seedShareDraft: true });
+    setTooltipShareFeedback(
+      `Imported current tuning with ${Object.keys(importedState.presets).length} saved preset(s).`,
+    );
+  };
+
+  const copyTooltipShareUrl = async () => {
+    if (!navigator.clipboard?.writeText) {
+      setTooltipShareFeedback("Clipboard is unavailable. Copy the share URL from the field.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(tooltipShareUrl);
+      setTooltipShareFeedback("Copied a share URL for the current tooltip tuning bundle.");
+    } catch {
+      setTooltipShareFeedback("Clipboard copy failed. Copy the share URL from the field.");
+    }
   };
 
   const saveTooltipPreset = () => {
@@ -1930,11 +1990,12 @@ function RunComparisonPanel({
     if (!SHOW_COMPARISON_TOOLTIP_TUNING_PANEL) {
       return;
     }
-    const storedState = loadComparisonTooltipTuningPresetState();
-    setTooltipTuning(storedState.current_tuning);
-    setTooltipTuningPresets(storedState.presets);
-    setSelectedTooltipPresetName(storedState.selected_preset_name ?? "");
-    setTooltipPresetDraftName(storedState.selected_preset_name ?? "");
+    const sharedState = loadComparisonTooltipTuningPresetStateFromUrl();
+    const storedState = sharedState ?? loadComparisonTooltipTuningPresetState();
+    applyTooltipTuningPresetState(storedState, { seedShareDraft: Boolean(sharedState) });
+    if (sharedState) {
+      setTooltipShareFeedback("Loaded tooltip tuning presets from the share URL.");
+    }
     setHasHydratedTooltipTuningState(true);
   }, []);
 
@@ -2126,13 +2187,20 @@ function RunComparisonPanel({
       {SHOW_COMPARISON_TOOLTIP_TUNING_PANEL ? (
         <ComparisonTooltipTuningPanel
           onChangePresetDraftName={setTooltipPresetDraftName}
+          onChangeShareDraft={setTooltipShareDraft}
           onChangeValue={updateTooltipTuning}
+          onCopyShareUrl={copyTooltipShareUrl}
           onDeletePreset={deleteTooltipPreset}
+          onExportJson={exportTooltipPresetBundle}
+          onImportJson={importTooltipPresetBundle}
           onLoadPreset={loadTooltipPreset}
           onReset={resetTooltipTuning}
           onSavePreset={saveTooltipPreset}
           presetDraftName={tooltipPresetDraftName}
           presets={tooltipTuningPresets}
+          shareDraft={tooltipShareDraft}
+          shareFeedback={tooltipShareFeedback}
+          shareUrl={tooltipShareUrl}
           selectedPresetName={selectedTooltipPresetName}
           tuning={tooltipTuning}
         />
@@ -2439,22 +2507,36 @@ const ComparisonTooltipBubble = forwardRef<
 function ComparisonTooltipTuningPanel({
   presetDraftName,
   presets,
+  shareDraft,
+  shareFeedback,
+  shareUrl,
   selectedPresetName,
   onChangePresetDraftName,
+  onChangeShareDraft,
   tuning,
   onChangeValue,
+  onCopyShareUrl,
   onDeletePreset,
+  onExportJson,
+  onImportJson,
   onLoadPreset,
   onReset,
   onSavePreset,
 }: {
   presetDraftName: string;
   presets: Record<string, ComparisonTooltipTuning>;
+  shareDraft: string;
+  shareFeedback: string | null;
+  shareUrl: string;
   selectedPresetName: string;
   onChangePresetDraftName: (value: string) => void;
+  onChangeShareDraft: (value: string) => void;
   tuning: ComparisonTooltipTuning;
   onChangeValue: (key: keyof ComparisonTooltipTuning, value: string) => void;
+  onCopyShareUrl: () => void;
   onDeletePreset: () => void;
+  onExportJson: () => void;
+  onImportJson: () => void;
   onLoadPreset: (name: string) => void;
   onReset: () => void;
   onSavePreset: () => void;
@@ -2506,6 +2588,50 @@ function ComparisonTooltipTuningPanel({
             Delete preset
           </button>
         </div>
+      </div>
+      <div className="comparison-dev-share-block">
+        <label className="comparison-dev-field comparison-dev-share-url-field">
+          <span>Share URL</span>
+          <input
+            onFocus={(event) => event.currentTarget.select()}
+            readOnly
+            type="text"
+            value={shareUrl}
+          />
+        </label>
+        <div className="comparison-dev-actions comparison-dev-actions-inline">
+          <button
+            className="ghost-button comparison-dev-reset"
+            onClick={onCopyShareUrl}
+            type="button"
+          >
+            Copy share URL
+          </button>
+          <button
+            className="ghost-button comparison-dev-reset"
+            onClick={onExportJson}
+            type="button"
+          >
+            Export JSON
+          </button>
+          <button
+            className="ghost-button comparison-dev-reset"
+            onClick={onImportJson}
+            type="button"
+          >
+            Import JSON
+          </button>
+        </div>
+        <label className="comparison-dev-field">
+          <span>Preset bundle JSON</span>
+          <textarea
+            onChange={(event) => onChangeShareDraft(event.target.value)}
+            placeholder='{"current_tuning": {...}, "presets": {...}}'
+            rows={8}
+            value={shareDraft}
+          />
+        </label>
+        {shareFeedback ? <p className="comparison-dev-feedback">{shareFeedback}</p> : null}
       </div>
       <div className="comparison-dev-grid">
         <ComparisonTooltipTuningField
@@ -2709,23 +2835,30 @@ function loadComparisonTooltipTuningPresetState(): ComparisonTooltipTuningPreset
     if (!raw) {
       return createDefaultComparisonTooltipTuningPresetState();
     }
-    const parsed = JSON.parse(raw) as Partial<ComparisonTooltipTuningPresetStateV1> | null;
-    if (!parsed || parsed.version !== COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION) {
+    const parsed = parseComparisonTooltipTuningPresetState(raw, { requireVersion: true });
+    if (!parsed) {
       return createDefaultComparisonTooltipTuningPresetState();
     }
-    const presets = normalizeComparisonTooltipPresetMap(parsed.presets);
-    const selectedPresetName =
-      typeof parsed.selected_preset_name === "string" && presets[parsed.selected_preset_name]
-        ? parsed.selected_preset_name
-        : null;
-    return {
-      current_tuning: normalizeComparisonTooltipTuning(parsed.current_tuning),
-      presets,
-      selected_preset_name: selectedPresetName,
-      version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
-    };
+    return parsed;
   } catch {
     return createDefaultComparisonTooltipTuningPresetState();
+  }
+}
+
+function loadComparisonTooltipTuningPresetStateFromUrl(): ComparisonTooltipTuningPresetStateV1 | null {
+  try {
+    const url = new URL(window.location.href);
+    const sharedValue = url.searchParams.get(COMPARISON_TOOLTIP_TUNING_SHARE_PARAM);
+    if (!sharedValue) {
+      return null;
+    }
+    const decoded = decodeComparisonTooltipTuningSharePayload(sharedValue);
+    if (!decoded) {
+      return null;
+    }
+    return parseComparisonTooltipTuningPresetState(decoded);
+  } catch {
+    return null;
   }
 }
 
@@ -2746,6 +2879,48 @@ function createDefaultComparisonTooltipTuningPresetState(): ComparisonTooltipTun
     selected_preset_name: null,
     version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
   };
+}
+
+function cloneComparisonTooltipPresetMap(
+  value: Record<string, ComparisonTooltipTuning>,
+): Record<string, ComparisonTooltipTuning> {
+  return Object.fromEntries(
+    Object.entries(value).map(([key, preset]) => [key, { ...preset }]),
+  );
+}
+
+function parseComparisonTooltipTuningPresetState(
+  raw: string,
+  options?: { requireVersion?: boolean },
+): ComparisonTooltipTuningPresetStateV1 | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<ComparisonTooltipTuningPresetStateV1> | null;
+    if (!parsed) {
+      return null;
+    }
+    if (options?.requireVersion && parsed.version !== COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION) {
+      return null;
+    }
+    if (
+      typeof parsed.version === "number" &&
+      parsed.version !== COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION
+    ) {
+      return null;
+    }
+    const presets = normalizeComparisonTooltipPresetMap(parsed.presets);
+    const selectedPresetName =
+      typeof parsed.selected_preset_name === "string" && presets[parsed.selected_preset_name]
+        ? parsed.selected_preset_name
+        : null;
+    return {
+      current_tuning: normalizeComparisonTooltipTuning(parsed.current_tuning),
+      presets,
+      selected_preset_name: selectedPresetName,
+      version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function normalizeComparisonTooltipPresetMap(
@@ -2781,6 +2956,42 @@ function normalizeComparisonTooltipTuning(value: unknown): ComparisonTooltipTuni
     }
   });
   return next;
+}
+
+function buildComparisonTooltipTuningShareUrl(state: ComparisonTooltipTuningPresetStateV1) {
+  const url = new URL(window.location.href);
+  url.searchParams.set(
+    COMPARISON_TOOLTIP_TUNING_SHARE_PARAM,
+    encodeComparisonTooltipTuningSharePayload(JSON.stringify(state)),
+  );
+  return url.toString();
+}
+
+function encodeComparisonTooltipTuningSharePayload(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return window
+    .btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function decodeComparisonTooltipTuningSharePayload(value: string) {
+  try {
+    let normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+    while (normalized.length % 4 !== 0) {
+      normalized += "=";
+    }
+    const binary = window.atob(normalized);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return null;
+  }
 }
 
 function buildComparisonTooltipId(baseId: string, ...parts: Array<string | null | undefined>) {
