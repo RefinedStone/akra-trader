@@ -746,20 +746,38 @@
     {
       "id": "planning-reference-lanes-run-column-aware-tooltip-suppression",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Tune comparison tooltip sweep suppression for fast scans down one run column",
-      "description": "Extend the dense comparison-table tooltip heuristics so fast vertical sweeps within a single run column can be detected and tuned separately from horizontal scans across one metric row, reducing tooltip churn during run-by-run inspection without regressing the newly completed metric-row-aware behavior.",
-      "status": "ready",
+      "title": "Run-column-aware comparison tooltip sweep suppression shipped",
+      "description": "Completed the run-column sweep suppression follow-up by extending metric-cell pointer sampling to track both metric row and run column keys, splitting sweep suppression into separate same-row horizontal and same-column vertical contexts, and adding a distinct column-scan interaction profile so fast downward scans within one run column damp tooltip swaps without reusing the exact row-sweep timing.",
+      "status": "done",
       "base_priority": 85,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the metric-row-aware suppression work and directly identified run-column-aware suppression as the likely next refinement, so this is now the clearest executable queue head for the comparison tooltip lane.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the run-column-aware sweep suppression in `App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `2a68def` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:45:00Z",
+      "updated_at": "2026-04-17T05:55:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-row-aware-tooltip-suppression"
       ],
       "direction_relation_note": "Builds on the completed row-aware sweep suppression by separating vertical run-column inspection from horizontal metric-row scanning, letting reference-lane comparison tables tune each high-density interaction pattern independently."
+    },
+    {
+      "id": "planning-reference-lanes-asymmetric-column-sweep-tuning",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Tune comparison tooltip suppression asymmetrically for downward versus upward column scans",
+      "description": "Refine the new run-column-aware tooltip sweep heuristics so same-column vertical scans can apply different suppression timing by direction, prioritizing slightly stronger damping for top-to-bottom review if that matches operator behavior while preserving the completed horizontal row-sweep and generic column-sweep protections.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply said nothing essential remains for run-column-aware suppression and directly identified asymmetric downward-versus-upward sweep tuning as the likely next refinement, making it the clearest executable follow-up for the comparison tooltip lane.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:55:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-run-column-aware-tooltip-suppression"
+      ],
+      "direction_relation_note": "Builds on the completed run-column-aware sweep suppression by tuning vertical comparison-table scan behavior to the likely top-to-bottom operator review pattern instead of treating upward and downward column sweeps identically."
     }
   ]
 }
