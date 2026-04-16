@@ -317,9 +317,17 @@ type ComparisonTooltipPresetConflictPreviewRow = {
   delta_direction: "higher" | "lower" | "same";
   delta_label: string;
   existing_value: number;
+  group_key: string;
+  group_label: string;
+  group_order: number;
   incoming_value: number;
   key: keyof ComparisonTooltipTuning;
   label: string;
+};
+type ComparisonTooltipPresetConflictPreviewGroup = {
+  key: string;
+  label: string;
+  rows: ComparisonTooltipPresetConflictPreviewRow[];
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -392,6 +400,121 @@ const COMPARISON_TOOLTIP_TUNING_LABELS: Record<keyof ComparisonTooltipTuning, st
   sweep_time_speed_multiplier: "Time speed",
   vertical_distance_ratio: "Vert ratio",
   vertical_velocity_threshold: "Vert velocity",
+};
+const COMPARISON_TOOLTIP_TUNING_GROUPS: Record<
+  keyof ComparisonTooltipTuning,
+  { key: string; label: string; order: number }
+> = {
+  column_down_sweep_close_ms: {
+    key: "column-down-sweep",
+    label: "Column Down Sweep",
+    order: 4,
+  },
+  column_down_sweep_hold_ms: {
+    key: "column-down-sweep",
+    label: "Column Down Sweep",
+    order: 4,
+  },
+  column_down_sweep_open_ms: {
+    key: "column-down-sweep",
+    label: "Column Down Sweep",
+    order: 4,
+  },
+  column_up_sweep_close_ms: {
+    key: "column-up-sweep",
+    label: "Column Up Sweep",
+    order: 5,
+  },
+  column_up_sweep_hold_ms: {
+    key: "column-up-sweep",
+    label: "Column Up Sweep",
+    order: 5,
+  },
+  column_up_sweep_open_ms: {
+    key: "column-up-sweep",
+    label: "Column Up Sweep",
+    order: 5,
+  },
+  horizontal_distance_ratio: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  horizontal_velocity_threshold: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  metric_hover_close_ms: {
+    key: "hover-timing",
+    label: "Hover Timing",
+    order: 0,
+  },
+  metric_hover_open_ms: {
+    key: "hover-timing",
+    label: "Hover Timing",
+    order: 0,
+  },
+  row_sweep_close_ms: {
+    key: "row-sweep",
+    label: "Row Sweep",
+    order: 3,
+  },
+  row_sweep_hold_ms: {
+    key: "row-sweep",
+    label: "Row Sweep",
+    order: 3,
+  },
+  row_sweep_open_ms: {
+    key: "row-sweep",
+    label: "Row Sweep",
+    order: 3,
+  },
+  speed_adjustment_base: {
+    key: "speed-scaling",
+    label: "Speed Scaling",
+    order: 6,
+  },
+  speed_adjustment_max: {
+    key: "speed-scaling",
+    label: "Speed Scaling",
+    order: 6,
+  },
+  speed_adjustment_min: {
+    key: "speed-scaling",
+    label: "Speed Scaling",
+    order: 6,
+  },
+  speed_adjustment_slope: {
+    key: "speed-scaling",
+    label: "Speed Scaling",
+    order: 6,
+  },
+  sweep_time_max_ms: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  sweep_time_min_ms: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  sweep_time_speed_multiplier: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  vertical_distance_ratio: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
+  vertical_velocity_threshold: {
+    key: "sweep-detection",
+    label: "Sweep Detection",
+    order: 2,
+  },
 };
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -2843,6 +2966,12 @@ function ComparisonTooltipTuningPanel({
       : [];
   const changedConflictPreviewRows = conflictPreviewRows.filter((row) => row.changed);
   const unchangedConflictPreviewRows = conflictPreviewRows.filter((row) => !row.changed);
+  const changedConflictPreviewGroups = groupComparisonTooltipPresetConflictPreviewRows(
+    changedConflictPreviewRows,
+  );
+  const unchangedConflictPreviewGroups = groupComparisonTooltipPresetConflictPreviewRows(
+    unchangedConflictPreviewRows,
+  );
   const changedConflictPreviewCount = changedConflictPreviewRows.length;
   const unchangedConflictPreviewCount = unchangedConflictPreviewRows.length;
 
@@ -2986,29 +3115,36 @@ function ComparisonTooltipTuningPanel({
                     <span>Existing</span>
                     <span>Incoming</span>
                   </div>
-                  {changedConflictPreviewRows.map((row) => (
-                    <div
-                      className={`comparison-dev-conflict-preview-row ${
-                        row.changed ? "is-changed" : ""
-                      }`}
-                      key={row.key}
-                    >
-                      <span className="comparison-dev-conflict-preview-label-group">
-                        <span className="comparison-dev-conflict-preview-label">{row.label}</span>
-                        <span
-                          className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                  {changedConflictPreviewGroups.map((group) => (
+                    <div className="comparison-dev-conflict-preview-group" key={group.key}>
+                      <div className="comparison-dev-conflict-preview-group-title">
+                        {group.label}
+                      </div>
+                      {group.rows.map((row) => (
+                        <div
+                          className={`comparison-dev-conflict-preview-row ${
+                            row.changed ? "is-changed" : ""
+                          }`}
+                          key={row.key}
                         >
-                          {row.delta_label}
-                        </span>
-                      </span>
-                      <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
-                        {formatComparisonTooltipTuningValue(row.existing_value)}
-                      </span>
-                      <span
-                        className={`comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-${row.delta_direction}`}
-                      >
-                        {formatComparisonTooltipTuningValue(row.incoming_value)}
-                      </span>
+                          <span className="comparison-dev-conflict-preview-label-group">
+                            <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+                            <span
+                              className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                            >
+                              {row.delta_label}
+                            </span>
+                          </span>
+                          <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+                            {formatComparisonTooltipTuningValue(row.existing_value)}
+                          </span>
+                          <span
+                            className={`comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-${row.delta_direction}`}
+                          >
+                            {formatComparisonTooltipTuningValue(row.incoming_value)}
+                          </span>
+                        </div>
+                      ))}
                     </div>
                   ))}
                   {unchangedConflictPreviewCount ? (
@@ -3023,22 +3159,31 @@ function ComparisonTooltipTuningPanel({
                     </button>
                   ) : null}
                   {showUnchangedConflictRows
-                    ? unchangedConflictPreviewRows.map((row) => (
-                        <div className="comparison-dev-conflict-preview-row" key={row.key}>
-                          <span className="comparison-dev-conflict-preview-label-group">
-                            <span className="comparison-dev-conflict-preview-label">{row.label}</span>
-                            <span
-                              className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
-                            >
-                              {row.delta_label}
-                            </span>
-                          </span>
-                          <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
-                            {formatComparisonTooltipTuningValue(row.existing_value)}
-                          </span>
-                          <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-same">
-                            {formatComparisonTooltipTuningValue(row.incoming_value)}
-                          </span>
+                    ? unchangedConflictPreviewGroups.map((group) => (
+                        <div className="comparison-dev-conflict-preview-group" key={group.key}>
+                          <div className="comparison-dev-conflict-preview-group-title">
+                            {group.label}
+                          </div>
+                          {group.rows.map((row) => (
+                            <div className="comparison-dev-conflict-preview-row" key={row.key}>
+                              <span className="comparison-dev-conflict-preview-label-group">
+                                <span className="comparison-dev-conflict-preview-label">
+                                  {row.label}
+                                </span>
+                                <span
+                                  className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                                >
+                                  {row.delta_label}
+                                </span>
+                              </span>
+                              <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+                                {formatComparisonTooltipTuningValue(row.existing_value)}
+                              </span>
+                              <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-same">
+                                {formatComparisonTooltipTuningValue(row.incoming_value)}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       ))
                     : null}
@@ -3524,16 +3669,52 @@ function buildComparisonTooltipPresetConflictPreviewRows(
     const existingValue = existingTuning[key];
     const incomingValue = incomingTuning[key];
     const delta = formatComparisonTooltipTuningDelta(existingValue, incomingValue);
+    const group = COMPARISON_TOOLTIP_TUNING_GROUPS[key];
     return {
       changed: existingValue !== incomingValue,
       delta_direction: delta.direction,
       delta_label: delta.label,
       existing_value: existingValue,
+      group_key: group.key,
+      group_label: group.label,
+      group_order: group.order,
       incoming_value: incomingValue,
       key,
       label: COMPARISON_TOOLTIP_TUNING_LABELS[key],
     };
   });
+}
+
+function groupComparisonTooltipPresetConflictPreviewRows(
+  rows: ComparisonTooltipPresetConflictPreviewRow[],
+): ComparisonTooltipPresetConflictPreviewGroup[] {
+  const groups = rows.reduce<Map<string, ComparisonTooltipPresetConflictPreviewGroup>>(
+    (accumulator, row) => {
+      const existingGroup = accumulator.get(row.group_key);
+      if (existingGroup) {
+        existingGroup.rows.push(row);
+        return accumulator;
+      }
+      accumulator.set(row.group_key, {
+        key: row.group_key,
+        label: row.group_label,
+        rows: [row],
+      });
+      return accumulator;
+    },
+    new Map(),
+  );
+
+  return [...groups.values()]
+    .sort((left, right) => {
+      const leftOrder = left.rows[0]?.group_order ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.rows[0]?.group_order ?? Number.MAX_SAFE_INTEGER;
+      return leftOrder - rightOrder || left.label.localeCompare(right.label);
+    })
+    .map((group) => ({
+      ...group,
+      rows: [...group.rows].sort((left, right) => left.label.localeCompare(right.label)),
+    }));
 }
 
 function formatComparisonTooltipTuningValue(value: number) {
