@@ -115,20 +115,38 @@
     {
       "id": "planning-control-room-binance-backfill-quality-status",
       "direction_id": "control-room-and-ops",
-      "title": "Differentiate Binance backfill count completion from contiguous coverage quality in ops",
-      "description": "Extend market-data ops status so operators can see whether a symbol has merely reached the configured historical candle count or also satisfies contiguous-gap quality expectations, including API status semantics and control-room cues that separate numeric target completion from usable historical continuity.",
-      "status": "ready",
+      "title": "Binance ops now separates backfill count completion from contiguous coverage quality",
+      "description": "Completed the ops quality follow-up by splitting Binance instrument status into distinct count-completion and contiguous-quality views, exposing missing-candle-aware quality fields through the API model, surfacing separate control-room summary tiles plus per-instrument Count and Quality columns, and locking in the 'count complete but gap exists' case with API and web verification.",
+      "status": "done",
       "base_priority": 86,
-      "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply says the just-finished task has no remaining work and explicitly names distinguishing count-based completion from contiguous-quality completion in ops as the next follow-up, so this is the clearest executable successor.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the count-versus-quality split in ops status, verified `apps/api` with `pytest` (`28 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `4da9d13`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:54:30Z",
+      "updated_at": "2026-04-16T15:05:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-backfill-ops-status"
       ],
       "direction_relation_note": "Pushes the control-room ops surface from simple backfill progress toward operator-trustworthy data quality signals about whether historical coverage is actually continuous enough to rely on."
+    },
+    {
+      "id": "planning-control-room-binance-gap-window-status",
+      "direction_id": "control-room-and-ops",
+      "title": "Surface exact Binance gap windows alongside backfill quality status",
+      "description": "Extend Binance market-data ops status so operators can inspect the exact affected time window of each detected historical gap, not just the aggregate gap count, including API payload fields and control-room presentation that make broken coverage spans directly actionable.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply says the count-versus-quality task is finished and explicitly names exposing the exact affected gap time window as the natural next follow-up, making this the clearest executable successor for the queue head.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T15:05:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-backfill-quality-status"
+      ],
+      "direction_relation_note": "Advances the control-room trust surface from coarse quality alarms toward operator-actionable diagnostics by showing where historical Binance coverage actually breaks."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
