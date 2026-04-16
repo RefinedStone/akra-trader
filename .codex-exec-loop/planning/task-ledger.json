@@ -64,17 +64,35 @@
     {
       "id": "planning-research-foundation-binance-background-sync",
       "direction_id": "research-foundation",
-      "title": "Move Binance market-data sync from request path to scheduled background jobs",
-      "description": "Add the next executable follow-up after on-demand Binance ingestion by introducing a scheduler or worker path that prewarms tracked symbol/timeframe candles, refreshes coverage on an interval, records last successful sync timestamps, and keeps API reads from depending on foreground fetch latency.",
-      "status": "ready",
+      "title": "Binance market-data sync now runs as a scheduled background job",
+      "description": "Completed the request-path sync removal by moving Binance refresh into a scheduled `MarketDataSyncJob`, wiring startup/shutdown through the FastAPI lifespan, adding sync interval/timeframe configuration, and covering both unsynced request behavior and job lifecycle with API tests.",
+      "status": "done",
       "base_priority": 93,
-      "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply says the per-symbol lineage control-room task is complete with no blocking follow-up, so scheduled/background Binance syncing becomes the clearest remaining executable queue-head task for reducing request-path data fetch latency.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the scheduled Binance sync migration, verified it with `pytest` (`27 passed`), and committed the change as `f722373`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:46:00Z",
+      "updated_at": "2026-04-16T14:52:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the research-foundation market-data lane from request-time freshness checks to predictable ingestion operations suitable for real trading workflows."
+    },
+    {
+      "id": "planning-research-foundation-binance-historical-backfill",
+      "direction_id": "research-foundation",
+      "title": "Add Binance historical backfill coverage beyond rolling sync windows",
+      "description": "Extend the new scheduled market-data sync so tracked symbols and timeframes can be backfilled beyond the current recent-lookback window, either through a dedicated backfill job or an explicit operational sync policy, with progress/state recording and tests that prove longer historical windows can be populated without request-path fetches.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply says background sync is complete and identifies deeper historical backfill or a production sync policy as the next remaining gap, so this becomes the clearest executable successor task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T14:52:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-research-foundation-binance-background-sync"
+      ],
+      "direction_relation_note": "Advances the research-foundation ingestion lane from short-horizon freshness into reproducible historical coverage needed for credible research and replay."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
