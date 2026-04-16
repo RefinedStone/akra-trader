@@ -178,6 +178,11 @@ class BinanceMarketDataAdapter(MarketDataPort):
     instruments: list[InstrumentStatus] = []
     for symbol in self._tracked_symbols:
       quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
+      backfill_target = self._historical_candle_limit
+      backfill_completion_ratio = min(
+        quality.coverage.candle_count / backfill_target,
+        1.0,
+      ) if backfill_target > 0 else None
 
       instruments.append(
         InstrumentStatus(
@@ -189,6 +194,13 @@ class BinanceMarketDataAdapter(MarketDataPort):
           sync_status=quality.sync_status,
           lag_seconds=quality.lag_seconds,
           last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+          backfill_target_candles=backfill_target,
+          backfill_completion_ratio=backfill_completion_ratio,
+          backfill_complete=(
+            quality.coverage.candle_count >= backfill_target
+            if backfill_target > 0
+            else None
+          ),
           issues=quality.issues,
         )
       )

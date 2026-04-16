@@ -91,6 +91,9 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert status.instruments[0].sync_status == "synced"
   assert status.instruments[0].candle_count == 6
   assert status.instruments[0].lag_seconds == 0
+  assert status.instruments[0].backfill_target_candles == 6
+  assert status.instruments[0].backfill_completion_ratio == 1.0
+  assert status.instruments[0].backfill_complete is True
   assert not status.instruments[0].issues
   assert len(candles) == 4
   assert candles[-1].close == 105.5
@@ -121,6 +124,9 @@ def test_binance_adapter_backfills_history_beyond_recent_window(tmp_path: Path) 
   candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m")
 
   assert status.instruments[0].candle_count == 8
+  assert status.instruments[0].backfill_target_candles == 8
+  assert status.instruments[0].backfill_completion_ratio == 1.0
+  assert status.instruments[0].backfill_complete is True
   assert candles[0].timestamp == now - timedelta(minutes=35)
   assert candles[-1].timestamp == now
   assert len(exchange.calls) == 2
@@ -211,6 +217,9 @@ def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path)
   assert exchange.calls == []
   assert status.instruments[0].sync_status == "empty"
   assert status.instruments[0].candle_count == 0
+  assert status.instruments[0].backfill_target_candles == 6
+  assert status.instruments[0].backfill_completion_ratio == 0.0
+  assert status.instruments[0].backfill_complete is False
   assert candles == []
   assert lineage.sync_status == "empty"
   assert "insufficient_candle_coverage" in lineage.issues

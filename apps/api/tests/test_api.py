@@ -132,3 +132,6 @@ def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> N
   assert payload["provider"] == "seeded"
   assert payload["instruments"]
   assert "sync_status" in payload["instruments"][0]
+  assert payload["instruments"][0]["backfill_target_candles"] is None
+  assert payload["instruments"][0]["backfill_completion_ratio"] is None
+  assert payload["instruments"][0]["backfill_complete"] is None

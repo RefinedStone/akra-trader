@@ -290,6 +290,36 @@ select {
   color: var(--muted);
 }
 
+.progress-stack {
+  display: grid;
+  gap: 4px;
+  min-width: 140px;
+}
+
+.progress-stack strong {
+  font-size: 0.9rem;
+}
+
+.progress-stack span {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.progress-track {
+  height: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--cyan), var(--amber));
+}
+
 .run-list {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

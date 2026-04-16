@@ -87,6 +87,9 @@ type MarketDataStatus = {
     sync_status: string;
     lag_seconds: number | null;
     last_sync_at: string | null;
+    backfill_target_candles: number | null;
+    backfill_completion_ratio: number | null;
+    backfill_complete: boolean | null;
     issues: string[];
   }[];
 };
@@ -164,6 +167,39 @@ export default function App() {
       future: strategies.filter((strategy) => strategy.runtime === "decision_engine"),
     };
   }, [strategies]);
+
+  const backfillSummary = useMemo(() => {
+    if (!marketStatus) {
+      return null;
+    }
+    const tracked = marketStatus.instruments.filter(
+      (instrument) => instrument.backfill_target_candles !== null,
+    );
+    if (!tracked.length) {
+      return null;
+    }
+    const targetCandles = tracked.reduce(
+      (total, instrument) => total + (instrument.backfill_target_candles ?? 0),
+      0,
+    );
+    const coveredCandles = tracked.reduce(
+      (total, instrument) =>
+        total +
+        Math.min(
+          instrument.candle_count,
+          instrument.backfill_target_candles ?? instrument.candle_count,
+        ),
+      0,
+    );
+    const completeCount = tracked.filter((instrument) => instrument.backfill_complete).length;
+    return {
+      targetCandles,
+      coveredCandles,
+      completeCount,
+      instrumentCount: tracked.length,
+      completionRatio: targetCandles > 0 ? coveredCandles / targetCandles : null,
+    };
+  }, [marketStatus]);
 
   async function handleBacktestSubmit(event: FormEvent) {
     event.preventDefault();
@@ -276,6 +312,20 @@ export default function App() {
                 <span>Tracked symbols</span>
                 <strong>{marketStatus.instruments.length}</strong>
               </div>
+              {backfillSummary ? (
+                <>
+                  <div className="metric-tile">
+                    <span>Backfill coverage</span>
+                    <strong>{formatCompletion(backfillSummary.completionRatio)}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Backfill complete</span>
+                    <strong>
+                      {backfillSummary.completeCount} / {backfillSummary.instrumentCount}
+                    </strong>
+                  </div>
+                </>
+              ) : null}
               <table className="data-table">
                 <thead>
                   <tr>
@@ -283,6 +333,8 @@ export default function App() {
                     <th>Timeframe</th>
                     <th>Sync</th>
                     <th>Candles</th>
+                    <th>Target</th>
+                    <th>Backfill</th>
                     <th>Lag</th>
                     <th>Latest</th>
                     <th>Issues</th>
@@ -295,6 +347,10 @@ export default function App() {
                       <td>{instrument.timeframe}</td>
                       <td>{instrument.sync_status}</td>
                       <td>{instrument.candle_count}</td>
+                      <td>{instrument.backfill_target_candles ?? "n/a"}</td>
+                      <td>
+                        <BackfillStatus instrument={instrument} />
+                      </td>
                       <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
                       <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
@@ -313,6 +369,40 @@ export default function App() {
       </main>
     </div>
   );
+}
+
+function BackfillStatus({
+  instrument,
+}: {
+  instrument: MarketDataStatus["instruments"][number];
+}) {
+  if (instrument.backfill_target_candles === null) {
+    return <span>n/a</span>;
+  }
+  return (
+    <div className="progress-stack">
+      <strong>{formatCompletion(instrument.backfill_completion_ratio)}</strong>
+      <span>
+        {Math.min(instrument.candle_count, instrument.backfill_target_candles)} /{" "}
+        {instrument.backfill_target_candles}
+        {instrument.backfill_complete ? " ready" : ""}
+      </span>
+      <div className="progress-track" aria-hidden="true">
+        <span
+          style={{
+            width: `${Math.round((instrument.backfill_completion_ratio ?? 0) * 100)}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function formatCompletion(value: number | null) {
+  if (value === null) {
+    return "n/a";
+  }
+  return `${Math.round(value * 100)}%`;
 }
 
 function StrategyColumn({
