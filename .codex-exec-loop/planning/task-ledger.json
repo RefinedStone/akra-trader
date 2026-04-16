@@ -367,20 +367,56 @@
     {
       "id": "planning-reference-lanes-benchmark-artifact-typing",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Promote flat reference artifact paths into typed benchmark artifacts",
-      "description": "Parse Freqtrade benchmark result manifests and related outputs into richer typed benchmark artifacts so reference-lane provenance and comparison surfaces can distinguish summary JSON, signals exports, logs, and other artifact kinds instead of showing a flat path list, while preserving deterministic locations when files are absent.",
-      "status": "ready",
+      "title": "Typed benchmark artifacts now back reference-lane provenance",
+      "description": "Completed the typed benchmark artifact follow-up by adding a `BenchmarkArtifact` model to reference-run provenance and comparison payloads, teaching the Freqtrade adapter to classify deterministic artifact paths into typed benchmark artifacts while preserving backward-compatible flat `artifact_paths`, surfacing the richer artifact metadata in normal and comparison payloads plus the control room, and adding backend assertions for typed artifact kinds.",
+      "status": "done",
       "base_priority": 75,
-      "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply explicitly identified manifest parsing and explicit artifact-kind labeling as the next refinement after provenance shipping, making this the clearest immediately executable queue-head follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the typed benchmark artifact implementation, verified `apps/api` with `.venv/bin/python -m pytest` (`34 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `f2a9354` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:20:00Z",
+      "updated_at": "2026-04-17T01:35:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-reference-run-provenance"
       ],
       "direction_relation_note": "Advances the reference-lanes benchmark surface from generic artifact links toward operator-meaningful benchmark evidence without collapsing external-runtime runs into native semantics."
+    },
+    {
+      "id": "planning-reference-lanes-benchmark-artifact-manifest-enrichment",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Typed benchmark artifacts now ingest Freqtrade manifests and summaries",
+      "description": "Completed the manifest-enrichment follow-up by extending `BenchmarkArtifact` with structured summary metadata and `summary_source_path`, teaching the Freqtrade reference adapter to enrich typed artifacts from `.meta.json` manifests, result `.json` summaries, sibling manifests for `.zip` snapshots, and backtest result roots, then surfacing the normalized summary fields through stored provenance, comparison payloads, and control-room artifact rows with synthetic parsing coverage.",
+      "status": "done",
+      "base_priority": 76,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the manifest and summary enrichment work, verified `apps/api` with `./.venv/bin/python -m pytest` (`36 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `ecc1a78` to `main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:45:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-benchmark-artifact-typing"
+      ],
+      "direction_relation_note": "Keeps reference-lane benchmark evidence explicit and operator-meaningful by grounding typed artifacts in real Freqtrade outputs instead of convention-only path heuristics."
+    },
+    {
+      "id": "planning-reference-lanes-freqtrade-nested-summary-parsing",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Parse richer nested Freqtrade benchmark sections beyond normalized key heuristics",
+      "description": "Extend the benchmark artifact enrichment pipeline to parse deeper Freqtrade-specific nested sections such as per-strategy comparison tables and richer export manifest structures so reference-lane provenance and comparison payloads can preserve more benchmark-native detail instead of flattening everything through generic summary-key normalization.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply said nothing essential remains for manifest enrichment and named richer nested Freqtrade section parsing as the clearest direct refinement, so this becomes the next immediately executable queue-head task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:45:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-benchmark-artifact-manifest-enrichment"
+      ],
+      "direction_relation_note": "Advances the reference benchmark lane from normalized artifact summaries toward benchmark-native semantics by capturing the nested Freqtrade structures that operators compare directly."
     }
   ]
 }
