@@ -9,7 +9,10 @@ from akra_trader.main import create_app
 
 
 def build_client(database_path: Path) -> TestClient:
-  settings = Settings(runs_database_url=f"sqlite:///{database_path}")
+  settings = Settings(
+    runs_database_url=f"sqlite:///{database_path}",
+    market_data_provider="seeded",
+  )
   return TestClient(create_app(settings))
 
 
@@ -114,3 +117,15 @@ def test_paper_alias_still_works(tmp_path: Path) -> None:
   assert response.status_code == 200
   payload = response.json()
   assert payload["config"]["mode"] == "sandbox"
+
+
+def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  response = client.get("/api/market-data/status")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["provider"] == "seeded"
+  assert payload["instruments"]
+  assert "sync_status" in payload["instruments"][0]

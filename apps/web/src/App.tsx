@@ -53,6 +53,10 @@ type MarketDataStatus = {
     candle_count: number;
     first_timestamp: string | null;
     last_timestamp: string | null;
+    sync_status: string;
+    lag_seconds: number | null;
+    last_sync_at: string | null;
+    issues: string[];
   }[];
 };
 
@@ -246,8 +250,11 @@ export default function App() {
                   <tr>
                     <th>Instrument</th>
                     <th>Timeframe</th>
+                    <th>Sync</th>
                     <th>Candles</th>
+                    <th>Lag</th>
                     <th>Latest</th>
+                    <th>Issues</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -255,8 +262,11 @@ export default function App() {
                     <tr key={instrument.instrument_id}>
                       <td>{instrument.instrument_id}</td>
                       <td>{instrument.timeframe}</td>
+                      <td>{instrument.sync_status}</td>
                       <td>{instrument.candle_count}</td>
+                      <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
+                      <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
                     </tr>
                   ))}
                 </tbody>

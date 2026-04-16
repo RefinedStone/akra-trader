@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.bootstrap import build_container
+from akra_trader.bootstrap import build_default_market_data_database_url
 from akra_trader.bootstrap import build_default_runs_database_url
 from akra_trader.config import Settings
 
@@ -16,7 +18,12 @@ def test_build_container_uses_configured_runs_database_url(monkeypatch) -> None:
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
 
-  build_container(Settings(runs_database_url="postgresql+psycopg://akra:akra@postgres:5432/akra_trader"))
+  build_container(
+    Settings(
+      runs_database_url="postgresql+psycopg://akra:akra@postgres:5432/akra_trader",
+      market_data_provider="seeded",
+    )
+  )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
 
@@ -28,3 +35,54 @@ def test_build_default_runs_database_url_points_to_local_sqlite() -> None:
 
   assert database_url.startswith("sqlite:///")
   assert database_url.endswith("/.local/state/runs.sqlite3")
+
+
+def test_build_default_market_data_database_url_points_to_local_sqlite() -> None:
+  repo_root = Path(__file__).resolve().parents[2]
+
+  database_url = build_default_market_data_database_url(repo_root)
+
+  assert database_url.startswith("sqlite:///")
+  assert database_url.endswith("/.local/state/market-data.sqlite3")
+
+
+def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> None:
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+
+  container = build_container(Settings(market_data_provider="seeded"))
+
+  assert isinstance(container.app._market_data, SeededMarketDataAdapter)
+
+
+def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:
+  captured: dict[str, str] = {}
+
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeBinanceMarketDataAdapter:
+    def __init__(self, *, database_url: str, tracked_symbols: tuple[str, ...], default_candle_limit: int) -> None:
+      captured["database_url"] = database_url
+      captured["tracked_symbols"] = ",".join(tracked_symbols)
+      captured["default_candle_limit"] = str(default_candle_limit)
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
+
+  build_container(
+    Settings(
+      runs_database_url="postgresql+psycopg://akra:akra@postgres:5432/akra_trader",
+      market_data_provider="binance",
+      market_data_symbols=("BTC/USDT",),
+      market_data_default_candle_limit=144,
+    )
+  )
+
+  assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["tracked_symbols"] == "BTC/USDT"
+  assert captured["default_candle_limit"] == "144"

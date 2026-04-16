@@ -274,6 +274,10 @@ class InstrumentStatus:
   candle_count: int
   first_timestamp: datetime | None
   last_timestamp: datetime | None
+  sync_status: str = "empty"
+  lag_seconds: int | None = None
+  last_sync_at: datetime | None = None
+  issues: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
