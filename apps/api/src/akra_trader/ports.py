@@ -130,3 +130,10 @@ class VenueExecutionPort(Protocol):
     self,
     request: GuardedLiveVenueOrderRequest,
   ) -> GuardedLiveVenueOrderResult: ...
+
+  def sync_order_states(
+    self,
+    *,
+    symbol: str,
+    order_ids: tuple[str, ...],
+  ) -> tuple[GuardedLiveVenueOrderResult, ...]: ...

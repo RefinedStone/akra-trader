@@ -54,8 +54,12 @@ def apply_signal(
       requested_price=market_price,
       status=OrderStatus.FILLED,
       filled_at=signal.timestamp,
+      updated_at=signal.timestamp,
       average_fill_price=executed_price,
       fee_paid=fee_paid,
+      filled_quantity=quantity,
+      remaining_quantity=0.0,
+      last_synced_at=signal.timestamp,
     )
     fill = Fill(
       order_id=order.order_id,
@@ -105,8 +109,12 @@ def apply_signal(
       requested_price=market_price,
       status=OrderStatus.FILLED,
       filled_at=signal.timestamp,
+      updated_at=signal.timestamp,
       average_fill_price=executed_price,
       fee_paid=fee_paid,
+      filled_quantity=quantity,
+      remaining_quantity=0.0,
+      last_synced_at=signal.timestamp,
     )
     fill = Fill(
       order_id=order.order_id,

@@ -14,6 +14,7 @@ from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import GuardedLiveKillSwitch
+from akra_trader.domain.models import ClosedTrade
 from akra_trader.domain.models import GuardedLiveInternalExposure
 from akra_trader.domain.models import GuardedLiveInternalStateSnapshot
 from akra_trader.domain.models import GuardedLiveReconciliation
@@ -27,6 +28,7 @@ from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import GuardedLiveRuntimeRecovery
+from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import Order
@@ -279,6 +281,14 @@ class TradingApplication:
       self,
       request: GuardedLiveVenueOrderRequest,
     ) -> GuardedLiveVenueOrderResult:
+      raise RuntimeError("Venue execution port is not configured.")
+
+    def sync_order_states(
+      self,
+      *,
+      symbol: str,
+      order_ids: tuple[str, ...],
+    ) -> tuple[GuardedLiveVenueOrderResult, ...]:
       raise RuntimeError("Venue execution port is not configured.")
 
   def __init__(
@@ -587,20 +597,10 @@ class TradingApplication:
   ) -> GuardedLiveStatus:
     current_time = self._clock()
     state = self._guarded_live_state.load_state()
-    internal_snapshot, venue_snapshot, findings = self._build_guarded_live_reconciliation_result()
-    reconciliation = GuardedLiveReconciliation(
-      state="clear" if not findings else "issues_detected",
+    reconciliation = self._build_guarded_live_reconciliation(
+      state=state,
       checked_at=current_time,
       checked_by=actor,
-      scope="venue_state",
-      summary=(
-        "Guarded-live reconciliation verified venue state against local runtime state."
-        if not findings
-        else f"Guarded-live reconciliation found {len(findings)} venue-state issue(s)."
-      ),
-      findings=tuple(findings),
-      internal_snapshot=internal_snapshot,
-      venue_snapshot=venue_snapshot,
     )
     event = OperatorAuditEvent(
       event_id=f"guarded-live-reconciliation-ran:{current_time.isoformat()}",
@@ -663,6 +663,12 @@ class TradingApplication:
         open_orders=recovered_open_orders,
         issues=tuple(dict.fromkeys((*snapshot.issues, *recovery_issues))),
       )
+    projected_state = replace(state, recovery=recovery_state)
+    refreshed_reconciliation = self._build_guarded_live_reconciliation(
+      state=projected_state,
+      checked_at=current_time,
+      checked_by=actor,
+    )
 
     event = OperatorAuditEvent(
       event_id=f"guarded-live-runtime-recovered:{current_time.isoformat()}",
@@ -678,7 +684,8 @@ class TradingApplication:
     )
     self._persist_guarded_live_state(
       replace(
-        state,
+        projected_state,
+        reconciliation=refreshed_reconciliation,
         recovery=recovery_state,
         audit_events=(event, *state.audit_events),
       )
@@ -1358,6 +1365,10 @@ class TradingApplication:
           status=OrderStatus.OPEN,
           order_id=recovered_order.order_id,
           created_at=state.recovery.recovered_at or self._clock(),
+          updated_at=state.recovery.recovered_at or self._clock(),
+          filled_quantity=0.0,
+          remaining_quantity=recovered_order.amount,
+          last_synced_at=state.recovery.recovered_at or self._clock(),
         )
       )
 
@@ -1408,15 +1419,41 @@ class TradingApplication:
     _, _, findings = self._build_guarded_live_reconciliation_result()
     return findings
 
+  def _build_guarded_live_reconciliation(
+    self,
+    *,
+    state: GuardedLiveState,
+    checked_at: datetime,
+    checked_by: str,
+  ) -> GuardedLiveReconciliation:
+    internal_snapshot, venue_snapshot, findings = self._build_guarded_live_reconciliation_result(state=state)
+    return GuardedLiveReconciliation(
+      state="clear" if not findings else "issues_detected",
+      checked_at=checked_at,
+      checked_by=checked_by,
+      scope="venue_state",
+      summary=(
+        "Guarded-live reconciliation verified venue state against local runtime state."
+        if not findings
+        else f"Guarded-live reconciliation found {len(findings)} venue-state issue(s)."
+      ),
+      findings=tuple(findings),
+      internal_snapshot=internal_snapshot,
+      venue_snapshot=venue_snapshot,
+    )
+
   def _build_guarded_live_reconciliation_result(
     self,
+    *,
+    state: GuardedLiveState | None = None,
   ) -> tuple[
     GuardedLiveInternalStateSnapshot,
     GuardedLiveVenueStateSnapshot,
     list[GuardedLiveReconciliationFinding],
   ]:
     findings: list[GuardedLiveReconciliationFinding] = []
-    internal_snapshot = self._build_guarded_live_internal_snapshot()
+    effective_state = state or self._guarded_live_state.load_state()
+    internal_snapshot = self._build_guarded_live_internal_snapshot(state=effective_state)
     venue_snapshot = self._venue_state.capture_snapshot()
 
     runtime_visibility = self.get_operator_visibility()
@@ -1532,17 +1569,28 @@ class TradingApplication:
     )
     return internal_snapshot, venue_snapshot, findings
 
-  def _build_guarded_live_internal_snapshot(self) -> GuardedLiveInternalStateSnapshot:
+  def _build_guarded_live_internal_snapshot(
+    self,
+    *,
+    state: GuardedLiveState | None = None,
+  ) -> GuardedLiveInternalStateSnapshot:
     captured_at = self._clock()
     exposures: list[GuardedLiveInternalExposure] = []
     open_order_count = 0
     running_run_ids: list[str] = []
+    running_live_count = 0
 
     for mode in (RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE):
       for run in self._runs.list_runs(mode=mode.value):
         if run.status == RunStatus.RUNNING:
           running_run_ids.append(run.config.run_id)
-        open_order_count += sum(1 for order in run.orders if order.status.value == "open")
+          if mode == RunMode.LIVE:
+            running_live_count += 1
+        open_order_count += sum(
+          1
+          for order in run.orders
+          if order.status in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}
+        )
         for position in run.positions.values():
           if not position.is_open:
             continue
@@ -1554,6 +1602,26 @@ class TradingApplication:
               quantity=position.quantity,
             )
           )
+
+    if (
+      running_live_count == 0
+      and state is not None
+      and state.recovery.state in {"recovered", "recovered_with_warnings"}
+    ):
+      for exposure in state.recovery.exposures:
+        exposures.append(
+          GuardedLiveInternalExposure(
+            run_id="guarded_live_recovery_projection",
+            mode=RunMode.LIVE.value,
+            instrument_id=exposure.instrument_id,
+            quantity=exposure.quantity,
+          )
+        )
+      open_order_count += sum(
+        1
+        for order in state.recovery.open_orders
+        if order.status.lower() not in {"closed", "filled", "canceled", "cancelled", "rejected"}
+      )
 
     return GuardedLiveInternalStateSnapshot(
       captured_at=captured_at,
@@ -1837,12 +1905,14 @@ class TradingApplication:
         "recovered": 0,
         "ticks_processed": 0,
         "orders_submitted": 0,
+        "orders_synced": 0,
       }
 
     maintained = 0
     recovered = 0
     ticks_processed = 0
     orders_submitted = 0
+    orders_synced = 0
     current_time = self._clock()
     for run in self._runs.list_runs(mode=RunMode.LIVE.value):
       if run.status != RunStatus.RUNNING:
@@ -1875,6 +1945,7 @@ class TradingApplication:
           )
           recovered += 1
 
+        orders_synced += self._sync_guarded_live_orders(run)
         advance = self._advance_guarded_live_worker_run(run)
         ticks_processed += advance["ticks_processed"]
         orders_submitted += advance["orders_submitted"]
@@ -1901,7 +1972,228 @@ class TradingApplication:
       "recovered": recovered,
       "ticks_processed": ticks_processed,
       "orders_submitted": orders_submitted,
+      "orders_synced": orders_synced,
     }
+
+  def _sync_guarded_live_orders(self, run: RunRecord) -> int:
+    tracked_orders = [
+      order
+      for order in run.orders
+      if order.status in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}
+    ]
+    if not tracked_orders:
+      return 0
+
+    synced_states = {
+      state.order_id: state
+      for state in self._venue_execution.sync_order_states(
+        symbol=run.config.symbols[0],
+        order_ids=tuple(order.order_id for order in tracked_orders),
+      )
+    }
+    synced_count = 0
+    for order in tracked_orders:
+      synced_state = synced_states.get(order.order_id)
+      if synced_state is None:
+        continue
+      synced_count += self._apply_guarded_live_synced_order_state(
+        run=run,
+        order=order,
+        synced_state=synced_state,
+      )
+    if synced_count > 0:
+      run.metrics = summarize_performance(
+        initial_cash=run.config.initial_cash,
+        equity_curve=run.equity_curve,
+        closed_trades=run.closed_trades,
+      )
+    return synced_count
+
+  def _apply_guarded_live_synced_order_state(
+    self,
+    *,
+    run: RunRecord,
+    order: Order,
+    synced_state: GuardedLiveVenueOrderResult,
+  ) -> int:
+    status_changed = False
+    fill_recorded = False
+    previous_status = order.status
+    previous_filled_quantity = order.filled_quantity
+    sync_time = synced_state.updated_at or synced_state.submitted_at or self._clock()
+    order.last_synced_at = sync_time
+    order.updated_at = sync_time
+    if synced_state.average_fill_price is not None:
+      order.average_fill_price = synced_state.average_fill_price
+
+    total_fee = synced_state.fee_paid if synced_state.fee_paid is not None else order.fee_paid
+    total_filled = synced_state.filled_amount
+    if total_filled is None:
+      if synced_state.status == OrderStatus.FILLED.value:
+        total_filled = order.quantity
+      elif synced_state.status == OrderStatus.PARTIALLY_FILLED.value:
+        total_filled = order.filled_quantity
+      else:
+        total_filled = order.filled_quantity
+    remaining_quantity = synced_state.remaining_amount
+    if remaining_quantity is None:
+      remaining_quantity = max(order.quantity - total_filled, 0.0)
+
+    incremental_fill = max(total_filled - order.filled_quantity, 0.0)
+    if incremental_fill > self._guarded_live_balance_tolerance:
+      incremental_fee = max(total_fee - order.fee_paid, 0.0)
+      self._materialize_guarded_live_fill_delta(
+        run=run,
+        order=order,
+        fill_quantity=incremental_fill,
+        fee_paid=incremental_fee,
+        fill_price=synced_state.average_fill_price or order.average_fill_price or order.requested_price,
+        fill_timestamp=sync_time,
+      )
+      fill_recorded = True
+
+    order.fee_paid = total_fee
+    order.filled_quantity = total_filled
+    order.remaining_quantity = remaining_quantity
+    mapped_status = self._map_guarded_live_order_status(
+      synced_state.status,
+      filled_quantity=total_filled,
+      remaining_quantity=remaining_quantity,
+    )
+    if mapped_status != order.status:
+      order.status = mapped_status
+      status_changed = True
+    if order.status == OrderStatus.FILLED and order.filled_at is None:
+      order.filled_at = sync_time
+
+    if status_changed or fill_recorded or synced_state.issues:
+      transition_copy = (
+        f"{previous_status.value}->{order.status.value}"
+        if status_changed
+        else f"{order.status.value}"
+      )
+      detail = (
+        f"Order {order.order_id} synced as {transition_copy}. "
+        f"filled {previous_filled_quantity:.8f}->{order.filled_quantity:.8f}, "
+        f"remaining {order.remaining_quantity or 0.0:.8f}."
+      )
+      if synced_state.issues:
+        detail += " Issues: " + ", ".join(synced_state.issues) + "."
+      run.notes.append(f"{sync_time.isoformat()} | guarded_live_order_synced | {detail}")
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_order_synced",
+        actor="system",
+        summary=f"Guarded-live order synced for {run.config.symbols[0]}.",
+        detail=detail,
+        run_id=run.config.run_id,
+        session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+      )
+      return 1
+    return 0
+
+  def _materialize_guarded_live_fill_delta(
+    self,
+    *,
+    run: RunRecord,
+    order: Order,
+    fill_quantity: float,
+    fee_paid: float,
+    fill_price: float,
+    fill_timestamp: datetime,
+  ) -> None:
+    cache = self._restore_state_cache(run)
+    active_position = cache.position if cache.position is not None and cache.position.is_open else None
+    if order.side == OrderSide.BUY:
+      gross_cost = fill_quantity * fill_price
+      next_cash = cache.cash - gross_cost - fee_paid
+      if active_position is None:
+        next_position = Position(
+          instrument_id=order.instrument_id,
+          quantity=fill_quantity,
+          average_price=fill_price,
+          opened_at=fill_timestamp,
+          updated_at=fill_timestamp,
+        )
+      else:
+        total_quantity = active_position.quantity + fill_quantity
+        average_price = (
+          (active_position.quantity * active_position.average_price) + (fill_quantity * fill_price)
+        ) / total_quantity
+        next_position = replace(
+          active_position,
+          quantity=total_quantity,
+          average_price=average_price,
+          updated_at=fill_timestamp,
+        )
+      cache.apply(cash=next_cash, position=next_position)
+      run.positions[order.instrument_id] = next_position
+    else:
+      if active_position is None or not active_position.is_open:
+        raise RuntimeError(f"guarded_live_sell_sync_without_position:{order.order_id}")
+      sell_quantity = min(fill_quantity, active_position.quantity)
+      gross_value = sell_quantity * fill_price
+      proceeds = gross_value - fee_paid
+      pnl = proceeds - (sell_quantity * active_position.average_price)
+      remaining_quantity = max(active_position.quantity - sell_quantity, 0.0)
+      next_position = replace(
+        active_position,
+        quantity=remaining_quantity,
+        updated_at=fill_timestamp,
+        realized_pnl=active_position.realized_pnl + pnl,
+      )
+      cache.apply(
+        cash=cache.cash + proceeds,
+        position=next_position if next_position.is_open else None,
+      )
+      run.positions[order.instrument_id] = next_position
+      run.closed_trades.append(
+        ClosedTrade(
+          instrument_id=order.instrument_id,
+          entry_price=active_position.average_price,
+          exit_price=fill_price,
+          quantity=sell_quantity,
+          fee_paid=fee_paid,
+          pnl=pnl,
+          opened_at=active_position.opened_at or fill_timestamp,
+          closed_at=fill_timestamp,
+        )
+      )
+
+    run.fills.append(
+      Fill(
+        order_id=order.order_id,
+        quantity=fill_quantity,
+        price=fill_price,
+        fee_paid=fee_paid,
+        timestamp=fill_timestamp,
+      )
+    )
+    run.equity_curve.append(
+      build_equity_point(
+        timestamp=fill_timestamp,
+        cash=cache.cash,
+        position=cache.position if cache.position and cache.position.is_open else None,
+        market_price=fill_price,
+      )
+    )
+
+  @staticmethod
+  def _map_guarded_live_order_status(
+    status: str,
+    *,
+    filled_quantity: float,
+    remaining_quantity: float,
+  ) -> OrderStatus:
+    normalized = status.lower()
+    if normalized in {"filled", "closed"} or (filled_quantity > 0 and remaining_quantity <= 0):
+      return OrderStatus.FILLED
+    if normalized in {"partially_filled", "partial"} or (filled_quantity > 0 and remaining_quantity > 0):
+      return OrderStatus.PARTIALLY_FILLED
+    if normalized in {"canceled", "cancelled", "expired"}:
+      return OrderStatus.CANCELED
+    if normalized == "rejected":
+      return OrderStatus.REJECTED
+    return OrderStatus.OPEN
 
   def _advance_guarded_live_worker_run(self, run: RunRecord) -> dict[str, int]:
     session = run.provenance.runtime_session
@@ -1979,7 +2271,7 @@ class TradingApplication:
     market_price: float,
   ) -> int:
     reviewed = self._execution_engine.review_decision(decision)
-    cash, position, order, fill, closed_trade = apply_signal(
+    _, _, order, _, _ = apply_signal(
       run_id=run.config.run_id,
       instrument_id=cache.instrument_id,
       signal=reviewed.signal,
@@ -1993,71 +2285,69 @@ class TradingApplication:
 
     submitted_orders = 0
     effective_price = market_price
+    fill_materialized = False
     if order is not None:
       venue_result = self._submit_guarded_live_market_order(
         run=run,
         order=order,
         market_price=market_price,
       )
-      if venue_result.status != "filled":
-        raise RuntimeError(f"Venue market order did not fill immediately: {venue_result.status}")
       order.order_id = venue_result.order_id
       order.created_at = venue_result.submitted_at
-      order.status = OrderStatus.FILLED
-      order.filled_at = venue_result.submitted_at
+      order.updated_at = venue_result.updated_at or venue_result.submitted_at
+      order.last_synced_at = venue_result.updated_at or venue_result.submitted_at
+      order.status = self._map_guarded_live_order_status(
+        venue_result.status,
+        filled_quantity=venue_result.filled_amount or 0.0,
+        remaining_quantity=venue_result.remaining_amount or 0.0,
+      )
       if venue_result.average_fill_price is not None:
         order.average_fill_price = venue_result.average_fill_price
         effective_price = venue_result.average_fill_price
-      if venue_result.fee_paid is not None:
-        order.fee_paid = venue_result.fee_paid
-      if fill is not None:
-        fill = replace(
-          fill,
-          order_id=order.order_id,
-          price=effective_price,
-          fee_paid=venue_result.fee_paid if venue_result.fee_paid is not None else fill.fee_paid,
-          timestamp=venue_result.submitted_at,
-        )
-      if closed_trade is not None:
-        closed_trade = replace(
-          closed_trade,
-          exit_price=effective_price,
-          fee_paid=venue_result.fee_paid if venue_result.fee_paid is not None else closed_trade.fee_paid,
-          closed_at=venue_result.submitted_at,
-        )
+      order.fee_paid = venue_result.fee_paid or 0.0
+      order.filled_quantity = venue_result.filled_amount or 0.0
+      order.remaining_quantity = (
+        venue_result.remaining_amount
+        if venue_result.remaining_amount is not None
+        else max(order.quantity - order.filled_quantity, 0.0)
+      )
+      if order.status == OrderStatus.FILLED:
+        order.filled_at = venue_result.updated_at or venue_result.submitted_at
       run.orders.append(order)
-      if fill is not None:
-        run.fills.append(fill)
-      if position is not None:
-        run.positions[position.instrument_id] = position
-      if closed_trade is not None:
-        run.closed_trades.append(closed_trade)
       submitted_orders = 1
+      if order.filled_quantity > self._guarded_live_balance_tolerance:
+        self._materialize_guarded_live_fill_delta(
+          run=run,
+          order=order,
+          fill_quantity=order.filled_quantity,
+          fee_paid=order.fee_paid,
+          fill_price=effective_price,
+          fill_timestamp=order.filled_at or venue_result.submitted_at,
+        )
+        fill_materialized = True
       self._append_guarded_live_audit_event(
         kind="guarded_live_order_submitted",
         actor="system",
         summary=f"Guarded-live venue order submitted for {run.config.symbols[0]}.",
         detail=(
           f"{reviewed.signal.action.value} {order.quantity:.8f} {run.config.symbols[0]} "
-          f"via {venue_result.order_id}."
+          f"via {venue_result.order_id} ({order.status.value})."
         ),
         run_id=run.config.run_id,
         session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
       )
 
+    cache = self._restore_state_cache(run)
     cache.mark_price(effective_price)
-    cache.apply(
-      cash=cash,
-      position=position if position is not None and position.is_open else None,
-    )
-    run.equity_curve.append(
-      build_equity_point(
-        timestamp=reviewed.signal.timestamp,
-        cash=cache.cash,
-        position=cache.position if cache.position and cache.position.is_open else None,
-        market_price=effective_price,
+    if not fill_materialized:
+      run.equity_curve.append(
+        build_equity_point(
+          timestamp=reviewed.signal.timestamp,
+          cash=cache.cash,
+          position=cache.position if cache.position and cache.position.is_open else None,
+          market_price=effective_price,
+        )
       )
-    )
     run.notes.append(
       f"{reviewed.context.timestamp.isoformat()} | {reviewed.signal.action.value} | {reviewed.rationale}"
     )

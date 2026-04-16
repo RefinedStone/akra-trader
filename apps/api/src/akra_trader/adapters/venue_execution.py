@@ -24,6 +24,24 @@ class VenueExecutionExchange(Protocol):
     params: dict[str, Any] | None = None,
   ) -> dict[str, Any]: ...
 
+  def fetch_orders(
+    self,
+    symbol: str | None = None,
+    since: int | None = None,
+    limit: int | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> list[dict[str, Any]]: ...
+
+  def fetch_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]: ...
+
+  def fetch_closed_orders(
+    self,
+    symbol: str | None = None,
+    since: int | None = None,
+    limit: int | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> list[dict[str, Any]]: ...
+
 
 def build_binance_trade_exchange(
   *,
@@ -48,6 +66,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     self._venue = venue
     self._clock = clock or (lambda: datetime.now(UTC))
     self.submitted_orders: list[GuardedLiveVenueOrderResult] = []
+    self._order_states: dict[str, GuardedLiveVenueOrderResult] = {}
 
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
     return True, ()
@@ -65,11 +84,96 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       amount=request.amount,
       status="filled",
       submitted_at=submitted_at,
+      updated_at=submitted_at,
       average_fill_price=request.reference_price,
       fee_paid=0.0,
+      requested_amount=request.amount,
+      filled_amount=request.amount,
+      remaining_amount=0.0,
     )
     self.submitted_orders.append(result)
+    self._order_states[result.order_id] = result
     return result
+
+  def sync_order_states(
+    self,
+    *,
+    symbol: str,
+    order_ids: tuple[str, ...],
+  ) -> tuple[GuardedLiveVenueOrderResult, ...]:
+    now = self._clock()
+    results: list[GuardedLiveVenueOrderResult] = []
+    for order_id in order_ids:
+      state = self._order_states.get(order_id)
+      if state is None:
+        results.append(
+          GuardedLiveVenueOrderResult(
+            order_id=order_id,
+            venue=self._venue,
+            symbol=symbol,
+            side="unknown",
+            amount=0.0,
+            status="unknown",
+            submitted_at=now,
+            updated_at=now,
+            issues=("seeded_order_state_missing",),
+          )
+        )
+        continue
+      results.append(state)
+    return tuple(results)
+
+  def set_order_state(
+    self,
+    order_id: str,
+    *,
+    symbol: str | None = None,
+    side: str | None = None,
+    amount: float | None = None,
+    status: str,
+    updated_at: datetime | None = None,
+    average_fill_price: float | None = None,
+    fee_paid: float | None = None,
+    filled_amount: float | None = None,
+    remaining_amount: float | None = None,
+    issues: tuple[str, ...] = (),
+  ) -> GuardedLiveVenueOrderResult:
+    current = self._order_states.get(order_id)
+    if current is None:
+      now = updated_at or self._clock()
+      if symbol is None or side is None or amount is None:
+        raise KeyError(order_id)
+      current = GuardedLiveVenueOrderResult(
+        order_id=order_id,
+        venue=self._venue,
+        symbol=symbol,
+        side=side,
+        amount=amount,
+        status="open",
+        submitted_at=now,
+        updated_at=now,
+        requested_amount=amount,
+        filled_amount=0.0,
+        remaining_amount=amount,
+      )
+    next_state = GuardedLiveVenueOrderResult(
+      order_id=order_id,
+      venue=current.venue,
+      symbol=symbol or current.symbol,
+      side=side or current.side,
+      amount=amount if amount is not None else current.amount,
+      status=status,
+      submitted_at=current.submitted_at,
+      updated_at=updated_at or self._clock(),
+      average_fill_price=average_fill_price if average_fill_price is not None else current.average_fill_price,
+      fee_paid=fee_paid if fee_paid is not None else current.fee_paid,
+      requested_amount=current.requested_amount,
+      filled_amount=filled_amount if filled_amount is not None else current.filled_amount,
+      remaining_amount=remaining_amount if remaining_amount is not None else current.remaining_amount,
+      issues=issues,
+    )
+    self._order_states[order_id] = next_state
+    return next_state
 
 
 class BinanceVenueExecutionAdapter(VenueExecutionPort):
@@ -117,45 +221,170 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       None,
       {},
     )
-    submitted_at = self._clock()
-    order_id = str(row.get("id") or row.get("clientOrderId") or f"live-order:{submitted_at.isoformat()}")
-    amount = _coerce_float(row.get("filled"))
-    if amount is None or amount <= 0:
-      amount = _coerce_float(row.get("amount")) or request.amount
-    average_fill_price = (
-      _coerce_float(row.get("average"))
-      or _coerce_float(row.get("price"))
-      or request.reference_price
-    )
-    fee_paid = _extract_fee(row)
-    status = _normalize_order_status(row, requested_amount=request.amount, filled_amount=amount)
-    return GuardedLiveVenueOrderResult(
-      order_id=order_id,
+    return _build_order_result_from_exchange_row(
+      row,
       venue=self._venue,
-      symbol=str(row.get("symbol") or request.symbol),
-      side=str(row.get("side") or request.side),
-      amount=amount,
-      status=status,
-      submitted_at=submitted_at,
-      average_fill_price=average_fill_price,
-      fee_paid=fee_paid,
+      fallback_symbol=request.symbol,
+      fallback_side=request.side,
+      fallback_amount=request.amount,
+      fallback_reference_price=request.reference_price,
+      fallback_time=self._clock(),
     )
+
+  def sync_order_states(
+    self,
+    *,
+    symbol: str,
+    order_ids: tuple[str, ...],
+  ) -> tuple[GuardedLiveVenueOrderResult, ...]:
+    if not order_ids:
+      return ()
+
+    exchange = self._exchange
+    if exchange is None:
+      ready, issues = self.describe_capability()
+      if not ready:
+        raise RuntimeError(", ".join(issues))
+      exchange = build_binance_trade_exchange(
+        api_key=self._api_key,
+        api_secret=self._api_secret,
+      )
+
+    rows_by_id: dict[str, dict[str, Any]] = {}
+    current_time = self._clock()
+    for row in self._fetch_order_rows(exchange=exchange, symbol=symbol):
+      order_id = str(row.get("id") or row.get("clientOrderId") or "")
+      if not order_id or order_id not in order_ids:
+        continue
+      rows_by_id[order_id] = row
+
+    results: list[GuardedLiveVenueOrderResult] = []
+    for order_id in order_ids:
+      row = rows_by_id.get(order_id)
+      if row is None:
+        results.append(
+          GuardedLiveVenueOrderResult(
+            order_id=order_id,
+            venue=self._venue,
+            symbol=symbol,
+            side="unknown",
+            amount=0.0,
+            status="unknown",
+            submitted_at=current_time,
+            updated_at=current_time,
+            issues=("order_state_unavailable",),
+          )
+        )
+        continue
+      results.append(
+        _build_order_result_from_exchange_row(
+          row,
+          venue=self._venue,
+          fallback_symbol=symbol,
+          fallback_time=current_time,
+        )
+      )
+    return tuple(results)
+
+  def _fetch_order_rows(
+    self,
+    *,
+    exchange: VenueExecutionExchange,
+    symbol: str,
+  ) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    try:
+      rows.extend(exchange.fetch_orders(symbol, None, None, {}))
+      return rows
+    except (AttributeError, TypeError, ccxt.NotSupported):
+      pass
+
+    for fetcher_name in ("fetch_open_orders", "fetch_closed_orders"):
+      fetcher = getattr(exchange, fetcher_name, None)
+      if fetcher is None:
+        continue
+      try:
+        if fetcher_name == "fetch_open_orders":
+          rows.extend(fetcher(symbol))
+        else:
+          rows.extend(fetcher(symbol, None, None, {}))
+      except (AttributeError, TypeError, ccxt.NotSupported):
+        continue
+    return rows
 
 
 def _normalize_order_status(
-  row: dict[str, Any],
   *,
+  raw_status: str,
   requested_amount: float,
   filled_amount: float,
+  remaining_amount: float | None,
 ) -> str:
-  raw_status = str(row.get("status") or "").lower()
   if raw_status in {"closed", "filled"}:
     return "filled"
   if raw_status in {"canceled", "cancelled", "rejected", "expired"}:
     return raw_status
+  if remaining_amount is not None and remaining_amount > 0 and filled_amount > 0:
+    return "partially_filled"
   if filled_amount >= requested_amount and requested_amount > 0:
     return "filled"
+  if filled_amount > 0:
+    return "partially_filled"
+  if raw_status in {"open", "new"}:
+    return "open"
   return raw_status or "unknown"
+
+
+def _build_order_result_from_exchange_row(
+  row: dict[str, Any],
+  *,
+  venue: str,
+  fallback_symbol: str,
+  fallback_side: str | None = None,
+  fallback_amount: float | None = None,
+  fallback_reference_price: float | None = None,
+  fallback_time: datetime,
+) -> GuardedLiveVenueOrderResult:
+  submitted_at = _coerce_datetime(row.get("datetime"), row.get("timestamp")) or fallback_time
+  updated_at = (
+    _coerce_datetime(None, row.get("lastTradeTimestamp"))
+    or _coerce_datetime(None, _extract_nested_value(row, ("info", "updateTime")))
+    or submitted_at
+  )
+  requested_amount = _coerce_float(row.get("amount")) or fallback_amount or 0.0
+  filled_amount = _coerce_float(row.get("filled"))
+  if filled_amount is None:
+    filled_amount = requested_amount if str(row.get("status") or "").lower() in {"filled", "closed"} else 0.0
+  remaining_amount = _coerce_float(row.get("remaining"))
+  if remaining_amount is None:
+    remaining_amount = max(requested_amount - filled_amount, 0.0)
+  average_fill_price = (
+    _coerce_float(row.get("average"))
+    or _coerce_float(row.get("price"))
+    or fallback_reference_price
+  )
+  fee_paid = _extract_fee(row)
+  status = _normalize_order_status(
+    raw_status=str(row.get("status") or "").lower(),
+    requested_amount=requested_amount,
+    filled_amount=filled_amount,
+    remaining_amount=remaining_amount,
+  )
+  return GuardedLiveVenueOrderResult(
+    order_id=str(row.get("id") or row.get("clientOrderId") or f"live-order:{submitted_at.isoformat()}"),
+    venue=venue,
+    symbol=str(row.get("symbol") or fallback_symbol),
+    side=str(row.get("side") or fallback_side or "unknown"),
+    amount=filled_amount if status == "filled" else requested_amount,
+    status=status,
+    submitted_at=submitted_at,
+    updated_at=updated_at,
+    average_fill_price=average_fill_price,
+    fee_paid=fee_paid,
+    requested_amount=requested_amount,
+    filled_amount=filled_amount,
+    remaining_amount=remaining_amount,
+  )
 
 
 def _extract_fee(row: dict[str, Any]) -> float | None:
@@ -179,6 +408,32 @@ def _extract_fee(row: dict[str, Any]) -> float | None:
     if found_fee:
       return total_fee
   return None
+
+
+def _extract_nested_value(row: dict[str, Any], path: tuple[str, ...]) -> Any:
+  current: Any = row
+  for key in path:
+    if not isinstance(current, dict):
+      return None
+    current = current.get(key)
+  return current
+
+
+def _coerce_datetime(
+  iso_value: Any,
+  timestamp_value: Any,
+) -> datetime | None:
+  if isinstance(iso_value, str):
+    try:
+      return datetime.fromisoformat(iso_value.replace("Z", "+00:00"))
+    except ValueError:
+      pass
+  timestamp = _coerce_float(timestamp_value)
+  if timestamp is None:
+    return None
+  if timestamp > 1_000_000_000_000:
+    timestamp /= 1000
+  return datetime.fromtimestamp(timestamp, UTC)
 
 
 def _coerce_float(value: Any) -> float | None:

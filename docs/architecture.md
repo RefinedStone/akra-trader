@@ -142,7 +142,8 @@ kill switch for operator-controlled runtime sessions, reconciliation results tha
 internal runtime exposure plus venue balance/open-order snapshots, persisted runtime recovery
 projections rebuilt from verified venue snapshots, and a guarded-live audit log of operator
 actions. A separate venue execution adapter now submits guarded-live market orders once those gates
-are clear.
+are clear, and the guarded-live worker now syncs tracked venue order lifecycle changes back into
+local orders, fills, positions, and audit notes.
 
 ## Modes
 
@@ -164,7 +165,8 @@ are clear.
 
 - guarded-live worker sessions are now available for native strategies
 - launch is blocked until kill switch, reconciliation, recovery, and venue-execution gates are clear
-- the current live order path submits venue market orders and persists the resulting run/session history
+- the current live order path submits venue market orders, then keeps syncing open and partially
+  filled venue orders into persisted run/session history
 
 ## Control Room
 
@@ -185,11 +187,11 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 ## Known Limits
 
-- guarded-live worker execution exists, but it is limited to a narrow market-order path
+- guarded-live worker execution exists, but it is still limited to a narrow market-entry path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
   guarded-live recovery/live launch still stop short of a full venue order-book restore or durable
   live worker resume
 - the system still lacks durable alert delivery and wider operator event coverage
-- venue order lifecycle management is still limited: no cancel/replace path or durable venue-order sync
+- venue order lifecycle management is still limited: no cancel/replace path or durable venue-order-book sync
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

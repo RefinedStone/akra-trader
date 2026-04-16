@@ -171,6 +171,23 @@ type Run = {
     } | null;
   };
   metrics: Record<string, number>;
+  orders: {
+    order_id: string;
+    instrument_id: string;
+    side: string;
+    quantity: number;
+    requested_price: number;
+    order_type: string;
+    status: string;
+    created_at: string;
+    updated_at?: string | null;
+    filled_at?: string | null;
+    average_fill_price?: number | null;
+    fee_paid: number;
+    filled_quantity: number;
+    remaining_quantity?: number | null;
+    last_synced_at?: string | null;
+  }[];
   notes: string[];
 };
 
@@ -2677,6 +2694,7 @@ function RunSection({
               {run.provenance.runtime_session ? (
                 <RunRuntimeSessionSummary runtimeSession={run.provenance.runtime_session} />
               ) : null}
+              {run.orders.length ? <RunOrderLifecycleSummary orders={run.orders} /> : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
                   lineage={run.provenance.market_data}
@@ -5844,6 +5862,68 @@ function RunRuntimeSessionSummary({
         <p>Last seen candle: {formatTimestamp(runtimeSession.last_seen_candle_at)}</p>
         <p>Last recovery: {formatTimestamp(runtimeSession.last_recovered_at)}</p>
         <p>Recovery reason: {runtimeSession.last_recovery_reason ?? "none"}</p>
+      </div>
+    </section>
+  );
+}
+
+function RunOrderLifecycleSummary({
+  orders,
+}: {
+  orders: Run["orders"];
+}) {
+  const openCount = orders.filter((order) => order.status === "open").length;
+  const partialCount = orders.filter((order) => order.status === "partially_filled").length;
+  const filledCount = orders.filter((order) => order.status === "filled").length;
+  const canceledCount = orders.filter((order) => order.status === "canceled").length;
+  const rejectedCount = orders.filter((order) => order.status === "rejected").length;
+  const latestSyncAt =
+    orders
+      .map((order) => order.last_synced_at ?? order.updated_at ?? null)
+      .filter((value): value is string => Boolean(value))
+      .sort()
+      .at(-1) ?? null;
+
+  return (
+    <section className="run-lineage">
+      <div className="run-lineage-head">
+        <span>Order lifecycle</span>
+        <strong>{orders.length} tracked</strong>
+      </div>
+      <div className="run-lineage-grid">
+        <Metric label="Open" value={String(openCount)} />
+        <Metric label="Partial" value={String(partialCount)} />
+        <Metric label="Filled" value={String(filledCount)} />
+        <Metric label="Canceled" value={String(canceledCount)} />
+        <Metric label="Rejected" value={String(rejectedCount)} />
+      </div>
+      <div className="run-lineage-copy">
+        <p>Last order sync: {formatTimestamp(latestSyncAt)}</p>
+      </div>
+      <div className="run-lineage-symbols">
+        {orders.slice(0, 4).map((order) => (
+          <article className="run-lineage-symbol-card" key={order.order_id}>
+            <div className="run-lineage-symbol-head">
+              <strong>{order.order_id}</strong>
+              <span>{order.status}</span>
+            </div>
+            <div className="run-lineage-symbol-grid">
+              <Metric label="Side" value={order.side} />
+              <Metric label="Qty" value={order.quantity.toFixed(8)} />
+              <Metric label="Filled" value={order.filled_quantity.toFixed(8)} />
+              <Metric
+                label="Remain"
+                value={(order.remaining_quantity ?? Math.max(order.quantity - order.filled_quantity, 0)).toFixed(8)}
+              />
+            </div>
+            <p className="run-lineage-symbol-copy">Instrument: {order.instrument_id}</p>
+            <p className="run-lineage-symbol-copy">
+              Avg fill: {order.average_fill_price === null || order.average_fill_price === undefined ? "n/a" : order.average_fill_price}
+            </p>
+            <p className="run-lineage-symbol-copy">Updated: {formatTimestamp(order.updated_at ?? null)}</p>
+            <p className="run-lineage-symbol-copy">Synced: {formatTimestamp(order.last_synced_at ?? null)}</p>
+          </article>
+        ))}
       </div>
     </section>
   );

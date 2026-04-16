@@ -45,6 +45,7 @@ class OrderType(str, Enum):
 
 class OrderStatus(str, Enum):
   OPEN = "open"
+  PARTIALLY_FILLED = "partially_filled"
   FILLED = "filled"
   CANCELED = "canceled"
   REJECTED = "rejected"
@@ -184,9 +185,13 @@ class Order:
   status: OrderStatus = OrderStatus.OPEN
   order_id: str = field(default_factory=lambda: str(uuid4()))
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime | None = None
   filled_at: datetime | None = None
   average_fill_price: float | None = None
   fee_paid: float = 0.0
+  filled_quantity: float = 0.0
+  remaining_quantity: float | None = None
+  last_synced_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -561,8 +566,12 @@ class GuardedLiveVenueOrderResult:
   amount: float
   status: str
   submitted_at: datetime
+  updated_at: datetime | None = None
   average_fill_price: float | None = None
   fee_paid: float | None = None
+  requested_amount: float | None = None
+  filled_amount: float | None = None
+  remaining_amount: float | None = None
   issues: tuple[str, ...] = ()
 
 

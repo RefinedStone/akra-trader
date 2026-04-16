@@ -1060,7 +1060,13 @@ def test_guarded_live_worker_submits_venue_order_on_new_candle(tmp_path: Path) -
   updated = app.get_run(run.config.run_id)
   guarded_live_status = app.get_guarded_live_status()
 
-  assert result == {"maintained": 1, "recovered": 0, "ticks_processed": 1, "orders_submitted": 1}
+  assert result == {
+    "maintained": 1,
+    "recovered": 0,
+    "ticks_processed": 1,
+    "orders_submitted": 1,
+    "orders_synced": 0,
+  }
   assert len(venue_execution.submitted_orders) == 1
   assert updated is not None
   assert updated.orders[-1].order_id == "seeded-live-order-1"
@@ -1070,6 +1076,105 @@ def test_guarded_live_worker_submits_venue_order_on_new_candle(tmp_path: Path) -
   assert updated.provenance.runtime_session is not None
   assert updated.provenance.runtime_session.processed_tick_count == 1
   assert any(event.kind == "guarded_live_order_submitted" for event in guarded_live_status.audit_events)
+
+
+def test_guarded_live_worker_syncs_recovered_order_lifecycle_into_local_state(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 20, 0, tzinfo=UTC))
+  market_data = MutableSeededMarketDataAdapter()
+  venue_execution = SeededVenueExecutionAdapter(clock=clock)
+  recovered_order_id = "venue-open-order-1"
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id=recovered_order_id,
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    ),
+    venue_execution=venue_execution,
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+    operator_reason="sync_recovered_orders",
+  )
+
+  venue_execution.set_order_state(
+    recovered_order_id,
+    symbol="ETH/USDT",
+    side="buy",
+    amount=0.5,
+    status="partially_filled",
+    updated_at=clock(),
+    average_fill_price=2_010.0,
+    fee_paid=0.2,
+    filled_amount=0.2,
+    remaining_amount=0.3,
+  )
+  first_sync = app.maintain_guarded_live_worker_sessions()
+  partially_synced = app.get_run(run.config.run_id)
+
+  assert first_sync["orders_synced"] == 1
+  assert partially_synced is not None
+  assert partially_synced.orders[0].status == OrderStatus.PARTIALLY_FILLED
+  assert partially_synced.orders[0].filled_quantity == pytest.approx(0.2)
+  assert partially_synced.orders[0].remaining_quantity == pytest.approx(0.3)
+  assert partially_synced.positions["binance:ETH/USDT"].quantity == pytest.approx(0.2)
+  assert len(partially_synced.fills) == 1
+
+  clock.advance(timedelta(seconds=5))
+  venue_execution.set_order_state(
+    recovered_order_id,
+    status="filled",
+    updated_at=clock(),
+    average_fill_price=2_012.0,
+    fee_paid=0.5,
+    filled_amount=0.5,
+    remaining_amount=0.0,
+  )
+  second_sync = app.maintain_guarded_live_worker_sessions()
+  filled_synced = app.get_run(run.config.run_id)
+  guarded_live_status = app.get_guarded_live_status()
+
+  assert second_sync["orders_synced"] == 1
+  assert filled_synced is not None
+  assert filled_synced.orders[0].status == OrderStatus.FILLED
+  assert filled_synced.orders[0].filled_quantity == pytest.approx(0.5)
+  assert filled_synced.orders[0].remaining_quantity == pytest.approx(0.0)
+  assert filled_synced.orders[0].filled_at == clock.current
+  assert filled_synced.positions["binance:ETH/USDT"].quantity == pytest.approx(0.5)
+  assert len(filled_synced.fills) == 2
+  assert any(event.kind == "guarded_live_order_synced" for event in guarded_live_status.audit_events)
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

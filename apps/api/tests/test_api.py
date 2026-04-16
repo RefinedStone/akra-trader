@@ -581,6 +581,87 @@ def test_live_endpoints_launch_and_stop_guarded_live_worker_after_gates_clear(tm
   assert stopped_payload["provenance"]["runtime_session"]["lifecycle_state"] == "stopped"
 
 
+def test_live_run_payload_exposes_synced_order_lifecycle(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    venue_execution = app._venue_execution
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 19, 0, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    reconcile_response = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    assert reconcile_response.status_code == 200
+
+    recovery_response = client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    assert recovery_response.status_code == 200
+
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "sync_payload_test",
+      },
+    )
+    assert live_response.status_code == 200
+    run_id = live_response.json()["config"]["run_id"]
+
+    venue_execution.set_order_state(
+      "venue-open-order-1",
+      symbol="ETH/USDT",
+      side="buy",
+      amount=0.5,
+      status="partially_filled",
+      average_fill_price=2_010.0,
+      fee_paid=0.2,
+      filled_amount=0.2,
+      remaining_amount=0.3,
+    )
+    app.maintain_guarded_live_worker_sessions()
+
+    runs_response = client.get("/api/runs?mode=live")
+
+  assert runs_response.status_code == 200
+  payload = runs_response.json()
+  assert len(payload) == 1
+  live_run = payload[0]
+  assert live_run["config"]["run_id"] == run_id
+  assert live_run["orders"][0]["status"] == "partially_filled"
+  assert live_run["orders"][0]["filled_quantity"] == 0.2
+  assert live_run["orders"][0]["remaining_quantity"] == 0.3
+  assert live_run["orders"][0]["last_synced_at"] is not None
+
+
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 

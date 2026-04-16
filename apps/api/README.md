@@ -27,11 +27,13 @@ Implemented now:
   latest verified venue snapshot after a restart or fault drill
 - guarded-live live-worker sessions can start behind reconciliation, recovery, and configuration
   gates, then submit venue market orders through a dedicated execution adapter
+- guarded-live workers now sync tracked venue order lifecycle state back into persisted orders,
+  fills, positions, and audit notes
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
 
-- full venue order lifecycle management such as cancel/replace and durable order sync
+- full venue order lifecycle management such as cancel/replace and durable order-book sync
 - external alert delivery and wider operator event storage
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -117,6 +119,8 @@ Defaults:
 - guarded-live workers now start only after reconciliation, recovery, and config gates are clear,
   then keep a venue-backed worker session alive and submit market orders through the live execution
   adapter
+- guarded-live worker maintenance now syncs open and partially-filled venue orders back into local
+  order status, fill history, position state, and runtime audit trails
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only
