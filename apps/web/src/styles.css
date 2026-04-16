@@ -873,6 +873,45 @@ select {
   text-transform: uppercase;
 }
 
+.comparison-dev-conflict-preview {
+  display: grid;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(3, 7, 13, 0.46);
+  overflow: hidden;
+}
+
+.comparison-dev-conflict-preview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(72px, 0.75fr));
+  gap: 10px;
+  padding: 8px 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.comparison-dev-conflict-preview-row + .comparison-dev-conflict-preview-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.comparison-dev-conflict-preview-head {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparison-dev-conflict-preview-row.is-changed {
+  background: rgba(255, 193, 94, 0.08);
+  color: rgba(255, 241, 214, 0.92);
+}
+
+.comparison-dev-conflict-preview-label {
+  color: inherit;
+}
+
 .comparison-dev-feedback {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);

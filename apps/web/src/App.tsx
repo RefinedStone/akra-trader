@@ -312,6 +312,13 @@ type ComparisonTooltipPendingPresetImportConflict = {
   raw: string;
   tuning: ComparisonTooltipTuning;
 };
+type ComparisonTooltipPresetConflictPreviewRow = {
+  changed: boolean;
+  existing_value: number;
+  incoming_value: number;
+  key: keyof ComparisonTooltipTuning;
+  label: string;
+};
 type ComparisonTooltipTuningShareImport =
   | {
       kind: "bundle";
@@ -360,6 +367,30 @@ const DEFAULT_COMPARISON_TOOLTIP_TUNING: ComparisonTooltipTuning = {
 const SHOW_COMPARISON_TOOLTIP_TUNING_PANEL = import.meta.env.DEV;
 const DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY: ComparisonTooltipPresetImportConflictPolicy =
   "rename";
+const COMPARISON_TOOLTIP_TUNING_LABELS: Record<keyof ComparisonTooltipTuning, string> = {
+  column_down_sweep_close_ms: "Col down close",
+  column_down_sweep_hold_ms: "Col down hold",
+  column_down_sweep_open_ms: "Col down open",
+  column_up_sweep_close_ms: "Col up close",
+  column_up_sweep_hold_ms: "Col up hold",
+  column_up_sweep_open_ms: "Col up open",
+  horizontal_distance_ratio: "Horiz ratio",
+  horizontal_velocity_threshold: "Horiz velocity",
+  metric_hover_close_ms: "Metric close",
+  metric_hover_open_ms: "Metric open",
+  row_sweep_close_ms: "Row close",
+  row_sweep_hold_ms: "Row hold",
+  row_sweep_open_ms: "Row open",
+  speed_adjustment_base: "Speed base",
+  speed_adjustment_max: "Speed max",
+  speed_adjustment_min: "Speed min",
+  speed_adjustment_slope: "Speed slope",
+  sweep_time_max_ms: "Time max",
+  sweep_time_min_ms: "Time min",
+  sweep_time_speed_multiplier: "Time speed",
+  vertical_distance_ratio: "Vert ratio",
+  vertical_velocity_threshold: "Vert velocity",
+};
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -2797,6 +2828,18 @@ function ComparisonTooltipTuningPanel({
   onSavePreset: () => void;
 }) {
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
+  const conflictExistingPreset = pendingPresetImportConflict
+    ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
+    : null;
+  const conflictPreviewRows =
+    pendingPresetImportConflict && conflictExistingPreset
+      ? buildComparisonTooltipPresetConflictPreviewRows(
+          conflictExistingPreset,
+          pendingPresetImportConflict.tuning,
+        )
+      : [];
+  const changedConflictPreviewCount = conflictPreviewRows.filter((row) => row.changed).length;
+  const unchangedConflictPreviewCount = conflictPreviewRows.length - changedConflictPreviewCount;
 
   return (
     <details className="comparison-dev-panel">
@@ -2921,6 +2964,34 @@ function ComparisonTooltipTuningPanel({
               A preset with that name already exists. Rename the import, overwrite the local
               preset, or skip this import.
             </p>
+            {conflictExistingPreset ? (
+              <>
+                <p className="comparison-dev-feedback">
+                  {changedConflictPreviewCount
+                    ? `${changedConflictPreviewCount} tuning value(s) differ and ${unchangedConflictPreviewCount} match.`
+                    : "Incoming preset matches the existing preset exactly."}
+                </p>
+                <div className="comparison-dev-conflict-preview">
+                  <div className="comparison-dev-conflict-preview-row comparison-dev-conflict-preview-head">
+                    <span>Setting</span>
+                    <span>Existing</span>
+                    <span>Incoming</span>
+                  </div>
+                  {conflictPreviewRows.map((row) => (
+                    <div
+                      className={`comparison-dev-conflict-preview-row ${
+                        row.changed ? "is-changed" : ""
+                      }`}
+                      key={row.key}
+                    >
+                      <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+                      <span>{formatComparisonTooltipTuningValue(row.existing_value)}</span>
+                      <span>{formatComparisonTooltipTuningValue(row.incoming_value)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            ) : null}
             <label className="comparison-dev-field">
               <span>Renamed preset</span>
               <input
@@ -3388,6 +3459,28 @@ function createAvailableComparisonTooltipPresetName(
     suffix += 1;
   }
   return `${normalizedBaseName} (import ${suffix})`;
+}
+
+function buildComparisonTooltipPresetConflictPreviewRows(
+  existingTuning: ComparisonTooltipTuning,
+  incomingTuning: ComparisonTooltipTuning,
+): ComparisonTooltipPresetConflictPreviewRow[] {
+  return (
+    Object.keys(DEFAULT_COMPARISON_TOOLTIP_TUNING) as Array<keyof ComparisonTooltipTuning>
+  ).map((key) => ({
+    changed: existingTuning[key] !== incomingTuning[key],
+    existing_value: existingTuning[key],
+    incoming_value: incomingTuning[key],
+    key,
+    label: COMPARISON_TOOLTIP_TUNING_LABELS[key],
+  }));
+}
+
+function formatComparisonTooltipTuningValue(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+  return value.toFixed(2).replace(/\.?0+$/, "");
 }
 
 function formatComparisonTooltipPresetImportFeedback(
