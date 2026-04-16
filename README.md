@@ -131,6 +131,7 @@ Third-party materials are tracked in [reference/catalog.toml](/home/akra/dev/akr
 ## Docs
 
 - [Current State](docs/status/current-state.md)
+- [Blueprint](docs/blueprint/README.md)
 - [Architecture](docs/architecture.md)
 - [Roadmap Overview](docs/roadmap/README.md)
 - [Product Roadmap](docs/roadmap/product-roadmap.md)

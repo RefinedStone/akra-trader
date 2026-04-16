@@ -36,6 +36,7 @@ Primary gaps:
 ## Documents
 
 - [Current State](../status/current-state.md)
+- [Blueprint](../blueprint/README.md)
 - [Product Roadmap](product-roadmap.md)
 - [Technical Roadmap](technical-roadmap.md)
 - [Epic Backlog](epic-backlog.md)

@@ -4,6 +4,8 @@ Canonical status snapshot for the repository as of April 17, 2026.
 
 Use this document as the source of truth for "what exists now" before reading roadmap or architecture docs.
 
+Forward-looking planning lives under [Blueprint](../blueprint/README.md).
+
 ## Stage Summary
 
 - Stage 0: complete
