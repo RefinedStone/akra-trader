@@ -13,6 +13,7 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
 from akra_trader.market_data_sync import MarketDataSyncJob
+from akra_trader.sandbox_workers import SandboxWorkerSessionsJob
 
 
 class AppLifecycle(Protocol):
@@ -54,16 +55,26 @@ def build_market_data_adapter(settings: Settings, repo_root: Path):
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 
 
-def build_background_jobs(settings: Settings, market_data) -> tuple[AppLifecycle, ...]:
-  if settings.market_data_provider != "binance":
-    return ()
-  return (
-    MarketDataSyncJob(
-      market_data=market_data,
-      timeframes=settings.market_data_sync_timeframes,
-      interval_seconds=settings.market_data_sync_interval_seconds,
-    ),
-  )
+def build_background_jobs(
+  settings: Settings,
+  market_data,
+  application: TradingApplication,
+) -> tuple[AppLifecycle, ...]:
+  jobs: list[AppLifecycle] = [
+    SandboxWorkerSessionsJob(
+      application,
+      interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
+    )
+  ]
+  if settings.market_data_provider == "binance":
+    jobs.append(
+      MarketDataSyncJob(
+        market_data=market_data,
+        timeframes=settings.market_data_sync_timeframes,
+        interval_seconds=settings.market_data_sync_interval_seconds,
+      )
+    )
+  return tuple(jobs)
 
 
 def build_container(settings: Settings) -> Container:
@@ -80,8 +91,10 @@ def build_container(settings: Settings) -> Container:
     references=references,
     runs=runs,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+    sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
+    sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,
   )
   return Container(
     app=application,
-    background_jobs=build_background_jobs(settings, market_data),
+    background_jobs=build_background_jobs(settings, market_data, application),
   )

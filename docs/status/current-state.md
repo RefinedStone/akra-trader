@@ -43,7 +43,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ### Research workflow
 
 - backtest execution with durable run lookup
-- replay-based sandbox previews and paper-session priming for native strategies
+- supervised sandbox worker sessions and paper-session priming for native strategies
 - run history listing and filtering by mode, strategy id, and strategy version
 - run comparison API and control-room comparison UI
 - native vs reference benchmark provenance and artifact display
@@ -57,13 +57,13 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - strategy catalog grouped by runtime lane
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
-- launch forms for backtests and native sandbox runs
-- separate sandbox previews and paper sessions with their own filters, stop controls, and rerun-boundary actions
+- launch forms for backtests and native sandbox worker sessions
+- separate sandbox worker sessions and paper sessions with their own filters, stop controls, and rerun-boundary actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
 
-- sandbox runs are replay previews, and paper runs are snapshot-primed sessions rather than continuous workers
+- sandbox runs are now supervised worker sessions with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic
@@ -72,7 +72,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ## Not Implemented Yet
 
-- continuous sandbox worker model with heartbeat and restart recovery
 - operator alerts for stale data, sync failures, worker crashes, and risk breaches
 - operator event log and audit trail
 - live exchange execution adapter and kill-switch workflow
@@ -83,6 +82,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Replace replay-style sandbox semantics with an actual long-running worker model.
+3. Add operator alerts, audit metadata, and recovery surfacing around the new sandbox worker model.
 4. Add alerts, operator events, and audit primitives before any live path work.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

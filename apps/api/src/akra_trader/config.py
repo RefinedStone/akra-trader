@@ -22,6 +22,8 @@ class Settings:
   market_data_sync_interval_seconds: int = 60
   market_data_default_candle_limit: int = 500
   market_data_historical_candle_limit: int = 2_000
+  sandbox_worker_heartbeat_interval_seconds: int = 15
+  sandbox_worker_heartbeat_timeout_seconds: int = 45
 
 
 def load_settings() -> Settings:
@@ -45,5 +47,11 @@ def load_settings() -> Settings:
     ),
     market_data_historical_candle_limit=int(
       os.getenv("AKRA_TRADER_MARKET_DATA_HISTORICAL_CANDLE_LIMIT", "2000")
+    ),
+    sandbox_worker_heartbeat_interval_seconds=int(
+      os.getenv("AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS", "15")
+    ),
+    sandbox_worker_heartbeat_timeout_seconds=int(
+      os.getenv("AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
     ),
   )

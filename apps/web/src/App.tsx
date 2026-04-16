@@ -153,6 +153,18 @@ type Run = {
         issues: string[];
       }
     >;
+    runtime_session?: {
+      session_id: string;
+      worker_kind: string;
+      lifecycle_state: string;
+      started_at: string;
+      last_heartbeat_at?: string | null;
+      heartbeat_interval_seconds: number;
+      heartbeat_timeout_seconds: number;
+      recovery_count: number;
+      last_recovered_at?: string | null;
+      last_recovery_reason?: string | null;
+    } | null;
   };
   metrics: Record<string, number>;
   notes: string[];
@@ -824,7 +836,7 @@ export default function App() {
 
   async function handleSandboxSubmit(event: FormEvent) {
     event.preventDefault();
-    setStatusText("Starting sandbox run...");
+    setStatusText("Starting sandbox worker session...");
     try {
       await fetchJson<Run>("/runs/sandbox", {
         method: "POST",
@@ -832,17 +844,17 @@ export default function App() {
       });
       await loadAll();
     } catch (error) {
-      setStatusText(`Sandbox run failed: ${(error as Error).message}`);
+      setStatusText(`Sandbox worker start failed: ${(error as Error).message}`);
     }
   }
 
   async function stopSandboxRun(runId: string) {
-    setStatusText(`Stopping run ${runId}...`);
+    setStatusText(`Stopping sandbox worker ${runId}...`);
     try {
       await fetchJson<Run>(`/runs/sandbox/${runId}/stop`, { method: "POST" });
       await loadAll();
     } catch (error) {
-      setStatusText(`Stop failed: ${(error as Error).message}`);
+      setStatusText(`Sandbox worker stop failed: ${(error as Error).message}`);
     }
   }
 
@@ -874,7 +886,7 @@ export default function App() {
   }
 
   async function rerunSandbox(rerunBoundaryId: string) {
-    setStatusText(`Launching sandbox replay for boundary ${rerunBoundaryId}...`);
+    setStatusText(`Restoring sandbox worker for boundary ${rerunBoundaryId}...`);
     try {
       const run = await fetchJson<Run>(`/runs/rerun-boundaries/${encodeURIComponent(rerunBoundaryId)}/sandbox`, {
         method: "POST",
@@ -882,11 +894,11 @@ export default function App() {
       await loadAll();
       setStatusText(
         run.provenance.rerun_match_status === "matched"
-          ? `Sandbox replay started and matched boundary ${rerunBoundaryId}.`
-          : `Sandbox replay started with expected drift from boundary ${rerunBoundaryId}.`,
+          ? `Sandbox worker started and matched boundary ${rerunBoundaryId}.`
+          : `Sandbox worker started with expected drift from boundary ${rerunBoundaryId}.`,
       );
     } catch (error) {
-      setStatusText(`Sandbox replay failed: ${(error as Error).message}`);
+      setStatusText(`Sandbox worker restore failed: ${(error as Error).message}`);
     }
   }
 
@@ -983,7 +995,7 @@ export default function App() {
 
         <section className="panel">
           <p className="kicker">Sandbox</p>
-          <h2>Start native replay</h2>
+          <h2>Start sandbox worker</h2>
           <RunForm form={sandboxForm} setForm={setSandboxForm} strategies={strategies.filter((strategy) => strategy.runtime === "native")} onSubmit={handleSandboxSubmit} />
         </section>
 
@@ -1132,7 +1144,7 @@ export default function App() {
               onRerun: rerunBacktest,
             },
             {
-              label: "Replay in sandbox",
+              label: "Start sandbox worker",
               onRerun: rerunSandbox,
             },
             {
@@ -1149,7 +1161,7 @@ export default function App() {
           setFilter={setSandboxRunFilter}
           rerunActions={[
             {
-              label: "Replay in sandbox",
+              label: "Restore sandbox worker",
               onRerun: rerunSandbox,
             },
             {
@@ -1167,7 +1179,7 @@ export default function App() {
           setFilter={setPaperRunFilter}
           rerunActions={[
             {
-              label: "Replay in sandbox",
+              label: "Start sandbox worker",
               onRerun: rerunSandbox,
             },
             {
@@ -1877,6 +1889,9 @@ function RunSection({
                   referenceVersion={run.provenance.reference_version}
                   workingDirectory={run.provenance.working_directory}
                 />
+              ) : null}
+              {run.provenance.runtime_session ? (
+                <RunRuntimeSessionSummary runtimeSession={run.provenance.runtime_session} />
               ) : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
@@ -5011,6 +5026,36 @@ function RunStrategySnapshot({
         {strategy.lifecycle.registered_at ? (
           <p>Registered: {formatTimestamp(strategy.lifecycle.registered_at)}</p>
         ) : null}
+      </div>
+    </section>
+  );
+}
+
+function RunRuntimeSessionSummary({
+  runtimeSession,
+}: {
+  runtimeSession: NonNullable<Run["provenance"]["runtime_session"]>;
+}) {
+  return (
+    <section className="run-lineage">
+      <div className="run-lineage-head">
+        <span>Runtime session</span>
+        <strong>{runtimeSession.worker_kind}</strong>
+      </div>
+      <div className="run-lineage-grid">
+        <Metric label="State" value={runtimeSession.lifecycle_state} />
+        <Metric label="Recoveries" value={String(runtimeSession.recovery_count)} />
+        <Metric
+          label="Heartbeat"
+          value={`${runtimeSession.heartbeat_interval_seconds}s / ${runtimeSession.heartbeat_timeout_seconds}s`}
+        />
+        <Metric label="Session" value={runtimeSession.session_id} />
+      </div>
+      <div className="run-lineage-copy">
+        <p>Started: {formatTimestamp(runtimeSession.started_at)}</p>
+        <p>Last heartbeat: {formatTimestamp(runtimeSession.last_heartbeat_at)}</p>
+        <p>Last recovery: {formatTimestamp(runtimeSession.last_recovered_at)}</p>
+        <p>Recovery reason: {runtimeSession.last_recovery_reason ?? "none"}</p>
       </div>
     </section>
   );

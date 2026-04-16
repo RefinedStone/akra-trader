@@ -46,6 +46,17 @@ def build_runs_repository(tmp_path: Path) -> SqlAlchemyRunRepository:
   return SqlAlchemyRunRepository(f"sqlite:///{tmp_path / 'runs.sqlite3'}")
 
 
+class MutableClock:
+  def __init__(self, current: datetime) -> None:
+    self.current = current
+
+  def __call__(self) -> datetime:
+    return self.current
+
+  def advance(self, delta: timedelta) -> None:
+    self.current += delta
+
+
 def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(
@@ -240,11 +251,13 @@ def test_backtest_provenance_links_directly_to_binance_sync_checkpoint(tmp_path:
 
 def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 0, 0, tzinfo=UTC))
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
     runs=runs,
+    clock=clock,
   )
 
   run = app.start_sandbox_run(
@@ -261,13 +274,21 @@ def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   assert run.status == RunStatus.RUNNING
   assert run.config.mode.value == "sandbox"
   assert run.notes
+  assert run.notes[0] == "Sandbox worker session primed from the latest market snapshot using 48 candles."
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.candle_count == 48
+  assert run.provenance.runtime_session is not None
+  assert run.provenance.runtime_session.worker_kind == "sandbox_native_worker"
+  assert run.provenance.runtime_session.lifecycle_state == "active"
+  assert run.provenance.runtime_session.started_at == clock.current
+  assert run.provenance.runtime_session.last_heartbeat_at == clock.current
+  assert run.provenance.runtime_session.recovery_count == 0
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
   assert reloaded.status == RunStatus.RUNNING
   assert reloaded.notes == run.notes
+  assert reloaded.provenance.runtime_session == run.provenance.runtime_session
 
 
 def test_paper_run_is_created_as_running_with_separate_mode(tmp_path: Path) -> None:
@@ -297,6 +318,7 @@ def test_paper_run_is_created_as_running_with_separate_mode(tmp_path: Path) -> N
   assert all("Sandbox preview replayed" not in note for note in run.notes)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.candle_count == 36
+  assert run.provenance.runtime_session is None
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
@@ -331,12 +353,96 @@ def test_stop_sandbox_run_persists_terminal_state(tmp_path: Path) -> None:
   assert stopped.status == RunStatus.STOPPED
   assert stopped.ended_at is not None
   assert stopped.notes[-1] == "Sandbox run stopped by operator."
+  assert stopped.provenance.runtime_session is not None
+  assert stopped.provenance.runtime_session.lifecycle_state == "stopped"
+  assert stopped.provenance.runtime_session.last_heartbeat_at == stopped.ended_at
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
   assert reloaded.status == RunStatus.STOPPED
   assert reloaded.ended_at is not None
   assert reloaded.notes[-1] == "Sandbox run stopped by operator."
+  assert reloaded.provenance.runtime_session is not None
+  assert reloaded.provenance.runtime_session.lifecycle_state == "stopped"
+
+
+def test_sandbox_worker_heartbeat_updates_runtime_session_state(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 6, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  first_heartbeat_at = run.provenance.runtime_session.last_heartbeat_at
+  clock.advance(timedelta(seconds=10))
+
+  result = app.maintain_sandbox_worker_sessions()
+  updated = app.get_run(run.config.run_id)
+
+  assert result == {"maintained": 1, "recovered": 0}
+  assert updated is not None
+  assert updated.provenance.runtime_session is not None
+  assert updated.provenance.runtime_session.last_heartbeat_at == clock.current
+  assert updated.provenance.runtime_session.last_heartbeat_at != first_heartbeat_at
+  assert updated.provenance.runtime_session.recovery_count == 0
+
+
+def test_sandbox_worker_recovery_marks_restart_and_timeout_history(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 8, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    sandbox_worker_heartbeat_interval_seconds=5,
+    sandbox_worker_heartbeat_timeout_seconds=15,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  startup_result = app.maintain_sandbox_worker_sessions(
+    force_recovery=True,
+    recovery_reason="process_restart",
+  )
+  clock.advance(timedelta(seconds=20))
+  timeout_result = app.maintain_sandbox_worker_sessions()
+  updated = app.get_run(run.config.run_id)
+
+  assert startup_result == {"maintained": 1, "recovered": 1}
+  assert timeout_result == {"maintained": 1, "recovered": 1}
+  assert updated is not None
+  assert updated.provenance.runtime_session is not None
+  assert updated.provenance.runtime_session.recovery_count == 2
+  assert updated.provenance.runtime_session.last_recovery_reason == "heartbeat_timeout"
+  assert updated.provenance.runtime_session.last_recovered_at == clock.current
+  assert updated.provenance.runtime_session.last_heartbeat_at == clock.current
+  assert any("sandbox_worker_recovered | process_restart" in note for note in updated.notes)
+  assert any("sandbox_worker_recovered | heartbeat_timeout" in note for note in updated.notes)
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
@@ -672,8 +778,9 @@ def test_rerun_sandbox_from_boundary_uses_stored_effective_window_and_replays_sa
   assert rerun.provenance.market_data is not None
   assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
   assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
+  assert rerun.provenance.runtime_session is not None
   assert rerun.notes[0].startswith("Explicit sandbox rerun from boundary ")
-  assert rerun.notes[1] == "Sandbox rerun replay preserved the stored sandbox bar window."
+  assert rerun.notes[1] == "Sandbox rerun restored the stored worker-session priming window."
   assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
 
 

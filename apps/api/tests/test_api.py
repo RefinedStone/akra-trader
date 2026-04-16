@@ -132,6 +132,10 @@ def test_sandbox_endpoint_returns_run_payload(tmp_path: Path) -> None:
   payload = response.json()
   assert payload["status"] == "running"
   assert payload["config"]["mode"] == "sandbox"
+  assert payload["notes"][0].startswith("Sandbox worker session primed from the latest market snapshot using ")
+  assert payload["provenance"]["runtime_session"]["worker_kind"] == "sandbox_native_worker"
+  assert payload["provenance"]["runtime_session"]["lifecycle_state"] == "active"
+  assert payload["provenance"]["runtime_session"]["recovery_count"] == 0
 
 
 def test_paper_alias_still_works(tmp_path: Path) -> None:
@@ -154,6 +158,38 @@ def test_paper_alias_still_works(tmp_path: Path) -> None:
   assert payload["config"]["mode"] == "paper"
   assert payload["notes"][0].startswith("Paper session primed from the latest market snapshot using ")
   assert all("Sandbox preview replayed" not in note for note in payload["notes"])
+  assert payload["provenance"]["runtime_session"] is None
+
+
+def test_sandbox_worker_recovers_running_session_after_app_restart(tmp_path: Path) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+
+  with build_client(database_path) as first_client:
+    response = first_client.post(
+      "/api/runs/sandbox",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+      },
+    )
+    assert response.status_code == 200
+    run_id = response.json()["config"]["run_id"]
+
+  with build_client(database_path) as restarted_client:
+    restarted_response = restarted_client.get(f"/api/runs/backtests/{run_id}")
+
+  assert restarted_response.status_code == 200
+  payload = restarted_response.json()
+  assert payload["config"]["mode"] == "sandbox"
+  assert payload["provenance"]["runtime_session"]["recovery_count"] >= 1
+  assert payload["provenance"]["runtime_session"]["last_recovery_reason"] == "process_restart"
+  assert any("sandbox_worker_recovered | process_restart" in note for note in payload["notes"])
 
 
 def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> None:

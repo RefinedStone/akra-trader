@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from numbers import Number
+from typing import Callable
 from uuid import uuid4
 
 from akra_trader.domain.models import RunComparison
@@ -213,6 +214,8 @@ COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
 
 
 class TradingApplication:
+  _sandbox_worker_kind = "sandbox_native_worker"
+
   def __init__(
     self,
     *,
@@ -225,6 +228,9 @@ class TradingApplication:
     data_engine: DataEngine | None = None,
     execution_engine: ExecutionEngine | None = None,
     run_supervisor: RunSupervisor | None = None,
+    sandbox_worker_heartbeat_interval_seconds: int = 15,
+    sandbox_worker_heartbeat_timeout_seconds: int = 45,
+    clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._market_data = market_data
     self._strategies = strategies
@@ -235,6 +241,9 @@ class TradingApplication:
     self._data_engine = data_engine or DataEngine(market_data)
     self._execution_engine = execution_engine or ExecutionEngine()
     self._run_supervisor = run_supervisor or RunSupervisor()
+    self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
+    self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
+    self._clock = clock or (lambda: datetime.now(UTC))
 
   def list_strategies(
     self,
@@ -417,8 +426,7 @@ class TradingApplication:
     start_at: datetime | None = None,
     end_at: datetime | None = None,
   ) -> RunRecord:
-    return self._start_preview_run(
-      target_mode=RunMode.SANDBOX,
+    return self._start_sandbox_session(
       strategy_id=strategy_id,
       symbol=symbol,
       timeframe=timeframe,
@@ -458,10 +466,78 @@ class TradingApplication:
       end_at=end_at,
     )
 
-  def _start_preview_run(
+  def _start_sandbox_session(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    return self._start_native_session(
+      target_mode=RunMode.SANDBOX,
+      reference_failure_copy="Sandbox worker sessions remain on the native engine for now.",
+      primed_note_prefix="Sandbox worker session primed from the latest market snapshot",
+      insufficient_candles_copy="Sandbox worker session requires at least",
+      attach_runtime_session=True,
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      start_at=start_at,
+      end_at=end_at,
+    )
+
+  def _start_paper_session(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    return self._start_native_session(
+      target_mode=RunMode.PAPER,
+      reference_failure_copy="Paper trading remains on the native engine for now.",
+      primed_note_prefix="Paper session primed from the latest market snapshot",
+      insufficient_candles_copy="Paper session requires at least",
+      attach_runtime_session=False,
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      start_at=start_at,
+      end_at=end_at,
+    )
+
+  def _start_native_session(
     self,
     *,
     target_mode: RunMode,
+    reference_failure_copy: str,
+    primed_note_prefix: str,
+    insufficient_candles_copy: str,
+    attach_runtime_session: bool,
     strategy_id: str,
     symbol: str,
     timeframe: str,
@@ -497,63 +573,7 @@ class TradingApplication:
       )
       run.notes.append(
         "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-        f"{target_mode.value.capitalize()} trading remains on the native engine for now."
-      )
-      return self._runs.save_run(run)
-    run = self._simulate_run(
-      config=config,
-      strategy=strategy,
-      strategy_snapshot=strategy_snapshot,
-      active_bars=replay_bars,
-    )
-    if run.status != RunStatus.FAILED:
-      self._run_supervisor.start_mode(
-        run=run,
-        mode=target_mode,
-        mode_service=self._mode_service,
-        replay_bars=replay_bars,
-      )
-    return self._runs.save_run(run)
-
-  def _start_paper_session(
-    self,
-    *,
-    strategy_id: str,
-    symbol: str,
-    timeframe: str,
-    initial_cash: float,
-    fee_rate: float,
-    slippage_bps: float,
-    parameters: dict,
-    replay_bars: int | None = 96,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
-  ) -> RunRecord:
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
-    config = RunConfig(
-      run_id=str(uuid4()),
-      mode=RunMode.PAPER,
-      strategy_id=metadata.strategy_id,
-      strategy_version=metadata.version,
-      venue="binance",
-      symbols=(symbol,),
-      timeframe=timeframe,
-      parameters=parameters,
-      initial_cash=initial_cash,
-      fee_rate=fee_rate,
-      slippage_bps=slippage_bps,
-      start_at=start_at,
-      end_at=end_at,
-    )
-    if metadata.runtime == "freqtrade_reference":
-      run = RunRecord(
-        config=config,
-        status=RunStatus.FAILED,
-        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
-      )
-      run.notes.append(
-        "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-        "Paper trading remains on the native engine for now."
+        + reference_failure_copy
       )
       return self._runs.save_run(run)
 
@@ -573,7 +593,7 @@ class TradingApplication:
     if len(enriched) < required_bars:
       run.status = RunStatus.FAILED
       run.notes.append(
-        f"Paper session requires at least {required_bars} candles to prime the current strategy state."
+        f"{insufficient_candles_copy} {required_bars} candles to prime the current strategy state."
       )
       return self._runs.save_run(run)
 
@@ -602,13 +622,22 @@ class TradingApplication:
     )
     self._run_supervisor.start_mode(
       run=run,
-      mode=RunMode.PAPER,
+      mode=target_mode,
       mode_service=self._mode_service,
+      replay_bars=replay_bars if target_mode == RunMode.SANDBOX else None,
     )
+    if attach_runtime_session:
+      self._run_supervisor.start_worker_session(
+        run=run,
+        worker_kind=self._sandbox_worker_kind,
+        heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
+        heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
+        now=self._clock(),
+      )
     primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
     run.notes.insert(
       0,
-      f"Paper session primed from the latest market snapshot using {primed_candle_count} candles.",
+      f"{primed_note_prefix} using {primed_candle_count} candles.",
     )
     return self._runs.save_run(run)
 
@@ -625,6 +654,40 @@ class TradingApplication:
       return None
     self._run_supervisor.stop(run, reason="Paper run stopped by operator.")
     return self._runs.save_run(run)
+
+  def maintain_sandbox_worker_sessions(
+    self,
+    *,
+    force_recovery: bool = False,
+    recovery_reason: str = "heartbeat_timeout",
+  ) -> dict[str, int]:
+    maintained = 0
+    recovered = 0
+    current_time = self._clock()
+    for run in self._runs.list_runs(mode=RunMode.SANDBOX.value):
+      if run.status != RunStatus.RUNNING:
+        continue
+      if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
+        self._run_supervisor.recover_worker_session(
+          run=run,
+          worker_kind=self._sandbox_worker_kind,
+          heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
+          heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
+          reason=recovery_reason,
+          now=current_time,
+        )
+        run.notes.append(
+          f"{current_time.isoformat()} | sandbox_worker_recovered | {recovery_reason}"
+        )
+        recovered += 1
+      else:
+        self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
+      self._runs.save_run(run)
+      maintained += 1
+    return {
+      "maintained": maintained,
+      "recovered": recovered,
+    }
 
   def _simulate_run(
     self,
@@ -679,8 +742,6 @@ class TradingApplication:
       equity_curve=run.equity_curve,
       closed_trades=run.closed_trades,
     )
-    if active_bars is not None:
-      run.notes.append(f"Sandbox preview replayed {active_bars} most recent bars.")
     return run
 
   def _prepare_strategy(
@@ -813,7 +874,7 @@ class TradingApplication:
     rerun_end_at = self._resolve_rerun_end_at(source_run)
     rerun_parameters = self._resolve_rerun_parameters(source_run)
     symbol = source_run.config.symbols[0]
-    preview_window_note: str | None = None
+    session_window_note: str | None = None
 
     if target_mode == RunMode.BACKTEST:
       rerun = self.run_backtest(
@@ -829,16 +890,16 @@ class TradingApplication:
       )
     elif target_mode in {RunMode.SANDBOX, RunMode.PAPER}:
       preview_start_at, preview_end_at, preview_replay_bars = self._resolve_preview_rerun_window(source_run)
-      preview_label = target_mode.value.capitalize()
       if target_mode == RunMode.SANDBOX:
         if preview_replay_bars is None:
-          preview_window_note = f"{preview_label} rerun locked execution to the stored effective market-data window."
-        else:
-          preview_window_note = (
-            f"{preview_label} rerun replay preserved the stored {source_run.config.mode.value} bar window."
+          session_window_note = (
+            "Sandbox rerun restored the worker session from the stored effective market-data window."
           )
-        rerun = self._start_preview_run(
-          target_mode=target_mode,
+        else:
+          session_window_note = (
+            "Sandbox rerun restored the stored worker-session priming window."
+          )
+        rerun = self._start_sandbox_session(
           strategy_id=source_run.config.strategy_id,
           symbol=symbol,
           timeframe=source_run.config.timeframe,
@@ -852,9 +913,9 @@ class TradingApplication:
         )
       else:
         if preview_replay_bars is None:
-          preview_window_note = "Paper rerun seeded the current paper session from the stored effective market-data window."
+          session_window_note = "Paper rerun seeded the current paper session from the stored effective market-data window."
         else:
-          preview_window_note = "Paper rerun seeded the current paper session from the stored priming window."
+          session_window_note = "Paper rerun seeded the current paper session from the stored priming window."
         rerun = self._start_paper_session(
           strategy_id=source_run.config.strategy_id,
           symbol=symbol,
@@ -875,7 +936,7 @@ class TradingApplication:
       source_run=source_run,
       rerun_boundary_id=rerun_boundary_id,
       requested_mode_label=requested_mode_label,
-      preview_window_note=preview_window_note,
+      preview_window_note=session_window_note,
     )
 
   def _persist_explicit_rerun(

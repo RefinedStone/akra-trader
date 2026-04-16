@@ -51,12 +51,24 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
     def __init__(self, database_url: str) -> None:
       self.database_url = database_url
 
+  class FakeSandboxWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      self._application = application
+      self._interval_seconds = interval_seconds
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
 
   container = build_container(Settings(market_data_provider="seeded"))
 
   assert isinstance(container.app._market_data, SeededMarketDataAdapter)
-  assert container.background_jobs == ()
+  assert len(container.background_jobs) == 1
 
 
 def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:
@@ -92,9 +104,21 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
     async def stop(self) -> None:
       return None
 
+  class FakeSandboxWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      captured["sandbox_interval_seconds"] = str(interval_seconds)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
+  monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
 
   container = build_container(
     Settings(
@@ -105,6 +129,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       market_data_sync_interval_seconds=120,
       market_data_default_candle_limit=144,
       market_data_historical_candle_limit=720,
+      sandbox_worker_heartbeat_interval_seconds=11,
     )
   )
 
@@ -112,6 +137,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["tracked_symbols"] == "BTC/USDT"
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"
+  assert captured["sandbox_interval_seconds"] == "11"
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
-  assert len(container.background_jobs) == 1
+  assert len(container.background_jobs) == 2

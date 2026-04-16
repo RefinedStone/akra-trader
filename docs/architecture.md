@@ -26,7 +26,7 @@ The repository is organized around a small set of stable boundaries:
 
 - strategy listing and registration
 - backtest orchestration
-- replay-based sandbox orchestration
+- supervised sandbox worker-session orchestration
 - run lookup, listing, filtering, and comparison
 - market-data status queries
 
@@ -108,9 +108,10 @@ This is enough for restart-safe history, comparison, and stable dataset-boundary
 yet the final analytics-friendly schema.
 
 Stored rerun boundaries can also be used to launch explicit backtest reruns or sandbox/paper
-execution. Sandbox and paper now persist as separate execution modes, and paper sessions no longer
-reuse the sandbox preview replay loop. The rerun records the source run, the target boundary, and
-whether the new execution still matched that boundary.
+execution. Sandbox and paper now persist as separate execution modes. Sandbox reruns restore a
+supervised worker session with the stored priming window, while paper sessions remain snapshot
+priming flows. The rerun records the source run, the target boundary, and whether the new
+execution still matched that boundary.
 
 ## Market Data
 
@@ -123,7 +124,9 @@ Two adapters exist today:
   - tracks sync status, lag, backfill progress, gap windows, last successful sync checkpoint,
     and recent sync failure history
 
-When Binance is enabled, the API app lifespan starts a `MarketDataSyncJob` that periodically refreshes tracked symbols.
+The API app lifespan always starts a sandbox worker maintenance job that heartbeats running worker
+sessions and applies restart recovery. When Binance is enabled, the app also starts a
+`MarketDataSyncJob` that periodically refreshes tracked symbols.
 
 ## Modes
 
@@ -134,9 +137,9 @@ When Binance is enabled, the API app lifespan starts a `MarketDataSyncJob` that 
 
 ### Sandbox
 
-- current implementation is a replay-based preview of recent bars
+- current implementation starts a native worker session from a bounded priming window
 - native-only today
-- marked as `running` for compatibility with a future long-running worker model
+- persisted runtime session state includes heartbeat cadence, last heartbeat, and recovery history
 - stoppable through the API and control room
 
 ### Live
@@ -152,7 +155,7 @@ The web app currently surfaces:
 - reference catalog
 - market-data health and backfill quality
 - backtest launch
-- sandbox launch and stop
+- sandbox worker launch, stop, and rerun restore
 - run history
 - run comparison and benchmark narratives
 
@@ -160,7 +163,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 ## Known Limits
 
-- no continuous execution worker yet
+- no venue-backed continuous execution worker yet
 - no alerts, audit trail, or reconciliation flows
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

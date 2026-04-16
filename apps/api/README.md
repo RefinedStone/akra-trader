@@ -1,6 +1,6 @@
 # Akra Trader API
 
-FastAPI backend for strategy cataloging, market-data access, durable run storage, native backtests, sandbox preview runs, paper-session priming, and external reference backtest delegation.
+FastAPI backend for strategy cataloging, market-data access, durable run storage, native backtests, supervised sandbox worker sessions, paper-session priming, and external reference backtest delegation.
 
 ## Current Scope
 
@@ -10,7 +10,7 @@ Implemented now:
 - in-process custom strategy registration endpoint
 - durable run storage through SQLAlchemy
 - backtest execution and run lookup
-- replay-based sandbox previews and paper-session priming for native strategies
+- supervised sandbox worker sessions and paper-session priming for native strategies
 - native vs reference run comparison API
 - dataset identity and reproducibility state recorded in run market-data provenance
 - Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
@@ -21,7 +21,6 @@ Implemented now:
 
 Not implemented yet:
 
-- continuous sandbox workers
 - live trading adapters
 - alerting and operator event storage
 - durable custom strategy registration lifecycle
@@ -43,6 +42,8 @@ Useful environment variables:
 - `AKRA_TRADER_MARKET_DATA_SYMBOLS`
 - `AKRA_TRADER_MARKET_DATA_SYNC_TIMEFRAMES`
 - `AKRA_TRADER_MARKET_DATA_SYNC_INTERVAL_SECONDS`
+- `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS`
+- `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
 
 Defaults:
 
@@ -78,13 +79,14 @@ Defaults:
 - native candle-backed runs persist dataset identity fingerprints for the exact candles used
 - stored rerun boundaries can launch explicit backtest, sandbox, and paper reruns with
   match-or-drift notes
-- sandbox preview runs and paper sessions now persist as separate modes, so history and filters no
+- sandbox worker sessions and paper sessions now persist as separate modes, so history and filters no
   longer share the same storage bucket
-- sandbox runs currently replay the most recent bars and are then marked `running` for forward compatibility with a future worker model
-- paper runs now start from the latest simulated market snapshot instead of replaying the sandbox
-  preview loop
+- sandbox runs now start as native worker sessions with persisted heartbeat and recovery state
+- paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
+  worker-session path
 - reference strategies are supported for backtest delegation only
-- the app lifespan starts background market-data sync jobs when the Binance provider is active
+- the app lifespan starts sandbox worker maintenance jobs, and adds market-data sync jobs when the
+  Binance provider is active
 
 ## Test
 

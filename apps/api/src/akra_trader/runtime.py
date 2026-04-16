@@ -16,6 +16,7 @@ from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import RuntimeSessionState
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionEnvelope
@@ -63,7 +64,7 @@ class ExecutionModeService:
     suffix = self._build_replay_suffix(replay_bars)
     if mode == RunMode.SANDBOX:
       return (
-        "Sandbox run uses the shared native engine and is ready for a future stream or worker adapter."
+        "Sandbox worker session is active on the native engine with heartbeat and recovery supervision."
         f"{suffix}"
       )
     if mode == RunMode.PAPER:
@@ -76,7 +77,7 @@ class ExecutionModeService:
   def _build_replay_suffix(replay_bars: int | None) -> str:
     if replay_bars is None:
       return ""
-    return f" Initial replay window: {replay_bars} bars."
+    return f" Initial priming window: {replay_bars} bars."
 
 
 class DataEngine:
@@ -361,5 +362,96 @@ class RunSupervisor:
   def stop(self, run: RunRecord, *, reason: str) -> RunRecord:
     run.status = RunStatus.STOPPED
     run.ended_at = datetime.now(UTC)
+    if run.provenance.runtime_session is not None:
+      run.provenance.runtime_session.lifecycle_state = "stopped"
+      run.provenance.runtime_session.last_heartbeat_at = run.ended_at
     run.notes.append(reason)
+    return run
+
+  def start_worker_session(
+    self,
+    *,
+    run: RunRecord,
+    worker_kind: str,
+    heartbeat_interval_seconds: int,
+    heartbeat_timeout_seconds: int,
+    now: datetime | None = None,
+  ) -> RunRecord:
+    started_at = now or datetime.now(UTC)
+    run.provenance.runtime_session = RuntimeSessionState(
+      worker_kind=worker_kind,
+      lifecycle_state="active",
+      started_at=started_at,
+      last_heartbeat_at=started_at,
+      heartbeat_interval_seconds=heartbeat_interval_seconds,
+      heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+    )
+    return run
+
+  def needs_worker_recovery(
+    self,
+    *,
+    run: RunRecord,
+    now: datetime | None = None,
+  ) -> bool:
+    if run.status != RunStatus.RUNNING:
+      return False
+    session = run.provenance.runtime_session
+    if session is None:
+      return True
+    if session.lifecycle_state == "stopped":
+      return False
+    heartbeat_at = session.last_heartbeat_at or session.started_at
+    current = now or datetime.now(UTC)
+    elapsed_seconds = (current - heartbeat_at).total_seconds()
+    return elapsed_seconds >= session.heartbeat_timeout_seconds
+
+  def heartbeat_worker_session(
+    self,
+    *,
+    run: RunRecord,
+    now: datetime | None = None,
+  ) -> RunRecord:
+    session = run.provenance.runtime_session
+    if session is None:
+      return run
+    session.lifecycle_state = "active"
+    session.last_heartbeat_at = now or datetime.now(UTC)
+    return run
+
+  def recover_worker_session(
+    self,
+    *,
+    run: RunRecord,
+    worker_kind: str,
+    heartbeat_interval_seconds: int,
+    heartbeat_timeout_seconds: int,
+    reason: str,
+    now: datetime | None = None,
+  ) -> RunRecord:
+    recovered_at = now or datetime.now(UTC)
+    session = run.provenance.runtime_session
+    if session is None:
+      session = RuntimeSessionState(
+        worker_kind=worker_kind,
+        lifecycle_state="active",
+        started_at=recovered_at,
+        last_heartbeat_at=recovered_at,
+        heartbeat_interval_seconds=heartbeat_interval_seconds,
+        heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+        recovery_count=1,
+        last_recovered_at=recovered_at,
+        last_recovery_reason=reason,
+      )
+      run.provenance.runtime_session = session
+      return run
+
+    session.worker_kind = worker_kind
+    session.lifecycle_state = "active"
+    session.last_heartbeat_at = recovered_at
+    session.heartbeat_interval_seconds = heartbeat_interval_seconds
+    session.heartbeat_timeout_seconds = heartbeat_timeout_seconds
+    session.recovery_count += 1
+    session.last_recovered_at = recovered_at
+    session.last_recovery_reason = reason
     return run

@@ -267,6 +267,21 @@ class MarketDataLineage:
   last_sync_at: datetime | None = None
   issues: tuple[str, ...] = ()
 
+
+@dataclass
+class RuntimeSessionState:
+  session_id: str = field(default_factory=lambda: str(uuid4()))
+  worker_kind: str = "sandbox_native_worker"
+  lifecycle_state: str = "active"
+  started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  last_heartbeat_at: datetime | None = None
+  heartbeat_interval_seconds: int = 15
+  heartbeat_timeout_seconds: int = 45
+  recovery_count: int = 0
+  last_recovered_at: datetime | None = None
+  last_recovery_reason: str | None = None
+
+
 @dataclass(frozen=True)
 class StrategyParameterSnapshot:
   requested: dict[str, Any] = field(default_factory=dict)
@@ -322,6 +337,7 @@ class RunProvenance:
   rerun_match_status: str = "not_rerun"
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
+  runtime_session: RuntimeSessionState | None = None
 
 
 @dataclass
