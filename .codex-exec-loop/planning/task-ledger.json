@@ -6,15 +6,33 @@
       "direction_id": "data-trust-and-lineage",
       "title": "Harden dataset identity and reproducibility boundaries",
       "description": "Make each run point to a stable dataset or sync-checkpoint identity, close the remaining reproducibility gap called out in current-state, and extend market-data lineage or status so rerun equivalence can be validated without shell-only inspection.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 100,
       "dynamic_priority_delta": 0,
-      "priority_reason": "Current-state lists reproducibility and dataset lineage hardening as Immediate Next Priority 1, and the blueprint dependency order puts dataset identity ahead of experiment query, lifecycle, runtime ops, and live-readiness work.",
+      "priority_reason": "Completed in main session commit 74e167c, which pinned dataset identity and reproducibility state into run provenance, surfaced it in UI and docs, and closed the top data-trust reproducibility gap.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:20:10Z",
+      "updated_at": "2026-04-16T19:29:52Z",
       "source_turn_id": null,
-      "direction_relation_note": "Directly satisfies the data-trust direction's first success criterion and unlocks Gate 1 prerequisites for the rest of Program 1."
+      "direction_relation_note": "Directly satisfies the data-trust direction's first success criterion and unblocks follow-up work on operator-visible market-data health and dataset-based rerun workflows."
+    },
+    {
+      "id": "planning-data-trust-market-data-status-history-surface",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Expose sync checkpoints and failure history in market-data status",
+      "description": "Extend the market-data status surface so operators can inspect the latest sync checkpoint, freshness boundary, and recent failure history without shell access, closing the remaining visibility gap called out after dataset identity hardening.",
+      "status": "ready",
+      "base_priority": 96,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly calls out missing sync checkpoint and failure-history visibility in `market-data status`, and the data-trust direction lists operator-visible freshness and failures as a success criterion.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:29:52Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advances the remaining data-trust requirement that freshness, gaps, and failure history be actionable from product surfaces rather than shell inspection."
     },
     {
       "id": "planning-experiment-os-queryable-metadata",
@@ -33,6 +51,24 @@
       "updated_at": "2026-04-16T19:20:10Z",
       "source_turn_id": null,
       "direction_relation_note": "Covers the experiment-os requirement that runs be filterable by dataset, preset, tag, benchmark family, and version through durable metadata."
+    },
+    {
+      "id": "planning-experiment-os-dataset-identity-rerun-workflow",
+      "direction_id": "experiment-os",
+      "title": "Add explicit rerun workflow from stored dataset identity",
+      "description": "Create an operator-visible rerun path that takes a stored `dataset_identity` and reproduces the same market-data boundary explicitly, instead of relying on implicit shell reconstruction, so equivalence checks become a first-class experiment workflow.",
+      "status": "proposed",
+      "base_priority": 91,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply identifies explicit rerun by stored dataset identity as the other concrete remaining gap, but only one next queued task should be promoted now and market-data status visibility is the more immediate operator-facing blocker.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:29:52Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Bridges data-trust provenance to experiment-os execution by turning stable dataset identity into a repeatable rerun and comparison entrypoint."
     },
     {
       "id": "planning-experiment-os-strategy-lifecycle-registration",
