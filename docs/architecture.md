@@ -139,7 +139,9 @@ sessions and applies restart recovery. When Binance is enabled, the app also sta
 
 - current implementation starts a native worker session from a bounded priming window
 - native-only today
-- persisted runtime session state includes heartbeat cadence, last heartbeat, and recovery history
+- worker cycles keep consuming new candle closes after priming and persist processed-tick progress
+- persisted runtime session state includes heartbeat cadence, last heartbeat, processed candle state,
+  and recovery history
 - stoppable through the API and control room
 
 ### Live

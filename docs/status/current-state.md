@@ -63,7 +63,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ## Partial or Fragile Areas
 
-- sandbox runs are now supervised worker sessions with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
+- sandbox runs are now supervised worker sessions that keep processing newly arrived candles with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic

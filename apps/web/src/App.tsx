@@ -158,7 +158,11 @@ type Run = {
       worker_kind: string;
       lifecycle_state: string;
       started_at: string;
+      primed_candle_count: number;
+      processed_tick_count: number;
       last_heartbeat_at?: string | null;
+      last_processed_candle_at?: string | null;
+      last_seen_candle_at?: string | null;
       heartbeat_interval_seconds: number;
       heartbeat_timeout_seconds: number;
       recovery_count: number;
@@ -5044,16 +5048,20 @@ function RunRuntimeSessionSummary({
       </div>
       <div className="run-lineage-grid">
         <Metric label="State" value={runtimeSession.lifecycle_state} />
+        <Metric label="Ticks" value={String(runtimeSession.processed_tick_count)} />
         <Metric label="Recoveries" value={String(runtimeSession.recovery_count)} />
         <Metric
           label="Heartbeat"
           value={`${runtimeSession.heartbeat_interval_seconds}s / ${runtimeSession.heartbeat_timeout_seconds}s`}
         />
-        <Metric label="Session" value={runtimeSession.session_id} />
+        <Metric label="Primed bars" value={String(runtimeSession.primed_candle_count)} />
       </div>
       <div className="run-lineage-copy">
+        <p>Session: {runtimeSession.session_id}</p>
         <p>Started: {formatTimestamp(runtimeSession.started_at)}</p>
         <p>Last heartbeat: {formatTimestamp(runtimeSession.last_heartbeat_at)}</p>
+        <p>Last processed candle: {formatTimestamp(runtimeSession.last_processed_candle_at)}</p>
+        <p>Last seen candle: {formatTimestamp(runtimeSession.last_seen_candle_at)}</p>
         <p>Last recovery: {formatTimestamp(runtimeSession.last_recovered_at)}</p>
         <p>Recovery reason: {runtimeSession.last_recovery_reason ?? "none"}</p>
       </div>

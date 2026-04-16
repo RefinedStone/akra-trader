@@ -368,6 +368,22 @@ class RunSupervisor:
     run.notes.append(reason)
     return run
 
+  def fail(
+    self,
+    run: RunRecord,
+    *,
+    reason: str,
+    now: datetime | None = None,
+  ) -> RunRecord:
+    failed_at = now or datetime.now(UTC)
+    run.status = RunStatus.FAILED
+    run.ended_at = failed_at
+    if run.provenance.runtime_session is not None:
+      run.provenance.runtime_session.lifecycle_state = "failed"
+      run.provenance.runtime_session.last_heartbeat_at = failed_at
+    run.notes.append(reason)
+    return run
+
   def start_worker_session(
     self,
     *,
@@ -376,13 +392,21 @@ class RunSupervisor:
     heartbeat_interval_seconds: int,
     heartbeat_timeout_seconds: int,
     now: datetime | None = None,
+    primed_candle_count: int = 0,
+    processed_tick_count: int = 0,
+    last_processed_candle_at: datetime | None = None,
+    last_seen_candle_at: datetime | None = None,
   ) -> RunRecord:
     started_at = now or datetime.now(UTC)
     run.provenance.runtime_session = RuntimeSessionState(
       worker_kind=worker_kind,
       lifecycle_state="active",
       started_at=started_at,
+      primed_candle_count=primed_candle_count,
+      processed_tick_count=processed_tick_count,
       last_heartbeat_at=started_at,
+      last_processed_candle_at=last_processed_candle_at,
+      last_seen_candle_at=last_seen_candle_at,
       heartbeat_interval_seconds=heartbeat_interval_seconds,
       heartbeat_timeout_seconds=heartbeat_timeout_seconds,
     )
@@ -428,6 +452,11 @@ class RunSupervisor:
     heartbeat_timeout_seconds: int,
     reason: str,
     now: datetime | None = None,
+    started_at: datetime | None = None,
+    primed_candle_count: int = 0,
+    processed_tick_count: int = 0,
+    last_processed_candle_at: datetime | None = None,
+    last_seen_candle_at: datetime | None = None,
   ) -> RunRecord:
     recovered_at = now or datetime.now(UTC)
     session = run.provenance.runtime_session
@@ -435,8 +464,12 @@ class RunSupervisor:
       session = RuntimeSessionState(
         worker_kind=worker_kind,
         lifecycle_state="active",
-        started_at=recovered_at,
+        started_at=started_at or recovered_at,
+        primed_candle_count=primed_candle_count,
+        processed_tick_count=processed_tick_count,
         last_heartbeat_at=recovered_at,
+        last_processed_candle_at=last_processed_candle_at,
+        last_seen_candle_at=last_seen_candle_at,
         heartbeat_interval_seconds=heartbeat_interval_seconds,
         heartbeat_timeout_seconds=heartbeat_timeout_seconds,
         recovery_count=1,
@@ -449,9 +482,32 @@ class RunSupervisor:
     session.worker_kind = worker_kind
     session.lifecycle_state = "active"
     session.last_heartbeat_at = recovered_at
+    session.last_processed_candle_at = last_processed_candle_at or session.last_processed_candle_at
+    session.last_seen_candle_at = last_seen_candle_at or session.last_seen_candle_at
+    session.primed_candle_count = max(session.primed_candle_count, primed_candle_count)
+    session.processed_tick_count = max(session.processed_tick_count, processed_tick_count)
     session.heartbeat_interval_seconds = heartbeat_interval_seconds
     session.heartbeat_timeout_seconds = heartbeat_timeout_seconds
     session.recovery_count += 1
     session.last_recovered_at = recovered_at
     session.last_recovery_reason = reason
+    return run
+
+  def record_worker_market_progress(
+    self,
+    *,
+    run: RunRecord,
+    last_seen_candle_at: datetime | None = None,
+    last_processed_candle_at: datetime | None = None,
+    processed_tick_count_increment: int = 0,
+  ) -> RunRecord:
+    session = run.provenance.runtime_session
+    if session is None:
+      return run
+    if last_seen_candle_at is not None:
+      session.last_seen_candle_at = last_seen_candle_at
+    if last_processed_candle_at is not None:
+      session.last_processed_candle_at = last_processed_candle_at
+    if processed_tick_count_increment > 0:
+      session.processed_tick_count += processed_tick_count_increment
     return run

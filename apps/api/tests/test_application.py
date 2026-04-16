@@ -13,6 +13,7 @@ from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
 from akra_trader.domain.models import BenchmarkArtifact
+from akra_trader.domain.models import Candle
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
@@ -55,6 +56,11 @@ class MutableClock:
 
   def advance(self, delta: timedelta) -> None:
     self.current += delta
+
+
+class MutableSeededMarketDataAdapter(SeededMarketDataAdapter):
+  def append_candle(self, *, symbol: str, candle: Candle) -> None:
+    self._candles[symbol].append(candle)
 
 
 def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
@@ -281,7 +287,11 @@ def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   assert run.provenance.runtime_session.worker_kind == "sandbox_native_worker"
   assert run.provenance.runtime_session.lifecycle_state == "active"
   assert run.provenance.runtime_session.started_at == clock.current
+  assert run.provenance.runtime_session.primed_candle_count == 48
+  assert run.provenance.runtime_session.processed_tick_count == 1
   assert run.provenance.runtime_session.last_heartbeat_at == clock.current
+  assert run.provenance.runtime_session.last_processed_candle_at == run.provenance.market_data.effective_end_at
+  assert run.provenance.runtime_session.last_seen_candle_at == run.provenance.market_data.effective_end_at
   assert run.provenance.runtime_session.recovery_count == 0
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
@@ -393,12 +403,13 @@ def test_sandbox_worker_heartbeat_updates_runtime_session_state(tmp_path: Path) 
   result = app.maintain_sandbox_worker_sessions()
   updated = app.get_run(run.config.run_id)
 
-  assert result == {"maintained": 1, "recovered": 0}
+  assert result == {"maintained": 1, "recovered": 0, "ticks_processed": 0}
   assert updated is not None
   assert updated.provenance.runtime_session is not None
   assert updated.provenance.runtime_session.last_heartbeat_at == clock.current
   assert updated.provenance.runtime_session.last_heartbeat_at != first_heartbeat_at
   assert updated.provenance.runtime_session.recovery_count == 0
+  assert updated.provenance.runtime_session.processed_tick_count == 1
 
 
 def test_sandbox_worker_recovery_marks_restart_and_timeout_history(tmp_path: Path) -> None:
@@ -433,8 +444,8 @@ def test_sandbox_worker_recovery_marks_restart_and_timeout_history(tmp_path: Pat
   timeout_result = app.maintain_sandbox_worker_sessions()
   updated = app.get_run(run.config.run_id)
 
-  assert startup_result == {"maintained": 1, "recovered": 1}
-  assert timeout_result == {"maintained": 1, "recovered": 1}
+  assert startup_result == {"maintained": 1, "recovered": 1, "ticks_processed": 0}
+  assert timeout_result == {"maintained": 1, "recovered": 1, "ticks_processed": 0}
   assert updated is not None
   assert updated.provenance.runtime_session is not None
   assert updated.provenance.runtime_session.recovery_count == 2
@@ -443,6 +454,111 @@ def test_sandbox_worker_recovery_marks_restart_and_timeout_history(tmp_path: Pat
   assert updated.provenance.runtime_session.last_heartbeat_at == clock.current
   assert any("sandbox_worker_recovered | process_restart" in note for note in updated.notes)
   assert any("sandbox_worker_recovered | heartbeat_timeout" in note for note in updated.notes)
+
+
+def test_sandbox_worker_processes_new_candles_continuously(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 9, 0, tzinfo=UTC))
+  market_data = MutableSeededMarketDataAdapter()
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  initial_equity_points = len(run.equity_curve)
+  latest_candle = market_data.get_candles(symbol="ETH/USDT", timeframe="5m")[-1]
+  first_new_candle = Candle(
+    timestamp=latest_candle.timestamp + timedelta(minutes=5),
+    open=latest_candle.close,
+    high=latest_candle.close * 1.001,
+    low=latest_candle.close * 0.999,
+    close=latest_candle.close * 1.0005,
+    volume=latest_candle.volume + 10,
+  )
+  second_new_candle = Candle(
+    timestamp=latest_candle.timestamp + timedelta(minutes=10),
+    open=first_new_candle.close,
+    high=first_new_candle.close * 1.001,
+    low=first_new_candle.close * 0.999,
+    close=first_new_candle.close * 1.0005,
+    volume=first_new_candle.volume + 10,
+  )
+  market_data.append_candle(symbol="ETH/USDT", candle=first_new_candle)
+  market_data.append_candle(symbol="ETH/USDT", candle=second_new_candle)
+  clock.advance(timedelta(seconds=5))
+
+  result = app.maintain_sandbox_worker_sessions()
+  updated = app.get_run(run.config.run_id)
+
+  assert result == {"maintained": 1, "recovered": 0, "ticks_processed": 2}
+  assert updated is not None
+  assert len(updated.equity_curve) == initial_equity_points + 2
+  assert updated.provenance.runtime_session is not None
+  assert updated.provenance.runtime_session.processed_tick_count == 3
+  assert updated.provenance.runtime_session.last_processed_candle_at == second_new_candle.timestamp
+  assert updated.provenance.runtime_session.last_seen_candle_at == second_new_candle.timestamp
+
+
+def test_sandbox_worker_does_not_reprocess_same_latest_candle(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 10, 0, tzinfo=UTC))
+  market_data = MutableSeededMarketDataAdapter()
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  latest_candle = market_data.get_candles(symbol="ETH/USDT", timeframe="5m")[-1]
+  new_candle = Candle(
+    timestamp=latest_candle.timestamp + timedelta(minutes=5),
+    open=latest_candle.close,
+    high=latest_candle.close * 1.001,
+    low=latest_candle.close * 0.999,
+    close=latest_candle.close * 1.0005,
+    volume=latest_candle.volume + 10,
+  )
+  market_data.append_candle(symbol="ETH/USDT", candle=new_candle)
+  first_result = app.maintain_sandbox_worker_sessions()
+  first_update = app.get_run(run.config.run_id)
+  first_equity_points = len(first_update.equity_curve)
+  clock.advance(timedelta(seconds=5))
+
+  second_result = app.maintain_sandbox_worker_sessions()
+  second_update = app.get_run(run.config.run_id)
+
+  assert first_result == {"maintained": 1, "recovered": 0, "ticks_processed": 1}
+  assert second_result == {"maintained": 1, "recovered": 0, "ticks_processed": 0}
+  assert second_update is not None
+  assert len(second_update.equity_curve) == first_equity_points
+  assert second_update.provenance.runtime_session is not None
+  assert second_update.provenance.runtime_session.processed_tick_count == 2
+  assert second_update.provenance.runtime_session.last_processed_candle_at == new_candle.timestamp
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

@@ -274,7 +274,11 @@ class RuntimeSessionState:
   worker_kind: str = "sandbox_native_worker"
   lifecycle_state: str = "active"
   started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  primed_candle_count: int = 0
+  processed_tick_count: int = 0
   last_heartbeat_at: datetime | None = None
+  last_processed_candle_at: datetime | None = None
+  last_seen_candle_at: datetime | None = None
   heartbeat_interval_seconds: int = 15
   heartbeat_timeout_seconds: int = 45
   recovery_count: int = 0

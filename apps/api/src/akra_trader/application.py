@@ -38,6 +38,7 @@ from akra_trader.runtime import ExecutionEngine
 from akra_trader.runtime import ExecutionModeService
 from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
+from akra_trader.runtime import candles_to_frame
 
 
 COMPARISON_METRICS: tuple[tuple[str, str, str, bool], ...] = (
@@ -627,12 +628,18 @@ class TradingApplication:
       replay_bars=replay_bars if target_mode == RunMode.SANDBOX else None,
     )
     if attach_runtime_session:
+      primed_timestamp = latest_row["timestamp"].to_pydatetime()
+      primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
       self._run_supervisor.start_worker_session(
         run=run,
         worker_kind=self._sandbox_worker_kind,
         heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
         heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
         now=self._clock(),
+        primed_candle_count=primed_candle_count,
+        processed_tick_count=1,
+        last_processed_candle_at=primed_timestamp,
+        last_seen_candle_at=primed_timestamp,
       )
     primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
     run.notes.insert(
@@ -663,31 +670,164 @@ class TradingApplication:
   ) -> dict[str, int]:
     maintained = 0
     recovered = 0
+    ticks_processed = 0
     current_time = self._clock()
     for run in self._runs.list_runs(mode=RunMode.SANDBOX.value):
       if run.status != RunStatus.RUNNING:
         continue
-      if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
-        self._run_supervisor.recover_worker_session(
-          run=run,
-          worker_kind=self._sandbox_worker_kind,
-          heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
-          heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
-          reason=recovery_reason,
+      try:
+        if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
+          self._run_supervisor.recover_worker_session(
+            run=run,
+            worker_kind=self._sandbox_worker_kind,
+            heartbeat_interval_seconds=self._sandbox_worker_heartbeat_interval_seconds,
+            heartbeat_timeout_seconds=self._sandbox_worker_heartbeat_timeout_seconds,
+            reason=recovery_reason,
+            now=current_time,
+            started_at=run.started_at,
+            primed_candle_count=self._infer_sandbox_primed_candle_count(run),
+            processed_tick_count=len(run.equity_curve),
+            last_processed_candle_at=self._infer_last_processed_candle_at(run),
+            last_seen_candle_at=self._infer_last_processed_candle_at(run),
+          )
+          run.notes.append(
+            f"{current_time.isoformat()} | sandbox_worker_recovered | {recovery_reason}"
+          )
+          recovered += 1
+
+        ticks_processed += self._advance_sandbox_worker_run(run)
+        self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
+      except Exception as exc:
+        self._run_supervisor.fail(
+          run,
+          reason=f"{current_time.isoformat()} | sandbox_worker_failed | {exc}",
           now=current_time,
         )
-        run.notes.append(
-          f"{current_time.isoformat()} | sandbox_worker_recovered | {recovery_reason}"
-        )
-        recovered += 1
-      else:
-        self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
       self._runs.save_run(run)
       maintained += 1
     return {
       "maintained": maintained,
       "recovered": recovered,
+      "ticks_processed": ticks_processed,
     }
+
+  def _advance_sandbox_worker_run(self, run: RunRecord) -> int:
+    session = run.provenance.runtime_session
+    if session is None:
+      return 0
+
+    strategy = self._strategies.load(run.config.strategy_id)
+    parameters = self._resolve_execution_parameters(run)
+    candles = self._load_sandbox_worker_candles(run=run)
+    if not candles:
+      return 0
+
+    latest_seen_candle_at = candles[-1].timestamp
+    self._run_supervisor.record_worker_market_progress(
+      run=run,
+      last_seen_candle_at=latest_seen_candle_at,
+    )
+    if (
+      session.last_processed_candle_at is not None
+      and latest_seen_candle_at <= session.last_processed_candle_at
+    ):
+      return 0
+
+    enriched = strategy.build_feature_frame(candles_to_frame(candles), parameters)
+    warmup = strategy.warmup_spec().required_bars
+    if len(enriched) < max(warmup, 2):
+      return 0
+
+    cache = self._restore_state_cache(run)
+    latest_processed_candle_at = session.last_processed_candle_at
+    processed_ticks = 0
+    for index in range(max(warmup, 2), len(enriched)):
+      history = enriched.iloc[: index + 1]
+      latest_row = history.iloc[-1]
+      latest_timestamp = latest_row["timestamp"].to_pydatetime()
+      if latest_processed_candle_at is not None and latest_timestamp <= latest_processed_candle_at:
+        continue
+      state = cache.snapshot(
+        timestamp=latest_timestamp,
+        parameters=parameters,
+      )
+      decision = strategy.evaluate(history, parameters, state)
+      self._execution_engine.apply_decision(
+        run=run,
+        config=run.config,
+        decision=decision,
+        cache=cache,
+        market_price=float(latest_row["close"]),
+      )
+      processed_ticks += 1
+      latest_processed_candle_at = latest_timestamp
+
+    if processed_ticks == 0:
+      return 0
+
+    self._run_supervisor.record_worker_market_progress(
+      run=run,
+      last_seen_candle_at=latest_seen_candle_at,
+      last_processed_candle_at=latest_processed_candle_at,
+      processed_tick_count_increment=processed_ticks,
+    )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    return processed_ticks
+
+  def _load_sandbox_worker_candles(self, *, run: RunRecord) -> list:
+    symbol = run.config.symbols[0]
+    history_start_at = self._resolve_sandbox_worker_history_start_at(run)
+    return self._market_data.get_candles(
+      symbol=symbol,
+      timeframe=run.config.timeframe,
+      start_at=history_start_at,
+      end_at=run.config.end_at,
+      limit=None,
+    )
+
+  def _resolve_sandbox_worker_history_start_at(self, run: RunRecord) -> datetime | None:
+    market_data = run.provenance.market_data
+    return (
+      run.config.start_at
+      or (market_data.effective_start_at if market_data is not None else None)
+      or (market_data.requested_start_at if market_data is not None else None)
+    )
+
+  def _resolve_execution_parameters(self, run: RunRecord) -> dict:
+    strategy_snapshot = run.provenance.strategy
+    if strategy_snapshot is None:
+      return deepcopy(run.config.parameters)
+    return deepcopy(strategy_snapshot.parameter_snapshot.resolved or run.config.parameters)
+
+  def _restore_state_cache(self, run: RunRecord) -> StateCache:
+    instrument_id = f"{run.config.venue}:{run.config.symbols[0]}"
+    cash = run.equity_curve[-1].cash if run.equity_curve else run.config.initial_cash
+    cache = StateCache(instrument_id=instrument_id, cash=cash)
+    position = run.positions.get(instrument_id)
+    cache.apply(
+      cash=cash,
+      position=position if position is not None and position.is_open else None,
+    )
+    return cache
+
+  def _infer_last_processed_candle_at(self, run: RunRecord) -> datetime | None:
+    if run.equity_curve:
+      return run.equity_curve[-1].timestamp
+    market_data = run.provenance.market_data
+    return market_data.effective_end_at if market_data is not None else None
+
+  def _infer_sandbox_primed_candle_count(self, run: RunRecord) -> int:
+    session = run.provenance.runtime_session
+    if session is not None and session.primed_candle_count > 0:
+      return session.primed_candle_count
+    market_data = run.provenance.market_data
+    if market_data is None:
+      return 0
+    return market_data.candle_count
 
   def _simulate_run(
     self,

@@ -81,7 +81,8 @@ Defaults:
   match-or-drift notes
 - sandbox worker sessions and paper sessions now persist as separate modes, so history and filters no
   longer share the same storage bucket
-- sandbox runs now start as native worker sessions with persisted heartbeat and recovery state
+- sandbox runs now start as native worker sessions, then continuously apply new candle ticks with
+  persisted heartbeat and recovery state
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

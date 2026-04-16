@@ -135,7 +135,17 @@ def test_sandbox_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["notes"][0].startswith("Sandbox worker session primed from the latest market snapshot using ")
   assert payload["provenance"]["runtime_session"]["worker_kind"] == "sandbox_native_worker"
   assert payload["provenance"]["runtime_session"]["lifecycle_state"] == "active"
+  assert payload["provenance"]["runtime_session"]["primed_candle_count"] == 48
+  assert payload["provenance"]["runtime_session"]["processed_tick_count"] == 1
   assert payload["provenance"]["runtime_session"]["recovery_count"] == 0
+  assert (
+    payload["provenance"]["runtime_session"]["last_processed_candle_at"]
+    == payload["provenance"]["market_data"]["effective_end_at"]
+  )
+  assert (
+    payload["provenance"]["runtime_session"]["last_seen_candle_at"]
+    == payload["provenance"]["market_data"]["effective_end_at"]
+  )
 
 
 def test_paper_alias_still_works(tmp_path: Path) -> None:
@@ -189,6 +199,7 @@ def test_sandbox_worker_recovers_running_session_after_app_restart(tmp_path: Pat
   assert payload["config"]["mode"] == "sandbox"
   assert payload["provenance"]["runtime_session"]["recovery_count"] >= 1
   assert payload["provenance"]["runtime_session"]["last_recovery_reason"] == "process_restart"
+  assert payload["provenance"]["runtime_session"]["processed_tick_count"] == 1
   assert any("sandbox_worker_recovered | process_restart" in note for note in payload["notes"])
 
 
