@@ -177,6 +177,9 @@ type RunComparison = {
     title: string;
     summary: string;
     bullets: string[];
+    rank: number;
+    insight_score: number;
+    is_primary: boolean;
   }[];
 };
 
@@ -1381,6 +1384,8 @@ function RunComparisonPanel({
     return null;
   }
 
+  const [primaryNarrative, ...secondaryNarratives] = comparison.narratives;
+
   return (
     <section className="comparison-panel">
       <div className="comparison-head">
@@ -1429,29 +1434,17 @@ function RunComparisonPanel({
           </article>
         ))}
       </div>
-      {comparison.narratives.length ? (
+      {primaryNarrative ? (
+        <div className="comparison-top-story">
+          <p className="kicker">Top insight</p>
+          <ComparisonNarrativeCard comparison={comparison} featured narrative={primaryNarrative} />
+        </div>
+      ) : null}
+      {secondaryNarratives.length ? (
         <div className="comparison-story-grid">
-          {comparison.narratives.map((narrative) => {
-            const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
-            const runLabel = run?.reference?.title ?? run?.strategy_name ?? run?.strategy_id ?? narrative.run_id;
-            return (
-              <article className="comparison-story-card" key={`${narrative.baseline_run_id}-${narrative.run_id}`}>
-                <div className="comparison-story-head">
-                  <span>{formatComparisonNarrativeLabel(narrative.comparison_type)}</span>
-                  <strong>{runLabel}</strong>
-                </div>
-                <p className="comparison-story-title">{narrative.title}</p>
-                <p className="comparison-story-summary">{narrative.summary}</p>
-                {narrative.bullets.length ? (
-                  <ul className="comparison-story-list">
-                    {narrative.bullets.map((bullet) => (
-                      <li key={`${narrative.run_id}-${bullet}`}>{bullet}</li>
-                    ))}
-                  </ul>
-                ) : null}
-              </article>
-            );
-          })}
+          {secondaryNarratives.map((narrative) => (
+            <ComparisonNarrativeCard comparison={comparison} key={`${narrative.baseline_run_id}-${narrative.run_id}`} narrative={narrative} />
+          ))}
         </div>
       ) : null}
       <div className="comparison-table-wrap">
@@ -1500,6 +1493,41 @@ function RunComparisonPanel({
         </table>
       </div>
     </section>
+  );
+}
+
+function ComparisonNarrativeCard({
+  comparison,
+  narrative,
+  featured = false,
+}: {
+  comparison: RunComparison;
+  narrative: RunComparison["narratives"][number];
+  featured?: boolean;
+}) {
+  const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
+  const runLabel = run?.reference?.title ?? run?.strategy_name ?? run?.strategy_id ?? narrative.run_id;
+
+  return (
+    <article className={`comparison-story-card ${featured ? "featured" : ""}`}>
+      <div className="comparison-story-head">
+        <span>{formatComparisonNarrativeLabel(narrative.comparison_type)}</span>
+        <strong>{runLabel}</strong>
+      </div>
+      <div className="comparison-story-meta">
+        <span>#{narrative.rank}</span>
+        <span>Score {narrative.insight_score}</span>
+      </div>
+      <p className="comparison-story-title">{narrative.title}</p>
+      <p className="comparison-story-summary">{narrative.summary}</p>
+      {narrative.bullets.length ? (
+        <ul className="comparison-story-list">
+          {narrative.bullets.map((bullet) => (
+            <li key={`${narrative.run_id}-${bullet}`}>{bullet}</li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
   );
 }
 

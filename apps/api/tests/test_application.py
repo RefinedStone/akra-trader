@@ -299,6 +299,9 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert len(comparison.narratives) == 1
   assert comparison.narratives[0].comparison_type == "native_vs_reference"
   assert comparison.narratives[0].run_id == reference_run.config.run_id
+  assert comparison.narratives[0].rank == 1
+  assert comparison.narratives[0].is_primary is True
+  assert comparison.narratives[0].insight_score > 0
   assert "persisted reference benchmark provenance" in comparison.narratives[0].summary
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
@@ -372,11 +375,107 @@ def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(
   assert metric_rows["trade_count"].values[reference_run.config.run_id] == 36
   assert len(comparison.narratives) == 1
   assert comparison.narratives[0].comparison_type == "native_vs_reference"
+  assert comparison.narratives[0].rank == 1
+  assert comparison.narratives[0].is_primary is True
   assert "return" in comparison.narratives[0].summary
   assert any(
     bullet.startswith("Reference context: NostalgiaForInfinityX7 returned 12.4%")
     for bullet in comparison.narratives[0].bullets
   )
+
+
+def test_compare_runs_ranks_multi_run_narratives_by_top_divergence(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = build_references()
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=references,
+    runs=runs,
+    freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+  )
+
+  baseline_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  alternate_native_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+  reference_run = app.run_backtest(
+    strategy_id="nfi_x7_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  baseline_run.metrics.update({
+    "total_return_pct": 10.0,
+    "max_drawdown_pct": 5.0,
+    "win_rate_pct": 60.0,
+    "trade_count": 20,
+  })
+  alternate_native_run.metrics.update({
+    "total_return_pct": -8.0,
+    "max_drawdown_pct": 18.0,
+    "win_rate_pct": 45.0,
+    "trade_count": 55,
+  })
+  reference_run.provenance.benchmark_artifacts = (
+    BenchmarkArtifact(
+      kind="result_snapshot_root",
+      label="Backtest results root",
+      path="/tmp/reference/backtest_results",
+      summary={
+        "strategy_name": "NostalgiaForInfinityX7",
+        "profit_total_pct": 12.0,
+        "max_drawdown_pct": 6.0,
+        "trade_count": 22,
+        "win_rate_pct": 61.0,
+      },
+      sections={
+        "benchmark_story": {
+          "headline": "NostalgiaForInfinityX7 returned 12% across 22 trades with 6% max drawdown.",
+        },
+      },
+    ),
+  )
+
+  runs.save_run(baseline_run)
+  runs.save_run(alternate_native_run)
+  runs.save_run(reference_run)
+
+  comparison = app.compare_runs(
+    run_ids=[
+      baseline_run.config.run_id,
+      alternate_native_run.config.run_id,
+      reference_run.config.run_id,
+    ],
+  )
+
+  assert [narrative.run_id for narrative in comparison.narratives] == [
+    alternate_native_run.config.run_id,
+    reference_run.config.run_id,
+  ]
+  assert [narrative.rank for narrative in comparison.narratives] == [1, 2]
+  assert comparison.narratives[0].is_primary is True
+  assert comparison.narratives[1].is_primary is False
+  assert comparison.narratives[0].insight_score > comparison.narratives[1].insight_score
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

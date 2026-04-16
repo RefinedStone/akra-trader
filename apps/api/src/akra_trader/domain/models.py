@@ -375,6 +375,9 @@ class RunComparisonNarrative:
   title: str
   summary: str
   bullets: tuple[str, ...] = ()
+  rank: int = 0
+  insight_score: float = 0.0
+  is_primary: bool = False
 
 
 @dataclass(frozen=True)

@@ -507,6 +507,10 @@ select {
   margin-top: 16px;
 }
 
+.comparison-top-story {
+  margin-top: 16px;
+}
+
 .comparison-story-card {
   padding: 16px;
   border-radius: 18px;
@@ -514,6 +518,16 @@ select {
   background:
     linear-gradient(180deg, rgba(255, 191, 71, 0.08), rgba(255, 191, 71, 0.02)),
     rgba(8, 14, 23, 0.8);
+}
+
+.comparison-story-card.featured {
+  border-color: rgba(255, 191, 71, 0.34);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 191, 71, 0.2),
+    0 16px 32px rgba(0, 0, 0, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 191, 71, 0.12), rgba(255, 191, 71, 0.03)),
+    rgba(10, 16, 26, 0.88);
 }
 
 .comparison-story-head {
@@ -533,6 +547,15 @@ select {
 
 .comparison-story-head strong {
   font-size: 0.9rem;
+}
+
+.comparison-story-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
 }
 
 .comparison-story-title,

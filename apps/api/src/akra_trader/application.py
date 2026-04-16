@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict
+from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from numbers import Number
@@ -135,22 +136,23 @@ class TradingApplication:
       for key, label, unit, higher_is_better in COMPARISON_METRICS
     )
     metric_row_by_key = {row.key: row for row in metric_rows}
+    ranked_narratives = _rank_comparison_narratives([
+      narrative
+      for run in ordered_runs[1:]
+      if (
+        narrative := _build_comparison_narrative(
+          baseline_run=baseline_run,
+          run=run,
+          metric_row_by_key=metric_row_by_key,
+        )
+      ) is not None
+    ])
     return RunComparison(
       requested_run_ids=tuple(normalized_run_ids),
       baseline_run_id=baseline_run.config.run_id,
       runs=tuple(_serialize_comparison_run(run) for run in ordered_runs),
       metric_rows=metric_rows,
-      narratives=tuple(
-        narrative
-        for run in ordered_runs[1:]
-        if (
-          narrative := _build_comparison_narrative(
-            baseline_run=baseline_run,
-            run=run,
-            metric_row_by_key=metric_row_by_key,
-          )
-        ) is not None
-      ),
+      narratives=tuple(ranked_narratives),
     )
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
@@ -580,6 +582,16 @@ def _build_comparison_narrative(
   if not title and not summary and not bullets:
     return None
 
+  insight_score = _score_comparison_narrative(
+    comparison_type=comparison_type,
+    baseline_run=baseline_run,
+    run=run,
+    total_return_delta=total_return_delta,
+    max_drawdown_delta=max_drawdown_delta,
+    win_rate_delta=win_rate_delta,
+    trade_count_delta=trade_count_delta,
+  )
+
   return RunComparisonNarrative(
     run_id=run.config.run_id,
     baseline_run_id=baseline_run.config.run_id,
@@ -587,7 +599,55 @@ def _build_comparison_narrative(
     title=title or f"{target_subject} diverged from {baseline_label}.",
     summary=summary or f"{target_label} is being compared against {baseline_label}.",
     bullets=tuple(bullets),
+    insight_score=insight_score,
   )
+
+
+def _rank_comparison_narratives(
+  narratives: list[RunComparisonNarrative],
+) -> list[RunComparisonNarrative]:
+  ordered = sorted(
+    narratives,
+    key=lambda narrative: (-narrative.insight_score, narrative.run_id),
+  )
+  return [
+    replace(
+      narrative,
+      rank=index + 1,
+      is_primary=index == 0,
+    )
+    for index, narrative in enumerate(ordered)
+  ]
+
+
+def _score_comparison_narrative(
+  *,
+  comparison_type: str,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  total_return_delta: float | int | None,
+  max_drawdown_delta: float | int | None,
+  win_rate_delta: float | int | None,
+  trade_count_delta: float | int | None,
+) -> float:
+  score = 0.0
+  score += abs(float(total_return_delta or 0.0)) * 1.6
+  score += abs(float(max_drawdown_delta or 0.0)) * 1.4
+  score += abs(float(win_rate_delta or 0.0)) * 0.9
+  score += min(abs(float(trade_count_delta or 0.0)), 50.0) * 0.18
+
+  if comparison_type == "native_vs_reference":
+    score += 4.0
+  elif comparison_type == "reference_vs_reference":
+    score += 2.0
+
+  if run.status != baseline_run.status:
+    score += 1.5
+  if _extract_benchmark_story(run) or _extract_benchmark_story(baseline_run):
+    score += 1.0
+  if score == 0.0 and _has_reference_context(run, baseline_run):
+    score = 1.0
+  return round(score, 2)
 
 
 def _build_comparison_narrative_title(
