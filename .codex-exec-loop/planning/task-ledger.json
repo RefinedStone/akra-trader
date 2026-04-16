@@ -403,20 +403,38 @@
     {
       "id": "planning-reference-lanes-freqtrade-nested-summary-parsing",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Parse richer nested Freqtrade benchmark sections beyond normalized key heuristics",
-      "description": "Extend the benchmark artifact enrichment pipeline to parse deeper Freqtrade-specific nested sections such as per-strategy comparison tables and richer export manifest structures so reference-lane provenance and comparison payloads can preserve more benchmark-native detail instead of flattening everything through generic summary-key normalization.",
-      "status": "ready",
+      "title": "Richer nested Freqtrade benchmark sections are now parsed into artifact summaries",
+      "description": "Completed the nested-summary follow-up by reworking the Freqtrade artifact parser around the actual export layout (`metadata[strategy_name]`, `strategy[strategy_name]`, `strategy_comparison`, and nested strategy sections), adding structured `sections` to `BenchmarkArtifact`, improving ratio normalization for UI-ready percentages, surfacing nested benchmark sections in the control room, and replacing synthetic tests with fixtures mirroring real nested Freqtrade JSON.",
+      "status": "done",
       "base_priority": 77,
-      "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply said nothing essential remains for manifest enrichment and named richer nested Freqtrade section parsing as the clearest direct refinement, so this becomes the next immediately executable queue-head task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the nested Freqtrade summary parsing work, verified `apps/api` with `./.venv/bin/python -m pytest` (`36 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `9b4e75f` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:45:00Z",
+      "updated_at": "2026-04-17T02:00:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-benchmark-artifact-manifest-enrichment"
       ],
       "direction_relation_note": "Advances the reference benchmark lane from normalized artifact summaries toward benchmark-native semantics by capturing the nested Freqtrade structures that operators compare directly."
+    },
+    {
+      "id": "planning-reference-lanes-freqtrade-zip-artifact-inspection",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Inspect Freqtrade zip artifacts directly for benchmark provenance",
+      "description": "Extend the Freqtrade benchmark artifact enrichment path to inspect zip contents directly, including candidates like `_config.json`, wallet feather outputs, and signal/rejected/exited exports, so reference-lane provenance can summarize benchmark-native evidence that does not appear in only the manifest and result JSON layers.",
+      "status": "ready",
+      "base_priority": 78,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply said nothing essential remains for nested section parsing and named direct zip-content inspection as the clearest later refinement, so it should now become the next immediately executable queue-head task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T02:00:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-freqtrade-nested-summary-parsing"
+      ],
+      "direction_relation_note": "Advances the reference benchmark lane from parsed result summaries toward fuller benchmark provenance by reading the packaged Freqtrade evidence operators actually export and inspect."
     }
   ]
 }
