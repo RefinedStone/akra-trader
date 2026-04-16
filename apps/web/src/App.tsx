@@ -1458,11 +1458,15 @@ function RunComparisonPanel({
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
+    metricRowKey: string;
     time: number;
     x: number;
     y: number;
   } | null>(null);
-  const metricSweepUntilRef = useRef(0);
+  const metricSweepStateRef = useRef<{
+    metricRowKey: string;
+    until: number;
+  } | null>(null);
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
   const [activeTooltipLayout, setActiveTooltipLayout] = useState<ComparisonTooltipLayout | null>(
     null,
@@ -1491,9 +1495,9 @@ function RunComparisonPanel({
     hoverCloseDelayMs: 70,
     hoverOpenDelayMs: 110,
   };
-  const metricSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
+  const metricRowSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
     hoverCloseDelayMs: 90,
-    hoverOpenDelayMs: 240,
+    hoverOpenDelayMs: 250,
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1619,16 +1623,21 @@ function RunComparisonPanel({
     };
   };
 
-  const recordMetricPointerSample = (event: MouseEvent<HTMLElement>) => {
+  const recordMetricPointerSample = (event: MouseEvent<HTMLElement>, metricRowKey: string) => {
     metricPointerSampleRef.current = {
+      metricRowKey,
       time: event.timeStamp,
       x: event.clientX,
       y: event.clientY,
     };
   };
 
-  const resolveMetricTooltipInteraction = (event: MouseEvent<HTMLElement>) => {
+  const resolveMetricTooltipInteraction = (
+    event: MouseEvent<HTMLElement>,
+    metricRowKey: string,
+  ) => {
     const sample = {
+      metricRowKey,
       time: event.timeStamp,
       x: event.clientX,
       y: event.clientY,
@@ -1644,16 +1653,32 @@ function RunComparisonPanel({
     const deltaX = Math.abs(sample.x - previousSample.x);
     const deltaY = Math.abs(sample.y - previousSample.y);
     const horizontalVelocity = deltaX / deltaTime;
+    const isSameMetricRow = previousSample.metricRowKey === metricRowKey;
     const isHorizontalSweep =
-      deltaTime <= 90 && deltaX >= 24 && deltaX >= deltaY * 2 && horizontalVelocity >= 0.42;
+      isSameMetricRow &&
+      deltaTime <= 90 &&
+      deltaX >= 24 &&
+      deltaX >= deltaY * 2 &&
+      horizontalVelocity >= 0.42;
 
     if (isHorizontalSweep) {
-      metricSweepUntilRef.current = sample.time + 180;
-      return metricSweepTooltipInteraction;
+      metricSweepStateRef.current = {
+        metricRowKey,
+        until: sample.time + 180,
+      };
+      return metricRowSweepTooltipInteraction;
     }
 
-    if (sample.time < metricSweepUntilRef.current) {
-      return metricSweepTooltipInteraction;
+    if (
+      metricSweepStateRef.current &&
+      metricSweepStateRef.current.metricRowKey === metricRowKey &&
+      sample.time < metricSweepStateRef.current.until
+    ) {
+      return metricRowSweepTooltipInteraction;
+    }
+
+    if (!isSameMetricRow) {
+      metricSweepStateRef.current = null;
     }
 
     return metricTooltipInteraction;
@@ -1661,24 +1686,25 @@ function RunComparisonPanel({
 
   const getMetricComparisonTooltipTargetProps = (
     tooltipId?: string,
+    metricRowKey?: string,
   ): ComparisonTooltipTargetProps | undefined => {
     const baseProps = getComparisonTooltipTargetProps(tooltipId, metricTooltipInteraction);
 
-    if (!baseProps || !tooltipId) {
+    if (!baseProps || !tooltipId || !metricRowKey) {
       return baseProps;
     }
 
     return {
       ...baseProps,
       onMouseEnter: (event: MouseEvent<HTMLElement>) => {
-        const interaction = resolveMetricTooltipInteraction(event);
+        const interaction = resolveMetricTooltipInteraction(event, metricRowKey);
         scheduleComparisonTooltipShow(tooltipId, interaction);
       },
       onMouseLeave: (event: MouseEvent<HTMLElement>) => {
-        recordMetricPointerSample(event);
+        recordMetricPointerSample(event, metricRowKey);
         scheduleComparisonTooltipHide(tooltipId, metricTooltipInteraction);
       },
-      onMouseMove: recordMetricPointerSample,
+      onMouseMove: (event: MouseEvent<HTMLElement>) => recordMetricPointerSample(event, metricRowKey),
     };
   };
 
@@ -2014,7 +2040,7 @@ function RunComparisonPanel({
                       }
                       tabIndex={cellTooltip ? 0 : undefined}
                       {...(cellTooltipId
-                        ? getMetricComparisonTooltipTargetProps(cellTooltipId)
+                        ? getMetricComparisonTooltipTargetProps(cellTooltipId, metricRow.key)
                         : {})}
                     >
                       <strong>
