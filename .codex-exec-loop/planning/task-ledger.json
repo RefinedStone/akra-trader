@@ -908,20 +908,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-preview",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Preview existing versus incoming preset values before resolving tooltip import conflicts",
-      "description": "Extend the inline tooltip preset conflict card so a collision shows the existing local preset values alongside the incoming preset values before the operator chooses `Rename and import` or `Overwrite existing`, making the conflict decision informed instead of name-only.",
-      "status": "ready",
+      "title": "Tooltip preset import conflicts now preview existing versus incoming values",
+      "description": "Completed the tooltip preset conflict-preview follow-up by showing existing and incoming preset values side by side inside the inline conflict card, summarizing how many tuning values differ versus match, and highlighting changed rows in a compact comparison table before the operator chooses rename, overwrite, or skip.",
+      "status": "done",
       "base_priority": 83,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply said nothing essential remains from the completed task and explicitly named conflict previews comparing existing versus incoming preset values as the most likely next refinement, making it the clearest executable next task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the tooltip preset conflict-preview refinement in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `93e90d9` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:45:00Z",
+      "updated_at": "2026-04-17T08:00:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-dialog"
       ],
       "direction_relation_note": "Builds directly on the completed interactive collision workflow by giving reference-lane operators the value-level context needed to choose rename or overwrite confidently when shared tooltip presets collide."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-preview-diff-first",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Show changed tooltip preset values first and collapse unchanged rows behind a toggle",
+      "description": "Refine the inline tooltip preset conflict preview so differing values are sorted to the top and unchanged rows are collapsed behind an explicit reveal toggle, reducing scan time when imported presets mostly match an existing local preset.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains from the completed preview task and explicitly identified sorting changed values first with unchanged rows hidden behind a toggle as the likely next refinement, so this is the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:00:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-preview"
+      ],
+      "direction_relation_note": "Builds directly on the completed value-level conflict preview by making reference-lane import comparisons faster to scan when only a small subset of tuning values actually differ."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
