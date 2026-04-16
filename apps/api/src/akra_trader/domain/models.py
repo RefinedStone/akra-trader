@@ -316,6 +316,9 @@ class RunProvenance:
   strategy: StrategySnapshot | None = None
   rerun_boundary_id: str | None = None
   rerun_boundary_state: str = "range_only"
+  rerun_source_run_id: str | None = None
+  rerun_target_boundary_id: str | None = None
+  rerun_match_status: str = "not_rerun"
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
 

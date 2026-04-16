@@ -191,7 +191,7 @@ def combine_reproducibility_states(states: list[str]) -> str:
 
 
 def _build_digest(payload: dict) -> str:
-  encoded = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
+  encoded = json.dumps(_normalize_json_value(payload), separators=(",", ":"), sort_keys=True).encode("utf-8")
   return hashlib.sha256(encoded).hexdigest()
 
 
@@ -205,3 +205,18 @@ def _serialize_optional_datetime(value: datetime | None) -> str | None:
   if value is None:
     return None
   return _serialize_datetime(value)
+
+
+def _normalize_json_value(value):
+  if isinstance(value, dict):
+    return {
+      key: _normalize_json_value(item)
+      for key, item in value.items()
+    }
+  if isinstance(value, (list, tuple)):
+    return [_normalize_json_value(item) for item in value]
+  if isinstance(value, bool):
+    return value
+  if isinstance(value, float) and value.is_integer():
+    return int(value)
+  return value

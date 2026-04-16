@@ -49,6 +49,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - native vs reference benchmark provenance and artifact display
 - native run provenance carries dataset identity fingerprints for candle-backed inputs
 - run provenance now links native runs to sync checkpoints and rerun boundary identities
+- explicit backtest rerun from stored rerun boundaries with match-or-drift tracking
 
 ### Control room
 
@@ -64,8 +65,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - sandbox runs are replay previews, not continuously advancing workers
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
-- native run provenance now pins dataset identity, but sync-checkpoint surfacing and full deterministic
-  rerun workflows are not complete
+- native run provenance now pins dataset identity and supports explicit rerun, but deterministic
+  promotion gates and normalized rerun queries are not complete
 - decision-engine support exists only as an interface and template strategy, not as a production research lane
 
 ## Not Implemented Yet

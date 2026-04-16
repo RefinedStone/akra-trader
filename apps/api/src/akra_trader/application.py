@@ -279,6 +279,42 @@ class TradingApplication:
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get_run(run_id)
 
+  def rerun_backtest_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
+    source_run = self._resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
+    if len(source_run.config.symbols) != 1:
+      raise ValueError("Explicit rerun currently supports only single-symbol backtests.")
+
+    rerun = self.run_backtest(
+      strategy_id=source_run.config.strategy_id,
+      symbol=source_run.config.symbols[0],
+      timeframe=source_run.config.timeframe,
+      initial_cash=source_run.config.initial_cash,
+      fee_rate=source_run.config.fee_rate,
+      slippage_bps=source_run.config.slippage_bps,
+      parameters=self._resolve_rerun_parameters(source_run),
+      start_at=self._resolve_rerun_start_at(source_run),
+      end_at=self._resolve_rerun_end_at(source_run),
+    )
+    rerun.provenance.rerun_source_run_id = source_run.config.run_id
+    rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
+    rerun.provenance.rerun_match_status = (
+      "matched"
+      if rerun.provenance.rerun_boundary_id == rerun_boundary_id
+      else "drifted"
+    )
+    rerun.notes.insert(
+      0,
+      f"Explicit rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
+    )
+    if rerun.provenance.rerun_match_status == "matched":
+      rerun.notes.append("Explicit rerun matched the stored rerun boundary.")
+    else:
+      rerun.notes.append(
+        "Explicit rerun drifted from the stored rerun boundary. "
+        f"Expected {rerun_boundary_id}, got {rerun.provenance.rerun_boundary_id or 'unavailable'}."
+      )
+    return self._runs.save_run(rerun)
+
   def compare_runs(self, *, run_ids: list[str], intent: str | None = None) -> RunComparison:
     normalized_run_ids = _normalize_run_ids(run_ids)
     if len(normalized_run_ids) < 2:
@@ -631,6 +667,41 @@ class TradingApplication:
       external_command=run.provenance.external_command,
     )
     run.provenance.rerun_boundary_state = market_data.reproducibility_state
+
+  def _resolve_rerun_source(self, *, rerun_boundary_id: str) -> RunRecord:
+    candidates = self._runs.list_runs(mode=RunMode.BACKTEST.value, rerun_boundary_id=rerun_boundary_id)
+    if not candidates:
+      raise LookupError(f"Rerun boundary not found: {rerun_boundary_id}")
+    completed = [run for run in candidates if run.status == RunStatus.COMPLETED]
+    return completed[0] if completed else candidates[0]
+
+  def _resolve_rerun_parameters(self, run: RunRecord) -> dict:
+    strategy = run.provenance.strategy
+    if strategy is not None:
+      return deepcopy(strategy.parameter_snapshot.resolved)
+    return deepcopy(run.config.parameters)
+
+  @staticmethod
+  def _resolve_rerun_start_at(run: RunRecord) -> datetime | None:
+    market_data = run.provenance.market_data
+    if market_data is None:
+      return run.config.start_at
+    return (
+      market_data.effective_start_at
+      or market_data.requested_start_at
+      or run.config.start_at
+    )
+
+  @staticmethod
+  def _resolve_rerun_end_at(run: RunRecord) -> datetime | None:
+    market_data = run.provenance.market_data
+    if market_data is None:
+      return run.config.end_at
+    return (
+      market_data.effective_end_at
+      or market_data.requested_end_at
+      or run.config.end_at
+    )
 
 
 def serialize_run(run: RunRecord) -> dict:

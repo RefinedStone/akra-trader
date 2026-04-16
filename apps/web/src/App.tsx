@@ -84,6 +84,9 @@ type Run = {
     integration_mode?: string | null;
     rerun_boundary_id?: string | null;
     rerun_boundary_state: string;
+    rerun_source_run_id?: string | null;
+    rerun_target_boundary_id?: string | null;
+    rerun_match_status: string;
     reference?: ReferenceSource | null;
     working_directory?: string | null;
     external_command: string[];
@@ -838,6 +841,23 @@ export default function App() {
     }
   }
 
+  async function rerunBacktest(rerunBoundaryId: string) {
+    setStatusText(`Rerunning boundary ${rerunBoundaryId}...`);
+    try {
+      const run = await fetchJson<Run>(`/runs/rerun-boundaries/${encodeURIComponent(rerunBoundaryId)}/backtests`, {
+        method: "POST",
+      });
+      await loadAll();
+      setStatusText(
+        run.provenance.rerun_match_status === "matched"
+          ? `Rerun completed and matched boundary ${rerunBoundaryId}.`
+          : `Rerun completed with boundary drift from ${rerunBoundaryId}.`,
+      );
+    } catch (error) {
+      setStatusText(`Rerun failed: ${(error as Error).message}`);
+    }
+  }
+
   function toggleComparisonRun(runId: string) {
     setSelectedComparisonRunIds((current) => {
       if (current.includes(runId)) {
@@ -1057,6 +1077,7 @@ export default function App() {
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
           }}
+          onRerun={rerunBacktest}
         />
         <RunSection
           title="Sandbox runs"
@@ -1616,6 +1637,7 @@ function RunSection({
   filter,
   setFilter,
   comparison,
+  onRerun,
   onStop,
 }: {
   title: string;
@@ -1624,6 +1646,7 @@ function RunSection({
   filter: RunHistoryFilter;
   setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
   comparison?: RunSectionComparisonControls;
+  onRerun?: (rerunBoundaryId: string) => Promise<void>;
   onStop?: (runId: string) => Promise<void>;
 }) {
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
@@ -1766,6 +1789,9 @@ function RunSection({
                   lineageBySymbol={run.provenance.market_data_by_symbol}
                   rerunBoundaryId={run.provenance.rerun_boundary_id}
                   rerunBoundaryState={run.provenance.rerun_boundary_state}
+                  rerunMatchStatus={run.provenance.rerun_match_status}
+                  rerunSourceRunId={run.provenance.rerun_source_run_id}
+                  rerunTargetBoundaryId={run.provenance.rerun_target_boundary_id}
                 />
               ) : null}
               <div className="run-card-actions">
@@ -1778,6 +1804,15 @@ function RunSection({
                     {comparison.selectedRunIds.includes(run.config.run_id)
                       ? "Remove from compare"
                       : "Add to compare"}
+                  </button>
+                ) : null}
+                {onRerun && run.config.mode === "backtest" && run.provenance.rerun_boundary_id ? (
+                  <button
+                    className="ghost-button"
+                    onClick={() => void onRerun(run.provenance.rerun_boundary_id!)}
+                    type="button"
+                  >
+                    Rerun boundary
                   </button>
                 ) : null}
                 {onStop && run.status === "running" ? (
@@ -4888,11 +4923,17 @@ function RunMarketDataLineage({
   lineageBySymbol,
   rerunBoundaryId,
   rerunBoundaryState,
+  rerunMatchStatus,
+  rerunSourceRunId,
+  rerunTargetBoundaryId,
 }: {
   lineage: NonNullable<Run["provenance"]["market_data"]>;
   lineageBySymbol?: NonNullable<Run["provenance"]["market_data_by_symbol"]>;
   rerunBoundaryId?: string | null;
   rerunBoundaryState: string;
+  rerunMatchStatus: string;
+  rerunSourceRunId?: string | null;
+  rerunTargetBoundaryId?: string | null;
 }) {
   const symbolEntries = Object.entries(lineageBySymbol ?? {});
 
@@ -4919,6 +4960,9 @@ function RunMarketDataLineage({
         <p>Dataset ID: {lineage.dataset_identity ?? "unavailable"}</p>
         <p>Sync checkpoint: {lineage.sync_checkpoint_id ?? "unavailable"}</p>
         <p>Rerun boundary: {rerunBoundaryId ?? "unavailable"}</p>
+        <p>Rerun status: {rerunMatchStatus}</p>
+        <p>Rerun source: {rerunSourceRunId ?? "n/a"}</p>
+        <p>Rerun target: {rerunTargetBoundaryId ?? "n/a"}</p>
         <p>Last sync: {formatTimestamp(lineage.last_sync_at)}</p>
         <p>Issues: {lineage.issues.length ? lineage.issues.join(", ") : "none"}</p>
       </div>

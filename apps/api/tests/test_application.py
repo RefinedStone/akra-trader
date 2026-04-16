@@ -470,6 +470,68 @@ def test_list_runs_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
   assert other.config.run_id not in [run.config.run_id for run in filtered]
 
 
+def test_rerun_backtest_from_boundary_uses_stored_effective_window_and_records_match(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    start_at=datetime(2025, 1, 1, 4, 0, tzinfo=UTC),
+    end_at=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+  )
+
+  rerun = app.rerun_backtest_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
+
+  assert rerun.config.run_id != source.config.run_id
+  assert rerun.provenance.rerun_source_run_id == source.config.run_id
+  assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.market_data is not None
+  assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
+  assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
+  assert rerun.notes[0].startswith("Explicit rerun from boundary ")
+  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+
+
+def test_rerun_backtest_from_boundary_uses_resolved_strategy_parameters(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+
+  rerun = app.rerun_backtest_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
+
+  assert rerun.config.parameters == {"short_window": 13, "long_window": 21}
+  assert rerun.provenance.strategy is not None
+  assert rerun.provenance.strategy.parameter_snapshot.requested == {"short_window": 13, "long_window": 21}
+  assert rerun.provenance.strategy.parameter_snapshot.resolved == {"short_window": 13, "long_window": 21}
+
+
 def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path: Path) -> None:
   repo_root = Path(__file__).resolve().parents[3]
   references = build_references()
