@@ -43,13 +43,13 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ### Research workflow
 
 - backtest execution with durable run lookup
-- replay-based sandbox preview flow for native strategies
+- replay-based sandbox and paper preview flows for native strategies
 - run history listing and filtering by mode, strategy id, and strategy version
 - run comparison API and control-room comparison UI
 - native vs reference benchmark provenance and artifact display
 - native run provenance carries dataset identity fingerprints for candle-backed inputs
 - run provenance now links native runs to sync checkpoints and rerun boundary identities
-- explicit rerun from stored rerun boundaries into backtest or sandbox execution with
+- explicit rerun from stored rerun boundaries into backtest, sandbox, or paper execution with
   match-or-drift tracking
 
 ### Control room
@@ -58,7 +58,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox runs
-- sandbox stop control plus explicit sandbox/paper rerun-boundary operator actions
+- separate sandbox and paper histories with their own filters, stop controls, and rerun-boundary actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas

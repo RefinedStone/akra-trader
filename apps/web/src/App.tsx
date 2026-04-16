@@ -613,12 +613,14 @@ export default function App() {
   const [references, setReferences] = useState<ReferenceSource[]>([]);
   const [backtests, setBacktests] = useState<Run[]>([]);
   const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
+  const [paperRuns, setPaperRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
+  const [paperRunFilter, setPaperRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>([]);
   const [comparisonIntent, setComparisonIntent] = useState<ComparisonIntent>(DEFAULT_COMPARISON_INTENT);
   const [runComparison, setRunComparison] = useState<RunComparison | null>(null);
@@ -631,17 +633,19 @@ export default function App() {
   async function loadAll() {
     setStatusText("Refreshing data plane...");
     try {
-      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, marketResponse] = await Promise.all([
+      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, paperResponse, marketResponse] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
         fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
         fetchJson<Run[]>(buildRunsPath("sandbox", sandboxRunFilter)),
+        fetchJson<Run[]>(buildRunsPath("paper", paperRunFilter)),
         fetchJson<MarketDataStatus>("/market-data/status"),
       ]);
       setStrategies(strategiesResponse);
       setReferences(referencesResponse);
       setBacktests(backtestsResponse);
       setSandboxRuns(sandboxResponse);
+      setPaperRuns(paperResponse);
       setMarketStatus(marketResponse);
       setStatusText("Control room synchronized.");
     } catch (error) {
@@ -651,7 +655,7 @@ export default function App() {
 
   useEffect(() => {
     void loadAll();
-  }, [backtestRunFilter, sandboxRunFilter]);
+  }, [backtestRunFilter, sandboxRunFilter, paperRunFilter]);
 
   useEffect(() => {
     if (!strategies.length) {
@@ -668,6 +672,7 @@ export default function App() {
     }
     setBacktestRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
     setSandboxRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
+    setPaperRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
   }, [strategies]);
 
   useEffect(() => {
@@ -838,6 +843,16 @@ export default function App() {
       await loadAll();
     } catch (error) {
       setStatusText(`Stop failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function stopPaperRun(runId: string) {
+    setStatusText(`Stopping paper run ${runId}...`);
+    try {
+      await fetchJson<Run>(`/runs/paper/${runId}/stop`, { method: "POST" });
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Paper stop failed: ${(error as Error).message}`);
     }
   }
 
@@ -1143,6 +1158,24 @@ export default function App() {
             },
           ]}
           onStop={stopSandboxRun}
+        />
+        <RunSection
+          title="Paper runs"
+          runs={paperRuns}
+          strategies={strategies}
+          filter={paperRunFilter}
+          setFilter={setPaperRunFilter}
+          rerunActions={[
+            {
+              label: "Replay in sandbox",
+              onRerun: rerunSandbox,
+            },
+            {
+              label: "Replay in paper",
+              onRerun: rerunPaper,
+            },
+          ]}
+          onStop={stopPaperRun}
         />
       </main>
     </div>

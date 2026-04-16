@@ -52,7 +52,7 @@ def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
 
 
 class ExecutionModeService:
-  _legacy_aliases = {"paper": RunMode.SANDBOX.value}
+  _legacy_aliases = {"paper": RunMode.PAPER.value}
 
   def normalize(self, mode: str | None) -> str | None:
     if mode is None:
@@ -60,17 +60,26 @@ class ExecutionModeService:
     return self._legacy_aliases.get(mode, mode)
 
   def launch_note(self, mode: RunMode, replay_bars: int | None = None) -> str | None:
+    suffix = self._build_replay_suffix(replay_bars)
     if mode == RunMode.SANDBOX:
-      suffix = ""
-      if replay_bars is not None:
-        suffix = f" Initial replay window: {replay_bars} bars."
       return (
         "Sandbox run uses the shared native engine and is ready for a future stream or worker adapter."
+        f"{suffix}"
+      )
+    if mode == RunMode.PAPER:
+      return (
+        "Paper run uses the shared native engine while remaining isolated from venue-backed live execution."
         f"{suffix}"
       )
     if mode == RunMode.LIVE:
       return "Live mode is reserved for guarded venue-backed execution."
     return None
+
+  @staticmethod
+  def _build_replay_suffix(replay_bars: int | None) -> str:
+    if replay_bars is None:
+      return ""
+    return f" Initial replay window: {replay_bars} bars."
 
 
 class DataEngine:

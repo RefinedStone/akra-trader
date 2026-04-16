@@ -108,8 +108,9 @@ This is enough for restart-safe history, comparison, and stable dataset-boundary
 yet the final analytics-friendly schema.
 
 Stored rerun boundaries can also be used to launch explicit backtest reruns or sandbox/paper replay
-runs. The rerun records the source run, the target boundary, and whether the new execution still
-matched that boundary.
+runs. Sandbox and paper now persist as separate execution modes, so their histories and filters do
+not collapse into one preview bucket. The rerun records the source run, the target boundary, and
+whether the new execution still matched that boundary.
 
 ## Market Data
 

@@ -296,8 +296,8 @@ class TradingApplication:
   def rerun_paper_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
     return self._rerun_from_boundary(
       rerun_boundary_id=rerun_boundary_id,
-      target_mode=RunMode.SANDBOX,
-      requested_mode_label="paper",
+      target_mode=RunMode.PAPER,
+      requested_mode_label=RunMode.PAPER.value,
     )
 
   def compare_runs(self, *, run_ids: list[str], intent: str | None = None) -> RunComparison:
@@ -417,10 +417,67 @@ class TradingApplication:
     start_at: datetime | None = None,
     end_at: datetime | None = None,
   ) -> RunRecord:
+    return self._start_preview_run(
+      target_mode=RunMode.SANDBOX,
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      start_at=start_at,
+      end_at=end_at,
+    )
+
+  def start_paper_run(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    return self._start_preview_run(
+      target_mode=RunMode.PAPER,
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      start_at=start_at,
+      end_at=end_at,
+    )
+
+  def _start_preview_run(
+    self,
+    *,
+    target_mode: RunMode,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     config = RunConfig(
       run_id=str(uuid4()),
-      mode=RunMode.SANDBOX,
+      mode=target_mode,
       strategy_id=metadata.strategy_id,
       strategy_version=metadata.version,
       venue="binance",
@@ -441,7 +498,7 @@ class TradingApplication:
       )
       run.notes.append(
         "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
-        "Sandbox trading remains on the native engine for now."
+        f"{target_mode.value.capitalize()} trading remains on the native engine for now."
       )
       return self._runs.save_run(run)
     run = self._simulate_run(
@@ -453,38 +510,11 @@ class TradingApplication:
     if run.status != RunStatus.FAILED:
       self._run_supervisor.start_mode(
         run=run,
-        mode=RunMode.SANDBOX,
+        mode=target_mode,
         mode_service=self._mode_service,
         replay_bars=replay_bars,
       )
     return self._runs.save_run(run)
-
-  def start_paper_run(
-    self,
-    *,
-    strategy_id: str,
-    symbol: str,
-    timeframe: str,
-    initial_cash: float,
-    fee_rate: float,
-    slippage_bps: float,
-    parameters: dict,
-    replay_bars: int | None = 96,
-    start_at: datetime | None = None,
-    end_at: datetime | None = None,
-  ) -> RunRecord:
-    return self.start_sandbox_run(
-      strategy_id=strategy_id,
-      symbol=symbol,
-      timeframe=timeframe,
-      initial_cash=initial_cash,
-      fee_rate=fee_rate,
-      slippage_bps=slippage_bps,
-      parameters=parameters,
-      replay_bars=replay_bars,
-      start_at=start_at,
-      end_at=end_at,
-    )
 
   def stop_sandbox_run(self, run_id: str) -> RunRecord | None:
     run = self._runs.get_run(run_id)
@@ -494,7 +524,11 @@ class TradingApplication:
     return self._runs.save_run(run)
 
   def stop_paper_run(self, run_id: str) -> RunRecord | None:
-    return self.stop_sandbox_run(run_id)
+    run = self._runs.get_run(run_id)
+    if run is None:
+      return None
+    self._run_supervisor.stop(run, reason="Paper run stopped by operator.")
+    return self._runs.save_run(run)
 
   def _simulate_run(
     self,
@@ -683,7 +717,7 @@ class TradingApplication:
     rerun_end_at = self._resolve_rerun_end_at(source_run)
     rerun_parameters = self._resolve_rerun_parameters(source_run)
     symbol = source_run.config.symbols[0]
-    sandbox_window_note: str | None = None
+    preview_window_note: str | None = None
 
     if target_mode == RunMode.BACKTEST:
       rerun = self.run_backtest(
@@ -697,13 +731,17 @@ class TradingApplication:
         start_at=rerun_start_at,
         end_at=rerun_end_at,
       )
-    elif target_mode == RunMode.SANDBOX:
-      sandbox_start_at, sandbox_end_at, sandbox_replay_bars = self._resolve_sandbox_rerun_window(source_run)
-      if sandbox_replay_bars is None:
-        sandbox_window_note = "Sandbox rerun locked execution to the stored effective market-data window."
+    elif target_mode in {RunMode.SANDBOX, RunMode.PAPER}:
+      preview_start_at, preview_end_at, preview_replay_bars = self._resolve_preview_rerun_window(source_run)
+      preview_label = target_mode.value.capitalize()
+      if preview_replay_bars is None:
+        preview_window_note = f"{preview_label} rerun locked execution to the stored effective market-data window."
       else:
-        sandbox_window_note = "Sandbox rerun replay preserved the stored sandbox bar window."
-      rerun = self.start_sandbox_run(
+        preview_window_note = (
+          f"{preview_label} rerun replay preserved the stored {source_run.config.mode.value} bar window."
+        )
+      rerun = self._start_preview_run(
+        target_mode=target_mode,
         strategy_id=source_run.config.strategy_id,
         symbol=symbol,
         timeframe=source_run.config.timeframe,
@@ -711,9 +749,9 @@ class TradingApplication:
         fee_rate=source_run.config.fee_rate,
         slippage_bps=source_run.config.slippage_bps,
         parameters=rerun_parameters,
-        replay_bars=sandbox_replay_bars,
-        start_at=sandbox_start_at,
-        end_at=sandbox_end_at,
+        replay_bars=preview_replay_bars,
+        start_at=preview_start_at,
+        end_at=preview_end_at,
       )
     else:
       raise ValueError(f"Unsupported rerun target mode: {target_mode.value}")
@@ -723,7 +761,7 @@ class TradingApplication:
       source_run=source_run,
       rerun_boundary_id=rerun_boundary_id,
       requested_mode_label=requested_mode_label,
-      sandbox_window_note=sandbox_window_note,
+      preview_window_note=preview_window_note,
     )
 
   def _persist_explicit_rerun(
@@ -733,7 +771,7 @@ class TradingApplication:
     source_run: RunRecord,
     rerun_boundary_id: str,
     requested_mode_label: str,
-    sandbox_window_note: str | None = None,
+    preview_window_note: str | None = None,
   ) -> RunRecord:
     rerun.provenance.rerun_source_run_id = source_run.config.run_id
     rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
@@ -746,10 +784,10 @@ class TradingApplication:
       0,
       f"Explicit {requested_mode_label} rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
     )
-    if rerun.config.mode == RunMode.SANDBOX and sandbox_window_note is not None:
+    if rerun.config.mode in {RunMode.SANDBOX, RunMode.PAPER} and preview_window_note is not None:
       rerun.notes.insert(
         1,
-        sandbox_window_note,
+        preview_window_note,
       )
     if rerun.provenance.rerun_match_status == "matched":
       rerun.notes.append("Explicit rerun matched the stored rerun boundary.")
@@ -793,10 +831,10 @@ class TradingApplication:
     )
 
   @staticmethod
-  def _resolve_sandbox_rerun_window(run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
+  def _resolve_preview_rerun_window(run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
     market_data = run.provenance.market_data
     if (
-      run.config.mode == RunMode.SANDBOX
+      run.config.mode in {RunMode.SANDBOX, RunMode.PAPER}
       and run.config.start_at is None
       and run.config.end_at is None
       and market_data is not None

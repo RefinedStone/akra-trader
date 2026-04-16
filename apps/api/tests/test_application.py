@@ -270,6 +270,39 @@ def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   assert reloaded.notes == run.notes
 
 
+def test_paper_run_is_created_as_running_with_separate_mode(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  run = app.start_paper_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=36,
+  )
+
+  assert run.status == RunStatus.RUNNING
+  assert run.config.mode == RunMode.PAPER
+  assert run.notes
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.candle_count == 36
+
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+  assert reloaded is not None
+  assert reloaded.status == RunStatus.RUNNING
+  assert reloaded.config.mode == RunMode.PAPER
+  assert reloaded.notes == run.notes
+
+
 def test_stop_sandbox_run_persists_terminal_state(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(
@@ -302,6 +335,40 @@ def test_stop_sandbox_run_persists_terminal_state(tmp_path: Path) -> None:
   assert reloaded.status == RunStatus.STOPPED
   assert reloaded.ended_at is not None
   assert reloaded.notes[-1] == "Sandbox run stopped by operator."
+
+
+def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  run = app.start_paper_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  stopped = app.stop_paper_run(run.config.run_id)
+
+  assert stopped is not None
+  assert stopped.status == RunStatus.STOPPED
+  assert stopped.ended_at is not None
+  assert stopped.notes[-1] == "Paper run stopped by operator."
+
+  reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
+  assert reloaded is not None
+  assert reloaded.status == RunStatus.STOPPED
+  assert reloaded.ended_at is not None
+  assert reloaded.notes[-1] == "Paper run stopped by operator."
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
@@ -425,6 +492,43 @@ def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
   assert len(filtered) == 1
   assert filtered[0].config.strategy_id == "ma_cross_v1"
   assert filtered[0].config.strategy_version == "1.0.0"
+
+
+def test_list_runs_can_filter_paper_history_separately_from_sandbox(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  sandbox_run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  paper_run = app.start_paper_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  sandbox_filtered = app.list_runs(mode="sandbox")
+  paper_filtered = app.list_runs(mode="paper")
+
+  assert [run.config.run_id for run in sandbox_filtered] == [sandbox_run.config.run_id]
+  assert [run.config.run_id for run in paper_filtered] == [paper_run.config.run_id]
 
 
 def test_list_runs_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
@@ -571,6 +675,42 @@ def test_rerun_sandbox_from_boundary_uses_stored_effective_window_and_replays_sa
   assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
 
 
+def test_rerun_paper_from_boundary_uses_stored_effective_window_and_replays_same_mode_boundary(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.start_paper_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  rerun = app.rerun_paper_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
+
+  assert rerun.config.run_id != source.config.run_id
+  assert rerun.config.mode == RunMode.PAPER
+  assert rerun.status == RunStatus.RUNNING
+  assert rerun.provenance.rerun_source_run_id == source.config.run_id
+  assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
+  assert rerun.notes[1] == "Paper rerun replay preserved the stored paper bar window."
+  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+
+
 def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(
@@ -594,7 +734,7 @@ def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path
 
   rerun = app.rerun_paper_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
 
-  assert rerun.config.mode == RunMode.SANDBOX
+  assert rerun.config.mode == RunMode.PAPER
   assert rerun.status == RunStatus.RUNNING
   assert rerun.provenance.rerun_source_run_id == source.config.run_id
   assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
@@ -605,6 +745,7 @@ def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path
   assert rerun.provenance.strategy is not None
   assert rerun.provenance.strategy.parameter_snapshot.resolved == {"short_window": 13, "long_window": 21}
   assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
+  assert rerun.notes[1] == "Paper rerun locked execution to the stored effective market-data window."
   assert rerun.notes[-1] == (
     "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
   )

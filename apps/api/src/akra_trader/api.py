@@ -212,11 +212,24 @@ def create_router(container: Container) -> APIRouter:
     request: SandboxRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    return start_sandbox_run(request, app)
+    run = app.start_paper_run(
+      strategy_id=request.strategy_id,
+      symbol=request.symbol,
+      timeframe=request.timeframe,
+      initial_cash=request.initial_cash,
+      fee_rate=request.fee_rate,
+      slippage_bps=request.slippage_bps,
+      parameters=request.parameters,
+      replay_bars=request.replay_bars,
+    )
+    return serialize_run(run)
 
   @router.post("/runs/paper/{run_id}/stop")
   def stop_paper_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    return stop_sandbox_run(run_id, app)
+    run = app.stop_paper_run(run_id)
+    if run is None:
+      raise HTTPException(status_code=404, detail="Run not found")
+    return serialize_run(run)
 
   @router.get("/runs/{run_id}/orders")
   def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:

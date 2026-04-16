@@ -21,6 +21,7 @@ class MarketType(str, Enum):
 class RunMode(str, Enum):
   BACKTEST = "backtest"
   SANDBOX = "sandbox"
+  PAPER = "paper"
   LIVE = "live"
 
 

@@ -10,7 +10,7 @@ Implemented now:
 - in-process custom strategy registration endpoint
 - durable run storage through SQLAlchemy
 - backtest execution and run lookup
-- replay-based sandbox preview flow for native strategies
+- replay-based sandbox and paper preview flows for native strategies
 - native vs reference run comparison API
 - dataset identity and reproducibility state recorded in run market-data provenance
 - Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
@@ -65,6 +65,8 @@ Defaults:
 - `POST /api/runs/rerun-boundaries/{rerun_boundary_id}/paper`
 - `POST /api/runs/sandbox`
 - `POST /api/runs/sandbox/{run_id}/stop`
+- `POST /api/runs/paper`
+- `POST /api/runs/paper/{run_id}/stop`
 - `GET /api/runs/{run_id}/orders`
 - `GET /api/runs/{run_id}/positions`
 - `GET /api/runs/{run_id}/metrics`
@@ -74,8 +76,10 @@ Defaults:
 
 - backtests run to completion and are persisted immediately
 - native candle-backed runs persist dataset identity fingerprints for the exact candles used
-- stored rerun boundaries can launch explicit backtest, sandbox, and paper-alias reruns with
+- stored rerun boundaries can launch explicit backtest, sandbox, and paper reruns with
   match-or-drift notes
+- sandbox and paper previews now persist as separate modes, so history and filters no longer share
+  the same storage bucket
 - sandbox runs currently replay the most recent bars and are then marked `running` for forward compatibility with a future worker model
 - reference strategies are supported for backtest delegation only
 - the app lifespan starts background market-data sync jobs when the Binance provider is active

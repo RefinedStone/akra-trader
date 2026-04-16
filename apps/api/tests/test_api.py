@@ -151,7 +151,7 @@ def test_paper_alias_still_works(tmp_path: Path) -> None:
   )
   assert response.status_code == 200
   payload = response.json()
-  assert payload["config"]["mode"] == "sandbox"
+  assert payload["config"]["mode"] == "paper"
 
 
 def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> None:
@@ -270,6 +270,48 @@ def test_runs_endpoint_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
   assert all(item["provenance"]["rerun_boundary_id"] == rerun_boundary_id for item in payload)
 
 
+def test_runs_endpoint_filters_paper_history_separately_from_sandbox(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  sandbox_response = client.post(
+    "/api/runs/sandbox",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+      "replay_bars": 24,
+    },
+  )
+  assert sandbox_response.status_code == 200
+
+  paper_response = client.post(
+    "/api/runs/paper",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+      "replay_bars": 24,
+    },
+  )
+  assert paper_response.status_code == 200
+
+  sandbox_filtered = client.get("/api/runs?mode=sandbox")
+  paper_filtered = client.get("/api/runs?mode=paper")
+
+  assert sandbox_filtered.status_code == 200
+  assert paper_filtered.status_code == 200
+  assert [item["config"]["mode"] for item in sandbox_filtered.json()] == ["sandbox"]
+  assert [item["config"]["mode"] for item in paper_filtered.json()] == ["paper"]
+
+
 def test_rerun_boundary_endpoint_creates_backtest_from_stored_boundary(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 
@@ -368,7 +410,7 @@ def test_rerun_boundary_paper_endpoint_replays_boundary_with_expected_mode_drift
 
   assert rerun_response.status_code == 200
   rerun_payload = rerun_response.json()
-  assert rerun_payload["config"]["mode"] == "sandbox"
+  assert rerun_payload["config"]["mode"] == "paper"
   assert rerun_payload["status"] == "running"
   assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
   assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
