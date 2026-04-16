@@ -95,6 +95,7 @@ def create_router(container: Container) -> APIRouter:
     mode: str | None = None,
     strategy_id: str | None = None,
     strategy_version: str | None = None,
+    rerun_boundary_id: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
     return [
@@ -103,6 +104,7 @@ def create_router(container: Container) -> APIRouter:
         mode=mode,
         strategy_id=strategy_id,
         strategy_version=strategy_version,
+        rerun_boundary_id=rerun_boundary_id,
       )
     ]
 

@@ -98,7 +98,8 @@ Run persistence is durable today.
 - every persisted run carries config, status, metrics, orders, fills, positions, equity, notes, and provenance
 - provenance can include:
   - strategy snapshot and parameter snapshot
-  - market-data lineage with dataset identity and reproducibility state
+  - market-data lineage with dataset identity, sync checkpoint links, and reproducibility state
+  - rerun boundary identity for the exact execution input bundle
   - reference id and integration mode
   - external command and artifact paths
   - benchmark artifact summaries

@@ -144,6 +144,7 @@ class SeededMarketDataAdapter(MarketDataPort):
       symbols=(symbol,),
       timeframe=timeframe,
       dataset_identity=dataset_identity,
+      sync_checkpoint_id=None,
       reproducibility_state=reproducibility_state,
       requested_start_at=start_at,
       requested_end_at=end_at,
@@ -175,6 +176,7 @@ class InMemoryRunRepository(RunRepositoryPort):
     *,
     strategy_id: str | None = None,
     strategy_version: str | None = None,
+    rerun_boundary_id: str | None = None,
   ) -> list[RunRecord]:
     values = list(self._runs.values())
     runs = list(reversed(values))
@@ -184,6 +186,8 @@ class InMemoryRunRepository(RunRepositoryPort):
       runs = [run for run in runs if run.config.strategy_id == strategy_id]
     if strategy_version is not None:
       runs = [run for run in runs if run.config.strategy_version == strategy_version]
+    if rerun_boundary_id is not None:
+      runs = [run for run in runs if run.provenance.rerun_boundary_id == rerun_boundary_id]
     return runs
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None:

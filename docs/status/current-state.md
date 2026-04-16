@@ -48,6 +48,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - run comparison API and control-room comparison UI
 - native vs reference benchmark provenance and artifact display
 - native run provenance carries dataset identity fingerprints for candle-backed inputs
+- run provenance now links native runs to sync checkpoints and rerun boundary identities
 
 ### Control room
 

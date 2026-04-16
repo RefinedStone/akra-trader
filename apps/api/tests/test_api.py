@@ -77,8 +77,11 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
   assert payload["provenance"]["market_data"]["dataset_identity"].startswith("dataset-v1:")
+  assert payload["provenance"]["market_data"]["sync_checkpoint_id"] is None
   assert payload["provenance"]["market_data"]["reproducibility_state"] == "pinned"
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
+  assert payload["provenance"]["rerun_boundary_id"].startswith("rerun-v1:")
+  assert payload["provenance"]["rerun_boundary_state"] == "pinned"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
     "candles-v1:"
@@ -211,6 +214,60 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   assert len(payload) == 1
   assert payload[0]["config"]["strategy_id"] == "ma_cross_v1"
   assert payload[0]["config"]["strategy_version"] == "1.0.0"
+
+
+def test_runs_endpoint_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  first_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert first_response.status_code == 200
+  rerun_boundary_id = first_response.json()["provenance"]["rerun_boundary_id"]
+
+  second_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert second_response.status_code == 200
+
+  other_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 12000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+    },
+  )
+  assert other_response.status_code == 200
+
+  filtered = client.get(f"/api/runs?rerun_boundary_id={rerun_boundary_id}")
+
+  assert filtered.status_code == 200
+  payload = filtered.json()
+  assert len(payload) == 2
+  assert all(item["provenance"]["rerun_boundary_id"] == rerun_boundary_id for item in payload)
 
 
 def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tmp_path: Path) -> None:

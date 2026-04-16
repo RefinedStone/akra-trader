@@ -87,6 +87,96 @@ def build_sync_checkpoint_identity(
   return f"checkpoint-v1:{_build_digest(payload)}"
 
 
+def build_aggregate_sync_checkpoint_identity(
+  *,
+  provider: str,
+  venue: str,
+  timeframe: str,
+  symbol_checkpoint_ids: dict[str, str],
+) -> str:
+  payload = {
+    "schema_version": 1,
+    "provider": provider,
+    "venue": venue,
+    "timeframe": timeframe,
+    "symbol_checkpoints": [
+      {
+        "symbol": symbol,
+        "sync_checkpoint_id": symbol_checkpoint_ids[symbol],
+      }
+      for symbol in sorted(symbol_checkpoint_ids)
+    ],
+  }
+  return f"checkpoint-group-v1:{_build_digest(payload)}"
+
+
+def build_rerun_boundary_identity(
+  *,
+  lane: str,
+  mode: str,
+  strategy_id: str,
+  strategy_version: str,
+  resolved_parameters: dict,
+  venue: str,
+  symbols: tuple[str, ...],
+  timeframe: str,
+  initial_cash: float,
+  fee_rate: float,
+  slippage_bps: float,
+  market_data_reproducibility_state: str,
+  market_data_dataset_identity: str | None,
+  market_data_sync_checkpoint_id: str | None,
+  market_data_symbol_checkpoint_ids: dict[str, str],
+  requested_start_at: datetime | None,
+  requested_end_at: datetime | None,
+  effective_start_at: datetime | None,
+  effective_end_at: datetime | None,
+  candle_count: int,
+  reference_id: str | None = None,
+  reference_version: str | None = None,
+  integration_mode: str | None = None,
+  external_command: tuple[str, ...] = (),
+) -> str:
+  payload = {
+    "schema_version": 1,
+    "lane": lane,
+    "mode": mode,
+    "strategy_id": strategy_id,
+    "strategy_version": strategy_version,
+    "resolved_parameters": resolved_parameters,
+    "venue": venue,
+    "symbols": list(symbols),
+    "timeframe": timeframe,
+    "initial_cash": initial_cash,
+    "fee_rate": fee_rate,
+    "slippage_bps": slippage_bps,
+    "market_data": {
+      "reproducibility_state": market_data_reproducibility_state,
+      "dataset_identity": market_data_dataset_identity,
+      "sync_checkpoint_id": market_data_sync_checkpoint_id,
+      "symbol_checkpoint_ids": [
+        {
+          "symbol": symbol,
+          "sync_checkpoint_id": market_data_symbol_checkpoint_ids[symbol],
+        }
+        for symbol in sorted(market_data_symbol_checkpoint_ids)
+      ],
+      "requested_start_at": _serialize_optional_datetime(requested_start_at),
+      "requested_end_at": _serialize_optional_datetime(requested_end_at),
+      "effective_start_at": _serialize_optional_datetime(effective_start_at),
+      "effective_end_at": _serialize_optional_datetime(effective_end_at),
+      "candle_count": candle_count,
+    },
+    "reference": {
+      "reference_id": reference_id,
+      "reference_version": reference_version,
+      "integration_mode": integration_mode,
+      "external_command": list(external_command),
+    },
+  }
+  return f"rerun-v1:{_build_digest(payload)}"
+
+
 def combine_reproducibility_states(states: list[str]) -> str:
   if not states:
     return "range_only"

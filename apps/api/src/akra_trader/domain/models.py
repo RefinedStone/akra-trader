@@ -255,6 +255,7 @@ class MarketDataLineage:
   symbols: tuple[str, ...]
   timeframe: str
   dataset_identity: str | None = None
+  sync_checkpoint_id: str | None = None
   reproducibility_state: str = "range_only"
   requested_start_at: datetime | None = None
   requested_end_at: datetime | None = None
@@ -313,6 +314,8 @@ class RunProvenance:
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()
   strategy: StrategySnapshot | None = None
+  rerun_boundary_id: str | None = None
+  rerun_boundary_state: str = "range_only"
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
 
@@ -351,6 +354,8 @@ class RunComparisonRun:
   integration_mode: str | None = None
   reference: ReferenceSource | None = None
   working_directory: str | None = None
+  rerun_boundary_id: str | None = None
+  rerun_boundary_state: str = "range_only"
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()

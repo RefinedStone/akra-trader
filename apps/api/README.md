@@ -15,6 +15,7 @@ Implemented now:
 - dataset identity and reproducibility state recorded in run market-data provenance
 - Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
   and status reporting
+- run provenance exposes rerun boundary identities and supports rerun-boundary filtering
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:

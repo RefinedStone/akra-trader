@@ -24,6 +24,7 @@ from akra_trader.domain.models import StrategySnapshot
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.lineage import build_aggregate_dataset_identity
+from akra_trader.lineage import build_aggregate_sync_checkpoint_identity
 from akra_trader.lineage import combine_reproducibility_states
 from akra_trader.ports import MarketDataPort
 
@@ -141,6 +142,11 @@ class DataEngine:
       for symbol, lineage in lineage_by_symbol.items()
       if lineage.dataset_identity is not None
     }
+    symbol_checkpoint_ids = {
+      symbol: lineage.sync_checkpoint_id
+      for symbol, lineage in lineage_by_symbol.items()
+      if lineage.sync_checkpoint_id is not None
+    }
     dataset_identity = None
     if reproducibility_state == "pinned" and len(symbol_identities) == len(lineage_by_symbol):
       dataset_identity = build_aggregate_dataset_identity(
@@ -149,6 +155,14 @@ class DataEngine:
         timeframe=config.timeframe,
         symbol_identities=symbol_identities,
       )
+    sync_checkpoint_id = None
+    if len(symbol_checkpoint_ids) == len(lineage_by_symbol):
+      sync_checkpoint_id = build_aggregate_sync_checkpoint_identity(
+        provider=lineages[0].provider,
+        venue=lineages[0].venue,
+        timeframe=config.timeframe,
+        symbol_checkpoint_ids=symbol_checkpoint_ids,
+      )
 
     return MarketDataLineage(
       provider=lineages[0].provider,
@@ -156,6 +170,7 @@ class DataEngine:
       symbols=config.symbols,
       timeframe=config.timeframe,
       dataset_identity=dataset_identity,
+      sync_checkpoint_id=sync_checkpoint_id,
       reproducibility_state=reproducibility_state,
       requested_start_at=config.start_at,
       requested_end_at=config.end_at,

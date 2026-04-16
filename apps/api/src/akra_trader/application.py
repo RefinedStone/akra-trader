@@ -26,6 +26,7 @@ from akra_trader.domain.models import StrategyRegistration
 from akra_trader.domain.models import StrategySnapshot
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.domain.services import summarize_performance
+from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
@@ -266,11 +267,13 @@ class TradingApplication:
     *,
     strategy_id: str | None = None,
     strategy_version: str | None = None,
+    rerun_boundary_id: str | None = None,
   ) -> list[RunRecord]:
     return self._runs.list_runs(
       mode=self._mode_service.normalize(mode),
       strategy_id=strategy_id,
       strategy_version=strategy_version,
+      rerun_boundary_id=rerun_boundary_id,
     )
 
   def get_run(self, run_id: str) -> RunRecord | None:
@@ -367,6 +370,7 @@ class TradingApplication:
         run.notes.append("Freqtrade reference adapter is not configured.")
       else:
         run = self._freqtrade_reference.execute_backtest(run, metadata)
+      self._attach_rerun_boundary(run)
       return self._runs.save_run(run)
     run = self._simulate_run(
       config=config,
@@ -480,6 +484,7 @@ class TradingApplication:
     run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
     run.provenance.market_data = loaded.lineage
     run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
+    self._attach_rerun_boundary(run)
     data = loaded.frame
     if data.empty:
       run.notes.append("No candles available for the requested range.")
@@ -581,6 +586,52 @@ class TradingApplication:
       resolved[name] = deepcopy(value)
     return resolved
 
+  def _attach_rerun_boundary(self, run: RunRecord) -> None:
+    market_data = run.provenance.market_data
+    if market_data is None:
+      run.provenance.rerun_boundary_id = None
+      run.provenance.rerun_boundary_state = "range_only"
+      return
+
+    strategy = run.provenance.strategy
+    symbol_checkpoint_ids = {
+      symbol: lineage.sync_checkpoint_id
+      for symbol, lineage in sorted(run.provenance.market_data_by_symbol.items())
+      if lineage.sync_checkpoint_id is not None
+    }
+    resolved_parameters = (
+      deepcopy(strategy.parameter_snapshot.resolved)
+      if strategy is not None
+      else deepcopy(run.config.parameters)
+    )
+    run.provenance.rerun_boundary_id = build_rerun_boundary_identity(
+      lane=run.provenance.lane,
+      mode=run.config.mode.value,
+      strategy_id=run.config.strategy_id,
+      strategy_version=run.config.strategy_version,
+      resolved_parameters=resolved_parameters,
+      venue=run.config.venue,
+      symbols=run.config.symbols,
+      timeframe=run.config.timeframe,
+      initial_cash=run.config.initial_cash,
+      fee_rate=run.config.fee_rate,
+      slippage_bps=run.config.slippage_bps,
+      market_data_reproducibility_state=market_data.reproducibility_state,
+      market_data_dataset_identity=market_data.dataset_identity,
+      market_data_sync_checkpoint_id=market_data.sync_checkpoint_id,
+      market_data_symbol_checkpoint_ids=symbol_checkpoint_ids,
+      requested_start_at=market_data.requested_start_at,
+      requested_end_at=market_data.requested_end_at,
+      effective_start_at=market_data.effective_start_at,
+      effective_end_at=market_data.effective_end_at,
+      candle_count=market_data.candle_count,
+      reference_id=run.provenance.reference_id,
+      reference_version=run.provenance.reference_version,
+      integration_mode=run.provenance.integration_mode,
+      external_command=run.provenance.external_command,
+    )
+    run.provenance.rerun_boundary_state = market_data.reproducibility_state
+
 
 def serialize_run(run: RunRecord) -> dict:
   payload = asdict(run)
@@ -656,6 +707,8 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     integration_mode=run.provenance.integration_mode,
     reference=deepcopy(run.provenance.reference),
     working_directory=run.provenance.working_directory,
+    rerun_boundary_id=run.provenance.rerun_boundary_id,
+    rerun_boundary_state=run.provenance.rerun_boundary_state,
     external_command=tuple(run.provenance.external_command),
     artifact_paths=tuple(run.provenance.artifact_paths),
     benchmark_artifacts=tuple(run.provenance.benchmark_artifacts),

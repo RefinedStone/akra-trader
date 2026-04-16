@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
+from akra_trader.adapters.binance import BinanceMarketDataAdapter
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
@@ -14,6 +16,25 @@ from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
+
+
+class FakeExchange:
+  def __init__(self, series: dict[tuple[str, str], list[list[float]]]) -> None:
+    self._series = series
+
+  def fetch_ohlcv(
+    self,
+    symbol: str,
+    timeframe: str = "5m",
+    since: int | None = None,
+    limit: int | None = None,
+  ) -> list[list[float]]:
+    values = list(self._series[(symbol, timeframe)])
+    if since is not None:
+      values = [row for row in values if row[0] >= since]
+    if limit is not None:
+      values = values[:limit]
+    return values
 
 
 def build_references():
@@ -61,8 +82,12 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert run.provenance.market_data.candle_count > 0
   assert run.provenance.market_data.dataset_identity is not None
   assert run.provenance.market_data.dataset_identity.startswith("dataset-v1:")
+  assert run.provenance.market_data.sync_checkpoint_id is None
   assert run.provenance.market_data.reproducibility_state == "pinned"
   assert run.provenance.market_data.sync_status == "fixture"
+  assert run.provenance.rerun_boundary_id is not None
+  assert run.provenance.rerun_boundary_id.startswith("rerun-v1:")
+  assert run.provenance.rerun_boundary_state == "pinned"
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
@@ -118,6 +143,99 @@ def test_backtest_dataset_identity_is_stable_for_matching_data_boundaries(tmp_pa
   assert first_identity == second_identity
   assert bounded_identity is not None
   assert bounded_identity != first_identity
+
+
+def test_backtest_rerun_boundary_is_stable_only_for_matching_execution_inputs(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  first = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  second = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  changed_cash = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=12_500,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  assert first.provenance.rerun_boundary_id is not None
+  assert first.provenance.rerun_boundary_id == second.provenance.rerun_boundary_id
+  assert changed_cash.provenance.rerun_boundary_id != first.provenance.rerun_boundary_id
+
+
+def test_backtest_provenance_links_directly_to_binance_sync_checkpoint(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = [
+    [
+      int((now - timedelta(minutes=25 - (index * 5))).timestamp() * 1000),
+      100 + index,
+      101 + index,
+      99 + index,
+      100.5 + index,
+      10 + index,
+    ]
+    for index in range(6)
+  ]
+  market_data = BinanceMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    exchange=FakeExchange({("BTC/USDT", "5m"): rows}),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now,
+  )
+  market_data.sync_tracked("5m")
+  status = market_data.get_status("5m")
+  checkpoint = status.instruments[0].sync_checkpoint
+  assert checkpoint is not None
+
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+  )
+
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.sync_checkpoint_id is not None
+  assert run.provenance.market_data.sync_checkpoint_id.startswith("checkpoint-group-v1:")
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_checkpoint_id == checkpoint.checkpoint_id
+  assert run.provenance.rerun_boundary_state == "pinned"
+  assert run.provenance.rerun_boundary_id is not None
 
 
 def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
@@ -307,6 +425,49 @@ def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
   assert len(filtered) == 1
   assert filtered[0].config.strategy_id == "ma_cross_v1"
   assert filtered[0].config.strategy_version == "1.0.0"
+
+
+def test_list_runs_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  first = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  second = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  other = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=5,
+    parameters={},
+  )
+
+  filtered = app.list_runs(rerun_boundary_id=first.provenance.rerun_boundary_id)
+
+  assert [run.config.run_id for run in filtered] == [second.config.run_id, first.config.run_id]
+  assert other.config.run_id not in [run.config.run_id for run in filtered]
 
 
 def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path: Path) -> None:
@@ -633,9 +794,12 @@ def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path)
   assert run.status == RunStatus.FAILED
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.dataset_identity is None
+  assert run.provenance.market_data.sync_checkpoint_id is None
   assert run.provenance.market_data.reproducibility_state == "range_only"
   assert run.provenance.market_data.requested_start_at == datetime(2030, 1, 1, tzinfo=UTC)
   assert run.provenance.market_data.candle_count == 0
+  assert run.provenance.rerun_boundary_id is not None
+  assert run.provenance.rerun_boundary_state == "range_only"
 
 
 def test_multi_symbol_run_records_market_lineage_per_symbol(tmp_path: Path) -> None:
@@ -668,15 +832,20 @@ def test_multi_symbol_run_records_market_lineage_per_symbol(tmp_path: Path) -> N
   assert run.provenance.market_data.symbols == ("BTC/USDT", "ETH/USDT")
   assert run.provenance.market_data.candle_count == 48
   assert run.provenance.market_data.dataset_identity is not None
+  assert run.provenance.market_data.sync_checkpoint_id is None
   assert run.provenance.market_data.reproducibility_state == "pinned"
   assert run.provenance.market_data.sync_status == "fixture"
+  assert run.provenance.rerun_boundary_id is not None
+  assert run.provenance.rerun_boundary_state == "pinned"
   assert run.provenance.market_data_by_symbol["BTC/USDT"].symbols == ("BTC/USDT",)
   assert run.provenance.market_data_by_symbol["BTC/USDT"].candle_count == 24
   assert run.provenance.market_data_by_symbol["BTC/USDT"].dataset_identity is not None
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_checkpoint_id is None
   assert run.provenance.market_data_by_symbol["BTC/USDT"].reproducibility_state == "pinned"
   assert run.provenance.market_data_by_symbol["ETH/USDT"].symbols == ("ETH/USDT",)
   assert run.provenance.market_data_by_symbol["ETH/USDT"].candle_count == 24
   assert run.provenance.market_data_by_symbol["ETH/USDT"].dataset_identity is not None
+  assert run.provenance.market_data_by_symbol["ETH/USDT"].sync_checkpoint_id is None
   assert run.provenance.market_data_by_symbol["ETH/USDT"].reproducibility_state == "pinned"
   assert reloaded is not None
   assert reloaded.provenance.market_data_by_symbol == run.provenance.market_data_by_symbol

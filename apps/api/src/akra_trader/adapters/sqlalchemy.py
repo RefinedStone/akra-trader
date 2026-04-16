@@ -89,6 +89,7 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
     *,
     strategy_id: str | None = None,
     strategy_version: str | None = None,
+    rerun_boundary_id: str | None = None,
   ) -> list[RunRecord]:
     statement = select(run_records.c.payload).order_by(
       run_records.c.started_at.desc(),
@@ -104,6 +105,8 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       runs = [run for run in runs if run.config.strategy_id == strategy_id]
     if strategy_version is not None:
       runs = [run for run in runs if run.config.strategy_version == strategy_version]
+    if rerun_boundary_id is not None:
+      runs = [run for run in runs if run.provenance.rerun_boundary_id == rerun_boundary_id]
     return runs
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None:

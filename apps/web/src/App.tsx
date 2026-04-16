@@ -82,6 +82,8 @@ type Run = {
     reference_id?: string | null;
     reference_version?: string | null;
     integration_mode?: string | null;
+    rerun_boundary_id?: string | null;
+    rerun_boundary_state: string;
     reference?: ReferenceSource | null;
     working_directory?: string | null;
     external_command: string[];
@@ -117,6 +119,7 @@ type Run = {
       symbols: string[];
       timeframe: string;
       dataset_identity?: string | null;
+      sync_checkpoint_id?: string | null;
       reproducibility_state: string;
       requested_start_at?: string | null;
       requested_end_at?: string | null;
@@ -135,6 +138,7 @@ type Run = {
         symbols: string[];
         timeframe: string;
         dataset_identity?: string | null;
+        sync_checkpoint_id?: string | null;
         reproducibility_state: string;
         requested_start_at?: string | null;
         requested_end_at?: string | null;
@@ -1760,6 +1764,8 @@ function RunSection({
                 <RunMarketDataLineage
                   lineage={run.provenance.market_data}
                   lineageBySymbol={run.provenance.market_data_by_symbol}
+                  rerunBoundaryId={run.provenance.rerun_boundary_id}
+                  rerunBoundaryState={run.provenance.rerun_boundary_state}
                 />
               ) : null}
               <div className="run-card-actions">
@@ -4880,9 +4886,13 @@ function RunStrategySnapshot({
 function RunMarketDataLineage({
   lineage,
   lineageBySymbol,
+  rerunBoundaryId,
+  rerunBoundaryState,
 }: {
   lineage: NonNullable<Run["provenance"]["market_data"]>;
   lineageBySymbol?: NonNullable<Run["provenance"]["market_data_by_symbol"]>;
+  rerunBoundaryId?: string | null;
+  rerunBoundaryState: string;
 }) {
   const symbolEntries = Object.entries(lineageBySymbol ?? {});
 
@@ -4896,6 +4906,7 @@ function RunMarketDataLineage({
         <Metric label="Provider" value={lineage.provider} />
         <Metric label="Sync" value={lineage.sync_status} />
         <Metric label="Repro" value={lineage.reproducibility_state} />
+        <Metric label="Boundary" value={rerunBoundaryState} />
         <Metric label="Candles" value={String(lineage.candle_count)} />
         <Metric label="Timeframe" value={lineage.timeframe} />
       </div>
@@ -4906,6 +4917,8 @@ function RunMarketDataLineage({
         <p>Requested window: {formatRange(lineage.requested_start_at, lineage.requested_end_at)}</p>
         <p>Effective window: {formatRange(lineage.effective_start_at, lineage.effective_end_at)}</p>
         <p>Dataset ID: {lineage.dataset_identity ?? "unavailable"}</p>
+        <p>Sync checkpoint: {lineage.sync_checkpoint_id ?? "unavailable"}</p>
+        <p>Rerun boundary: {rerunBoundaryId ?? "unavailable"}</p>
         <p>Last sync: {formatTimestamp(lineage.last_sync_at)}</p>
         <p>Issues: {lineage.issues.length ? lineage.issues.join(", ") : "none"}</p>
       </div>
@@ -4924,6 +4937,9 @@ function RunMarketDataLineage({
                 <Metric label="Window" value={formatRange(symbolLineage.effective_start_at, symbolLineage.effective_end_at)} />
               </div>
               <p className="run-lineage-symbol-copy">Dataset ID: {symbolLineage.dataset_identity ?? "unavailable"}</p>
+              <p className="run-lineage-symbol-copy">
+                Sync checkpoint: {symbolLineage.sync_checkpoint_id ?? "unavailable"}
+              </p>
               <p className="run-lineage-symbol-copy">Last sync: {formatTimestamp(symbolLineage.last_sync_at)}</p>
               <p className="run-lineage-symbol-copy">
                 Issues: {symbolLineage.issues.length ? symbolLineage.issues.join(", ") : "none"}

@@ -103,6 +103,7 @@ class RunRepositoryPort(Protocol):
     *,
     strategy_id: str | None = None,
     strategy_version: str | None = None,
+    rerun_boundary_id: str | None = None,
   ) -> list[RunRecord]: ...
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None: ...

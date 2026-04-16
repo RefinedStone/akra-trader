@@ -283,6 +283,13 @@ class BinanceMarketDataAdapter(MarketDataPort):
     limit: int | None = None,
   ) -> MarketDataLineage:
     quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
+    sync_checkpoint = quality.sync_state.checkpoint if quality.sync_state is not None else None
+    if sync_checkpoint is None and quality.coverage.candle_count > 0:
+      sync_checkpoint = self._build_sync_checkpoint(
+        symbol=symbol,
+        timeframe=timeframe,
+        coverage=quality.coverage,
+      )
     issues = list(quality.issues)
     if limit is not None and len(candles) < limit:
       issues.append("insufficient_candle_coverage")
@@ -303,6 +310,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
       symbols=(symbol,),
       timeframe=timeframe,
       dataset_identity=dataset_identity,
+      sync_checkpoint_id=sync_checkpoint.checkpoint_id if sync_checkpoint is not None else None,
       reproducibility_state=reproducibility_state,
       requested_start_at=start_at,
       requested_end_at=end_at,
