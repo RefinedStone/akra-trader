@@ -1374,8 +1374,31 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
   assert first_status.ownership.state == "owned"
   assert first_status.ownership.owner_run_id == run.config.run_id
   assert first_status.order_book.open_orders[0].order_id == recovered_order_id
+  assert first_status.session_handoff.state == "active"
+  assert first_status.session_handoff.transport == "seeded_stream"
 
   clock.advance(timedelta(seconds=5))
+  resumed_execution = SeededVenueExecutionAdapter(
+    clock=clock,
+    restored_orders=(
+      GuardedLiveVenueOrderResult(
+        order_id=recovered_order_id,
+        venue="binance",
+        symbol="ETH/USDT",
+        side="buy",
+        amount=0.5,
+        status="partially_filled",
+        submitted_at=run.started_at,
+        updated_at=clock(),
+        requested_price=2_000.0,
+        average_fill_price=1_998.0,
+        fee_paid=0.2,
+        requested_amount=0.5,
+        filled_amount=0.2,
+        remaining_amount=0.3,
+      ),
+    ),
+  )
   resumed_app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
@@ -1384,27 +1407,7 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
     guarded_live_state=guarded_live_state,
     clock=clock,
     venue_state=StaticVenueStateAdapter(venue_snapshot),
-    venue_execution=SeededVenueExecutionAdapter(
-      clock=clock,
-      restored_orders=(
-        GuardedLiveVenueOrderResult(
-          order_id=recovered_order_id,
-          venue="binance",
-          symbol="ETH/USDT",
-          side="buy",
-          amount=0.5,
-          status="partially_filled",
-          submitted_at=run.started_at,
-          updated_at=clock(),
-          requested_price=2_000.0,
-          average_fill_price=1_998.0,
-          fee_paid=0.2,
-          requested_amount=0.5,
-          filled_amount=0.2,
-          remaining_amount=0.3,
-        ),
-      ),
-    ),
+    venue_execution=resumed_execution,
     guarded_live_execution_enabled=True,
   )
 
@@ -1413,12 +1416,6 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
     reason="process_restart_resume",
   )
   resumed_status = resumed_app.get_guarded_live_status()
-  canceled = resumed_app.cancel_live_order(
-    run_id=run.config.run_id,
-    order_id=recovered_order_id,
-    actor="operator",
-    reason="resume_validation_cancel",
-  )
 
   assert resumed.status == RunStatus.RUNNING
   assert resumed.provenance.runtime_session is not None
@@ -1434,9 +1431,40 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
   assert resumed_status.session_restore.state == "restored"
   assert resumed_status.session_restore.source == "seeded_venue_execution"
   assert resumed_status.session_restore.owner_run_id == run.config.run_id
+  assert resumed_status.session_handoff.state == "active"
+  assert resumed_status.session_handoff.transport == "seeded_stream"
+  assert resumed_status.session_handoff.owner_run_id == run.config.run_id
   assert resumed_status.order_book.open_orders[0].order_id == recovered_order_id
   assert resumed_status.order_book.open_orders[0].amount == pytest.approx(0.3)
-  assert canceled.orders[0].status == OrderStatus.CANCELED
+
+  prior_cursor = resumed_status.session_handoff.cursor
+  clock.advance(timedelta(seconds=5))
+  resumed_execution.set_order_state(
+    recovered_order_id,
+    symbol="ETH/USDT",
+    side="buy",
+    amount=0.5,
+    requested_price=2_000.0,
+    status="filled",
+    updated_at=clock(),
+    average_fill_price=1_999.0,
+    fee_paid=0.3,
+    filled_amount=0.5,
+    remaining_amount=0.0,
+  )
+  maintenance = resumed_app.maintain_guarded_live_worker_sessions()
+  post_sync_status = resumed_app.get_guarded_live_status()
+
+  assert maintenance["maintained"] == 1
+  assert maintenance["orders_synced"] >= 1
+  synced_run = resumed_app.get_run(run.config.run_id)
+  assert synced_run is not None
+  assert synced_run.orders[0].status == OrderStatus.FILLED
+  assert post_sync_status.session_handoff.state == "active"
+  assert post_sync_status.session_handoff.cursor != prior_cursor
+  assert post_sync_status.session_handoff.last_event_at == clock()
+  assert post_sync_status.order_book.state == "empty"
+  assert any("guarded_live_venue_session_synced" in note for note in resumed_app.get_run(run.config.run_id).notes)
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

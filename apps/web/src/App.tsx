@@ -456,6 +456,23 @@ type GuardedLiveStatus = {
     }[];
     issues: string[];
   };
+  session_handoff: {
+    state: string;
+    handed_off_at?: string | null;
+    released_at?: string | null;
+    source: string;
+    venue?: string | null;
+    symbol?: string | null;
+    owner_run_id?: string | null;
+    owner_session_id?: string | null;
+    venue_session_id?: string | null;
+    transport: string;
+    cursor?: string | null;
+    last_event_at?: string | null;
+    last_sync_at?: string | null;
+    active_order_count: number;
+    issues: string[];
+  };
   audit_events: {
     event_id: string;
     timestamp: string;
@@ -1083,6 +1100,7 @@ export default function App() {
       latestRecoveryAt: guardedLive.recovery.recovered_at ?? null,
       latestOrderSyncAt: guardedLive.order_book.synced_at ?? guardedLive.ownership.last_order_sync_at ?? null,
       latestSessionRestoreAt: guardedLive.session_restore.restored_at ?? null,
+      latestSessionHandoffAt: guardedLive.session_handoff.last_sync_at ?? guardedLive.session_handoff.handed_off_at ?? null,
     };
   }, [guardedLive]);
 
@@ -1732,6 +1750,10 @@ export default function App() {
                     <strong>{guardedLive.session_restore.state}</strong>
                   </div>
                   <div className="metric-tile">
+                    <span>Session handoff</span>
+                    <strong>{guardedLive.session_handoff.state}</strong>
+                  </div>
+                  <div className="metric-tile">
                     <span>Latest audit</span>
                     <strong>{formatTimestamp(guardedLiveSummary.latestAuditAt)}</strong>
                   </div>
@@ -1835,6 +1857,18 @@ export default function App() {
                       <tr>
                         <th>Restored at</th>
                         <td>{formatTimestamp(guardedLiveSummary?.latestSessionRestoreAt ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Handoff state</th>
+                        <td>{guardedLive.session_handoff.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Handoff transport</th>
+                        <td>{guardedLive.session_handoff.transport}</td>
+                      </tr>
+                      <tr>
+                        <th>Last handoff sync</th>
+                        <td>{formatTimestamp(guardedLiveSummary?.latestSessionHandoffAt ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Reconciliation scope</th>
@@ -2161,6 +2195,63 @@ export default function App() {
                   ) : (
                     <p className="empty-state">No venue-native session lifecycle rows restored yet.</p>
                   )}
+                  <h3>Venue-native session handoff</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>State</th>
+                        <td>{guardedLive.session_handoff.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Source</th>
+                        <td>{guardedLive.session_handoff.source}</td>
+                      </tr>
+                      <tr>
+                        <th>Transport</th>
+                        <td>{guardedLive.session_handoff.transport}</td>
+                      </tr>
+                      <tr>
+                        <th>Handed off at</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.handed_off_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Released at</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.released_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last event</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last sync</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_sync_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Venue session</th>
+                        <td>{guardedLive.session_handoff.venue_session_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Cursor</th>
+                        <td>{guardedLive.session_handoff.cursor ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Active orders</th>
+                        <td>{guardedLive.session_handoff.active_order_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner run</th>
+                        <td>{guardedLive.session_handoff.owner_run_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner session</th>
+                        <td>{guardedLive.session_handoff.owner_session_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Issues</th>
+                        <td>{guardedLive.session_handoff.issues.length ? guardedLive.session_handoff.issues.join(", ") : "none"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
                   <h3>Durable order book</h3>
                   <table className="data-table">
                     <tbody>

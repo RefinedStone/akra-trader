@@ -59,6 +59,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live control state now persists live session ownership and a durable open-order snapshot,
   and guarded-live resume now restores tracked venue order lifecycle state before falling back to
   the persisted snapshot after restart or fault drills
+- guarded-live runtime now persists a venue session handoff with transport/session metadata so
+  maintenance keeps following the same venue-owned lifecycle after resume
 
 ### Control room
 
@@ -74,7 +76,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live panel with persisted kill-switch state, candidacy blockers, reconciliation findings,
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
   live-owner visibility, venue-native session-restore state, durable order-book visibility,
-  guarded-live resume controls, and guarded-live audit history
+  venue session handoff visibility, guarded-live resume controls, and guarded-live audit history
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -99,7 +101,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - durable operator event storage and external alert delivery
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
-- full venue-native stream/session handoff after restart or faults
+- venue-push stream transport and richer exchange-native session continuation after restart or faults
 - live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
 
@@ -108,5 +110,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from venue-native lifecycle restore into full stream/session handoff and wider live-path audit coverage.
+4. Expand guarded-live controls from persisted venue session handoff into venue-push continuation and wider live-path audit coverage.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

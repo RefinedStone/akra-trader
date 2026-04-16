@@ -26,11 +26,13 @@ from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveStatus
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueSessionHandoff
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import GuardedLiveRuntimeRecovery
 from akra_trader.domain.models import GuardedLiveOrderBookSync
 from akra_trader.domain.models import GuardedLiveSessionOwnership
 from akra_trader.domain.models import GuardedLiveVenueSessionRestore
+from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
@@ -279,6 +281,39 @@ class TradingApplication:
   class _UnavailableVenueExecutionAdapter(VenueExecutionPort):
     def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
       return False, ("venue_execution_port_unconfigured",)
+
+    def restore_session(
+      self,
+      *,
+      symbol: str,
+      owned_order_ids: tuple[str, ...],
+    ) -> GuardedLiveVenueSessionRestore:
+      raise RuntimeError("Venue execution port is not configured.")
+
+    def handoff_session(
+      self,
+      *,
+      symbol: str,
+      owner_run_id: str,
+      owner_session_id: str | None,
+      owned_order_ids: tuple[str, ...],
+    ) -> GuardedLiveVenueSessionHandoff:
+      raise RuntimeError("Venue execution port is not configured.")
+
+    def sync_session(
+      self,
+      *,
+      handoff: GuardedLiveVenueSessionHandoff,
+      order_ids: tuple[str, ...],
+    ) -> GuardedLiveVenueSessionSync:
+      raise RuntimeError("Venue execution port is not configured.")
+
+    def release_session(
+      self,
+      *,
+      handoff: GuardedLiveVenueSessionHandoff,
+    ) -> GuardedLiveVenueSessionHandoff:
+      raise RuntimeError("Venue execution port is not configured.")
 
     def submit_market_order(
       self,
@@ -530,6 +565,7 @@ class TradingApplication:
       ownership=state.ownership,
       order_book=state.order_book,
       session_restore=state.session_restore,
+      session_handoff=state.session_handoff,
       audit_events=audit_events,
       active_runtime_alert_count=len(runtime_visibility.alerts),
       running_sandbox_count=running_sandbox_count,
@@ -1030,10 +1066,16 @@ class TradingApplication:
       ),
     )
     saved_run = self._runs.save_run(run)
+    session_handoff = self._activate_guarded_live_venue_session(
+      run=saved_run,
+      reason=operator_reason,
+    )
+    saved_run = self._runs.save_run(saved_run)
     self._claim_guarded_live_session_ownership(
       run=saved_run,
       actor="operator",
       reason=operator_reason,
+      session_handoff=session_handoff,
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_started",
@@ -1189,11 +1231,14 @@ class TradingApplication:
       reason="Guarded-live worker stopped by operator. Venue open orders remain operator-managed.",
     )
     saved_run = self._runs.save_run(run)
+    session_handoff = self._release_guarded_live_venue_session(run=saved_run)
+    saved_run = self._runs.save_run(saved_run)
     self._release_guarded_live_session_ownership(
       run=saved_run,
       actor="operator",
       reason="operator_stop",
       ownership_state="released",
+      session_handoff=session_handoff,
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_stopped",
@@ -1253,6 +1298,10 @@ class TradingApplication:
         run.notes.append(
           f"{current_time.isoformat()} | guarded_live_order_book_resume_warning | {exc}"
         )
+    session_handoff = self._activate_guarded_live_venue_session(
+      run=run,
+      reason=reason,
+    )
     self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
     run.notes.append(
       f"{current_time.isoformat()} | guarded_live_worker_resumed | {reason}"
@@ -1269,6 +1318,7 @@ class TradingApplication:
       reason=reason,
       resumed=True,
       session_restore=session_restore,
+      session_handoff=session_handoff,
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_resumed",
@@ -1497,6 +1547,7 @@ class TradingApplication:
     reason: str,
     resumed: bool = False,
     session_restore: GuardedLiveVenueSessionRestore | None = None,
+    session_handoff: GuardedLiveVenueSessionHandoff | None = None,
   ) -> None:
     session = run.provenance.runtime_session
     current_time = self._clock()
@@ -1524,6 +1575,11 @@ class TradingApplication:
           existing=state.session_restore,
           session_restore=session_restore,
         ),
+        session_handoff=self._resolve_guarded_live_session_handoff_state(
+          run=run,
+          existing=state.session_handoff,
+          session_handoff=session_handoff,
+        ),
       )
     )
 
@@ -1534,6 +1590,7 @@ class TradingApplication:
     actor: str,
     reason: str,
     ownership_state: str,
+    session_handoff: GuardedLiveVenueSessionHandoff | None = None,
   ) -> None:
     session = run.provenance.runtime_session
     current_time = self._clock()
@@ -1559,6 +1616,11 @@ class TradingApplication:
         session_restore=self._resolve_guarded_live_session_restore_state(
           run=run,
           existing=state.session_restore,
+        ),
+        session_handoff=self._resolve_guarded_live_session_handoff_state(
+          run=run,
+          existing=state.session_handoff,
+          session_handoff=session_handoff,
         ),
       )
     )
@@ -1597,6 +1659,100 @@ class TradingApplication:
       owner_run_id=run.config.run_id,
       owner_session_id=session_id,
     )
+
+  def _resolve_guarded_live_session_handoff_state(
+    self,
+    *,
+    run: RunRecord,
+    existing: GuardedLiveVenueSessionHandoff,
+    session_handoff: GuardedLiveVenueSessionHandoff | None = None,
+  ) -> GuardedLiveVenueSessionHandoff:
+    session = run.provenance.runtime_session
+    session_id = session.session_id if session is not None else existing.owner_session_id
+    symbol = run.config.symbols[0] if run.config.symbols else existing.symbol
+    if session_handoff is not None:
+      return replace(
+        session_handoff,
+        venue=session_handoff.venue or run.config.venue,
+        symbol=session_handoff.symbol or symbol,
+        owner_run_id=run.config.run_id,
+        owner_session_id=session_id,
+      )
+    if existing.owner_run_id == run.config.run_id:
+      return replace(
+        existing,
+        venue=existing.venue or run.config.venue,
+        symbol=existing.symbol or symbol,
+        owner_run_id=run.config.run_id,
+        owner_session_id=session_id,
+      )
+    return GuardedLiveVenueSessionHandoff(
+      state="inactive",
+      source="live_start",
+      venue=run.config.venue,
+      symbol=symbol,
+      owner_run_id=run.config.run_id,
+      owner_session_id=session_id,
+    )
+
+  def _activate_guarded_live_venue_session(
+    self,
+    *,
+    run: RunRecord,
+    reason: str,
+  ) -> GuardedLiveVenueSessionHandoff:
+    session = run.provenance.runtime_session
+    handoff = self._venue_execution.handoff_session(
+      symbol=run.config.symbols[0],
+      owner_run_id=run.config.run_id,
+      owner_session_id=session.session_id if session is not None else None,
+      owned_order_ids=tuple(order.order_id for order in run.orders),
+    )
+    current_time = self._clock()
+    run.notes.append(
+      f"{current_time.isoformat()} | guarded_live_venue_session_handed_off | "
+      f"source={handoff.source}; transport={handoff.transport}; state={handoff.state}; reason={reason}"
+    )
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_venue_session_handed_off",
+      actor="system",
+      summary=f"Guarded-live venue session handed off for {run.config.symbols[0]}.",
+      detail=(
+        f"Reason: {reason}. Source {handoff.source} activated transport {handoff.transport} "
+        f"with session {handoff.venue_session_id or 'n/a'}."
+      ),
+      run_id=run.config.run_id,
+      session_id=session.session_id if session is not None else None,
+    )
+    return handoff
+
+  def _release_guarded_live_venue_session(
+    self,
+    *,
+    run: RunRecord,
+  ) -> GuardedLiveVenueSessionHandoff:
+    state = self._guarded_live_state.load_state()
+    current_handoff = state.session_handoff
+    if current_handoff.owner_run_id != run.config.run_id:
+      return current_handoff
+    released = self._venue_execution.release_session(handoff=current_handoff)
+    current_time = self._clock()
+    run.notes.append(
+      f"{current_time.isoformat()} | guarded_live_venue_session_released | "
+      f"source={released.source}; transport={released.transport}; state={released.state}"
+    )
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_venue_session_released",
+      actor="system",
+      summary=f"Guarded-live venue session released for {run.config.symbols[0]}.",
+      detail=(
+        f"Source {released.source} released transport {released.transport} "
+        f"for session {released.venue_session_id or 'n/a'}."
+      ),
+      run_id=run.config.run_id,
+      session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+    )
+    return released
 
   def _restore_guarded_live_venue_session(
     self,
@@ -1704,13 +1860,13 @@ class TradingApplication:
     *,
     run: RunRecord,
     session_restore: GuardedLiveVenueSessionRestore,
-  ) -> None:
+  ) -> int:
     existing_orders = {order.order_id: order for order in run.orders}
     open_orders_by_id = {
       order.order_id: order
       for order in session_restore.open_orders
     }
-    state_changed = False
+    state_changes = 0
     for synced_state in session_restore.synced_orders:
       if synced_state.status == "unknown":
         continue
@@ -1722,14 +1878,12 @@ class TradingApplication:
           open_order=open_orders_by_id.get(synced_state.order_id),
         )
         existing_orders[order.order_id] = order
-        state_changed = True
-      state_changed = bool(
-        self._apply_guarded_live_synced_order_state(
-          run=run,
-          order=order,
-          synced_state=synced_state,
-        )
-      ) or state_changed
+        state_changes += 1
+      state_changes += self._apply_guarded_live_synced_order_state(
+        run=run,
+        order=order,
+        synced_state=synced_state,
+      )
 
     for open_order in session_restore.open_orders:
       if open_order.order_id in existing_orders:
@@ -1740,14 +1894,15 @@ class TradingApplication:
         open_order=open_order,
       )
       existing_orders[order.order_id] = order
-      state_changed = True
+      state_changes += 1
 
-    if state_changed:
+    if state_changes > 0:
       run.metrics = summarize_performance(
         initial_cash=run.config.initial_cash,
         equity_curve=run.equity_curve,
         closed_trades=run.closed_trades,
       )
+    return state_changes
 
   def _materialize_guarded_live_restored_order(
     self,
@@ -2652,6 +2807,7 @@ class TradingApplication:
       if run.status != RunStatus.RUNNING:
         continue
       try:
+        state = self._guarded_live_state.load_state()
         if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
           self._run_supervisor.recover_worker_session(
             run=run,
@@ -2679,7 +2835,17 @@ class TradingApplication:
           )
           recovered += 1
 
-        orders_synced += self._sync_guarded_live_orders(run)
+        session_handoff = state.session_handoff
+        if session_handoff.owner_run_id == run.config.run_id and session_handoff.state == "active":
+          session_sync = self._sync_guarded_live_session(run=run, handoff=session_handoff)
+          orders_synced += session_sync["synced"]
+          session_handoff = session_sync["handoff"]
+        else:
+          orders_synced += self._sync_guarded_live_orders(run)
+          session_handoff = self._activate_guarded_live_venue_session(
+            run=run,
+            reason=recovery_reason if force_recovery else "worker_heartbeat",
+          )
         advance = self._advance_guarded_live_worker_run(run)
         ticks_processed += advance["ticks_processed"]
         orders_submitted += advance["orders_submitted"]
@@ -2689,6 +2855,7 @@ class TradingApplication:
           actor="system",
           reason=recovery_reason if force_recovery else "worker_heartbeat",
           resumed=force_recovery,
+          session_handoff=session_handoff,
         )
       except Exception as exc:
         self._run_supervisor.fail(
@@ -2696,11 +2863,13 @@ class TradingApplication:
           reason=f"{current_time.isoformat()} | guarded_live_worker_failed | {exc}",
           now=current_time,
         )
+        session_handoff = self._release_guarded_live_venue_session(run=run)
         self._release_guarded_live_session_ownership(
           run=run,
           actor="system",
           reason=str(exc),
           ownership_state="orphaned",
+          session_handoff=session_handoff,
         )
         self._append_guarded_live_audit_event(
           kind="guarded_live_worker_failed",
@@ -2754,6 +2923,58 @@ class TradingApplication:
         closed_trades=run.closed_trades,
       )
     return synced_count
+
+  def _sync_guarded_live_session(
+    self,
+    *,
+    run: RunRecord,
+    handoff: GuardedLiveVenueSessionHandoff,
+  ) -> dict[str, object]:
+    session_sync = self._venue_execution.sync_session(
+      handoff=handoff,
+      order_ids=tuple(order.order_id for order in run.orders),
+    )
+    restore_view = GuardedLiveVenueSessionRestore(
+      state="restored" if session_sync.state == "active" else session_sync.state,
+      restored_at=session_sync.synced_at,
+      source=session_sync.handoff.source,
+      venue=session_sync.handoff.venue,
+      symbol=session_sync.handoff.symbol,
+      owner_run_id=session_sync.handoff.owner_run_id,
+      owner_session_id=session_sync.handoff.owner_session_id,
+      open_orders=session_sync.open_orders,
+      synced_orders=session_sync.synced_orders,
+      issues=session_sync.issues,
+    )
+    synced_count = self._apply_guarded_live_restored_session(
+      run=run,
+      session_restore=restore_view,
+    )
+    next_handoff = session_sync.handoff
+    if synced_count > 0 or session_sync.issues or next_handoff.last_event_at != handoff.last_event_at:
+      sync_time = session_sync.synced_at or self._clock()
+      detail = (
+        f"source={next_handoff.source}; transport={next_handoff.transport}; "
+        f"state={next_handoff.state}; active_orders={next_handoff.active_order_count}; "
+        f"cursor={next_handoff.cursor or 'n/a'}"
+      )
+      if session_sync.issues:
+        detail += f"; issues={', '.join(session_sync.issues)}"
+      run.notes.append(
+        f"{sync_time.isoformat()} | guarded_live_venue_session_synced | {detail}"
+      )
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_venue_session_synced",
+        actor="system",
+        summary=f"Guarded-live venue session synced for {run.config.symbols[0]}.",
+        detail=detail,
+        run_id=run.config.run_id,
+        session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+      )
+    return {
+      "synced": synced_count,
+      "handoff": next_handoff,
+    }
 
   def _apply_guarded_live_synced_order_state(
     self,

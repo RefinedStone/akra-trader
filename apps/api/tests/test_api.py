@@ -832,6 +832,8 @@ def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path
   assert status_payload["ownership"]["state"] == "owned"
   assert status_payload["ownership"]["owner_run_id"] == run_id
   assert status_payload["order_book"]["open_orders"][0]["order_id"] == "venue-open-order-1"
+  assert status_payload["session_handoff"]["state"] == "active"
+  assert status_payload["session_handoff"]["transport"] == "seeded_stream"
 
   with build_client(database_path, guarded_live_execution_enabled=True) as restarted_client:
     restarted_client.app.state.container.app._venue_execution = SeededVenueExecutionAdapter(
@@ -873,6 +875,9 @@ def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path
   assert resumed_status_payload["session_restore"]["state"] == "restored"
   assert resumed_status_payload["session_restore"]["source"] == "seeded_venue_execution"
   assert resumed_status_payload["session_restore"]["owner_run_id"] == run_id
+  assert resumed_status_payload["session_handoff"]["state"] == "active"
+  assert resumed_status_payload["session_handoff"]["transport"] == "seeded_stream"
+  assert resumed_status_payload["session_handoff"]["owner_run_id"] == run_id
   assert resumed_status_payload["order_book"]["open_orders"][0]["amount"] == 0.3
 
 

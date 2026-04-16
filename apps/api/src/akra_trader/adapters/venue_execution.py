@@ -11,7 +11,9 @@ import ccxt
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueSessionHandoff
 from akra_trader.domain.models import GuardedLiveVenueSessionRestore
+from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.ports import VenueExecutionPort
 
 
@@ -80,6 +82,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       order.order_id: order
       for order in restored_orders
     }
+    self._active_handoffs: dict[str, GuardedLiveVenueSessionHandoff] = {}
 
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
     return True, ()
@@ -153,6 +156,106 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       synced_orders=tuple(synced_orders),
       issues=tuple(issues),
     )
+
+  def handoff_session(
+    self,
+    *,
+    symbol: str,
+    owner_run_id: str,
+    owner_session_id: str | None,
+    owned_order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionHandoff:
+    current_time = self._clock()
+    session_key = owner_session_id or f"seeded-session-{len(self._active_handoffs) + 1}"
+    handoff = GuardedLiveVenueSessionHandoff(
+      state="active",
+      handed_off_at=current_time,
+      source="seeded_venue_execution",
+      venue=self._venue,
+      symbol=symbol,
+      owner_run_id=owner_run_id,
+      owner_session_id=owner_session_id,
+      venue_session_id=session_key,
+      transport="seeded_stream",
+      cursor="event-0",
+      last_event_at=self._resolve_last_event_at(symbol=symbol),
+      last_sync_at=current_time,
+      active_order_count=self._count_active_orders(symbol=symbol),
+      issues=(),
+    )
+    self._active_handoffs[session_key] = handoff
+    return handoff
+
+  def sync_session(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionSync:
+    current_time = self._clock()
+    session_key = handoff.venue_session_id or handoff.owner_session_id or ""
+    existing = self._active_handoffs.get(session_key, handoff)
+    synced_orders = self.sync_order_states(
+      symbol=existing.symbol or handoff.symbol or "",
+      order_ids=order_ids,
+    )
+    open_orders = self._build_open_orders(symbol=existing.symbol or handoff.symbol or "")
+    next_cursor = self._increment_cursor(existing.cursor)
+    next_handoff = GuardedLiveVenueSessionHandoff(
+      state="active",
+      handed_off_at=existing.handed_off_at or handoff.handed_off_at or current_time,
+      released_at=None,
+      source=existing.source or handoff.source or "seeded_venue_execution",
+      venue=existing.venue or handoff.venue or self._venue,
+      symbol=existing.symbol or handoff.symbol,
+      owner_run_id=existing.owner_run_id or handoff.owner_run_id,
+      owner_session_id=existing.owner_session_id or handoff.owner_session_id,
+      venue_session_id=session_key or None,
+      transport=existing.transport or handoff.transport or "seeded_stream",
+      cursor=next_cursor,
+      last_event_at=self._resolve_last_event_at(symbol=existing.symbol or handoff.symbol or ""),
+      last_sync_at=current_time,
+      active_order_count=len(open_orders),
+      issues=(),
+    )
+    if session_key:
+      self._active_handoffs[session_key] = next_handoff
+    return GuardedLiveVenueSessionSync(
+      state="active",
+      synced_at=current_time,
+      handoff=next_handoff,
+      synced_orders=synced_orders,
+      open_orders=open_orders,
+      issues=(),
+    )
+
+  def release_session(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+  ) -> GuardedLiveVenueSessionHandoff:
+    current_time = self._clock()
+    session_key = handoff.venue_session_id or handoff.owner_session_id or ""
+    released = GuardedLiveVenueSessionHandoff(
+      state="released",
+      handed_off_at=handoff.handed_off_at,
+      released_at=current_time,
+      source=handoff.source or "seeded_venue_execution",
+      venue=handoff.venue or self._venue,
+      symbol=handoff.symbol,
+      owner_run_id=handoff.owner_run_id,
+      owner_session_id=handoff.owner_session_id,
+      venue_session_id=handoff.venue_session_id,
+      transport=handoff.transport or "seeded_stream",
+      cursor=handoff.cursor,
+      last_event_at=handoff.last_event_at,
+      last_sync_at=current_time,
+      active_order_count=0,
+      issues=handoff.issues,
+    )
+    if session_key:
+      self._active_handoffs[session_key] = released
+    return released
 
   def submit_market_order(
     self,
@@ -326,6 +429,62 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       remaining_amount=remaining_amount,
     )
 
+  def _build_open_orders(
+    self,
+    *,
+    symbol: str,
+  ) -> tuple[GuardedLiveVenueOpenOrder, ...]:
+    return tuple(
+      sorted(
+        (
+          GuardedLiveVenueOpenOrder(
+            order_id=state.order_id,
+            symbol=state.symbol,
+            side=state.side,
+            amount=state.remaining_amount if state.remaining_amount is not None else state.amount,
+            status=state.status,
+            price=state.requested_price or state.average_fill_price,
+          )
+          for state in self._order_states.values()
+          if state.symbol == symbol
+          and state.status in {"open", "partially_filled"}
+          and (state.remaining_amount is None or state.remaining_amount > 0)
+        ),
+        key=lambda order: (order.symbol, order.order_id),
+      )
+    )
+
+  def _count_active_orders(
+    self,
+    *,
+    symbol: str,
+  ) -> int:
+    return len(self._build_open_orders(symbol=symbol))
+
+  def _resolve_last_event_at(
+    self,
+    *,
+    symbol: str,
+  ) -> datetime | None:
+    matching_times = [
+      state.updated_at or state.submitted_at
+      for state in self._order_states.values()
+      if state.symbol == symbol
+    ]
+    if not matching_times:
+      return None
+    return max(matching_times)
+
+  @staticmethod
+  def _increment_cursor(cursor: str | None) -> str:
+    if cursor is None or not cursor.startswith("event-"):
+      return "event-1"
+    try:
+      value = int(cursor.split("-", 1)[1])
+    except (IndexError, ValueError):
+      return "event-1"
+    return f"event-{value + 1}"
+
 
 class BinanceVenueExecutionAdapter(VenueExecutionPort):
   def __init__(
@@ -436,6 +595,98 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       open_orders=open_orders,
       synced_orders=tuple(synced_orders),
       issues=tuple(issues),
+    )
+
+  def handoff_session(
+    self,
+    *,
+    symbol: str,
+    owner_run_id: str,
+    owner_session_id: str | None,
+    owned_order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionHandoff:
+    current_time = self._clock()
+    restore = self.restore_session(symbol=symbol, owned_order_ids=owned_order_ids)
+    handoff_state = "active" if restore.state in {"restored", "partial", "not_found"} else "unavailable"
+    return GuardedLiveVenueSessionHandoff(
+      state=handoff_state,
+      handed_off_at=current_time,
+      source="binance_exchange",
+      venue=self._venue,
+      symbol=symbol,
+      owner_run_id=owner_run_id,
+      owner_session_id=owner_session_id,
+      venue_session_id=f"binance-session:{symbol}:{int(current_time.timestamp())}",
+      transport="binance_rest_session",
+      cursor=current_time.isoformat(),
+      last_event_at=restore.restored_at,
+      last_sync_at=current_time,
+      active_order_count=len(restore.open_orders),
+      issues=restore.issues,
+    )
+
+  def sync_session(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionSync:
+    current_time = self._clock()
+    symbol = handoff.symbol or ""
+    restore = self.restore_session(symbol=symbol, owned_order_ids=order_ids)
+    synced_orders = restore.synced_orders
+    open_orders = restore.open_orders
+    active_order_count = len(open_orders)
+    handoff_state = "active" if handoff.state != "released" else "released"
+    last_event_at = restore.restored_at or handoff.last_event_at
+    next_handoff = GuardedLiveVenueSessionHandoff(
+      state=handoff_state,
+      handed_off_at=handoff.handed_off_at,
+      released_at=handoff.released_at,
+      source=handoff.source or "binance_exchange",
+      venue=handoff.venue or self._venue,
+      symbol=symbol or handoff.symbol,
+      owner_run_id=handoff.owner_run_id,
+      owner_session_id=handoff.owner_session_id,
+      venue_session_id=handoff.venue_session_id,
+      transport=handoff.transport or "binance_rest_session",
+      cursor=current_time.isoformat(),
+      last_event_at=last_event_at,
+      last_sync_at=current_time,
+      active_order_count=active_order_count,
+      issues=restore.issues,
+    )
+    return GuardedLiveVenueSessionSync(
+      state=handoff_state,
+      synced_at=current_time,
+      handoff=next_handoff,
+      synced_orders=synced_orders,
+      open_orders=open_orders,
+      issues=restore.issues,
+    )
+
+  def release_session(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+  ) -> GuardedLiveVenueSessionHandoff:
+    current_time = self._clock()
+    return GuardedLiveVenueSessionHandoff(
+      state="released",
+      handed_off_at=handoff.handed_off_at,
+      released_at=current_time,
+      source=handoff.source or "binance_exchange",
+      venue=handoff.venue or self._venue,
+      symbol=handoff.symbol,
+      owner_run_id=handoff.owner_run_id,
+      owner_session_id=handoff.owner_session_id,
+      venue_session_id=handoff.venue_session_id,
+      transport=handoff.transport or "binance_rest_session",
+      cursor=current_time.isoformat(),
+      last_event_at=handoff.last_event_at,
+      last_sync_at=current_time,
+      active_order_count=0,
+      issues=handoff.issues,
     )
 
   def submit_market_order(

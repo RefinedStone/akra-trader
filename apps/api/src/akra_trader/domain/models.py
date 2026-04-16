@@ -650,6 +650,35 @@ class GuardedLiveVenueSessionRestore:
 
 
 @dataclass(frozen=True)
+class GuardedLiveVenueSessionHandoff:
+  state: str = "inactive"
+  handed_off_at: datetime | None = None
+  released_at: datetime | None = None
+  source: str = "none"
+  venue: str | None = None
+  symbol: str | None = None
+  owner_run_id: str | None = None
+  owner_session_id: str | None = None
+  venue_session_id: str | None = None
+  transport: str = "none"
+  cursor: str | None = None
+  last_event_at: datetime | None = None
+  last_sync_at: datetime | None = None
+  active_order_count: int = 0
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class GuardedLiveVenueSessionSync:
+  state: str = "inactive"
+  synced_at: datetime | None = None
+  handoff: GuardedLiveVenueSessionHandoff = field(default_factory=GuardedLiveVenueSessionHandoff)
+  synced_orders: tuple[GuardedLiveVenueOrderResult, ...] = ()
+  open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveReconciliation:
   state: str = "not_started"
   checked_at: datetime | None = None
@@ -669,6 +698,7 @@ class GuardedLiveState:
   ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
   order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
   session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
+  session_handoff: GuardedLiveVenueSessionHandoff = field(default_factory=GuardedLiveVenueSessionHandoff)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -683,6 +713,7 @@ class GuardedLiveStatus:
   ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
   order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
   session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
+  session_handoff: GuardedLiveVenueSessionHandoff = field(default_factory=GuardedLiveVenueSessionHandoff)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
   active_runtime_alert_count: int = 0
   running_sandbox_count: int = 0

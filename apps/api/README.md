@@ -34,11 +34,13 @@ Implemented now:
 - guarded-live control state now persists live session ownership and a durable open-order snapshot,
   and guarded-live resume now restores the owned live run from venue-native order lifecycle state
   before falling back to the persisted snapshot
+- guarded-live live workers now keep an explicit venue session handoff so maintenance can continue
+  through the same venue-owned session lifecycle after resume
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
 
-- full venue-native stream/session handoff and richer venue order management beyond cancel/replace
+- richer venue order management beyond cancel/replace, including venue-native amend flows
 - external alert delivery and wider operator event storage
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -134,6 +136,8 @@ Defaults:
 - guarded-live control state now tracks owned live session identity plus a durable open-order
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
+- guarded-live maintenance now keeps a persisted venue session handoff with transport/session
+  metadata so the resumed worker can continue through the same venue-owned lifecycle
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only
