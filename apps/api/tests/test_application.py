@@ -287,6 +287,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
 
   comparison = app.compare_runs(run_ids=[native_run.config.run_id, reference_run.config.run_id])
 
+  assert comparison.intent == "benchmark_validation"
   assert comparison.baseline_run_id == native_run.config.run_id
   assert [run.lane for run in comparison.runs] == ["native", "reference"]
   assert comparison.runs[1].reference_id == "nostalgia-for-infinity"
@@ -369,6 +370,7 @@ def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(
 
   comparison = app.compare_runs(run_ids=[native_run.config.run_id, reference_run.config.run_id])
 
+  assert comparison.intent == "benchmark_validation"
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert metric_rows["total_return_pct"].values[reference_run.config.run_id] == 12.4
   assert metric_rows["max_drawdown_pct"].values[reference_run.config.run_id] == 7.2
@@ -384,7 +386,7 @@ def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(
   )
 
 
-def test_compare_runs_ranks_multi_run_narratives_by_top_divergence(tmp_path: Path) -> None:
+def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -> None:
   repo_root = Path(__file__).resolve().parents[3]
   references = build_references()
   runs = build_runs_repository(tmp_path)
@@ -431,10 +433,10 @@ def test_compare_runs_ranks_multi_run_narratives_by_top_divergence(tmp_path: Pat
     "trade_count": 20,
   })
   alternate_native_run.metrics.update({
-    "total_return_pct": -8.0,
-    "max_drawdown_pct": 18.0,
-    "win_rate_pct": 45.0,
-    "trade_count": 55,
+    "total_return_pct": 15.0,
+    "max_drawdown_pct": 7.0,
+    "win_rate_pct": 64.0,
+    "trade_count": 30,
   })
   reference_run.provenance.benchmark_artifacts = (
     BenchmarkArtifact(
@@ -460,22 +462,42 @@ def test_compare_runs_ranks_multi_run_narratives_by_top_divergence(tmp_path: Pat
   runs.save_run(alternate_native_run)
   runs.save_run(reference_run)
 
-  comparison = app.compare_runs(
+  benchmark_validation = app.compare_runs(
     run_ids=[
       baseline_run.config.run_id,
       alternate_native_run.config.run_id,
       reference_run.config.run_id,
     ],
+    intent="benchmark_validation",
+  )
+  strategy_tuning = app.compare_runs(
+    run_ids=[
+      baseline_run.config.run_id,
+      alternate_native_run.config.run_id,
+      reference_run.config.run_id,
+    ],
+    intent="strategy_tuning",
   )
 
-  assert [narrative.run_id for narrative in comparison.narratives] == [
+  assert benchmark_validation.intent == "benchmark_validation"
+  assert [narrative.run_id for narrative in benchmark_validation.narratives] == [
+    reference_run.config.run_id,
+    alternate_native_run.config.run_id,
+  ]
+  assert [narrative.rank for narrative in benchmark_validation.narratives] == [1, 2]
+  assert benchmark_validation.narratives[0].is_primary is True
+  assert benchmark_validation.narratives[0].comparison_type == "native_vs_reference"
+
+  assert strategy_tuning.intent == "strategy_tuning"
+  assert [narrative.run_id for narrative in strategy_tuning.narratives] == [
     alternate_native_run.config.run_id,
     reference_run.config.run_id,
   ]
-  assert [narrative.rank for narrative in comparison.narratives] == [1, 2]
-  assert comparison.narratives[0].is_primary is True
-  assert comparison.narratives[1].is_primary is False
-  assert comparison.narratives[0].insight_score > comparison.narratives[1].insight_score
+  assert [narrative.rank for narrative in strategy_tuning.narratives] == [1, 2]
+  assert strategy_tuning.narratives[0].is_primary is True
+  assert strategy_tuning.narratives[0].comparison_type == "native_vs_native"
+  assert benchmark_validation.narratives[0].insight_score > benchmark_validation.narratives[1].insight_score
+  assert strategy_tuning.narratives[0].insight_score > strategy_tuning.narratives[1].insight_score
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

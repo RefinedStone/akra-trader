@@ -138,6 +138,7 @@ type Run = {
 type RunComparison = {
   requested_run_ids: string[];
   baseline_run_id: string;
+  intent: ComparisonIntent;
   runs: {
     run_id: string;
     mode: string;
@@ -228,6 +229,8 @@ type RunHistoryFilter = {
   strategy_version: string;
 };
 
+type ComparisonIntent = "benchmark_validation" | "execution_regression" | "strategy_tuning";
+
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
     headers: { "Content-Type": "application/json" },
@@ -253,6 +256,13 @@ const defaultRunHistoryFilter: RunHistoryFilter = {
   strategy_version: ALL_FILTER_VALUE,
 };
 
+const DEFAULT_COMPARISON_INTENT: ComparisonIntent = "benchmark_validation";
+const comparisonIntentOptions: ComparisonIntent[] = [
+  "benchmark_validation",
+  "execution_regression",
+  "strategy_tuning",
+];
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -265,6 +275,7 @@ export default function App() {
   const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>([]);
+  const [comparisonIntent, setComparisonIntent] = useState<ComparisonIntent>(DEFAULT_COMPARISON_INTENT);
   const [runComparison, setRunComparison] = useState<RunComparison | null>(null);
   const [runComparisonLoading, setRunComparisonLoading] = useState(false);
   const [runComparisonError, setRunComparisonError] = useState<string | null>(null);
@@ -334,7 +345,7 @@ export default function App() {
     setRunComparisonLoading(true);
     setRunComparisonError(null);
 
-    void fetchJson<RunComparison>(buildRunComparisonPath(selectedComparisonRunIds))
+    void fetchJson<RunComparison>(buildRunComparisonPath(selectedComparisonRunIds, comparisonIntent))
       .then((payload) => {
         if (cancelled) {
           return;
@@ -357,7 +368,7 @@ export default function App() {
     return () => {
       cancelled = true;
     };
-  }, [selectedComparisonRunIds]);
+  }, [selectedComparisonRunIds, comparisonIntent]);
 
   useEffect(() => {
     persistExpandedGapRows(expandedGapRows);
@@ -490,6 +501,7 @@ export default function App() {
       return;
     }
 
+    setComparisonIntent(DEFAULT_COMPARISON_INTENT);
     setSelectedComparisonRunIds([nativeRun.config.run_id, referenceRun.config.run_id]);
   }
 
@@ -649,9 +661,11 @@ export default function App() {
           setFilter={setBacktestRunFilter}
           comparison={{
             selectedRunIds: selectedComparisonRunIds,
+            comparisonIntent,
             payload: runComparison,
             loading: runComparisonLoading,
             error: runComparisonError,
+            onChangeComparisonIntent: setComparisonIntent,
             onToggleRunSelection: toggleComparisonRun,
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
@@ -935,9 +949,10 @@ function buildRunsPath(mode: string, filter: RunHistoryFilter) {
   return `/runs?${params.toString()}`;
 }
 
-function buildRunComparisonPath(runIds: string[]) {
+function buildRunComparisonPath(runIds: string[], intent: ComparisonIntent) {
   const params = new URLSearchParams();
   runIds.forEach((runId) => params.append("run_id", runId));
+  params.set("intent", intent);
   return `/runs/compare?${params.toString()}`;
 }
 
@@ -1150,9 +1165,11 @@ function RunForm({
 
 type RunSectionComparisonControls = {
   selectedRunIds: string[];
+  comparisonIntent: ComparisonIntent;
   payload: RunComparison | null;
   loading: boolean;
   error: string | null;
+  onChangeComparisonIntent: (intent: ComparisonIntent) => void;
   onToggleRunSelection: (runId: string) => void;
   onClearSelection: () => void;
   onSelectBenchmarkPair: () => void;
@@ -1237,6 +1254,19 @@ function RunSection({
               <span>
                 Compare {comparison.selectedRunIds.length} / {MAX_COMPARISON_RUNS}
               </span>
+              <label className="comparison-intent-field">
+                Intent
+                <select
+                  value={comparison.comparisonIntent}
+                  onChange={(event) => comparison.onChangeComparisonIntent(event.target.value as ComparisonIntent)}
+                >
+                  {comparisonIntentOptions.map((intent) => (
+                    <option key={intent} value={intent}>
+                      {formatComparisonIntentLabel(intent)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <button className="ghost-button" onClick={comparison.onSelectBenchmarkPair} type="button">
                 Benchmark native vs NFI
               </button>
@@ -1393,7 +1423,9 @@ function RunComparisonPanel({
           <p className="kicker">Comparison deck</p>
           <h3>Native and reference backtests, side by side</h3>
         </div>
-        <p className="comparison-baseline">Baseline: {comparison.baseline_run_id}</p>
+        <p className="comparison-baseline">
+          Baseline: {comparison.baseline_run_id} / Intent: {formatComparisonIntentLabel(comparison.intent)}
+        </p>
       </div>
       <div className="comparison-run-grid">
         {comparison.runs.map((run) => (
@@ -1436,7 +1468,7 @@ function RunComparisonPanel({
       </div>
       {primaryNarrative ? (
         <div className="comparison-top-story">
-          <p className="kicker">Top insight</p>
+          <p className="kicker">Top insight / {formatComparisonIntentLabel(comparison.intent)}</p>
           <ComparisonNarrativeCard comparison={comparison} featured narrative={primaryNarrative} />
         </div>
       ) : null}
@@ -1754,6 +1786,19 @@ function formatComparisonNarrativeLabel(value: string) {
       return "Native vs native";
     default:
       return "Run divergence";
+  }
+}
+
+function formatComparisonIntentLabel(value: ComparisonIntent) {
+  switch (value) {
+    case "benchmark_validation":
+      return "Benchmark validation";
+    case "execution_regression":
+      return "Execution regression";
+    case "strategy_tuning":
+      return "Strategy tuning";
+    default:
+      return value;
   }
 }
 

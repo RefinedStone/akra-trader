@@ -239,11 +239,12 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   reference_run_id = reference_response.json()["config"]["run_id"]
 
   comparison_response = client.get(
-    f"/api/runs/compare?run_id={native_run_id}&run_id={reference_run_id}"
+    f"/api/runs/compare?run_id={native_run_id}&run_id={reference_run_id}&intent=strategy_tuning"
   )
 
   assert comparison_response.status_code == 200
   payload = comparison_response.json()
+  assert payload["intent"] == "strategy_tuning"
   assert payload["baseline_run_id"] == native_run_id
   assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
   assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"

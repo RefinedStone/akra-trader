@@ -109,10 +109,11 @@ def create_router(container: Container) -> APIRouter:
   @router.get("/runs/compare")
   def compare_runs(
     run_id: list[str] = Query(default_factory=list),
+    intent: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
     try:
-      comparison = app.compare_runs(run_ids=run_id)
+      comparison = app.compare_runs(run_ids=run_id, intent=intent)
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:

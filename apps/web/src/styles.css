@@ -307,6 +307,22 @@ select {
   font-size: 0.84rem;
 }
 
+.comparison-intent-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.comparison-intent-field select {
+  min-width: 190px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
 .status-grid {
   display: grid;
   gap: 16px;

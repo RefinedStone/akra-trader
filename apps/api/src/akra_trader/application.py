@@ -45,6 +45,43 @@ COMPARISON_METRICS: tuple[tuple[str, str, str, bool], ...] = (
   ("trade_count", "Trades", "count", True),
 )
 
+COMPARISON_INTENT_DEFAULT = "benchmark_validation"
+COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
+  "benchmark_validation": {
+    "return": 0.8,
+    "drawdown": 1.5,
+    "win_rate": 0.7,
+    "trade_count": 0.12,
+    "native_reference_bonus": 8.0,
+    "reference_bonus": 3.0,
+    "status_bonus": 1.5,
+    "benchmark_story_bonus": 1.5,
+    "reference_floor": 1.0,
+  },
+  "execution_regression": {
+    "return": 0.9,
+    "drawdown": 1.9,
+    "win_rate": 1.0,
+    "trade_count": 0.4,
+    "native_reference_bonus": 3.0,
+    "reference_bonus": 1.0,
+    "status_bonus": 3.0,
+    "benchmark_story_bonus": 0.8,
+    "reference_floor": 1.0,
+  },
+  "strategy_tuning": {
+    "return": 2.0,
+    "drawdown": 0.7,
+    "win_rate": 1.3,
+    "trade_count": 0.35,
+    "native_reference_bonus": 1.5,
+    "reference_bonus": 0.5,
+    "status_bonus": 0.8,
+    "benchmark_story_bonus": 0.4,
+    "reference_floor": 0.5,
+  },
+}
+
 
 class TradingApplication:
   def __init__(
@@ -111,10 +148,11 @@ class TradingApplication:
   def get_run(self, run_id: str) -> RunRecord | None:
     return self._runs.get_run(run_id)
 
-  def compare_runs(self, *, run_ids: list[str]) -> RunComparison:
+  def compare_runs(self, *, run_ids: list[str], intent: str | None = None) -> RunComparison:
     normalized_run_ids = _normalize_run_ids(run_ids)
     if len(normalized_run_ids) < 2:
       raise ValueError("Run comparison requires at least two unique run IDs.")
+    resolved_intent = _normalize_comparison_intent(intent)
 
     runs = self._runs.compare_runs(normalized_run_ids)
     run_by_id = {run.config.run_id: run for run in runs}
@@ -143,12 +181,14 @@ class TradingApplication:
         narrative := _build_comparison_narrative(
           baseline_run=baseline_run,
           run=run,
+          intent=resolved_intent,
           metric_row_by_key=metric_row_by_key,
         )
       ) is not None
     ])
     return RunComparison(
       requested_run_ids=tuple(normalized_run_ids),
+      intent=resolved_intent,
       baseline_run_id=baseline_run.config.run_id,
       runs=tuple(_serialize_comparison_run(run) for run in ordered_runs),
       metric_rows=metric_rows,
@@ -540,6 +580,7 @@ def _build_comparison_narrative(
   *,
   baseline_run: RunRecord,
   run: RunRecord,
+  intent: str,
   metric_row_by_key: dict[str, RunComparisonMetricRow],
 ) -> RunComparisonNarrative | None:
   comparison_type = _classify_comparison_type(baseline_run, run)
@@ -583,6 +624,7 @@ def _build_comparison_narrative(
     return None
 
   insight_score = _score_comparison_narrative(
+    intent=intent,
     comparison_type=comparison_type,
     baseline_run=baseline_run,
     run=run,
@@ -622,6 +664,7 @@ def _rank_comparison_narratives(
 
 def _score_comparison_narrative(
   *,
+  intent: str,
   comparison_type: str,
   baseline_run: RunRecord,
   run: RunRecord,
@@ -630,24 +673,34 @@ def _score_comparison_narrative(
   win_rate_delta: float | int | None,
   trade_count_delta: float | int | None,
 ) -> float:
+  weights = COMPARISON_INTENT_WEIGHTS[intent]
   score = 0.0
-  score += abs(float(total_return_delta or 0.0)) * 1.6
-  score += abs(float(max_drawdown_delta or 0.0)) * 1.4
-  score += abs(float(win_rate_delta or 0.0)) * 0.9
-  score += min(abs(float(trade_count_delta or 0.0)), 50.0) * 0.18
+  score += abs(float(total_return_delta or 0.0)) * weights["return"]
+  score += abs(float(max_drawdown_delta or 0.0)) * weights["drawdown"]
+  score += abs(float(win_rate_delta or 0.0)) * weights["win_rate"]
+  score += min(abs(float(trade_count_delta or 0.0)), 50.0) * weights["trade_count"]
 
   if comparison_type == "native_vs_reference":
-    score += 4.0
+    score += weights["native_reference_bonus"]
   elif comparison_type == "reference_vs_reference":
-    score += 2.0
+    score += weights["reference_bonus"]
 
   if run.status != baseline_run.status:
-    score += 1.5
+    score += weights["status_bonus"]
   if _extract_benchmark_story(run) or _extract_benchmark_story(baseline_run):
-    score += 1.0
+    score += weights["benchmark_story_bonus"]
   if score == 0.0 and _has_reference_context(run, baseline_run):
-    score = 1.0
+    score = weights["reference_floor"]
   return round(score, 2)
+
+
+def _normalize_comparison_intent(intent: str | None) -> str:
+  if intent in (None, ""):
+    return COMPARISON_INTENT_DEFAULT
+  if intent not in COMPARISON_INTENT_WEIGHTS:
+    supported = ", ".join(sorted(COMPARISON_INTENT_WEIGHTS))
+    raise ValueError(f"Unsupported comparison intent: {intent}. Expected one of: {supported}.")
+  return intent
 
 
 def _build_comparison_narrative_title(

@@ -386,6 +386,7 @@ class RunComparison:
   baseline_run_id: str
   runs: tuple[RunComparisonRun, ...]
   metric_rows: tuple[RunComparisonMetricRow, ...]
+  intent: str = "benchmark_validation"
   narratives: tuple[RunComparisonNarrative, ...] = ()
 
 
