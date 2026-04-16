@@ -1106,6 +1106,25 @@ select {
   text-transform: uppercase;
 }
 
+.comparison-dev-session-summary-toggle {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  text-align: left;
+}
+
+.comparison-dev-session-summary-toggle:hover,
+.comparison-dev-session-summary-toggle:focus-visible {
+  border-color: rgba(255, 193, 94, 0.24);
+  background: rgba(255, 193, 94, 0.12);
+  color: rgba(255, 241, 214, 0.98);
+}
+
 .comparison-dev-reset-danger {
   border-color: rgba(255, 193, 94, 0.28);
   background: rgba(255, 193, 94, 0.12);

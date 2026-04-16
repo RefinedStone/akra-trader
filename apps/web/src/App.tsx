@@ -2983,6 +2983,8 @@ function ComparisonTooltipTuningPanel({
   >({});
   const [isConfirmingResetAllConflictViews, setIsConfirmingResetAllConflictViews] =
     useState(false);
+  const [showAllSavedConflictSessionSummaries, setShowAllSavedConflictSessionSummaries] =
+    useState(false);
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -3023,6 +3025,9 @@ function ComparisonTooltipTuningPanel({
     0,
     savedConflictSessionSummaries.length - visibleSavedConflictSessionSummaries.length,
   );
+  const displayedSavedConflictSessionSummaries = showAllSavedConflictSessionSummaries
+    ? savedConflictSessionSummaries
+    : visibleSavedConflictSessionSummaries;
   const showUnchangedConflictRows =
     currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
   const collapsedUnchangedConflictGroups =
@@ -3044,6 +3049,12 @@ function ComparisonTooltipTuningPanel({
       setIsConfirmingResetAllConflictViews(false);
     }
   }, [isConfirmingResetAllConflictViews, savedConflictSessionCount]);
+
+  useEffect(() => {
+    if (!isConfirmingResetAllConflictViews || !hiddenSavedConflictSessionSummaryCount) {
+      setShowAllSavedConflictSessionSummaries(false);
+    }
+  }, [hiddenSavedConflictSessionSummaryCount, isConfirmingResetAllConflictViews]);
 
   const updateCurrentConflictSessionUiState = (
     updater: (
@@ -3124,6 +3135,7 @@ function ComparisonTooltipTuningPanel({
       return;
     }
     setIsConfirmingResetAllConflictViews(true);
+    setShowAllSavedConflictSessionSummaries(false);
     onSetShareFeedback(null);
   };
 
@@ -3289,7 +3301,7 @@ function ComparisonTooltipTuningPanel({
                 <div className="comparison-dev-session-summary">
                   <p className="comparison-dev-session-summary-title">Sessions queued for clearing</p>
                   <ul className="comparison-dev-session-summary-list">
-                    {visibleSavedConflictSessionSummaries.map((summary) => (
+                    {displayedSavedConflictSessionSummaries.map((summary) => (
                       <li
                         className="comparison-dev-session-summary-item"
                         key={summary.label}
@@ -3302,10 +3314,17 @@ function ComparisonTooltipTuningPanel({
                     ))}
                   </ul>
                   {hiddenSavedConflictSessionSummaryCount ? (
-                    <p className="comparison-dev-feedback">
-                      +{hiddenSavedConflictSessionSummaryCount} more saved preset
-                      {hiddenSavedConflictSessionSummaryCount === 1 ? "" : "s"} not shown.
-                    </p>
+                    <button
+                      className="comparison-dev-session-summary-toggle"
+                      onClick={() =>
+                        setShowAllSavedConflictSessionSummaries((current) => !current)
+                      }
+                      type="button"
+                    >
+                      {showAllSavedConflictSessionSummaries
+                        ? "Show fewer preset groups"
+                        : `Show all ${savedConflictSessionSummaries.length} preset groups`}
+                    </button>
                   ) : null}
                 </div>
               ) : null}
