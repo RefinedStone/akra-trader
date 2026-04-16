@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC
 from datetime import datetime
@@ -1105,6 +1106,8 @@ class FreqtradeReferenceAdapter:
     if non_temporal_columns:
       section["pair_count"] = len(non_temporal_columns)
       section["pairs"] = non_temporal_columns[:8]
+      pair_change_summary = self._summarize_market_change_pairs(dataframe, non_temporal_columns)
+      section.update(pair_change_summary)
     return section
 
   def _summarize_zip_wallet_exports(
@@ -1124,6 +1127,7 @@ class FreqtradeReferenceAdapter:
     currencies: set[str] = set()
     total_row_count = 0
     unreadable_entries: list[str] = []
+    wallet_frames: list[Any] = []
 
     for member in wallet_members:
       dataframe = self._read_zip_feather_frame(archive, member)
@@ -1139,6 +1143,7 @@ class FreqtradeReferenceAdapter:
           str(value)
           for value in dataframe["currency"].dropna().astype(str).unique().tolist()
         )
+      wallet_frames.append(dataframe)
       entry = self._summarize_dataframe(dataframe)
       entry["entry"] = member
       if strategy_name is not None:
@@ -1159,6 +1164,8 @@ class FreqtradeReferenceAdapter:
       ordered_currencies = sorted(currencies)
       section["currencies"] = ordered_currencies[:8]
       section["currency_count"] = len(ordered_currencies)
+    wallet_semantics = self._summarize_wallet_frames(wallet_frames)
+    section.update(wallet_semantics)
     if unreadable_entries:
       section["unreadable_entries"] = unreadable_entries[:5]
     return section
@@ -1183,27 +1190,38 @@ class FreqtradeReferenceAdapter:
     total_row_count = 0
     total_frame_count = 0
     unreadable_entries: list[str] = []
+    strategy_row_counts: Counter[str] = Counter()
+    pair_row_counts: Counter[str] = Counter()
+    semantic_counters: dict[str, Counter[str]] = {}
+    semantic_columns: set[str] = set()
 
     for member in pickle_members:
       payload = self._read_zip_pickle_payload(archive, member)
       if payload is None:
         unreadable_entries.append(member)
         continue
-      payload_entries = self._summarize_pickle_payload_entries(payload, member)
+      frames = self._iter_pickle_payload_frames(payload)
+      payload_entries = self._summarize_pickle_frames(frames, member)
       if not payload_entries:
         unreadable_entries.append(member)
         continue
-      for payload_entry in payload_entries:
+      for payload_entry, (strategy_name, pair_name, dataframe) in zip(payload_entries, frames, strict=False):
         total_frame_count += 1
         row_count = payload_entry.get("row_count")
         if isinstance(row_count, int):
           total_row_count += row_count
-        strategy_name = payload_entry.get("strategy")
-        pair_name = payload_entry.get("pair")
         if isinstance(strategy_name, str):
           strategies.add(strategy_name)
+          if isinstance(row_count, int):
+            strategy_row_counts[strategy_name] += row_count
         if isinstance(pair_name, str):
           pairs.add(pair_name)
+          if isinstance(row_count, int):
+            pair_row_counts[pair_name] += row_count
+        dataframe_semantics = self._summarize_pickle_dataframe_semantics(dataframe, suffix)
+        for semantic_key, values in dataframe_semantics.items():
+          semantic_columns.add(semantic_key)
+          semantic_counters.setdefault(semantic_key, Counter()).update(values)
       entries.extend(payload_entries)
 
     section: dict[str, Any] = {
@@ -1220,21 +1238,29 @@ class FreqtradeReferenceAdapter:
       ordered_pairs = sorted(pairs)
       section["pair_count"] = len(ordered_pairs)
       section["pairs"] = ordered_pairs[:8]
+    if strategy_row_counts:
+      section["strategy_row_preview"] = self._rank_counter(strategy_row_counts, label_key="strategy")
+    if pair_row_counts:
+      section["pair_row_preview"] = self._rank_counter(pair_row_counts, label_key="pair")
+    if semantic_columns:
+      section["semantic_columns"] = sorted(semantic_columns)
+    for semantic_key, counter in semantic_counters.items():
+      if counter:
+        section[f"{semantic_key}_counts"] = self._rank_counter(counter)
     if unreadable_entries:
       section["unreadable_entries"] = unreadable_entries[:5]
     return section
 
-  def _summarize_pickle_payload_entries(
+  def _iter_pickle_payload_frames(
     self,
     payload: Any,
-    member: str,
-  ) -> list[dict[str, Any]]:
+  ) -> list[tuple[str | None, str | None, Any]]:
     try:
       import pandas as pd
     except ImportError:
-      return [{"entry": member, "inspection_status": "dependency_missing"}]
+      return []
 
-    entries: list[dict[str, Any]] = []
+    frames: list[tuple[str | None, str | None, Any]] = []
 
     if isinstance(payload, dict):
       for strategy_key, strategy_value in payload.items():
@@ -1243,24 +1269,31 @@ class FreqtradeReferenceAdapter:
           for pair_key, pair_value in strategy_value.items():
             pair_name = pair_key if isinstance(pair_key, str) else None
             if isinstance(pair_value, pd.DataFrame):
-              entry = self._summarize_dataframe(pair_value)
-              entry["entry"] = member
-              if strategy_name is not None:
-                entry["strategy"] = strategy_name
-              if pair_name is not None:
-                entry["pair"] = pair_name
-              entries.append(entry)
+              frames.append((strategy_name, pair_name, pair_value))
         elif isinstance(strategy_value, pd.DataFrame):
-          entry = self._summarize_dataframe(strategy_value)
-          entry["entry"] = member
-          if strategy_name is not None:
-            entry["strategy"] = strategy_name
-          entries.append(entry)
+          frames.append((strategy_name, None, strategy_value))
     elif isinstance(payload, pd.DataFrame):
-      entry = self._summarize_dataframe(payload)
-      entry["entry"] = member
-      entries.append(entry)
+      frames.append((None, None, payload))
 
+    return frames
+
+  def _summarize_pickle_frames(
+    self,
+    frames: list[tuple[str | None, str | None, Any]],
+    member: str,
+  ) -> list[dict[str, Any]]:
+    if not frames:
+      return []
+
+    entries: list[dict[str, Any]] = []
+    for strategy_name, pair_name, dataframe in frames:
+      entry = self._summarize_dataframe(dataframe)
+      entry["entry"] = member
+      if strategy_name is not None:
+        entry["strategy"] = strategy_name
+      if pair_name is not None:
+        entry["pair"] = pair_name
+      entries.append(entry)
     return entries
 
   def _read_zip_feather_frame(
@@ -1303,6 +1336,163 @@ class FreqtradeReferenceAdapter:
     self._set_summary_entry(summary, "date_start", date_start)
     self._set_summary_entry(summary, "date_end", date_end)
     return summary
+
+  def _summarize_market_change_pairs(
+    self,
+    dataframe: Any,
+    pair_columns: list[Any],
+  ) -> dict[str, Any]:
+    try:
+      import pandas as pd
+    except ImportError:
+      return {}
+    ordered_dataframe = self._sort_dataframe_by_time(dataframe)
+    pair_summaries: list[dict[str, Any]] = []
+    for column in pair_columns:
+      series = pd.to_numeric(ordered_dataframe[column], errors="coerce").dropna()
+      if series.empty:
+        continue
+      start_value = float(series.iloc[0])
+      end_value = float(series.iloc[-1])
+      delta_pct = round((end_value - start_value) * 100, 4)
+      pair_summaries.append(
+        {
+          "pair": str(column),
+          "start_value": round(start_value, 6),
+          "end_value": round(end_value, 6),
+          "change_pct": delta_pct,
+        }
+      )
+    if not pair_summaries:
+      return {}
+    ordered_pairs = sorted(pair_summaries, key=lambda item: item["change_pct"], reverse=True)
+    return {
+      "pair_change_preview": ordered_pairs[:3],
+      "best_pair": ordered_pairs[0]["pair"],
+      "best_pair_change_pct": ordered_pairs[0]["change_pct"],
+      "worst_pair": ordered_pairs[-1]["pair"],
+      "worst_pair_change_pct": ordered_pairs[-1]["change_pct"],
+      "positive_pair_count": sum(1 for item in ordered_pairs if item["change_pct"] > 0),
+      "negative_pair_count": sum(1 for item in ordered_pairs if item["change_pct"] < 0),
+    }
+
+  def _summarize_wallet_frames(self, frames: list[Any]) -> dict[str, Any]:
+    if not frames:
+      return {}
+    try:
+      import pandas as pd
+    except ImportError:
+      return {}
+    combined = pd.concat(frames, ignore_index=True)
+    if combined.empty:
+      return {}
+
+    section: dict[str, Any] = {}
+    date_column = self._detect_dataframe_time_column(combined)
+    if {"rate", "balance"}.issubset(set(combined.columns)):
+      quote_values = pd.to_numeric(combined["rate"], errors="coerce") * pd.to_numeric(
+        combined["balance"],
+        errors="coerce",
+      )
+      combined = combined.assign(__quote_value=quote_values)
+      if date_column is not None:
+        ordered = self._sort_dataframe_by_time(combined)
+        grouped = ordered.groupby(date_column)["__quote_value"].sum(min_count=1).dropna()
+        if not grouped.empty:
+          section["total_quote_start"] = round(float(grouped.iloc[0]), 4)
+          section["total_quote_end"] = round(float(grouped.iloc[-1]), 4)
+          section["total_quote_high"] = round(float(grouped.max()), 4)
+          section["total_quote_low"] = round(float(grouped.min()), 4)
+      if "currency" in combined.columns:
+        latest_preview = self._summarize_wallet_currency_preview(combined, date_column)
+        if latest_preview:
+          section["currency_quote_preview"] = latest_preview
+    return section
+
+  def _summarize_wallet_currency_preview(
+    self,
+    dataframe: Any,
+    date_column: str | None,
+  ) -> list[dict[str, Any]]:
+    try:
+      import pandas as pd
+    except ImportError:
+      return []
+    if "currency" not in dataframe.columns or "__quote_value" not in dataframe.columns:
+      return []
+    if date_column is not None:
+      ordered = dataframe.sort_values(date_column)
+      latest_rows = ordered.groupby("currency", as_index=False).tail(1)
+    else:
+      latest_rows = dataframe.groupby("currency", as_index=False).tail(1)
+    previews: list[dict[str, Any]] = []
+    for _, row in latest_rows.iterrows():
+      previews.append(
+        {
+          "currency": str(row["currency"]),
+          "latest_balance": round(float(row["balance"]), 6) if pd.notna(row["balance"]) else None,
+          "latest_quote_value": round(float(row["__quote_value"]), 4)
+          if pd.notna(row["__quote_value"])
+          else None,
+        }
+      )
+    previews.sort(key=lambda item: item.get("latest_quote_value") or 0.0, reverse=True)
+    return previews[:3]
+
+  def _summarize_pickle_dataframe_semantics(
+    self,
+    dataframe: Any,
+    suffix: str,
+  ) -> dict[str, Counter[str]]:
+    columns_by_suffix = {
+      "signals.pkl": ("enter_tag", "action", "side"),
+      "rejected.pkl": ("reason", "enter_tag", "action"),
+      "exited.pkl": ("exit_reason", "enter_tag", "action"),
+    }
+    semantic_counters: dict[str, Counter[str]] = {}
+    for column in columns_by_suffix.get(suffix, ()):
+      if column not in dataframe.columns:
+        continue
+      values = dataframe[column].dropna().astype(str).tolist()
+      filtered_values = [value for value in values if value]
+      if filtered_values:
+        semantic_counters[column] = Counter(filtered_values)
+    return semantic_counters
+
+  def _sort_dataframe_by_time(self, dataframe: Any) -> Any:
+    date_column = self._detect_dataframe_time_column(dataframe)
+    if date_column is None:
+      return dataframe
+    return dataframe.sort_values(date_column)
+
+  def _detect_dataframe_time_column(self, dataframe: Any) -> str | None:
+    candidate_columns = ("date", "open_date", "close_date", "timestamp")
+    for column in candidate_columns:
+      if column in dataframe.columns:
+        return column
+    try:
+      import pandas as pd
+    except ImportError:
+      return None
+    for column in dataframe.columns:
+      if pd.api.types.is_datetime64_any_dtype(dataframe[column]):
+        return str(column)
+    return None
+
+  def _rank_counter(
+    self,
+    counter: Counter[str],
+    *,
+    label_key: str = "label",
+  ) -> list[dict[str, Any]]:
+    ranked = sorted(counter.items(), key=lambda item: (-item[1], item[0]))
+    return [
+      {
+        label_key: label,
+        "count": count,
+      }
+      for label, count in ranked[:5]
+    ]
 
   def _extract_dataframe_time_range(self, dataframe: Any) -> tuple[str | None, str | None]:
     candidate_columns = ("date", "open_date", "close_date", "timestamp")

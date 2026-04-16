@@ -526,14 +526,38 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
   assert snapshot_artifact.sections["zip_market_change"]["row_count"] == 2
   assert snapshot_artifact.sections["zip_market_change"]["pair_count"] == 2
   assert snapshot_artifact.sections["zip_market_change"]["date_start"] == "2026-04-01T00:00:00+00:00"
+  assert snapshot_artifact.sections["zip_market_change"]["best_pair"] == "BTC/USDT"
+  assert snapshot_artifact.sections["zip_market_change"]["best_pair_change_pct"] == 3.0
+  assert snapshot_artifact.sections["zip_market_change"]["worst_pair"] == "ETH/USDT"
+  assert snapshot_artifact.sections["zip_market_change"]["pair_change_preview"][0]["pair"] == "BTC/USDT"
   assert snapshot_artifact.sections["zip_wallet_exports"]["export_count"] == 1
   assert snapshot_artifact.sections["zip_wallet_exports"]["strategy_count"] == 1
   assert snapshot_artifact.sections["zip_wallet_exports"]["currency_count"] == 2
+  assert snapshot_artifact.sections["zip_wallet_exports"]["total_quote_start"] == 10500.0
+  assert snapshot_artifact.sections["zip_wallet_exports"]["total_quote_end"] == 17000.0
+  assert snapshot_artifact.sections["zip_wallet_exports"]["currency_quote_preview"][0]["currency"] == "BTC"
+  assert snapshot_artifact.sections["zip_wallet_exports"]["currency_quote_preview"][0]["latest_quote_value"] == 17000.0
   assert snapshot_artifact.sections["zip_signal_exports"]["strategy_count"] == 1
   assert snapshot_artifact.sections["zip_signal_exports"]["pair_count"] == 2
   assert snapshot_artifact.sections["zip_signal_exports"]["row_count"] == 3
+  assert snapshot_artifact.sections["zip_signal_exports"]["enter_tag_counts"][0] == {
+    "label": "dip_buy",
+    "count": 2,
+  }
+  assert snapshot_artifact.sections["zip_signal_exports"]["pair_row_preview"][0] == {
+    "pair": "BTC/USDT",
+    "count": 2,
+  }
   assert snapshot_artifact.sections["zip_rejected_exports"]["row_count"] == 1
+  assert snapshot_artifact.sections["zip_rejected_exports"]["reason_counts"][0] == {
+    "label": "volume_limit",
+    "count": 1,
+  }
   assert snapshot_artifact.sections["zip_exited_exports"]["row_count"] == 1
+  assert snapshot_artifact.sections["zip_exited_exports"]["exit_reason_counts"][0] == {
+    "label": "roi",
+    "count": 1,
+  }
   assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 18
   assert snapshot_artifact.sections["wallet_stats"]["sharpe"] == 1.2
 
