@@ -133,20 +133,38 @@
     {
       "id": "planning-control-room-binance-gap-window-status",
       "direction_id": "control-room-and-ops",
-      "title": "Surface exact Binance gap windows alongside backfill quality status",
-      "description": "Extend Binance market-data ops status so operators can inspect the exact affected time window of each detected historical gap, not just the aggregate gap count, including API payload fields and control-room presentation that make broken coverage spans directly actionable.",
-      "status": "ready",
+      "title": "Exact Binance gap windows are now shown with backfill quality status",
+      "description": "Completed the gap-window diagnostics follow-up by deriving concrete missing candle ranges from Binance candle timestamps, exposing them as `backfill_gap_windows` in instrument status, and rendering precise `start -> end (missing_count)` ranges in the control-room UI with API and web coverage for gap-free and single-gap cases.",
+      "status": "done",
       "base_priority": 85,
-      "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply says the count-versus-quality task is finished and explicitly names exposing the exact affected gap time window as the natural next follow-up, making this the clearest executable successor for the queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the exact gap-window surface, verified `apps/api` with `pytest` (`28 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `589bbdc`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T15:05:00Z",
+      "updated_at": "2026-04-16T14:57:04Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-backfill-quality-status"
       ],
       "direction_relation_note": "Advances the control-room trust surface from coarse quality alarms toward operator-actionable diagnostics by showing where historical Binance coverage actually breaks."
+    },
+    {
+      "id": "planning-control-room-binance-gap-window-rollup",
+      "direction_id": "control-room-and-ops",
+      "title": "Group or collapse fragmented Binance gap windows in ops status",
+      "description": "Refine the new Binance gap-window diagnostics so symbols with long fragmented histories remain readable in the control room, likely by grouping adjacent windows, collapsing long lists behind a summary, or otherwise reducing UI/API noise while preserving actionable missing-range detail.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply says there is no blocking work left on exact gap windows and explicitly names grouping or collapsing many gap windows as the next natural follow-up, so this is the clearest executable successor for the queue head.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T14:57:04Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-gap-window-status"
+      ],
+      "direction_relation_note": "Keeps the control-room gap diagnostics operator-usable as Binance history grows more fragmented, so the new quality surface stays readable instead of turning into raw noise."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
