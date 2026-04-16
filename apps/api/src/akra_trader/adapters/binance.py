@@ -12,6 +12,7 @@ import ccxt
 from sqlalchemy import Column
 from sqlalchemy import DateTime
 from sqlalchemy import Float
+from sqlalchemy import Integer
 from sqlalchemy import MetaData
 from sqlalchemy import String
 from sqlalchemy import Table
@@ -20,6 +21,7 @@ from sqlalchemy import and_
 from sqlalchemy import create_engine
 from sqlalchemy import func
 from sqlalchemy import insert
+from sqlalchemy import inspect
 from sqlalchemy import select
 from sqlalchemy import update
 from sqlalchemy.engine import Engine
@@ -33,7 +35,10 @@ from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
+from akra_trader.domain.models import SyncCheckpoint
+from akra_trader.domain.models import SyncFailure
 from akra_trader.lineage import build_candle_dataset_identity
+from akra_trader.lineage import build_sync_checkpoint_identity
 from akra_trader.ports import MarketDataPort
 
 
@@ -61,6 +66,23 @@ market_sync_state = Table(
   Column("sync_status", String, nullable=False),
   Column("last_sync_at", DateTime(timezone=True), nullable=True),
   Column("last_error", Text, nullable=True),
+  Column("checkpoint_id", String, nullable=True),
+  Column("checkpoint_recorded_at", DateTime(timezone=True), nullable=True),
+  Column("checkpoint_first_timestamp", DateTime(timezone=True), nullable=True),
+  Column("checkpoint_last_timestamp", DateTime(timezone=True), nullable=True),
+  Column("checkpoint_candle_count", Integer, nullable=True),
+  Column("checkpoint_contiguous_missing_candles", Integer, nullable=True),
+)
+market_sync_failures = Table(
+  "market_sync_failures",
+  metadata,
+  Column("failure_id", Integer, primary_key=True, autoincrement=True),
+  Column("venue", String, nullable=False),
+  Column("symbol", String, nullable=False),
+  Column("timeframe", String, nullable=False),
+  Column("operation", String, nullable=False),
+  Column("failed_at", DateTime(timezone=True), nullable=False),
+  Column("error", Text, nullable=False),
 )
 
 _TIMEFRAME_SECONDS = {
@@ -91,6 +113,7 @@ class CandleCoverage:
   candle_count: int
   first_timestamp: datetime | None
   last_timestamp: datetime | None
+  latest_ingested_at: datetime | None
 
 
 @dataclass(frozen=True)
@@ -98,6 +121,7 @@ class SyncState:
   sync_status: str
   last_sync_at: datetime | None
   last_error: str | None
+  checkpoint: SyncCheckpoint | None = None
 
 
 @dataclass(frozen=True)
@@ -150,6 +174,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     self._clock = clock or (lambda: datetime.now(UTC))
     self._engine = self._build_engine(database_url)
     metadata.create_all(self._engine)
+    self._ensure_schema()
 
   def list_instruments(self) -> list[Instrument]:
     return [self._build_instrument(symbol) for symbol in self._tracked_symbols]
@@ -196,6 +221,21 @@ class BinanceMarketDataAdapter(MarketDataPort):
         timeframe=timeframe,
         coverage=quality.coverage,
       )
+      recent_failures = self._read_recent_failures(symbol=symbol, timeframe=timeframe)
+      failure_count_24h = self._count_failures_since(
+        symbol=symbol,
+        timeframe=timeframe,
+        since=self._clock() - timedelta(hours=24),
+      )
+      sync_checkpoint = quality.sync_state.checkpoint if quality.sync_state is not None else None
+      if sync_checkpoint is None and quality.coverage.candle_count > 0:
+        sync_checkpoint = self._build_sync_checkpoint(
+          symbol=symbol,
+          timeframe=timeframe,
+          coverage=quality.coverage,
+          contiguous_missing_candles=backfill.contiguous_missing_candles,
+          recorded_at=quality.coverage.latest_ingested_at,
+        )
 
       instruments.append(
         InstrumentStatus(
@@ -207,6 +247,9 @@ class BinanceMarketDataAdapter(MarketDataPort):
           sync_status=quality.sync_status,
           lag_seconds=quality.lag_seconds,
           last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+          sync_checkpoint=sync_checkpoint,
+          recent_failures=recent_failures,
+          failure_count_24h=failure_count_24h,
           backfill_target_candles=backfill.target_candles,
           backfill_completion_ratio=backfill.completion_ratio,
           backfill_complete=backfill.complete,
@@ -326,6 +369,12 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="error",
         last_error=str(exc),
       )
+      self._record_failure_event(
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_recent",
+        error=str(exc),
+      )
       return False
 
   def _sync_range(
@@ -385,6 +434,12 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="error",
         last_error=str(exc),
       )
+      self._record_failure_event(
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="sync_range",
+        error=str(exc),
+      )
       return False
 
   def _backfill_history(
@@ -438,6 +493,12 @@ class BinanceMarketDataAdapter(MarketDataPort):
         sync_status="error",
         last_error=str(exc),
       )
+      self._record_failure_event(
+        symbol=symbol,
+        timeframe=timeframe,
+        operation="backfill_history",
+        error=str(exc),
+      )
       return False
 
   def _upsert_candles(self, *, symbol: str, timeframe: str, candles: list[Candle]) -> None:
@@ -471,6 +532,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
       func.count().label("candle_count"),
       func.min(market_candles.c.timestamp).label("first_timestamp"),
       func.max(market_candles.c.timestamp).label("last_timestamp"),
+      func.max(market_candles.c.ingested_at).label("latest_ingested_at"),
     ).where(
       and_(
         market_candles.c.venue == self._venue,
@@ -484,6 +546,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
       candle_count=int(row["candle_count"] or 0),
       first_timestamp=self._ensure_utc(row["first_timestamp"]),
       last_timestamp=self._ensure_utc(row["last_timestamp"]),
+      latest_ingested_at=self._ensure_utc(row["latest_ingested_at"]),
     )
 
   def _read_sync_state(self, *, symbol: str, timeframe: str) -> SyncState | None:
@@ -498,10 +561,21 @@ class BinanceMarketDataAdapter(MarketDataPort):
       row = connection.execute(statement).mappings().first()
     if row is None:
       return None
+    checkpoint = None
+    if row["checkpoint_id"] is not None and row["checkpoint_recorded_at"] is not None:
+      checkpoint = SyncCheckpoint(
+        checkpoint_id=row["checkpoint_id"],
+        recorded_at=self._ensure_utc(row["checkpoint_recorded_at"]),
+        candle_count=int(row["checkpoint_candle_count"] or 0),
+        first_timestamp=self._ensure_utc(row["checkpoint_first_timestamp"]),
+        last_timestamp=self._ensure_utc(row["checkpoint_last_timestamp"]),
+        contiguous_missing_candles=int(row["checkpoint_contiguous_missing_candles"] or 0),
+      )
     return SyncState(
       sync_status=row["sync_status"],
       last_sync_at=self._ensure_utc(row["last_sync_at"]),
       last_error=row["last_error"],
+      checkpoint=checkpoint,
     )
 
   def _record_sync_state(
@@ -520,6 +594,23 @@ class BinanceMarketDataAdapter(MarketDataPort):
       "last_sync_at": self._clock(),
       "last_error": last_error,
     }
+    if sync_status == "synced":
+      checkpoint = self._build_sync_checkpoint(
+        symbol=symbol,
+        timeframe=timeframe,
+        coverage=self._read_coverage(symbol=symbol, timeframe=timeframe),
+      )
+      if checkpoint is not None:
+        row.update(
+          {
+            "checkpoint_id": checkpoint.checkpoint_id,
+            "checkpoint_recorded_at": checkpoint.recorded_at,
+            "checkpoint_first_timestamp": checkpoint.first_timestamp,
+            "checkpoint_last_timestamp": checkpoint.last_timestamp,
+            "checkpoint_candle_count": checkpoint.candle_count,
+            "checkpoint_contiguous_missing_candles": checkpoint.contiguous_missing_candles,
+          }
+        )
     with self._engine.begin() as connection:
       existing = connection.execute(
         select(market_sync_state.c.symbol).where(
@@ -544,6 +635,109 @@ class BinanceMarketDataAdapter(MarketDataPort):
           )
           .values(**row)
         )
+
+  def _record_failure_event(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    operation: str,
+    error: str,
+  ) -> None:
+    with self._engine.begin() as connection:
+      connection.execute(
+        insert(market_sync_failures).values(
+          venue=self._venue,
+          symbol=symbol,
+          timeframe=timeframe,
+          operation=operation,
+          failed_at=self._clock(),
+          error=error,
+        )
+      )
+
+  def _read_recent_failures(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    limit: int = 3,
+  ) -> tuple[SyncFailure, ...]:
+    statement = (
+      select(market_sync_failures)
+      .where(
+        and_(
+          market_sync_failures.c.venue == self._venue,
+          market_sync_failures.c.symbol == symbol,
+          market_sync_failures.c.timeframe == timeframe,
+        )
+      )
+      .order_by(market_sync_failures.c.failed_at.desc(), market_sync_failures.c.failure_id.desc())
+      .limit(limit)
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      SyncFailure(
+        failed_at=self._ensure_utc(row["failed_at"]),
+        operation=row["operation"],
+        error=row["error"],
+      )
+      for row in rows
+    )
+
+  def _count_failures_since(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    since: datetime,
+  ) -> int:
+    statement = select(func.count()).where(
+      and_(
+        market_sync_failures.c.venue == self._venue,
+        market_sync_failures.c.symbol == symbol,
+        market_sync_failures.c.timeframe == timeframe,
+        market_sync_failures.c.failed_at >= since,
+      )
+    )
+    with self._engine.connect() as connection:
+      return int(connection.execute(statement).scalar_one())
+
+  def _build_sync_checkpoint(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    coverage: CandleCoverage,
+    contiguous_missing_candles: int | None = None,
+    recorded_at: datetime | None = None,
+  ) -> SyncCheckpoint | None:
+    if coverage.candle_count == 0 or coverage.latest_ingested_at is None:
+      return None
+    missing_candles = (
+      contiguous_missing_candles
+      if contiguous_missing_candles is not None
+      else self._count_missing_candles(symbol=symbol, timeframe=timeframe)
+    )
+    return SyncCheckpoint(
+      checkpoint_id=build_sync_checkpoint_identity(
+        provider="binance",
+        venue=self._venue,
+        symbol=symbol,
+        timeframe=timeframe,
+        candle_count=coverage.candle_count,
+        first_timestamp=coverage.first_timestamp,
+        last_timestamp=coverage.last_timestamp,
+        latest_ingested_at=coverage.latest_ingested_at,
+        contiguous_missing_candles=missing_candles,
+      ),
+      recorded_at=recorded_at or self._clock(),
+      candle_count=coverage.candle_count,
+      first_timestamp=coverage.first_timestamp,
+      last_timestamp=coverage.last_timestamp,
+      contiguous_missing_candles=missing_candles,
+    )
 
   def _build_quality_snapshot(self, *, symbol: str, timeframe: str) -> QualitySnapshot:
     coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
@@ -748,6 +942,28 @@ class BinanceMarketDataAdapter(MarketDataPort):
     if value.tzinfo is None:
       return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
+
+  def _ensure_schema(self) -> None:
+    inspector = inspect(self._engine)
+    existing_columns = {
+      column["name"]
+      for column in inspector.get_columns("market_sync_state")
+    }
+    missing_columns = {
+      "checkpoint_id": "TEXT",
+      "checkpoint_recorded_at": "TIMESTAMP",
+      "checkpoint_first_timestamp": "TIMESTAMP",
+      "checkpoint_last_timestamp": "TIMESTAMP",
+      "checkpoint_candle_count": "INTEGER",
+      "checkpoint_contiguous_missing_candles": "INTEGER",
+    }
+    with self._engine.begin() as connection:
+      for column_name, column_type in missing_columns.items():
+        if column_name in existing_columns:
+          continue
+        connection.exec_driver_sql(
+          f"ALTER TABLE market_sync_state ADD COLUMN {column_name} {column_type}"
+        )
 
   def _build_engine(self, database_url: str) -> Engine:
     url = make_url(database_url)

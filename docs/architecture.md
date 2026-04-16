@@ -114,7 +114,8 @@ Two adapters exist today:
   - used for tests and deterministic fixture flows
 - `BinanceMarketDataAdapter`
   - backed by ccxt and local SQL storage
-  - tracks sync status, lag, backfill progress, and gap windows
+  - tracks sync status, lag, backfill progress, gap windows, last successful sync checkpoint,
+    and recent sync failure history
 
 When Binance is enabled, the API app lifespan starts a `MarketDataSyncJob` that periodically refreshes tracked symbols.
 

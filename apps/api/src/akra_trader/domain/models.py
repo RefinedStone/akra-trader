@@ -404,6 +404,9 @@ class InstrumentStatus:
   sync_status: str = "empty"
   lag_seconds: int | None = None
   last_sync_at: datetime | None = None
+  sync_checkpoint: "SyncCheckpoint" | None = None
+  recent_failures: tuple["SyncFailure", ...] = ()
+  failure_count_24h: int = 0
   backfill_target_candles: int | None = None
   backfill_completion_ratio: float | None = None
   backfill_complete: bool | None = None
@@ -426,6 +429,23 @@ class GapWindow:
   start_at: datetime
   end_at: datetime
   missing_candles: int
+
+
+@dataclass(frozen=True)
+class SyncCheckpoint:
+  checkpoint_id: str
+  recorded_at: datetime
+  candle_count: int
+  first_timestamp: datetime | None = None
+  last_timestamp: datetime | None = None
+  contiguous_missing_candles: int = 0
+
+
+@dataclass(frozen=True)
+class SyncFailure:
+  failed_at: datetime
+  operation: str
+  error: str
 
 
 @dataclass(frozen=True)

@@ -38,6 +38,17 @@ class FakeExchange:
     return values
 
 
+class BrokenExchange:
+  def fetch_ohlcv(
+    self,
+    symbol: str,
+    timeframe: str = "5m",
+    since: int | None = None,
+    limit: int | None = None,
+  ) -> list[list[float]]:
+    raise RuntimeError(f"upstream fetch failed for {symbol} {timeframe}")
+
+
 def build_ohlcv_rows(
   *,
   start_at: datetime,
@@ -93,6 +104,12 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert status.instruments[0].sync_status == "synced"
   assert status.instruments[0].candle_count == 6
   assert status.instruments[0].lag_seconds == 0
+  assert status.instruments[0].sync_checkpoint is not None
+  assert status.instruments[0].sync_checkpoint.checkpoint_id.startswith("checkpoint-v1:")
+  assert status.instruments[0].sync_checkpoint.candle_count == 6
+  assert status.instruments[0].sync_checkpoint.last_timestamp == now
+  assert status.instruments[0].recent_failures == ()
+  assert status.instruments[0].failure_count_24h == 0
   assert status.instruments[0].backfill_target_candles == 6
   assert status.instruments[0].backfill_completion_ratio == 1.0
   assert status.instruments[0].backfill_complete is True
@@ -212,6 +229,48 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
   assert "missing_candles:1" in status.instruments[0].issues
 
 
+def test_binance_adapter_status_exposes_checkpoint_and_recent_failure_history(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=25),
+    count=6,
+  )
+  database_url = f"sqlite:///{tmp_path / 'market-data.sqlite3'}"
+  healthy_adapter = BinanceMarketDataAdapter(
+    database_url=database_url,
+    tracked_symbols=("BTC/USDT",),
+    exchange=FakeExchange({("BTC/USDT", "5m"): rows}),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now,
+  )
+  healthy_adapter.sync_tracked("5m")
+  initial_status = healthy_adapter.get_status("5m")
+
+  degraded_adapter = BinanceMarketDataAdapter(
+    database_url=database_url,
+    tracked_symbols=("BTC/USDT",),
+    exchange=BrokenExchange(),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now + timedelta(minutes=5),
+  )
+  degraded_adapter.sync_tracked("5m")
+  degraded_status = degraded_adapter.get_status("5m")
+
+  initial_checkpoint = initial_status.instruments[0].sync_checkpoint
+  degraded_instrument = degraded_status.instruments[0]
+
+  assert initial_checkpoint is not None
+  assert degraded_instrument.sync_status == "error"
+  assert degraded_instrument.sync_checkpoint == initial_checkpoint
+  assert degraded_instrument.failure_count_24h == 1
+  assert len(degraded_instrument.recent_failures) == 1
+  assert degraded_instrument.recent_failures[0].operation == "sync_recent"
+  assert "upstream fetch failed" in degraded_instrument.recent_failures[0].error
+  assert "last_sync_failed" in degraded_instrument.issues
+
+
 def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path) -> None:
   now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
   rows = build_ohlcv_rows(
@@ -239,6 +298,9 @@ def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path)
   assert exchange.calls == []
   assert status.instruments[0].sync_status == "empty"
   assert status.instruments[0].candle_count == 0
+  assert status.instruments[0].sync_checkpoint is None
+  assert status.instruments[0].recent_failures == ()
+  assert status.instruments[0].failure_count_24h == 0
   assert status.instruments[0].backfill_target_candles == 6
   assert status.instruments[0].backfill_completion_ratio == 0.0
   assert status.instruments[0].backfill_complete is False

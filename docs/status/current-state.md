@@ -53,7 +53,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 - strategy catalog grouped by runtime lane
 - reference catalog panel
-- market-data status with backfill and contiguous-gap summaries
+- market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox runs
 - sandbox stop control
 - side-by-side backtest comparison with narratives

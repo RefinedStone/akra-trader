@@ -13,7 +13,8 @@ Implemented now:
 - replay-based sandbox preview flow for native strategies
 - native vs reference run comparison API
 - dataset identity and reproducibility state recorded in run market-data provenance
-- Binance-backed market data with sync, backfill, gap detection, and status reporting
+- Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
+  and status reporting
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:

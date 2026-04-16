@@ -214,6 +214,20 @@ type MarketDataStatus = {
     sync_status: string;
     lag_seconds: number | null;
     last_sync_at: string | null;
+    sync_checkpoint: {
+      checkpoint_id: string;
+      recorded_at: string;
+      candle_count: number;
+      first_timestamp: string | null;
+      last_timestamp: string | null;
+      contiguous_missing_candles: number;
+    } | null;
+    recent_failures: {
+      failed_at: string;
+      operation: string;
+      error: string;
+    }[];
+    failure_count_24h: number;
     backfill_target_candles: number | null;
     backfill_completion_ratio: number | null;
     backfill_complete: boolean | null;
@@ -761,6 +775,27 @@ export default function App() {
     };
   }, [marketStatus]);
 
+  const failureSummary = useMemo(() => {
+    if (!marketStatus) {
+      return null;
+    }
+    const instrumentsWithFailures = marketStatus.instruments.filter(
+      (instrument) => instrument.failure_count_24h > 0,
+    );
+    return {
+      failureCount24h: marketStatus.instruments.reduce(
+        (total, instrument) => total + instrument.failure_count_24h,
+        0,
+      ),
+      affectedInstrumentCount: instrumentsWithFailures.length,
+      lastFailureAt:
+        instrumentsWithFailures
+          .flatMap((instrument) => instrument.recent_failures.map((failure) => failure.failed_at))
+          .sort()
+          .at(-1) ?? null,
+    };
+  }, [marketStatus]);
+
   async function handleBacktestSubmit(event: FormEvent) {
     event.preventDefault();
     setStatusText("Running backtest...");
@@ -902,6 +937,22 @@ export default function App() {
                 <span>Tracked symbols</span>
                 <strong>{marketStatus.instruments.length}</strong>
               </div>
+              {failureSummary ? (
+                <>
+                  <div className="metric-tile">
+                    <span>Failures 24h</span>
+                    <strong>{failureSummary.failureCount24h}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Affected instruments</span>
+                    <strong>{failureSummary.affectedInstrumentCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Latest failure</span>
+                    <strong>{formatTimestamp(failureSummary.lastFailureAt)}</strong>
+                  </div>
+                </>
+              ) : null}
               {backfillSummary ? (
                 <>
                   <div className="metric-tile">
@@ -940,6 +991,8 @@ export default function App() {
                     <th>Quality</th>
                     <th>Lag</th>
                     <th>Latest</th>
+                    <th>Checkpoint</th>
+                    <th>Failures</th>
                     <th>Issues</th>
                   </tr>
                 </thead>
@@ -966,6 +1019,12 @@ export default function App() {
                       </td>
                       <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
+                      <td>
+                        <SyncCheckpointStatus instrument={instrument} />
+                      </td>
+                      <td>
+                        <SyncFailureStatus instrument={instrument} />
+                      </td>
                       <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
                     </tr>
                   ))}
@@ -1089,6 +1148,53 @@ function BackfillQualityStatus({
           }}
         />
       </div>
+    </div>
+  );
+}
+
+function SyncCheckpointStatus({
+  instrument,
+}: {
+  instrument: MarketDataStatus["instruments"][number];
+}) {
+  const checkpoint = instrument.sync_checkpoint;
+  if (!checkpoint) {
+    return <span>n/a</span>;
+  }
+  return (
+    <div className="progress-stack">
+      <strong title={checkpoint.checkpoint_id}>{shortenIdentifier(checkpoint.checkpoint_id)}</strong>
+      <span>
+        {checkpoint.candle_count} candles
+        {checkpoint.contiguous_missing_candles > 0
+          ? ` / gaps ${checkpoint.contiguous_missing_candles}`
+          : " / gap-free"}
+      </span>
+      <span>{formatTimestamp(checkpoint.recorded_at)}</span>
+    </div>
+  );
+}
+
+function SyncFailureStatus({
+  instrument,
+}: {
+  instrument: MarketDataStatus["instruments"][number];
+}) {
+  if (instrument.failure_count_24h === 0 && instrument.recent_failures.length === 0) {
+    return <span>clear</span>;
+  }
+  const latestFailure = instrument.recent_failures[0];
+  return (
+    <div className="progress-stack">
+      <strong>{instrument.failure_count_24h} in 24h</strong>
+      <span>
+        {latestFailure
+          ? `${latestFailure.operation} @ ${formatTimestamp(latestFailure.failed_at)}`
+          : "history unavailable"}
+      </span>
+      {latestFailure ? (
+        <span title={latestFailure.error}>{truncateLabel(latestFailure.error, 56)}</span>
+      ) : null}
     </div>
   );
 }
@@ -5047,6 +5153,20 @@ function formatTimestamp(value?: string | null) {
     return "n/a";
   }
   return value;
+}
+
+function shortenIdentifier(value: string, maxLength = 18) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
+}
+
+function truncateLabel(value: string, maxLength = 56) {
+  if (value.length <= maxLength) {
+    return value;
+  }
+  return `${value.slice(0, maxLength - 3)}...`;
 }
 
 function formatRange(start?: string | null, end?: string | null) {
