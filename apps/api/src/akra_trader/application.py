@@ -196,14 +196,16 @@ class TradingApplication:
 
   def _simulate_run(self, *, config: RunConfig, active_bars: int | None) -> RunRecord:
     strategy = self._strategies.load(config.strategy_id)
-    data = self._data_engine.load_frame(config=config, active_bars=active_bars)
+    loaded = self._data_engine.load_frame(config=config, active_bars=active_bars)
+    run = self._run_supervisor.create_native_run(config=config)
+    run.provenance.market_data = loaded.lineage
+    data = loaded.frame
     if data.empty:
-      run = RunRecord(config=config, status=RunStatus.FAILED)
       run.notes.append("No candles available for the requested range.")
+      run.status = RunStatus.FAILED
       return run
 
     enriched = strategy.build_feature_frame(data, config.parameters)
-    run = self._run_supervisor.create_native_run(config=config)
     warmup = strategy.warmup_spec().required_bars
     cache = StateCache(
       instrument_id=f"{config.venue}:{config.symbols[0]}",

@@ -8,6 +8,7 @@ import shutil
 import subprocess
 
 from akra_trader.adapters.references import ReferenceCatalog
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
@@ -70,6 +71,15 @@ class FreqtradeReferenceAdapter:
       integration_mode=prepared.integration_mode,
       working_directory=prepared.working_directory,
       external_command=tuple(prepared.command),
+      market_data=MarketDataLineage(
+        provider="freqtrade_reference",
+        venue=run.config.venue,
+        symbols=run.config.symbols,
+        timeframe=run.config.timeframe,
+        requested_start_at=run.config.start_at,
+        requested_end_at=run.config.end_at,
+        sync_status="delegated",
+      ),
     )
     run.notes.append(f"Prepared NFI reference command: {' '.join(prepared.command)}")
 

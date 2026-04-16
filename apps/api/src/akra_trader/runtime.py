@@ -3,11 +3,13 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
+from typing import NamedTuple
 
 import pandas as pd
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import ExecutionPlan
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
@@ -21,6 +23,11 @@ from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.ports import MarketDataPort
+
+
+class LoadedFrame(NamedTuple):
+  frame: pd.DataFrame
+  lineage: MarketDataLineage
 
 
 def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
@@ -65,7 +72,7 @@ class DataEngine:
   def __init__(self, market_data: MarketDataPort) -> None:
     self._market_data = market_data
 
-  def load_frame(self, *, config: RunConfig, active_bars: int | None):
+  def load_frame(self, *, config: RunConfig, active_bars: int | None) -> LoadedFrame:
     candles = self._market_data.get_candles(
       symbol=config.symbols[0],
       timeframe=config.timeframe,
@@ -73,7 +80,15 @@ class DataEngine:
       end_at=config.end_at,
       limit=active_bars,
     )
-    return candles_to_frame(candles)
+    lineage = self._market_data.describe_lineage(
+      symbol=config.symbols[0],
+      timeframe=config.timeframe,
+      candles=candles,
+      start_at=config.start_at,
+      end_at=config.end_at,
+      limit=active_bars,
+    )
+    return LoadedFrame(frame=candles_to_frame(candles), lineage=lineage)
 
 
 class StateCache:

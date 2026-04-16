@@ -79,6 +79,12 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
 
   status = adapter.get_status("5m")
   candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m", limit=4)
+  lineage = adapter.describe_lineage(
+    symbol="BTC/USDT",
+    timeframe="5m",
+    candles=candles,
+    limit=4,
+  )
 
   assert status.provider == "binance"
   assert status.instruments[0].sync_status == "synced"
@@ -87,6 +93,9 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert not status.instruments[0].issues
   assert len(candles) == 4
   assert candles[-1].close == 105.5
+  assert lineage.provider == "binance"
+  assert lineage.candle_count == 4
+  assert lineage.sync_status == "synced"
 
 
 def test_binance_adapter_reuses_persisted_candles_when_coverage_is_fresh(tmp_path: Path) -> None:

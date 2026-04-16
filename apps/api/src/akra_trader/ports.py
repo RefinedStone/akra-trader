@@ -7,6 +7,7 @@ import pandas as pd
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunRecord
@@ -52,6 +53,17 @@ class MarketDataPort(Protocol):
     end_at: datetime | None = None,
     limit: int | None = None,
   ) -> list[Candle]: ...
+
+  def describe_lineage(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    candles: list[Candle],
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataLineage: ...
 
   def get_status(self, timeframe: str) -> MarketDataStatus: ...
 

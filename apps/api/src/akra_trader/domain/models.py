@@ -240,6 +240,22 @@ class RunConfig:
   end_at: datetime | None = None
 
 
+@dataclass(frozen=True)
+class MarketDataLineage:
+  provider: str
+  venue: str
+  symbols: tuple[str, ...]
+  timeframe: str
+  requested_start_at: datetime | None = None
+  requested_end_at: datetime | None = None
+  effective_start_at: datetime | None = None
+  effective_end_at: datetime | None = None
+  candle_count: int = 0
+  sync_status: str = "unknown"
+  last_sync_at: datetime | None = None
+  issues: tuple[str, ...] = ()
+
+
 @dataclass
 class RunProvenance:
   lane: str = "native"
@@ -249,6 +265,7 @@ class RunProvenance:
   working_directory: str | None = None
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
+  market_data: MarketDataLineage | None = None
 
 
 @dataclass

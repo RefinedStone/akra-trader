@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC
+from datetime import datetime
 from pathlib import Path
 
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
@@ -43,11 +45,16 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert run.metrics["initial_cash"] == 10_000
   assert "total_return_pct" in run.metrics
   assert run.config.strategy_id == "ma_cross_v1"
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.provider == "seeded"
+  assert run.provenance.market_data.candle_count > 0
+  assert run.provenance.market_data.sync_status == "fixture"
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
   assert reloaded.status == RunStatus.COMPLETED
   assert reloaded.metrics == run.metrics
+  assert reloaded.provenance.market_data == run.provenance.market_data
 
 
 def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
@@ -73,6 +80,8 @@ def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
   assert run.status == RunStatus.RUNNING
   assert run.config.mode.value == "sandbox"
   assert run.notes
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.candle_count == 48
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
   assert reloaded is not None
@@ -138,3 +147,32 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
 
   assert run.provenance.reference_id == "nostalgia-for-infinity"
   assert run.provenance.external_command
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.provider == "freqtrade_reference"
+  assert run.provenance.market_data.sync_status == "delegated"
+
+
+def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    start_at=datetime(2030, 1, 1, tzinfo=UTC),
+  )
+
+  assert run.status == RunStatus.FAILED
+  assert run.provenance.market_data is not None
+  assert run.provenance.market_data.requested_start_at == datetime(2030, 1, 1, tzinfo=UTC)
+  assert run.provenance.market_data.candle_count == 0

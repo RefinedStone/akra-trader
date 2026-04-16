@@ -29,6 +29,7 @@ from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.ports import MarketDataPort
@@ -95,6 +96,15 @@ class SyncState:
   sync_status: str
   last_sync_at: datetime | None
   last_error: str | None
+
+
+@dataclass(frozen=True)
+class QualitySnapshot:
+  coverage: CandleCoverage
+  sync_state: SyncState | None
+  lag_seconds: int | None
+  sync_status: str
+  issues: tuple[str, ...]
 
 
 def build_binance_exchange() -> OhlcvExchange:
@@ -171,37 +181,51 @@ class BinanceMarketDataAdapter(MarketDataPort):
     instruments: list[InstrumentStatus] = []
     for symbol in self._tracked_symbols:
       self._sync_recent(symbol=symbol, timeframe=timeframe)
-      coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
-      sync_state = self._read_sync_state(symbol=symbol, timeframe=timeframe)
-      lag_seconds = self._calculate_lag_seconds(coverage.last_timestamp)
-      missing_candles = self._count_missing_candles(symbol=symbol, timeframe=timeframe)
-      issues: list[str] = []
-      sync_status = "empty"
-      if coverage.candle_count > 0:
-        sync_status = "synced"
-      if sync_state is not None and sync_state.sync_status == "error":
-        sync_status = "error"
-        issues.append("last_sync_failed")
-      elif lag_seconds is not None and lag_seconds > self._freshness_threshold_seconds(timeframe):
-        sync_status = "stale"
-        issues.append("lagging")
-      if missing_candles > 0:
-        issues.append(f"missing_candles:{missing_candles}")
+      quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
 
       instruments.append(
         InstrumentStatus(
           instrument_id=f"{self._venue}:{symbol}",
           timeframe=timeframe,
-          candle_count=coverage.candle_count,
-          first_timestamp=coverage.first_timestamp,
-          last_timestamp=coverage.last_timestamp,
-          sync_status=sync_status,
-          lag_seconds=lag_seconds,
-          last_sync_at=sync_state.last_sync_at if sync_state is not None else None,
-          issues=tuple(issues),
+          candle_count=quality.coverage.candle_count,
+          first_timestamp=quality.coverage.first_timestamp,
+          last_timestamp=quality.coverage.last_timestamp,
+          sync_status=quality.sync_status,
+          lag_seconds=quality.lag_seconds,
+          last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+          issues=quality.issues,
         )
       )
     return MarketDataStatus(provider="binance", venue=self._venue, instruments=instruments)
+
+  def describe_lineage(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    candles: list[Candle],
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataLineage:
+    quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
+    issues = list(quality.issues)
+    if limit is not None and len(candles) < limit:
+      issues.append("insufficient_candle_coverage")
+    return MarketDataLineage(
+      provider="binance",
+      venue=self._venue,
+      symbols=(symbol,),
+      timeframe=timeframe,
+      requested_start_at=start_at,
+      requested_end_at=end_at,
+      effective_start_at=candles[0].timestamp if candles else None,
+      effective_end_at=candles[-1].timestamp if candles else None,
+      candle_count=len(candles),
+      sync_status=quality.sync_status,
+      last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
+      issues=tuple(issues),
+    )
 
   def _build_instrument(self, symbol: str) -> Instrument:
     base_currency, quote_currency = symbol.split("/")
@@ -475,6 +499,31 @@ class BinanceMarketDataAdapter(MarketDataPort):
           )
           .values(**row)
         )
+
+  def _build_quality_snapshot(self, *, symbol: str, timeframe: str) -> QualitySnapshot:
+    coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
+    sync_state = self._read_sync_state(symbol=symbol, timeframe=timeframe)
+    lag_seconds = self._calculate_lag_seconds(coverage.last_timestamp)
+    missing_candles = self._count_missing_candles(symbol=symbol, timeframe=timeframe)
+    issues: list[str] = []
+    sync_status = "empty"
+    if coverage.candle_count > 0:
+      sync_status = "synced"
+    if sync_state is not None and sync_state.sync_status == "error":
+      sync_status = "error"
+      issues.append("last_sync_failed")
+    elif lag_seconds is not None and lag_seconds > self._freshness_threshold_seconds(timeframe):
+      sync_status = "stale"
+      issues.append("lagging")
+    if missing_candles > 0:
+      issues.append(f"missing_candles:{missing_candles}")
+    return QualitySnapshot(
+      coverage=coverage,
+      sync_state=sync_state,
+      lag_seconds=lag_seconds,
+      sync_status=sync_status,
+      issues=tuple(issues),
+    )
 
   def _count_missing_candles(self, *, symbol: str, timeframe: str) -> int:
     statement = select(market_candles.c.timestamp).where(

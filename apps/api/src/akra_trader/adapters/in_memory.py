@@ -13,6 +13,7 @@ from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import RunRecord
@@ -110,6 +111,33 @@ class SeededMarketDataAdapter(MarketDataPort):
         )
       )
     return MarketDataStatus(provider="seeded", venue=self._venue, instruments=instruments)
+
+  def describe_lineage(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    candles: list[Candle],
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> MarketDataLineage:
+    issues: list[str] = []
+    if limit is not None and len(candles) < limit:
+      issues.append("insufficient_fixture_coverage")
+    return MarketDataLineage(
+      provider="seeded",
+      venue=self._venue,
+      symbols=(symbol,),
+      timeframe=timeframe,
+      requested_start_at=start_at,
+      requested_end_at=end_at,
+      effective_start_at=candles[0].timestamp if candles else None,
+      effective_end_at=candles[-1].timestamp if candles else None,
+      candle_count=len(candles),
+      sync_status="fixture",
+      issues=tuple(issues),
+    )
 
 
 class InMemoryRunRepository(RunRepositoryPort):

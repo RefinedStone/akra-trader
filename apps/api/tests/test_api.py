@@ -51,6 +51,8 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   payload = response.json()
   assert payload["status"] == "completed"
   assert payload["config"]["strategy_id"] == "ma_cross_v1"
+  assert payload["provenance"]["market_data"]["provider"] == "seeded"
+  assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
 
 
 def test_backtest_run_survives_app_restart(tmp_path: Path) -> None:
