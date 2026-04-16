@@ -57,19 +57,55 @@
       "direction_id": "experiment-os",
       "title": "Link run provenance directly to sync checkpoints and rerun boundaries",
       "description": "Extend run provenance so each run directly references or pins the market-data sync checkpoint now exposed in status, then use that stable boundary to drive explicit rerun equivalence instead of relying on indirect dataset reconstruction.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 95,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply names missing linkage between run provenance and the new market-data sync checkpoint as the clearest remaining executable gap, and it is the most direct follow-up now that the status surface work is done.",
+      "priority_reason": "Completed in main session commit 68f913f, which added aggregate and per-symbol sync checkpoint lineage, persisted rerun boundary IDs and state across native/reference runs, and exposed rerun-boundary lookup plus UI visibility.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening",
         "planning-data-trust-market-data-status-history-surface"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:00:00Z",
+      "updated_at": "2026-04-17T00:15:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Bridges data-trust checkpoint identity to experiment-os rerun flows by making the newly surfaced sync boundary first-class run provenance."
+      "direction_relation_note": "Closed the provenance-linking gap between data-trust checkpoint identity and experiment-os rerun flows by making sync checkpoints and rerun boundaries first-class run metadata."
+    },
+    {
+      "id": "planning-experiment-os-explicit-rerun-from-boundary",
+      "direction_id": "experiment-os",
+      "title": "Add explicit rerun workflow from stored rerun boundaries",
+      "description": "Introduce an explicit rerun endpoint or workflow that accepts a prior run or rerun_boundary_id, reconstructs the stored boundary directly, and launches native or reference reruns without relying on manual operator reconstruction of provenance fields.",
+      "status": "ready",
+      "base_priority": 94,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly says rerun boundaries are now stored and queryable but there is still no endpoint or workflow that reuses a stored boundary for reruns, making this the clearest immediate executable follow-up.",
+      "depends_on": [
+        "planning-experiment-os-dataset-identity-rerun-workflow"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advances the experiment-os requirement that native and reference runs share one reproducible experiment model by turning stored rerun boundaries into a first-class rerun operation."
+    },
+    {
+      "id": "planning-experiment-os-rerun-boundary-indexing",
+      "direction_id": "experiment-os",
+      "title": "Make rerun-boundary lookup durable and indexable in SQL storage",
+      "description": "Move rerun_boundary_id and related summary fields out of payload-only filtering into durable SQL summary columns or indexes so common rerun-boundary queries do not depend on in-memory scans as run volume grows.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main-session validation confirms rerun-boundary queries work today but still rely on payload-centric in-memory filtering in SQL storage, which is a credible follow-up optimization once explicit rerun flows prove the access pattern.",
+      "depends_on": [
+        "planning-experiment-os-dataset-identity-rerun-workflow"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Supports the experiment-os goal of queryable experiment metadata by promoting rerun-boundary access from payload scans to durable storage paths."
     },
     {
       "id": "planning-experiment-os-strategy-lifecycle-registration",
@@ -79,14 +115,14 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 0,
-      "priority_reason": "Gate 1 and Program Phase 1 both require durable lifecycle state, but the blueprint places it after dataset identity and basic experiment metadata completion.",
+      "priority_reason": "Gate 1 and Program Phase 1 still require durable lifecycle state, but the latest main-session reply surfaced more immediate rerun workflow and rerun-boundary storage follow-ups ahead of lifecycle work.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening",
         "planning-experiment-os-queryable-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:20:10Z",
+      "updated_at": "2026-04-17T00:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Directly targets the experiment-os success criterion that strategy registration and lifecycle state remain durable and queryable across restarts."
     },
