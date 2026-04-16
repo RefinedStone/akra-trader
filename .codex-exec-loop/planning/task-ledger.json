@@ -130,18 +130,54 @@
       "direction_id": "experiment-os",
       "title": "Separate paper replay history and filters from sandbox alias storage",
       "description": "Refactor run persistence and query surfaces so rerun-boundary paper replays are stored and filterable as an explicit paper lane rather than collapsing into the existing sandbox alias, giving operators durable paper-specific history, counts, and replay lookup semantics.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 1,
-      "priority_reason": "The latest main-session reply says explicit paper replay is now surfaced in UI, but persisted history and filters still collapse into the sandbox alias, making storage and query separation the clearest immediate follow-up for builtin next-task execution.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 5945969, which added RunMode.PAPER, split paper run history and filters from sandbox storage in the API and control room, updated docs, and verified with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-experiment-os-surface-paper-rerun-boundary-action"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:20:00Z",
+      "updated_at": "2026-04-17T05:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Strengthens the shared experiment model by ensuring paper remains a first-class execution lane in persisted run history and operator filters rather than a hidden alias of sandbox."
+    },
+    {
+      "id": "planning-runtime-ops-separate-paper-execution-from-sandbox-preview-engine",
+      "direction_id": "runtime-ops",
+      "title": "Separate paper execution semantics from the sandbox preview engine",
+      "description": "Stop treating paper as a storage-only distinction on top of the sandbox preview engine by introducing paper-specific runtime semantics, supervision, and operator-facing state boundaries, so paper becomes a real execution lane instead of another sandbox alias with different history filters.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 8642bdc, which split paper runtime priming from sandbox preview replay, introduced paper-specific startup notes and current-snapshot semantics, aligned operator wording, and verified the change with API pytest plus web typecheck and build.",
+      "depends_on": [
+        "planning-experiment-os-separate-paper-replay-history-from-sandbox-alias"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advanced runtime-ops by separating preview-style sandbox behavior from paper startup semantics, creating a cleaner base for the remaining worker-session, health, and supervision work."
+    },
+    {
+      "id": "planning-experiment-os-reconcile-legacy-paper-runs-from-sandbox-history",
+      "direction_id": "experiment-os",
+      "title": "Reconcile legacy paper runs that were stored under sandbox history",
+      "description": "Decide how to handle pre-RunMode.PAPER replay history that was persisted as sandbox without mode metadata, then add the chosen migration, annotation, or operator-facing caveat so legacy paper runs do not silently disappear or remain misclassified after the storage split.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly calls out that old sandbox-stored paper runs cannot be auto-classified, but the correct migration or disclosure policy still needs operator-product judgment before it should be auto-executed.",
+      "depends_on": [
+        "planning-experiment-os-separate-paper-replay-history-from-sandbox-alias"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Preserves experiment-os trust in run history by making the post-split paper lane honest about legacy ambiguity instead of relying on silent misclassification."
     },
     {
       "id": "planning-operator-trust-paper-replay-audit-and-approval-metadata",
@@ -221,18 +257,36 @@
       "direction_id": "runtime-ops",
       "title": "Replace sandbox preview semantics with worker session state, heartbeat, and recovery",
       "description": "Introduce a real worker or session model separate from preview runs, then add heartbeat, restart recovery, and operator-visible runtime state so sandbox stops being a replay preview and can satisfy Gate 2 semantics.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 84,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Current-state lists the long-running worker model as Immediate Next Priority 3, but Program 2 is downstream of Program 1 reproducibility and experiment-state work.",
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says the paper lane is now separated but still lacks continuous worker, heartbeat, and recovery semantics, making this the clearest immediately executable runtime-ops follow-up.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:20:10Z",
+      "updated_at": "2026-04-17T06:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Matches runtime-ops success criteria around separating preview and active sessions while surfacing heartbeat and recoverable health."
+      "direction_relation_note": "Now becomes the queue head for runtime-ops because paper startup semantics are split, but active worker identity, heartbeat, recovery, and operator-visible session health are still missing."
+    },
+    {
+      "id": "planning-runtime-ops-paper-launch-request-surface",
+      "direction_id": "runtime-ops",
+      "title": "Replace replay-shaped paper launch fields with a paper-specific request surface",
+      "description": "Stop reusing sandbox replay request fields such as replay_bars for paper launch priming, and define a paper-specific API contract and UI wording that matches current-snapshot session startup rather than replay semantics.",
+      "status": "proposed",
+      "base_priority": 82,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly calls out that paper launch still reuses replay_bars for its priming window, but worker-session semantics are the more immediate executable follow-up.",
+      "depends_on": [
+        "planning-runtime-ops-separate-paper-execution-from-sandbox-preview-engine"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps runtime-ops and operator wording coherent by making the paper launch contract reflect paper-session semantics instead of lingering replay terminology."
     },
     {
       "id": "planning-operator-trust-alerts-and-event-log",
