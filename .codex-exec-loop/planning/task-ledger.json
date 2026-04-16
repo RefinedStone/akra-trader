@@ -383,36 +383,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Recover guarded-live runtime state from venue snapshots after restart or fault",
       "description": "Extend guarded-live beyond snapshot comparison so restart or fault handling can rebuild or quarantine runtime state from venue balances and open orders, letting venue verification drive safe recovery instead of ending at mismatch reporting alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 83,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply explicitly says venue verification still stops at snapshot comparison and does not recover live worker state after restart or fault, making venue-state recovery the clearest immediate executable follow-up before any live write path.",
+      "priority_reason": "Completed in main session commit aac2910, which rebuilt guarded-live runtime state from verified venue snapshots, exposed recovery state and a recovery action through the API and control room, persisted recovery audit details, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-venue-state-reconciliation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:20:00Z",
+      "updated_at": "2026-04-17T07:35:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live execution from passive venue verification into recoverable operator-safe runtime behavior, which is needed before live candidacy can rely on restart handling instead of manual local repair."
+      "direction_relation_note": "Closed the restart-recovery gap in guarded-live execution by reconstructing persisted runtime state from verified venue snapshots, which now leaves real venue-backed worker execution and broader live-path audit or alert coverage as the next candidacy steps."
     },
     {
       "id": "planning-guarded-live-live-venue-order-path",
       "direction_id": "guarded-live-execution",
-      "title": "Introduce a guarded live venue adapter and real order path behind safety gates",
-      "description": "Implement the first real live execution adapter and order submission or cancellation path behind the new guarded-live controls, ensuring live-affecting actions remain blocked unless kill-switch, audit, and reconciliation preconditions are satisfied.",
-      "status": "proposed",
+      "title": "Introduce a guarded live worker and venue order path behind safety gates",
+      "description": "Implement the first real venue-backed guarded-live worker loop and order submission or cancellation path behind the new safety controls so recovered runtime state can transition into supervised live execution instead of stopping at control-plane reconstruction alone, while keeping kill-switch, audit, and reconciliation preconditions mandatory for every live-affecting action.",
+      "status": "ready",
       "base_priority": 78,
-      "dynamic_priority_delta": 2,
-      "priority_reason": "The latest main-session reply says no live venue adapter or actual live order path exists yet, but restart or fault recovery from venue state is now the safer immediate step before execution-capable write paths are promoted to the queue head.",
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says guarded-live recovery is shipped but still does not resume a real venue-backed live worker and no live execution path exists yet, making the first supervised live worker plus venue order path the clearest immediate executable follow-up once recovery is complete.",
       "depends_on": [
         "planning-guarded-live-venue-state-recovery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:20:00Z",
+      "updated_at": "2026-04-17T07:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Carries guarded-live execution from safety-readiness into tightly gated live write capability, but intentionally stays behind venue-state recovery so execution does not outrun verification and restart safety."
+      "direction_relation_note": "Carries guarded-live execution from recovered control-plane state into a supervised venue-backed worker and tightly gated live write capability, which is the next step before live candidacy can claim restart-safe execution rather than snapshot-only recovery."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
