@@ -237,6 +237,7 @@ const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
+const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
 
 type ControlRoomUiStateV1 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
@@ -343,6 +344,12 @@ type ComparisonTooltipConflictSessionUiState = {
 type ComparisonTooltipConflictUiStateV1 = {
   sessions: Record<string, ComparisonTooltipConflictSessionUiState>;
   version: typeof COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION;
+};
+type ComparisonTooltipConflictSessionSummary = {
+  includes_current: boolean;
+  label: string;
+  preset_name: string;
+  session_count: number;
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -3004,6 +3011,18 @@ function ComparisonTooltipTuningPanel({
     ? conflictSessionUiStateMap[conflictSessionKey] ?? null
     : null;
   const savedConflictSessionCount = Object.keys(conflictSessionUiStateMap).length;
+  const savedConflictSessionSummaries = buildComparisonTooltipConflictSessionSummaries(
+    conflictSessionUiStateMap,
+    conflictSessionKey,
+  );
+  const visibleSavedConflictSessionSummaries = savedConflictSessionSummaries.slice(
+    0,
+    MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES,
+  );
+  const hiddenSavedConflictSessionSummaryCount = Math.max(
+    0,
+    savedConflictSessionSummaries.length - visibleSavedConflictSessionSummaries.length,
+  );
   const showUnchangedConflictRows =
     currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
   const collapsedUnchangedConflictGroups =
@@ -3266,6 +3285,30 @@ function ComparisonTooltipTuningPanel({
                 {" "}
                 session{savedConflictSessionCount === 1 ? "" : "s"} for conflict preview layout.
               </p>
+              {visibleSavedConflictSessionSummaries.length ? (
+                <div className="comparison-dev-session-summary">
+                  <p className="comparison-dev-session-summary-title">Sessions queued for clearing</p>
+                  <ul className="comparison-dev-session-summary-list">
+                    {visibleSavedConflictSessionSummaries.map((summary) => (
+                      <li
+                        className="comparison-dev-session-summary-item"
+                        key={summary.label}
+                      >
+                        <span>{summary.label}</span>
+                        {summary.includes_current ? (
+                          <span className="comparison-dev-session-summary-badge">current</span>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                  {hiddenSavedConflictSessionSummaryCount ? (
+                    <p className="comparison-dev-feedback">
+                      +{hiddenSavedConflictSessionSummaryCount} more saved preset
+                      {hiddenSavedConflictSessionSummaryCount === 1 ? "" : "s"} not shown.
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <div className="comparison-dev-actions comparison-dev-actions-inline">
                 <button
                   className="ghost-button comparison-dev-reset comparison-dev-reset-danger"
@@ -4034,6 +4077,65 @@ function buildComparisonTooltipConflictSessionKey(
   return `${pendingConflict.imported_preset_name}:${hashComparisonTooltipConflictSessionRaw(
     pendingConflict.raw,
   )}`;
+}
+
+function buildComparisonTooltipConflictSessionSummaries(
+  sessions: Record<string, ComparisonTooltipConflictSessionUiState>,
+  currentConflictSessionKey: string | null,
+): ComparisonTooltipConflictSessionSummary[] {
+  const groupedSessions = Object.keys(sessions).reduce<
+    Record<string, Omit<ComparisonTooltipConflictSessionSummary, "label">>
+  >((accumulator, sessionKey) => {
+    const parsed = parseComparisonTooltipConflictSessionKey(sessionKey);
+    const presetName = parsed.preset_name || "Unnamed preset";
+    const current = accumulator[presetName] ?? {
+      includes_current: false,
+      preset_name: presetName,
+      session_count: 0,
+    };
+    current.includes_current ||= sessionKey === currentConflictSessionKey;
+    current.session_count += 1;
+    accumulator[presetName] = current;
+    return accumulator;
+  }, {});
+
+  return Object.values(groupedSessions)
+    .sort((left, right) => {
+      if (left.includes_current !== right.includes_current) {
+        return left.includes_current ? -1 : 1;
+      }
+      if (left.session_count !== right.session_count) {
+        return right.session_count - left.session_count;
+      }
+      return left.preset_name.localeCompare(right.preset_name);
+    })
+    .map((summary) => ({
+      ...summary,
+      label: formatComparisonTooltipConflictSessionSummary(summary),
+    }));
+}
+
+function parseComparisonTooltipConflictSessionKey(sessionKey: string) {
+  const separatorIndex = sessionKey.lastIndexOf(":");
+  if (separatorIndex <= 0 || separatorIndex === sessionKey.length - 1) {
+    return {
+      hash: null,
+      preset_name: sessionKey.trim(),
+    };
+  }
+  return {
+    hash: sessionKey.slice(separatorIndex + 1).trim() || null,
+    preset_name: sessionKey.slice(0, separatorIndex).trim(),
+  };
+}
+
+function formatComparisonTooltipConflictSessionSummary(
+  summary: Omit<ComparisonTooltipConflictSessionSummary, "label">,
+) {
+  if (summary.session_count === 1) {
+    return summary.preset_name;
+  }
+  return `${summary.preset_name} (${summary.session_count} saved sessions)`;
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {
