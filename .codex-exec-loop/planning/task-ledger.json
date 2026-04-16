@@ -783,19 +783,55 @@
       "id": "planning-reference-lanes-adaptive-tooltip-sweep-thresholds",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Adapt comparison tooltip sweep thresholds to cell size or pointer speed",
-      "description": "Replace the current fixed pixel and timing cutoffs for dense comparison-table tooltip sweep suppression with adaptive heuristics derived from actual metric-cell dimensions and/or observed pointer velocity so row and column scan damping stays stable across different table densities without over-suppressing deliberate inspection.",
-      "status": "ready",
+      "description": "Completed the adaptive-threshold follow-up by capturing metric-cell dimensions in recent pointer samples and deriving row/column sweep suppression thresholds from observed pointer speed plus average cell size, so narrow cells react faster while larger or slower interactions require stronger evidence before tooltip swaps are damped.",
+      "status": "done",
       "base_priority": 87,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply said nothing essential remains for asymmetric column-sweep tuning and explicitly identified adaptive thresholds based on cell size or pointer speed as the likely next refinement, making it the clearest executable follow-up for the comparison tooltip lane.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the adaptive comparison tooltip threshold implementation in `apps/web/src/App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `6064d92` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:05:00Z",
+      "updated_at": "2026-04-17T06:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-asymmetric-column-sweep-tuning"
       ],
       "direction_relation_note": "Builds on the completed asymmetric column-sweep tuning by replacing hard-coded dense-table suppression thresholds with interaction-aware scaling that can better match different comparison layouts and operator scan speeds."
+    },
+    {
+      "id": "planning-reference-lanes-dev-tooltip-threshold-tuning-panel",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add a dev-only tuning panel for comparison tooltip sweep thresholds",
+      "description": "Expose the adaptive comparison-tooltip sweep thresholds through a development-only tuning panel so operators can inspect the live derived row/column suppression inputs, override calibration constants locally, and evaluate pointer-behavior tradeoffs against real dense-table interactions without editing source constants between runs.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply said nothing essential remains for adaptive sweep thresholds and explicitly named a dev-only tuning panel as the likeliest next refinement to calibrate the new heuristics against real operator behavior, making it the clearest immediately executable successor task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-adaptive-tooltip-sweep-thresholds"
+      ],
+      "direction_relation_note": "Builds on the completed adaptive threshold logic by giving the reference-lane comparison UI a practical calibration surface for dense-table tooltip behavior before committing to longer-term operator defaults."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-interaction-telemetry",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Persist lightweight telemetry for comparison tooltip sweep behavior",
+      "description": "Capture lightweight comparison-table interaction telemetry around tooltip suppression decisions, pointer speed bands, cell dimensions, and swap outcomes so the adaptive sweep heuristics can be tuned from observed operator behavior instead of only from hand-tuned constants.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 2,
+      "priority_reason": "The latest main-session reply named lightweight interaction telemetry as a plausible next refinement, but it is a broader instrumentation choice than the immediately actionable dev-only tuning panel and may need product judgment on storage scope and retention.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-adaptive-tooltip-sweep-thresholds"
+      ],
+      "direction_relation_note": "Extends the reference-lane tooltip calibration work from local manual tuning toward evidence-backed threshold decisions using real comparison-table interaction patterns."
     }
   ]
 }
