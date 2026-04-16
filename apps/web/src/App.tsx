@@ -1465,7 +1465,7 @@ function RunComparisonPanel({
     y: number;
   } | null>(null);
   const metricSweepStateRef = useRef<{
-    axis: "column" | "row";
+    axis: "column_down" | "column_up" | "row";
     contextKey: string;
     until: number;
   } | null>(null);
@@ -1501,9 +1501,13 @@ function RunComparisonPanel({
     hoverCloseDelayMs: 90,
     hoverOpenDelayMs: 250,
   };
-  const metricColumnSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
-    hoverCloseDelayMs: 85,
-    hoverOpenDelayMs: 210,
+  const metricColumnDownSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
+    hoverCloseDelayMs: 80,
+    hoverOpenDelayMs: 170,
+  };
+  const metricColumnUpSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
+    hoverCloseDelayMs: 95,
+    hoverOpenDelayMs: 260,
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1665,6 +1669,7 @@ function RunComparisonPanel({
     const deltaTime = Math.max(sample.time - previousSample.time, 1);
     const deltaX = Math.abs(sample.x - previousSample.x);
     const deltaY = Math.abs(sample.y - previousSample.y);
+    const signedDeltaY = sample.y - previousSample.y;
     const horizontalVelocity = deltaX / deltaTime;
     const verticalVelocity = deltaY / deltaTime;
     const isSameMetricRow = previousSample.metricRowKey === metricRowKey;
@@ -1681,6 +1686,7 @@ function RunComparisonPanel({
       deltaY >= 18 &&
       deltaY >= deltaX * 2 &&
       verticalVelocity >= 0.34;
+    const columnSweepAxis = signedDeltaY >= 0 ? "column_down" : "column_up";
 
     if (isHorizontalSweep) {
       metricSweepStateRef.current = {
@@ -1693,11 +1699,13 @@ function RunComparisonPanel({
 
     if (isVerticalSweep) {
       metricSweepStateRef.current = {
-        axis: "column",
+        axis: columnSweepAxis,
         contextKey: runColumnKey,
         until: sample.time + 160,
       };
-      return metricColumnSweepTooltipInteraction;
+      return columnSweepAxis === "column_down"
+        ? metricColumnDownSweepTooltipInteraction
+        : metricColumnUpSweepTooltipInteraction;
     }
 
     if (
@@ -1711,16 +1719,21 @@ function RunComparisonPanel({
         return metricRowSweepTooltipInteraction;
       }
       if (
-        metricSweepStateRef.current.axis === "column" &&
+        (metricSweepStateRef.current.axis === "column_down" ||
+          metricSweepStateRef.current.axis === "column_up") &&
         metricSweepStateRef.current.contextKey === runColumnKey
       ) {
-        return metricColumnSweepTooltipInteraction;
+        return metricSweepStateRef.current.axis === "column_down"
+          ? metricColumnDownSweepTooltipInteraction
+          : metricColumnUpSweepTooltipInteraction;
       }
     }
 
     if (
       (!isSameMetricRow && metricSweepStateRef.current?.axis === "row") ||
-      (!isSameRunColumn && metricSweepStateRef.current?.axis === "column")
+      (!isSameRunColumn &&
+        (metricSweepStateRef.current?.axis === "column_down" ||
+          metricSweepStateRef.current?.axis === "column_up"))
     ) {
       metricSweepStateRef.current = null;
     }
