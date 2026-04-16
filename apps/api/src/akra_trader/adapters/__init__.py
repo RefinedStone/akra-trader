@@ -1,0 +1,2 @@
+"""Concrete adapters for ports."""
+

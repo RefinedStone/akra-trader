@@ -1,0 +1,13 @@
+reference/NostalgiaForInfinity
+reference/cctx
+reference/yfinance
+.git.backup-*
+.codex-exec-loop/
+.idea/
+__pycache__/
+.pytest_cache/
+.venv/
+node_modules/
+dist/
+*.pyc
+*.tsbuildinfo

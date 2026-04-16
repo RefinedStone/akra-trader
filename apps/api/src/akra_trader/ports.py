@@ -1,0 +1,73 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Protocol
+
+import pandas as pd
+
+from akra_trader.domain.models import Candle
+from akra_trader.domain.models import Instrument
+from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import RunRecord
+from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import StrategyDecisionContext
+from akra_trader.domain.models import StrategyDecisionEnvelope
+from akra_trader.domain.models import StrategyExecutionState
+from akra_trader.domain.models import StrategyMetadata
+from akra_trader.domain.models import StrategyRegistration
+from akra_trader.domain.models import WarmupSpec
+
+
+class StrategyRuntime(Protocol):
+  def describe(self) -> StrategyMetadata: ...
+
+  def warmup_spec(self) -> WarmupSpec: ...
+
+  def build_feature_frame(self, candles: pd.DataFrame, parameters: dict) -> pd.DataFrame: ...
+
+  def build_decision_context(
+    self,
+    candles: pd.DataFrame,
+    parameters: dict,
+    state: StrategyExecutionState,
+  ) -> StrategyDecisionContext: ...
+
+  def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope: ...
+
+
+class DecisionEnginePort(Protocol):
+  def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope: ...
+
+
+class MarketDataPort(Protocol):
+  def list_instruments(self) -> list[Instrument]: ...
+
+  def get_candles(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+    limit: int | None = None,
+  ) -> list[Candle]: ...
+
+  def get_status(self, timeframe: str) -> MarketDataStatus: ...
+
+
+class StrategyCatalogPort(Protocol):
+  def list_strategies(self) -> list[StrategyMetadata]: ...
+
+  def load(self, strategy_id: str) -> StrategyRuntime: ...
+
+  def register(self, registration: StrategyRegistration) -> StrategyMetadata: ...
+
+
+class RunRepositoryPort(Protocol):
+  def save_run(self, run: RunRecord) -> RunRecord: ...
+
+  def get_run(self, run_id: str) -> RunRecord | None: ...
+
+  def list_runs(self, mode: str | None = None) -> list[RunRecord]: ...
+
+  def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None: ...
