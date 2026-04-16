@@ -325,9 +325,14 @@ type ComparisonTooltipPresetConflictPreviewRow = {
   label: string;
 };
 type ComparisonTooltipPresetConflictPreviewGroup = {
+  changed_count: number;
+  higher_count: number;
   key: string;
   label: string;
+  lower_count: number;
   rows: ComparisonTooltipPresetConflictPreviewRow[];
+  same_count: number;
+  summary_label: string;
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -3118,7 +3123,10 @@ function ComparisonTooltipTuningPanel({
                   {changedConflictPreviewGroups.map((group) => (
                     <div className="comparison-dev-conflict-preview-group" key={group.key}>
                       <div className="comparison-dev-conflict-preview-group-title">
-                        {group.label}
+                        <span>{group.label}</span>
+                        <span className="comparison-dev-conflict-preview-group-summary">
+                          {group.summary_label}
+                        </span>
                       </div>
                       {group.rows.map((row) => (
                         <div
@@ -3162,7 +3170,10 @@ function ComparisonTooltipTuningPanel({
                     ? unchangedConflictPreviewGroups.map((group) => (
                         <div className="comparison-dev-conflict-preview-group" key={group.key}>
                           <div className="comparison-dev-conflict-preview-group-title">
-                            {group.label}
+                            <span>{group.label}</span>
+                            <span className="comparison-dev-conflict-preview-group-summary">
+                              {group.summary_label}
+                            </span>
                           </div>
                           {group.rows.map((row) => (
                             <div className="comparison-dev-conflict-preview-row" key={row.key}>
@@ -3696,9 +3707,14 @@ function groupComparisonTooltipPresetConflictPreviewRows(
         return accumulator;
       }
       accumulator.set(row.group_key, {
+        changed_count: 0,
+        higher_count: 0,
         key: row.group_key,
         label: row.group_label,
+        lower_count: 0,
         rows: [row],
+        same_count: 0,
+        summary_label: "",
       });
       return accumulator;
     },
@@ -3713,7 +3729,12 @@ function groupComparisonTooltipPresetConflictPreviewRows(
     })
     .map((group) => ({
       ...group,
+      changed_count: group.rows.filter((row) => row.changed).length,
+      higher_count: group.rows.filter((row) => row.delta_direction === "higher").length,
+      lower_count: group.rows.filter((row) => row.delta_direction === "lower").length,
       rows: [...group.rows].sort((left, right) => left.label.localeCompare(right.label)),
+      same_count: group.rows.filter((row) => row.delta_direction === "same").length,
+      summary_label: formatComparisonTooltipPresetConflictGroupSummary(group.rows),
     }));
 }
 
@@ -3736,6 +3757,31 @@ function formatComparisonTooltipTuningDelta(existingValue: number, incomingValue
     direction: delta > 0 ? ("higher" as const) : ("lower" as const),
     label: `${delta > 0 ? "higher " : "lower "}${delta > 0 ? "+" : ""}${formatComparisonTooltipTuningValue(delta)}`,
   };
+}
+
+function formatComparisonTooltipPresetConflictGroupSummary(
+  rows: ComparisonTooltipPresetConflictPreviewRow[],
+) {
+  const changedCount = rows.filter((row) => row.changed).length;
+  const higherCount = rows.filter((row) => row.delta_direction === "higher").length;
+  const lowerCount = rows.filter((row) => row.delta_direction === "lower").length;
+  const sameCount = rows.filter((row) => row.delta_direction === "same").length;
+
+  if (!changedCount) {
+    return `${sameCount} match${sameCount === 1 ? "" : "es"}`;
+  }
+
+  const parts = [`${changedCount} changed`];
+  if (higherCount) {
+    parts.push(`${higherCount} higher`);
+  }
+  if (lowerCount) {
+    parts.push(`${lowerCount} lower`);
+  }
+  if (sameCount) {
+    parts.push(`${sameCount} match${sameCount === 1 ? "" : "es"}`);
+  }
+  return parts.join(" · ");
 }
 
 function formatComparisonTooltipPresetImportFeedback(
