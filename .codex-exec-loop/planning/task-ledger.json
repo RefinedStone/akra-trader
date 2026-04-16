@@ -855,14 +855,14 @@
       "id": "planning-reference-lanes-single-preset-portability",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Support sharing or exporting a single named tooltip tuning preset",
-      "description": "Refine the dev-only tooltip tuning portability flow so operators can export, import, or generate a share URL for one named preset without always serializing the full draft-plus-presets bundle, while preserving the current normalization and safety checks for malformed payloads.",
-      "status": "ready",
+      "description": "Completed the tooltip tuning portability refinement by adding selected-preset-only share URLs and standalone JSON export from the dev-only panel, extending import parsing so single-preset payloads merge into the current bundle while full bundles still replace it, and separating bundle-versus-selected-preset controls in the panel copy and layout.",
+      "status": "done",
       "base_priority": 87,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply marked the broader portability task complete and explicitly called finer-grained sharing, such as exporting a single named preset instead of the whole bundle, the likeliest next refinement, making it the clearest executable successor.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the single-preset portability follow-up in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `9cba3a8` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:15:00Z",
+      "updated_at": "2026-04-17T07:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-preset-portability"
@@ -872,20 +872,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-merge-modes",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Add merge or replace modes when importing shared tooltip tuning bundles",
-      "description": "Extend the dev-only tooltip tuning import flow so shared bundles can either fully replace the current local draft and saved presets or merge into existing presets selectively, instead of always overwriting the whole local bundle.",
-      "status": "proposed",
+      "title": "Handle preset name conflicts when importing shared tooltip tuning presets",
+      "description": "Completed the tooltip preset conflict-handling follow-up by adding single-preset import conflict policy controls in the dev tuning panel, supporting `rename` and `overwrite` outcomes for duplicate preset names, defaulting shared preset URL loads to safe rename behavior, and normalizing imported JSON to the actual stored preset name when a rename occurs.",
+      "status": "done",
       "base_priority": 85,
-      "dynamic_priority_delta": 3,
-      "priority_reason": "The latest main-session reply explicitly named merge/import modes as a likely next refinement, but it is a broader UX and conflict-resolution choice than the immediately executable single-preset sharing follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the preset import conflict-handling work in `apps/web/src/App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `d1caf5a` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T07:15:00Z",
+      "updated_at": "2026-04-17T07:35:00Z",
       "source_turn_id": null,
       "depends_on": [
-        "planning-reference-lanes-tooltip-preset-portability"
+        "planning-reference-lanes-single-preset-portability"
       ],
-      "direction_relation_note": "Extends the completed bundle portability flow by making shared tooltip calibration imports safer for iterative local tuning sessions that already have saved presets."
+      "direction_relation_note": "Builds directly on the completed bundle and single-preset portability flow by making reference-lane tooltip preset imports safer when shared payloads collide with existing local preset names."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-dialog",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Resolve tooltip preset import name conflicts interactively when a collision is detected",
+      "description": "Refine the dev-only tooltip tuning import flow so operators are prompted only when an imported preset name actually collides with an existing local preset, with per-conflict actions such as `rename`, `overwrite`, or `skip` replacing the current advance policy selection in the panel.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply marked the preset conflict policy task complete and explicitly identified per-import interactive resolution on actual collisions, including `rename`, `overwrite`, or `skip`, as the clearest next refinement.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:35:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-merge-modes"
+      ],
+      "direction_relation_note": "Builds on the completed conflict-policy import safety work by moving tooltip preset collision handling from a global preselection model to a more targeted, operator-driven decision at the moment an actual name collision occurs."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
