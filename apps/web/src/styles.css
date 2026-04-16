@@ -778,6 +778,14 @@ select {
   line-height: 1.5;
 }
 
+.comparison-dev-preset-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  margin-top: 14px;
+  align-items: end;
+}
+
 .comparison-dev-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -802,8 +810,23 @@ select {
   color: var(--text);
 }
 
+.comparison-dev-field select {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
 .comparison-dev-actions {
   margin-top: 14px;
+}
+
+.comparison-dev-actions-inline {
+  display: flex;
+  gap: 8px;
+  margin-top: 0;
 }
 
 .comparison-dev-reset {

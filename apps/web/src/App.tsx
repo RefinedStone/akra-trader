@@ -229,6 +229,8 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 1;
+const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
+const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
@@ -282,6 +284,12 @@ type ComparisonTooltipTuning = {
   sweep_time_speed_multiplier: number;
   vertical_distance_ratio: number;
   vertical_velocity_threshold: number;
+};
+type ComparisonTooltipTuningPresetStateV1 = {
+  current_tuning: ComparisonTooltipTuning;
+  presets: Record<string, ComparisonTooltipTuning>;
+  selected_preset_name?: string | null;
+  version: typeof COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION;
 };
 type ComparisonTooltipLayout = {
   tooltipId: string;
@@ -1529,6 +1537,14 @@ function RunComparisonPanel({
   const [tooltipTuning, setTooltipTuning] = useState<ComparisonTooltipTuning>(
     DEFAULT_COMPARISON_TOOLTIP_TUNING,
   );
+  const [tooltipTuningPresets, setTooltipTuningPresets] = useState<
+    Record<string, ComparisonTooltipTuning>
+  >({});
+  const [selectedTooltipPresetName, setSelectedTooltipPresetName] = useState("");
+  const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
+  const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
+    !SHOW_COMPARISON_TOOLTIP_TUNING_PANEL,
+  );
   const intentClassName = getComparisonIntentClassName(comparison.intent);
   const intentTooltip = formatComparisonIntentTooltip(comparison.intent);
   const baselineTooltip = formatComparisonCueTooltip(comparison.intent, "baseline");
@@ -1577,6 +1593,52 @@ function RunComparisonPanel({
       ...current,
       [key]: nextValue,
     }));
+    setSelectedTooltipPresetName("");
+  };
+
+  const saveTooltipPreset = () => {
+    const presetName = tooltipPresetDraftName.trim();
+    if (!presetName) {
+      return;
+    }
+    setTooltipTuningPresets((current) => ({
+      ...current,
+      [presetName]: { ...tooltipTuning },
+    }));
+    setSelectedTooltipPresetName(presetName);
+    setTooltipPresetDraftName(presetName);
+  };
+
+  const loadTooltipPreset = (presetName: string) => {
+    if (!presetName) {
+      setSelectedTooltipPresetName("");
+      return;
+    }
+    const preset = tooltipTuningPresets[presetName];
+    if (!preset) {
+      return;
+    }
+    setTooltipTuning({ ...preset });
+    setSelectedTooltipPresetName(presetName);
+    setTooltipPresetDraftName(presetName);
+  };
+
+  const deleteTooltipPreset = () => {
+    if (!selectedTooltipPresetName) {
+      return;
+    }
+    setTooltipTuningPresets((current) => {
+      const next = { ...current };
+      delete next[selectedTooltipPresetName];
+      return next;
+    });
+    setSelectedTooltipPresetName("");
+    setTooltipPresetDraftName("");
+  };
+
+  const resetTooltipTuning = () => {
+    setTooltipTuning(DEFAULT_COMPARISON_TOOLTIP_TUNING);
+    setSelectedTooltipPresetName("");
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1864,6 +1926,35 @@ function RunComparisonPanel({
 
   useEffect(() => clearComparisonTooltipTimers, []);
 
+  useEffect(() => {
+    if (!SHOW_COMPARISON_TOOLTIP_TUNING_PANEL) {
+      return;
+    }
+    const storedState = loadComparisonTooltipTuningPresetState();
+    setTooltipTuning(storedState.current_tuning);
+    setTooltipTuningPresets(storedState.presets);
+    setSelectedTooltipPresetName(storedState.selected_preset_name ?? "");
+    setTooltipPresetDraftName(storedState.selected_preset_name ?? "");
+    setHasHydratedTooltipTuningState(true);
+  }, []);
+
+  useEffect(() => {
+    if (!SHOW_COMPARISON_TOOLTIP_TUNING_PANEL || !hasHydratedTooltipTuningState) {
+      return;
+    }
+    persistComparisonTooltipTuningPresetState({
+      current_tuning: tooltipTuning,
+      presets: tooltipTuningPresets,
+      selected_preset_name: selectedTooltipPresetName || null,
+      version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+    });
+  }, [
+    hasHydratedTooltipTuningState,
+    selectedTooltipPresetName,
+    tooltipTuning,
+    tooltipTuningPresets,
+  ]);
+
   useLayoutEffect(() => {
     if (!activeTooltipId) {
       setActiveTooltipLayout(null);
@@ -2034,8 +2125,15 @@ function RunComparisonPanel({
       </div>
       {SHOW_COMPARISON_TOOLTIP_TUNING_PANEL ? (
         <ComparisonTooltipTuningPanel
+          onChangePresetDraftName={setTooltipPresetDraftName}
           onChangeValue={updateTooltipTuning}
-          onReset={() => setTooltipTuning(DEFAULT_COMPARISON_TOOLTIP_TUNING)}
+          onDeletePreset={deleteTooltipPreset}
+          onLoadPreset={loadTooltipPreset}
+          onReset={resetTooltipTuning}
+          onSavePreset={saveTooltipPreset}
+          presetDraftName={tooltipPresetDraftName}
+          presets={tooltipTuningPresets}
+          selectedPresetName={selectedTooltipPresetName}
           tuning={tooltipTuning}
         />
       ) : null}
@@ -2339,14 +2437,30 @@ const ComparisonTooltipBubble = forwardRef<
 });
 
 function ComparisonTooltipTuningPanel({
+  presetDraftName,
+  presets,
+  selectedPresetName,
+  onChangePresetDraftName,
   tuning,
   onChangeValue,
+  onDeletePreset,
+  onLoadPreset,
   onReset,
+  onSavePreset,
 }: {
+  presetDraftName: string;
+  presets: Record<string, ComparisonTooltipTuning>;
+  selectedPresetName: string;
+  onChangePresetDraftName: (value: string) => void;
   tuning: ComparisonTooltipTuning;
   onChangeValue: (key: keyof ComparisonTooltipTuning, value: string) => void;
+  onDeletePreset: () => void;
+  onLoadPreset: (name: string) => void;
   onReset: () => void;
+  onSavePreset: () => void;
 }) {
+  const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
+
   return (
     <details className="comparison-dev-panel">
       <summary className="comparison-dev-summary">
@@ -2355,6 +2469,44 @@ function ComparisonTooltipTuningPanel({
       <p className="comparison-dev-copy">
         Tune sweep detection and suppression live while scanning dense comparison cells.
       </p>
+      <div className="comparison-dev-preset-bar">
+        <label className="comparison-dev-field">
+          <span>Preset</span>
+          <select
+            onChange={(event) => onLoadPreset(event.target.value)}
+            value={selectedPresetName}
+          >
+            <option value="">Draft only</option>
+            {presetNames.map((presetName) => (
+              <option key={presetName} value={presetName}>
+                {presetName}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="comparison-dev-field">
+          <span>Preset name</span>
+          <input
+            onChange={(event) => onChangePresetDraftName(event.target.value)}
+            placeholder="session-a"
+            type="text"
+            value={presetDraftName}
+          />
+        </label>
+        <div className="comparison-dev-actions comparison-dev-actions-inline">
+          <button className="ghost-button comparison-dev-reset" onClick={onSavePreset} type="button">
+            Save preset
+          </button>
+          <button
+            className="ghost-button comparison-dev-reset"
+            disabled={!selectedPresetName}
+            onClick={onDeletePreset}
+            type="button"
+          >
+            Delete preset
+          </button>
+        </div>
+      </div>
       <div className="comparison-dev-grid">
         <ComparisonTooltipTuningField
           label="Metric open"
@@ -2549,6 +2701,86 @@ function ComparisonTooltipTuningField({
 
 function sanitizeComparisonTooltipId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "-");
+}
+
+function loadComparisonTooltipTuningPresetState(): ComparisonTooltipTuningPresetStateV1 {
+  try {
+    const raw = window.localStorage.getItem(COMPARISON_TOOLTIP_TUNING_STORAGE_KEY);
+    if (!raw) {
+      return createDefaultComparisonTooltipTuningPresetState();
+    }
+    const parsed = JSON.parse(raw) as Partial<ComparisonTooltipTuningPresetStateV1> | null;
+    if (!parsed || parsed.version !== COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION) {
+      return createDefaultComparisonTooltipTuningPresetState();
+    }
+    const presets = normalizeComparisonTooltipPresetMap(parsed.presets);
+    const selectedPresetName =
+      typeof parsed.selected_preset_name === "string" && presets[parsed.selected_preset_name]
+        ? parsed.selected_preset_name
+        : null;
+    return {
+      current_tuning: normalizeComparisonTooltipTuning(parsed.current_tuning),
+      presets,
+      selected_preset_name: selectedPresetName,
+      version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+    };
+  } catch {
+    return createDefaultComparisonTooltipTuningPresetState();
+  }
+}
+
+function persistComparisonTooltipTuningPresetState(
+  state: ComparisonTooltipTuningPresetStateV1,
+) {
+  try {
+    window.localStorage.setItem(COMPARISON_TOOLTIP_TUNING_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore localStorage failures in dev-only tuning controls.
+  }
+}
+
+function createDefaultComparisonTooltipTuningPresetState(): ComparisonTooltipTuningPresetStateV1 {
+  return {
+    current_tuning: { ...DEFAULT_COMPARISON_TOOLTIP_TUNING },
+    presets: {},
+    selected_preset_name: null,
+    version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+  };
+}
+
+function normalizeComparisonTooltipPresetMap(
+  value: unknown,
+): Record<string, ComparisonTooltipTuning> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, ComparisonTooltipTuning>>(
+    (accumulator, [key, preset]) => {
+      if (!key.trim()) {
+        return accumulator;
+      }
+      accumulator[key] = normalizeComparisonTooltipTuning(preset);
+      return accumulator;
+    },
+    {},
+  );
+}
+
+function normalizeComparisonTooltipTuning(value: unknown): ComparisonTooltipTuning {
+  if (!value || typeof value !== "object") {
+    return { ...DEFAULT_COMPARISON_TOOLTIP_TUNING };
+  }
+  const parsed = value as Partial<Record<keyof ComparisonTooltipTuning, unknown>>;
+  const next = { ...DEFAULT_COMPARISON_TOOLTIP_TUNING };
+  (
+    Object.keys(DEFAULT_COMPARISON_TOOLTIP_TUNING) as Array<keyof ComparisonTooltipTuning>
+  ).forEach((key) => {
+    const candidate = parsed[key];
+    if (typeof candidate === "number" && Number.isFinite(candidate)) {
+      next[key] = candidate;
+    }
+  });
+  return next;
 }
 
 function buildComparisonTooltipId(baseId: string, ...parts: Array<string | null | undefined>) {
