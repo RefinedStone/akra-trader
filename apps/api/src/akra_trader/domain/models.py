@@ -301,6 +301,7 @@ class InstrumentStatus:
   backfill_contiguous_completion_ratio: float | None = None
   backfill_contiguous_complete: bool | None = None
   backfill_contiguous_missing_candles: int | None = None
+  backfill_gap_windows: tuple["GapWindow", ...] = ()
   issues: tuple[str, ...] = ()
 
 
@@ -309,6 +310,13 @@ class MarketDataStatus:
   provider: str
   venue: str
   instruments: list[InstrumentStatus]
+
+
+@dataclass(frozen=True)
+class GapWindow:
+  start_at: datetime
+  end_at: datetime
+  missing_candles: int
 
 
 @dataclass(frozen=True)

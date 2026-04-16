@@ -27,6 +27,7 @@ from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
@@ -115,6 +116,7 @@ class BackfillSnapshot:
   contiguous_completion_ratio: float | None
   contiguous_complete: bool | None
   contiguous_missing_candles: int | None
+  gap_windows: tuple[GapWindow, ...]
 
 
 def build_binance_exchange() -> OhlcvExchange:
@@ -210,6 +212,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
           backfill_contiguous_completion_ratio=backfill.contiguous_completion_ratio,
           backfill_contiguous_complete=backfill.contiguous_complete,
           backfill_contiguous_missing_candles=backfill.contiguous_missing_candles,
+          backfill_gap_windows=backfill.gap_windows,
           issues=quality.issues,
         )
       )
@@ -577,6 +580,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
         contiguous_completion_ratio=None,
         contiguous_complete=None,
         contiguous_missing_candles=None,
+        gap_windows=(),
       )
 
     timeframe_delta = self._timeframe_delta(timeframe)
@@ -596,10 +600,11 @@ class BinanceMarketDataAdapter(MarketDataPort):
       start_at=window_start,
       end_at=coverage.last_timestamp,
     )
-    missing_candles = self._count_missing_candles_from_timestamps(
+    gap_windows = self._build_gap_windows_from_timestamps(
       timestamps=timestamps,
       timeframe=timeframe,
     )
+    missing_candles = sum(window.missing_candles for window in gap_windows)
     contiguous_completion_ratio = (
       min(len(timestamps) / expected_candle_count, 1.0)
       if expected_candle_count > 0
@@ -612,31 +617,41 @@ class BinanceMarketDataAdapter(MarketDataPort):
       contiguous_completion_ratio=contiguous_completion_ratio,
       contiguous_complete=missing_candles == 0,
       contiguous_missing_candles=missing_candles,
+      gap_windows=gap_windows,
     )
 
   def _count_missing_candles(self, *, symbol: str, timeframe: str) -> int:
     timestamps = self._read_timestamps(symbol=symbol, timeframe=timeframe)
-    return self._count_missing_candles_from_timestamps(
-      timestamps=timestamps,
-      timeframe=timeframe,
+    return sum(
+      window.missing_candles
+      for window in self._build_gap_windows_from_timestamps(
+        timestamps=timestamps,
+        timeframe=timeframe,
+      )
     )
 
-  def _count_missing_candles_from_timestamps(
+  def _build_gap_windows_from_timestamps(
     self,
     *,
     timestamps: list[datetime],
     timeframe: str,
-  ) -> int:
+  ) -> tuple[GapWindow, ...]:
     if len(timestamps) < 2:
-      return 0
+      return ()
 
-    timeframe_seconds = self._timeframe_seconds(timeframe)
-    missing_candles = 0
+    timeframe_delta = self._timeframe_delta(timeframe)
+    windows: list[GapWindow] = []
     for previous, current in zip(timestamps, timestamps[1:]):
-      gap_size = int((current - previous).total_seconds() // timeframe_seconds) - 1
+      gap_size = int((current - previous).total_seconds() // timeframe_delta.total_seconds()) - 1
       if gap_size > 0:
-        missing_candles += gap_size
-    return missing_candles
+        windows.append(
+          GapWindow(
+            start_at=previous + timeframe_delta,
+            end_at=current - timeframe_delta,
+            missing_candles=gap_size,
+          )
+        )
+    return tuple(windows)
 
   def _read_timestamps(
     self,

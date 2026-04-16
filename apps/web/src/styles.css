@@ -306,6 +306,11 @@ select {
   font-family: "IBM Plex Mono", monospace;
 }
 
+.progress-detail-list {
+  display: grid;
+  gap: 3px;
+}
+
 .progress-track {
   height: 6px;
   border-radius: 999px;

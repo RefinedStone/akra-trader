@@ -93,6 +93,11 @@ type MarketDataStatus = {
     backfill_contiguous_completion_ratio: number | null;
     backfill_contiguous_complete: boolean | null;
     backfill_contiguous_missing_candles: number | null;
+    backfill_gap_windows: {
+      start_at: string;
+      end_at: string;
+      missing_candles: number;
+    }[];
     issues: string[];
   }[];
 };
@@ -448,6 +453,15 @@ function BackfillQualityStatus({
           ? "gap-free"
           : `gaps: ${instrument.backfill_contiguous_missing_candles ?? 0}`}
       </span>
+      {instrument.backfill_gap_windows.length ? (
+        <div className="progress-detail-list">
+          {instrument.backfill_gap_windows.map((gap, index) => (
+            <span key={`${gap.start_at}-${gap.end_at}-${index}`}>
+              {formatRange(gap.start_at, gap.end_at)} ({gap.missing_candles})
+            </span>
+          ))}
+        </div>
+      ) : null}
       <div className="progress-track" aria-hidden="true">
         <span
           style={{
