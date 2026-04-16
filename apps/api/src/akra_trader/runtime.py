@@ -23,6 +23,8 @@ from akra_trader.domain.models import StrategyExecutionState
 from akra_trader.domain.models import StrategySnapshot
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
+from akra_trader.lineage import build_aggregate_dataset_identity
+from akra_trader.lineage import combine_reproducibility_states
 from akra_trader.ports import MarketDataPort
 
 
@@ -115,6 +117,7 @@ class DataEngine:
         venue=config.venue,
         symbols=config.symbols,
         timeframe=config.timeframe,
+        reproducibility_state="range_only",
         requested_start_at=config.start_at,
         requested_end_at=config.end_at,
         sync_status="unknown",
@@ -130,12 +133,30 @@ class DataEngine:
         for issue in lineage.issues
       )
     )
+    reproducibility_state = combine_reproducibility_states(
+      [lineage.reproducibility_state for lineage in lineages]
+    )
+    symbol_identities = {
+      symbol: lineage.dataset_identity
+      for symbol, lineage in lineage_by_symbol.items()
+      if lineage.dataset_identity is not None
+    }
+    dataset_identity = None
+    if reproducibility_state == "pinned" and len(symbol_identities) == len(lineage_by_symbol):
+      dataset_identity = build_aggregate_dataset_identity(
+        provider=lineages[0].provider,
+        venue=lineages[0].venue,
+        timeframe=config.timeframe,
+        symbol_identities=symbol_identities,
+      )
 
     return MarketDataLineage(
       provider=lineages[0].provider,
       venue=lineages[0].venue,
       symbols=config.symbols,
       timeframe=config.timeframe,
+      dataset_identity=dataset_identity,
+      reproducibility_state=reproducibility_state,
       requested_start_at=config.start_at,
       requested_end_at=config.end_at,
       effective_start_at=min(effective_starts) if effective_starts else None,

@@ -104,6 +104,9 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert len(candles) == 4
   assert candles[-1].close == 105.5
   assert lineage.provider == "binance"
+  assert lineage.dataset_identity is not None
+  assert lineage.dataset_identity.startswith("candles-v1:")
+  assert lineage.reproducibility_state == "pinned"
   assert lineage.candle_count == 4
   assert lineage.sync_status == "synced"
 
@@ -244,5 +247,7 @@ def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path)
   assert status.instruments[0].backfill_contiguous_missing_candles is None
   assert status.instruments[0].backfill_gap_windows == ()
   assert candles == []
+  assert lineage.dataset_identity is None
+  assert lineage.reproducibility_state == "range_only"
   assert lineage.sync_status == "empty"
   assert "insufficient_candle_coverage" in lineage.issues

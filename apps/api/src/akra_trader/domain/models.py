@@ -254,6 +254,8 @@ class MarketDataLineage:
   venue: str
   symbols: tuple[str, ...]
   timeframe: str
+  dataset_identity: str | None = None
+  reproducibility_state: str = "range_only"
   requested_start_at: datetime | None = None
   requested_end_at: datetime | None = None
   effective_start_at: datetime | None = None

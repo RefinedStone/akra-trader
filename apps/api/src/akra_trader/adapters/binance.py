@@ -33,6 +33,7 @@ from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
+from akra_trader.lineage import build_candle_dataset_identity
 from akra_trader.ports import MarketDataPort
 
 
@@ -242,11 +243,24 @@ class BinanceMarketDataAdapter(MarketDataPort):
     issues = list(quality.issues)
     if limit is not None and len(candles) < limit:
       issues.append("insufficient_candle_coverage")
+    dataset_identity = None
+    reproducibility_state = "range_only"
+    if candles:
+      dataset_identity = build_candle_dataset_identity(
+        provider="binance",
+        venue=self._venue,
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+      )
+      reproducibility_state = "pinned"
     return MarketDataLineage(
       provider="binance",
       venue=self._venue,
       symbols=(symbol,),
       timeframe=timeframe,
+      dataset_identity=dataset_identity,
+      reproducibility_state=reproducibility_state,
       requested_start_at=start_at,
       requested_end_at=end_at,
       effective_start_at=candles[0].timestamp if candles else None,

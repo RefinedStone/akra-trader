@@ -76,8 +76,13 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["strategy"]["warmup"]["required_bars"] == 21
   assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
+  assert payload["provenance"]["market_data"]["dataset_identity"].startswith("dataset-v1:")
+  assert payload["provenance"]["market_data"]["reproducibility_state"] == "pinned"
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
+  assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
+    "candles-v1:"
+  )
 
 
 def test_backtest_run_survives_app_restart(tmp_path: Path) -> None:

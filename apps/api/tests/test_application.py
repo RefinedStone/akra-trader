@@ -59,6 +59,9 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "seeded"
   assert run.provenance.market_data.candle_count > 0
+  assert run.provenance.market_data.dataset_identity is not None
+  assert run.provenance.market_data.dataset_identity.startswith("dataset-v1:")
+  assert run.provenance.market_data.reproducibility_state == "pinned"
   assert run.provenance.market_data.sync_status == "fixture"
 
   reloaded = build_runs_repository(tmp_path).get_run(run.config.run_id)
@@ -67,6 +70,54 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert reloaded.metrics == run.metrics
   assert reloaded.provenance.strategy == run.provenance.strategy
   assert reloaded.provenance.market_data == run.provenance.market_data
+
+
+def test_backtest_dataset_identity_is_stable_for_matching_data_boundaries(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  first = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  second = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=5_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+  bounded = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    start_at=datetime(2025, 1, 1, 6, 0, tzinfo=UTC),
+  )
+
+  first_identity = first.provenance.market_data.dataset_identity
+  second_identity = second.provenance.market_data.dataset_identity
+  bounded_identity = bounded.provenance.market_data.dataset_identity
+
+  assert first_identity is not None
+  assert first_identity == second_identity
+  assert bounded_identity is not None
+  assert bounded_identity != first_identity
 
 
 def test_sandbox_run_is_created_as_running(tmp_path: Path) -> None:
@@ -177,7 +228,11 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert all(isinstance(artifact.sections, dict) for artifact in run.provenance.benchmark_artifacts)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
+  assert run.provenance.market_data.dataset_identity is None
+  assert run.provenance.market_data.reproducibility_state == "delegated"
   assert run.provenance.market_data.sync_status == "delegated"
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].dataset_identity is None
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].reproducibility_state == "delegated"
   assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_status == "delegated"
 
 
@@ -577,6 +632,8 @@ def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path)
 
   assert run.status == RunStatus.FAILED
   assert run.provenance.market_data is not None
+  assert run.provenance.market_data.dataset_identity is None
+  assert run.provenance.market_data.reproducibility_state == "range_only"
   assert run.provenance.market_data.requested_start_at == datetime(2030, 1, 1, tzinfo=UTC)
   assert run.provenance.market_data.candle_count == 0
 
@@ -610,10 +667,16 @@ def test_multi_symbol_run_records_market_lineage_per_symbol(tmp_path: Path) -> N
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.symbols == ("BTC/USDT", "ETH/USDT")
   assert run.provenance.market_data.candle_count == 48
+  assert run.provenance.market_data.dataset_identity is not None
+  assert run.provenance.market_data.reproducibility_state == "pinned"
   assert run.provenance.market_data.sync_status == "fixture"
   assert run.provenance.market_data_by_symbol["BTC/USDT"].symbols == ("BTC/USDT",)
   assert run.provenance.market_data_by_symbol["BTC/USDT"].candle_count == 24
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].dataset_identity is not None
+  assert run.provenance.market_data_by_symbol["BTC/USDT"].reproducibility_state == "pinned"
   assert run.provenance.market_data_by_symbol["ETH/USDT"].symbols == ("ETH/USDT",)
   assert run.provenance.market_data_by_symbol["ETH/USDT"].candle_count == 24
+  assert run.provenance.market_data_by_symbol["ETH/USDT"].dataset_identity is not None
+  assert run.provenance.market_data_by_symbol["ETH/USDT"].reproducibility_state == "pinned"
   assert reloaded is not None
   assert reloaded.provenance.market_data_by_symbol == run.provenance.market_data_by_symbol

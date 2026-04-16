@@ -24,6 +24,7 @@ from akra_trader.domain.models import StrategyRegistration
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
+from akra_trader.lineage import build_candle_dataset_identity
 from akra_trader.strategies.base import Strategy
 from akra_trader.strategies.examples import MovingAverageCrossStrategy
 from akra_trader.strategies.reference import build_reference_strategies
@@ -126,11 +127,24 @@ class SeededMarketDataAdapter(MarketDataPort):
     issues: list[str] = []
     if limit is not None and len(candles) < limit:
       issues.append("insufficient_fixture_coverage")
+    dataset_identity = None
+    reproducibility_state = "range_only"
+    if candles:
+      dataset_identity = build_candle_dataset_identity(
+        provider="seeded",
+        venue=self._venue,
+        symbol=symbol,
+        timeframe=timeframe,
+        candles=candles,
+      )
+      reproducibility_state = "pinned"
     return MarketDataLineage(
       provider="seeded",
       venue=self._venue,
       symbols=(symbol,),
       timeframe=timeframe,
+      dataset_identity=dataset_identity,
+      reproducibility_state=reproducibility_state,
       requested_start_at=start_at,
       requested_end_at=end_at,
       effective_start_at=candles[0].timestamp if candles else None,
