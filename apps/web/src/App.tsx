@@ -2,6 +2,7 @@ import {
   CSSProperties,
   FormEvent,
   KeyboardEvent,
+  MouseEvent,
   forwardRef,
   useEffect,
   useId,
@@ -250,8 +251,9 @@ type ComparisonTooltipTargetProps = {
   onBlur: () => void;
   onFocus: () => void;
   onKeyDown: (event: KeyboardEvent<HTMLElement>) => void;
-  onMouseEnter: () => void;
-  onMouseLeave: () => void;
+  onMouseEnter: (event: MouseEvent<HTMLElement>) => void;
+  onMouseLeave: (event: MouseEvent<HTMLElement>) => void;
+  onMouseMove?: (event: MouseEvent<HTMLElement>) => void;
 };
 type ComparisonTooltipInteractionOptions = {
   hoverCloseDelayMs?: number;
@@ -1455,6 +1457,12 @@ function RunComparisonPanel({
   const tooltipBubbleRefs = useRef(new Map<string, HTMLSpanElement>());
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
+  const metricPointerSampleRef = useRef<{
+    time: number;
+    x: number;
+    y: number;
+  } | null>(null);
+  const metricSweepUntilRef = useRef(0);
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
   const [activeTooltipLayout, setActiveTooltipLayout] = useState<ComparisonTooltipLayout | null>(
     null,
@@ -1482,6 +1490,10 @@ function RunComparisonPanel({
   const metricTooltipInteraction: ComparisonTooltipInteractionOptions = {
     hoverCloseDelayMs: 70,
     hoverOpenDelayMs: 110,
+  };
+  const metricSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
+    hoverCloseDelayMs: 90,
+    hoverOpenDelayMs: 240,
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1604,6 +1616,69 @@ function RunComparisonPanel({
       },
       onMouseEnter: () => scheduleComparisonTooltipShow(tooltipId, options),
       onMouseLeave: () => scheduleComparisonTooltipHide(tooltipId, options),
+    };
+  };
+
+  const recordMetricPointerSample = (event: MouseEvent<HTMLElement>) => {
+    metricPointerSampleRef.current = {
+      time: event.timeStamp,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const resolveMetricTooltipInteraction = (event: MouseEvent<HTMLElement>) => {
+    const sample = {
+      time: event.timeStamp,
+      x: event.clientX,
+      y: event.clientY,
+    };
+    const previousSample = metricPointerSampleRef.current;
+    metricPointerSampleRef.current = sample;
+
+    if (!previousSample) {
+      return metricTooltipInteraction;
+    }
+
+    const deltaTime = Math.max(sample.time - previousSample.time, 1);
+    const deltaX = Math.abs(sample.x - previousSample.x);
+    const deltaY = Math.abs(sample.y - previousSample.y);
+    const horizontalVelocity = deltaX / deltaTime;
+    const isHorizontalSweep =
+      deltaTime <= 90 && deltaX >= 24 && deltaX >= deltaY * 2 && horizontalVelocity >= 0.42;
+
+    if (isHorizontalSweep) {
+      metricSweepUntilRef.current = sample.time + 180;
+      return metricSweepTooltipInteraction;
+    }
+
+    if (sample.time < metricSweepUntilRef.current) {
+      return metricSweepTooltipInteraction;
+    }
+
+    return metricTooltipInteraction;
+  };
+
+  const getMetricComparisonTooltipTargetProps = (
+    tooltipId?: string,
+  ): ComparisonTooltipTargetProps | undefined => {
+    const baseProps = getComparisonTooltipTargetProps(tooltipId, metricTooltipInteraction);
+
+    if (!baseProps || !tooltipId) {
+      return baseProps;
+    }
+
+    return {
+      ...baseProps,
+      onMouseEnter: (event: MouseEvent<HTMLElement>) => {
+        const interaction = resolveMetricTooltipInteraction(event);
+        scheduleComparisonTooltipShow(tooltipId, interaction);
+      },
+      onMouseLeave: (event: MouseEvent<HTMLElement>) => {
+        recordMetricPointerSample(event);
+        scheduleComparisonTooltipHide(tooltipId, metricTooltipInteraction);
+      },
+      onMouseMove: recordMetricPointerSample,
     };
   };
 
@@ -1939,7 +2014,7 @@ function RunComparisonPanel({
                       }
                       tabIndex={cellTooltip ? 0 : undefined}
                       {...(cellTooltipId
-                        ? getComparisonTooltipTargetProps(cellTooltipId, metricTooltipInteraction)
+                        ? getMetricComparisonTooltipTargetProps(cellTooltipId)
                         : {})}
                     >
                       <strong>
