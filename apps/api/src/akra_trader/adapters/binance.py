@@ -107,6 +107,16 @@ class QualitySnapshot:
   issues: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class BackfillSnapshot:
+  target_candles: int
+  completion_ratio: float
+  complete: bool
+  contiguous_completion_ratio: float | None
+  contiguous_complete: bool | None
+  contiguous_missing_candles: int | None
+
+
 def build_binance_exchange() -> OhlcvExchange:
   return ccxt.binance({"enableRateLimit": True})
 
@@ -178,11 +188,11 @@ class BinanceMarketDataAdapter(MarketDataPort):
     instruments: list[InstrumentStatus] = []
     for symbol in self._tracked_symbols:
       quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
-      backfill_target = self._historical_candle_limit
-      backfill_completion_ratio = min(
-        quality.coverage.candle_count / backfill_target,
-        1.0,
-      ) if backfill_target > 0 else None
+      backfill = self._build_backfill_snapshot(
+        symbol=symbol,
+        timeframe=timeframe,
+        coverage=quality.coverage,
+      )
 
       instruments.append(
         InstrumentStatus(
@@ -194,13 +204,12 @@ class BinanceMarketDataAdapter(MarketDataPort):
           sync_status=quality.sync_status,
           lag_seconds=quality.lag_seconds,
           last_sync_at=quality.sync_state.last_sync_at if quality.sync_state is not None else None,
-          backfill_target_candles=backfill_target,
-          backfill_completion_ratio=backfill_completion_ratio,
-          backfill_complete=(
-            quality.coverage.candle_count >= backfill_target
-            if backfill_target > 0
-            else None
-          ),
+          backfill_target_candles=backfill.target_candles,
+          backfill_completion_ratio=backfill.completion_ratio,
+          backfill_complete=backfill.complete,
+          backfill_contiguous_completion_ratio=backfill.contiguous_completion_ratio,
+          backfill_contiguous_complete=backfill.contiguous_complete,
+          backfill_contiguous_missing_candles=backfill.contiguous_missing_candles,
           issues=quality.issues,
         )
       )
@@ -544,16 +553,80 @@ class BinanceMarketDataAdapter(MarketDataPort):
       issues=tuple(issues),
     )
 
-  def _count_missing_candles(self, *, symbol: str, timeframe: str) -> int:
-    statement = select(market_candles.c.timestamp).where(
-      and_(
-        market_candles.c.venue == self._venue,
-        market_candles.c.symbol == symbol,
-        market_candles.c.timeframe == timeframe,
+  def _build_backfill_snapshot(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    coverage: CandleCoverage,
+  ) -> BackfillSnapshot:
+    target_candles = self._historical_candle_limit
+    completion_ratio = min(coverage.candle_count / target_candles, 1.0) if target_candles > 0 else 0.0
+    complete = coverage.candle_count >= target_candles
+
+    if (
+      target_candles <= 0
+      or coverage.first_timestamp is None
+      or coverage.last_timestamp is None
+      or coverage.candle_count == 0
+    ):
+      return BackfillSnapshot(
+        target_candles=target_candles,
+        completion_ratio=completion_ratio,
+        complete=complete,
+        contiguous_completion_ratio=None,
+        contiguous_complete=None,
+        contiguous_missing_candles=None,
       )
-    ).order_by(market_candles.c.timestamp.asc())
-    with self._engine.connect() as connection:
-      timestamps = [row[0] for row in connection.execute(statement).all()]
+
+    timeframe_delta = self._timeframe_delta(timeframe)
+    window_start = coverage.first_timestamp
+    expected_candle_count = self._estimate_bar_count(
+      start_at=coverage.first_timestamp,
+      end_at=coverage.last_timestamp,
+      timeframe=timeframe,
+    )
+    if complete:
+      window_start = coverage.last_timestamp - (timeframe_delta * max(target_candles - 1, 0))
+      expected_candle_count = target_candles
+
+    timestamps = self._read_timestamps(
+      symbol=symbol,
+      timeframe=timeframe,
+      start_at=window_start,
+      end_at=coverage.last_timestamp,
+    )
+    missing_candles = self._count_missing_candles_from_timestamps(
+      timestamps=timestamps,
+      timeframe=timeframe,
+    )
+    contiguous_completion_ratio = (
+      min(len(timestamps) / expected_candle_count, 1.0)
+      if expected_candle_count > 0
+      else None
+    )
+    return BackfillSnapshot(
+      target_candles=target_candles,
+      completion_ratio=completion_ratio,
+      complete=complete,
+      contiguous_completion_ratio=contiguous_completion_ratio,
+      contiguous_complete=missing_candles == 0,
+      contiguous_missing_candles=missing_candles,
+    )
+
+  def _count_missing_candles(self, *, symbol: str, timeframe: str) -> int:
+    timestamps = self._read_timestamps(symbol=symbol, timeframe=timeframe)
+    return self._count_missing_candles_from_timestamps(
+      timestamps=timestamps,
+      timeframe=timeframe,
+    )
+
+  def _count_missing_candles_from_timestamps(
+    self,
+    *,
+    timestamps: list[datetime],
+    timeframe: str,
+  ) -> int:
     if len(timestamps) < 2:
       return 0
 
@@ -564,6 +637,29 @@ class BinanceMarketDataAdapter(MarketDataPort):
       if gap_size > 0:
         missing_candles += gap_size
     return missing_candles
+
+  def _read_timestamps(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> list[datetime]:
+    statement = select(market_candles.c.timestamp).where(
+      and_(
+        market_candles.c.venue == self._venue,
+        market_candles.c.symbol == symbol,
+        market_candles.c.timeframe == timeframe,
+      )
+    )
+    if start_at is not None:
+      statement = statement.where(market_candles.c.timestamp >= start_at)
+    if end_at is not None:
+      statement = statement.where(market_candles.c.timestamp <= end_at)
+    statement = statement.order_by(market_candles.c.timestamp.asc())
+    with self._engine.connect() as connection:
+      return [self._ensure_utc(row[0]) for row in connection.execute(statement).all()]
 
   def _calculate_lag_seconds(self, last_timestamp: datetime | None) -> int | None:
     if last_timestamp is None:

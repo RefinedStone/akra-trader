@@ -90,6 +90,9 @@ type MarketDataStatus = {
     backfill_target_candles: number | null;
     backfill_completion_ratio: number | null;
     backfill_complete: boolean | null;
+    backfill_contiguous_completion_ratio: number | null;
+    backfill_contiguous_complete: boolean | null;
+    backfill_contiguous_missing_candles: number | null;
     issues: string[];
   }[];
 };
@@ -178,6 +181,9 @@ export default function App() {
     if (!tracked.length) {
       return null;
     }
+    const contiguousTracked = tracked.filter(
+      (instrument) => instrument.backfill_contiguous_completion_ratio !== null,
+    );
     const targetCandles = tracked.reduce(
       (total, instrument) => total + (instrument.backfill_target_candles ?? 0),
       0,
@@ -198,6 +204,18 @@ export default function App() {
       completeCount,
       instrumentCount: tracked.length,
       completionRatio: targetCandles > 0 ? coveredCandles / targetCandles : null,
+      contiguousQualityRatio:
+        contiguousTracked.length > 0
+          ? contiguousTracked.reduce(
+              (total, instrument) =>
+                total + (instrument.backfill_contiguous_completion_ratio ?? 0),
+              0,
+            ) / contiguousTracked.length
+          : null,
+      contiguousCompleteCount: contiguousTracked.filter(
+        (instrument) => instrument.backfill_contiguous_complete,
+      ).length,
+      contiguousInstrumentCount: contiguousTracked.length,
     };
   }, [marketStatus]);
 
@@ -315,13 +333,25 @@ export default function App() {
               {backfillSummary ? (
                 <>
                   <div className="metric-tile">
-                    <span>Backfill coverage</span>
+                    <span>Backfill count</span>
                     <strong>{formatCompletion(backfillSummary.completionRatio)}</strong>
                   </div>
                   <div className="metric-tile">
-                    <span>Backfill complete</span>
+                    <span>Count complete</span>
                     <strong>
                       {backfillSummary.completeCount} / {backfillSummary.instrumentCount}
+                    </strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Contiguous quality</span>
+                    <strong>{formatCompletion(backfillSummary.contiguousQualityRatio)}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Gap-free spans</span>
+                    <strong>
+                      {backfillSummary.contiguousInstrumentCount > 0
+                        ? `${backfillSummary.contiguousCompleteCount} / ${backfillSummary.contiguousInstrumentCount}`
+                        : "n/a"}
                     </strong>
                   </div>
                 </>
@@ -334,7 +364,8 @@ export default function App() {
                     <th>Sync</th>
                     <th>Candles</th>
                     <th>Target</th>
-                    <th>Backfill</th>
+                    <th>Count</th>
+                    <th>Quality</th>
                     <th>Lag</th>
                     <th>Latest</th>
                     <th>Issues</th>
@@ -349,7 +380,10 @@ export default function App() {
                       <td>{instrument.candle_count}</td>
                       <td>{instrument.backfill_target_candles ?? "n/a"}</td>
                       <td>
-                        <BackfillStatus instrument={instrument} />
+                        <BackfillCountStatus instrument={instrument} />
+                      </td>
+                      <td>
+                        <BackfillQualityStatus instrument={instrument} />
                       </td>
                       <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
@@ -371,7 +405,7 @@ export default function App() {
   );
 }
 
-function BackfillStatus({
+function BackfillCountStatus({
   instrument,
 }: {
   instrument: MarketDataStatus["instruments"][number];
@@ -391,6 +425,33 @@ function BackfillStatus({
         <span
           style={{
             width: `${Math.round((instrument.backfill_completion_ratio ?? 0) * 100)}%`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BackfillQualityStatus({
+  instrument,
+}: {
+  instrument: MarketDataStatus["instruments"][number];
+}) {
+  if (instrument.backfill_contiguous_completion_ratio === null) {
+    return <span>n/a</span>;
+  }
+  return (
+    <div className="progress-stack">
+      <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
+      <span>
+        {instrument.backfill_contiguous_complete
+          ? "gap-free"
+          : `gaps: ${instrument.backfill_contiguous_missing_candles ?? 0}`}
+      </span>
+      <div className="progress-track" aria-hidden="true">
+        <span
+          style={{
+            width: `${Math.round((instrument.backfill_contiguous_completion_ratio ?? 0) * 100)}%`,
           }}
         />
       </div>

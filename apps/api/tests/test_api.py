@@ -135,3 +135,6 @@ def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> N
   assert payload["instruments"][0]["backfill_target_candles"] is None
   assert payload["instruments"][0]["backfill_completion_ratio"] is None
   assert payload["instruments"][0]["backfill_complete"] is None
+  assert payload["instruments"][0]["backfill_contiguous_completion_ratio"] is None
+  assert payload["instruments"][0]["backfill_contiguous_complete"] is None
+  assert payload["instruments"][0]["backfill_contiguous_missing_candles"] is None

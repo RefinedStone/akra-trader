@@ -298,6 +298,9 @@ class InstrumentStatus:
   backfill_target_candles: int | None = None
   backfill_completion_ratio: float | None = None
   backfill_complete: bool | None = None
+  backfill_contiguous_completion_ratio: float | None = None
+  backfill_contiguous_complete: bool | None = None
+  backfill_contiguous_missing_candles: int | None = None
   issues: tuple[str, ...] = ()
 
 

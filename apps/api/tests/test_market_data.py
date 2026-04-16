@@ -5,6 +5,8 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 
+import pytest
+
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
 
 
@@ -94,6 +96,9 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
   assert status.instruments[0].backfill_target_candles == 6
   assert status.instruments[0].backfill_completion_ratio == 1.0
   assert status.instruments[0].backfill_complete is True
+  assert status.instruments[0].backfill_contiguous_completion_ratio == 1.0
+  assert status.instruments[0].backfill_contiguous_complete is True
+  assert status.instruments[0].backfill_contiguous_missing_candles == 0
   assert not status.instruments[0].issues
   assert len(candles) == 4
   assert candles[-1].close == 105.5
@@ -127,6 +132,9 @@ def test_binance_adapter_backfills_history_beyond_recent_window(tmp_path: Path) 
   assert status.instruments[0].backfill_target_candles == 8
   assert status.instruments[0].backfill_completion_ratio == 1.0
   assert status.instruments[0].backfill_complete is True
+  assert status.instruments[0].backfill_contiguous_completion_ratio == 1.0
+  assert status.instruments[0].backfill_contiguous_complete is True
+  assert status.instruments[0].backfill_contiguous_missing_candles == 0
   assert candles[0].timestamp == now - timedelta(minutes=35)
   assert candles[-1].timestamp == now
   assert len(exchange.calls) == 2
@@ -187,6 +195,11 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
   adapter.sync_tracked("5m")
   status = adapter.get_status("5m")
 
+  assert status.instruments[0].backfill_completion_ratio == 1.0
+  assert status.instruments[0].backfill_complete is True
+  assert status.instruments[0].backfill_contiguous_completion_ratio == pytest.approx(5 / 6)
+  assert status.instruments[0].backfill_contiguous_complete is False
+  assert status.instruments[0].backfill_contiguous_missing_candles == 1
   assert "missing_candles:1" in status.instruments[0].issues
 
 
@@ -220,6 +233,9 @@ def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path)
   assert status.instruments[0].backfill_target_candles == 6
   assert status.instruments[0].backfill_completion_ratio == 0.0
   assert status.instruments[0].backfill_complete is False
+  assert status.instruments[0].backfill_contiguous_completion_ratio is None
+  assert status.instruments[0].backfill_contiguous_complete is None
+  assert status.instruments[0].backfill_contiguous_missing_candles is None
   assert candles == []
   assert lineage.sync_status == "empty"
   assert "insufficient_candle_coverage" in lineage.issues
