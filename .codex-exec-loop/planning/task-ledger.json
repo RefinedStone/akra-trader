@@ -332,6 +332,24 @@
       "direction_relation_note": "Covers the strategy-platform success criteria around explicit runtime lane metadata and comparable version lifecycle."
     },
     {
+      "id": "planning-research-foundation-run-comparison-workflow",
+      "direction_id": "research-foundation",
+      "title": "Add run comparison workflow for native and reference benchmarks",
+      "description": "Build the next Stage 2 experiment workflow on top of the new strategy metadata by adding comparison queries and API/UI surfaces that let operators select at least two runs, compare core metrics such as return, drawdown, win rate, trade count, notes, and strategy/version lineage, and keep native versus reference lanes visibly distinct but comparable.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply finished the strategy lifecycle/version filter foundation, and the clearest immediate follow-up from the roadmap and epic backlog is the compare-runs workflow those filters unlock.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T15:50:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-strategy-platform-versioned-metadata"
+      ],
+      "direction_relation_note": "Directly advances the research-foundation success criteria around reproducible experiments and straightforward comparison across strategy versions and benchmark lanes."
+    },
+    {
       "id": "planning-reference-lanes-reference-run-provenance",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Keep reference runs explicitly separated with imported provenance",
