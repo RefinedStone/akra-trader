@@ -675,19 +675,37 @@
       "id": "planning-reference-lanes-tooltip-placement-edge-awareness",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Make comparison tooltips place intelligently near viewport and scroller edges",
-      "description": "Refine the newly semantic comparison tooltip system so long cue copy is less likely to clip on narrow layouts or inside the comparison table scroller, adding edge-aware placement or fallback alignment behavior for intent chips, legend cues, featured insight cues, baseline cards, narrative cards, and emphasized comparison cells while preserving the new accessible tooltip semantics.",
-      "status": "ready",
+      "description": "Completed the tooltip-placement follow-up by measuring active comparison cue targets and tooltip bubbles at runtime, flipping placement above targets when needed, clamping horizontal placement against the viewport, constraining tooltip width to the visible `.comparison-table-wrap` scroller, recomputing on resize and scroll, and updating fixed-position tooltip/arrow styling so semantic comparison cues stay readable near viewport and table edges.",
+      "status": "done",
       "base_priority": 81,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply said nothing essential remains for accessible tooltip semantics and directly named smarter placement near viewport edges or inside the comparison table scroller as the likely next refinement, so this is now the clearest executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the edge-aware comparison tooltip placement in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `554c037` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T04:55:00Z",
+      "updated_at": "2026-04-17T05:10:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-accessible-tooltip-semantics"
       ],
       "direction_relation_note": "Builds on the completed accessible tooltip semantics by making reference-lane comparison explanations stay visible and readable at narrow viewport and scroller boundaries instead of trading accessibility gains for clipped presentation."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-hover-intent-stability",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Reduce comparison tooltip jitter across dense metric cells",
+      "description": "Stabilize the new edge-aware comparison tooltip system for dense table interactions by adding a tiny show delay, hover-intent threshold, or equivalent pointer-transfer buffering so metric-cell tooltips do not flicker or jump excessively while operators move across adjacent comparison cues, without regressing keyboard focus behavior or the accessible tooltip semantics.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply said nothing essential remains for tooltip placement and directly named reduced tooltip jitter across dense comparison cells, such as a tiny show delay or hover-intent threshold, as the likely next refinement, so this is now the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:10:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-placement-edge-awareness"
+      ],
+      "direction_relation_note": "Builds on the completed edge-aware tooltip placement by making dense reference-lane comparison tables feel stable during pointer movement instead of trading readable placement for hover jitter."
     }
   ]
 }
