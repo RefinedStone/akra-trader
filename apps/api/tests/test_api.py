@@ -434,6 +434,74 @@ def test_guarded_live_reconciliation_endpoint_surfaces_venue_balance_mismatch(tm
   )
 
 
+def test_guarded_live_recovery_endpoint_recovers_from_stored_verified_snapshot_after_restart(
+  tmp_path: Path,
+) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+
+  with build_client(database_path) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 17, 0, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="ETH", total=0.6, free=0.4, used=0.2),
+          GuardedLiveVenueBalance(asset="USDT", total=9_400.0, free=9_400.0, used=0.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-order-2",
+            symbol="ETH/USDT",
+            side="sell",
+            amount=0.2,
+            status="open",
+            price=2_250.0,
+          ),
+        ),
+      )
+    )
+
+    reconcile_response = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_restart_snapshot"},
+    )
+    assert reconcile_response.status_code == 200
+
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="binance",
+        venue="binance",
+        verification_state="unavailable",
+        captured_at=datetime(2025, 1, 3, 17, 5, tzinfo=UTC),
+        issues=("temporary_venue_fault",),
+      )
+    )
+    recovery_response = client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "post_restart_recovery"},
+    )
+
+    assert recovery_response.status_code == 200
+    recovery_payload = recovery_response.json()
+    assert recovery_payload["recovery"]["state"] == "recovered"
+    assert recovery_payload["recovery"]["source_verification_state"] == "verified"
+    assert recovery_payload["recovery"]["exposures"][0]["instrument_id"] == "binance:ETH/USDT"
+    assert recovery_payload["recovery"]["open_orders"][0]["order_id"] == "venue-order-2"
+    assert any(event["kind"] == "guarded_live_runtime_recovered" for event in recovery_payload["audit_events"])
+
+  with build_client(database_path) as restarted_client:
+    status_response = restarted_client.get("/api/guarded-live")
+
+  assert status_response.status_code == 200
+  payload = status_response.json()
+  assert payload["recovery"]["state"] == "recovered"
+  assert payload["recovery"]["source_verification_state"] == "verified"
+  assert payload["recovery"]["exposures"][0]["symbol"] == "ETH/USDT"
+
+
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 

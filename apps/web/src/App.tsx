@@ -351,6 +351,30 @@ type GuardedLiveStatus = {
       issues: string[];
     } | null;
   };
+  recovery: {
+    state: string;
+    recovered_at?: string | null;
+    recovered_by?: string | null;
+    reason?: string | null;
+    source_snapshot_at?: string | null;
+    source_verification_state: string;
+    summary: string;
+    exposures: {
+      instrument_id: string;
+      symbol: string;
+      asset: string;
+      quantity: number;
+    }[];
+    open_orders: {
+      order_id: string;
+      symbol: string;
+      side: string;
+      amount: number;
+      status: string;
+      price?: number | null;
+    }[];
+    issues: string[];
+  };
   audit_events: {
     event_id: string;
     timestamp: string;
@@ -964,6 +988,7 @@ export default function App() {
       blockerCount: guardedLive.blockers.length,
       latestAuditAt: guardedLive.audit_events[0]?.timestamp ?? null,
       latestReconciliationAt: guardedLive.reconciliation.checked_at ?? null,
+      latestRecoveryAt: guardedLive.recovery.recovered_at ?? null,
     };
   }, [guardedLive]);
 
@@ -1113,6 +1138,21 @@ export default function App() {
       setStatusText("Guarded-live reconciliation recorded.");
     } catch (error) {
       setStatusText(`Reconciliation failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function recoverGuardedLiveRuntime() {
+    const reason = resolveGuardedLiveReason("post_fault_runtime_recovery");
+    setStatusText("Recovering guarded-live runtime state...");
+    try {
+      await fetchJson<GuardedLiveStatus>("/guarded-live/recovery", {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText("Guarded-live runtime recovery recorded.");
+    } catch (error) {
+      setStatusText(`Runtime recovery failed: ${(error as Error).message}`);
     }
   }
 
@@ -1441,6 +1481,10 @@ export default function App() {
                     <strong>{formatTimestamp(guardedLiveSummary.latestReconciliationAt)}</strong>
                   </div>
                   <div className="metric-tile">
+                    <span>Last recovery</span>
+                    <strong>{formatTimestamp(guardedLiveSummary.latestRecoveryAt)}</strong>
+                  </div>
+                  <div className="metric-tile">
                     <span>Blockers</span>
                     <strong>{guardedLiveSummary.blockerCount}</strong>
                   </div>
@@ -1462,6 +1506,9 @@ export default function App() {
                 </label>
                 <button className="ghost-button" onClick={() => void runGuardedLiveReconciliation()} type="button">
                   Run reconciliation
+                </button>
+                <button className="ghost-button" onClick={() => void recoverGuardedLiveRuntime()} type="button">
+                  Recover runtime state
                 </button>
                 <button className="ghost-button" onClick={() => void engageGuardedLiveKillSwitch()} type="button">
                   Engage kill switch
@@ -1681,6 +1728,89 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">No venue open orders captured.</p>
+                  )}
+                  <h3>Recovered runtime</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>Recovery state</th>
+                        <td>{guardedLive.recovery.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Recovered at</th>
+                        <td>{formatTimestamp(guardedLive.recovery.recovered_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Recovered by</th>
+                        <td>{guardedLive.recovery.recovered_by ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Source snapshot</th>
+                        <td>{formatTimestamp(guardedLive.recovery.source_snapshot_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Source state</th>
+                        <td>{guardedLive.recovery.source_verification_state}</td>
+                      </tr>
+                      <tr>
+                        <th>Summary</th>
+                        <td>{guardedLive.recovery.summary}</td>
+                      </tr>
+                      <tr>
+                        <th>Issues</th>
+                        <td>{guardedLive.recovery.issues.length ? guardedLive.recovery.issues.join(", ") : "none"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <h3>Recovered exposures</h3>
+                  {guardedLive.recovery.exposures.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Instrument</th>
+                          <th>Asset</th>
+                          <th>Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.recovery.exposures.map((exposure) => (
+                          <tr key={`${exposure.instrument_id}-${exposure.asset}`}>
+                            <td>{exposure.instrument_id}</td>
+                            <td>{exposure.asset}</td>
+                            <td>{exposure.quantity.toFixed(8)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No recovered venue exposures recorded.</p>
+                  )}
+                  <h3>Recovered open orders</h3>
+                  {guardedLive.recovery.open_orders.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Symbol</th>
+                          <th>Side</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.recovery.open_orders.map((order) => (
+                          <tr key={order.order_id}>
+                            <td>{order.order_id}</td>
+                            <td>{order.symbol}</td>
+                            <td>{order.side}</td>
+                            <td>{order.amount.toFixed(8)}</td>
+                            <td>{order.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No recovered venue orders recorded.</p>
                   )}
                   <h3>Guarded-live audit</h3>
                   {guardedLive.audit_events.length ? (

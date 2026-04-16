@@ -836,6 +836,68 @@ def test_guarded_live_reconciliation_verifies_venue_state_against_internal_expos
   )
 
 
+def test_guarded_live_runtime_recovery_uses_last_verified_venue_snapshot_after_fault(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 30, tzinfo=UTC))
+  verified_snapshot = GuardedLiveVenueStateSnapshot(
+    provider="seeded",
+    venue="binance",
+    verification_state="verified",
+    captured_at=clock(),
+    balances=(
+      GuardedLiveVenueBalance(asset="ETH", total=0.75, free=0.5, used=0.25),
+      GuardedLiveVenueBalance(asset="USDT", total=9_250.0, free=9_250.0, used=0.0),
+    ),
+    open_orders=(
+      GuardedLiveVenueOpenOrder(
+        order_id="venue-order-2",
+        symbol="ETH/USDT",
+        side="sell",
+        amount=0.25,
+        status="open",
+        price=2_200.0,
+      ),
+    ),
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(verified_snapshot),
+  )
+
+  app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="pre_fault_snapshot",
+  )
+  app._venue_state = StaticVenueStateAdapter(
+    GuardedLiveVenueStateSnapshot(
+      provider="binance",
+      venue="binance",
+      verification_state="unavailable",
+      captured_at=clock(),
+      issues=("temporary_venue_fault",),
+    )
+  )
+
+  status = app.recover_guarded_live_runtime_state(
+    actor="operator",
+    reason="post_fault_recovery",
+  )
+
+  assert status.recovery.state == "recovered"
+  assert status.recovery.source_verification_state == "verified"
+  assert status.recovery.source_snapshot_at == verified_snapshot.captured_at
+  assert status.recovery.exposures[0].instrument_id == "binance:ETH/USDT"
+  assert status.recovery.exposures[0].quantity == 0.75
+  assert status.recovery.open_orders[0].order_id == "venue-order-2"
+  assert status.audit_events[0].kind == "guarded_live_runtime_recovered"
+
+
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(

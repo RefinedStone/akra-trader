@@ -552,6 +552,28 @@ class GuardedLiveVenueStateSnapshot:
 
 
 @dataclass(frozen=True)
+class GuardedLiveRecoveredExposure:
+  instrument_id: str
+  symbol: str
+  asset: str
+  quantity: float
+
+
+@dataclass(frozen=True)
+class GuardedLiveRuntimeRecovery:
+  state: str = "not_recovered"
+  recovered_at: datetime | None = None
+  recovered_by: str | None = None
+  reason: str | None = None
+  source_snapshot_at: datetime | None = None
+  source_verification_state: str = "unavailable"
+  summary: str = "Guarded-live runtime state has not been recovered from venue snapshots."
+  exposures: tuple[GuardedLiveRecoveredExposure, ...] = ()
+  open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveReconciliation:
   state: str = "not_started"
   checked_at: datetime | None = None
@@ -567,6 +589,7 @@ class GuardedLiveReconciliation:
 class GuardedLiveState:
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
+  recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -577,6 +600,7 @@ class GuardedLiveStatus:
   blockers: tuple[str, ...] = ()
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
+  recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
   active_runtime_alert_count: int = 0
   running_sandbox_count: int = 0

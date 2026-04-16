@@ -138,8 +138,9 @@ recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
-internal runtime exposure plus venue balance/open-order snapshots, and a guarded-live audit log of
-operator actions.
+internal runtime exposure plus venue balance/open-order snapshots, persisted runtime recovery
+projections rebuilt from verified venue snapshots, and a guarded-live audit log of operator
+actions.
 
 ## Modes
 
@@ -182,7 +183,8 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 - no venue-backed continuous execution worker yet
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
-  guarded-live reconciliation still stops at snapshot comparison rather than restart-safe live state recovery
+  guarded-live recovery only rebuilds persisted control-plane state rather than resuming a real
+  venue-backed live worker
 - the system still lacks durable alert delivery and wider operator event coverage
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

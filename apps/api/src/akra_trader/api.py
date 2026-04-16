@@ -302,6 +302,14 @@ def create_router(container: Container) -> APIRouter:
     status = app.run_guarded_live_reconciliation(actor=request.actor, reason=request.reason)
     return asdict(status)
 
+  @router.post("/guarded-live/recovery")
+  def recover_guarded_live_runtime_state(
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    status = app.recover_guarded_live_runtime_state(actor=request.actor, reason=request.reason)
+    return asdict(status)
+
   return router
 
 

@@ -18,11 +18,14 @@ from akra_trader.domain.models import GuardedLiveInternalExposure
 from akra_trader.domain.models import GuardedLiveInternalStateSnapshot
 from akra_trader.domain.models import GuardedLiveReconciliation
 from akra_trader.domain.models import GuardedLiveReconciliationFinding
+from akra_trader.domain.models import GuardedLiveRecoveredExposure
 from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveStatus
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import GuardedLiveRuntimeRecovery
+from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
@@ -433,6 +436,8 @@ class TradingApplication:
       blockers.append("Kill switch is engaged for operator-controlled runtime sessions.")
     if state.reconciliation.state != "clear":
       blockers.append("Guarded-live reconciliation has not been cleared.")
+    if state.recovery.state == "failed":
+      blockers.append("Guarded-live runtime recovery failed after the latest restart or fault drill.")
     if runtime_visibility.alerts:
       blockers.append("Unresolved runtime alerts remain in sandbox operations.")
     blockers.append("Venue-backed live execution is not implemented.")
@@ -446,6 +451,7 @@ class TradingApplication:
       blockers=tuple(dict.fromkeys(blockers)),
       kill_switch=state.kill_switch,
       reconciliation=state.reconciliation,
+      recovery=state.recovery,
       audit_events=audit_events,
       active_runtime_alert_count=len(runtime_visibility.alerts),
       running_sandbox_count=running_sandbox_count,
@@ -490,7 +496,7 @@ class TradingApplication:
       replace(
         state,
         kill_switch=kill_switch,
-        audit_events=(*state.audit_events, event),
+        audit_events=(event, *state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -525,7 +531,7 @@ class TradingApplication:
       replace(
         state,
         kill_switch=kill_switch,
-        audit_events=(*state.audit_events, event),
+        audit_events=(event, *state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -566,7 +572,72 @@ class TradingApplication:
       replace(
         state,
         reconciliation=reconciliation,
-        audit_events=(*state.audit_events, event),
+        audit_events=(event, *state.audit_events),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def recover_guarded_live_runtime_state(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    snapshot = self._select_guarded_live_recovery_snapshot(state)
+    recovered_exposures, recovery_issues = self._recover_exposures_from_venue_snapshot(snapshot)
+    recovered_open_orders = snapshot.open_orders
+
+    if snapshot.verification_state == "unavailable":
+      recovery_state = GuardedLiveRuntimeRecovery(
+        state="failed",
+        recovered_at=current_time,
+        recovered_by=actor,
+        reason=reason,
+        source_snapshot_at=snapshot.captured_at,
+        source_verification_state=snapshot.verification_state,
+        summary="Guarded-live runtime recovery failed because no usable venue snapshot was available.",
+        exposures=(),
+        open_orders=(),
+        issues=tuple(snapshot.issues),
+      )
+    else:
+      recovered_with_warnings = bool(recovery_issues) or snapshot.verification_state != "verified"
+      recovery_state = GuardedLiveRuntimeRecovery(
+        state="recovered_with_warnings" if recovered_with_warnings else "recovered",
+        recovered_at=current_time,
+        recovered_by=actor,
+        reason=reason,
+        source_snapshot_at=snapshot.captured_at,
+        source_verification_state=snapshot.verification_state,
+        summary=(
+          "Guarded-live runtime state recovered from the latest verified venue snapshot."
+          if not recovered_with_warnings
+          else "Guarded-live runtime state recovered from venue data with follow-up issues to review."
+        ),
+        exposures=recovered_exposures,
+        open_orders=recovered_open_orders,
+        issues=tuple(dict.fromkeys((*snapshot.issues, *recovery_issues))),
+      )
+
+    event = OperatorAuditEvent(
+      event_id=f"guarded-live-runtime-recovered:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_runtime_recovered",
+      summary="Guarded-live runtime recovery recorded.",
+      detail=(
+        f"Reason: {reason}. {recovery_state.summary} "
+        f"Recovered {len(recovery_state.exposures)} exposure(s) and {len(recovery_state.open_orders)} open order(s)."
+      ),
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        recovery=recovery_state,
+        audit_events=(event, *state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -884,6 +955,74 @@ class TradingApplication:
 
   def _persist_guarded_live_state(self, state: GuardedLiveState) -> GuardedLiveState:
     return self._guarded_live_state.save_state(state)
+
+  def _select_guarded_live_recovery_snapshot(
+    self,
+    state: GuardedLiveState,
+  ) -> GuardedLiveVenueStateSnapshot:
+    snapshot = state.reconciliation.venue_snapshot
+    if snapshot is not None and snapshot.verification_state != "unavailable":
+      return snapshot
+    return self._venue_state.capture_snapshot()
+
+  def _recover_exposures_from_venue_snapshot(
+    self,
+    snapshot: GuardedLiveVenueStateSnapshot,
+  ) -> tuple[tuple[GuardedLiveRecoveredExposure, ...], tuple[str, ...]]:
+    tolerance = self._guarded_live_balance_tolerance
+    instruments = self._market_data.list_instruments()
+    quote_assets = {instrument.quote_currency for instrument in instruments}
+    recovered: list[GuardedLiveRecoveredExposure] = []
+    issues: list[str] = []
+
+    for balance in snapshot.balances:
+      if abs(balance.total) <= tolerance:
+        continue
+      if balance.asset in quote_assets:
+        continue
+      instrument = self._resolve_recovery_instrument(balance.asset, snapshot.open_orders, instruments)
+      if instrument is None:
+        issues.append(f"unmapped_recovery_asset:{balance.asset}")
+        recovered.append(
+          GuardedLiveRecoveredExposure(
+            instrument_id=f"{snapshot.venue}:{balance.asset}",
+            symbol=balance.asset,
+            asset=balance.asset,
+            quantity=balance.total,
+          )
+        )
+        continue
+      recovered.append(
+        GuardedLiveRecoveredExposure(
+          instrument_id=instrument.instrument_id,
+          symbol=instrument.symbol,
+          asset=balance.asset,
+          quantity=balance.total,
+        )
+      )
+    recovered.sort(key=lambda exposure: (exposure.symbol, exposure.asset))
+    return tuple(recovered), tuple(issues)
+
+  def _resolve_recovery_instrument(
+    self,
+    asset: str,
+    open_orders: tuple[GuardedLiveVenueOpenOrder, ...],
+    instruments: list[Instrument],
+  ) -> Instrument | None:
+    for order in open_orders:
+      if order.symbol.split("/", 1)[0] != asset:
+        continue
+      for instrument in instruments:
+        if instrument.symbol == order.symbol:
+          return instrument
+
+    candidates = [instrument for instrument in instruments if instrument.base_currency == asset]
+    if not candidates:
+      return None
+    if len(candidates) == 1:
+      return candidates[0]
+    candidates.sort(key=lambda instrument: (instrument.quote_currency != "USDT", instrument.symbol))
+    return candidates[0]
 
   def _count_running_runs(self, mode: RunMode) -> int:
     return sum(

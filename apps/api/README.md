@@ -23,6 +23,8 @@ Implemented now:
   audit events in the control plane
 - guarded-live reconciliation records venue-state snapshots and compares them against local runtime
   exposure before live candidacy discussion
+- guarded-live runtime recovery can rebuild persisted runtime exposure and open-order state from the
+  latest verified venue snapshot after a restart or fault drill
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -85,6 +87,7 @@ Defaults:
 - `POST /api/guarded-live/kill-switch/engage`
 - `POST /api/guarded-live/kill-switch/release`
 - `POST /api/guarded-live/reconciliation`
+- `POST /api/guarded-live/recovery`
 
 ## Runtime Notes
 
@@ -102,6 +105,8 @@ Defaults:
   record operator reconciliation drills before any live candidacy discussion
 - guarded-live reconciliation now stores internal exposure snapshots, venue balance/open-order
   snapshots, and mismatch findings when external venue state does not line up with local runtime
+- guarded-live recovery can reuse the last verified venue snapshot to rebuild persisted runtime
+  exposures and open orders after restart-or-fault drills, while still recording recovery issues
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only
