@@ -76,18 +76,108 @@
       "direction_id": "experiment-os",
       "title": "Add explicit rerun workflow from stored rerun boundaries",
       "description": "Introduce an explicit rerun endpoint or workflow that accepts a prior run or rerun_boundary_id, reconstructs the stored boundary directly, and launches native or reference reruns without relying on manual operator reconstruction of provenance fields.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 94,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says rerun boundaries are now stored and queryable but there is still no endpoint or workflow that reuses a stored boundary for reruns, making this the clearest immediate executable follow-up.",
+      "priority_reason": "Completed in main session commit bf93673, which added rerun_backtest_from_boundary, a rerun-boundary backtest endpoint, UI wiring, provenance match-status capture, and API plus application coverage for the explicit workflow.",
       "depends_on": [
         "planning-experiment-os-dataset-identity-rerun-workflow"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:15:00Z",
+      "updated_at": "2026-04-17T00:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Directly advances the experiment-os requirement that native and reference runs share one reproducible experiment model by turning stored rerun boundaries into a first-class rerun operation."
+    },
+    {
+      "id": "planning-experiment-os-expand-rerun-boundary-workflow-beyond-backtests",
+      "direction_id": "experiment-os",
+      "title": "Extend rerun-boundary workflow beyond backtest-only execution",
+      "description": "Broaden the new explicit rerun-boundary flow so operators can relaunch the other supported experiment lanes from stored boundaries, not just backtests, while preserving shared provenance fields and match or drift reporting across run types.",
+      "status": "done",
+      "base_priority": 93,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 08444e0, which introduced shared rerun-boundary execution for sandbox and paper aliases, added API and UI entry points, documented the workflow, and locked same-mode and cross-mode provenance behavior with tests.",
+      "depends_on": [
+        "planning-experiment-os-explicit-rerun-from-boundary"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps the experiment model unified across native and reference lanes by extending stored-boundary reruns beyond the first backtest-only surface."
+    },
+    {
+      "id": "planning-experiment-os-surface-paper-rerun-boundary-action",
+      "direction_id": "experiment-os",
+      "title": "Surface paper rerun-boundary replay as an explicit operator action",
+      "description": "Extend the current UI and operator-facing replay surfaces so stored rerun boundaries can be relaunched into paper as a first-class action, instead of keeping paper replay available only through the API alias layer.",
+      "status": "done",
+      "base_priority": 91,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit a9b1141, which exposed explicit paper rerun-boundary actions in the control-room UI, updated operator-facing replay wording, aligned current-state documentation, and verified with typecheck plus build.",
+      "depends_on": [
+        "planning-experiment-os-expand-rerun-boundary-workflow-beyond-backtests"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances the shared experiment model by making the new rerun-boundary replay lanes consistently accessible from operator-visible product surfaces rather than API-only aliases."
+    },
+    {
+      "id": "planning-experiment-os-separate-paper-replay-history-from-sandbox-alias",
+      "direction_id": "experiment-os",
+      "title": "Separate paper replay history and filters from sandbox alias storage",
+      "description": "Refactor run persistence and query surfaces so rerun-boundary paper replays are stored and filterable as an explicit paper lane rather than collapsing into the existing sandbox alias, giving operators durable paper-specific history, counts, and replay lookup semantics.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 1,
+      "priority_reason": "The latest main-session reply says explicit paper replay is now surfaced in UI, but persisted history and filters still collapse into the sandbox alias, making storage and query separation the clearest immediate follow-up for builtin next-task execution.",
+      "depends_on": [
+        "planning-experiment-os-surface-paper-rerun-boundary-action"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Strengthens the shared experiment model by ensuring paper remains a first-class execution lane in persisted run history and operator filters rather than a hidden alias of sandbox."
+    },
+    {
+      "id": "planning-operator-trust-paper-replay-audit-and-approval-metadata",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Attach paper replay audit trail and approval metadata to operator actions",
+      "description": "Add paper-specific operator-event capture, approval or acknowledgement metadata, and control-room visibility for rerun-boundary paper actions so replay decisions leave a durable audit trail instead of only changing run history.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly calls out missing paper-specific audit trail and approval metadata, but the storage-model separation for paper history is the more immediate executable queue head.",
+      "depends_on": [
+        "planning-experiment-os-surface-paper-rerun-boundary-action"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by making paper replay actions explainable, reviewable, and durable in operator-visible records rather than implicit UI-triggered side effects."
+    },
+    {
+      "id": "planning-experiment-os-cross-mode-rerun-translation-model",
+      "direction_id": "experiment-os",
+      "title": "Model cross-mode reruns as explicit drift or matched translation",
+      "description": "Decide whether rerun-boundary identity should remain mode-specific with explicit drift notes, or whether backtest-to-sandbox and backtest-to-paper replays need a first-class matched-translation model with new provenance semantics and operator wording.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says current cross-mode drift behavior is intentional but leaves open whether matched translation should be modeled separately, so this remains a valid follow-up that still needs product and provenance-shape judgment.",
+      "depends_on": [
+        "planning-experiment-os-expand-rerun-boundary-workflow-beyond-backtests"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Clarifies the experiment-os contract for how stored boundaries map across execution lanes, keeping provenance and operator interpretation coherent as replay support expands."
     },
     {
       "id": "planning-experiment-os-rerun-boundary-indexing",
@@ -97,13 +187,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 0,
-      "priority_reason": "Main-session validation confirms rerun-boundary queries work today but still rely on payload-centric in-memory filtering in SQL storage, which is a credible follow-up optimization once explicit rerun flows prove the access pattern.",
+      "priority_reason": "The latest main-session reply explicitly calls out payload-scan-based boundary lookup as remaining work, but scope expansion of the rerun flow is the more direct queue-head follow-up before storage optimization.",
       "depends_on": [
-        "planning-experiment-os-dataset-identity-rerun-workflow"
+        "planning-experiment-os-explicit-rerun-from-boundary"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:15:00Z",
+      "updated_at": "2026-04-17T00:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of queryable experiment metadata by promoting rerun-boundary access from payload scans to durable storage paths."
     },
