@@ -334,15 +334,15 @@
     {
       "id": "planning-research-foundation-run-comparison-workflow",
       "direction_id": "research-foundation",
-      "title": "Add run comparison workflow for native and reference benchmarks",
-      "description": "Build the next Stage 2 experiment workflow on top of the new strategy metadata by adding comparison queries and API/UI surfaces that let operators select at least two runs, compare core metrics such as return, drawdown, win rate, trade count, notes, and strategy/version lineage, and keep native versus reference lanes visibly distinct but comparable.",
-      "status": "ready",
+      "title": "Run comparison workflow for native and reference benchmarks shipped",
+      "description": "Completed the Stage 2 compare-runs workflow by adding ordered multi-run lookup plus `GET /api/runs/compare`, returning side-by-side comparison payloads for total return, max drawdown, win rate, trade count, run notes, lane/status metadata, and strategy/version context, then wiring the control room to select up to four runs, auto-pick a native versus NFI baseline pair, and render baseline deltas with lane visibility.",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply finished the strategy lifecycle/version filter foundation, and the clearest immediate follow-up from the roadmap and epic backlog is the compare-runs workflow those filters unlock.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the compare-runs workflow end to end, verified it with `.venv/bin/python -m pytest` (`34 passed`), `npm run typecheck`, and `npm run build`, and pushed commit `d36c99b` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T15:50:00Z",
+      "updated_at": "2026-04-17T01:05:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-strategy-platform-versioned-metadata"
@@ -352,15 +352,15 @@
     {
       "id": "planning-reference-lanes-reference-run-provenance",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Keep reference runs explicitly separated with imported provenance",
-      "description": "Add the follow-up work needed so NFI or other external-runtime benchmark runs remain visible as reference-lane runs with stored external command, artifact paths, reference identity, and adoption posture rather than looking like native runs in the shared repository model.",
-      "status": "proposed",
+      "title": "Persist reference-run provenance and artifact links for benchmark comparisons",
+      "description": "Build the next benchmark-comparison follow-up by extending stored reference-lane runs so NFI or other external-runtime benchmarks retain imported provenance, external command details, artifact links, reference identity, and adoption posture in the shared repository model, making those reference-only fields available to comparison surfaces without blurring them into native runs.",
+      "status": "ready",
       "base_priority": 74,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "Once durable run storage lands, the next credible benchmark step is to persist imported provenance for external-runtime lanes in line with ADR 0006 and Stage 2 comparability goals.",
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The compare-runs workflow is now complete, and the clearest executable follow-up from the latest main-session reply is richer comparison context via artifact links and preserved benchmark provenance so reference lanes stay explicit while comparisons deepen.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T13:47:58Z",
+      "updated_at": "2026-04-17T01:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the reference-lanes success criteria that reference runs stay explicit and traceable rather than becoming hidden native equivalents."
     }
