@@ -558,6 +558,33 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
     "label": "roi",
     "count": 1,
   }
+  assert snapshot_artifact.sections["benchmark_story"]["headline"] == (
+    "NostalgiaForInfinityX7 returned 9.5% across 18 trades with 4.1% max drawdown "
+    "against a 5.7% market move."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["market_context"] == (
+    "Breadth stayed positive across 2 tracked pairs; BTC/USDT led at +3% while "
+    "ETH/USDT lagged at +3%."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["portfolio_context"] == (
+    "Wallet quote value rose from 10500 to 17000, ranging between 10500 and 17000; "
+    "BTC finished as the largest tracked balance at 17000."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["signal_context"] == (
+    "Signal exports captured 3 rows across 2 pairs; dip_buy was the dominant entry tag "
+    "(2) and BTC/USDT generated the most rows (2)."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["rejection_context"] == (
+    "Rejected entries were limited to 1 row, entirely driven by volume_limit."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["exit_context"] == (
+    "Exit exports were dominated by roi (1 row), matching the benchmark summary where "
+    "roi closed 15 trades for 10.7%."
+  )
+  assert snapshot_artifact.sections["benchmark_story"]["pair_context"] == (
+    "Pair metrics stayed concentrated in BTC/USDT; the aggregate row logged 18 trades "
+    "and 9.5% total return."
+  )
   assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 18
   assert snapshot_artifact.sections["wallet_stats"]["sharpe"] == 1.2
 
@@ -566,3 +593,7 @@ def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path)
   assert root_artifact.summary["snapshot_count"] == 1
   assert root_artifact.summary_source_path == str(snapshot_path)
   assert root_artifact.sections["zip_contents"]["result_json_entry"] == "backtest-result-20260417_030000.json"
+  assert root_artifact.sections["benchmark_story"]["headline"] == (
+    "NostalgiaForInfinityX7 returned 9.5% across 18 trades with 4.1% max drawdown "
+    "against a 5.7% market move."
+  )

@@ -1772,6 +1772,13 @@ const benchmarkArtifactSummaryOrder = [
 ] as const;
 
 const benchmarkArtifactSummaryLabels: Record<string, string> = {
+  headline: "Headline",
+  market_context: "Market read",
+  portfolio_context: "Portfolio read",
+  signal_context: "Signal read",
+  rejection_context: "Rejections",
+  exit_context: "Exit read",
+  pair_context: "Pair read",
   strategy_name: "Strategy",
   run_id: "Run ID",
   exchange: "Exchange",
@@ -1864,6 +1871,7 @@ const benchmarkArtifactSummaryLabels: Record<string, string> = {
 };
 
 const benchmarkArtifactSectionOrder = [
+  "benchmark_story",
   "zip_contents",
   "zip_config",
   "zip_strategy_bundle",
@@ -1886,6 +1894,7 @@ const benchmarkArtifactSectionOrder = [
 ] as const;
 
 const benchmarkArtifactSectionLabels: Record<string, string> = {
+  benchmark_story: "Benchmark narrative",
   zip_contents: "Zip contents",
   zip_config: "Embedded config",
   zip_strategy_bundle: "Strategy bundle",
