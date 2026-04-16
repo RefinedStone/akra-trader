@@ -1179,19 +1179,55 @@
       "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Show relative time alongside saved session update timestamps in the reset summary",
-      "description": "Add relative recency labels such as `updated 5m ago` next to the absolute saved-session update time in the `Reset all saved views` confirmation summary so operators can scan recent versus stale remembered tooltip conflict layouts faster without parsing timestamps alone.",
-      "status": "ready",
+      "description": "Completed the saved-reset-summary recency scan follow-up by adding relative labels such as `updated 5m ago` alongside the existing absolute timestamp in saved session chips, keeping older sessions without timestamps backward-compatible, and covering seconds-through-years formatting in the reset summary.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed `updated_at` work and directly called relative time alongside the absolute timestamp the likeliest next refinement, so this is the clearest executable follow-up to promote into the queue.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the relative-time timestamp refinement in the reset summary, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `53243ea` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:39:35Z",
+      "updated_at": "2026-04-17T10:15:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-reset-all-session-updated-at"
       ],
       "direction_relation_note": "Builds on the shipped absolute timestamp chips by adding faster visual recency scanning for saved tooltip conflict-view sessions before operators confirm a destructive reset."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-live-refresh",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Refresh saved-session relative time labels while the reset summary stays open",
+      "description": "Completed the live-recency follow-up by re-rendering saved-session relative time chips on a short interval while the `Reset all saved views` confirmation summary stays open, scoping the timer so it only runs when the clear-confirmation card is visible and saved-session timestamps are present, and preserving static behavior when the summary is closed.",
+      "status": "done",
+      "base_priority": 81,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the live refresh for saved-session relative time labels in the reset summary, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `e96c545` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time"
+      ],
+      "direction_relation_note": "Extends the saved reset-summary recency chips so their relative-time guidance remains trustworthy during longer confirmation pauses instead of drifting stale after the card opens."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-adaptive-refresh-cadence",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Adapt reset-summary relative time refresh cadence to session age",
+      "description": "Tune the `Reset all saved views` confirmation summary so very recent saved-session timestamps refresh more frequently while older sessions refresh less often, keeping relative-time chips perceptually accurate without paying the same timer cost for long-stale entries.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains after shipping live relative-time refresh and directly identified adaptive refresh cadence by session age as the likeliest next refinement, making it the clearest executable follow-up to keep the queue moving.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time-live-refresh"
+      ],
+      "direction_relation_note": "Builds on the shipped live-aging reset-summary chips by making their refresh policy more efficient and age-aware, preserving trustworthy recency cues without running an equally aggressive timer for every saved session."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-contextual-reset-scopes",
