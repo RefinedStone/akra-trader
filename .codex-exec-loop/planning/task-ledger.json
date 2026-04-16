@@ -927,19 +927,55 @@
       "id": "planning-reference-lanes-tooltip-import-conflict-preview-diff-first",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Show changed tooltip preset values first and collapse unchanged rows behind a toggle",
-      "description": "Refine the inline tooltip preset conflict preview so differing values are sorted to the top and unchanged rows are collapsed behind an explicit reveal toggle, reducing scan time when imported presets mostly match an existing local preset.",
-      "status": "ready",
+      "description": "Completed the inline tooltip preset conflict-preview scanability follow-up by sorting changed values ahead of unchanged rows, collapsing unchanged rows behind an explicit reveal toggle, resetting the toggle when a new conflict payload loads, and adding supporting inline toggle styling in the dev conflict preview.",
+      "status": "done",
       "base_priority": 82,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains from the completed preview task and explicitly identified sorting changed values first with unchanged rows hidden behind a toggle as the likely next refinement, so this is the clearest executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the changed-first and collapsed-unchanged conflict-preview refinement in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `fff37ff` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T08:00:00Z",
+      "updated_at": "2026-04-17T08:10:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-preview"
       ],
       "direction_relation_note": "Builds directly on the completed value-level conflict preview by making reference-lane import comparisons faster to scan when only a small subset of tuning values actually differ."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-delta-badges",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add stronger visual diff cues to tooltip preset conflict rows",
+      "description": "Refine the inline tooltip preset conflict preview with stronger row-level diff signals such as per-row delta badges or direction markers, so operators can parse how incoming preset values differ from local ones without comparing raw numbers cell by cell.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains from the completed preview task and explicitly identified stronger visual diff cues, for example per-row delta badges, as the likeliest next refinement, making this the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:10:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-preview-diff-first"
+      ],
+      "direction_relation_note": "Builds on the changed-first conflict preview by making value deltas themselves easier to interpret at a glance when reference-lane tooltip preset imports disagree."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-grouped-settings",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Group tooltip preset conflict rows by setting type",
+      "description": "Organize the inline tooltip preset conflict preview into meaningful groups such as timing-related versus threshold-related settings so imported preset differences are easier to scan as coherent tuning clusters instead of one flat parameter list.",
+      "status": "proposed",
+      "base_priority": 79,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply identified grouping timing-related versus threshold-related settings as a plausible next refinement, but it is a secondary presentation choice after the more direct row-level diff-cue improvement.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:10:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-preview-diff-first"
+      ],
+      "direction_relation_note": "Extends the reference-lane conflict-preview usability work by restructuring tooltip preset parameters into operator-meaningful groups once the most immediate diff visibility refinement is in place."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
