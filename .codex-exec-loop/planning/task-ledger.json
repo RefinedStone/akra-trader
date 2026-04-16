@@ -418,37 +418,55 @@
       "id": "planning-guarded-live-order-lifecycle-and-venue-sync",
       "direction_id": "guarded-live-execution",
       "title": "Extend guarded-live from market submit only to order lifecycle sync",
-      "description": "Broaden the new guarded-live venue execution path beyond market-order submission by adding cancel or replace handling and durable venue-order synchronization, so active live runs can reconcile and supervise the full order lifecycle instead of treating venue writes as fire-and-forget submissions.",
-      "status": "ready",
+      "description": "Broaden the new guarded-live venue execution path beyond market-order submission by adding venue order-state synchronization so active live runs can reconcile and supervise open, partially filled, and completed venue orders instead of treating venue writes as fire-and-forget submissions.",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says the live order path is still intentionally narrow with market-order submit only and no cancel or replace flow or durable venue-order sync, making this the clearest immediate executable follow-up after the first live worker shipped.",
+      "priority_reason": "Completed in main session commit 9a912e6, which added guarded-live venue order-state sync, periodic open-order reconciliation, local fills and positions progression, operator-facing lifecycle summaries, and matching API plus application coverage.",
       "depends_on": [
         "planning-guarded-live-live-venue-order-path"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:01:23Z",
+      "updated_at": "2026-04-17T08:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live execution from a minimal gated write path into a supervised order lifecycle with durable venue-state tracking, which is required before live candidacy can rely on ongoing execution safety rather than one-shot market submits."
+      "direction_relation_note": "Closed the first guarded-live order-lifecycle supervision gap by keeping local live state synced to venue order progression, which now leaves active order management controls and restart-safe durable venue session resume as the remaining candidacy steps."
     },
     {
-      "id": "planning-guarded-live-full-venue-session-resume",
+      "id": "planning-guarded-live-active-order-management-controls",
       "direction_id": "guarded-live-execution",
-      "title": "Resume guarded-live with full venue session and order-book lifecycle state",
-      "description": "Upgrade guarded-live recovery and launch so restart or recovery does not just rebuild local state from snapshots, but resumes a fuller venue session and order-book lifecycle with explicit runtime ownership or quarantine semantics for in-flight live activity.",
-      "status": "proposed",
-      "base_priority": 77,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says recovery and live launch still rebuild local live state from snapshots but do not resume a full venue session or order-book lifecycle, making this a concrete follow-up once the order lifecycle path is broadened.",
+      "title": "Add guarded-live cancel or replace controls for active venue orders",
+      "description": "Extend guarded-live beyond passive order-state syncing by adding explicit cancel or replace order-management flows, audit capture, and operator-facing controls for active venue orders so supervision can actively manage in-flight live exposure instead of only observing venue progression.",
+      "status": "ready",
+      "base_priority": 78,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly says cancel or replace style active order management is still missing after lifecycle sync landed, making this the clearest immediate executable follow-up for the next queued task.",
       "depends_on": [
         "planning-guarded-live-order-lifecycle-and-venue-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:01:23Z",
+      "updated_at": "2026-04-17T08:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps guarded-live candidacy honest by requiring restart-safe venue-session ownership and order-lifecycle resumption, not just snapshot-based state reconstruction."
+      "direction_relation_note": "Advances guarded-live execution from venue-state observation into operator-controlled order supervision, which is required before live candidacy can manage in-flight exposure safely rather than relying on submit-and-watch behavior."
+    },
+    {
+      "id": "planning-guarded-live-full-venue-session-resume",
+      "direction_id": "guarded-live-execution",
+      "title": "Resume guarded-live with durable venue order-book sync and live session ownership",
+      "description": "Upgrade guarded-live recovery and launch so restart or recovery does not just rebuild local state from snapshots, but durably syncs the venue order book and resumes or quarantines the live worker session with explicit ownership semantics for in-flight venue activity.",
+      "status": "proposed",
+      "base_priority": 77,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply says durable venue order-book sync and restart-safe full live worker resume are still missing after lifecycle sync landed, but active order management is the more immediate next executable queue head.",
+      "depends_on": [
+        "planning-guarded-live-active-order-management-controls"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T08:00:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps guarded-live candidacy honest by requiring restart-safe venue order-book ownership and resumable live-session semantics, not just snapshot reconstruction plus periodic sync."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
