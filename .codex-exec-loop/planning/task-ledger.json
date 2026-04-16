@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply says wider live-path alerting and audit coverage are still missing beyond the current guarded-live control trail, so durable alert history and operator-visible delivery remain a concrete executable follow-up after restart-safe live session ownership is addressed.",
+      "priority_reason": "The latest main-session reply for commit 044a40e confirms wider live-path alerting and audit coverage are still missing beyond the current guarded-live control trail, but full venue-native stream/session lifecycle handoff remains the more direct executable follow-up from the completed restore work.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:35:33Z",
+      "updated_at": "2026-04-17T09:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply explicitly notes that replace is still implemented as cancel plus new limit submit rather than a venue-native atomic amend flow, but whether that gap should block immediate live-session resume work still needs guarded-live product and venue-contract judgment.",
+      "priority_reason": "The latest main-session reply after commit 044a40e still notes replace is implemented as cancel plus new submit instead of venue-native amend, but that remains behind the more immediate full venue-native stream/session lifecycle handoff and still needs guarded-live product and venue-contract judgment.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:35:33Z",
+      "updated_at": "2026-04-17T09:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -473,18 +473,54 @@
       "direction_id": "guarded-live-execution",
       "title": "Resume guarded-live with durable venue order-book sync and live session ownership",
       "description": "Upgrade guarded-live recovery and launch so restart or recovery does not just rebuild local state from snapshots, but durably syncs the venue order book and resumes or quarantines the live worker session with explicit ownership semantics for in-flight venue activity.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says durable venue order-book sync and restart-safe live worker resume are still missing after guarded-live active-order controls landed, making this the clearest immediate executable follow-up for the next queued task.",
+      "priority_reason": "Completed in main session commit 8950ec9, which persisted guarded-live ownership and durable open-order snapshots, reattached the owned live run on resume, reseeded venue order state after restart or fault, exposed the ownership surface in the control room, and verified the flow with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T22:35:33Z",
+      "updated_at": "2026-04-17T09:15:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps guarded-live candidacy honest by requiring restart-safe venue order-book ownership and resumable live-session semantics, not just snapshot reconstruction plus periodic sync."
+      "direction_relation_note": "Closed the durable ownership and order-book snapshot resume gap for guarded-live execution, which now leaves venue-native session lifecycle restoration and broader live-path alert coverage as the next candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-venue-native-session-lifecycle-restore",
+      "direction_id": "guarded-live-execution",
+      "title": "Restore guarded-live from venue-native session lifecycle, not snapshot reseeding alone",
+      "description": "Extend guarded-live resume beyond persisted run state plus durable open-order snapshots so restart or fault recovery can reconcile and reattach against the venue's native session and exchange order lifecycle directly, including explicit quarantine behavior when a prior live session cannot be authoritatively resumed.",
+      "status": "done",
+      "base_priority": 81,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "Completed in main session commit 044a40e, which restored tracked venue order lifecycle from venue-native session state ahead of snapshot fallback, persisted session_restore control state, surfaced restore provenance in the control room, and verified the resume path with API pytest plus web typecheck and build.",
+      "depends_on": [
+        "planning-guarded-live-full-venue-session-resume"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T09:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from restart-safe ownership and snapshot recovery toward authoritative venue-native session restoration, so live recovery no longer depends on local reseeding semantics alone."
+    },
+    {
+      "id": "planning-guarded-live-full-venue-native-session-handoff",
+      "direction_id": "guarded-live-execution",
+      "title": "Hand off a full venue-native stream/session lifecycle after guarded-live resume",
+      "description": "Extend guarded-live resume beyond restoring tracked order lifecycle so the resumed owner reattaches to the venue-native stream or session lifecycle itself, keeps receiving authoritative venue events after restart, and quarantines clearly when continuous venue-native handoff cannot be re-established.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply for commit 044a40e says resume now restores tracked venue order lifecycle, but it still does not hand off a full venue-native stream/session lifecycle, making this the clearest automatic next queued task from the numbered remaining-work list.",
+      "depends_on": [
+        "planning-guarded-live-venue-native-session-lifecycle-restore"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T09:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from one-time venue-native restore toward continuous authoritative venue-session ownership, so restart recovery resumes the live supervision stream instead of only reconstructing local order state."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
