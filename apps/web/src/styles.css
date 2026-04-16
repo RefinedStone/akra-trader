@@ -908,6 +908,32 @@ select {
   text-align: right;
 }
 
+.comparison-dev-conflict-preview-group-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.comparison-dev-conflict-preview-group-toggle {
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.86);
+  cursor: pointer;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+}
+
+.comparison-dev-conflict-preview-group-toggle:hover,
+.comparison-dev-conflict-preview-group-toggle:focus-visible {
+  border-color: rgba(255, 193, 94, 0.24);
+  background: rgba(255, 193, 94, 0.12);
+  color: rgba(255, 241, 214, 0.98);
+}
+
 .comparison-dev-conflict-preview-row {
   display: grid;
   grid-template-columns: minmax(0, 1.5fr) repeat(2, minmax(72px, 0.75fr));

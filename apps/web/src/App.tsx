@@ -382,6 +382,7 @@ const DEFAULT_COMPARISON_TOOLTIP_TUNING: ComparisonTooltipTuning = {
 const SHOW_COMPARISON_TOOLTIP_TUNING_PANEL = import.meta.env.DEV;
 const DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY: ComparisonTooltipPresetImportConflictPolicy =
   "rename";
+const COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD = 3;
 const COMPARISON_TOOLTIP_TUNING_LABELS: Record<keyof ComparisonTooltipTuning, string> = {
   column_down_sweep_close_ms: "Col down close",
   column_down_sweep_hold_ms: "Col down hold",
@@ -2958,6 +2959,9 @@ function ComparisonTooltipTuningPanel({
   onSavePreset: () => void;
 }) {
   const [showUnchangedConflictRows, setShowUnchangedConflictRows] = useState(false);
+  const [collapsedUnchangedConflictGroups, setCollapsedUnchangedConflictGroups] = useState<
+    Record<string, boolean>
+  >({});
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -2982,7 +2986,25 @@ function ComparisonTooltipTuningPanel({
 
   useEffect(() => {
     setShowUnchangedConflictRows(false);
+    setCollapsedUnchangedConflictGroups({});
   }, [pendingPresetImportConflict?.imported_preset_name, pendingPresetImportConflict?.raw]);
+
+  const isUnchangedConflictGroupCollapsed = (
+    group: ComparisonTooltipPresetConflictPreviewGroup,
+  ) =>
+    collapsedUnchangedConflictGroups[group.key] ??
+    group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD;
+
+  const toggleUnchangedConflictGroupCollapse = (
+    group: ComparisonTooltipPresetConflictPreviewGroup,
+  ) => {
+    setCollapsedUnchangedConflictGroups((current) => ({
+      ...current,
+      [group.key]:
+        !(current[group.key] ??
+          group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD),
+    }));
+  };
 
   return (
     <details className="comparison-dev-panel">
@@ -3124,8 +3146,10 @@ function ComparisonTooltipTuningPanel({
                     <div className="comparison-dev-conflict-preview-group" key={group.key}>
                       <div className="comparison-dev-conflict-preview-group-title">
                         <span>{group.label}</span>
-                        <span className="comparison-dev-conflict-preview-group-summary">
-                          {group.summary_label}
+                        <span className="comparison-dev-conflict-preview-group-meta">
+                          <span className="comparison-dev-conflict-preview-group-summary">
+                            {group.summary_label}
+                          </span>
                         </span>
                       </div>
                       {group.rows.map((row) => (
@@ -3171,30 +3195,46 @@ function ComparisonTooltipTuningPanel({
                         <div className="comparison-dev-conflict-preview-group" key={group.key}>
                           <div className="comparison-dev-conflict-preview-group-title">
                             <span>{group.label}</span>
-                            <span className="comparison-dev-conflict-preview-group-summary">
-                              {group.summary_label}
+                            <span className="comparison-dev-conflict-preview-group-meta">
+                              <span className="comparison-dev-conflict-preview-group-summary">
+                                {group.summary_label}
+                              </span>
+                              {group.rows.length >=
+                              COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD ? (
+                                <button
+                                  className="comparison-dev-conflict-preview-group-toggle"
+                                  onClick={() => toggleUnchangedConflictGroupCollapse(group)}
+                                  type="button"
+                                >
+                                  {isUnchangedConflictGroupCollapsed(group)
+                                    ? "Show rows"
+                                    : "Hide rows"}
+                                </button>
+                              ) : null}
                             </span>
                           </div>
-                          {group.rows.map((row) => (
-                            <div className="comparison-dev-conflict-preview-row" key={row.key}>
-                              <span className="comparison-dev-conflict-preview-label-group">
-                                <span className="comparison-dev-conflict-preview-label">
-                                  {row.label}
-                                </span>
-                                <span
-                                  className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
-                                >
-                                  {row.delta_label}
-                                </span>
-                              </span>
-                              <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
-                                {formatComparisonTooltipTuningValue(row.existing_value)}
-                              </span>
-                              <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-same">
-                                {formatComparisonTooltipTuningValue(row.incoming_value)}
-                              </span>
-                            </div>
-                          ))}
+                          {isUnchangedConflictGroupCollapsed(group)
+                            ? null
+                            : group.rows.map((row) => (
+                                <div className="comparison-dev-conflict-preview-row" key={row.key}>
+                                  <span className="comparison-dev-conflict-preview-label-group">
+                                    <span className="comparison-dev-conflict-preview-label">
+                                      {row.label}
+                                    </span>
+                                    <span
+                                      className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}
+                                    >
+                                      {row.delta_label}
+                                    </span>
+                                  </span>
+                                  <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+                                    {formatComparisonTooltipTuningValue(row.existing_value)}
+                                  </span>
+                                  <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-same">
+                                    {formatComparisonTooltipTuningValue(row.incoming_value)}
+                                  </span>
+                                </div>
+                              ))}
                         </div>
                       ))
                     : null}
