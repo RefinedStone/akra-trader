@@ -1803,9 +1803,32 @@ const benchmarkArtifactSummaryLabels: Record<string, string> = {
   sharpe: "Sharpe",
   sortino: "Sortino",
   calmar: "Calmar",
+  member_count: "Members",
+  entry_preview: "Entries",
+  market_change_export_count: "Market exports",
+  wallet_export_count: "Wallet exports",
+  signal_export_count: "Signal exports",
+  rejected_export_count: "Rejected exports",
+  exited_export_count: "Exited exports",
+  strategy_source_count: "Strategy sources",
+  strategy_param_count: "Strategy params",
+  result_json_entry: "Result JSON",
+  config_json_entry: "Config JSON",
+  strategy: "Strategy",
+  trading_mode: "Trading mode",
+  margin_mode: "Margin mode",
+  max_open_trades: "Max open trades",
+  export: "Export",
+  source_files: "Source files",
+  parameter_files: "Parameter files",
+  strategy_names: "Strategy names",
+  parameter_keys: "Parameter keys",
 };
 
 const benchmarkArtifactSectionOrder = [
+  "zip_contents",
+  "zip_config",
+  "zip_strategy_bundle",
   "metadata",
   "strategy_comparison",
   "pair_metrics",
@@ -1820,6 +1843,9 @@ const benchmarkArtifactSectionOrder = [
 ] as const;
 
 const benchmarkArtifactSectionLabels: Record<string, string> = {
+  zip_contents: "Zip contents",
+  zip_config: "Embedded config",
+  zip_strategy_bundle: "Strategy bundle",
   metadata: "Metadata",
   strategy_comparison: "Strategy comparison",
   pair_metrics: "Pair metrics",

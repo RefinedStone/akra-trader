@@ -9,6 +9,8 @@ import os
 import shutil
 import subprocess
 from typing import Any
+from zipfile import BadZipFile
+from zipfile import ZipFile
 
 from akra_trader.adapters.references import ReferenceCatalog
 from akra_trader.domain.models import BenchmarkArtifact
@@ -260,6 +262,12 @@ class FreqtradeReferenceAdapter:
         summary.update(snapshot_summary)
         sections.update(snapshot_sections)
         source_path = str(path)
+    elif path.suffix.lower() == ".zip":
+      zip_summary, zip_sections = self._inspect_zip_snapshot(path)
+      if zip_summary or zip_sections:
+        summary.update(zip_summary)
+        sections.update(zip_sections)
+        source_path = str(path)
 
     manifest_path = self._find_related_manifest(path)
     if manifest_path is not None:
@@ -311,6 +319,57 @@ class FreqtradeReferenceAdapter:
     if snapshot_paths:
       summary.setdefault("snapshot_count", len(snapshot_paths))
     return summary, sections, source_path
+
+  def _inspect_zip_snapshot(self, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
+    try:
+      with ZipFile(path, "r") as archive:
+        members = [
+          member
+          for member in archive.namelist()
+          if member and not member.endswith("/")
+        ]
+        sections: dict[str, Any] = {}
+        zip_contents = self._summarize_zip_members(members)
+        if zip_contents:
+          sections["zip_contents"] = zip_contents
+
+        result_member, result_payload = self._find_zip_result_payload(archive, members)
+        summary: dict[str, Any] = {}
+        if result_payload is not None:
+          result_summary, result_sections = self._summarize_freqtrade_payload(result_payload)
+          summary.update(result_summary)
+          self._merge_sections(sections, result_sections)
+          if "zip_contents" in sections and result_member is not None:
+            sections["zip_contents"]["result_json_entry"] = result_member
+
+        config_member, config_payload = self._find_zip_config_payload(archive, members)
+        config_section = self._summarize_zip_config_payload(config_payload)
+        if config_section:
+          sections["zip_config"] = config_section
+          if "zip_contents" in sections and config_member is not None:
+            sections["zip_contents"]["config_json_entry"] = config_member
+          for key in ("exchange", "timeframe", "timeframe_detail", "stake_currency", "timerange"):
+            summary.setdefault(key, config_section.get(key))
+          self._set_summary_entry(summary, "strategy_name", summary.get("strategy_name") or config_section.get("strategy"))
+
+        strategy_bundle = self._summarize_zip_strategy_bundle(archive, members)
+        if strategy_bundle:
+          sections["zip_strategy_bundle"] = strategy_bundle
+          if "zip_contents" in sections:
+            if "source_files" in strategy_bundle:
+              sections["zip_contents"]["strategy_source_count"] = len(strategy_bundle["source_files"])
+            if "parameter_files" in strategy_bundle:
+              sections["zip_contents"]["strategy_param_count"] = len(strategy_bundle["parameter_files"])
+          self._set_summary_entry(
+            summary,
+            "strategy_name",
+            summary.get("strategy_name")
+            or self._first_value(strategy_bundle.get("strategy_names")),
+          )
+
+        return summary, sections
+    except (BadZipFile, OSError):
+      return {}, {}
 
   def _extract_summary_from_json(self, path: Path) -> tuple[dict[str, Any], dict[str, Any]]:
     payload = self._read_json_payload(path)
@@ -825,6 +884,11 @@ class FreqtradeReferenceAdapter:
     return None
 
   @staticmethod
+  def _merge_sections(target: dict[str, Any], source: dict[str, Any]) -> None:
+    for key, value in source.items():
+      target[key] = value
+
+  @staticmethod
   def _set_summary_entry(summary: dict[str, Any], key: str, value: Any) -> None:
     normalized = FreqtradeReferenceAdapter._normalize_summary_value(key, value)
     if normalized is not None:
@@ -877,6 +941,146 @@ class FreqtradeReferenceAdapter:
       return json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
       return None
+
+  @staticmethod
+  def _read_zip_json_payload(archive: ZipFile, member: str) -> Any | None:
+    try:
+      with archive.open(member, "r") as file_handle:
+        return json.loads(file_handle.read().decode("utf-8"))
+    except (KeyError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+      return None
+
+  def _find_zip_result_payload(
+    self,
+    archive: ZipFile,
+    members: list[str],
+  ) -> tuple[str | None, Any | None]:
+    for member in members:
+      if not member.lower().endswith(".json"):
+        continue
+      if member.lower().endswith("_config.json"):
+        continue
+      payload = self._read_zip_json_payload(archive, member)
+      if isinstance(payload, dict) and (
+        "strategy" in payload or "strategy_comparison" in payload or "metadata" in payload
+      ):
+        return member, payload
+    return None, None
+
+  def _find_zip_config_payload(
+    self,
+    archive: ZipFile,
+    members: list[str],
+  ) -> tuple[str | None, dict[str, Any] | None]:
+    config_member = next(
+      (
+        member for member in members
+        if member.lower().endswith("_config.json")
+      ),
+      None,
+    )
+    if config_member is None:
+      return None, None
+    payload = self._read_zip_json_payload(archive, config_member)
+    return config_member, payload if isinstance(payload, dict) else None
+
+  def _summarize_zip_members(self, members: list[str]) -> dict[str, Any]:
+    if not members:
+      return {}
+    lower_members = [member.lower() for member in members]
+    return {
+      "member_count": len(members),
+      "entry_preview": members[:6],
+      "market_change_export_count": sum(member.endswith("_market_change.feather") for member in lower_members),
+      "wallet_export_count": sum(member.endswith("_wallet.feather") for member in lower_members),
+      "signal_export_count": sum(member.endswith("_signals.pkl") for member in lower_members),
+      "rejected_export_count": sum(member.endswith("_rejected.pkl") for member in lower_members),
+      "exited_export_count": sum(member.endswith("_exited.pkl") for member in lower_members),
+      "strategy_source_count": sum(member.endswith(".py") for member in lower_members),
+    }
+
+  def _summarize_zip_config_payload(self, payload: dict[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(payload, dict):
+      return {}
+    section: dict[str, Any] = {}
+    self._set_summary_entry(section, "strategy", payload.get("strategy"))
+    self._set_summary_entry(section, "timeframe", payload.get("timeframe"))
+    self._set_summary_entry(section, "timeframe_detail", payload.get("timeframe_detail"))
+    self._set_summary_entry(section, "stake_currency", payload.get("stake_currency"))
+    self._set_summary_entry(section, "timerange", payload.get("timerange"))
+    self._set_summary_entry(section, "trading_mode", payload.get("trading_mode"))
+    self._set_summary_entry(section, "margin_mode", payload.get("margin_mode"))
+    self._set_summary_entry(section, "max_open_trades", payload.get("max_open_trades"))
+    self._set_summary_entry(section, "export", payload.get("export"))
+    self._set_summary_entry(section, "exchange", self._extract_config_exchange_name(payload.get("exchange")))
+    return section
+
+  def _summarize_zip_strategy_bundle(
+    self,
+    archive: ZipFile,
+    members: list[str],
+  ) -> dict[str, Any]:
+    source_files = [
+      member for member in members
+      if member.lower().endswith(".py")
+    ]
+    parameter_files = [
+      member
+      for member in members
+      if self._is_zip_strategy_parameter_member(archive, member)
+    ]
+    strategy_names: list[str] = []
+    parameter_keys: dict[str, list[str]] = {}
+    for parameter_file in parameter_files[:5]:
+      payload = self._read_zip_json_payload(archive, parameter_file)
+      if not isinstance(payload, dict):
+        continue
+      strategy_name = payload.get("strategy_name")
+      if isinstance(strategy_name, str):
+        strategy_names.append(strategy_name)
+      params = payload.get("params")
+      if isinstance(params, dict):
+        parameter_keys[self._zip_member_name(parameter_file)] = list(params.keys())[:8]
+    section: dict[str, Any] = {}
+    if source_files:
+      section["source_files"] = source_files[:5]
+    if parameter_files:
+      section["parameter_files"] = parameter_files[:5]
+    if strategy_names:
+      section["strategy_names"] = strategy_names[:5]
+    if parameter_keys:
+      section["parameter_keys"] = parameter_keys
+    return section
+
+  def _is_zip_strategy_parameter_member(self, archive: ZipFile, member: str) -> bool:
+    if not member.lower().endswith(".json"):
+      return False
+    if member.lower().endswith("_config.json"):
+      return False
+    payload = self._read_zip_json_payload(archive, member)
+    if not isinstance(payload, dict):
+      return False
+    return "strategy_name" in payload or "params" in payload
+
+  @staticmethod
+  def _extract_config_exchange_name(exchange: Any) -> str | None:
+    if isinstance(exchange, str):
+      return exchange
+    if isinstance(exchange, dict):
+      name = exchange.get("name")
+      if isinstance(name, str):
+        return name
+    return None
+
+  @staticmethod
+  def _zip_member_name(member: str) -> str:
+    return Path(member).name
+
+  @staticmethod
+  def _first_value(value: Any) -> Any:
+    if isinstance(value, list) and value:
+      return value[0]
+    return value
 
   @staticmethod
   def _is_result_snapshot(path: Path) -> bool:

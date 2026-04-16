@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from zipfile import ZipFile
 
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.references import load_reference_catalog
@@ -301,3 +302,144 @@ def test_reference_adapter_uses_manifest_summary_for_zip_snapshots(tmp_path: Pat
   assert artifact.summary["backtest_start_at"] == "2024-02-01T00:00:00+00:00"
   assert artifact.sections["metadata"]["timeframe"] == "1h"
   assert artifact.summary_source_path == str(manifest_path)
+
+
+def test_reference_adapter_inspects_zip_artifacts_for_provenance(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = load_reference_catalog(repo_root / "reference" / "catalog.toml")
+  adapter = FreqtradeReferenceAdapter(repo_root, references)
+  result_root = tmp_path / "user_data" / "backtest_results"
+  result_root.mkdir(parents=True)
+
+  snapshot_path = result_root / "backtest-result-20260417_030000.zip"
+  with ZipFile(snapshot_path, "w") as archive:
+    archive.writestr(
+      "backtest-result-20260417_030000.json",
+      json.dumps(
+        {
+          "strategy": {
+            "NostalgiaForInfinityX7": {
+              "results_per_pair": [
+                {
+                  "key": "BTC/USDT",
+                  "trades": 18,
+                  "profit_total_pct": 9.5,
+                  "profit_total_abs": 950.0,
+                  "winrate": 0.72,
+                },
+                {
+                  "key": "TOTAL",
+                  "trades": 18,
+                  "profit_total_pct": 9.5,
+                  "profit_total_abs": 950.0,
+                  "winrate": 0.72,
+                },
+              ],
+              "exit_reason_summary": [
+                {
+                  "key": "roi",
+                  "trades": 15,
+                  "profit_total_pct": 10.7,
+                  "profit_total_abs": 1070.0,
+                  "winrate": 0.86,
+                },
+              ],
+              "wallet_stats": {
+                "start_balance": 10000,
+                "end_balance": 10950,
+                "sharpe": 1.2,
+                "max_drawdown_account": 0.041,
+              },
+              "total_trades": 18,
+              "profit_total": 0.095,
+              "profit_total_abs": 950.0,
+              "max_drawdown_account": 0.041,
+              "market_change": 0.057,
+              "exchange": "binance",
+              "stake_currency": "USDT",
+              "timeframe": "15m",
+              "timerange": "20240301-20240331",
+            }
+          },
+          "strategy_comparison": [
+            {
+              "key": "NostalgiaForInfinityX7",
+              "trades": 18,
+              "profit_total_pct": 9.5,
+              "profit_total_abs": 950.0,
+              "max_drawdown_account": 0.041,
+              "winrate": 0.72,
+            }
+          ],
+        }
+      ),
+    )
+    archive.writestr(
+      "backtest-result-20260417_030000_config.json",
+      json.dumps(
+        {
+          "strategy": "NostalgiaForInfinityX7",
+          "exchange": {"name": "binance"},
+          "stake_currency": "USDT",
+          "timeframe": "15m",
+          "timerange": "20240301-20240331",
+          "trading_mode": "spot",
+          "margin_mode": "isolated",
+          "max_open_trades": 3,
+          "export": "signals",
+        }
+      ),
+    )
+    archive.writestr(
+      "backtest-result-20260417_030000_NostalgiaForInfinityX7.json",
+      json.dumps(
+        {
+          "strategy_name": "NostalgiaForInfinityX7",
+          "params": {
+            "buy_threshold": 0.32,
+            "sell_threshold": 0.14,
+          },
+        }
+      ),
+    )
+    archive.writestr("backtest-result-20260417_030000_NostalgiaForInfinityX7.py", "# strategy")
+    archive.writestr("backtest-result-20260417_030000_market_change.feather", b"market-change")
+    archive.writestr("backtest-result-20260417_030000_NostalgiaForInfinityX7_wallet.feather", b"wallet")
+    archive.writestr("backtest-result-20260417_030000_signals.pkl", b"signals")
+    archive.writestr("backtest-result-20260417_030000_rejected.pkl", b"rejected")
+    archive.writestr("backtest-result-20260417_030000_exited.pkl", b"exited")
+
+  artifacts = adapter._build_benchmark_artifacts((
+    str(result_root),
+    str(snapshot_path),
+  ))
+  artifact_by_kind = {artifact.kind: artifact for artifact in artifacts}
+
+  snapshot_artifact = artifact_by_kind["result_snapshot"]
+  assert snapshot_artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
+  assert snapshot_artifact.summary["trade_count"] == 18
+  assert snapshot_artifact.summary["profit_total_pct"] == 9.5
+  assert snapshot_artifact.summary["max_drawdown_pct"] == 4.1
+  assert snapshot_artifact.summary["market_change_pct"] == 5.7
+  assert snapshot_artifact.summary["timeframe"] == "15m"
+  assert snapshot_artifact.summary["exchange"] == "binance"
+  assert snapshot_artifact.summary_source_path == str(snapshot_path)
+  assert snapshot_artifact.sections["zip_contents"]["member_count"] == 9
+  assert snapshot_artifact.sections["zip_contents"]["signal_export_count"] == 1
+  assert snapshot_artifact.sections["zip_contents"]["wallet_export_count"] == 1
+  assert snapshot_artifact.sections["zip_contents"]["strategy_source_count"] == 1
+  assert snapshot_artifact.sections["zip_contents"]["strategy_param_count"] == 1
+  assert snapshot_artifact.sections["zip_config"]["trading_mode"] == "spot"
+  assert snapshot_artifact.sections["zip_config"]["margin_mode"] == "isolated"
+  assert snapshot_artifact.sections["zip_strategy_bundle"]["strategy_names"] == ["NostalgiaForInfinityX7"]
+  assert snapshot_artifact.sections["zip_strategy_bundle"]["parameter_keys"][
+    "backtest-result-20260417_030000_NostalgiaForInfinityX7.json"
+  ] == ["buy_threshold", "sell_threshold"]
+  assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 18
+  assert snapshot_artifact.sections["wallet_stats"]["sharpe"] == 1.2
+
+  root_artifact = artifact_by_kind["result_snapshot_root"]
+  assert root_artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
+  assert root_artifact.summary["snapshot_count"] == 1
+  assert root_artifact.summary_source_path == str(snapshot_path)
+  assert root_artifact.sections["zip_contents"]["result_json_entry"] == "backtest-result-20260417_030000.json"
