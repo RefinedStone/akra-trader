@@ -875,6 +875,23 @@ export default function App() {
     }
   }
 
+  async function rerunPaper(rerunBoundaryId: string) {
+    setStatusText(`Launching paper replay for boundary ${rerunBoundaryId}...`);
+    try {
+      const run = await fetchJson<Run>(`/runs/rerun-boundaries/${encodeURIComponent(rerunBoundaryId)}/paper`, {
+        method: "POST",
+      });
+      await loadAll();
+      setStatusText(
+        run.provenance.rerun_match_status === "matched"
+          ? `Paper replay started and matched boundary ${rerunBoundaryId}.`
+          : `Paper replay started with expected boundary translation from ${rerunBoundaryId}.`,
+      );
+    } catch (error) {
+      setStatusText(`Paper replay failed: ${(error as Error).message}`);
+    }
+  }
+
   function toggleComparisonRun(runId: string) {
     setSelectedComparisonRunIds((current) => {
       if (current.includes(runId)) {
@@ -1103,6 +1120,10 @@ export default function App() {
               label: "Replay in sandbox",
               onRerun: rerunSandbox,
             },
+            {
+              label: "Replay in paper",
+              onRerun: rerunPaper,
+            },
           ]}
         />
         <RunSection
@@ -1113,8 +1134,12 @@ export default function App() {
           setFilter={setSandboxRunFilter}
           rerunActions={[
             {
-              label: "Replay boundary",
+              label: "Replay in sandbox",
               onRerun: rerunSandbox,
+            },
+            {
+              label: "Replay in paper",
+              onRerun: rerunPaper,
             },
           ]}
           onStop={stopSandboxRun}

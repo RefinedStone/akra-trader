@@ -58,7 +58,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox runs
-- sandbox stop control and rerun-boundary replay actions
+- sandbox stop control plus explicit sandbox/paper rerun-boundary operator actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
