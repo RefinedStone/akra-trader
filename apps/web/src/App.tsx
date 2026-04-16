@@ -177,6 +177,13 @@ export default function App() {
     persistExpandedGapRows(expandedGapRows);
   }, [expandedGapRows]);
 
+  useEffect(() => {
+    if (!marketStatus) {
+      return;
+    }
+    setExpandedGapRows((current) => pruneExpandedGapRows(current, marketStatus));
+  }, [marketStatus]);
+
   const strategyGroups = useMemo(() => {
     return {
       native: strategies.filter((strategy) => strategy.runtime === "native"),
@@ -567,6 +574,29 @@ function toggleExpandedGapRow(current: Record<string, boolean>, key: string) {
     return next;
   }
   return { ...current, [key]: true };
+}
+
+function pruneExpandedGapRows(
+  current: Record<string, boolean>,
+  marketStatus: MarketDataStatus,
+) {
+  const activeKeys = new Set(
+    marketStatus.instruments
+      .filter((instrument) => instrument.backfill_gap_windows.length > MAX_VISIBLE_GAP_WINDOWS)
+      .map((instrument) => instrumentGapRowKey(instrument)),
+  );
+  const next = Object.fromEntries(
+    Object.entries(current).filter(([key, expanded]) => expanded && activeKeys.has(key)),
+  );
+  const currentKeys = Object.keys(current);
+  const nextKeys = Object.keys(next);
+  if (
+    currentKeys.length === nextKeys.length &&
+    currentKeys.every((key) => next[key] === current[key])
+  ) {
+    return current;
+  }
+  return next;
 }
 
 function loadExpandedGapRows() {
