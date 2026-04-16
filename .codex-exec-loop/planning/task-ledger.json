@@ -79,20 +79,38 @@
     {
       "id": "planning-research-foundation-binance-historical-backfill",
       "direction_id": "research-foundation",
-      "title": "Add Binance historical backfill coverage beyond rolling sync windows",
-      "description": "Extend the new scheduled market-data sync so tracked symbols and timeframes can be backfilled beyond the current recent-lookback window, either through a dedicated backfill job or an explicit operational sync policy, with progress/state recording and tests that prove longer historical windows can be populated without request-path fetches.",
-      "status": "ready",
+      "title": "Binance historical backfill beyond rolling sync windows shipped",
+      "description": "Completed the historical coverage follow-up by teaching Binance background sync to keep the recent window current and then walk backward in batches until a configurable historical candle target is reached, wiring `AKRA_TRADER_MARKET_DATA_HISTORICAL_CANDLE_LIMIT` through bootstrap/config, and adding API/bootstrap coverage for expanding stored history beyond the rolling sync window.",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says background sync is complete and identifies deeper historical backfill or a production sync policy as the next remaining gap, so this becomes the clearest executable successor task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the historical Binance backfill implementation, verified `apps/api` with `pytest` (`28 passed`), and committed the change as `b64edf2`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:52:00Z",
+      "updated_at": "2026-04-16T14:53:30Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-research-foundation-binance-background-sync"
       ],
       "direction_relation_note": "Advances the research-foundation ingestion lane from short-horizon freshness into reproducible historical coverage needed for credible research and replay."
+    },
+    {
+      "id": "planning-control-room-binance-backfill-ops-status",
+      "direction_id": "control-room-and-ops",
+      "title": "Expose Binance historical backfill target and completion in ops status",
+      "description": "Extend the operator-facing market-data status surfaces so they distinguish a merely recent sync from historically complete coverage, including the configured historical candle target, current coverage/progress, and tests that lock the new status semantics through the API and any surfaced control-room views.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply says no blocking code remains and directly identifies exposing backfill target/progress in ops status as the next likely follow-up, making it the clearest executable successor task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T14:53:30Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-research-foundation-binance-historical-backfill"
+      ],
+      "direction_relation_note": "Advances the control-room goal that operators can tell whether Binance data is only recently refreshed or fully backfilled to the configured historical target."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
