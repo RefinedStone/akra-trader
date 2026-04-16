@@ -117,6 +117,99 @@ COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
   },
 }
 
+COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
+  "benchmark_validation": {
+    "total_return_pct": {
+      "annotation": "Validation read: return drift versus the selected benchmark baseline.",
+      "positive_delta": "above benchmark",
+      "negative_delta": "below benchmark",
+      "baseline": "benchmark baseline",
+      "missing": "benchmark delta unavailable",
+    },
+    "max_drawdown_pct": {
+      "annotation": "Validation read: downside drift versus the benchmark risk envelope.",
+      "positive_delta": "deeper than benchmark",
+      "negative_delta": "tighter than benchmark",
+      "baseline": "benchmark baseline",
+      "missing": "benchmark drawdown delta unavailable",
+    },
+    "win_rate_pct": {
+      "annotation": "Validation read: hit-rate drift versus the benchmark baseline.",
+      "positive_delta": "above benchmark",
+      "negative_delta": "below benchmark",
+      "baseline": "benchmark baseline",
+      "missing": "benchmark hit-rate delta unavailable",
+    },
+    "trade_count": {
+      "annotation": "Validation read: participation and pacing drift versus the benchmark.",
+      "positive_delta": "above benchmark",
+      "negative_delta": "below benchmark",
+      "baseline": "benchmark baseline",
+      "missing": "benchmark activity delta unavailable",
+    },
+  },
+  "execution_regression": {
+    "total_return_pct": {
+      "annotation": "Regression read: return movement is treated as execution drift.",
+      "positive_delta": "return lift",
+      "negative_delta": "return regression",
+      "baseline": "regression baseline",
+      "missing": "return regression unavailable",
+    },
+    "max_drawdown_pct": {
+      "annotation": "Regression read: higher drawdown is treated as risk regression.",
+      "positive_delta": "extra drawdown",
+      "negative_delta": "risk improvement",
+      "baseline": "regression baseline",
+      "missing": "drawdown regression unavailable",
+    },
+    "win_rate_pct": {
+      "annotation": "Regression read: hit-rate movement is treated as execution drift.",
+      "positive_delta": "hit-rate lift",
+      "negative_delta": "hit-rate regression",
+      "baseline": "regression baseline",
+      "missing": "hit-rate regression unavailable",
+    },
+    "trade_count": {
+      "annotation": "Regression read: trade-flow changes point to execution behavior drift.",
+      "positive_delta": "extra activity",
+      "negative_delta": "reduced activity",
+      "baseline": "regression baseline",
+      "missing": "activity regression unavailable",
+    },
+  },
+  "strategy_tuning": {
+    "total_return_pct": {
+      "annotation": "Tuning read: return deltas show optimization edge versus the baseline.",
+      "positive_delta": "tuning edge",
+      "negative_delta": "tuning gap",
+      "baseline": "tuning baseline",
+      "missing": "tuning delta unavailable",
+    },
+    "max_drawdown_pct": {
+      "annotation": "Tuning read: lower drawdown marks a cleaner optimization tradeoff.",
+      "positive_delta": "drawdown penalty",
+      "negative_delta": "drawdown improvement",
+      "baseline": "tuning baseline",
+      "missing": "drawdown tuning delta unavailable",
+    },
+    "win_rate_pct": {
+      "annotation": "Tuning read: hit-rate deltas show signal-quality tradeoffs.",
+      "positive_delta": "hit-rate edge",
+      "negative_delta": "hit-rate gap",
+      "baseline": "tuning baseline",
+      "missing": "hit-rate tuning delta unavailable",
+    },
+    "trade_count": {
+      "annotation": "Tuning read: trade-count changes expose activity tradeoffs in the variant.",
+      "positive_delta": "activity expansion",
+      "negative_delta": "activity reduction",
+      "baseline": "tuning baseline",
+      "missing": "activity tuning delta unavailable",
+    },
+  },
+}
+
 
 class TradingApplication:
   def __init__(
@@ -201,6 +294,7 @@ class TradingApplication:
       _build_comparison_metric_row(
         runs=ordered_runs,
         baseline_run=baseline_run,
+        intent=resolved_intent,
         key=key,
         label=label,
         unit=unit,
@@ -574,6 +668,7 @@ def _build_comparison_metric_row(
   *,
   runs: list[RunRecord],
   baseline_run: RunRecord,
+  intent: str,
   key: str,
   label: str,
   unit: str,
@@ -587,6 +682,18 @@ def _build_comparison_metric_row(
   deltas_vs_baseline = {
     run_id: _calculate_metric_delta(value, baseline_value)
     for run_id, value in values.items()
+  }
+  delta_annotations = {
+    run_id: _build_metric_delta_annotation(
+      intent=intent,
+      key=key,
+      unit=unit,
+      is_baseline=run_id == baseline_run.config.run_id,
+      higher_is_better=higher_is_better,
+      delta=deltas_vs_baseline[run_id],
+      value=values[run_id],
+    )
+    for run_id in values
   }
   comparable_values = {
     run_id: value
@@ -607,8 +714,58 @@ def _build_comparison_metric_row(
     higher_is_better=higher_is_better,
     values=values,
     deltas_vs_baseline=deltas_vs_baseline,
+    delta_annotations=delta_annotations,
+    annotation=_build_metric_annotation(intent=intent, key=key),
     best_run_id=best_run_id,
   )
+
+
+def _build_metric_annotation(*, intent: str, key: str) -> str | None:
+  return COMPARISON_METRIC_COPY.get(intent, {}).get(key, {}).get("annotation")
+
+
+def _build_metric_delta_annotation(
+  *,
+  intent: str,
+  key: str,
+  unit: str,
+  is_baseline: bool,
+  higher_is_better: bool,
+  delta: float | int | None,
+  value: float | int | None,
+) -> str:
+  copy = COMPARISON_METRIC_COPY.get(intent, {}).get(key, {})
+  if is_baseline:
+    return copy.get("baseline", "baseline")
+  if value is None or delta is None:
+    return copy.get("missing", "delta unavailable")
+  if delta == 0:
+    return "aligned with baseline"
+
+  magnitude = _format_metric_delta_magnitude(delta=delta, unit=unit)
+  positive_phrase = copy.get("positive_delta", "above baseline")
+  negative_phrase = copy.get("negative_delta", "below baseline")
+
+  if higher_is_better:
+    phrase = positive_phrase if delta > 0 else negative_phrase
+  else:
+    phrase = positive_phrase if delta > 0 else negative_phrase
+  return f"{magnitude} {phrase}"
+
+
+def _format_metric_delta_magnitude(
+  *,
+  delta: float | int,
+  unit: str,
+) -> str:
+  magnitude = abs(float(delta))
+  if unit == "pct":
+    rounded = round(magnitude, 2)
+    return f"{rounded:g} pts"
+  rounded = round(magnitude, 2)
+  if rounded.is_integer():
+    return str(int(rounded))
+  return f"{rounded:g}"
 
 
 def _build_comparison_narrative(

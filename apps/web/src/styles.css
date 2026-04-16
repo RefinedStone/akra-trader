@@ -651,6 +651,22 @@ select {
   color: var(--muted);
 }
 
+.comparison-table tbody th span {
+  display: block;
+}
+
+.comparison-metric-annotation {
+  display: block;
+  margin-top: 6px;
+  font-family: "Sora", sans-serif;
+  font-size: 0.72rem;
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.45;
+  text-transform: none;
+  color: var(--muted);
+}
+
 .comparison-table td strong {
   display: block;
   font-size: 1rem;

@@ -315,6 +315,10 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     "win_rate_pct",
     "trade_count",
   }
+  assert metric_rows["total_return_pct"].annotation == (
+    "Validation read: return drift versus the selected benchmark baseline."
+  )
+  assert metric_rows["total_return_pct"].delta_annotations[native_run.config.run_id] == "benchmark baseline"
   assert metric_rows["total_return_pct"].values[native_run.config.run_id] == native_run.metrics["total_return_pct"]
   assert reference_run.config.run_id in metric_rows["trade_count"].values
   assert comparison.runs[1].notes
@@ -379,6 +383,8 @@ def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(
   assert metric_rows["total_return_pct"].values[reference_run.config.run_id] == 12.4
   assert metric_rows["max_drawdown_pct"].values[reference_run.config.run_id] == 7.2
   assert metric_rows["trade_count"].values[reference_run.config.run_id] == 36
+  assert "benchmark" in metric_rows["total_return_pct"].delta_annotations[reference_run.config.run_id]
+  assert "benchmark" in metric_rows["max_drawdown_pct"].delta_annotations[reference_run.config.run_id]
   assert len(comparison.narratives) == 1
   assert comparison.narratives[0].comparison_type == "native_vs_reference"
   assert comparison.narratives[0].rank == 1
@@ -497,6 +503,7 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
     reference_run.config.run_id,
     alternate_native_run.config.run_id,
   ]
+  benchmark_metric_rows = {row.key: row for row in benchmark_validation.metric_rows}
   assert [narrative.rank for narrative in benchmark_validation.narratives] == [1, 2]
   assert benchmark_validation.narratives[0].is_primary is True
   assert benchmark_validation.narratives[0].comparison_type == "native_vs_reference"
@@ -512,6 +519,7 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
     alternate_native_run.config.run_id,
     reference_run.config.run_id,
   ]
+  strategy_metric_rows = {row.key: row for row in strategy_tuning.metric_rows}
   assert [narrative.rank for narrative in strategy_tuning.narratives] == [1, 2]
   assert strategy_tuning.narratives[0].is_primary is True
   assert strategy_tuning.narratives[0].comparison_type == "native_vs_native"
@@ -523,6 +531,7 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
   )
 
   assert execution_regression.intent == "execution_regression"
+  execution_metric_rows = {row.key: row for row in execution_regression.metric_rows}
   assert execution_regression.narratives[0].run_id == alternate_native_run.config.run_id
   assert execution_regression.narratives[0].title.startswith("Execution regression")
   assert "execution drift" in execution_regression.narratives[0].summary
@@ -530,6 +539,18 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
     bullet.startswith("Execution signal:")
     for bullet in execution_regression.narratives[0].bullets
   )
+  assert benchmark_metric_rows["total_return_pct"].annotation == (
+    "Validation read: return drift versus the selected benchmark baseline."
+  )
+  assert strategy_metric_rows["total_return_pct"].annotation == (
+    "Tuning read: return deltas show optimization edge versus the baseline."
+  )
+  assert execution_metric_rows["total_return_pct"].annotation == (
+    "Regression read: return movement is treated as execution drift."
+  )
+  assert benchmark_metric_rows["total_return_pct"].delta_annotations[reference_run.config.run_id] == "2 pts above benchmark"
+  assert strategy_metric_rows["total_return_pct"].delta_annotations[alternate_native_run.config.run_id] == "5 pts tuning edge"
+  assert execution_metric_rows["trade_count"].delta_annotations[alternate_native_run.config.run_id] == "10 extra activity"
   assert benchmark_validation.narratives[0].insight_score > benchmark_validation.narratives[1].insight_score
   assert strategy_tuning.narratives[0].insight_score > strategy_tuning.narratives[1].insight_score
 

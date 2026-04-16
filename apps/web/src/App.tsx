@@ -169,6 +169,8 @@ type RunComparison = {
     higher_is_better?: boolean | null;
     values: Record<string, number | null>;
     deltas_vs_baseline: Record<string, number | null>;
+    delta_annotations: Record<string, string>;
+    annotation?: string | null;
     best_run_id?: string | null;
   }[];
   narratives: {
@@ -1492,7 +1494,12 @@ function RunComparisonPanel({
           <tbody>
             {comparison.metric_rows.map((metricRow) => (
               <tr key={metricRow.key}>
-                <th>{metricRow.label}</th>
+                <th>
+                  <span>{metricRow.label}</span>
+                  {metricRow.annotation ? (
+                    <small className="comparison-metric-annotation">{metricRow.annotation}</small>
+                  ) : null}
+                </th>
                 {comparison.runs.map((run) => (
                   <td
                     className={metricRow.best_run_id === run.run_id ? "comparison-best" : undefined}
@@ -1503,8 +1510,8 @@ function RunComparisonPanel({
                     </strong>
                     <span className="comparison-delta">
                       {run.run_id === comparison.baseline_run_id
-                        ? "baseline"
-                        : formatComparisonDelta(
+                        ? metricRow.delta_annotations[run.run_id] ?? "baseline"
+                        : metricRow.delta_annotations[run.run_id] ?? formatComparisonDelta(
                             metricRow.deltas_vs_baseline[run.run_id],
                             metricRow.unit,
                           )}

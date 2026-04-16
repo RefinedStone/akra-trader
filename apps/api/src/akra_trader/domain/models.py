@@ -364,6 +364,8 @@ class RunComparisonMetricRow:
   higher_is_better: bool | None = None
   values: dict[str, float | int | None] = field(default_factory=dict)
   deltas_vs_baseline: dict[str, float | int | None] = field(default_factory=dict)
+  delta_annotations: dict[str, str] = field(default_factory=dict)
+  annotation: str | None = None
   best_run_id: str | None = None
 
 
