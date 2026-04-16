@@ -1459,12 +1459,14 @@ function RunComparisonPanel({
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
     metricRowKey: string;
+    runColumnKey: string;
     time: number;
     x: number;
     y: number;
   } | null>(null);
   const metricSweepStateRef = useRef<{
-    metricRowKey: string;
+    axis: "column" | "row";
+    contextKey: string;
     until: number;
   } | null>(null);
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
@@ -1498,6 +1500,10 @@ function RunComparisonPanel({
   const metricRowSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
     hoverCloseDelayMs: 90,
     hoverOpenDelayMs: 250,
+  };
+  const metricColumnSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
+    hoverCloseDelayMs: 85,
+    hoverOpenDelayMs: 210,
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1623,9 +1629,14 @@ function RunComparisonPanel({
     };
   };
 
-  const recordMetricPointerSample = (event: MouseEvent<HTMLElement>, metricRowKey: string) => {
+  const recordMetricPointerSample = (
+    event: MouseEvent<HTMLElement>,
+    metricRowKey: string,
+    runColumnKey: string,
+  ) => {
     metricPointerSampleRef.current = {
       metricRowKey,
+      runColumnKey,
       time: event.timeStamp,
       x: event.clientX,
       y: event.clientY,
@@ -1635,9 +1646,11 @@ function RunComparisonPanel({
   const resolveMetricTooltipInteraction = (
     event: MouseEvent<HTMLElement>,
     metricRowKey: string,
+    runColumnKey: string,
   ) => {
     const sample = {
       metricRowKey,
+      runColumnKey,
       time: event.timeStamp,
       x: event.clientX,
       y: event.clientY,
@@ -1653,31 +1666,62 @@ function RunComparisonPanel({
     const deltaX = Math.abs(sample.x - previousSample.x);
     const deltaY = Math.abs(sample.y - previousSample.y);
     const horizontalVelocity = deltaX / deltaTime;
+    const verticalVelocity = deltaY / deltaTime;
     const isSameMetricRow = previousSample.metricRowKey === metricRowKey;
+    const isSameRunColumn = previousSample.runColumnKey === runColumnKey;
     const isHorizontalSweep =
       isSameMetricRow &&
       deltaTime <= 90 &&
       deltaX >= 24 &&
       deltaX >= deltaY * 2 &&
       horizontalVelocity >= 0.42;
+    const isVerticalSweep =
+      isSameRunColumn &&
+      deltaTime <= 90 &&
+      deltaY >= 18 &&
+      deltaY >= deltaX * 2 &&
+      verticalVelocity >= 0.34;
 
     if (isHorizontalSweep) {
       metricSweepStateRef.current = {
-        metricRowKey,
+        axis: "row",
+        contextKey: metricRowKey,
         until: sample.time + 180,
       };
       return metricRowSweepTooltipInteraction;
     }
 
-    if (
-      metricSweepStateRef.current &&
-      metricSweepStateRef.current.metricRowKey === metricRowKey &&
-      sample.time < metricSweepStateRef.current.until
-    ) {
-      return metricRowSweepTooltipInteraction;
+    if (isVerticalSweep) {
+      metricSweepStateRef.current = {
+        axis: "column",
+        contextKey: runColumnKey,
+        until: sample.time + 160,
+      };
+      return metricColumnSweepTooltipInteraction;
     }
 
-    if (!isSameMetricRow) {
+    if (
+      metricSweepStateRef.current &&
+      sample.time < metricSweepStateRef.current.until
+    ) {
+      if (
+        metricSweepStateRef.current.axis === "row" &&
+        metricSweepStateRef.current.contextKey === metricRowKey
+      ) {
+        return metricRowSweepTooltipInteraction;
+      }
+      if (
+        metricSweepStateRef.current.axis === "column" &&
+        metricSweepStateRef.current.contextKey === runColumnKey
+      ) {
+        return metricColumnSweepTooltipInteraction;
+      }
+    }
+
+    if (
+      (!isSameMetricRow && metricSweepStateRef.current?.axis === "row") ||
+      (!isSameRunColumn && metricSweepStateRef.current?.axis === "column")
+    ) {
       metricSweepStateRef.current = null;
     }
 
@@ -1687,24 +1731,26 @@ function RunComparisonPanel({
   const getMetricComparisonTooltipTargetProps = (
     tooltipId?: string,
     metricRowKey?: string,
+    runColumnKey?: string,
   ): ComparisonTooltipTargetProps | undefined => {
     const baseProps = getComparisonTooltipTargetProps(tooltipId, metricTooltipInteraction);
 
-    if (!baseProps || !tooltipId || !metricRowKey) {
+    if (!baseProps || !tooltipId || !metricRowKey || !runColumnKey) {
       return baseProps;
     }
 
     return {
       ...baseProps,
       onMouseEnter: (event: MouseEvent<HTMLElement>) => {
-        const interaction = resolveMetricTooltipInteraction(event, metricRowKey);
+        const interaction = resolveMetricTooltipInteraction(event, metricRowKey, runColumnKey);
         scheduleComparisonTooltipShow(tooltipId, interaction);
       },
       onMouseLeave: (event: MouseEvent<HTMLElement>) => {
-        recordMetricPointerSample(event, metricRowKey);
+        recordMetricPointerSample(event, metricRowKey, runColumnKey);
         scheduleComparisonTooltipHide(tooltipId, metricTooltipInteraction);
       },
-      onMouseMove: (event: MouseEvent<HTMLElement>) => recordMetricPointerSample(event, metricRowKey),
+      onMouseMove: (event: MouseEvent<HTMLElement>) =>
+        recordMetricPointerSample(event, metricRowKey, runColumnKey),
     };
   };
 
@@ -2040,7 +2086,11 @@ function RunComparisonPanel({
                       }
                       tabIndex={cellTooltip ? 0 : undefined}
                       {...(cellTooltipId
-                        ? getMetricComparisonTooltipTargetProps(cellTooltipId, metricRow.key)
+                        ? getMetricComparisonTooltipTargetProps(
+                            cellTooltipId,
+                            metricRow.key,
+                            run.run_id,
+                          )
                         : {})}
                     >
                       <strong>
