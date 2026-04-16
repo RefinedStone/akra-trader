@@ -753,6 +753,63 @@ select {
   margin-top: 14px;
 }
 
+.comparison-dev-panel {
+  margin-top: 14px;
+  padding: 14px 16px 16px;
+  border-radius: 18px;
+  border: 1px dashed rgba(var(--comparison-accent-rgb), 0.26);
+  background: rgba(4, 10, 17, 0.42);
+}
+
+.comparison-dev-summary {
+  cursor: pointer;
+  color: var(--comparison-accent-solid);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparison-dev-copy {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.5;
+}
+
+.comparison-dev-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.comparison-dev-field {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+}
+
+.comparison-dev-field input {
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
+.comparison-dev-actions {
+  margin-top: 14px;
+}
+
+.comparison-dev-reset {
+  padding: 10px 14px;
+}
+
 .comparison-legend-item {
   display: inline-flex;
   align-items: center;

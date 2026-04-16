@@ -259,6 +259,30 @@ type ComparisonTooltipInteractionOptions = {
   hoverCloseDelayMs?: number;
   hoverOpenDelayMs?: number;
 };
+type ComparisonTooltipTuning = {
+  column_down_sweep_close_ms: number;
+  column_down_sweep_hold_ms: number;
+  column_down_sweep_open_ms: number;
+  column_up_sweep_close_ms: number;
+  column_up_sweep_hold_ms: number;
+  column_up_sweep_open_ms: number;
+  horizontal_distance_ratio: number;
+  horizontal_velocity_threshold: number;
+  metric_hover_close_ms: number;
+  metric_hover_open_ms: number;
+  row_sweep_close_ms: number;
+  row_sweep_hold_ms: number;
+  row_sweep_open_ms: number;
+  speed_adjustment_base: number;
+  speed_adjustment_max: number;
+  speed_adjustment_min: number;
+  speed_adjustment_slope: number;
+  sweep_time_max_ms: number;
+  sweep_time_min_ms: number;
+  sweep_time_speed_multiplier: number;
+  vertical_distance_ratio: number;
+  vertical_velocity_threshold: number;
+};
 type ComparisonTooltipLayout = {
   tooltipId: string;
   left: number;
@@ -267,6 +291,32 @@ type ComparisonTooltipLayout = {
   arrowLeft: number;
   side: "top" | "bottom";
 };
+
+const DEFAULT_COMPARISON_TOOLTIP_TUNING: ComparisonTooltipTuning = {
+  column_down_sweep_close_ms: 80,
+  column_down_sweep_hold_ms: 140,
+  column_down_sweep_open_ms: 170,
+  column_up_sweep_close_ms: 95,
+  column_up_sweep_hold_ms: 180,
+  column_up_sweep_open_ms: 260,
+  horizontal_distance_ratio: 0.32,
+  horizontal_velocity_threshold: 0.42,
+  metric_hover_close_ms: 70,
+  metric_hover_open_ms: 110,
+  row_sweep_close_ms: 90,
+  row_sweep_hold_ms: 180,
+  row_sweep_open_ms: 250,
+  speed_adjustment_base: 1.18,
+  speed_adjustment_max: 1.12,
+  speed_adjustment_min: 0.72,
+  speed_adjustment_slope: 0.28,
+  sweep_time_max_ms: 126,
+  sweep_time_min_ms: 72,
+  sweep_time_speed_multiplier: 42,
+  vertical_distance_ratio: 0.42,
+  vertical_velocity_threshold: 0.34,
+};
+const SHOW_COMPARISON_TOOLTIP_TUNING_PANEL = import.meta.env.DEV;
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -1476,6 +1526,9 @@ function RunComparisonPanel({
     null,
   );
   const [dismissedTooltipId, setDismissedTooltipId] = useState<string | null>(null);
+  const [tooltipTuning, setTooltipTuning] = useState<ComparisonTooltipTuning>(
+    DEFAULT_COMPARISON_TOOLTIP_TUNING,
+  );
   const intentClassName = getComparisonIntentClassName(comparison.intent);
   const intentTooltip = formatComparisonIntentTooltip(comparison.intent);
   const baselineTooltip = formatComparisonCueTooltip(comparison.intent, "baseline");
@@ -1496,20 +1549,34 @@ function RunComparisonPanel({
     ? buildComparisonTooltipId(tooltipScopeId, "featured-narrative", primaryNarrative.run_id)
     : undefined;
   const metricTooltipInteraction: ComparisonTooltipInteractionOptions = {
-    hoverCloseDelayMs: 70,
-    hoverOpenDelayMs: 110,
+    hoverCloseDelayMs: tooltipTuning.metric_hover_close_ms,
+    hoverOpenDelayMs: tooltipTuning.metric_hover_open_ms,
   };
   const metricRowSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
-    hoverCloseDelayMs: 90,
-    hoverOpenDelayMs: 250,
+    hoverCloseDelayMs: tooltipTuning.row_sweep_close_ms,
+    hoverOpenDelayMs: tooltipTuning.row_sweep_open_ms,
   };
   const metricColumnDownSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
-    hoverCloseDelayMs: 80,
-    hoverOpenDelayMs: 170,
+    hoverCloseDelayMs: tooltipTuning.column_down_sweep_close_ms,
+    hoverOpenDelayMs: tooltipTuning.column_down_sweep_open_ms,
   };
   const metricColumnUpSweepTooltipInteraction: ComparisonTooltipInteractionOptions = {
-    hoverCloseDelayMs: 95,
-    hoverOpenDelayMs: 260,
+    hoverCloseDelayMs: tooltipTuning.column_up_sweep_close_ms,
+    hoverOpenDelayMs: tooltipTuning.column_up_sweep_open_ms,
+  };
+
+  const updateTooltipTuning = (
+    key: keyof ComparisonTooltipTuning,
+    rawValue: string,
+  ) => {
+    const nextValue = Number(rawValue);
+    if (!Number.isFinite(nextValue)) {
+      return;
+    }
+    setTooltipTuning((current) => ({
+      ...current,
+      [key]: nextValue,
+    }));
   };
 
   const clearComparisonTooltipOpenTimer = () => {
@@ -1683,16 +1750,18 @@ function RunComparisonPanel({
     const pointerSpeed = Math.hypot(deltaX, deltaY) / deltaTime;
     const averageCellWidth = (sample.cellWidth + previousSample.cellWidth) / 2;
     const averageCellHeight = (sample.cellHeight + previousSample.cellHeight) / 2;
-    const sweepTimeThreshold = getAdaptiveMetricSweepTimeThreshold(pointerSpeed);
+    const sweepTimeThreshold = getAdaptiveMetricSweepTimeThreshold(pointerSpeed, tooltipTuning);
     const horizontalDistanceThreshold = getAdaptiveMetricSweepDistanceThreshold(
       averageCellWidth,
       pointerSpeed,
       "horizontal",
+      tooltipTuning,
     );
     const verticalDistanceThreshold = getAdaptiveMetricSweepDistanceThreshold(
       averageCellHeight,
       pointerSpeed,
       "vertical",
+      tooltipTuning,
     );
     const isSameMetricRow = previousSample.metricRowKey === metricRowKey;
     const isSameRunColumn = previousSample.runColumnKey === runColumnKey;
@@ -1701,20 +1770,20 @@ function RunComparisonPanel({
       deltaTime <= sweepTimeThreshold &&
       deltaX >= horizontalDistanceThreshold &&
       deltaX >= deltaY * 2 &&
-      horizontalVelocity >= 0.42;
+      horizontalVelocity >= tooltipTuning.horizontal_velocity_threshold;
     const isVerticalSweep =
       isSameRunColumn &&
       deltaTime <= sweepTimeThreshold &&
       deltaY >= verticalDistanceThreshold &&
       deltaY >= deltaX * 2 &&
-      verticalVelocity >= 0.34;
+      verticalVelocity >= tooltipTuning.vertical_velocity_threshold;
     const columnSweepAxis = signedDeltaY >= 0 ? "column_down" : "column_up";
 
     if (isHorizontalSweep) {
       metricSweepStateRef.current = {
         axis: "row",
         contextKey: metricRowKey,
-        until: sample.time + 180,
+        until: sample.time + tooltipTuning.row_sweep_hold_ms,
       };
       return metricRowSweepTooltipInteraction;
     }
@@ -1723,7 +1792,11 @@ function RunComparisonPanel({
       metricSweepStateRef.current = {
         axis: columnSweepAxis,
         contextKey: runColumnKey,
-        until: sample.time + 160,
+        until:
+          sample.time +
+          (columnSweepAxis === "column_down"
+            ? tooltipTuning.column_down_sweep_hold_ms
+            : tooltipTuning.column_up_sweep_hold_ms),
       };
       return columnSweepAxis === "column_down"
         ? metricColumnDownSweepTooltipInteraction
@@ -1959,6 +2032,13 @@ function RunComparisonPanel({
           />
         </span>
       </div>
+      {SHOW_COMPARISON_TOOLTIP_TUNING_PANEL ? (
+        <ComparisonTooltipTuningPanel
+          onChangeValue={updateTooltipTuning}
+          onReset={() => setTooltipTuning(DEFAULT_COMPARISON_TOOLTIP_TUNING)}
+          tuning={tooltipTuning}
+        />
+      ) : null}
       <div className="comparison-run-grid">
         {comparison.runs.map((run) => (
           <article
@@ -2258,6 +2338,215 @@ const ComparisonTooltipBubble = forwardRef<
   );
 });
 
+function ComparisonTooltipTuningPanel({
+  tuning,
+  onChangeValue,
+  onReset,
+}: {
+  tuning: ComparisonTooltipTuning;
+  onChangeValue: (key: keyof ComparisonTooltipTuning, value: string) => void;
+  onReset: () => void;
+}) {
+  return (
+    <details className="comparison-dev-panel">
+      <summary className="comparison-dev-summary">
+        Dev only: tooltip sweep tuning
+      </summary>
+      <p className="comparison-dev-copy">
+        Tune sweep detection and suppression live while scanning dense comparison cells.
+      </p>
+      <div className="comparison-dev-grid">
+        <ComparisonTooltipTuningField
+          label="Metric open"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="metric_hover_open_ms"
+          value={tuning.metric_hover_open_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Metric close"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="metric_hover_close_ms"
+          value={tuning.metric_hover_close_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Row open"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="row_sweep_open_ms"
+          value={tuning.row_sweep_open_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Row close"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="row_sweep_close_ms"
+          value={tuning.row_sweep_close_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Row hold"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="row_sweep_hold_ms"
+          value={tuning.row_sweep_hold_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col down open"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_down_sweep_open_ms"
+          value={tuning.column_down_sweep_open_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col down close"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_down_sweep_close_ms"
+          value={tuning.column_down_sweep_close_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col down hold"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_down_sweep_hold_ms"
+          value={tuning.column_down_sweep_hold_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col up open"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_up_sweep_open_ms"
+          value={tuning.column_up_sweep_open_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col up close"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_up_sweep_close_ms"
+          value={tuning.column_up_sweep_close_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Col up hold"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="column_up_sweep_hold_ms"
+          value={tuning.column_up_sweep_hold_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Time min"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="sweep_time_min_ms"
+          value={tuning.sweep_time_min_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Time max"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="sweep_time_max_ms"
+          value={tuning.sweep_time_max_ms}
+        />
+        <ComparisonTooltipTuningField
+          label="Time speed"
+          onChangeValue={onChangeValue}
+          step="1"
+          tuningKey="sweep_time_speed_multiplier"
+          value={tuning.sweep_time_speed_multiplier}
+        />
+        <ComparisonTooltipTuningField
+          label="Horiz ratio"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="horizontal_distance_ratio"
+          value={tuning.horizontal_distance_ratio}
+        />
+        <ComparisonTooltipTuningField
+          label="Horiz velocity"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="horizontal_velocity_threshold"
+          value={tuning.horizontal_velocity_threshold}
+        />
+        <ComparisonTooltipTuningField
+          label="Vert ratio"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="vertical_distance_ratio"
+          value={tuning.vertical_distance_ratio}
+        />
+        <ComparisonTooltipTuningField
+          label="Vert velocity"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="vertical_velocity_threshold"
+          value={tuning.vertical_velocity_threshold}
+        />
+        <ComparisonTooltipTuningField
+          label="Speed base"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="speed_adjustment_base"
+          value={tuning.speed_adjustment_base}
+        />
+        <ComparisonTooltipTuningField
+          label="Speed slope"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="speed_adjustment_slope"
+          value={tuning.speed_adjustment_slope}
+        />
+        <ComparisonTooltipTuningField
+          label="Speed min"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="speed_adjustment_min"
+          value={tuning.speed_adjustment_min}
+        />
+        <ComparisonTooltipTuningField
+          label="Speed max"
+          onChangeValue={onChangeValue}
+          step="0.01"
+          tuningKey="speed_adjustment_max"
+          value={tuning.speed_adjustment_max}
+        />
+      </div>
+      <div className="comparison-dev-actions">
+        <button className="ghost-button comparison-dev-reset" onClick={onReset} type="button">
+          Reset tuning
+        </button>
+      </div>
+    </details>
+  );
+}
+
+function ComparisonTooltipTuningField({
+  label,
+  onChangeValue,
+  step,
+  tuningKey,
+  value,
+}: {
+  label: string;
+  onChangeValue: (key: keyof ComparisonTooltipTuning, value: string) => void;
+  step: string;
+  tuningKey: keyof ComparisonTooltipTuning;
+  value: number;
+}) {
+  return (
+    <label className="comparison-dev-field">
+      <span>{label}</span>
+      <input
+        min="0"
+        onChange={(event) => onChangeValue(tuningKey, event.target.value)}
+        step={step}
+        type="number"
+        value={value}
+      />
+    </label>
+  );
+}
+
 function sanitizeComparisonTooltipId(value: string) {
   return value.replace(/[^a-zA-Z0-9_-]+/g, "-");
 }
@@ -2270,20 +2559,33 @@ function getComparisonTooltipBoundaryRect(target: HTMLElement) {
   return target.closest(".comparison-table-wrap")?.getBoundingClientRect() ?? null;
 }
 
-function getAdaptiveMetricSweepTimeThreshold(pointerSpeed: number) {
-  return clampComparisonNumber(72 + pointerSpeed * 42, 72, 126);
+function getAdaptiveMetricSweepTimeThreshold(
+  pointerSpeed: number,
+  tuning: ComparisonTooltipTuning,
+) {
+  return clampComparisonNumber(
+    tuning.sweep_time_min_ms + pointerSpeed * tuning.sweep_time_speed_multiplier,
+    tuning.sweep_time_min_ms,
+    tuning.sweep_time_max_ms,
+  );
 }
 
 function getAdaptiveMetricSweepDistanceThreshold(
   cellSize: number,
   pointerSpeed: number,
   axis: "horizontal" | "vertical",
+  tuning: ComparisonTooltipTuning,
 ) {
-  const baseRatio = axis === "horizontal" ? 0.32 : 0.42;
+  const baseRatio =
+    axis === "horizontal" ? tuning.horizontal_distance_ratio : tuning.vertical_distance_ratio;
   const minimum = axis === "horizontal" ? 16 : 12;
   const maximum = axis === "horizontal" ? 44 : 34;
   const baseThreshold = clampComparisonNumber(cellSize * baseRatio, minimum, maximum);
-  const speedAdjustment = clampComparisonNumber(1.18 - pointerSpeed * 0.28, 0.72, 1.12);
+  const speedAdjustment = clampComparisonNumber(
+    tuning.speed_adjustment_base - pointerSpeed * tuning.speed_adjustment_slope,
+    tuning.speed_adjustment_min,
+    tuning.speed_adjustment_max,
+  );
   return baseThreshold * speedAdjustment;
 }
 
