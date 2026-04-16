@@ -620,20 +620,38 @@
     {
       "id": "planning-reference-lanes-intent-aware-hover-tooltips",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Add intent-aware hover states and tooltip copy for comparison cues",
-      "description": "Extend the completed comparison iconography and legend work with intent-aware hover states or tooltip copy so operators can tell why a metric cell, baseline card, or top insight is emphasized, not just what the visual cue represents, while keeping the explanations aligned with `benchmark_validation`, `execution_regression`, and `strategy_tuning` semantics.",
-      "status": "ready",
+      "title": "Intent-aware hover states and tooltip copy shipped for comparison cues",
+      "description": "Completed the intent-aware comparison cue explanation follow-up by adding comparison-mode tooltip copy for intent, legend, featured insight, baseline card, and emphasized metric cues, wiring those explanations into the comparison UI, and extending the same cue system with stronger intent-aware hover emphasis and tooltip styling in the web app.",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the iconography task and directly identified intent-aware hover states or tooltip copy as the likely next refinement, so this is the clearest executable follow-up to keep comparison mode progressing.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the intent-aware hover and tooltip implementation in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `2b78321` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T04:42:00Z",
+      "updated_at": "2026-04-17T04:43:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-intent-aware-iconography-and-legend"
       ],
       "direction_relation_note": "Builds on the completed comparison legend cues by making the benchmark-comparison emphasis self-explaining on hover, so operators can interpret why the UI is calling attention to a result without inferring the meaning from styling alone."
+    },
+    {
+      "id": "planning-reference-lanes-comparison-cue-keyboard-focus-accessibility",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add keyboard-focus tooltip and focus-ring treatment for comparison cues",
+      "description": "Extend the completed comparison hover/tooltip cue system with keyboard-focus behavior so the same intent, legend, featured insight, baseline card, and emphasized metric explanations are discoverable without mouse hover, including visible focus-ring treatment and any needed non-hover tooltip trigger wiring for comparison mode.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the hover/tooltip task and directly identified keyboard-focus tooltip and focus-ring treatment for the same cues as the likely next refinement, making this the clearest executable next task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:44:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-intent-aware-hover-tooltips"
+      ],
+      "direction_relation_note": "Builds on the completed comparison cue hover system by making the same benchmark-comparison explanations and emphasis accessible from keyboard navigation, reducing reliance on mouse-only discovery for reference-lane comparisons."
     }
   ]
 }
