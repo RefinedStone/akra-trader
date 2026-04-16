@@ -146,8 +146,8 @@ for the current live owner. A separate venue execution adapter now submits guard
 orders once those gates are clear, and the guarded-live worker now syncs tracked venue order
 lifecycle changes back into local orders, fills, positions, and audit notes. Operator controls can
 cancel active venue orders or replace them with repriced limit orders from persisted live run
-state, and the guarded-live resume flow can reattach the owned live session after restart or fault
-drills.
+state, and the guarded-live resume flow now restores tracked venue order lifecycle state before it
+falls back to the persisted snapshot after restart or fault drills.
 
 ## Modes
 
@@ -173,7 +173,8 @@ drills.
   filled venue orders into persisted run/session history
 - operator controls can cancel active venue orders and replace them with repriced limit orders
 - guarded-live control state persists live session ownership and a durable open-order snapshot so a
-  guarded-live resume action can recover the owned live session after restart or fault drills
+  guarded-live resume action can recover the owned live session from venue-native order lifecycle
+  state after restart or fault drills
 
 ## Control Room
 
@@ -198,8 +199,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 - guarded-live worker execution exists, but it is still limited to a narrow market-entry path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
-  guarded-live recovery/live resume still stop short of a full venue-native order-book and session
-  lifecycle restore
+  guarded-live recovery/live resume still stop short of a full venue-native stream/session handoff
 - the system still lacks durable alert delivery and wider operator event coverage
 - venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
   flow and no full exchange-order restore

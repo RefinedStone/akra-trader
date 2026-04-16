@@ -30,6 +30,7 @@ from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import GuardedLiveRuntimeRecovery
 from akra_trader.domain.models import GuardedLiveOrderBookSync
 from akra_trader.domain.models import GuardedLiveSessionOwnership
+from akra_trader.domain.models import GuardedLiveVenueSessionRestore
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
@@ -528,6 +529,7 @@ class TradingApplication:
       recovery=state.recovery,
       ownership=state.ownership,
       order_book=state.order_book,
+      session_restore=state.session_restore,
       audit_events=audit_events,
       active_runtime_alert_count=len(runtime_visibility.alerts),
       running_sandbox_count=running_sandbox_count,
@@ -1239,13 +1241,18 @@ class TradingApplication:
       last_processed_candle_at=last_processed_candle_at,
       last_seen_candle_at=last_processed_candle_at,
     )
-    self._seed_guarded_live_execution_order_book(state.order_book)
-    try:
-      self._sync_guarded_live_orders(run)
-    except Exception as exc:
-      run.notes.append(
-        f"{current_time.isoformat()} | guarded_live_order_book_resume_warning | {exc}"
-      )
+    session_restore = self._restore_guarded_live_venue_session(
+      run=run,
+      state=state,
+      reason=reason,
+    )
+    if session_restore.state == "fallback_snapshot":
+      try:
+        self._sync_guarded_live_orders(run)
+      except Exception as exc:
+        run.notes.append(
+          f"{current_time.isoformat()} | guarded_live_order_book_resume_warning | {exc}"
+        )
     self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
     run.notes.append(
       f"{current_time.isoformat()} | guarded_live_worker_resumed | {reason}"
@@ -1261,6 +1268,7 @@ class TradingApplication:
       actor=actor,
       reason=reason,
       resumed=True,
+      session_restore=session_restore,
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_resumed",
@@ -1488,6 +1496,7 @@ class TradingApplication:
     actor: str,
     reason: str,
     resumed: bool = False,
+    session_restore: GuardedLiveVenueSessionRestore | None = None,
   ) -> None:
     session = run.provenance.runtime_session
     current_time = self._clock()
@@ -1510,6 +1519,11 @@ class TradingApplication:
           last_released_at=None,
         ),
         order_book=self._build_guarded_live_order_book_sync(run=run),
+        session_restore=self._resolve_guarded_live_session_restore_state(
+          run=run,
+          existing=state.session_restore,
+          session_restore=session_restore,
+        ),
       )
     )
 
@@ -1542,8 +1556,249 @@ class TradingApplication:
           last_released_at=current_time if ownership_state == "released" else existing.last_released_at,
         ),
         order_book=self._build_guarded_live_order_book_sync(run=run),
+        session_restore=self._resolve_guarded_live_session_restore_state(
+          run=run,
+          existing=state.session_restore,
+        ),
       )
     )
+
+  def _resolve_guarded_live_session_restore_state(
+    self,
+    *,
+    run: RunRecord,
+    existing: GuardedLiveVenueSessionRestore,
+    session_restore: GuardedLiveVenueSessionRestore | None = None,
+  ) -> GuardedLiveVenueSessionRestore:
+    session = run.provenance.runtime_session
+    session_id = session.session_id if session is not None else existing.owner_session_id
+    symbol = run.config.symbols[0] if run.config.symbols else existing.symbol
+    if session_restore is not None:
+      return replace(
+        session_restore,
+        venue=session_restore.venue or run.config.venue,
+        symbol=session_restore.symbol or symbol,
+        owner_run_id=run.config.run_id,
+        owner_session_id=session_id,
+      )
+    if existing.owner_run_id == run.config.run_id:
+      return replace(
+        existing,
+        venue=existing.venue or run.config.venue,
+        symbol=existing.symbol or symbol,
+        owner_run_id=run.config.run_id,
+        owner_session_id=session_id,
+      )
+    return GuardedLiveVenueSessionRestore(
+      state="not_restored",
+      source="live_start",
+      venue=run.config.venue,
+      symbol=symbol,
+      owner_run_id=run.config.run_id,
+      owner_session_id=session_id,
+    )
+
+  def _restore_guarded_live_venue_session(
+    self,
+    *,
+    run: RunRecord,
+    state: GuardedLiveState,
+    reason: str,
+  ) -> GuardedLiveVenueSessionRestore:
+    current_time = self._clock()
+    symbol = run.config.symbols[0]
+    session = run.provenance.runtime_session
+    session_id = session.session_id if session is not None else None
+    owned_order_ids = tuple(order.order_id for order in run.orders)
+    try:
+      venue_restore = self._venue_execution.restore_session(
+        symbol=symbol,
+        owned_order_ids=owned_order_ids,
+      )
+    except Exception as exc:
+      venue_restore = GuardedLiveVenueSessionRestore(
+        state="unavailable",
+        restored_at=current_time,
+        source="venue_execution",
+        venue=run.config.venue,
+        symbol=symbol,
+        owner_run_id=run.config.run_id,
+        owner_session_id=session_id,
+        issues=(f"venue_session_restore_failed:{exc}",),
+      )
+    venue_restore = replace(
+      venue_restore,
+      restored_at=venue_restore.restored_at or current_time,
+      venue=venue_restore.venue or run.config.venue,
+      symbol=venue_restore.symbol or symbol,
+      owner_run_id=run.config.run_id,
+      owner_session_id=session_id,
+    )
+    if self._guarded_live_venue_restore_has_state(venue_restore):
+      self._apply_guarded_live_restored_session(
+        run=run,
+        session_restore=venue_restore,
+      )
+      run.notes.append(
+        f"{current_time.isoformat()} | guarded_live_venue_session_restored | "
+        f"source={venue_restore.source}; open_orders={len(venue_restore.open_orders)}; "
+        f"tracked_orders={len(venue_restore.synced_orders)}; reason={reason}"
+      )
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_venue_session_restored",
+        actor="system",
+        summary=f"Guarded-live venue session restored for {symbol}.",
+        detail=(
+          f"Resume reason: {reason}. Source {venue_restore.source} restored "
+          f"{len(venue_restore.synced_orders)} tracked order state(s) and "
+          f"{len(venue_restore.open_orders)} open venue order(s)."
+        ),
+        run_id=run.config.run_id,
+        session_id=session_id,
+      )
+      return venue_restore
+
+    self._seed_guarded_live_execution_order_book(state.order_book)
+    fallback_issues = tuple(dict.fromkeys((*venue_restore.issues, "venue_session_restore_unavailable")))
+    fallback_restore = GuardedLiveVenueSessionRestore(
+      state="fallback_snapshot",
+      restored_at=current_time,
+      source="durable_order_book_snapshot",
+      venue=run.config.venue,
+      symbol=symbol,
+      owner_run_id=run.config.run_id,
+      owner_session_id=session_id,
+      open_orders=state.order_book.open_orders,
+      synced_orders=(),
+      issues=fallback_issues,
+    )
+    run.notes.append(
+      f"{current_time.isoformat()} | guarded_live_venue_session_restore_fallback | "
+      f"source={fallback_restore.source}; issues={', '.join(fallback_issues) if fallback_issues else 'none'}; "
+      f"reason={reason}"
+    )
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_venue_session_restore_fallback",
+      actor="system",
+      summary=f"Guarded-live session restore fell back to persisted order book for {symbol}.",
+      detail=(
+        f"Resume reason: {reason}. Venue-native restore was unavailable, so the persisted "
+        f"order-book snapshot was reseeded instead. Issues: "
+        f"{', '.join(fallback_issues) if fallback_issues else 'none'}."
+      ),
+      run_id=run.config.run_id,
+      session_id=session_id,
+    )
+    return fallback_restore
+
+  @staticmethod
+  def _guarded_live_venue_restore_has_state(
+    session_restore: GuardedLiveVenueSessionRestore,
+  ) -> bool:
+    if session_restore.open_orders:
+      return True
+    return any(result.status != "unknown" for result in session_restore.synced_orders)
+
+  def _apply_guarded_live_restored_session(
+    self,
+    *,
+    run: RunRecord,
+    session_restore: GuardedLiveVenueSessionRestore,
+  ) -> None:
+    existing_orders = {order.order_id: order for order in run.orders}
+    open_orders_by_id = {
+      order.order_id: order
+      for order in session_restore.open_orders
+    }
+    state_changed = False
+    for synced_state in session_restore.synced_orders:
+      if synced_state.status == "unknown":
+        continue
+      order = existing_orders.get(synced_state.order_id)
+      if order is None:
+        order = self._materialize_guarded_live_restored_order(
+          run=run,
+          synced_state=synced_state,
+          open_order=open_orders_by_id.get(synced_state.order_id),
+        )
+        existing_orders[order.order_id] = order
+        state_changed = True
+      state_changed = bool(
+        self._apply_guarded_live_synced_order_state(
+          run=run,
+          order=order,
+          synced_state=synced_state,
+        )
+      ) or state_changed
+
+    for open_order in session_restore.open_orders:
+      if open_order.order_id in existing_orders:
+        continue
+      order = self._materialize_guarded_live_restored_order(
+        run=run,
+        synced_state=None,
+        open_order=open_order,
+      )
+      existing_orders[order.order_id] = order
+      state_changed = True
+
+    if state_changed:
+      run.metrics = summarize_performance(
+        initial_cash=run.config.initial_cash,
+        equity_curve=run.equity_curve,
+        closed_trades=run.closed_trades,
+      )
+
+  def _materialize_guarded_live_restored_order(
+    self,
+    *,
+    run: RunRecord,
+    synced_state: GuardedLiveVenueOrderResult | None,
+    open_order: GuardedLiveVenueOpenOrder | None,
+  ) -> Order:
+    symbol = run.config.symbols[0]
+    restored_at = synced_state.submitted_at if synced_state is not None else self._clock()
+    explicit_price = None
+    if synced_state is not None:
+      explicit_price = synced_state.requested_price
+    if explicit_price is None and open_order is not None:
+      explicit_price = open_order.price
+    quantity = (
+      (synced_state.requested_amount if synced_state is not None else None)
+      or (synced_state.amount if synced_state is not None and synced_state.amount > 0 else None)
+      or (open_order.amount if open_order is not None else None)
+      or 0.0
+    )
+    restored_order = Order(
+      run_id=run.config.run_id,
+      instrument_id=f"{run.config.venue}:{symbol}",
+      side=self._resolve_order_side(
+        synced_state.side if synced_state is not None else open_order.side if open_order is not None else "buy"
+      ),
+      quantity=quantity,
+      requested_price=(
+        explicit_price
+        if explicit_price is not None
+        else (synced_state.average_fill_price if synced_state is not None and synced_state.average_fill_price is not None else 0.0)
+      ),
+      order_type=OrderType.LIMIT if explicit_price is not None else OrderType.MARKET,
+      status=(
+        self._map_guarded_live_order_status(
+          open_order.status,
+          filled_quantity=0.0,
+          remaining_quantity=quantity,
+        )
+        if open_order is not None
+        else OrderStatus.OPEN
+      ),
+      order_id=synced_state.order_id if synced_state is not None else open_order.order_id,
+      created_at=restored_at,
+      updated_at=synced_state.updated_at if synced_state is not None else restored_at,
+      last_synced_at=synced_state.updated_at if synced_state is not None else restored_at,
+      remaining_quantity=quantity,
+    )
+    run.orders.append(restored_order)
+    return restored_order
 
   def _build_guarded_live_order_book_sync(self, *, run: RunRecord) -> GuardedLiveOrderBookSync:
     session = run.provenance.runtime_session
@@ -1596,6 +1851,7 @@ class TradingApplication:
         symbol=order.symbol,
         side=order.side,
         amount=order.amount,
+        requested_price=order.price,
         status=order.status,
         updated_at=order_book.synced_at or self._clock(),
         filled_amount=0.0,
@@ -1855,6 +2111,7 @@ class TradingApplication:
       symbol=symbol,
       side=order.side.value,
       amount=order.quantity,
+      requested_price=order.requested_price,
       status=order.status.value,
       updated_at=order.updated_at or order.created_at,
       average_fill_price=order.average_fill_price,
@@ -2674,14 +2931,14 @@ class TradingApplication:
     remaining_quantity: float,
   ) -> OrderStatus:
     normalized = status.lower()
-    if normalized in {"filled", "closed"} or (filled_quantity > 0 and remaining_quantity <= 0):
-      return OrderStatus.FILLED
-    if normalized in {"partially_filled", "partial"} or (filled_quantity > 0 and remaining_quantity > 0):
-      return OrderStatus.PARTIALLY_FILLED
     if normalized in {"canceled", "cancelled", "expired"}:
       return OrderStatus.CANCELED
     if normalized == "rejected":
       return OrderStatus.REJECTED
+    if normalized in {"filled", "closed"} or (filled_quantity > 0 and remaining_quantity <= 0):
+      return OrderStatus.FILLED
+    if normalized in {"partially_filled", "partial"} or (filled_quantity > 0 and remaining_quantity > 0):
+      return OrderStatus.PARTIALLY_FILLED
     return OrderStatus.OPEN
 
   def _advance_guarded_live_worker_run(self, run: RunRecord) -> dict[str, int]:

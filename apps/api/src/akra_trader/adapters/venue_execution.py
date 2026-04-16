@@ -10,6 +10,8 @@ import ccxt
 
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
+from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueSessionRestore
 from akra_trader.ports import VenueExecutionPort
 
 
@@ -69,14 +71,88 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     *,
     venue: str = "binance",
     clock: Callable[[], datetime] | None = None,
+    restored_orders: tuple[GuardedLiveVenueOrderResult, ...] = (),
   ) -> None:
     self._venue = venue
     self._clock = clock or (lambda: datetime.now(UTC))
-    self.submitted_orders: list[GuardedLiveVenueOrderResult] = []
-    self._order_states: dict[str, GuardedLiveVenueOrderResult] = {}
+    self.submitted_orders: list[GuardedLiveVenueOrderResult] = list(restored_orders)
+    self._order_states: dict[str, GuardedLiveVenueOrderResult] = {
+      order.order_id: order
+      for order in restored_orders
+    }
 
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
     return True, ()
+
+  def restore_session(
+    self,
+    *,
+    symbol: str,
+    owned_order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionRestore:
+    current_time = self._clock()
+    symbol_states = {
+      order_id: state
+      for order_id, state in self._order_states.items()
+      if state.symbol == symbol
+    }
+    synced_orders: list[GuardedLiveVenueOrderResult] = []
+    issues: list[str] = []
+    found_owned_state = False
+    for order_id in owned_order_ids:
+      state = symbol_states.get(order_id)
+      if state is None:
+        synced_orders.append(
+          GuardedLiveVenueOrderResult(
+            order_id=order_id,
+            venue=self._venue,
+            symbol=symbol,
+            side="unknown",
+            amount=0.0,
+            status="unknown",
+            submitted_at=current_time,
+            updated_at=current_time,
+            issues=("restored_order_state_missing",),
+          )
+        )
+        issues.append(f"restored_order_state_missing:{order_id}")
+        continue
+      synced_orders.append(state)
+      found_owned_state = True
+
+    open_orders = tuple(
+      sorted(
+        (
+          GuardedLiveVenueOpenOrder(
+            order_id=state.order_id,
+            symbol=state.symbol,
+            side=state.side,
+            amount=state.remaining_amount if state.remaining_amount is not None else state.amount,
+            status=state.status,
+            price=state.requested_price or state.average_fill_price,
+          )
+          for state in symbol_states.values()
+          if state.status in {"open", "partially_filled"}
+          and (state.remaining_amount is None or state.remaining_amount > 0)
+        ),
+        key=lambda order: (order.symbol, order.order_id),
+      )
+    )
+    state = "not_found"
+    if found_owned_state or open_orders:
+      state = "restored" if not issues else "partial"
+    elif issues:
+      state = "unavailable"
+    return GuardedLiveVenueSessionRestore(
+      state=state,
+      restored_at=current_time,
+      source="seeded_venue_execution",
+      venue=self._venue,
+      symbol=symbol,
+      open_orders=open_orders,
+      synced_orders=tuple(synced_orders),
+      issues=tuple(issues),
+    )
 
   def submit_market_order(
     self,
@@ -129,6 +205,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       status="canceled",
       submitted_at=current.submitted_at,
       updated_at=canceled_at,
+      requested_price=current.requested_price,
       average_fill_price=current.average_fill_price,
       fee_paid=current.fee_paid,
       requested_amount=requested_amount,
@@ -174,6 +251,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     symbol: str | None = None,
     side: str | None = None,
     amount: float | None = None,
+    requested_price: float | None = None,
     status: str,
     updated_at: datetime | None = None,
     average_fill_price: float | None = None,
@@ -196,6 +274,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
         status="open",
         submitted_at=now,
         updated_at=now,
+        requested_price=requested_price,
         requested_amount=amount,
         filled_amount=0.0,
         remaining_amount=amount,
@@ -209,6 +288,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       status=status,
       submitted_at=current.submitted_at,
       updated_at=updated_at or self._clock(),
+      requested_price=requested_price if requested_price is not None else current.requested_price,
       average_fill_price=average_fill_price if average_fill_price is not None else current.average_fill_price,
       fee_paid=fee_paid if fee_paid is not None else current.fee_paid,
       requested_amount=current.requested_amount,
@@ -238,6 +318,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       status=status,
       submitted_at=submitted_at,
       updated_at=submitted_at,
+      requested_price=request.reference_price,
       average_fill_price=average_fill_price,
       fee_paid=0.0,
       requested_amount=request.amount,
@@ -268,6 +349,94 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     if self._api_key and self._api_secret:
       return True, ()
     return False, ("binance_trade_credentials_missing",)
+
+  def restore_session(
+    self,
+    *,
+    symbol: str,
+    owned_order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionRestore:
+    current_time = self._clock()
+    try:
+      exchange = self._resolve_exchange()
+      rows = self._fetch_order_rows(exchange=exchange, symbol=symbol)
+    except Exception as exc:
+      return GuardedLiveVenueSessionRestore(
+        state="unavailable",
+        restored_at=current_time,
+        source="binance_exchange",
+        venue=self._venue,
+        symbol=symbol,
+        issues=(f"venue_session_restore_failed:{exc}",),
+      )
+
+    rows_by_id: dict[str, GuardedLiveVenueOrderResult] = {}
+    for row in rows:
+      result = _build_order_result_from_exchange_row(
+        row,
+        venue=self._venue,
+        fallback_symbol=symbol,
+        fallback_time=current_time,
+      )
+      rows_by_id[result.order_id] = result
+
+    synced_orders: list[GuardedLiveVenueOrderResult] = []
+    issues: list[str] = []
+    found_owned_state = False
+    for order_id in owned_order_ids:
+      result = rows_by_id.get(order_id)
+      if result is None:
+        synced_orders.append(
+          GuardedLiveVenueOrderResult(
+            order_id=order_id,
+            venue=self._venue,
+            symbol=symbol,
+            side="unknown",
+            amount=0.0,
+            status="unknown",
+            submitted_at=current_time,
+            updated_at=current_time,
+            issues=("restored_order_state_missing",),
+          )
+        )
+        issues.append(f"restored_order_state_missing:{order_id}")
+        continue
+      synced_orders.append(result)
+      found_owned_state = True
+
+    open_orders = tuple(
+      sorted(
+        (
+          GuardedLiveVenueOpenOrder(
+            order_id=result.order_id,
+            symbol=result.symbol,
+            side=result.side,
+            amount=result.remaining_amount if result.remaining_amount is not None else result.amount,
+            status=result.status,
+            price=result.requested_price or result.average_fill_price,
+          )
+          for result in rows_by_id.values()
+          if result.status in {"open", "partially_filled"}
+          and (result.remaining_amount is None or result.remaining_amount > 0)
+        ),
+        key=lambda order: (order.symbol, order.order_id),
+      )
+    )
+    state = "not_found"
+    if found_owned_state or open_orders:
+      state = "restored" if not issues else "partial"
+    elif issues:
+      state = "unavailable"
+    return GuardedLiveVenueSessionRestore(
+      state=state,
+      restored_at=current_time,
+      source="binance_exchange",
+      venue=self._venue,
+      symbol=symbol,
+      open_orders=open_orders,
+      synced_orders=tuple(synced_orders),
+      issues=tuple(issues),
+    )
 
   def submit_market_order(
     self,
@@ -483,6 +652,7 @@ def _build_order_result_from_exchange_row(
     status=status,
     submitted_at=submitted_at,
     updated_at=updated_at,
+    requested_price=_coerce_float(row.get("price")) or fallback_reference_price,
     average_fill_price=average_fill_price,
     fee_paid=fee_paid,
     requested_amount=requested_amount,

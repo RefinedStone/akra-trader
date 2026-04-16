@@ -21,6 +21,7 @@ from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
@@ -1383,7 +1384,27 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
     guarded_live_state=guarded_live_state,
     clock=clock,
     venue_state=StaticVenueStateAdapter(venue_snapshot),
-    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    venue_execution=SeededVenueExecutionAdapter(
+      clock=clock,
+      restored_orders=(
+        GuardedLiveVenueOrderResult(
+          order_id=recovered_order_id,
+          venue="binance",
+          symbol="ETH/USDT",
+          side="buy",
+          amount=0.5,
+          status="partially_filled",
+          submitted_at=run.started_at,
+          updated_at=clock(),
+          requested_price=2_000.0,
+          average_fill_price=1_998.0,
+          fee_paid=0.2,
+          requested_amount=0.5,
+          filled_amount=0.2,
+          remaining_amount=0.3,
+        ),
+      ),
+    ),
     guarded_live_execution_enabled=True,
   )
 
@@ -1402,10 +1423,19 @@ def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp
   assert resumed.status == RunStatus.RUNNING
   assert resumed.provenance.runtime_session is not None
   assert resumed.provenance.runtime_session.recovery_count >= 1
+  assert resumed.orders[0].status == OrderStatus.PARTIALLY_FILLED
+  assert resumed.orders[0].filled_quantity == pytest.approx(0.2)
+  assert resumed.orders[0].remaining_quantity == pytest.approx(0.3)
+  assert len(resumed.fills) == 1
   assert any("guarded_live_worker_resumed" in note for note in resumed.notes)
+  assert any("guarded_live_venue_session_restored" in note for note in resumed.notes)
   assert resumed_status.ownership.state == "owned"
   assert resumed_status.ownership.owner_run_id == run.config.run_id
+  assert resumed_status.session_restore.state == "restored"
+  assert resumed_status.session_restore.source == "seeded_venue_execution"
+  assert resumed_status.session_restore.owner_run_id == run.config.run_id
   assert resumed_status.order_book.open_orders[0].order_id == recovered_order_id
+  assert resumed_status.order_book.open_orders[0].amount == pytest.approx(0.3)
   assert canceled.orders[0].status == OrderStatus.CANCELED
 
 

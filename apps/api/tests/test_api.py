@@ -8,9 +8,11 @@ from fastapi.testclient import TestClient
 from akra_trader.config import Settings
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Position
 from akra_trader.main import create_app
+from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 
 
 def build_client(
@@ -832,16 +834,46 @@ def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path
   assert status_payload["order_book"]["open_orders"][0]["order_id"] == "venue-open-order-1"
 
   with build_client(database_path, guarded_live_execution_enabled=True) as restarted_client:
+    restarted_client.app.state.container.app._venue_execution = SeededVenueExecutionAdapter(
+      restored_orders=(
+        GuardedLiveVenueOrderResult(
+          order_id="venue-open-order-1",
+          venue="binance",
+          symbol="ETH/USDT",
+          side="buy",
+          amount=0.5,
+          status="partially_filled",
+          submitted_at=datetime(2025, 1, 3, 21, 0, tzinfo=UTC),
+          updated_at=datetime(2025, 1, 3, 21, 5, tzinfo=UTC),
+          requested_price=2_000.0,
+          average_fill_price=1_998.0,
+          fee_paid=0.2,
+          requested_amount=0.5,
+          filled_amount=0.2,
+          remaining_amount=0.3,
+        ),
+      )
+    )
     resume_response = restarted_client.post(
       "/api/guarded-live/resume",
       json={"actor": "operator", "reason": "process_restart_resume"},
     )
+    resumed_status_response = restarted_client.get("/api/guarded-live")
 
   assert resume_response.status_code == 200
   resume_payload = resume_response.json()
   assert resume_payload["config"]["run_id"] == run_id
   assert resume_payload["status"] == "running"
   assert resume_payload["provenance"]["runtime_session"]["recovery_count"] >= 1
+  assert resume_payload["orders"][0]["status"] == "partially_filled"
+  assert resume_payload["orders"][0]["filled_quantity"] == 0.2
+  assert resume_payload["orders"][0]["remaining_quantity"] == 0.3
+  assert resumed_status_response.status_code == 200
+  resumed_status_payload = resumed_status_response.json()
+  assert resumed_status_payload["session_restore"]["state"] == "restored"
+  assert resumed_status_payload["session_restore"]["source"] == "seeded_venue_execution"
+  assert resumed_status_payload["session_restore"]["owner_run_id"] == run_id
+  assert resumed_status_payload["order_book"]["open_orders"][0]["amount"] == 0.3
 
 
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:

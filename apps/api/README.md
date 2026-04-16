@@ -32,12 +32,13 @@ Implemented now:
 - guarded-live operator actions can now cancel active venue orders or replace them with repriced
   limit orders from stored live run state
 - guarded-live control state now persists live session ownership and a durable open-order snapshot,
-  and guarded-live resume can reattach the owned live run after restart or fault drills
+  and guarded-live resume now restores the owned live run from venue-native order lifecycle state
+  before falling back to the persisted snapshot
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
 
-- full venue-native order-book restore and richer venue order management beyond cancel/replace
+- full venue-native stream/session handoff and richer venue order management beyond cancel/replace
 - external alert delivery and wider operator event storage
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -131,8 +132,8 @@ Defaults:
 - guarded-live operator controls can now cancel active venue orders or replace them with repriced
   limit orders while keeping local order history and audit state aligned
 - guarded-live control state now tracks owned live session identity plus a durable open-order
-  snapshot, and the explicit resume action can reattach that owned session after restart or fault
-  drills
+  snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
+  falling back to the persisted snapshot after restart or fault drills
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

@@ -9,6 +9,7 @@ from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
+from akra_trader.domain.models import GuardedLiveVenueSessionRestore
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
@@ -125,6 +126,13 @@ class VenueStatePort(Protocol):
 
 class VenueExecutionPort(Protocol):
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]: ...
+
+  def restore_session(
+    self,
+    *,
+    symbol: str,
+    owned_order_ids: tuple[str, ...],
+  ) -> GuardedLiveVenueSessionRestore: ...
 
   def submit_market_order(
     self,

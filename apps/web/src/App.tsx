@@ -421,6 +421,41 @@ type GuardedLiveStatus = {
     }[];
     issues: string[];
   };
+  session_restore: {
+    state: string;
+    restored_at?: string | null;
+    source: string;
+    venue?: string | null;
+    symbol?: string | null;
+    owner_run_id?: string | null;
+    owner_session_id?: string | null;
+    open_orders: {
+      order_id: string;
+      symbol: string;
+      side: string;
+      amount: number;
+      status: string;
+      price?: number | null;
+    }[];
+    synced_orders: {
+      order_id: string;
+      venue: string;
+      symbol: string;
+      side: string;
+      amount: number;
+      status: string;
+      submitted_at: string;
+      updated_at?: string | null;
+      requested_price?: number | null;
+      average_fill_price?: number | null;
+      fee_paid?: number | null;
+      requested_amount?: number | null;
+      filled_amount?: number | null;
+      remaining_amount?: number | null;
+      issues: string[];
+    }[];
+    issues: string[];
+  };
   audit_events: {
     event_id: string;
     timestamp: string;
@@ -1047,6 +1082,7 @@ export default function App() {
       latestReconciliationAt: guardedLive.reconciliation.checked_at ?? null,
       latestRecoveryAt: guardedLive.recovery.recovered_at ?? null,
       latestOrderSyncAt: guardedLive.order_book.synced_at ?? guardedLive.ownership.last_order_sync_at ?? null,
+      latestSessionRestoreAt: guardedLive.session_restore.restored_at ?? null,
     };
   }, [guardedLive]);
 
@@ -1692,6 +1728,10 @@ export default function App() {
                     <strong>{formatTimestamp(guardedLiveSummary.latestOrderSyncAt)}</strong>
                   </div>
                   <div className="metric-tile">
+                    <span>Session restore</span>
+                    <strong>{guardedLive.session_restore.state}</strong>
+                  </div>
+                  <div className="metric-tile">
                     <span>Latest audit</span>
                     <strong>{formatTimestamp(guardedLiveSummary.latestAuditAt)}</strong>
                   </div>
@@ -1783,6 +1823,18 @@ export default function App() {
                       <tr>
                         <th>Last order sync</th>
                         <td>{formatTimestamp(guardedLive.ownership.last_order_sync_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Restore state</th>
+                        <td>{guardedLive.session_restore.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Restore source</th>
+                        <td>{guardedLive.session_restore.source}</td>
+                      </tr>
+                      <tr>
+                        <th>Restored at</th>
+                        <td>{formatTimestamp(guardedLiveSummary?.latestSessionRestoreAt ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Reconciliation scope</th>
@@ -2045,6 +2097,69 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">No recovered venue orders recorded.</p>
+                  )}
+                  <h3>Venue-native session restore</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>State</th>
+                        <td>{guardedLive.session_restore.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Source</th>
+                        <td>{guardedLive.session_restore.source}</td>
+                      </tr>
+                      <tr>
+                        <th>Restored at</th>
+                        <td>{formatTimestamp(guardedLive.session_restore.restored_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Venue</th>
+                        <td>{guardedLive.session_restore.venue ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Symbol</th>
+                        <td>{guardedLive.session_restore.symbol ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner run</th>
+                        <td>{guardedLive.session_restore.owner_run_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner session</th>
+                        <td>{guardedLive.session_restore.owner_session_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Issues</th>
+                        <td>{guardedLive.session_restore.issues.length ? guardedLive.session_restore.issues.join(", ") : "none"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {guardedLive.session_restore.synced_orders.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Status</th>
+                          <th>Filled</th>
+                          <th>Remaining</th>
+                          <th>Updated</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.session_restore.synced_orders.map((order) => (
+                          <tr key={`restored-${order.order_id}`}>
+                            <td>{order.order_id}</td>
+                            <td>{order.status}</td>
+                            <td>{(order.filled_amount ?? 0).toFixed(8)}</td>
+                            <td>{(order.remaining_amount ?? 0).toFixed(8)}</td>
+                            <td>{formatTimestamp(order.updated_at ?? null)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No venue-native session lifecycle rows restored yet.</p>
                   )}
                   <h3>Durable order book</h3>
                   <table className="data-table">

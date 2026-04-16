@@ -567,6 +567,7 @@ class GuardedLiveVenueOrderResult:
   status: str
   submitted_at: datetime
   updated_at: datetime | None = None
+  requested_price: float | None = None
   average_fill_price: float | None = None
   fee_paid: float | None = None
   requested_amount: float | None = None
@@ -635,6 +636,20 @@ class GuardedLiveOrderBookSync:
 
 
 @dataclass(frozen=True)
+class GuardedLiveVenueSessionRestore:
+  state: str = "not_restored"
+  restored_at: datetime | None = None
+  source: str = "none"
+  venue: str | None = None
+  symbol: str | None = None
+  owner_run_id: str | None = None
+  owner_session_id: str | None = None
+  open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
+  synced_orders: tuple[GuardedLiveVenueOrderResult, ...] = ()
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveReconciliation:
   state: str = "not_started"
   checked_at: datetime | None = None
@@ -653,6 +668,7 @@ class GuardedLiveState:
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
   ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
   order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
+  session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -666,6 +682,7 @@ class GuardedLiveStatus:
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
   ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
   order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
+  session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
   active_runtime_alert_count: int = 0
   running_sandbox_count: int = 0
