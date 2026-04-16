@@ -238,6 +238,7 @@ const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansio
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
+const COMPARISON_TOOLTIP_RELATIVE_TIME_REFRESH_MS = 15 * 1000;
 
 type ControlRoomUiStateV1 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
@@ -2998,6 +2999,9 @@ function ComparisonTooltipTuningPanel({
     useState(false);
   const [expandedSavedConflictSessionSummaryGroups, setExpandedSavedConflictSessionSummaryGroups] =
     useState<Record<string, boolean>>({});
+  const [savedConflictSessionSummaryNowMs, setSavedConflictSessionSummaryNowMs] = useState(() =>
+    Date.now(),
+  );
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
@@ -3029,6 +3033,7 @@ function ComparisonTooltipTuningPanel({
   const savedConflictSessionSummaries = buildComparisonTooltipConflictSessionSummaries(
     conflictSessionUiStateMap,
     conflictSessionKey,
+    savedConflictSessionSummaryNowMs,
   );
   const visibleSavedConflictSessionSummaries = savedConflictSessionSummaries.slice(
     0,
@@ -3041,6 +3046,9 @@ function ComparisonTooltipTuningPanel({
   const displayedSavedConflictSessionSummaries = showAllSavedConflictSessionSummaries
     ? savedConflictSessionSummaries
     : visibleSavedConflictSessionSummaries;
+  const hasTimestampedSavedConflictSessions = savedConflictSessionSummaries.some((summary) =>
+    summary.sessions.some((session) => Boolean(session.updated_at)),
+  );
   const showUnchangedConflictRows =
     currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
   const collapsedUnchangedConflictGroups =
@@ -3074,6 +3082,18 @@ function ComparisonTooltipTuningPanel({
       setExpandedSavedConflictSessionSummaryGroups({});
     }
   }, [isConfirmingResetAllConflictViews]);
+
+  useEffect(() => {
+    if (!isConfirmingResetAllConflictViews || !hasTimestampedSavedConflictSessions) {
+      return;
+    }
+    setSavedConflictSessionSummaryNowMs(Date.now());
+    const intervalId = window.setInterval(
+      () => setSavedConflictSessionSummaryNowMs(Date.now()),
+      COMPARISON_TOOLTIP_RELATIVE_TIME_REFRESH_MS,
+    );
+    return () => window.clearInterval(intervalId);
+  }, [hasTimestampedSavedConflictSessions, isConfirmingResetAllConflictViews]);
 
   const updateCurrentConflictSessionUiState = (
     updater: (
@@ -3161,6 +3181,7 @@ function ComparisonTooltipTuningPanel({
     setIsConfirmingResetAllConflictViews(true);
     setShowAllSavedConflictSessionSummaries(false);
     setExpandedSavedConflictSessionSummaryGroups({});
+    setSavedConflictSessionSummaryNowMs(Date.now());
     onSetShareFeedback(null);
   };
 
@@ -4181,6 +4202,7 @@ function buildComparisonTooltipConflictSessionKey(
 function buildComparisonTooltipConflictSessionSummaries(
   sessions: Record<string, ComparisonTooltipConflictSessionUiState>,
   currentConflictSessionKey: string | null,
+  referenceNowMs: number,
 ): ComparisonTooltipConflictSessionSummary[] {
   const groupedSessions = Object.keys(sessions).reduce<
     Record<string, Omit<ComparisonTooltipConflictSessionSummary, "label">>
@@ -4244,6 +4266,7 @@ function buildComparisonTooltipConflictSessionSummaries(
           metadata: formatComparisonTooltipConflictSessionMetadata(
             sessions[session.session_key],
             session.hash,
+            referenceNowMs,
           ),
         })),
     }));
@@ -4286,9 +4309,12 @@ function formatComparisonTooltipConflictSessionSummarySession(
 function formatComparisonTooltipConflictSessionMetadata(
   session: ComparisonTooltipConflictSessionUiState,
   hash: string | null,
+  referenceNowMs: number,
 ) {
   const metadata: string[] = [];
-  metadata.push(formatComparisonTooltipConflictSessionUpdatedAtLabel(session.updated_at));
+  metadata.push(
+    formatComparisonTooltipConflictSessionUpdatedAtLabel(session.updated_at, referenceNowMs),
+  );
   metadata.push(
     session.show_unchanged_conflict_rows ? "unchanged rows visible" : "unchanged rows hidden",
   );
@@ -4325,13 +4351,16 @@ function parseComparisonTooltipConflictSessionUpdatedAt(value: string | null) {
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function formatComparisonTooltipConflictSessionUpdatedAtLabel(value: string | null) {
+function formatComparisonTooltipConflictSessionUpdatedAtLabel(
+  value: string | null,
+  referenceNowMs: number,
+) {
   const timestamp = parseComparisonTooltipConflictSessionUpdatedAt(value);
   if (!timestamp) {
     return "updated time unavailable";
   }
   const date = new Date(timestamp);
-  const now = new Date();
+  const now = new Date(referenceNowMs);
   const absoluteLabel = new Intl.DateTimeFormat(undefined, {
     ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
     day: "numeric",
