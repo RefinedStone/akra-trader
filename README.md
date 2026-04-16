@@ -78,3 +78,8 @@ If `freqtrade` is not installed, the platform records the prepared command and r
 ## Docs
 
 - [Architecture](docs/architecture.md)
+- [Roadmap Overview](docs/roadmap/README.md)
+- [Product Roadmap](docs/roadmap/product-roadmap.md)
+- [Technical Roadmap](docs/roadmap/technical-roadmap.md)
+- [Epic Backlog](docs/roadmap/epic-backlog.md)
+- [ADR Index](docs/adr/README.md)
