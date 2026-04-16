@@ -104,7 +104,14 @@ type MarketDataStatus = {
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
-const GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
+const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
+const CONTROL_ROOM_UI_STATE_VERSION = 1;
+const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
+
+type ControlRoomUiStateV1 = {
+  version: typeof CONTROL_ROOM_UI_STATE_VERSION;
+  expandedGapRows: Record<string, boolean>;
+};
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -600,23 +607,32 @@ function pruneExpandedGapRows(
 }
 
 function loadExpandedGapRows() {
+  const persistedState = loadControlRoomUiState();
+  if (persistedState) {
+    return persistedState.expandedGapRows;
+  }
+  return loadLegacyExpandedGapRows();
+}
+
+function loadControlRoomUiState() {
   if (typeof window === "undefined") {
-    return {};
+    return null;
   }
   try {
-    const raw = window.localStorage.getItem(GAP_WINDOW_EXPANSION_STORAGE_KEY);
+    const raw = window.localStorage.getItem(CONTROL_ROOM_UI_STATE_STORAGE_KEY);
     if (!raw) {
-      return {};
+      return null;
     }
     const parsed = JSON.parse(raw);
-    if (!parsed || typeof parsed !== "object") {
-      return {};
+    if (!isControlRoomUiStateV1(parsed)) {
+      return null;
     }
-    return Object.fromEntries(
-      Object.entries(parsed).filter((entry): entry is [string, boolean] => entry[1] === true),
-    );
+    return {
+      version: parsed.version,
+      expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+    };
   } catch {
-    return {};
+    return null;
   }
 }
 
@@ -625,13 +641,57 @@ function persistExpandedGapRows(value: Record<string, boolean>) {
     return;
   }
   try {
+    const nextState: ControlRoomUiStateV1 = {
+      version: CONTROL_ROOM_UI_STATE_VERSION,
+      expandedGapRows: filterExpandedGapRows(value),
+    };
     window.localStorage.setItem(
-      GAP_WINDOW_EXPANSION_STORAGE_KEY,
-      JSON.stringify(value),
+      CONTROL_ROOM_UI_STATE_STORAGE_KEY,
+      JSON.stringify(nextState),
     );
+    window.localStorage.removeItem(LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY);
   } catch {
     return;
   }
+}
+
+function loadLegacyExpandedGapRows() {
+  if (typeof window === "undefined") {
+    return {};
+  }
+  try {
+    const raw = window.localStorage.getItem(LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") {
+      return {};
+    }
+    return filterExpandedGapRows(parsed);
+  } catch {
+    return {};
+  }
+}
+
+function filterExpandedGapRows(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).filter((entry): entry is [string, boolean] => entry[1] === true),
+  );
+}
+
+function isControlRoomUiStateV1(value: unknown): value is ControlRoomUiStateV1 {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ControlRoomUiStateV1>;
+  return (
+    candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
+    candidate.expandedGapRows !== undefined
+  );
 }
 
 function StrategyColumn({
