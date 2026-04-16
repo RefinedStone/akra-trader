@@ -1124,20 +1124,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-per-group-expansion",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Add per-group expansion within the saved reset summary",
-      "description": "Refine the `Reset all saved views` confirmation summary so operators can expand one preset group at a time to inspect the saved sessions inside that group without having to fully expand the entire saved-session list at once.",
-      "status": "ready",
+      "title": "Per-group expansion within the saved reset summary shipped",
+      "description": "Completed the reset-summary detail follow-up by adding per-preset-group `Show ... sessions` / `Hide sessions` controls inside the destructive reset confirmation card, revealing each saved session entry with short session ids plus a `current` marker when expanded, and resetting per-group expansion state whenever the confirmation card closes or reopens.",
+      "status": "done",
       "base_priority": 77,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed full-list expansion task and explicitly identified per-group expansion for the saved reset summary as the likeliest next refinement, making it the clearest immediately executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the per-group reset-summary expansion refinement in the tooltip conflict clear-confirmation card, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `b884c27` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:32:07Z",
+      "updated_at": "2026-04-16T18:34:55Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-reset-all-expand-full-list"
       ],
       "direction_relation_note": "Builds on the shipped reset-summary expansion card by preserving the compact grouped overview while letting operators inspect individual preset groups in detail before a destructive reset."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-session-metadata",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Show clearer per-session metadata in the saved reset summary",
+      "description": "Refine the `Reset all saved views` confirmation summary so expanded saved sessions show more informative per-session metadata than a short saved-session id alone, such as when the session was first stored or which conflict layout choices it remembers.",
+      "status": "ready",
+      "base_priority": 78,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed per-group expansion task and explicitly identified clearer per-session metadata than the short saved-session id as the likeliest next refinement, making it the clearest immediately executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T18:34:55Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-per-group-expansion"
+      ],
+      "direction_relation_note": "Builds on the shipped per-group reset-summary expansion by making the saved-session entries themselves more legible, so operators can distinguish remembered conflict-view sessions by meaningful metadata before a destructive reset."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-contextual-reset-scopes",
