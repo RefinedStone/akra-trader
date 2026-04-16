@@ -1,4 +1,129 @@
 {
   "version": 1,
-  "tasks": []
+  "tasks": [
+    {
+      "id": "planning-data-trust-dataset-identity-hardening",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Harden dataset identity and reproducibility boundaries",
+      "description": "Make each run point to a stable dataset or sync-checkpoint identity, close the remaining reproducibility gap called out in current-state, and extend market-data lineage or status so rerun equivalence can be validated without shell-only inspection.",
+      "status": "ready",
+      "base_priority": 100,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Current-state lists reproducibility and dataset lineage hardening as Immediate Next Priority 1, and the blueprint dependency order puts dataset identity ahead of experiment query, lifecycle, runtime ops, and live-readiness work.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly satisfies the data-trust direction's first success criterion and unlocks Gate 1 prerequisites for the rest of Program 1."
+    },
+    {
+      "id": "planning-experiment-os-queryable-metadata",
+      "direction_id": "experiment-os",
+      "title": "Add durable experiment metadata for tags, presets, and comparison filters",
+      "description": "Move beyond payload-centric run lookup by adding durable run metadata and query paths for dataset identity, tags, preset selection, benchmark family, and richer comparison or export support so experiment retrieval matches Program Phase 1 expectations.",
+      "status": "proposed",
+      "base_priority": 92,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Current-state lists Stage 2 experiment workflow completion as Immediate Next Priority 2, but backlog ordering keeps this behind dataset identity hardening.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Covers the experiment-os requirement that runs be filterable by dataset, preset, tag, benchmark family, and version through durable metadata."
+    },
+    {
+      "id": "planning-experiment-os-strategy-lifecycle-registration",
+      "direction_id": "experiment-os",
+      "title": "Make strategy lifecycle and registration durable across restarts",
+      "description": "Replace the current process-local strategy registration behavior with durable strategy records and lifecycle states such as draft, benchmark candidate, sandbox candidate, live candidate, and archived so promotion decisions become queryable product state instead of static metadata.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Gate 1 and Program Phase 1 both require durable lifecycle state, but the blueprint places it after dataset identity and basic experiment metadata completion.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening",
+        "planning-experiment-os-queryable-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly targets the experiment-os success criterion that strategy registration and lifecycle state remain durable and queryable across restarts."
+    },
+    {
+      "id": "planning-runtime-ops-worker-session-foundation",
+      "direction_id": "runtime-ops",
+      "title": "Replace sandbox preview semantics with worker session state, heartbeat, and recovery",
+      "description": "Introduce a real worker or session model separate from preview runs, then add heartbeat, restart recovery, and operator-visible runtime state so sandbox stops being a replay preview and can satisfy Gate 2 semantics.",
+      "status": "proposed",
+      "base_priority": 84,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Current-state lists the long-running worker model as Immediate Next Priority 3, but Program 2 is downstream of Program 1 reproducibility and experiment-state work.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Matches runtime-ops success criteria around separating preview and active sessions while surfacing heartbeat and recoverable health."
+    },
+    {
+      "id": "planning-operator-trust-alerts-and-event-log",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add operator alerts and structured operator-event visibility",
+      "description": "Create the operator-facing alert and event substrate for stale data, sync failures, worker failures, and promotion decisions so daily and incident workflows can be handled from product surfaces rather than shell knowledge.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Current-state lists alerts and operator events as Immediate Next Priority 4 before live-path work, but they should sit behind initial worker-session and data-trust foundations.",
+      "depends_on": [
+        "planning-runtime-ops-worker-session-foundation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advances the operator-trust direction by giving the control room actionable answers about what is running, what failed, and what the operator should do next."
+    },
+    {
+      "id": "planning-guarded-live-audit-and-reconciliation-substrate",
+      "direction_id": "guarded-live-execution",
+      "title": "Establish audit, kill-switch, and reconciliation primitives before live candidacy",
+      "description": "Build the safety substrate that blocks live-affecting actions unless audit capture, operator-event logging, kill-switch controls, and reconciliation flows are present, keeping live readiness separate from sandbox worker readiness.",
+      "status": "proposed",
+      "base_priority": 76,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Blueprint and current-state both say live-path work must remain blocked until audit and reconciliation primitives exist, so this is a valid follow-up but not yet the queue head.",
+      "depends_on": [
+        "planning-operator-trust-alerts-and-event-log"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly targets guarded-live-execution success criteria by making live candidacy an explicit gated safety program rather than an execution shortcut."
+    },
+    {
+      "id": "planning-intelligence-research-trace-replay-fallback",
+      "direction_id": "intelligence-research-lane",
+      "title": "Keep the LLM lane isolated until trace, replay, and fallback are real features",
+      "description": "Implement the minimum research-lane substrate for prompt versioning, raw trace storage, replay or evaluation hooks, and mandatory deterministic fallback or human review so DecisionEnginePort stops being only an interface skeleton.",
+      "status": "proposed",
+      "base_priority": 72,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Current-state lists LLM isolation with trace storage, replay, and fallback as Immediate Next Priority 5, but the roadmap treats it as downstream of research-core and runtime-operability foundations.",
+      "depends_on": [
+        "planning-data-trust-dataset-identity-hardening"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T19:20:10Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Matches the intelligence-research-lane success criteria that every intelligence run be traceable and blocked from promotion without fallback or review."
+    }
+  ]
 }
