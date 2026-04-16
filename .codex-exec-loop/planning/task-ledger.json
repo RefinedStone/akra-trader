@@ -693,19 +693,55 @@
       "id": "planning-reference-lanes-tooltip-hover-intent-stability",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Reduce comparison tooltip jitter across dense metric cells",
-      "description": "Stabilize the new edge-aware comparison tooltip system for dense table interactions by adding a tiny show delay, hover-intent threshold, or equivalent pointer-transfer buffering so metric-cell tooltips do not flicker or jump excessively while operators move across adjacent comparison cues, without regressing keyboard focus behavior or the accessible tooltip semantics.",
-      "status": "ready",
+      "description": "Completed the dense-table tooltip stability follow-up by adding metric-cell-specific hover-intent timing, delaying mouse-triggered tooltip open slightly, delaying close briefly on leave, canceling pending open/close timers when focus or Escape takes over, and keeping non-table comparison cues plus keyboard-triggered tooltip behavior immediate.",
+      "status": "done",
       "base_priority": 82,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply said nothing essential remains for tooltip placement and directly named reduced tooltip jitter across dense comparison cells, such as a tiny show delay or hover-intent threshold, as the likely next refinement, so this is now the clearest executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the metric-cell hover-intent stability work in `App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `d32bd81` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:10:00Z",
+      "updated_at": "2026-04-17T05:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-placement-edge-awareness"
       ],
       "direction_relation_note": "Builds on the completed edge-aware tooltip placement by making dense reference-lane comparison tables feel stable during pointer movement instead of trading readable placement for hover jitter."
+    },
+    {
+      "id": "planning-reference-lanes-directional-pointer-intent",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Suppress tooltip swaps during quick horizontal sweeps across comparison cells",
+      "description": "Completed the directional pointer-intent follow-up by sampling recent metric-cell pointer movement, detecting quick horizontally dominant sweeps across adjacent comparison cells, and applying a longer hover-open delay only during those sweeps so the prior tooltip stays stable while preserving immediate keyboard focus and non-metric cue behavior.",
+      "status": "done",
+      "base_priority": 83,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the directional pointer-intent sweep suppression in `App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `e9d8fb9` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:35:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-hover-intent-stability"
+      ],
+      "direction_relation_note": "Builds on the completed hover-intent stabilization by making dense reference-lane comparison tables distinguish deliberate inspection from fast row-wise scanning, further reducing tooltip churn in the highest-noise interaction path."
+    },
+    {
+      "id": "planning-reference-lanes-row-aware-tooltip-suppression",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make comparison tooltip sweep suppression aware of metric-row context",
+      "description": "Refine the new directional sweep suppression so metric-cell tooltip behavior distinguishes staying within one metric row from jumping between rows with different semantic context, reducing over-suppression during same-row scans while still damping noisy cross-row tooltip swaps in dense comparison tables.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains for directional sweep suppression and directly identified row-aware suppression as the likely next refinement, so this is now the clearest executable follow-up for the comparison tooltip lane.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T05:35:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-directional-pointer-intent"
+      ],
+      "direction_relation_note": "Builds on the completed directional sweep suppression by aligning dense comparison-table tooltip behavior with metric-row semantic boundaries instead of treating all pointer sweeps as equally suppressible."
     }
   ]
 }
