@@ -818,20 +818,38 @@
     {
       "id": "planning-reference-lanes-tooltip-tuning-preset-persistence",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Persist dev tooltip tuning presets for repeatable comparison sessions",
-      "description": "Persist the dev-only comparison tooltip tuning values across sessions, preferably through `localStorage` or shareable URL params, so operators can reopen or exchange the same sweep-threshold calibration without re-entering the panel values each time.",
-      "status": "ready",
+      "title": "Dev tooltip tuning presets now persist for repeatable comparison sessions",
+      "description": "Completed the dev-only tooltip tuning persistence follow-up by storing the current draft tuning values, named presets, and selected preset in `localStorage`, adding save/load/delete preset controls to the tuning panel, and restoring persisted data through versioned normalization so malformed or outdated browser state falls back safely to default tuning.",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the tuning-panel task and explicitly named persisted dev presets via local storage or URL params as the likeliest next refinement, making it the clearest executable successor task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the preset persistence work in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `bdcab63` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T17:37:01Z",
+      "updated_at": "2026-04-16T17:41:33Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-dev-tooltip-threshold-tuning-panel"
       ],
       "direction_relation_note": "Extends the reference-lane tooltip calibration loop from one-off local tuning toward repeatable operator comparisons by making chosen sweep settings durable or shareable across sessions."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-preset-portability",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add preset import/export or URL-backed sharing for tooltip tuning profiles",
+      "description": "Extend the dev-only tooltip tuning preset workflow so saved calibration profiles can move across machines, preferably through import/export payloads or URL-backed sharing, while preserving the current local draft-versus-saved-preset model and keeping malformed shared payloads safely normalized or rejected.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply said nothing essential remains for local preset persistence and explicitly named preset import/export or URL-backed sharing as the likeliest next refinement, making portability the clearest executable successor task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T17:41:33Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-tuning-preset-persistence"
+      ],
+      "direction_relation_note": "Builds on the completed local preset persistence by making reference-lane tooltip calibration profiles portable across operators and machines instead of remaining browser-local."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
