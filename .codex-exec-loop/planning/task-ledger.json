@@ -422,19 +422,37 @@
       "id": "planning-reference-lanes-freqtrade-zip-artifact-inspection",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Inspect Freqtrade zip artifacts directly for benchmark provenance",
-      "description": "Extend the Freqtrade benchmark artifact enrichment path to inspect zip contents directly, including candidates like `_config.json`, wallet feather outputs, and signal/rejected/exited exports, so reference-lane provenance can summarize benchmark-native evidence that does not appear in only the manifest and result JSON layers.",
-      "status": "ready",
+      "description": "Completed the direct zip-inspection follow-up by teaching the Freqtrade reference adapter to open benchmark `.zip` artifacts directly, extract provenance from embedded result/config JSON plus strategy bundles and source files, record export presence for wallet/market-change/signals/rejected/exited artifacts, surface the new `zip_contents`, `zip_config`, and `zip_strategy_bundle` sections through benchmark artifact payloads and control-room labels, and cover both direct zip inspection and root-level provenance fallback with adapter tests.",
+      "status": "done",
       "base_priority": 78,
-      "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply said nothing essential remains for nested section parsing and named direct zip-content inspection as the clearest later refinement, so it should now become the next immediately executable queue-head task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the direct Freqtrade zip-artifact inspection work, verified `apps/api` with `./.venv/bin/python -m pytest` (`37 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `9347fbf` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:00:00Z",
+      "updated_at": "2026-04-17T02:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-freqtrade-nested-summary-parsing"
       ],
       "direction_relation_note": "Advances the reference benchmark lane from parsed result summaries toward fuller benchmark provenance by reading the packaged Freqtrade evidence operators actually export and inspect."
+    },
+    {
+      "id": "planning-reference-lanes-freqtrade-binary-export-inspection",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Inspect embedded Freqtrade feather and pickle exports for benchmark provenance",
+      "description": "Extend the Freqtrade zip-artifact enrichment path beyond export presence checks to inspect embedded binary `.feather` and `.pkl` benchmark exports themselves, extracting safe provenance signals such as schema, row counts, strategy/runtime metadata, and recognizable payload summaries so reference-lane artifact sections reflect the actual contents of packaged wallet and analysis bundles rather than only their filenames.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply said nothing essential remains from direct zip inspection and named binary inspection of embedded `.feather` and `.pkl` exports as the next later refinement, so this should become the next immediately executable queue-head task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T02:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-freqtrade-zip-artifact-inspection"
+      ],
+      "direction_relation_note": "Extends the reference benchmark lane from zip-level inventory into deeper benchmark-native provenance by reading the packaged binary exports that still remain opaque to operators and comparison views."
     }
   ]
 }
