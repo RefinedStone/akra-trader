@@ -353,16 +353,34 @@
       "id": "planning-reference-lanes-reference-run-provenance",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Persist reference-run provenance and artifact links for benchmark comparisons",
-      "description": "Build the next benchmark-comparison follow-up by extending stored reference-lane runs so NFI or other external-runtime benchmarks retain imported provenance, external command details, artifact links, reference identity, and adoption posture in the shared repository model, making those reference-only fields available to comparison surfaces without blurring them into native runs.",
-      "status": "ready",
+      "description": "Completed the benchmark-comparison provenance follow-up by persisting reference catalog snapshots into reference-lane run provenance, preserving benchmark-specific provenance and deterministic artifact paths in comparison payloads, teaching the Freqtrade adapter to retain expected result/log locations even when `freqtrade` is unavailable, and exposing the new provenance across control-room run and comparison views.",
+      "status": "done",
       "base_priority": 74,
-      "dynamic_priority_delta": 15,
-      "priority_reason": "The compare-runs workflow is now complete, and the clearest executable follow-up from the latest main-session reply is richer comparison context via artifact links and preserved benchmark provenance so reference lanes stay explicit while comparisons deepen.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the reference-run provenance and artifact-link follow-up, verified it with `.venv/bin/python -m pytest` (`34 passed`), `npm run typecheck`, and `npm run build`, and pushed commit `fe96a26` to `main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:05:00Z",
+      "updated_at": "2026-04-17T01:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the reference-lanes success criteria that reference runs stay explicit and traceable rather than becoming hidden native equivalents."
+    },
+    {
+      "id": "planning-reference-lanes-benchmark-artifact-typing",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Promote flat reference artifact paths into typed benchmark artifacts",
+      "description": "Parse Freqtrade benchmark result manifests and related outputs into richer typed benchmark artifacts so reference-lane provenance and comparison surfaces can distinguish summary JSON, signals exports, logs, and other artifact kinds instead of showing a flat path list, while preserving deterministic locations when files are absent.",
+      "status": "ready",
+      "base_priority": 75,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply explicitly identified manifest parsing and explicit artifact-kind labeling as the next refinement after provenance shipping, making this the clearest immediately executable queue-head follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-reference-run-provenance"
+      ],
+      "direction_relation_note": "Advances the reference-lanes benchmark surface from generic artifact links toward operator-meaningful benchmark evidence without collapsing external-runtime runs into native semantics."
     }
   ]
 }
