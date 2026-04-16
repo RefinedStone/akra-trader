@@ -603,19 +603,37 @@
       "id": "planning-reference-lanes-intent-aware-iconography-and-legend",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Add intent-aware iconography and compact legend cues to comparison mode",
-      "description": "Extend the completed intent-aware comparison styling with lightweight iconography and a compact legend so `benchmark_validation`, `execution_regression`, and `strategy_tuning` remain recognizable at a glance even before an operator reads the narrative copy, while keeping the cues consistent with the existing intent-specific CSS classes and comparison emphasis system.",
-      "status": "ready",
+      "description": "Completed the intent-aware comparison cue follow-up by adding intent-specific icons to the comparison header and mode chip, introducing a compact legend for current intent, baseline run, best metric, and top insight cues, reusing the same legend treatment in the featured insight area, and styling all three comparison intents with consistent swatches and iconography in the web UI.",
+      "status": "done",
       "base_priority": 85,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply said nothing essential remains for visual emphasis and directly identified intent-aware iconography or compact legends as the likely next refinement, making this the clearest executable follow-up for the queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the intent-aware iconography and legend implementation in `App.tsx` and `styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `7d2804e` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T04:36:00Z",
+      "updated_at": "2026-04-17T04:41:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-intent-aware-visual-emphasis"
       ],
       "direction_relation_note": "Builds on the intent-aware comparison visual system by adding faster-recognition cues so benchmark-comparison mode stays legible even when operators scan the panel before reading detailed text."
+    },
+    {
+      "id": "planning-reference-lanes-intent-aware-hover-tooltips",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add intent-aware hover states and tooltip copy for comparison cues",
+      "description": "Extend the completed comparison iconography and legend work with intent-aware hover states or tooltip copy so operators can tell why a metric cell, baseline card, or top insight is emphasized, not just what the visual cue represents, while keeping the explanations aligned with `benchmark_validation`, `execution_regression`, and `strategy_tuning` semantics.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the iconography task and directly identified intent-aware hover states or tooltip copy as the likely next refinement, so this is the clearest executable follow-up to keep comparison mode progressing.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:42:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-intent-aware-iconography-and-legend"
+      ],
+      "direction_relation_note": "Builds on the completed comparison legend cues by making the benchmark-comparison emphasis self-explaining on hover, so operators can interpret why the UI is calling attention to a result without inferring the meaning from styling alone."
     }
   ]
 }
