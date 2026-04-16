@@ -494,20 +494,56 @@
       "id": "planning-reference-lanes-benchmark-comparison-narratives",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Explain native-vs-reference benchmark divergence with comparison-level narratives",
-      "description": "Build on the newly shipped per-artifact `benchmark_story` summaries so run comparison payloads and operator-facing views explain how a native run diverges from a reference benchmark at comparison level, highlighting headline performance deltas, breadth/participation differences, wallet concentration drift, signal bias shifts, rejection friction gaps, and exit-posture differences instead of narrating each benchmark artifact in isolation.",
-      "status": "ready",
+      "description": "Completed the comparison-narrative follow-up by extending native-vs-reference run comparison payloads with structured comparison-level `narratives`, teaching the application layer to classify native/reference pairings and synthesize divergence headlines, summaries, and supporting bullets with fallback to reference benchmark artifact summaries, then surfacing the resulting narrative cards above the metric table in the control room with API and application regression coverage.",
+      "status": "done",
       "base_priority": 82,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed benchmark-story task and explicitly identified comparison-level narratives about how a native run diverges from a reference benchmark as the likely next refinement, so this becomes the next executable queue-head task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the comparison-level divergence narratives, verified `apps/api` with `./.venv/bin/python -m pytest` (`38 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `9fb1958` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T03:10:00Z",
+      "updated_at": "2026-04-17T03:25:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-freqtrade-benchmark-narratives",
         "planning-research-foundation-run-comparison-workflow"
       ],
       "direction_relation_note": "Advances the reference benchmark lane from isolated benchmark storytelling into direct native-versus-reference interpretation so operators can understand divergence without manually reconciling separate summaries."
+    },
+    {
+      "id": "planning-reference-lanes-multi-run-narrative-ranking",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Rank multi-run divergence narratives so comparisons surface the top insight first",
+      "description": "Completed the multi-run ranking follow-up by scoring comparison-level divergence narratives with `insight_score`, annotating each narrative with `rank` and `is_primary`, ordering multi-run insights by return, drawdown, win-rate, trade-flow, and native-vs-reference context, and surfacing the top-ranked narrative first in the control room with regression coverage for both application ordering and API payload fields.",
+      "status": "done",
+      "base_priority": 83,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the multi-run divergence narrative ranking, verified `apps/api` with `./.venv/bin/python -m pytest` (`39 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `6ea5716` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T03:40:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-benchmark-comparison-narratives"
+      ],
+      "direction_relation_note": "Extends the reference benchmark comparison surface from per-run divergence explanations into operator-prioritized storytelling for multi-run benchmark sessions where the most important divergence should appear first."
+    },
+    {
+      "id": "planning-reference-lanes-regime-aware-narrative-ranking",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make divergence narrative ranking regime-aware by comparison intent",
+      "description": "Refine the newly shipped `insight_score` ordering so benchmark validation, execution regression, and strategy-tuning comparisons can weight drawdown, trade-flow, and related signals differently, with explicit comparison-intent heuristics or inputs, deterministic ranking behavior, and regression coverage that proves the top insight changes appropriately by regime.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed ranking work and explicitly called out regime-aware weighting as the likely next refinement, making this the clearest executable follow-up for the benchmark comparison queue.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T03:40:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-multi-run-narrative-ranking"
+      ],
+      "direction_relation_note": "Extends the reference benchmark comparison surface from one-size-fits-all insight ordering into intent-aware prioritization so operators see the most relevant divergence first for the kind of comparison they are running."
     }
   ]
 }
