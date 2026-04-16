@@ -10,6 +10,7 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
+from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
@@ -295,6 +296,10 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.runs[1].benchmark_artifacts
   assert all(isinstance(artifact.summary, dict) for artifact in comparison.runs[1].benchmark_artifacts)
   assert all(isinstance(artifact.sections, dict) for artifact in comparison.runs[1].benchmark_artifacts)
+  assert len(comparison.narratives) == 1
+  assert comparison.narratives[0].comparison_type == "native_vs_reference"
+  assert comparison.narratives[0].run_id == reference_run.config.run_id
+  assert "persisted reference benchmark provenance" in comparison.narratives[0].summary
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
     "total_return_pct",
@@ -305,6 +310,73 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert metric_rows["total_return_pct"].values[native_run.config.run_id] == native_run.metrics["total_return_pct"]
   assert reference_run.config.run_id in metric_rows["trade_count"].values
   assert comparison.runs[1].notes
+
+
+def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = build_references()
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=references,
+    runs=runs,
+    freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+  )
+
+  native_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  reference_run = app.run_backtest(
+    strategy_id="nfi_x7_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  reference_run.provenance.benchmark_artifacts = (
+    BenchmarkArtifact(
+      kind="result_snapshot_root",
+      label="Backtest results root",
+      path="/tmp/reference/backtest_results",
+      summary={
+        "strategy_name": "NostalgiaForInfinityX7",
+        "profit_total_pct": 12.4,
+        "max_drawdown_pct": 7.2,
+        "trade_count": 36,
+      },
+      sections={
+        "benchmark_story": {
+          "headline": "NostalgiaForInfinityX7 returned 12.4% across 36 trades with 7.2% max drawdown.",
+          "signal_context": "Signal exports captured 36 rows across 10 pairs.",
+        },
+      },
+    ),
+  )
+  runs.save_run(reference_run)
+
+  comparison = app.compare_runs(run_ids=[native_run.config.run_id, reference_run.config.run_id])
+
+  metric_rows = {row.key: row for row in comparison.metric_rows}
+  assert metric_rows["total_return_pct"].values[reference_run.config.run_id] == 12.4
+  assert metric_rows["max_drawdown_pct"].values[reference_run.config.run_id] == 7.2
+  assert metric_rows["trade_count"].values[reference_run.config.run_id] == 36
+  assert len(comparison.narratives) == 1
+  assert comparison.narratives[0].comparison_type == "native_vs_reference"
+  assert "return" in comparison.narratives[0].summary
+  assert any(
+    bullet.startswith("Reference context: NostalgiaForInfinityX7 returned 12.4%")
+    for bullet in comparison.narratives[0].bullets
+  )
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

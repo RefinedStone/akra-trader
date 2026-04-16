@@ -368,11 +368,22 @@ class RunComparisonMetricRow:
 
 
 @dataclass(frozen=True)
+class RunComparisonNarrative:
+  run_id: str
+  baseline_run_id: str
+  comparison_type: str
+  title: str
+  summary: str
+  bullets: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class RunComparison:
   requested_run_ids: tuple[str, ...]
   baseline_run_id: str
   runs: tuple[RunComparisonRun, ...]
   metric_rows: tuple[RunComparisonMetricRow, ...]
+  narratives: tuple[RunComparisonNarrative, ...] = ()
 
 
 @dataclass(frozen=True)

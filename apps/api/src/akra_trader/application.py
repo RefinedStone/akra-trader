@@ -8,6 +8,7 @@ from numbers import Number
 from uuid import uuid4
 
 from akra_trader.domain.models import RunComparison
+from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import MarketDataStatus
@@ -122,20 +123,33 @@ class TradingApplication:
 
     ordered_runs = [run_by_id[run_id] for run_id in normalized_run_ids]
     baseline_run = ordered_runs[0]
+    metric_rows = tuple(
+      _build_comparison_metric_row(
+        runs=ordered_runs,
+        baseline_run=baseline_run,
+        key=key,
+        label=label,
+        unit=unit,
+        higher_is_better=higher_is_better,
+      )
+      for key, label, unit, higher_is_better in COMPARISON_METRICS
+    )
+    metric_row_by_key = {row.key: row for row in metric_rows}
     return RunComparison(
       requested_run_ids=tuple(normalized_run_ids),
       baseline_run_id=baseline_run.config.run_id,
       runs=tuple(_serialize_comparison_run(run) for run in ordered_runs),
-      metric_rows=tuple(
-        _build_comparison_metric_row(
-          runs=ordered_runs,
-          baseline_run=baseline_run,
-          key=key,
-          label=label,
-          unit=unit,
-          higher_is_better=higher_is_better,
-        )
-        for key, label, unit, higher_is_better in COMPARISON_METRICS
+      metric_rows=metric_rows,
+      narratives=tuple(
+        narrative
+        for run in ordered_runs[1:]
+        if (
+          narrative := _build_comparison_narrative(
+            baseline_run=baseline_run,
+            run=run,
+            metric_row_by_key=metric_row_by_key,
+          )
+        ) is not None
       ),
     )
 
@@ -488,9 +502,9 @@ def _build_comparison_metric_row(
   unit: str,
   higher_is_better: bool,
 ) -> RunComparisonMetricRow:
-  baseline_value = _coerce_metric_value(baseline_run.metrics.get(key))
+  baseline_value = _resolve_run_metric_value(baseline_run, key)
   values = {
-    run.config.run_id: _coerce_metric_value(run.metrics.get(key))
+    run.config.run_id: _resolve_run_metric_value(run, key)
     for run in runs
   }
   deltas_vs_baseline = {
@@ -518,6 +532,364 @@ def _build_comparison_metric_row(
     deltas_vs_baseline=deltas_vs_baseline,
     best_run_id=best_run_id,
   )
+
+
+def _build_comparison_narrative(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  metric_row_by_key: dict[str, RunComparisonMetricRow],
+) -> RunComparisonNarrative | None:
+  comparison_type = _classify_comparison_type(baseline_run, run)
+  target_label = _comparison_run_label(run)
+  baseline_label = _comparison_run_label(baseline_run)
+  target_subject = _comparison_subject_label(run)
+
+  total_return_delta = _metric_row_delta(metric_row_by_key, "total_return_pct", run.config.run_id)
+  max_drawdown_delta = _metric_row_delta(metric_row_by_key, "max_drawdown_pct", run.config.run_id)
+  win_rate_delta = _metric_row_delta(metric_row_by_key, "win_rate_pct", run.config.run_id)
+  trade_count_delta = _metric_row_delta(metric_row_by_key, "trade_count", run.config.run_id)
+
+  title = _build_comparison_narrative_title(
+    comparison_type=comparison_type,
+    target_subject=target_subject,
+    baseline_label=baseline_label,
+    total_return_delta=total_return_delta,
+    max_drawdown_delta=max_drawdown_delta,
+  )
+  summary = _build_comparison_narrative_summary(
+    comparison_type=comparison_type,
+    baseline_run=baseline_run,
+    run=run,
+    baseline_label=baseline_label,
+    total_return_delta=total_return_delta,
+    max_drawdown_delta=max_drawdown_delta,
+    win_rate_delta=win_rate_delta,
+    trade_count_delta=trade_count_delta,
+  )
+  bullets = _build_comparison_narrative_bullets(
+    comparison_type=comparison_type,
+    baseline_run=baseline_run,
+    run=run,
+    target_label=target_label,
+    baseline_label=baseline_label,
+    win_rate_delta=win_rate_delta,
+    trade_count_delta=trade_count_delta,
+  )
+
+  if not title and not summary and not bullets:
+    return None
+
+  return RunComparisonNarrative(
+    run_id=run.config.run_id,
+    baseline_run_id=baseline_run.config.run_id,
+    comparison_type=comparison_type,
+    title=title or f"{target_subject} diverged from {baseline_label}.",
+    summary=summary or f"{target_label} is being compared against {baseline_label}.",
+    bullets=tuple(bullets),
+  )
+
+
+def _build_comparison_narrative_title(
+  *,
+  comparison_type: str,
+  target_subject: str,
+  baseline_label: str,
+  total_return_delta: float | int | None,
+  max_drawdown_delta: float | int | None,
+) -> str | None:
+  versus_baseline = "the baseline" if comparison_type != "native_vs_reference" else f"the native/reference baseline {baseline_label}"
+  if total_return_delta is not None and max_drawdown_delta is not None:
+    if total_return_delta > 0 and max_drawdown_delta <= 0:
+      return f"{target_subject} beat {versus_baseline} on both return and drawdown."
+    if total_return_delta > 0 and max_drawdown_delta > 0:
+      return f"{target_subject} found more return than {versus_baseline}, but with deeper drawdown."
+    if total_return_delta < 0 and max_drawdown_delta <= 0:
+      return f"{target_subject} gave up return while containing drawdown versus {versus_baseline}."
+    if total_return_delta < 0 and max_drawdown_delta > 0:
+      return f"{target_subject} lagged {versus_baseline} on both return and drawdown."
+    return f"{target_subject} held close to {versus_baseline} on return and drawdown."
+  if total_return_delta is not None:
+    if total_return_delta > 0:
+      return f"{target_subject} outperformed {versus_baseline} on total return."
+    if total_return_delta < 0:
+      return f"{target_subject} trailed {versus_baseline} on total return."
+    return f"{target_subject} matched {versus_baseline} on total return."
+  if max_drawdown_delta is not None:
+    if max_drawdown_delta < 0:
+      return f"{target_subject} contained drawdown better than {versus_baseline}."
+    if max_drawdown_delta > 0:
+      return f"{target_subject} ran with deeper drawdown than {versus_baseline}."
+    return f"{target_subject} matched {versus_baseline} on drawdown."
+  if comparison_type == "native_vs_reference":
+    return f"{target_subject} is the comparison counterpart to {baseline_label}."
+  return f"{target_subject} is being read against {baseline_label}."
+
+
+def _build_comparison_narrative_summary(
+  *,
+  comparison_type: str,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  baseline_label: str,
+  total_return_delta: float | int | None,
+  max_drawdown_delta: float | int | None,
+  win_rate_delta: float | int | None,
+  trade_count_delta: float | int | None,
+) -> str | None:
+  metric_shifts: list[str] = []
+  if total_return_delta is not None:
+    metric_shifts.append(f"return {_format_metric_delta(total_return_delta, 'pct_points')}")
+  if max_drawdown_delta is not None:
+    metric_shifts.append(f"drawdown {_format_metric_delta(max_drawdown_delta, 'pct_points')}")
+  if win_rate_delta is not None:
+    metric_shifts.append(f"win rate {_format_metric_delta(win_rate_delta, 'pct_points')}")
+  if trade_count_delta is not None:
+    metric_shifts.append(f"trades {_format_metric_delta(trade_count_delta, 'count')}")
+  if metric_shifts:
+    return f"Against {baseline_label}, the comparison shifted by {', '.join(metric_shifts)}."
+
+  if comparison_type == "native_vs_reference" and _has_reference_context(run, baseline_run):
+    return (
+      "Direct metric deltas are partial here, so this comparison leans on native engine metrics "
+      "plus persisted reference benchmark provenance."
+    )
+  if run.status != baseline_run.status:
+    return f"Status diverged as well: {run.status} versus {baseline_run.status}."
+  return None
+
+
+def _build_comparison_narrative_bullets(
+  *,
+  comparison_type: str,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  target_label: str,
+  baseline_label: str,
+  win_rate_delta: float | int | None,
+  trade_count_delta: float | int | None,
+) -> list[str]:
+  bullets: list[str] = []
+
+  lane_context = _build_lane_context_bullet(
+    comparison_type=comparison_type,
+    baseline_run=baseline_run,
+    run=run,
+  )
+  if lane_context is not None:
+    bullets.append(lane_context)
+
+  activity_context = _build_activity_context_bullet(
+    run=run,
+    trade_count_delta=trade_count_delta,
+    win_rate_delta=win_rate_delta,
+  )
+  if activity_context is not None:
+    bullets.append(activity_context)
+
+  reference_story = _build_reference_story_bullet(baseline_run=baseline_run, run=run)
+  if reference_story is not None:
+    bullets.append(reference_story)
+
+  if not bullets and comparison_type == "native_vs_reference":
+    bullets.append(f"{target_label} is the reference/native counterpart to {baseline_label}.")
+  return bullets[:3]
+
+
+def _build_lane_context_bullet(
+  *,
+  comparison_type: str,
+  baseline_run: RunRecord,
+  run: RunRecord,
+) -> str | None:
+  if comparison_type != "native_vs_reference":
+    return None
+  reference_run = run if run.provenance.lane == "reference" else baseline_run
+  native_run = baseline_run if reference_run is run else run
+  reference_label = _comparison_run_label(reference_run)
+  integration_mode = reference_run.provenance.integration_mode or "external_runtime"
+  return (
+    f"Lane context: native engine {_comparison_run_label(native_run)} is being read against "
+    f"reference benchmark {reference_label} via {integration_mode}."
+  )
+
+
+def _build_activity_context_bullet(
+  *,
+  run: RunRecord,
+  trade_count_delta: float | int | None,
+  win_rate_delta: float | int | None,
+) -> str | None:
+  trade_count = _resolve_run_metric_value(run, "trade_count")
+  win_rate = _resolve_run_metric_value(run, "win_rate_pct")
+  segments: list[str] = []
+  if trade_count is not None:
+    segment = f"trade flow landed at {trade_count}"
+    if trade_count_delta is not None:
+      segment += f" ({_format_metric_delta(trade_count_delta, 'count')} vs baseline)"
+    segments.append(segment)
+  if win_rate is not None:
+    segment = f"win rate closed at {win_rate}%"
+    if win_rate_delta is not None:
+      segment += f" ({_format_metric_delta(win_rate_delta, 'pct_points')} vs baseline)"
+    segments.append(segment)
+  if not segments:
+    return None
+  return "; ".join(segments) + "."
+
+
+def _build_reference_story_bullet(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+) -> str | None:
+  reference_run = None
+  if run.provenance.lane == "reference":
+    reference_run = run
+  elif baseline_run.provenance.lane == "reference":
+    reference_run = baseline_run
+  if reference_run is None:
+    return None
+  benchmark_story = _extract_benchmark_story(reference_run)
+  if not benchmark_story:
+    return None
+  for key in ("headline", "signal_context", "exit_context", "market_context", "pair_context", "portfolio_context"):
+    value = benchmark_story.get(key)
+    if isinstance(value, str) and value:
+      return f"Reference context: {value}"
+  return None
+
+
+def _classify_comparison_type(baseline_run: RunRecord, run: RunRecord) -> str:
+  lanes = {baseline_run.provenance.lane, run.provenance.lane}
+  if lanes == {"native", "reference"}:
+    return "native_vs_reference"
+  if lanes == {"reference"}:
+    return "reference_vs_reference"
+  if lanes == {"native"}:
+    return "native_vs_native"
+  return "run_vs_baseline"
+
+
+def _comparison_run_label(run: RunRecord) -> str:
+  if run.provenance.reference is not None and run.provenance.reference.title:
+    return run.provenance.reference.title
+  if run.provenance.strategy is not None and run.provenance.strategy.name:
+    return run.provenance.strategy.name
+  return run.config.strategy_id
+
+
+def _comparison_subject_label(run: RunRecord) -> str:
+  label = _comparison_run_label(run)
+  if run.provenance.lane == "reference":
+    return f"Reference benchmark {label}"
+  if run.provenance.lane == "native":
+    return f"Native run {label}"
+  return label
+
+
+def _has_reference_context(run: RunRecord, baseline_run: RunRecord) -> bool:
+  return any(candidate.provenance.lane == "reference" for candidate in (run, baseline_run))
+
+
+def _metric_row_delta(
+  metric_row_by_key: dict[str, RunComparisonMetricRow],
+  key: str,
+  run_id: str,
+) -> float | int | None:
+  metric_row = metric_row_by_key.get(key)
+  if metric_row is None:
+    return None
+  return metric_row.deltas_vs_baseline.get(run_id)
+
+
+def _resolve_run_metric_value(run: RunRecord, key: str) -> float | int | None:
+  direct_value = _coerce_metric_value(run.metrics.get(key))
+  if direct_value is not None:
+    return direct_value
+  return _extract_benchmark_metric_value(run, key)
+
+
+def _extract_benchmark_metric_value(run: RunRecord, key: str) -> float | int | None:
+  summary_key_map = {
+    "total_return_pct": "profit_total_pct",
+    "max_drawdown_pct": "max_drawdown_pct",
+    "trade_count": "trade_count",
+    "win_rate_pct": "win_rate_pct",
+  }
+  summary_key = summary_key_map.get(key)
+  if summary_key is None:
+    return None
+
+  artifacts = sorted(
+    run.provenance.benchmark_artifacts,
+    key=lambda artifact: _benchmark_artifact_priority(artifact.kind),
+  )
+  for artifact in artifacts:
+    value = _coerce_metric_value(artifact.summary.get(summary_key))
+    if value is not None:
+      return value
+    if key == "win_rate_pct":
+      for section_name, row_key in (
+        ("strategy_comparison", "best"),
+        ("pair_metrics", "total"),
+      ):
+        section = artifact.sections.get(section_name)
+        if not isinstance(section, dict):
+          continue
+        candidate_row = section.get(row_key)
+        if isinstance(candidate_row, dict):
+          value = _coerce_metric_value(candidate_row.get(summary_key))
+          if value is not None:
+            return value
+        preview = section.get("preview")
+        if isinstance(preview, list) and preview:
+          first_row = preview[0]
+          if isinstance(first_row, dict):
+            value = _coerce_metric_value(first_row.get(summary_key))
+            if value is not None:
+              return value
+  return None
+
+
+def _extract_benchmark_story(run: RunRecord) -> dict[str, str]:
+  artifacts = sorted(
+    run.provenance.benchmark_artifacts,
+    key=lambda artifact: _benchmark_artifact_priority(artifact.kind),
+  )
+  for artifact in artifacts:
+    story = artifact.sections.get("benchmark_story")
+    if not isinstance(story, dict):
+      continue
+    normalized_story = {
+      key: value
+      for key, value in story.items()
+      if isinstance(value, str) and value
+    }
+    if normalized_story:
+      return normalized_story
+  return {}
+
+
+def _benchmark_artifact_priority(kind: str) -> int:
+  priorities = {
+    "result_snapshot": 0,
+    "result_snapshot_root": 1,
+    "result_manifest": 2,
+  }
+  return priorities.get(kind, 100)
+
+
+def _format_metric_delta(value: float | int | None, unit: str) -> str:
+  if value is None:
+    return "n/a"
+  prefix = "+" if value > 0 else ""
+  if unit == "pct_points":
+    return f"{prefix}{value} pts"
+  if unit == "count":
+    suffix = "trade" if value in {-1, 1} else "trades"
+    return f"{prefix}{value} {suffix}"
+  return f"{prefix}{value}"
 
 
 def _coerce_metric_value(value: object) -> float | int | None:

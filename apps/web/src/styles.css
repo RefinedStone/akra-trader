@@ -500,6 +500,65 @@ select {
   margin-top: 16px;
 }
 
+.comparison-story-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.comparison-story-card {
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 191, 71, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 191, 71, 0.08), rgba(255, 191, 71, 0.02)),
+    rgba(8, 14, 23, 0.8);
+}
+
+.comparison-story-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.comparison-story-head span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparison-story-head strong {
+  font-size: 0.9rem;
+}
+
+.comparison-story-title,
+.comparison-story-summary {
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.comparison-story-title {
+  font-weight: 600;
+}
+
+.comparison-story-summary {
+  color: var(--muted);
+}
+
+.comparison-story-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+}
+
+.comparison-story-list li + li {
+  margin-top: 8px;
+}
+
 .comparison-run-card {
   padding: 16px;
   border-radius: 18px;

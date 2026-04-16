@@ -170,6 +170,14 @@ type RunComparison = {
     deltas_vs_baseline: Record<string, number | null>;
     best_run_id?: string | null;
   }[];
+  narratives: {
+    run_id: string;
+    baseline_run_id: string;
+    comparison_type: string;
+    title: string;
+    summary: string;
+    bullets: string[];
+  }[];
 };
 
 type MarketDataStatus = {
@@ -1421,6 +1429,31 @@ function RunComparisonPanel({
           </article>
         ))}
       </div>
+      {comparison.narratives.length ? (
+        <div className="comparison-story-grid">
+          {comparison.narratives.map((narrative) => {
+            const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
+            const runLabel = run?.reference?.title ?? run?.strategy_name ?? run?.strategy_id ?? narrative.run_id;
+            return (
+              <article className="comparison-story-card" key={`${narrative.baseline_run_id}-${narrative.run_id}`}>
+                <div className="comparison-story-head">
+                  <span>{formatComparisonNarrativeLabel(narrative.comparison_type)}</span>
+                  <strong>{runLabel}</strong>
+                </div>
+                <p className="comparison-story-title">{narrative.title}</p>
+                <p className="comparison-story-summary">{narrative.summary}</p>
+                {narrative.bullets.length ? (
+                  <ul className="comparison-story-list">
+                    {narrative.bullets.map((bullet) => (
+                      <li key={`${narrative.run_id}-${bullet}`}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : null}
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
       <div className="comparison-table-wrap">
         <table className="comparison-table">
           <thead>
@@ -1681,6 +1714,19 @@ function formatComparisonDelta(value: number | null | undefined, unit: string) {
     return `${prefix}${value}% vs baseline`;
   }
   return `${prefix}${value} vs baseline`;
+}
+
+function formatComparisonNarrativeLabel(value: string) {
+  switch (value) {
+    case "native_vs_reference":
+      return "Native vs reference";
+    case "reference_vs_reference":
+      return "Reference vs reference";
+    case "native_vs_native":
+      return "Native vs native";
+    default:
+      return "Run divergence";
+  }
 }
 
 function formatLaneLabel(runtime: string) {
