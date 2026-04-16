@@ -231,6 +231,8 @@ const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
 const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
+const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY = "akra-trader-comparison-tooltip-conflict-ui";
+const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const ALL_FILTER_VALUE = "__all__";
@@ -333,6 +335,14 @@ type ComparisonTooltipPresetConflictPreviewGroup = {
   rows: ComparisonTooltipPresetConflictPreviewRow[];
   same_count: number;
   summary_label: string;
+};
+type ComparisonTooltipConflictSessionUiState = {
+  collapsed_unchanged_groups: Record<string, boolean>;
+  show_unchanged_conflict_rows: boolean;
+};
+type ComparisonTooltipConflictUiStateV1 = {
+  sessions: Record<string, ComparisonTooltipConflictSessionUiState>;
+  version: typeof COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION;
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -2958,13 +2968,15 @@ function ComparisonTooltipTuningPanel({
   onReset: () => void;
   onSavePreset: () => void;
 }) {
-  const [showUnchangedConflictRows, setShowUnchangedConflictRows] = useState(false);
-  const [collapsedUnchangedConflictGroups, setCollapsedUnchangedConflictGroups] = useState<
-    Record<string, boolean>
+  const [conflictSessionUiStateMap, setConflictSessionUiStateMap] = useState<
+    Record<string, ComparisonTooltipConflictSessionUiState>
   >({});
   const presetNames = Object.keys(presets).sort((left, right) => left.localeCompare(right));
   const conflictExistingPreset = pendingPresetImportConflict
     ? presets[pendingPresetImportConflict.imported_preset_name] ?? null
+    : null;
+  const conflictSessionKey = pendingPresetImportConflict
+    ? buildComparisonTooltipConflictSessionKey(pendingPresetImportConflict)
     : null;
   const conflictPreviewRows =
     pendingPresetImportConflict && conflictExistingPreset
@@ -2983,26 +2995,63 @@ function ComparisonTooltipTuningPanel({
   );
   const changedConflictPreviewCount = changedConflictPreviewRows.length;
   const unchangedConflictPreviewCount = unchangedConflictPreviewRows.length;
+  const currentConflictSessionUiState = conflictSessionKey
+    ? conflictSessionUiStateMap[conflictSessionKey] ?? null
+    : null;
+  const showUnchangedConflictRows =
+    currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
+  const collapsedUnchangedConflictGroups =
+    currentConflictSessionUiState?.collapsed_unchanged_groups ?? {};
 
   useEffect(() => {
-    setShowUnchangedConflictRows(false);
-    setCollapsedUnchangedConflictGroups({});
-  }, [pendingPresetImportConflict?.imported_preset_name, pendingPresetImportConflict?.raw]);
+    setConflictSessionUiStateMap(loadComparisonTooltipConflictUiState().sessions);
+  }, []);
+
+  useEffect(() => {
+    persistComparisonTooltipConflictUiState({
+      sessions: conflictSessionUiStateMap,
+      version: COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION,
+    });
+  }, [conflictSessionUiStateMap]);
+
+  const updateCurrentConflictSessionUiState = (
+    updater: (
+      current: ComparisonTooltipConflictSessionUiState,
+    ) => ComparisonTooltipConflictSessionUiState,
+  ) => {
+    if (!conflictSessionKey) {
+      return;
+    }
+    setConflictSessionUiStateMap((current) => {
+      const nextCurrent = current[conflictSessionKey] ?? {
+        collapsed_unchanged_groups: {},
+        show_unchanged_conflict_rows: false,
+      };
+      return {
+        ...current,
+        [conflictSessionKey]: updater(nextCurrent),
+      };
+    });
+  };
 
   const ensureUnchangedConflictGroupCollapseState = () => {
-    setCollapsedUnchangedConflictGroups((current) =>
-      seedComparisonTooltipUnchangedConflictGroupCollapseState(
+    updateCurrentConflictSessionUiState((current) => ({
+      ...current,
+      collapsed_unchanged_groups: seedComparisonTooltipUnchangedConflictGroupCollapseState(
         unchangedConflictPreviewGroups,
-        current,
+        current.collapsed_unchanged_groups,
       ),
-    );
+    }));
   };
 
   const toggleShowUnchangedConflictRows = () => {
     if (!showUnchangedConflictRows) {
       ensureUnchangedConflictGroupCollapseState();
     }
-    setShowUnchangedConflictRows((current) => !current);
+    updateCurrentConflictSessionUiState((current) => ({
+      ...current,
+      show_unchanged_conflict_rows: !current.show_unchanged_conflict_rows,
+    }));
   };
 
   const isUnchangedConflictGroupCollapsed = (
@@ -3014,11 +3063,14 @@ function ComparisonTooltipTuningPanel({
   const toggleUnchangedConflictGroupCollapse = (
     group: ComparisonTooltipPresetConflictPreviewGroup,
   ) => {
-    setCollapsedUnchangedConflictGroups((current) => ({
+    updateCurrentConflictSessionUiState((current) => ({
       ...current,
-      [group.key]:
-        !(current[group.key] ??
-          group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD),
+      collapsed_unchanged_groups: {
+        ...current.collapsed_unchanged_groups,
+        [group.key]:
+          !(current.collapsed_unchanged_groups[group.key] ??
+            group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD),
+      },
     }));
   };
 
@@ -3504,6 +3556,25 @@ function loadComparisonTooltipTuningPresetState(): ComparisonTooltipTuningPreset
   }
 }
 
+function loadComparisonTooltipConflictUiState(): ComparisonTooltipConflictUiStateV1 {
+  try {
+    const raw = window.localStorage.getItem(COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY);
+    if (!raw) {
+      return createDefaultComparisonTooltipConflictUiState();
+    }
+    const parsed = JSON.parse(raw) as Partial<ComparisonTooltipConflictUiStateV1> | null;
+    if (!parsed || parsed.version !== COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION) {
+      return createDefaultComparisonTooltipConflictUiState();
+    }
+    return {
+      sessions: normalizeComparisonTooltipConflictSessionUiStateMap(parsed.sessions),
+      version: COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION,
+    };
+  } catch {
+    return createDefaultComparisonTooltipConflictUiState();
+  }
+}
+
 function loadComparisonTooltipTuningShareImportFromUrl(): ComparisonTooltipTuningShareImport | null {
   try {
     const url = new URL(window.location.href);
@@ -3531,12 +3602,27 @@ function persistComparisonTooltipTuningPresetState(
   }
 }
 
+function persistComparisonTooltipConflictUiState(state: ComparisonTooltipConflictUiStateV1) {
+  try {
+    window.localStorage.setItem(COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Ignore localStorage failures in dev-only tuning controls.
+  }
+}
+
 function createDefaultComparisonTooltipTuningPresetState(): ComparisonTooltipTuningPresetStateV1 {
   return {
     current_tuning: { ...DEFAULT_COMPARISON_TOOLTIP_TUNING },
     presets: {},
     selected_preset_name: null,
     version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+  };
+}
+
+function createDefaultComparisonTooltipConflictUiState(): ComparisonTooltipConflictUiStateV1 {
+  return {
+    sessions: {},
+    version: COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION,
   };
 }
 
@@ -3557,6 +3643,43 @@ function cloneComparisonTooltipPresetMap(
   return Object.fromEntries(
     Object.entries(value).map(([key, preset]) => [key, { ...preset }]),
   );
+}
+
+function normalizeComparisonTooltipConflictSessionUiStateMap(
+  value: unknown,
+): Record<string, ComparisonTooltipConflictSessionUiState> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, ComparisonTooltipConflictSessionUiState>>(
+    (accumulator, [key, session]) => {
+      if (!key.trim() || !session || typeof session !== "object") {
+        return accumulator;
+      }
+      const parsed = session as Partial<ComparisonTooltipConflictSessionUiState>;
+      accumulator[key] = {
+        collapsed_unchanged_groups: normalizeComparisonTooltipBooleanMap(
+          parsed.collapsed_unchanged_groups,
+        ),
+        show_unchanged_conflict_rows: parsed.show_unchanged_conflict_rows === true,
+      };
+      return accumulator;
+    },
+    {},
+  );
+}
+
+function normalizeComparisonTooltipBooleanMap(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.entries(value).reduce<Record<string, boolean>>((accumulator, [key, flag]) => {
+    if (!key.trim() || typeof flag !== "boolean") {
+      return accumulator;
+    }
+    accumulator[key] = flag;
+    return accumulator;
+  }, {});
 }
 
 function parseComparisonTooltipTuningPresetState(
@@ -3806,6 +3929,22 @@ function seedComparisonTooltipUnchangedConflictGroupCollapseState(
       group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD;
     return accumulator;
   }, { ...current });
+}
+
+function buildComparisonTooltipConflictSessionKey(
+  pendingConflict: ComparisonTooltipPendingPresetImportConflict,
+) {
+  return `${pendingConflict.imported_preset_name}:${hashComparisonTooltipConflictSessionRaw(
+    pendingConflict.raw,
+  )}`;
+}
+
+function hashComparisonTooltipConflictSessionRaw(value: string) {
+  let hash = 5381;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 33) ^ value.charCodeAt(index);
+  }
+  return (hash >>> 0).toString(36);
 }
 
 function formatComparisonTooltipTuningValue(value: number) {
