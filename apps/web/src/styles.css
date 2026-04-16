@@ -477,17 +477,58 @@ select {
 }
 
 .comparison-panel {
+  --comparison-accent-rgb: 255, 191, 71;
+  --comparison-accent-solid: var(--amber);
   margin-top: 18px;
+  position: relative;
+  overflow: hidden;
   padding: 20px;
   border-radius: 20px;
-  border: 1px solid rgba(255, 191, 71, 0.16);
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.2);
   background:
-    linear-gradient(180deg, rgba(255, 191, 71, 0.06), rgba(255, 191, 71, 0.01)),
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.08), rgba(var(--comparison-accent-rgb), 0.01)),
     rgba(5, 10, 17, 0.72);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.08),
+    0 18px 36px rgba(0, 0, 0, 0.16);
+}
+
+.comparison-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at top right, rgba(var(--comparison-accent-rgb), 0.2), transparent 34%),
+    linear-gradient(90deg, rgba(var(--comparison-accent-rgb), 0.1), transparent 26%);
+  pointer-events: none;
+}
+
+.comparison-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.comparison-panel.comparison-intent-benchmark-validation {
+  --comparison-accent-rgb: 88, 217, 255;
+  --comparison-accent-solid: var(--cyan);
+}
+
+.comparison-panel.comparison-intent-execution-regression {
+  --comparison-accent-rgb: 255, 123, 86;
+  --comparison-accent-solid: var(--ember);
+}
+
+.comparison-panel.comparison-intent-strategy-tuning {
+  --comparison-accent-rgb: 134, 239, 172;
+  --comparison-accent-solid: var(--success);
 }
 
 .comparison-panel-empty {
   border-style: dashed;
+}
+
+.comparison-panel .kicker {
+  color: var(--comparison-accent-solid);
 }
 
 .comparison-head {
@@ -504,9 +545,23 @@ select {
 
 .comparison-baseline {
   margin: 0;
-  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.78);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.8rem;
+}
+
+.comparison-intent-chip {
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.32);
+  background: rgba(var(--comparison-accent-rgb), 0.12);
+  color: var(--comparison-accent-solid);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .comparison-run-grid {
@@ -530,19 +585,20 @@ select {
 .comparison-story-card {
   padding: 16px;
   border-radius: 18px;
-  border: 1px solid rgba(255, 191, 71, 0.14);
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 191, 71, 0.08), rgba(255, 191, 71, 0.02)),
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.09), rgba(var(--comparison-accent-rgb), 0.02)),
     rgba(8, 14, 23, 0.8);
 }
 
 .comparison-story-card.featured {
-  border-color: rgba(255, 191, 71, 0.34);
+  border-color: rgba(var(--comparison-accent-rgb), 0.38);
   box-shadow:
-    inset 0 1px 0 rgba(255, 191, 71, 0.2),
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.24),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08),
     0 16px 32px rgba(0, 0, 0, 0.18);
   background:
-    linear-gradient(180deg, rgba(255, 191, 71, 0.12), rgba(255, 191, 71, 0.03)),
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.16), rgba(var(--comparison-accent-rgb), 0.04)),
     rgba(10, 16, 26, 0.88);
 }
 
@@ -554,7 +610,7 @@ select {
 }
 
 .comparison-story-head span {
-  color: var(--muted);
+  color: var(--comparison-accent-solid);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
   letter-spacing: 0.08em;
@@ -569,7 +625,7 @@ select {
   display: flex;
   gap: 10px;
   margin-top: 10px;
-  color: var(--muted);
+  color: rgba(var(--comparison-accent-rgb), 0.82);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.76rem;
 }
@@ -585,13 +641,13 @@ select {
 }
 
 .comparison-story-summary {
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .comparison-story-list {
   margin: 12px 0 0;
   padding-left: 18px;
-  color: var(--muted);
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .comparison-story-list li + li {
@@ -606,8 +662,10 @@ select {
 }
 
 .comparison-run-card.baseline {
-  border-color: rgba(255, 191, 71, 0.4);
-  box-shadow: inset 0 1px 0 rgba(255, 191, 71, 0.18);
+  border-color: rgba(var(--comparison-accent-rgb), 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.2),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
 }
 
 .comparison-run-head {
@@ -664,7 +722,7 @@ select {
   letter-spacing: normal;
   line-height: 1.45;
   text-transform: none;
-  color: var(--muted);
+  color: rgba(var(--comparison-accent-rgb), 0.86);
 }
 
 .comparison-table td strong {
@@ -672,8 +730,18 @@ select {
   font-size: 1rem;
 }
 
+.comparison-baseline-cell {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comparison-best {
+  background:
+    linear-gradient(90deg, rgba(var(--comparison-accent-rgb), 0.14), rgba(var(--comparison-accent-rgb), 0.05)),
+    rgba(255, 255, 255, 0.02);
+}
+
 .comparison-best strong {
-  color: var(--amber);
+  color: var(--comparison-accent-solid);
 }
 
 .comparison-delta {
@@ -682,6 +750,10 @@ select {
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.76rem;
+}
+
+.comparison-best .comparison-delta {
+  color: rgba(var(--comparison-accent-rgb), 0.92);
 }
 
 .comparison-note-copy {

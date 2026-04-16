@@ -1417,16 +1417,18 @@ function RunComparisonPanel({
   }
 
   const [primaryNarrative, ...secondaryNarratives] = comparison.narratives;
+  const intentClassName = getComparisonIntentClassName(comparison.intent);
 
   return (
-    <section className="comparison-panel">
+    <section className={`comparison-panel ${intentClassName}`}>
       <div className="comparison-head">
         <div>
           <p className="kicker">Comparison deck</p>
           <h3>Native and reference backtests, side by side</h3>
         </div>
         <p className="comparison-baseline">
-          Baseline: {comparison.baseline_run_id} / Intent: {formatComparisonIntentLabel(comparison.intent)}
+          <span>Baseline: {comparison.baseline_run_id}</span>
+          <span className="comparison-intent-chip">{formatComparisonIntentLabel(comparison.intent)}</span>
         </p>
       </div>
       <div className="comparison-run-grid">
@@ -1502,7 +1504,14 @@ function RunComparisonPanel({
                 </th>
                 {comparison.runs.map((run) => (
                   <td
-                    className={metricRow.best_run_id === run.run_id ? "comparison-best" : undefined}
+                    className={
+                      [
+                        metricRow.best_run_id === run.run_id ? "comparison-best" : "",
+                        run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined
+                    }
                     key={`${metricRow.key}-${run.run_id}`}
                   >
                     <strong>
@@ -1807,6 +1816,10 @@ function formatComparisonIntentLabel(value: ComparisonIntent) {
     default:
       return value;
   }
+}
+
+function getComparisonIntentClassName(value: ComparisonIntent) {
+  return `comparison-intent-${value.replaceAll("_", "-")}`;
 }
 
 function formatLaneLabel(runtime: string) {
