@@ -256,6 +256,34 @@ class MarketDataLineage:
   issues: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class StrategyLifecycle:
+  stage: str = "active"
+  registered_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class StrategyParameterSnapshot:
+  requested: dict[str, Any] = field(default_factory=dict)
+  resolved: dict[str, Any] = field(default_factory=dict)
+  schema: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class StrategySnapshot:
+  strategy_id: str
+  name: str
+  version: str
+  runtime: str
+  lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+  parameter_snapshot: StrategyParameterSnapshot = field(default_factory=StrategyParameterSnapshot)
+  supported_timeframes: tuple[str, ...] = ()
+  warmup: WarmupSpec = field(default_factory=lambda: WarmupSpec(required_bars=0))
+  reference_id: str | None = None
+  reference_path: str | None = None
+  entrypoint: str | None = None
+
+
 @dataclass
 class RunProvenance:
   lane: str = "native"
@@ -265,6 +293,7 @@ class RunProvenance:
   working_directory: str | None = None
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
+  strategy: StrategySnapshot | None = None
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
 

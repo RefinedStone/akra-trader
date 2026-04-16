@@ -20,6 +20,7 @@ from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyExecutionState
+from akra_trader.domain.models import StrategySnapshot
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.ports import MarketDataPort
@@ -282,11 +283,16 @@ class ExecutionEngine:
 
 
 class RunSupervisor:
-  def create_native_run(self, *, config: RunConfig) -> RunRecord:
+  def create_native_run(
+    self,
+    *,
+    config: RunConfig,
+    strategy: StrategySnapshot | None = None,
+  ) -> RunRecord:
     return RunRecord(
       config=config,
       status=RunStatus.RUNNING,
-      provenance=RunProvenance(lane="native"),
+      provenance=RunProvenance(lane="native", strategy=strategy),
     )
 
   def complete(self, run: RunRecord) -> RunRecord:

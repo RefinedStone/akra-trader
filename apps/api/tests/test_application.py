@@ -47,6 +47,14 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert run.metrics["initial_cash"] == 10_000
   assert "total_return_pct" in run.metrics
   assert run.config.strategy_id == "ma_cross_v1"
+  assert run.provenance.strategy is not None
+  assert run.provenance.strategy.strategy_id == "ma_cross_v1"
+  assert run.provenance.strategy.lifecycle.stage == "active"
+  assert run.provenance.strategy.parameter_snapshot.requested == {}
+  assert run.provenance.strategy.parameter_snapshot.resolved == {
+    "short_window": 8,
+    "long_window": 21,
+  }
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "seeded"
   assert run.provenance.market_data.candle_count > 0
@@ -56,6 +64,7 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert reloaded is not None
   assert reloaded.status == RunStatus.COMPLETED
   assert reloaded.metrics == run.metrics
+  assert reloaded.provenance.strategy == run.provenance.strategy
   assert reloaded.provenance.market_data == run.provenance.market_data
 
 
@@ -147,12 +156,51 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
     parameters={},
   )
 
+  assert run.provenance.strategy is not None
+  assert run.provenance.strategy.runtime == "freqtrade_reference"
+  assert run.provenance.strategy.entrypoint == "NostalgiaForInfinityX7"
+  assert run.provenance.strategy.parameter_snapshot.requested == {}
+  assert run.provenance.strategy.parameter_snapshot.resolved == {}
   assert run.provenance.reference_id == "nostalgia-for-infinity"
   assert run.provenance.external_command
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
   assert run.provenance.market_data.sync_status == "delegated"
   assert run.provenance.market_data_by_symbol["BTC/USDT"].sync_status == "delegated"
+
+
+def test_registered_strategy_run_records_lifecycle_timestamp(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  strategies = LocalStrategyCatalog()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=strategies,
+    references=build_references(),
+    runs=runs,
+  )
+
+  app.register_strategy(
+    strategy_id="ma_cross_v1",
+    module_path="akra_trader.strategies.examples",
+    class_name="MovingAverageCrossStrategy",
+  )
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+
+  assert run.provenance.strategy is not None
+  assert run.provenance.strategy.lifecycle.registered_at is not None
+  assert run.provenance.strategy.parameter_snapshot.requested == {"short_window": 13}
+  assert run.provenance.strategy.parameter_snapshot.resolved == {
+    "short_window": 13,
+    "long_window": 21,
+  }
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

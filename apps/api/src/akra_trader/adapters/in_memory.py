@@ -207,6 +207,9 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     self._registrations[registration.strategy_id] = registration
     return strategy.describe()
 
+  def get_registration(self, strategy_id: str) -> StrategyRegistration | None:
+    return self._registrations.get(strategy_id)
+
 
 def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
   return pd.DataFrame(

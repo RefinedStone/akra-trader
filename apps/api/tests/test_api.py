@@ -51,6 +51,15 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   payload = response.json()
   assert payload["status"] == "completed"
   assert payload["config"]["strategy_id"] == "ma_cross_v1"
+  assert payload["provenance"]["strategy"]["strategy_id"] == "ma_cross_v1"
+  assert payload["provenance"]["strategy"]["lifecycle"]["stage"] == "active"
+  assert payload["provenance"]["strategy"]["parameter_snapshot"]["requested"] == {}
+  assert payload["provenance"]["strategy"]["parameter_snapshot"]["resolved"] == {
+    "short_window": 8,
+    "long_window": 21,
+  }
+  assert payload["provenance"]["strategy"]["warmup"]["required_bars"] == 21
+  assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"

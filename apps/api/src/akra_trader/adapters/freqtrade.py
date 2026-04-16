@@ -10,7 +10,6 @@ import subprocess
 from akra_trader.adapters.references import ReferenceCatalog
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import RunConfig
-from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyMetadata
@@ -76,24 +75,22 @@ class FreqtradeReferenceAdapter:
       )
       for symbol in run.config.symbols
     }
-    run.provenance = RunProvenance(
-      lane="reference",
-      reference_id=prepared.reference_id,
-      reference_version=prepared.reference_version,
-      integration_mode=prepared.integration_mode,
-      working_directory=prepared.working_directory,
-      external_command=tuple(prepared.command),
-      market_data=MarketDataLineage(
-        provider="freqtrade_reference",
-        venue=run.config.venue,
-        symbols=run.config.symbols,
-        timeframe=run.config.timeframe,
-        requested_start_at=run.config.start_at,
-        requested_end_at=run.config.end_at,
-        sync_status="delegated",
-      ),
-      market_data_by_symbol=market_data_by_symbol,
+    run.provenance.lane = "reference"
+    run.provenance.reference_id = prepared.reference_id
+    run.provenance.reference_version = prepared.reference_version
+    run.provenance.integration_mode = prepared.integration_mode
+    run.provenance.working_directory = prepared.working_directory
+    run.provenance.external_command = tuple(prepared.command)
+    run.provenance.market_data = MarketDataLineage(
+      provider="freqtrade_reference",
+      venue=run.config.venue,
+      symbols=run.config.symbols,
+      timeframe=run.config.timeframe,
+      requested_start_at=run.config.start_at,
+      requested_end_at=run.config.end_at,
+      sync_status="delegated",
     )
+    run.provenance.market_data_by_symbol = market_data_by_symbol
     run.notes.append(f"Prepared NFI reference command: {' '.join(prepared.command)}")
 
     if shutil.which("freqtrade") is None:

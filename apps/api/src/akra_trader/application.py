@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import asdict
 from datetime import UTC
 from datetime import datetime
@@ -9,16 +10,21 @@ from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
+from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
+from akra_trader.domain.models import StrategyParameterSnapshot
 from akra_trader.domain.models import StrategyRegistration
+from akra_trader.domain.models import StrategySnapshot
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.domain.services import summarize_performance
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
+from akra_trader.ports import StrategyRuntime
 from akra_trader.runtime import DataEngine
 from akra_trader.runtime import ExecutionEngine
 from akra_trader.runtime import ExecutionModeService
@@ -87,8 +93,7 @@ class TradingApplication:
     start_at: datetime | None = None,
     end_at: datetime | None = None,
   ) -> RunRecord:
-    strategy = self._strategies.load(strategy_id)
-    metadata = strategy.describe()
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     config = RunConfig(
       run_id=str(uuid4()),
       mode=RunMode.BACKTEST,
@@ -105,14 +110,23 @@ class TradingApplication:
       end_at=end_at,
     )
     if metadata.runtime == "freqtrade_reference":
-      run = RunRecord(config=config, status=RunStatus.PENDING)
+      run = RunRecord(
+        config=config,
+        status=RunStatus.PENDING,
+        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+      )
       if self._freqtrade_reference is None:
         run.status = RunStatus.FAILED
         run.notes.append("Freqtrade reference adapter is not configured.")
       else:
         run = self._freqtrade_reference.execute_backtest(run, metadata)
       return self._runs.save_run(run)
-    run = self._simulate_run(config=config, active_bars=None)
+    run = self._simulate_run(
+      config=config,
+      strategy=strategy,
+      strategy_snapshot=strategy_snapshot,
+      active_bars=None,
+    )
     if run.status != RunStatus.FAILED:
       self._run_supervisor.complete(run)
     return self._runs.save_run(run)
@@ -129,8 +143,7 @@ class TradingApplication:
     parameters: dict,
     replay_bars: int = 96,
   ) -> RunRecord:
-    strategy = self._strategies.load(strategy_id)
-    metadata = strategy.describe()
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     config = RunConfig(
       run_id=str(uuid4()),
       mode=RunMode.SANDBOX,
@@ -145,13 +158,22 @@ class TradingApplication:
       slippage_bps=slippage_bps,
     )
     if metadata.runtime == "freqtrade_reference":
-      run = RunRecord(config=config, status=RunStatus.FAILED)
+      run = RunRecord(
+        config=config,
+        status=RunStatus.FAILED,
+        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+      )
       run.notes.append(
         "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
         "Sandbox trading remains on the native engine for now."
       )
       return self._runs.save_run(run)
-    run = self._simulate_run(config=config, active_bars=replay_bars)
+    run = self._simulate_run(
+      config=config,
+      strategy=strategy,
+      strategy_snapshot=strategy_snapshot,
+      active_bars=replay_bars,
+    )
     if run.status != RunStatus.FAILED:
       self._run_supervisor.start_mode(
         run=run,
@@ -194,10 +216,21 @@ class TradingApplication:
   def stop_paper_run(self, run_id: str) -> RunRecord | None:
     return self.stop_sandbox_run(run_id)
 
-  def _simulate_run(self, *, config: RunConfig, active_bars: int | None) -> RunRecord:
-    strategy = self._strategies.load(config.strategy_id)
+  def _simulate_run(
+    self,
+    *,
+    config: RunConfig,
+    active_bars: int | None,
+    strategy: StrategyRuntime | None = None,
+    strategy_snapshot: StrategySnapshot | None = None,
+  ) -> RunRecord:
+    if strategy is None:
+      strategy, _, strategy_snapshot = self._prepare_strategy(
+        strategy_id=config.strategy_id,
+        parameters=config.parameters,
+      )
     loaded = self._data_engine.load_frame(config=config, active_bars=active_bars)
-    run = self._run_supervisor.create_native_run(config=config)
+    run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
     run.provenance.market_data = loaded.lineage
     run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
     data = loaded.frame
@@ -239,6 +272,64 @@ class TradingApplication:
       run.notes.append(f"Sandbox preview replayed {active_bars} most recent bars.")
     return run
 
+  def _prepare_strategy(
+    self,
+    *,
+    strategy_id: str,
+    parameters: dict,
+  ) -> tuple[StrategyRuntime, StrategyMetadata, StrategySnapshot]:
+    strategy = self._strategies.load(strategy_id)
+    metadata = strategy.describe()
+    registration = self._strategies.get_registration(metadata.strategy_id)
+    return strategy, metadata, self._build_strategy_snapshot(
+      strategy=strategy,
+      metadata=metadata,
+      parameters=parameters,
+      registration=registration,
+    )
+
+  def _build_strategy_snapshot(
+    self,
+    *,
+    strategy: StrategyRuntime,
+    metadata: StrategyMetadata,
+    parameters: dict,
+    registration: StrategyRegistration | None,
+  ) -> StrategySnapshot:
+    schema = deepcopy(metadata.parameter_schema)
+    requested = deepcopy(parameters)
+    resolved = self._resolve_parameters(schema=schema, requested=requested)
+    return StrategySnapshot(
+      strategy_id=metadata.strategy_id,
+      name=metadata.name,
+      version=metadata.version,
+      runtime=metadata.runtime,
+      lifecycle=StrategyLifecycle(
+        stage="active",
+        registered_at=registration.registered_at if registration is not None else None,
+      ),
+      parameter_snapshot=StrategyParameterSnapshot(
+        requested=requested,
+        resolved=resolved,
+        schema=schema,
+      ),
+      supported_timeframes=metadata.supported_timeframes,
+      warmup=strategy.warmup_spec(),
+      reference_id=metadata.reference_id,
+      reference_path=metadata.reference_path,
+      entrypoint=metadata.entrypoint,
+    )
+
+  @staticmethod
+  def _resolve_parameters(*, schema: dict, requested: dict) -> dict:
+    resolved: dict = {}
+    for name, definition in schema.items():
+      if isinstance(definition, dict) and "default" in definition:
+        resolved[name] = deepcopy(definition["default"])
+    for name, value in requested.items():
+      resolved[name] = deepcopy(value)
+    return resolved
+
 
 def serialize_run(run: RunRecord) -> dict:
   payload = asdict(run)
@@ -246,4 +337,8 @@ def serialize_run(run: RunRecord) -> dict:
   payload["status"] = run.status.value
   payload["provenance"]["external_command"] = list(run.provenance.external_command)
   payload["provenance"]["artifact_paths"] = list(run.provenance.artifact_paths)
+  strategy_snapshot = payload["provenance"].get("strategy")
+  if strategy_snapshot is not None:
+    strategy_snapshot["supported_timeframes"] = list(run.provenance.strategy.supported_timeframes)
+    strategy_snapshot["warmup"]["timeframes"] = list(run.provenance.strategy.warmup.timeframes)
   return payload
