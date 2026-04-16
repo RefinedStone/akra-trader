@@ -2989,6 +2989,22 @@ function ComparisonTooltipTuningPanel({
     setCollapsedUnchangedConflictGroups({});
   }, [pendingPresetImportConflict?.imported_preset_name, pendingPresetImportConflict?.raw]);
 
+  const ensureUnchangedConflictGroupCollapseState = () => {
+    setCollapsedUnchangedConflictGroups((current) =>
+      seedComparisonTooltipUnchangedConflictGroupCollapseState(
+        unchangedConflictPreviewGroups,
+        current,
+      ),
+    );
+  };
+
+  const toggleShowUnchangedConflictRows = () => {
+    if (!showUnchangedConflictRows) {
+      ensureUnchangedConflictGroupCollapseState();
+    }
+    setShowUnchangedConflictRows((current) => !current);
+  };
+
   const isUnchangedConflictGroupCollapsed = (
     group: ComparisonTooltipPresetConflictPreviewGroup,
   ) =>
@@ -3182,7 +3198,7 @@ function ComparisonTooltipTuningPanel({
                   {unchangedConflictPreviewCount ? (
                     <button
                       className="comparison-dev-conflict-toggle"
-                      onClick={() => setShowUnchangedConflictRows((current) => !current)}
+                      onClick={toggleShowUnchangedConflictRows}
                       type="button"
                     >
                       {showUnchangedConflictRows
@@ -3776,6 +3792,20 @@ function groupComparisonTooltipPresetConflictPreviewRows(
       same_count: group.rows.filter((row) => row.delta_direction === "same").length,
       summary_label: formatComparisonTooltipPresetConflictGroupSummary(group.rows),
     }));
+}
+
+function seedComparisonTooltipUnchangedConflictGroupCollapseState(
+  groups: ComparisonTooltipPresetConflictPreviewGroup[],
+  current: Record<string, boolean>,
+) {
+  return groups.reduce<Record<string, boolean>>((accumulator, group) => {
+    if (Object.prototype.hasOwnProperty.call(accumulator, group.key)) {
+      return accumulator;
+    }
+    accumulator[group.key] =
+      group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD;
+    return accumulator;
+  }, { ...current });
 }
 
 function formatComparisonTooltipTuningValue(value: number) {
