@@ -253,6 +253,10 @@ type ComparisonTooltipTargetProps = {
   onMouseEnter: () => void;
   onMouseLeave: () => void;
 };
+type ComparisonTooltipInteractionOptions = {
+  hoverCloseDelayMs?: number;
+  hoverOpenDelayMs?: number;
+};
 type ComparisonTooltipLayout = {
   tooltipId: string;
   left: number;
@@ -1449,6 +1453,8 @@ function RunComparisonPanel({
   const tooltipScopeId = sanitizeComparisonTooltipId(useId());
   const tooltipTargetRefs = useRef(new Map<string, HTMLElement>());
   const tooltipBubbleRefs = useRef(new Map<string, HTMLSpanElement>());
+  const tooltipOpenTimerRef = useRef<number | null>(null);
+  const tooltipCloseTimerRef = useRef<number | null>(null);
   const [activeTooltipId, setActiveTooltipId] = useState<string | null>(null);
   const [activeTooltipLayout, setActiveTooltipLayout] = useState<ComparisonTooltipLayout | null>(
     null,
@@ -1473,6 +1479,29 @@ function RunComparisonPanel({
   const featuredNarrativeTooltipId = primaryNarrative
     ? buildComparisonTooltipId(tooltipScopeId, "featured-narrative", primaryNarrative.run_id)
     : undefined;
+  const metricTooltipInteraction: ComparisonTooltipInteractionOptions = {
+    hoverCloseDelayMs: 70,
+    hoverOpenDelayMs: 110,
+  };
+
+  const clearComparisonTooltipOpenTimer = () => {
+    if (tooltipOpenTimerRef.current !== null) {
+      window.clearTimeout(tooltipOpenTimerRef.current);
+      tooltipOpenTimerRef.current = null;
+    }
+  };
+
+  const clearComparisonTooltipCloseTimer = () => {
+    if (tooltipCloseTimerRef.current !== null) {
+      window.clearTimeout(tooltipCloseTimerRef.current);
+      tooltipCloseTimerRef.current = null;
+    }
+  };
+
+  const clearComparisonTooltipTimers = () => {
+    clearComparisonTooltipOpenTimer();
+    clearComparisonTooltipCloseTimer();
+  };
 
   const showComparisonTooltip = (tooltipId: string) => {
     setDismissedTooltipId((current) => (current === tooltipId ? null : current));
@@ -1488,6 +1517,42 @@ function RunComparisonPanel({
     setActiveTooltipId((current) => (current === tooltipId ? null : current));
     setActiveTooltipLayout((current) => (current?.tooltipId === tooltipId ? null : current));
     setDismissedTooltipId(tooltipId);
+  };
+
+  const scheduleComparisonTooltipShow = (
+    tooltipId: string,
+    options?: ComparisonTooltipInteractionOptions,
+  ) => {
+    clearComparisonTooltipCloseTimer();
+    const delayMs = options?.hoverOpenDelayMs ?? 0;
+    if (delayMs <= 0) {
+      clearComparisonTooltipOpenTimer();
+      showComparisonTooltip(tooltipId);
+      return;
+    }
+    clearComparisonTooltipOpenTimer();
+    tooltipOpenTimerRef.current = window.setTimeout(() => {
+      tooltipOpenTimerRef.current = null;
+      showComparisonTooltip(tooltipId);
+    }, delayMs);
+  };
+
+  const scheduleComparisonTooltipHide = (
+    tooltipId: string,
+    options?: ComparisonTooltipInteractionOptions,
+  ) => {
+    clearComparisonTooltipOpenTimer();
+    const delayMs = options?.hoverCloseDelayMs ?? 0;
+    if (delayMs <= 0) {
+      clearComparisonTooltipCloseTimer();
+      hideComparisonTooltip(tooltipId);
+      return;
+    }
+    clearComparisonTooltipCloseTimer();
+    tooltipCloseTimerRef.current = window.setTimeout(() => {
+      tooltipCloseTimerRef.current = null;
+      hideComparisonTooltip(tooltipId);
+    }, delayMs);
   };
 
   const registerComparisonTooltipTargetRef = (tooltipId?: string) => (node: HTMLElement | null) => {
@@ -1512,6 +1577,7 @@ function RunComparisonPanel({
 
   const getComparisonTooltipTargetProps = (
     tooltipId?: string,
+    options?: ComparisonTooltipInteractionOptions,
   ): ComparisonTooltipTargetProps | undefined => {
     if (!tooltipId) {
       return undefined;
@@ -1521,18 +1587,27 @@ function RunComparisonPanel({
       "aria-describedby": dismissedTooltipId === tooltipId ? undefined : tooltipId,
       "data-tooltip-visible":
         activeTooltipId === tooltipId && dismissedTooltipId !== tooltipId ? "true" : "false",
-      onBlur: () => hideComparisonTooltip(tooltipId),
-      onFocus: () => showComparisonTooltip(tooltipId),
+      onBlur: () => {
+        clearComparisonTooltipTimers();
+        hideComparisonTooltip(tooltipId);
+      },
+      onFocus: () => {
+        clearComparisonTooltipTimers();
+        showComparisonTooltip(tooltipId);
+      },
       onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
         if (event.key === "Escape") {
+          clearComparisonTooltipTimers();
           dismissComparisonTooltip(tooltipId);
           event.stopPropagation();
         }
       },
-      onMouseEnter: () => showComparisonTooltip(tooltipId),
-      onMouseLeave: () => hideComparisonTooltip(tooltipId),
+      onMouseEnter: () => scheduleComparisonTooltipShow(tooltipId, options),
+      onMouseLeave: () => scheduleComparisonTooltipHide(tooltipId, options),
     };
   };
+
+  useEffect(() => clearComparisonTooltipTimers, []);
 
   useLayoutEffect(() => {
     if (!activeTooltipId) {
@@ -1863,7 +1938,9 @@ function RunComparisonPanel({
                           : undefined
                       }
                       tabIndex={cellTooltip ? 0 : undefined}
-                      {...(cellTooltipId ? getComparisonTooltipTargetProps(cellTooltipId) : {})}
+                      {...(cellTooltipId
+                        ? getComparisonTooltipTargetProps(cellTooltipId, metricTooltipInteraction)
+                        : {})}
                     >
                       <strong>
                         {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
