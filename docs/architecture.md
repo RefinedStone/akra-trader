@@ -107,8 +107,9 @@ Run persistence is durable today.
 This is enough for restart-safe history, comparison, and stable dataset-boundary inspection, but not
 yet the final analytics-friendly schema.
 
-Stored rerun boundaries can also be used to launch explicit backtest reruns. The rerun records the
-source run, the target boundary, and whether the new execution still matched that boundary.
+Stored rerun boundaries can also be used to launch explicit backtest reruns or sandbox/paper replay
+runs. The rerun records the source run, the target boundary, and whether the new execution still
+matched that boundary.
 
 ## Market Data
 

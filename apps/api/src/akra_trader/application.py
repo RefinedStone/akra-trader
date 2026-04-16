@@ -280,40 +280,25 @@ class TradingApplication:
     return self._runs.get_run(run_id)
 
   def rerun_backtest_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
-    source_run = self._resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
-    if len(source_run.config.symbols) != 1:
-      raise ValueError("Explicit rerun currently supports only single-symbol backtests.")
+    return self._rerun_from_boundary(
+      rerun_boundary_id=rerun_boundary_id,
+      target_mode=RunMode.BACKTEST,
+      requested_mode_label=RunMode.BACKTEST.value,
+    )
 
-    rerun = self.run_backtest(
-      strategy_id=source_run.config.strategy_id,
-      symbol=source_run.config.symbols[0],
-      timeframe=source_run.config.timeframe,
-      initial_cash=source_run.config.initial_cash,
-      fee_rate=source_run.config.fee_rate,
-      slippage_bps=source_run.config.slippage_bps,
-      parameters=self._resolve_rerun_parameters(source_run),
-      start_at=self._resolve_rerun_start_at(source_run),
-      end_at=self._resolve_rerun_end_at(source_run),
+  def rerun_sandbox_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
+    return self._rerun_from_boundary(
+      rerun_boundary_id=rerun_boundary_id,
+      target_mode=RunMode.SANDBOX,
+      requested_mode_label=RunMode.SANDBOX.value,
     )
-    rerun.provenance.rerun_source_run_id = source_run.config.run_id
-    rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
-    rerun.provenance.rerun_match_status = (
-      "matched"
-      if rerun.provenance.rerun_boundary_id == rerun_boundary_id
-      else "drifted"
+
+  def rerun_paper_from_boundary(self, *, rerun_boundary_id: str) -> RunRecord:
+    return self._rerun_from_boundary(
+      rerun_boundary_id=rerun_boundary_id,
+      target_mode=RunMode.SANDBOX,
+      requested_mode_label="paper",
     )
-    rerun.notes.insert(
-      0,
-      f"Explicit rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
-    )
-    if rerun.provenance.rerun_match_status == "matched":
-      rerun.notes.append("Explicit rerun matched the stored rerun boundary.")
-    else:
-      rerun.notes.append(
-        "Explicit rerun drifted from the stored rerun boundary. "
-        f"Expected {rerun_boundary_id}, got {rerun.provenance.rerun_boundary_id or 'unavailable'}."
-      )
-    return self._runs.save_run(rerun)
 
   def compare_runs(self, *, run_ids: list[str], intent: str | None = None) -> RunComparison:
     normalized_run_ids = _normalize_run_ids(run_ids)
@@ -428,7 +413,9 @@ class TradingApplication:
     fee_rate: float,
     slippage_bps: float,
     parameters: dict,
-    replay_bars: int = 96,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
   ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     config = RunConfig(
@@ -443,6 +430,8 @@ class TradingApplication:
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
+      start_at=start_at,
+      end_at=end_at,
     )
     if metadata.runtime == "freqtrade_reference":
       run = RunRecord(
@@ -480,7 +469,9 @@ class TradingApplication:
     fee_rate: float,
     slippage_bps: float,
     parameters: dict,
-    replay_bars: int = 96,
+    replay_bars: int | None = 96,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
   ) -> RunRecord:
     return self.start_sandbox_run(
       strategy_id=strategy_id,
@@ -491,6 +482,8 @@ class TradingApplication:
       slippage_bps=slippage_bps,
       parameters=parameters,
       replay_bars=replay_bars,
+      start_at=start_at,
+      end_at=end_at,
     )
 
   def stop_sandbox_run(self, run_id: str) -> RunRecord | None:
@@ -669,11 +662,107 @@ class TradingApplication:
     run.provenance.rerun_boundary_state = market_data.reproducibility_state
 
   def _resolve_rerun_source(self, *, rerun_boundary_id: str) -> RunRecord:
-    candidates = self._runs.list_runs(mode=RunMode.BACKTEST.value, rerun_boundary_id=rerun_boundary_id)
+    candidates = self._runs.list_runs(rerun_boundary_id=rerun_boundary_id)
     if not candidates:
       raise LookupError(f"Rerun boundary not found: {rerun_boundary_id}")
     completed = [run for run in candidates if run.status == RunStatus.COMPLETED]
     return completed[0] if completed else candidates[0]
+
+  def _rerun_from_boundary(
+    self,
+    *,
+    rerun_boundary_id: str,
+    target_mode: RunMode,
+    requested_mode_label: str,
+  ) -> RunRecord:
+    source_run = self._resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
+    if len(source_run.config.symbols) != 1:
+      raise ValueError(f"Explicit rerun currently supports only single-symbol {requested_mode_label} runs.")
+
+    rerun_start_at = self._resolve_rerun_start_at(source_run)
+    rerun_end_at = self._resolve_rerun_end_at(source_run)
+    rerun_parameters = self._resolve_rerun_parameters(source_run)
+    symbol = source_run.config.symbols[0]
+    sandbox_window_note: str | None = None
+
+    if target_mode == RunMode.BACKTEST:
+      rerun = self.run_backtest(
+        strategy_id=source_run.config.strategy_id,
+        symbol=symbol,
+        timeframe=source_run.config.timeframe,
+        initial_cash=source_run.config.initial_cash,
+        fee_rate=source_run.config.fee_rate,
+        slippage_bps=source_run.config.slippage_bps,
+        parameters=rerun_parameters,
+        start_at=rerun_start_at,
+        end_at=rerun_end_at,
+      )
+    elif target_mode == RunMode.SANDBOX:
+      sandbox_start_at, sandbox_end_at, sandbox_replay_bars = self._resolve_sandbox_rerun_window(source_run)
+      if sandbox_replay_bars is None:
+        sandbox_window_note = "Sandbox rerun locked execution to the stored effective market-data window."
+      else:
+        sandbox_window_note = "Sandbox rerun replay preserved the stored sandbox bar window."
+      rerun = self.start_sandbox_run(
+        strategy_id=source_run.config.strategy_id,
+        symbol=symbol,
+        timeframe=source_run.config.timeframe,
+        initial_cash=source_run.config.initial_cash,
+        fee_rate=source_run.config.fee_rate,
+        slippage_bps=source_run.config.slippage_bps,
+        parameters=rerun_parameters,
+        replay_bars=sandbox_replay_bars,
+        start_at=sandbox_start_at,
+        end_at=sandbox_end_at,
+      )
+    else:
+      raise ValueError(f"Unsupported rerun target mode: {target_mode.value}")
+
+    return self._persist_explicit_rerun(
+      rerun=rerun,
+      source_run=source_run,
+      rerun_boundary_id=rerun_boundary_id,
+      requested_mode_label=requested_mode_label,
+      sandbox_window_note=sandbox_window_note,
+    )
+
+  def _persist_explicit_rerun(
+    self,
+    *,
+    rerun: RunRecord,
+    source_run: RunRecord,
+    rerun_boundary_id: str,
+    requested_mode_label: str,
+    sandbox_window_note: str | None = None,
+  ) -> RunRecord:
+    rerun.provenance.rerun_source_run_id = source_run.config.run_id
+    rerun.provenance.rerun_target_boundary_id = rerun_boundary_id
+    rerun.provenance.rerun_match_status = (
+      "matched"
+      if rerun.provenance.rerun_boundary_id == rerun_boundary_id
+      else "drifted"
+    )
+    rerun.notes.insert(
+      0,
+      f"Explicit {requested_mode_label} rerun from boundary {rerun_boundary_id} using source run {source_run.config.run_id}.",
+    )
+    if rerun.config.mode == RunMode.SANDBOX and sandbox_window_note is not None:
+      rerun.notes.insert(
+        1,
+        sandbox_window_note,
+      )
+    if rerun.provenance.rerun_match_status == "matched":
+      rerun.notes.append("Explicit rerun matched the stored rerun boundary.")
+    else:
+      rerun.notes.append(
+        "Explicit rerun drifted from the stored rerun boundary. "
+        f"Expected {rerun_boundary_id}, got {rerun.provenance.rerun_boundary_id or 'unavailable'}."
+      )
+      if source_run.config.mode != rerun.config.mode:
+        rerun.notes.append(
+          "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
+        )
+    return self._runs.save_run(rerun)
 
   def _resolve_rerun_parameters(self, run: RunRecord) -> dict:
     strategy = run.provenance.strategy
@@ -701,6 +790,23 @@ class TradingApplication:
       market_data.effective_end_at
       or market_data.requested_end_at
       or run.config.end_at
+    )
+
+  @staticmethod
+  def _resolve_sandbox_rerun_window(run: RunRecord) -> tuple[datetime | None, datetime | None, int | None]:
+    market_data = run.provenance.market_data
+    if (
+      run.config.mode == RunMode.SANDBOX
+      and run.config.start_at is None
+      and run.config.end_at is None
+      and market_data is not None
+      and market_data.candle_count > 0
+    ):
+      return None, None, market_data.candle_count
+    return (
+      TradingApplication._resolve_rerun_start_at(run),
+      TradingApplication._resolve_rerun_end_at(run),
+      None,
     )
 
 

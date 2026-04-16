@@ -49,7 +49,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - native vs reference benchmark provenance and artifact display
 - native run provenance carries dataset identity fingerprints for candle-backed inputs
 - run provenance now links native runs to sync checkpoints and rerun boundary identities
-- explicit backtest rerun from stored rerun boundaries with match-or-drift tracking
+- explicit rerun from stored rerun boundaries into backtest or sandbox execution with
+  match-or-drift tracking
 
 ### Control room
 
@@ -57,7 +58,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox runs
-- sandbox stop control
+- sandbox stop control and rerun-boundary replay actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas

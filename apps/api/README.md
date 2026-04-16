@@ -15,7 +15,8 @@ Implemented now:
 - dataset identity and reproducibility state recorded in run market-data provenance
 - Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
   and status reporting
-- run provenance exposes rerun boundary identities and supports rerun-boundary filtering
+- run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
+  relaunch stored boundaries into backtest or sandbox flows
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -60,6 +61,8 @@ Defaults:
 - `POST /api/runs/backtests`
 - `GET /api/runs/backtests/{run_id}`
 - `POST /api/runs/rerun-boundaries/{rerun_boundary_id}/backtests`
+- `POST /api/runs/rerun-boundaries/{rerun_boundary_id}/sandbox`
+- `POST /api/runs/rerun-boundaries/{rerun_boundary_id}/paper`
 - `POST /api/runs/sandbox`
 - `POST /api/runs/sandbox/{run_id}/stop`
 - `GET /api/runs/{run_id}/orders`
@@ -71,7 +74,8 @@ Defaults:
 
 - backtests run to completion and are persisted immediately
 - native candle-backed runs persist dataset identity fingerprints for the exact candles used
-- stored rerun boundaries can launch explicit backtest reruns with match-or-drift notes
+- stored rerun boundaries can launch explicit backtest, sandbox, and paper-alias reruns with
+  match-or-drift notes
 - sandbox runs currently replay the most recent bars and are then marked `running` for forward compatibility with a future worker model
 - reference strategies are supported for backtest delegation only
 - the app lifespan starts background market-data sync jobs when the Binance provider is active

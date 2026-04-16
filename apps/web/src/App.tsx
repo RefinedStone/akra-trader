@@ -858,6 +858,23 @@ export default function App() {
     }
   }
 
+  async function rerunSandbox(rerunBoundaryId: string) {
+    setStatusText(`Launching sandbox replay for boundary ${rerunBoundaryId}...`);
+    try {
+      const run = await fetchJson<Run>(`/runs/rerun-boundaries/${encodeURIComponent(rerunBoundaryId)}/sandbox`, {
+        method: "POST",
+      });
+      await loadAll();
+      setStatusText(
+        run.provenance.rerun_match_status === "matched"
+          ? `Sandbox replay started and matched boundary ${rerunBoundaryId}.`
+          : `Sandbox replay started with expected drift from boundary ${rerunBoundaryId}.`,
+      );
+    } catch (error) {
+      setStatusText(`Sandbox replay failed: ${(error as Error).message}`);
+    }
+  }
+
   function toggleComparisonRun(runId: string) {
     setSelectedComparisonRunIds((current) => {
       if (current.includes(runId)) {
@@ -1077,7 +1094,16 @@ export default function App() {
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
           }}
-          onRerun={rerunBacktest}
+          rerunActions={[
+            {
+              label: "Rerun backtest",
+              onRerun: rerunBacktest,
+            },
+            {
+              label: "Replay in sandbox",
+              onRerun: rerunSandbox,
+            },
+          ]}
         />
         <RunSection
           title="Sandbox runs"
@@ -1085,6 +1111,12 @@ export default function App() {
           strategies={strategies}
           filter={sandboxRunFilter}
           setFilter={setSandboxRunFilter}
+          rerunActions={[
+            {
+              label: "Replay boundary",
+              onRerun: rerunSandbox,
+            },
+          ]}
           onStop={stopSandboxRun}
         />
       </main>
@@ -1630,6 +1662,11 @@ type RunSectionComparisonControls = {
   onSelectBenchmarkPair: () => void;
 };
 
+type RunSectionRerunAction = {
+  label: string;
+  onRerun: (rerunBoundaryId: string) => Promise<void>;
+};
+
 function RunSection({
   title,
   runs,
@@ -1637,7 +1674,7 @@ function RunSection({
   filter,
   setFilter,
   comparison,
-  onRerun,
+  rerunActions,
   onStop,
 }: {
   title: string;
@@ -1646,7 +1683,7 @@ function RunSection({
   filter: RunHistoryFilter;
   setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
   comparison?: RunSectionComparisonControls;
-  onRerun?: (rerunBoundaryId: string) => Promise<void>;
+  rerunActions?: RunSectionRerunAction[];
   onStop?: (runId: string) => Promise<void>;
 }) {
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
@@ -1806,15 +1843,18 @@ function RunSection({
                       : "Add to compare"}
                   </button>
                 ) : null}
-                {onRerun && run.config.mode === "backtest" && run.provenance.rerun_boundary_id ? (
-                  <button
-                    className="ghost-button"
-                    onClick={() => void onRerun(run.provenance.rerun_boundary_id!)}
-                    type="button"
-                  >
-                    Rerun boundary
-                  </button>
-                ) : null}
+                {rerunActions && run.provenance.rerun_boundary_id
+                  ? rerunActions.map((action) => (
+                    <button
+                      className="ghost-button"
+                      key={action.label}
+                      onClick={() => void action.onRerun(run.provenance.rerun_boundary_id!)}
+                      type="button"
+                    >
+                      {action.label}
+                    </button>
+                  ))
+                  : null}
                 {onStop && run.status === "running" ? (
                   <button className="ghost-button" onClick={() => void onStop(run.config.run_id)} type="button">
                     Stop

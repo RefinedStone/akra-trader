@@ -308,12 +308,85 @@ def test_rerun_boundary_endpoint_creates_backtest_from_stored_boundary(tmp_path:
   }
 
 
+def test_rerun_boundary_endpoint_creates_sandbox_run_from_stored_boundary(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  source_response = client.post(
+    "/api/runs/sandbox",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+      "replay_bars": 24,
+    },
+  )
+  assert source_response.status_code == 200
+  source_payload = source_response.json()
+  rerun_boundary_id = source_payload["provenance"]["rerun_boundary_id"]
+
+  rerun_response = client.post(f"/api/runs/rerun-boundaries/{rerun_boundary_id}/sandbox")
+
+  assert rerun_response.status_code == 200
+  rerun_payload = rerun_response.json()
+  assert rerun_payload["config"]["run_id"] != source_payload["config"]["run_id"]
+  assert rerun_payload["config"]["mode"] == "sandbox"
+  assert rerun_payload["status"] == "running"
+  assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
+  assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
+  assert rerun_payload["provenance"]["rerun_match_status"] == "matched"
+  assert rerun_payload["provenance"]["rerun_boundary_id"] == rerun_boundary_id
+  assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
+  assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
+
+
+def test_rerun_boundary_paper_endpoint_replays_boundary_with_expected_mode_drift(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  source_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {"short_window": 13},
+      "start_at": "2025-01-01T04:00:00Z",
+      "end_at": "2025-01-01T12:00:00Z",
+    },
+  )
+  assert source_response.status_code == 200
+  source_payload = source_response.json()
+  rerun_boundary_id = source_payload["provenance"]["rerun_boundary_id"]
+
+  rerun_response = client.post(f"/api/runs/rerun-boundaries/{rerun_boundary_id}/paper")
+
+  assert rerun_response.status_code == 200
+  rerun_payload = rerun_response.json()
+  assert rerun_payload["config"]["mode"] == "sandbox"
+  assert rerun_payload["status"] == "running"
+  assert rerun_payload["provenance"]["rerun_source_run_id"] == source_payload["config"]["run_id"]
+  assert rerun_payload["provenance"]["rerun_target_boundary_id"] == rerun_boundary_id
+  assert rerun_payload["provenance"]["rerun_match_status"] == "drifted"
+  assert rerun_payload["provenance"]["market_data"]["effective_start_at"] == source_payload["provenance"]["market_data"]["effective_start_at"]
+  assert rerun_payload["provenance"]["market_data"]["effective_end_at"] == source_payload["provenance"]["market_data"]["effective_end_at"]
+
+
 def test_rerun_boundary_endpoint_returns_not_found_for_unknown_boundary(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 
   response = client.post("/api/runs/rerun-boundaries/rerun-v1:missing/backtests")
 
   assert response.status_code == 404
+
+  sandbox_response = client.post("/api/runs/rerun-boundaries/rerun-v1:missing/sandbox")
+
+  assert sandbox_response.status_code == 404
 
 
 def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tmp_path: Path) -> None:

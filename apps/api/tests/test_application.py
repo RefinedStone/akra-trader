@@ -501,7 +501,7 @@ def test_rerun_backtest_from_boundary_uses_stored_effective_window_and_records_m
   assert rerun.provenance.market_data is not None
   assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
   assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
-  assert rerun.notes[0].startswith("Explicit rerun from boundary ")
+  assert rerun.notes[0].startswith("Explicit backtest rerun from boundary ")
   assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
 
 
@@ -530,6 +530,84 @@ def test_rerun_backtest_from_boundary_uses_resolved_strategy_parameters(tmp_path
   assert rerun.provenance.strategy is not None
   assert rerun.provenance.strategy.parameter_snapshot.requested == {"short_window": 13, "long_window": 21}
   assert rerun.provenance.strategy.parameter_snapshot.resolved == {"short_window": 13, "long_window": 21}
+
+
+def test_rerun_sandbox_from_boundary_uses_stored_effective_window_and_replays_same_mode_boundary(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  rerun = app.rerun_sandbox_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
+
+  assert rerun.config.run_id != source.config.run_id
+  assert rerun.config.mode == RunMode.SANDBOX
+  assert rerun.status == RunStatus.RUNNING
+  assert rerun.provenance.rerun_source_run_id == source.config.run_id
+  assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.rerun_match_status == "matched"
+  assert rerun.provenance.rerun_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.market_data is not None
+  assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
+  assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
+  assert rerun.notes[0].startswith("Explicit sandbox rerun from boundary ")
+  assert rerun.notes[1] == "Sandbox rerun replay preserved the stored sandbox bar window."
+  assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+
+
+def test_rerun_paper_from_backtest_boundary_records_expected_mode_drift(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+    start_at=datetime(2025, 1, 1, 4, 0, tzinfo=UTC),
+    end_at=datetime(2025, 1, 1, 12, 0, tzinfo=UTC),
+  )
+
+  rerun = app.rerun_paper_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
+
+  assert rerun.config.mode == RunMode.SANDBOX
+  assert rerun.status == RunStatus.RUNNING
+  assert rerun.provenance.rerun_source_run_id == source.config.run_id
+  assert rerun.provenance.rerun_target_boundary_id == source.provenance.rerun_boundary_id
+  assert rerun.provenance.rerun_match_status == "drifted"
+  assert rerun.provenance.market_data is not None
+  assert rerun.provenance.market_data.effective_start_at == source.provenance.market_data.effective_start_at
+  assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
+  assert rerun.provenance.strategy is not None
+  assert rerun.provenance.strategy.parameter_snapshot.resolved == {"short_window": 13, "long_window": 21}
+  assert rerun.notes[0].startswith("Explicit paper rerun from boundary ")
+  assert rerun.notes[-1] == (
+    "Mode-specific rerun boundary drift is expected when replaying a stored boundary into a different execution mode."
+  )
 
 
 def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path: Path) -> None:

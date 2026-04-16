@@ -157,6 +157,32 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     return serialize_run(run)
 
+  @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/sandbox")
+  def rerun_sandbox_from_boundary(
+    rerun_boundary_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.rerun_sandbox_from_boundary(rerun_boundary_id=rerun_boundary_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_run(run)
+
+  @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/paper")
+  def rerun_paper_from_boundary(
+    rerun_boundary_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.rerun_paper_from_boundary(rerun_boundary_id=rerun_boundary_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_run(run)
+
   @router.post("/runs/sandbox")
   def start_sandbox_run(
     request: SandboxRunRequest,
