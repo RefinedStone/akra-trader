@@ -458,19 +458,56 @@
       "id": "planning-reference-lanes-freqtrade-binary-export-semantic-breakdown",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Decode richer semantics from embedded Freqtrade binary exports",
-      "description": "Extend the new binary-export inspection beyond structural summaries so benchmark artifact sections expose deeper operator-meaningful semantics from embedded Freqtrade exports, such as per-tag signal distributions, wallet balance extrema grouped by currency, and richer rejected/exited event breakdowns instead of only high-level previews and counts.",
-      "status": "ready",
+      "description": "Completed the semantic-decoding follow-up by extending the Freqtrade zip inspector to read richer meaning from embedded binary exports, including market-change best/worst pairs and positive/negative counts, wallet portfolio start/end/high/low quote values plus per-currency latest quote previews, and signal/rejected/exited previews with `enter_tag`, reject-reason, and exit-reason breakdown counts, while keeping unreadable members non-fatal and covering the new behavior with real in-memory feather/joblib payload tests plus control-room labels.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply said nothing essential remains from binary-export inspection and directly named deeper semantic decoding of signals, wallet extrema, and rejected/exited breakdowns as the clear next refinement, so this becomes the next executable queue-head task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the richer Freqtrade binary-export semantic decoding, verified `apps/api` with `./.venv/bin/python -m pytest` (`37 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `117bc55` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:35:00Z",
+      "updated_at": "2026-04-17T02:50:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-freqtrade-binary-export-inspection"
       ],
       "direction_relation_note": "Advances the reference benchmark lane from structural binary-export provenance toward richer benchmark-native semantics that operators can compare directly without opening raw Freqtrade artifacts."
+    },
+    {
+      "id": "planning-reference-lanes-freqtrade-benchmark-narratives",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Higher-level benchmark narratives from decoded Freqtrade exports shipped",
+      "description": "Completed the benchmark narrative follow-up by synthesizing decoded Freqtrade zip exports into artifact/root `benchmark_story` sections that summarize run headline, market breadth, wallet trajectory, signal bias, rejection friction, exit posture, and pair concentration, then surfacing those readable labels in the web artifact cards and locking both snapshot/root narrative outputs into API tests.",
+      "status": "done",
+      "base_priority": 81,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the higher-level Freqtrade benchmark narrative synthesis, verified `apps/api` with `./.venv/bin/python -m pytest` (`37 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `07b6caf` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T03:10:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-freqtrade-binary-export-semantic-breakdown"
+      ],
+      "direction_relation_note": "Pushes the reference benchmark lane past raw decoded sections into operator-usable benchmark narratives that improve quick comparison without collapsing external-runtime evidence into native analytics."
+    },
+    {
+      "id": "planning-reference-lanes-benchmark-comparison-narratives",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Explain native-vs-reference benchmark divergence with comparison-level narratives",
+      "description": "Build on the newly shipped per-artifact `benchmark_story` summaries so run comparison payloads and operator-facing views explain how a native run diverges from a reference benchmark at comparison level, highlighting headline performance deltas, breadth/participation differences, wallet concentration drift, signal bias shifts, rejection friction gaps, and exit-posture differences instead of narrating each benchmark artifact in isolation.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed benchmark-story task and explicitly identified comparison-level narratives about how a native run diverges from a reference benchmark as the likely next refinement, so this becomes the next executable queue-head task.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T03:10:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-freqtrade-benchmark-narratives",
+        "planning-research-foundation-run-comparison-workflow"
+      ],
+      "direction_relation_note": "Advances the reference benchmark lane from isolated benchmark storytelling into direct native-versus-reference interpretation so operators can understand divergence without manually reconciling separate summaries."
     }
   ]
 }
