@@ -1142,20 +1142,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-session-metadata",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Show clearer per-session metadata in the saved reset summary",
-      "description": "Refine the `Reset all saved views` confirmation summary so expanded saved sessions show more informative per-session metadata than a short saved-session id alone, such as when the session was first stored or which conflict layout choices it remembers.",
-      "status": "ready",
+      "title": "Saved reset summary now shows clearer per-session metadata",
+      "description": "Completed the saved-reset-summary metadata follow-up by showing clearer per-session chips for whether unchanged rows were visible, whether group layout stayed at defaults or had expanded/collapsed overrides, and a short session id as a secondary identifier instead of the primary label.",
+      "status": "done",
       "base_priority": 78,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed per-group expansion task and explicitly identified clearer per-session metadata than the short saved-session id as the likeliest next refinement, making it the clearest immediately executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the per-session metadata refinement in the saved reset summary, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `9787578` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:34:55Z",
+      "updated_at": "2026-04-16T18:37:14Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-reset-all-per-group-expansion"
       ],
       "direction_relation_note": "Builds on the shipped per-group reset-summary expansion by making the saved-session entries themselves more legible, so operators can distinguish remembered conflict-view sessions by meaningful metadata before a destructive reset."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-session-updated-at",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Show each saved session's last updated time in the reset summary",
+      "description": "Persist and surface when each saved tooltip conflict-view session was last updated so the `Reset all saved views` confirmation summary can distinguish recent remembered layouts from older ones without relying on short ids alone.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed metadata-chip task and explicitly named persisting plus showing each saved session's last updated time as the likeliest next refinement, making it the clearest immediately executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T18:37:14Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-session-metadata"
+      ],
+      "direction_relation_note": "Builds on the clearer saved-session metadata chips by adding recency context, so operators can tell whether remembered conflict-view layouts are recent or stale before a destructive reset."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-contextual-reset-scopes",
