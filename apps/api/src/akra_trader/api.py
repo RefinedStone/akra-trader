@@ -34,7 +34,7 @@ class BacktestRequest(BaseModel):
   end_at: datetime | None = None
 
 
-class PaperRunRequest(BaseModel):
+class SandboxRunRequest(BaseModel):
   strategy_id: str
   symbol: str
   timeframe: str = "5m"
@@ -58,6 +58,10 @@ def create_router(container: Container) -> APIRouter:
   @router.get("/strategies")
   def list_strategies(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
     return [asdict(strategy) for strategy in app.list_strategies()]
+
+  @router.get("/references")
+  def list_references(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
+    return [asdict(reference) for reference in app.list_references()]
 
   @router.post("/strategies/register")
   def register_strategy(
@@ -97,9 +101,12 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail="Run not found")
     return serialize_run(run)
 
-  @router.post("/runs/paper")
-  def start_paper_run(request: PaperRunRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.start_paper_run(
+  @router.post("/runs/sandbox")
+  def start_sandbox_run(
+    request: SandboxRunRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    run = app.start_sandbox_run(
       strategy_id=request.strategy_id,
       symbol=request.symbol,
       timeframe=request.timeframe,
@@ -111,12 +118,23 @@ def create_router(container: Container) -> APIRouter:
     )
     return serialize_run(run)
 
-  @router.post("/runs/paper/{run_id}/stop")
-  def stop_paper_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.stop_paper_run(run_id)
+  @router.post("/runs/sandbox/{run_id}/stop")
+  def stop_sandbox_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    run = app.stop_sandbox_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
     return serialize_run(run)
+
+  @router.post("/runs/paper")
+  def start_paper_run(
+    request: SandboxRunRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    return start_sandbox_run(request, app)
+
+  @router.post("/runs/paper/{run_id}/stop")
+  def stop_paper_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    return stop_sandbox_run(run_id, app)
 
   @router.get("/runs/{run_id}/orders")
   def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:

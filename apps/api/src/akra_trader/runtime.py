@@ -1,0 +1,235 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from datetime import UTC
+from datetime import datetime
+
+import pandas as pd
+
+from akra_trader.domain.models import Candle
+from akra_trader.domain.models import ExecutionPlan
+from akra_trader.domain.models import Position
+from akra_trader.domain.models import RunConfig
+from akra_trader.domain.models import RunMode
+from akra_trader.domain.models import RunProvenance
+from akra_trader.domain.models import RunRecord
+from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import SignalAction
+from akra_trader.domain.models import SignalDecision
+from akra_trader.domain.models import StrategyDecisionEnvelope
+from akra_trader.domain.models import StrategyExecutionState
+from akra_trader.domain.services import apply_signal
+from akra_trader.domain.services import build_equity_point
+from akra_trader.ports import MarketDataPort
+
+
+def candles_to_frame(candles: list[Candle]) -> pd.DataFrame:
+  return pd.DataFrame(
+    [
+      {
+        "timestamp": candle.timestamp,
+        "open": candle.open,
+        "high": candle.high,
+        "low": candle.low,
+        "close": candle.close,
+        "volume": candle.volume,
+      }
+      for candle in candles
+    ]
+  )
+
+
+class ExecutionModeService:
+  _legacy_aliases = {"paper": RunMode.SANDBOX.value}
+
+  def normalize(self, mode: str | None) -> str | None:
+    if mode is None:
+      return None
+    return self._legacy_aliases.get(mode, mode)
+
+  def launch_note(self, mode: RunMode, replay_bars: int | None = None) -> str | None:
+    if mode == RunMode.SANDBOX:
+      suffix = ""
+      if replay_bars is not None:
+        suffix = f" Initial replay window: {replay_bars} bars."
+      return (
+        "Sandbox run uses the shared native engine and is ready for a future stream or worker adapter."
+        f"{suffix}"
+      )
+    if mode == RunMode.LIVE:
+      return "Live mode is reserved for guarded venue-backed execution."
+    return None
+
+
+class DataEngine:
+  def __init__(self, market_data: MarketDataPort) -> None:
+    self._market_data = market_data
+
+  def load_frame(self, *, config: RunConfig, active_bars: int | None):
+    candles = self._market_data.get_candles(
+      symbol=config.symbols[0],
+      timeframe=config.timeframe,
+      start_at=config.start_at,
+      end_at=config.end_at,
+      limit=active_bars,
+    )
+    return candles_to_frame(candles)
+
+
+class StateCache:
+  def __init__(self, *, instrument_id: str, cash: float) -> None:
+    self.instrument_id = instrument_id
+    self.cash = cash
+    self.position: Position | None = None
+    self.last_price: float | None = None
+
+  def mark_price(self, market_price: float) -> None:
+    self.last_price = market_price
+
+  def snapshot(self, *, timestamp: datetime, parameters: dict) -> StrategyExecutionState:
+    return StrategyExecutionState(
+      timestamp=timestamp,
+      instrument_id=self.instrument_id,
+      has_position=self.position is not None and self.position.is_open,
+      cash=self.cash,
+      position_size=self.position.quantity if self.position else 0.0,
+      parameters=parameters,
+    )
+
+  def apply(self, *, cash: float, position: Position | None) -> None:
+    self.cash = cash
+    self.position = position
+
+
+class RiskEngine:
+  def review(self, decision: StrategyDecisionEnvelope) -> StrategyDecisionEnvelope:
+    state = decision.context.state
+    plan = decision.execution
+    normalized_fraction = min(max(plan.size_fraction, 0.0), min(max(plan.max_position_fraction, 0.0), 1.0))
+    normalized_plan = replace(plan, size_fraction=normalized_fraction)
+
+    if plan.reduce_only and decision.signal.action == SignalAction.BUY:
+      return self._block(decision, normalized_plan, "reduce_only_prevents_buy")
+    if decision.signal.action == SignalAction.BUY and state.has_position and not normalized_plan.allow_scale_in:
+      return self._block(decision, normalized_plan, "scale_in_disabled")
+    if decision.signal.action == SignalAction.SELL and not state.has_position:
+      return self._block(decision, normalized_plan, "no_position_to_reduce")
+    if decision.signal.action == SignalAction.BUY and state.cash <= 0:
+      return self._block(decision, normalized_plan, "insufficient_cash")
+    if normalized_fraction == 0 and decision.signal.action != SignalAction.HOLD:
+      return self._block(decision, normalized_plan, "size_fraction_zero")
+
+    if normalized_plan != plan:
+      trace = {**decision.trace, "risk_adjustments": ("normalized_size_fraction",)}
+      return replace(decision, execution=normalized_plan, trace=trace)
+    return decision
+
+  def _block(
+    self,
+    decision: StrategyDecisionEnvelope,
+    execution: ExecutionPlan,
+    reason: str,
+  ) -> StrategyDecisionEnvelope:
+    blocked_signal = SignalDecision(
+      timestamp=decision.signal.timestamp,
+      action=SignalAction.HOLD,
+      size_fraction=0.0,
+      confidence=decision.signal.confidence,
+      tags=(*decision.signal.tags, "risk_blocked"),
+      reason=reason,
+    )
+    trace = {**decision.trace, "risk_block": reason}
+    return StrategyDecisionEnvelope(
+      signal=blocked_signal,
+      rationale=f"{decision.rationale} RiskEngine blocked execution: {reason}.",
+      context=decision.context,
+      execution=replace(execution, size_fraction=0.0),
+      trace=trace,
+    )
+
+
+class ExecutionEngine:
+  def __init__(self, risk_engine: RiskEngine | None = None) -> None:
+    self._risk_engine = risk_engine or RiskEngine()
+
+  def apply_decision(
+    self,
+    *,
+    run: RunRecord,
+    config: RunConfig,
+    decision: StrategyDecisionEnvelope,
+    cache: StateCache,
+    market_price: float,
+  ) -> None:
+    reviewed = self._risk_engine.review(decision)
+    cash, position, order, fill, closed_trade = apply_signal(
+      run_id=config.run_id,
+      instrument_id=cache.instrument_id,
+      signal=reviewed.signal,
+      execution=reviewed.execution,
+      market_price=market_price,
+      position=cache.position,
+      cash=cache.cash,
+      fee_rate=config.fee_rate,
+      slippage_bps=config.slippage_bps,
+    )
+    cache.mark_price(market_price)
+    cache.apply(cash=cash, position=position)
+
+    if order is not None:
+      run.orders.append(order)
+    if fill is not None:
+      run.fills.append(fill)
+    if position is not None:
+      run.positions[position.instrument_id] = position
+    if closed_trade is not None:
+      run.closed_trades.append(closed_trade)
+
+    run.equity_curve.append(
+      build_equity_point(
+        timestamp=reviewed.signal.timestamp,
+        cash=cache.cash,
+        position=cache.position if cache.position and cache.position.is_open else None,
+        market_price=market_price,
+      )
+    )
+    run.notes.append(
+      f"{reviewed.context.timestamp.isoformat()} | "
+      f"{reviewed.signal.action.value} | {reviewed.rationale}"
+    )
+
+
+class RunSupervisor:
+  def create_native_run(self, *, config: RunConfig) -> RunRecord:
+    return RunRecord(
+      config=config,
+      status=RunStatus.RUNNING,
+      provenance=RunProvenance(lane="native"),
+    )
+
+  def complete(self, run: RunRecord) -> RunRecord:
+    run.status = RunStatus.COMPLETED
+    run.ended_at = datetime.now(UTC)
+    return run
+
+  def start_mode(
+    self,
+    *,
+    run: RunRecord,
+    mode: RunMode,
+    mode_service: ExecutionModeService,
+    replay_bars: int | None = None,
+  ) -> RunRecord:
+    if run.status == RunStatus.FAILED:
+      return run
+    run.status = RunStatus.RUNNING
+    note = mode_service.launch_note(mode, replay_bars=replay_bars)
+    if note:
+      run.notes.append(note)
+    return run
+
+  def stop(self, run: RunRecord, *, reason: str) -> RunRecord:
+    run.status = RunStatus.STOPPED
+    run.ended_at = datetime.now(UTC)
+    run.notes.append(reason)
+    return run

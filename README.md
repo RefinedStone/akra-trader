@@ -7,12 +7,12 @@ Python-first algorithmic trading platform with strong hexagonal boundaries, an o
 - `apps/api`
   - FastAPI backend
   - hexagonal domain/application/adapter split
-  - native backtest and paper-replay engine
-  - strategy pipeline split into `feature frame -> decision context -> decision envelope`
-  - NFI reference catalog and Freqtrade command delegation
+  - native backtest and sandbox-replay engine
+  - strategy pipeline split into `feature frame -> decision context -> signal policy -> execution policy -> decision envelope`
+  - reference catalog, NFI Freqtrade delegation, and run provenance capture
 - `apps/web`
   - React + TypeScript control room
-  - strategy catalog, market-data status, backtest launch, paper run control
+  - strategy catalog, reference catalog, market-data status, backtest launch, sandbox run control
 - `reference/NostalgiaForInfinity`
   - upstream reference repository kept intact for strategy/config reuse
 
@@ -24,8 +24,9 @@ Current stack:
 
 1. `build_feature_frame`
 2. `build_decision_context`
-3. `decide`
-4. execution engine applies the returned signal
+3. `signal_policy`
+4. `execution_policy`
+5. execution engine applies the returned intent
 
 This lets three strategy families coexist:
 
@@ -75,9 +76,20 @@ These entries point directly at files under [reference/NostalgiaForInfinity](/ho
 
 If `freqtrade` is not installed, the platform records the prepared command and reports that the reference runtime is unavailable.
 
+## Reference catalog
+
+Third-party materials are tracked in [reference/catalog.toml](/home/akra/dev/akra-trader/reference/catalog.toml).
+
+- `nostalgia-for-infinity`: external-runtime reference lane
+- `nautilus-trader`: ideas-only architecture reference
+- `ccxt`: direct dependency candidate for exchange adapters
+- `yfinance`: direct dependency candidate for stock-market data
+
 ## Docs
 
 - [Architecture](docs/architecture.md)
+- [NautilusTrader Notes](docs/reference-nautilus-trader.md)
+- [NostalgiaForInfinity Notes](docs/reference-nostalgia-for-infinity.md)
 - [Roadmap Overview](docs/roadmap/README.md)
 - [Product Roadmap](docs/roadmap/product-roadmap.md)
 - [Technical Roadmap](docs/roadmap/technical-roadmap.md)

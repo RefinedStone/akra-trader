@@ -20,7 +20,8 @@ class MarketType(str, Enum):
 
 class RunMode(str, Enum):
   BACKTEST = "backtest"
-  PAPER = "paper"
+  SANDBOX = "sandbox"
+  LIVE = "live"
 
 
 class RunStatus(str, Enum):
@@ -85,6 +86,19 @@ class WarmupSpec:
 
 
 @dataclass(frozen=True)
+class ReferenceSource:
+  reference_id: str
+  title: str
+  kind: str
+  homepage: str
+  license: str
+  integration_mode: str
+  local_path: str | None = None
+  runtime: str | None = None
+  summary: str = ""
+
+
+@dataclass(frozen=True)
 class StrategyMetadata:
   strategy_id: str
   name: str
@@ -94,6 +108,7 @@ class StrategyMetadata:
   supported_timeframes: tuple[str, ...]
   parameter_schema: dict[str, Any]
   description: str
+  reference_id: str | None = None
   reference_path: str | None = None
   entrypoint: str | None = None
 
@@ -106,6 +121,19 @@ class SignalDecision:
   confidence: float = 1.0
   tags: tuple[str, ...] = ()
   reason: str | None = None
+
+
+@dataclass(frozen=True)
+class ExecutionPlan:
+  size_fraction: float = 1.0
+  allow_scale_in: bool = False
+  allow_partial_exit: bool = False
+  reduce_only: bool = False
+  max_position_fraction: float = 1.0
+  stop_loss_pct: float | None = None
+  take_profit_pct: float | None = None
+  exit_mode: str | None = None
+  tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -132,6 +160,7 @@ class StrategyDecisionEnvelope:
   signal: SignalDecision
   rationale: str
   context: StrategyDecisionContext
+  execution: ExecutionPlan = field(default_factory=ExecutionPlan)
   trace: dict[str, Any] = field(default_factory=dict)
 
 
@@ -212,11 +241,23 @@ class RunConfig:
 
 
 @dataclass
+class RunProvenance:
+  lane: str = "native"
+  reference_id: str | None = None
+  reference_version: str | None = None
+  integration_mode: str | None = None
+  working_directory: str | None = None
+  external_command: tuple[str, ...] = ()
+  artifact_paths: tuple[str, ...] = ()
+
+
+@dataclass
 class RunRecord:
   config: RunConfig
   status: RunStatus = RunStatus.PENDING
   started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   ended_at: datetime | None = None
+  provenance: RunProvenance = field(default_factory=RunProvenance)
   orders: list[Order] = field(default_factory=list)
   fills: list[Fill] = field(default_factory=list)
   positions: dict[str, Position] = field(default_factory=dict)

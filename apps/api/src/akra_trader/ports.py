@@ -8,6 +8,7 @@ import pandas as pd
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyDecisionContext
@@ -61,6 +62,12 @@ class StrategyCatalogPort(Protocol):
   def load(self, strategy_id: str) -> StrategyRuntime: ...
 
   def register(self, registration: StrategyRegistration) -> StrategyMetadata: ...
+
+
+class ReferenceCatalogPort(Protocol):
+  def list_entries(self) -> list[ReferenceSource]: ...
+
+  def get(self, reference_id: str) -> ReferenceSource: ...
 
 
 class RunRepositoryPort(Protocol):

@@ -1,0 +1,45 @@
+version = 1
+
+[[references]]
+id = "ccxt"
+title = "ccxt"
+kind = "repository"
+homepage = "https://github.com/ccxt/ccxt"
+license = "MIT"
+integration_mode = "direct_dependency_candidate"
+local_path = "reference/cctx/ccxt"
+runtime = "python_package"
+summary = "Primary candidate for exchange market-data and execution adapters."
+
+[[references]]
+id = "nautilus-trader"
+title = "NautilusTrader"
+kind = "repository"
+homepage = "https://github.com/nautechsystems/nautilus_trader"
+license = "LGPL-3.0"
+integration_mode = "ideas_only"
+local_path = "reference/nautilus_trader/nautilus_trader"
+runtime = "nautilus"
+summary = "Architecture and execution-engine reference. Keep outside akra core until a sidecar or dependency case is explicit."
+
+[[references]]
+id = "nostalgia-for-infinity"
+title = "NostalgiaForInfinity"
+kind = "repository"
+homepage = "https://github.com/iterativv/NostalgiaForInfinity"
+license = "GPL-3.0"
+integration_mode = "external_runtime"
+local_path = "reference/NostalgiaForInfinity"
+runtime = "freqtrade"
+summary = "Reference strategy lane executed through the upstream Freqtrade runtime."
+
+[[references]]
+id = "yfinance"
+title = "yfinance"
+kind = "repository"
+homepage = "https://github.com/ranaroussi/yfinance"
+license = "Apache-2.0"
+integration_mode = "direct_dependency_candidate"
+local_path = "reference/yfinance"
+runtime = "python_package"
+summary = "Candidate stock-market data adapter for non-crypto research lanes."

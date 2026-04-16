@@ -6,8 +6,18 @@ type Strategy = {
   version: string;
   runtime: string;
   description: string;
+  reference_id?: string | null;
   reference_path?: string | null;
   entrypoint?: string | null;
+};
+
+type ReferenceSource = {
+  reference_id: string;
+  title: string;
+  license: string;
+  integration_mode: string;
+  runtime?: string | null;
+  summary: string;
 };
 
 type Run = {
@@ -23,6 +33,13 @@ type Run = {
   status: string;
   started_at: string;
   ended_at?: string | null;
+  provenance: {
+    lane: string;
+    reference_id?: string | null;
+    reference_version?: string | null;
+    integration_mode?: string | null;
+    external_command: string[];
+  };
   metrics: Record<string, number>;
   notes: string[];
 };
@@ -63,25 +80,28 @@ const defaultRunForm = {
 
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
+  const [references, setReferences] = useState<ReferenceSource[]>([]);
   const [backtests, setBacktests] = useState<Run[]>([]);
-  const [paperRuns, setPaperRuns] = useState<Run[]>([]);
+  const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
-  const [paperForm, setPaperForm] = useState(defaultRunForm);
+  const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
 
   async function loadAll() {
     setStatusText("Refreshing data plane...");
     try {
-      const [strategiesResponse, backtestsResponse, paperResponse, marketResponse] = await Promise.all([
+      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, marketResponse] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
+        fetchJson<ReferenceSource[]>("/references"),
         fetchJson<Run[]>("/runs?mode=backtest"),
-        fetchJson<Run[]>("/runs?mode=paper"),
+        fetchJson<Run[]>("/runs?mode=sandbox"),
         fetchJson<MarketDataStatus>("/market-data/status"),
       ]);
       setStrategies(strategiesResponse);
+      setReferences(referencesResponse);
       setBacktests(backtestsResponse);
-      setPaperRuns(paperResponse);
+      setSandboxRuns(sandboxResponse);
       setMarketStatus(marketResponse);
       setStatusText("Control room synchronized.");
     } catch (error) {
@@ -99,7 +119,7 @@ export default function App() {
     }
     const preferredNative = strategies.find((strategy) => strategy.runtime === "native") ?? strategies[0];
     setBacktestForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
-    setPaperForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
+    setSandboxForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
   }, [strategies]);
 
   const strategyGroups = useMemo(() => {
@@ -124,24 +144,24 @@ export default function App() {
     }
   }
 
-  async function handlePaperSubmit(event: FormEvent) {
+  async function handleSandboxSubmit(event: FormEvent) {
     event.preventDefault();
-    setStatusText("Starting paper run...");
+    setStatusText("Starting sandbox run...");
     try {
-      await fetchJson<Run>("/runs/paper", {
+      await fetchJson<Run>("/runs/sandbox", {
         method: "POST",
-        body: JSON.stringify({ ...paperForm, parameters: {}, replay_bars: 96 }),
+        body: JSON.stringify({ ...sandboxForm, parameters: {}, replay_bars: 96 }),
       });
       await loadAll();
     } catch (error) {
-      setStatusText(`Paper run failed: ${(error as Error).message}`);
+      setStatusText(`Sandbox run failed: ${(error as Error).message}`);
     }
   }
 
-  async function stopPaperRun(runId: string) {
+  async function stopSandboxRun(runId: string) {
     setStatusText(`Stopping run ${runId}...`);
     try {
-      await fetchJson<Run>(`/runs/paper/${runId}/stop`, { method: "POST" });
+      await fetchJson<Run>(`/runs/sandbox/${runId}/stop`, { method: "POST" });
       await loadAll();
     } catch (error) {
       setStatusText(`Stop failed: ${(error as Error).message}`);
@@ -193,9 +213,15 @@ export default function App() {
         </section>
 
         <section className="panel">
-          <p className="kicker">Paper</p>
+          <p className="kicker">Sandbox</p>
           <h2>Start native replay</h2>
-          <RunForm form={paperForm} setForm={setPaperForm} strategies={strategies.filter((strategy) => strategy.runtime === "native")} onSubmit={handlePaperSubmit} />
+          <RunForm form={sandboxForm} setForm={setSandboxForm} strategies={strategies.filter((strategy) => strategy.runtime === "native")} onSubmit={handleSandboxSubmit} />
+        </section>
+
+        <section className="panel panel-wide">
+          <p className="kicker">Reference lane</p>
+          <h2>Third-party references</h2>
+          <ReferenceCatalog references={references} />
         </section>
 
         <section className="panel panel-wide">
@@ -242,7 +268,7 @@ export default function App() {
         </section>
 
         <RunSection title="Recent backtests" runs={backtests} />
-        <RunSection title="Paper runs" runs={paperRuns} onStop={stopPaperRun} />
+        <RunSection title="Sandbox runs" runs={sandboxRuns} onStop={stopSandboxRun} />
       </main>
     </div>
   );
@@ -283,6 +309,12 @@ function StrategyColumn({
                   <dd>{strategy.reference_path}</dd>
                 </div>
               ) : null}
+              {strategy.reference_id ? (
+                <div>
+                  <dt>Reference ID</dt>
+                  <dd>{strategy.reference_id}</dd>
+                </div>
+              ) : null}
             </dl>
           </article>
         ))
@@ -290,6 +322,31 @@ function StrategyColumn({
         <p className="empty-state">No strategies registered.</p>
       )}
     </div>
+  );
+}
+
+function ReferenceCatalog({ references }: { references: ReferenceSource[] }) {
+  return references.length ? (
+    <div className="run-list">
+      {references.map((reference) => (
+        <article className="run-card" key={reference.reference_id}>
+          <div className="run-card-head">
+            <div>
+              <strong>{reference.title}</strong>
+              <span>{reference.reference_id}</span>
+            </div>
+            <div className="run-status completed">{reference.integration_mode}</div>
+          </div>
+          <div className="run-metrics">
+            <Metric label="License" value={reference.license} />
+            <Metric label="Runtime" value={reference.runtime ?? "n/a"} />
+          </div>
+          <p className="run-note">{reference.summary}</p>
+        </article>
+      ))}
+    </div>
+  ) : (
+    <p className="empty-state">No references registered.</p>
   );
 }
 
@@ -388,12 +445,21 @@ function RunSection({
                 <div className={`run-status ${run.status}`}>{run.status}</div>
               </div>
               <div className="run-metrics">
+                <Metric label="Mode" value={run.config.mode} />
+                <Metric label="Lane" value={run.provenance.lane} />
                 <Metric label="Return" value={formatMetric(run.metrics.total_return_pct, "%")} />
                 <Metric label="Drawdown" value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
                 <Metric label="Win rate" value={formatMetric(run.metrics.win_rate_pct, "%")} />
                 <Metric label="Trades" value={formatMetric(run.metrics.trade_count)} />
               </div>
-              <p className="run-note">{run.notes[0] ?? "No notes recorded."}</p>
+              <p className="run-note">
+                {run.provenance.reference_id
+                  ? `Reference ${run.provenance.reference_id} (${run.provenance.reference_version ?? "unknown"})`
+                  : run.notes[0] ?? "No notes recorded."}
+              </p>
+              {run.provenance.external_command.length ? (
+                <p className="run-note">{run.provenance.external_command.join(" ")}</p>
+              ) : null}
               {onStop && run.status === "running" ? (
                 <button className="ghost-button" onClick={() => void onStop(run.config.run_id)}>
                   Stop

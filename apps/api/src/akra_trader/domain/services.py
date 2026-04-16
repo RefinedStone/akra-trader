@@ -6,6 +6,7 @@ from math import isclose
 
 from akra_trader.domain.models import ClosedTrade
 from akra_trader.domain.models import EquityPoint
+from akra_trader.domain.models import ExecutionPlan
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Order
 from akra_trader.domain.models import OrderSide
@@ -25,13 +26,22 @@ def apply_signal(
   cash: float,
   fee_rate: float,
   slippage_bps: float,
+  execution: ExecutionPlan | None = None,
 ) -> tuple[float, Position | None, Order | None, Fill | None, ClosedTrade | None]:
   slippage_ratio = slippage_bps / 10_000
   active_position = position if position and position.is_open else None
+  plan = execution or ExecutionPlan()
+  size_fraction = min(max(plan.size_fraction, 0.0), 1.0)
 
-  if signal.action == SignalAction.BUY and active_position is None and cash > 0:
+  if (
+    signal.action == SignalAction.BUY
+    and cash > 0
+    and size_fraction > 0
+    and (active_position is None or plan.allow_scale_in)
+  ):
     executed_price = market_price * (1 + slippage_ratio)
-    quantity = cash / (executed_price * (1 + fee_rate))
+    allocated_cash = cash * size_fraction
+    quantity = allocated_cash / (executed_price * (1 + fee_rate))
     if isclose(quantity, 0.0):
       return cash, active_position, None, None, None
     gross_cost = quantity * executed_price
@@ -54,26 +64,44 @@ def apply_signal(
       fee_paid=fee_paid,
       timestamp=signal.timestamp,
     )
-    new_position = Position(
-      instrument_id=instrument_id,
-      quantity=quantity,
-      average_price=executed_price,
-      opened_at=signal.timestamp,
-      updated_at=signal.timestamp,
-    )
+    if active_position is None:
+      new_position = Position(
+        instrument_id=instrument_id,
+        quantity=quantity,
+        average_price=executed_price,
+        opened_at=signal.timestamp,
+        updated_at=signal.timestamp,
+      )
+    else:
+      total_quantity = active_position.quantity + quantity
+      average_price = (
+        (active_position.quantity * active_position.average_price) + (quantity * executed_price)
+      ) / total_quantity
+      new_position = replace(
+        active_position,
+        quantity=total_quantity,
+        average_price=average_price,
+        updated_at=signal.timestamp,
+      )
     return cash - gross_cost - fee_paid, new_position, order, fill, None
 
-  if signal.action == SignalAction.SELL and active_position is not None:
+  if signal.action == SignalAction.SELL and active_position is not None and size_fraction > 0:
     executed_price = market_price * (1 - slippage_ratio)
-    gross_value = active_position.quantity * executed_price
+    quantity = active_position.quantity
+    if plan.allow_partial_exit:
+      quantity = active_position.quantity * size_fraction
+    if isclose(quantity, 0.0):
+      return cash, active_position, None, None, None
+
+    gross_value = quantity * executed_price
     fee_paid = gross_value * fee_rate
     proceeds = gross_value - fee_paid
-    pnl = proceeds - (active_position.quantity * active_position.average_price)
+    pnl = proceeds - (quantity * active_position.average_price)
     order = Order(
       run_id=run_id,
       instrument_id=instrument_id,
       side=OrderSide.SELL,
-      quantity=active_position.quantity,
+      quantity=quantity,
       requested_price=market_price,
       status=OrderStatus.FILLED,
       filled_at=signal.timestamp,
@@ -82,7 +110,7 @@ def apply_signal(
     )
     fill = Fill(
       order_id=order.order_id,
-      quantity=active_position.quantity,
+      quantity=quantity,
       price=executed_price,
       fee_paid=fee_paid,
       timestamp=signal.timestamp,
@@ -91,13 +119,19 @@ def apply_signal(
       instrument_id=instrument_id,
       entry_price=active_position.average_price,
       exit_price=executed_price,
-      quantity=active_position.quantity,
+      quantity=quantity,
       fee_paid=fee_paid,
       pnl=pnl,
       opened_at=active_position.opened_at or signal.timestamp,
       closed_at=signal.timestamp,
     )
-    closed_position = replace(active_position, quantity=0.0, updated_at=signal.timestamp, realized_pnl=pnl)
+    remaining_quantity = active_position.quantity - quantity
+    closed_position = replace(
+      active_position,
+      quantity=0.0 if isclose(remaining_quantity, 0.0) else remaining_quantity,
+      updated_at=signal.timestamp,
+      realized_pnl=active_position.realized_pnl + pnl,
+    )
     return cash + proceeds, closed_position, order, fill, closed_trade
 
   return cash, active_position, None, None, None

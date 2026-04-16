@@ -6,13 +6,50 @@ from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionContext
-from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import WarmupSpec
-from akra_trader.strategies.base import Strategy
+from akra_trader.strategies.base import FixedFractionExecutionPolicy
+from akra_trader.strategies.base import PolicyBackedStrategy
+from akra_trader.strategies.base import SignalPolicy
 
 
-class MovingAverageCrossStrategy(Strategy):
+class MovingAverageCrossSignalPolicy(SignalPolicy):
+  def decide(self, context: StrategyDecisionContext) -> SignalDecision:
+    buy_cross = (
+      context.features["previous_sma_short"] <= context.features["previous_sma_long"]
+      and context.features["current_sma_short"] > context.features["current_sma_long"]
+    )
+    sell_cross = (
+      context.features["previous_sma_short"] >= context.features["previous_sma_long"]
+      and context.features["current_sma_short"] < context.features["current_sma_long"]
+    )
+
+    if buy_cross and not context.state.has_position:
+      return SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        confidence=0.65,
+        tags=("trend", "crossover"),
+        reason="short_ma_crossed_above_long_ma",
+      )
+    if sell_cross and context.state.has_position:
+      return SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.SELL,
+        confidence=0.65,
+        tags=("trend", "crossover"),
+        reason="short_ma_crossed_below_long_ma",
+      )
+    return SignalDecision(
+      timestamp=context.timestamp,
+      action=SignalAction.HOLD,
+      confidence=0.5,
+      tags=("idle",),
+      reason="no_action",
+    )
+
+
+class MovingAverageCrossStrategy(PolicyBackedStrategy):
   def describe(self) -> StrategyMetadata:
     return StrategyMetadata(
       strategy_id="ma_cross_v1",
@@ -63,39 +100,15 @@ class MovingAverageCrossStrategy(Strategy):
       state=context.state,
     )
 
-  def decide(self, context: StrategyDecisionContext) -> StrategyDecisionEnvelope:
-    buy_cross = (
-      context.features["previous_sma_short"] <= context.features["previous_sma_long"]
-      and context.features["current_sma_short"] > context.features["current_sma_long"]
-    )
-    sell_cross = (
-      context.features["previous_sma_short"] >= context.features["previous_sma_long"]
-      and context.features["current_sma_short"] < context.features["current_sma_long"]
-    )
+  def signal_policy(self, parameters: dict) -> SignalPolicy:
+    return MovingAverageCrossSignalPolicy()
 
-    if buy_cross and not context.state.has_position:
-      signal = SignalDecision(
-        timestamp=context.timestamp,
-        action=SignalAction.BUY,
-        confidence=0.65,
-        tags=("trend", "crossover"),
-        reason="short_ma_crossed_above_long_ma",
-      )
-      return StrategyDecisionEnvelope(signal=signal, rationale="Bullish moving-average crossover.", context=context)
-    if sell_cross and context.state.has_position:
-      signal = SignalDecision(
-        timestamp=context.timestamp,
-        action=SignalAction.SELL,
-        confidence=0.65,
-        tags=("trend", "crossover"),
-        reason="short_ma_crossed_below_long_ma",
-      )
-      return StrategyDecisionEnvelope(signal=signal, rationale="Bearish moving-average crossover.", context=context)
-    signal = SignalDecision(
-      timestamp=context.timestamp,
-      action=SignalAction.HOLD,
-      confidence=0.5,
-      tags=("idle",),
-      reason="no_action",
-    )
-    return StrategyDecisionEnvelope(signal=signal, rationale="No crossover condition met.", context=context)
+  def execution_policy(self, parameters: dict) -> FixedFractionExecutionPolicy:
+    return FixedFractionExecutionPolicy(size_fraction=1.0, tags=("full_notional",))
+
+  def build_rationale(self, context: StrategyDecisionContext, signal: SignalDecision) -> str:
+    if signal.action == SignalAction.BUY:
+      return "Bullish moving-average crossover."
+    if signal.action == SignalAction.SELL:
+      return "Bearish moving-average crossover."
+    return "No crossover condition met."

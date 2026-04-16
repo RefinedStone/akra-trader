@@ -1,6 +1,7 @@
 # Akra Trader API
 
-Python-first backend for strategy registration, market-data access, backtesting, and paper trading.
+Python-first backend for strategy registration, market-data access, backtesting, sandbox trading, and
+reference-runtime orchestration.
 
 ## Run
 

@@ -7,7 +7,9 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from akra_trader.adapters.references import ReferenceCatalog
 from akra_trader.domain.models import RunConfig
+from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyMetadata
@@ -17,14 +19,23 @@ from akra_trader.domain.models import StrategyMetadata
 class PreparedCommand:
   command: list[str]
   working_directory: str
+  reference_id: str
+  reference_version: str | None
+  integration_mode: str
 
 
 class FreqtradeReferenceAdapter:
-  def __init__(self, repo_root: Path) -> None:
+  def __init__(self, repo_root: Path, references: ReferenceCatalog) -> None:
     self._repo_root = repo_root
-    self._reference_root = repo_root / "reference" / "NostalgiaForInfinity"
+    self._references = references
 
   def prepare_backtest(self, config: RunConfig, metadata: StrategyMetadata) -> PreparedCommand:
+    if metadata.reference_id is None:
+      raise ValueError("Freqtrade reference strategy is missing reference_id metadata.")
+    reference = self._references.get(metadata.reference_id)
+    working_directory = self._references.absolute_path(self._repo_root, reference)
+    if working_directory is None:
+      raise ValueError(f"Reference {metadata.reference_id} does not define a local path.")
     timerange = self._format_timerange(config.start_at, config.end_at)
     mode = "spot"
     exchange = config.venue
@@ -42,10 +53,24 @@ class FreqtradeReferenceAdapter:
       "--breakdown=day",
       "--export=signals",
     ]
-    return PreparedCommand(command=command, working_directory=str(self._reference_root))
+    return PreparedCommand(
+      command=command,
+      working_directory=str(working_directory),
+      reference_id=reference.reference_id,
+      reference_version=self._resolve_reference_version(working_directory, metadata.version),
+      integration_mode=reference.integration_mode,
+    )
 
   def execute_backtest(self, run: RunRecord, metadata: StrategyMetadata) -> RunRecord:
     prepared = self.prepare_backtest(run.config, metadata)
+    run.provenance = RunProvenance(
+      lane="reference",
+      reference_id=prepared.reference_id,
+      reference_version=prepared.reference_version,
+      integration_mode=prepared.integration_mode,
+      working_directory=prepared.working_directory,
+      external_command=tuple(prepared.command),
+    )
     run.notes.append(f"Prepared NFI reference command: {' '.join(prepared.command)}")
 
     if shutil.which("freqtrade") is None:
@@ -70,6 +95,22 @@ class FreqtradeReferenceAdapter:
     run.status = RunStatus.COMPLETED if process.returncode == 0 else RunStatus.FAILED
     run.ended_at = datetime.now(UTC)
     return run
+
+  @staticmethod
+  def _resolve_reference_version(reference_root: Path, fallback: str | None) -> str | None:
+    if not reference_root.exists():
+      return fallback
+    process = subprocess.run(
+      ["git", "rev-parse", "HEAD"],
+      cwd=reference_root,
+      check=False,
+      capture_output=True,
+      text=True,
+      shell=False,
+    )
+    if process.returncode == 0 and process.stdout.strip():
+      return process.stdout.strip()
+    return fallback
 
   @staticmethod
   def _format_timerange(start_at: datetime | None, end_at: datetime | None) -> str:
