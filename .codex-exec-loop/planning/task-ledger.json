@@ -765,19 +765,37 @@
       "id": "planning-reference-lanes-asymmetric-column-sweep-tuning",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Tune comparison tooltip suppression asymmetrically for downward versus upward column scans",
-      "description": "Refine the new run-column-aware tooltip sweep heuristics so same-column vertical scans can apply different suppression timing by direction, prioritizing slightly stronger damping for top-to-bottom review if that matches operator behavior while preserving the completed horizontal row-sweep and generic column-sweep protections.",
-      "status": "ready",
+      "description": "Completed the asymmetric vertical sweep follow-up by splitting same-column comparison tooltip suppression into distinct `column_down` and `column_up` states, applying a faster tooltip handoff profile for downward scans while keeping upward scans more conservative, and preserving the completed row-sweep, keyboard, and non-metric cue behavior.",
+      "status": "done",
       "base_priority": 86,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply said nothing essential remains for run-column-aware suppression and directly identified asymmetric downward-versus-upward sweep tuning as the likely next refinement, making it the clearest executable follow-up for the comparison tooltip lane.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the asymmetric column-sweep tuning in `apps/web/src/App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `5507758` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:55:00Z",
+      "updated_at": "2026-04-17T06:05:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-run-column-aware-tooltip-suppression"
       ],
       "direction_relation_note": "Builds on the completed run-column-aware sweep suppression by tuning vertical comparison-table scan behavior to the likely top-to-bottom operator review pattern instead of treating upward and downward column sweeps identically."
+    },
+    {
+      "id": "planning-reference-lanes-adaptive-tooltip-sweep-thresholds",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Adapt comparison tooltip sweep thresholds to cell size or pointer speed",
+      "description": "Replace the current fixed pixel and timing cutoffs for dense comparison-table tooltip sweep suppression with adaptive heuristics derived from actual metric-cell dimensions and/or observed pointer velocity so row and column scan damping stays stable across different table densities without over-suppressing deliberate inspection.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply said nothing essential remains for asymmetric column-sweep tuning and explicitly identified adaptive thresholds based on cell size or pointer speed as the likely next refinement, making it the clearest executable follow-up for the comparison tooltip lane.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:05:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-asymmetric-column-sweep-tuning"
+      ],
+      "direction_relation_note": "Builds on the completed asymmetric column-sweep tuning by replacing hard-coded dense-table suppression thresholds with interaction-aware scaling that can better match different comparison layouts and operator scan speeds."
     }
   ]
 }
