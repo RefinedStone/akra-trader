@@ -45,6 +45,8 @@ python3 -m venv .venv
 .venv/bin/uvicorn akra_trader.main:app --reload
 ```
 
+Run storage defaults to a local SQLite file under `.local/state/runs.sqlite3`.
+
 ### Web
 
 ```bash
@@ -52,6 +54,15 @@ cd apps/web
 npm install
 npm run dev
 ```
+
+### Docker Compose
+
+```bash
+docker compose up --build
+```
+
+In the Compose stack, the API uses Postgres for run storage through
+`AKRA_TRADER_RUNS_DATABASE_URL=postgresql+psycopg://akra:akra@postgres:5432/akra_trader`.
 
 API default: `http://localhost:8000`
 

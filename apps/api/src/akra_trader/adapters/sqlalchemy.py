@@ -104,7 +104,12 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
 
   def _build_engine(self, database_url: str) -> Engine:
     url = make_url(database_url)
+    engine_kwargs = {"pool_pre_ping": True}
     if url.get_backend_name() == "sqlite" and url.database not in {None, "", ":memory:"}:
       Path(url.database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-      return create_engine(database_url, connect_args={"check_same_thread": False})
-    return create_engine(database_url)
+      return create_engine(
+        database_url,
+        connect_args={"check_same_thread": False},
+        **engine_kwargs,
+      )
+    return create_engine(database_url, **engine_kwargs)

@@ -5,6 +5,11 @@ services:
       POSTGRES_USER: akra
       POSTGRES_PASSWORD: akra
       POSTGRES_DB: akra_trader
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U akra -d akra_trader"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
       - "5432:5432"
     volumes:
@@ -13,6 +18,8 @@ services:
   api:
     image: python:3.12-slim
     working_dir: /workspace/apps/api
+    environment:
+      AKRA_TRADER_RUNS_DATABASE_URL: postgresql+psycopg://akra:akra@postgres:5432/akra_trader
     command: >
       bash -lc "python -m venv .venv &&
       .venv/bin/python -m pip install -e '.[dev]' &&
@@ -22,7 +29,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   web:
     image: node:24
