@@ -340,6 +340,7 @@ type ComparisonTooltipPresetConflictPreviewGroup = {
 type ComparisonTooltipConflictSessionUiState = {
   collapsed_unchanged_groups: Record<string, boolean>;
   show_unchanged_conflict_rows: boolean;
+  updated_at: string | null;
 };
 type ComparisonTooltipConflictUiStateV1 = {
   sessions: Record<string, ComparisonTooltipConflictSessionUiState>;
@@ -359,6 +360,7 @@ type ComparisonTooltipConflictSessionSummarySession = {
   label: string;
   metadata: string[];
   session_key: string;
+  updated_at: string | null;
 };
 type ComparisonTooltipTuningShareImport =
   | {
@@ -3085,10 +3087,15 @@ function ComparisonTooltipTuningPanel({
       const nextCurrent = current[conflictSessionKey] ?? {
         collapsed_unchanged_groups: {},
         show_unchanged_conflict_rows: false,
+        updated_at: null,
       };
+      const nextSession = updater(nextCurrent);
       return {
         ...current,
-        [conflictSessionKey]: updater(nextCurrent),
+        [conflictSessionKey]: {
+          ...nextSession,
+          updated_at: new Date().toISOString(),
+        },
       };
     });
   };
@@ -3890,6 +3897,10 @@ function normalizeComparisonTooltipConflictSessionUiStateMap(
           parsed.collapsed_unchanged_groups,
         ),
         show_unchanged_conflict_rows: parsed.show_unchanged_conflict_rows === true,
+        updated_at:
+          typeof parsed.updated_at === "string" && parsed.updated_at.trim()
+            ? parsed.updated_at
+            : null,
       };
       return accumulator;
     },
@@ -4192,6 +4203,7 @@ function buildComparisonTooltipConflictSessionSummaries(
       label: "",
       metadata: [],
       session_key: sessionKey,
+      updated_at: sessions[sessionKey]?.updated_at ?? null,
     });
     accumulator[presetName] = current;
     return accumulator;
@@ -4214,6 +4226,11 @@ function buildComparisonTooltipConflictSessionSummaries(
         .sort((left, right) => {
           if (left.includes_current !== right.includes_current) {
             return left.includes_current ? -1 : 1;
+          }
+          const leftUpdatedAt = parseComparisonTooltipConflictSessionUpdatedAt(left.updated_at);
+          const rightUpdatedAt = parseComparisonTooltipConflictSessionUpdatedAt(right.updated_at);
+          if (leftUpdatedAt !== rightUpdatedAt) {
+            return rightUpdatedAt - leftUpdatedAt;
           }
           return (left.hash ?? "").localeCompare(right.hash ?? "");
         })
@@ -4271,9 +4288,7 @@ function formatComparisonTooltipConflictSessionMetadata(
   hash: string | null,
 ) {
   const metadata: string[] = [];
-  if (hash) {
-    metadata.push(`ID ${hash.slice(0, 8)}`);
-  }
+  metadata.push(formatComparisonTooltipConflictSessionUpdatedAtLabel(session.updated_at));
   metadata.push(
     session.show_unchanged_conflict_rows ? "unchanged rows visible" : "unchanged rows hidden",
   );
@@ -4293,10 +4308,37 @@ function formatComparisonTooltipConflictSessionMetadata(
   }
   if (expandedCount) {
     metadata.push(`${expandedCount} expanded group${expandedCount === 1 ? "" : "s"}`);
-    return metadata;
+  } else {
+    metadata.push(`${collapsedCount} collapsed group${collapsedCount === 1 ? "" : "s"}`);
   }
-  metadata.push(`${collapsedCount} collapsed group${collapsedCount === 1 ? "" : "s"}`);
+  if (hash) {
+    metadata.push(`ID ${hash.slice(0, 8)}`);
+  }
   return metadata;
+}
+
+function parseComparisonTooltipConflictSessionUpdatedAt(value: string | null) {
+  if (!value) {
+    return 0;
+  }
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function formatComparisonTooltipConflictSessionUpdatedAtLabel(value: string | null) {
+  const timestamp = parseComparisonTooltipConflictSessionUpdatedAt(value);
+  if (!timestamp) {
+    return "updated time unavailable";
+  }
+  const date = new Date(timestamp);
+  const now = new Date();
+  return `updated ${new Intl.DateTimeFormat(undefined, {
+    ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    month: "short",
+  }).format(date)}`;
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {
