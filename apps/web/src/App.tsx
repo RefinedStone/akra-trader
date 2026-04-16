@@ -297,6 +297,15 @@ type ComparisonTooltipTuningSinglePresetShareV1 = {
   tuning: ComparisonTooltipTuning;
   version: typeof COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION;
 };
+type ComparisonTooltipPresetImportConflictPolicy = "overwrite" | "rename";
+type ComparisonTooltipPresetImportResolution = {
+  conflicted: boolean;
+  final_preset_name: string;
+  imported_preset_name: string;
+  policy: ComparisonTooltipPresetImportConflictPolicy;
+  renamed: boolean;
+  overwritten: boolean;
+};
 type ComparisonTooltipTuningShareImport =
   | {
       kind: "bundle";
@@ -343,6 +352,8 @@ const DEFAULT_COMPARISON_TOOLTIP_TUNING: ComparisonTooltipTuning = {
   vertical_velocity_threshold: 0.34,
 };
 const SHOW_COMPARISON_TOOLTIP_TUNING_PANEL = import.meta.env.DEV;
+const DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY: ComparisonTooltipPresetImportConflictPolicy =
+  "rename";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -1560,6 +1571,10 @@ function RunComparisonPanel({
   >({});
   const [selectedTooltipPresetName, setSelectedTooltipPresetName] = useState("");
   const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
+  const [tooltipPresetImportConflictPolicy, setTooltipPresetImportConflictPolicy] =
+    useState<ComparisonTooltipPresetImportConflictPolicy>(
+      DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY,
+    );
   const [tooltipShareDraft, setTooltipShareDraft] = useState("");
   const [tooltipShareFeedback, setTooltipShareFeedback] = useState<string | null>(null);
   const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
@@ -1685,16 +1700,24 @@ function RunComparisonPanel({
       );
       return;
     }
-    const mergedState = mergeComparisonTooltipSinglePresetIntoState(
+    const mergedPreset = mergeComparisonTooltipSinglePresetIntoState(
       createTooltipTuningPresetState(),
       importedShare.preset_name,
       importedShare.tuning,
+      tooltipPresetImportConflictPolicy,
     );
-    applyTooltipTuningPresetState(mergedState);
-    setTooltipShareDraft(importedShare.raw);
-    setTooltipShareFeedback(
-      `Imported preset "${importedShare.preset_name}" into the current tuning bundle.`,
+    applyTooltipTuningPresetState(mergedPreset.state);
+    setTooltipShareDraft(
+      JSON.stringify(
+        createComparisonTooltipTuningSinglePresetShare(
+          mergedPreset.resolution.final_preset_name,
+          importedShare.tuning,
+        ),
+        null,
+        2,
+      ),
     );
+    setTooltipShareFeedback(formatComparisonTooltipPresetImportFeedback(mergedPreset.resolution));
   };
 
   const copyTooltipShareUrl = async () => {
@@ -2065,17 +2088,39 @@ function RunComparisonPanel({
     }
     const storedState = loadComparisonTooltipTuningPresetState();
     const sharedImport = loadComparisonTooltipTuningShareImportFromUrl();
-    const nextState = sharedImport
-      ? applyComparisonTooltipTuningShareImport(storedState, sharedImport)
-      : storedState;
-    applyTooltipTuningPresetState(nextState);
+    const appliedImport = sharedImport
+      ? applyComparisonTooltipTuningShareImport(
+          storedState,
+          sharedImport,
+          DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY,
+        )
+      : null;
+    applyTooltipTuningPresetState(appliedImport?.state ?? storedState);
     if (sharedImport) {
-      setTooltipShareDraft(sharedImport.raw);
-      setTooltipShareFeedback(
-        sharedImport.kind === "bundle"
+      if (appliedImport?.kind === "preset" && sharedImport.kind === "preset") {
+        setTooltipShareDraft(
+          JSON.stringify(
+            createComparisonTooltipTuningSinglePresetShare(
+              appliedImport.resolution.final_preset_name,
+              sharedImport.tuning,
+            ),
+            null,
+            2,
+          ),
+        );
+        setTooltipShareFeedback(
+          formatComparisonTooltipPresetImportFeedback(appliedImport.resolution, {
+            verb: "Loaded",
+          }),
+        );
+      } else {
+        setTooltipShareDraft(sharedImport.raw);
+        setTooltipShareFeedback(
+          sharedImport.kind === "bundle"
           ? "Loaded tooltip tuning presets from the share URL."
           : `Loaded preset "${sharedImport.preset_name}" from the share URL.`,
-      );
+        );
+      }
     }
     setHasHydratedTooltipTuningState(true);
   }, []);
@@ -2268,6 +2313,7 @@ function RunComparisonPanel({
       {SHOW_COMPARISON_TOOLTIP_TUNING_PANEL ? (
         <ComparisonTooltipTuningPanel
           onChangePresetDraftName={setTooltipPresetDraftName}
+          onChangePresetImportConflictPolicy={setTooltipPresetImportConflictPolicy}
           onChangeShareDraft={setTooltipShareDraft}
           onChangeValue={updateTooltipTuning}
           onCopyShareUrl={copyTooltipShareUrl}
@@ -2284,6 +2330,7 @@ function RunComparisonPanel({
           shareDraft={tooltipShareDraft}
           shareFeedback={tooltipShareFeedback}
           shareUrl={tooltipShareUrl}
+          presetImportConflictPolicy={tooltipPresetImportConflictPolicy}
           selectedPresetShareUrl={selectedTooltipPresetShareUrl}
           selectedPresetName={selectedTooltipPresetName}
           tuning={tooltipTuning}
@@ -2589,6 +2636,7 @@ const ComparisonTooltipBubble = forwardRef<
 });
 
 function ComparisonTooltipTuningPanel({
+  presetImportConflictPolicy,
   presetDraftName,
   presets,
   shareDraft,
@@ -2596,6 +2644,7 @@ function ComparisonTooltipTuningPanel({
   shareUrl,
   selectedPresetShareUrl,
   selectedPresetName,
+  onChangePresetImportConflictPolicy,
   onChangePresetDraftName,
   onChangeShareDraft,
   tuning,
@@ -2610,6 +2659,7 @@ function ComparisonTooltipTuningPanel({
   onReset,
   onSavePreset,
 }: {
+  presetImportConflictPolicy: ComparisonTooltipPresetImportConflictPolicy;
   presetDraftName: string;
   presets: Record<string, ComparisonTooltipTuning>;
   shareDraft: string;
@@ -2617,6 +2667,9 @@ function ComparisonTooltipTuningPanel({
   shareUrl: string;
   selectedPresetShareUrl: string;
   selectedPresetName: string;
+  onChangePresetImportConflictPolicy: (
+    value: ComparisonTooltipPresetImportConflictPolicy,
+  ) => void;
   onChangePresetDraftName: (value: string) => void;
   onChangeShareDraft: (value: string) => void;
   tuning: ComparisonTooltipTuning;
@@ -2698,6 +2751,20 @@ function ComparisonTooltipTuningPanel({
             type="text"
             value={selectedPresetShareUrl}
           />
+        </label>
+        <label className="comparison-dev-field comparison-dev-import-policy-field">
+          <span>Single preset conflict</span>
+          <select
+            onChange={(event) =>
+              onChangePresetImportConflictPolicy(
+                event.target.value as ComparisonTooltipPresetImportConflictPolicy,
+              )
+            }
+            value={presetImportConflictPolicy}
+          >
+            <option value="rename">Rename imported preset</option>
+            <option value="overwrite">Overwrite existing preset</option>
+          </select>
         </label>
         <div className="comparison-dev-actions comparison-dev-actions-inline">
           <button
@@ -3092,31 +3159,102 @@ function parseComparisonTooltipTuningShareImport(
 function applyComparisonTooltipTuningShareImport(
   baseState: ComparisonTooltipTuningPresetStateV1,
   importedShare: ComparisonTooltipTuningShareImport,
-): ComparisonTooltipTuningPresetStateV1 {
+  presetImportConflictPolicy: ComparisonTooltipPresetImportConflictPolicy,
+):
+  | {
+      kind: "bundle";
+      state: ComparisonTooltipTuningPresetStateV1;
+    }
+  | {
+      kind: "preset";
+      resolution: ComparisonTooltipPresetImportResolution;
+      state: ComparisonTooltipTuningPresetStateV1;
+    } {
   if (importedShare.kind === "bundle") {
-    return importedShare.state;
+    return {
+      kind: "bundle",
+      state: importedShare.state,
+    };
   }
-  return mergeComparisonTooltipSinglePresetIntoState(
-    baseState,
-    importedShare.preset_name,
-    importedShare.tuning,
-  );
+  return {
+    kind: "preset",
+    ...mergeComparisonTooltipSinglePresetIntoState(
+      baseState,
+      importedShare.preset_name,
+      importedShare.tuning,
+      presetImportConflictPolicy,
+    ),
+  };
 }
 
 function mergeComparisonTooltipSinglePresetIntoState(
   baseState: ComparisonTooltipTuningPresetStateV1,
   presetName: string,
   tuning: ComparisonTooltipTuning,
-): ComparisonTooltipTuningPresetStateV1 {
+  presetImportConflictPolicy: ComparisonTooltipPresetImportConflictPolicy,
+): {
+  resolution: ComparisonTooltipPresetImportResolution;
+  state: ComparisonTooltipTuningPresetStateV1;
+} {
+  const importedPresetName = presetName.trim();
+  const conflicted = Boolean(baseState.presets[importedPresetName]);
+  const finalPresetName =
+    conflicted && presetImportConflictPolicy === "rename"
+      ? createAvailableComparisonTooltipPresetName(baseState.presets, importedPresetName)
+      : importedPresetName;
+
   return {
-    current_tuning: { ...tuning },
-    presets: {
-      ...cloneComparisonTooltipPresetMap(baseState.presets),
-      [presetName]: { ...tuning },
+    resolution: {
+      conflicted,
+      final_preset_name: finalPresetName,
+      imported_preset_name: importedPresetName,
+      policy: presetImportConflictPolicy,
+      renamed: conflicted && finalPresetName !== importedPresetName,
+      overwritten: conflicted && finalPresetName === importedPresetName,
     },
-    selected_preset_name: presetName,
-    version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+    state: {
+      current_tuning: { ...tuning },
+      presets: {
+        ...cloneComparisonTooltipPresetMap(baseState.presets),
+        [finalPresetName]: { ...tuning },
+      },
+      selected_preset_name: finalPresetName,
+      version: COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION,
+    },
   };
+}
+
+function createAvailableComparisonTooltipPresetName(
+  presets: Record<string, ComparisonTooltipTuning>,
+  presetName: string,
+) {
+  const normalizedBaseName = presetName.trim() || "imported-preset";
+  if (!presets[normalizedBaseName]) {
+    return normalizedBaseName;
+  }
+  const firstCandidate = `${normalizedBaseName} (import)`;
+  if (!presets[firstCandidate]) {
+    return firstCandidate;
+  }
+  let suffix = 2;
+  while (presets[`${normalizedBaseName} (import ${suffix})`]) {
+    suffix += 1;
+  }
+  return `${normalizedBaseName} (import ${suffix})`;
+}
+
+function formatComparisonTooltipPresetImportFeedback(
+  resolution: ComparisonTooltipPresetImportResolution,
+  options?: { verb?: "Imported" | "Loaded" },
+) {
+  const verb = options?.verb ?? "Imported";
+  if (!resolution.conflicted) {
+    return `${verb} preset "${resolution.final_preset_name}" into the current tuning bundle.`;
+  }
+  if (resolution.renamed) {
+    return `${verb} preset "${resolution.imported_preset_name}" as "${resolution.final_preset_name}" because that name already existed.`;
+  }
+  return `${verb} preset "${resolution.final_preset_name}" and overwrote the existing preset with the same name.`;
 }
 
 function normalizeComparisonTooltipPresetMap(
