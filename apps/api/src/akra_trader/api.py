@@ -397,6 +397,19 @@ def create_router(container: Container) -> APIRouter:
     status = app.recover_guarded_live_runtime_state(actor=request.actor, reason=request.reason)
     return asdict(status)
 
+  @router.post("/guarded-live/resume")
+  def resume_guarded_live_run(
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.resume_guarded_live_run(actor=request.actor, reason=request.reason)
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
+
   return router
 
 

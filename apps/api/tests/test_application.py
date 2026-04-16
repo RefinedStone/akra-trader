@@ -9,6 +9,7 @@ import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
+from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
@@ -85,6 +86,10 @@ class StaticVenueStateAdapter:
 
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
     return self._snapshot
+
+
+def build_guarded_live_repository(tmp_path: Path):
+  return SqlAlchemyGuardedLiveStateRepository(f"sqlite:///{tmp_path / 'guarded-live.sqlite3'}")
 
 
 class AlwaysBuyStrategy(Strategy):
@@ -1312,6 +1317,96 @@ def test_replace_live_order_cancels_old_order_and_appends_limit_replacement(tmp_
   assert replacement_order.remaining_quantity == pytest.approx(0.3)
   assert any("guarded_live_order_replaced" in note for note in replaced.notes)
   assert any(event.kind == "guarded_live_order_replaced" for event in guarded_live_status.audit_events)
+
+
+def test_guarded_live_resume_reuses_durable_order_book_and_session_ownership(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 21, 0, tzinfo=UTC))
+  recovered_order_id = "venue-open-order-1"
+  venue_snapshot = GuardedLiveVenueStateSnapshot(
+    provider="seeded",
+    venue="binance",
+    verification_state="verified",
+    captured_at=clock(),
+    balances=(
+      GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+    ),
+    open_orders=(
+      GuardedLiveVenueOpenOrder(
+        order_id=recovered_order_id,
+        symbol="ETH/USDT",
+        side="buy",
+        amount=0.5,
+        status="open",
+        price=2_000.0,
+      ),
+    ),
+  )
+  first_app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(venue_snapshot),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  first_app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  first_app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = first_app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+    operator_reason="start_owned_session",
+  )
+  first_status = first_app.get_guarded_live_status()
+
+  assert first_status.ownership.state == "owned"
+  assert first_status.ownership.owner_run_id == run.config.run_id
+  assert first_status.order_book.open_orders[0].order_id == recovered_order_id
+
+  clock.advance(timedelta(seconds=5))
+  resumed_app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(venue_snapshot),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  resumed = resumed_app.resume_guarded_live_run(
+    actor="operator",
+    reason="process_restart_resume",
+  )
+  resumed_status = resumed_app.get_guarded_live_status()
+  canceled = resumed_app.cancel_live_order(
+    run_id=run.config.run_id,
+    order_id=recovered_order_id,
+    actor="operator",
+    reason="resume_validation_cancel",
+  )
+
+  assert resumed.status == RunStatus.RUNNING
+  assert resumed.provenance.runtime_session is not None
+  assert resumed.provenance.runtime_session.recovery_count >= 1
+  assert any("guarded_live_worker_resumed" in note for note in resumed.notes)
+  assert resumed_status.ownership.state == "owned"
+  assert resumed_status.ownership.owner_run_id == run.config.run_id
+  assert resumed_status.order_book.open_orders[0].order_id == recovered_order_id
+  assert canceled.orders[0].status == OrderStatus.CANCELED
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

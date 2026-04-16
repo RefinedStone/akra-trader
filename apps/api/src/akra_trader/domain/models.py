@@ -609,6 +609,32 @@ class GuardedLiveRuntimeRecovery:
 
 
 @dataclass(frozen=True)
+class GuardedLiveSessionOwnership:
+  state: str = "unclaimed"
+  owner_run_id: str | None = None
+  owner_session_id: str | None = None
+  symbol: str | None = None
+  claimed_at: datetime | None = None
+  claimed_by: str | None = None
+  last_heartbeat_at: datetime | None = None
+  last_order_sync_at: datetime | None = None
+  last_resumed_at: datetime | None = None
+  last_reason: str | None = None
+  last_released_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveOrderBookSync:
+  state: str = "empty"
+  synced_at: datetime | None = None
+  owner_run_id: str | None = None
+  owner_session_id: str | None = None
+  symbol: str | None = None
+  open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveReconciliation:
   state: str = "not_started"
   checked_at: datetime | None = None
@@ -625,6 +651,8 @@ class GuardedLiveState:
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
+  ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
+  order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -636,6 +664,8 @@ class GuardedLiveStatus:
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
+  ownership: GuardedLiveSessionOwnership = field(default_factory=GuardedLiveSessionOwnership)
+  order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
   audit_events: tuple[OperatorAuditEvent, ...] = ()
   active_runtime_alert_count: int = 0
   running_sandbox_count: int = 0

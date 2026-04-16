@@ -56,6 +56,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live worker order lifecycle sync for recovered/open venue orders, including partial-fill
   and fill progression in local run state
 - guarded-live operator cancel/replace controls for active venue orders from the control room and API
+- guarded-live control state now persists live session ownership and a durable open-order snapshot,
+  and guarded-live resume can reattach the owned live run after restart or fault drills
 
 ### Control room
 
@@ -70,7 +72,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   events
 - guarded-live panel with persisted kill-switch state, candidacy blockers, reconciliation findings,
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
-  and guarded-live audit history
+  live-owner and durable order-book visibility, guarded-live resume controls, and guarded-live audit history
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -79,10 +81,10 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - operator visibility is derived from runtime session state and run notes, but it is not yet a
   durable event store or notification channel
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
-  recovery/live launch currently rebuild persisted control-plane state before attaching a narrow
-  guarded-live worker rather than reviving a full venue order book or session lifecycle
-- guarded-live order sync now persists lifecycle progression and supports cancel/replace controls,
-  but it still does not maintain a durable venue order book
+  recovery/live resume currently rebuild persisted control-plane state before reattaching a narrow
+  guarded-live worker rather than reviving a full venue-native order book or session lifecycle
+- guarded-live order sync now persists lifecycle progression, a durable open-order snapshot, and
+  session ownership for resume, but it still does not restore a full exchange session lifecycle
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic
@@ -93,9 +95,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 - durable operator event storage and external alert delivery
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
-- full live order lifecycle management beyond cancel/replace, including durable venue order-book sync
-- reconciliation against live exchange state after restart or faults
-- live-worker restart recovery that resumes actual venue-backed execution from recovered state
+- full live order lifecycle management beyond cancel/replace, including venue-native amend flows
+- full venue-native order-book and session reconciliation after restart or faults
+- live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
 
 ## Immediate Next Priorities
@@ -103,5 +105,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from cancel/replace into durable venue order-book state and wider live-path audit coverage.
+4. Expand guarded-live controls from owned-session resume into full venue-native session restore and wider live-path audit coverage.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

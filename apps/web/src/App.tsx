@@ -392,6 +392,35 @@ type GuardedLiveStatus = {
     }[];
     issues: string[];
   };
+  ownership: {
+    state: string;
+    owner_run_id?: string | null;
+    owner_session_id?: string | null;
+    symbol?: string | null;
+    claimed_at?: string | null;
+    claimed_by?: string | null;
+    last_heartbeat_at?: string | null;
+    last_order_sync_at?: string | null;
+    last_resumed_at?: string | null;
+    last_reason?: string | null;
+    last_released_at?: string | null;
+  };
+  order_book: {
+    state: string;
+    synced_at?: string | null;
+    owner_run_id?: string | null;
+    owner_session_id?: string | null;
+    symbol?: string | null;
+    open_orders: {
+      order_id: string;
+      symbol: string;
+      side: string;
+      amount: number;
+      status: string;
+      price?: number | null;
+    }[];
+    issues: string[];
+  };
   audit_events: {
     event_id: string;
     timestamp: string;
@@ -1017,6 +1046,7 @@ export default function App() {
       latestAuditAt: guardedLive.audit_events[0]?.timestamp ?? null,
       latestReconciliationAt: guardedLive.reconciliation.checked_at ?? null,
       latestRecoveryAt: guardedLive.recovery.recovered_at ?? null,
+      latestOrderSyncAt: guardedLive.order_book.synced_at ?? guardedLive.ownership.last_order_sync_at ?? null,
     };
   }, [guardedLive]);
 
@@ -1292,6 +1322,21 @@ export default function App() {
       setStatusText("Guarded-live runtime recovery recorded.");
     } catch (error) {
       setStatusText(`Runtime recovery failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function resumeGuardedLiveRun() {
+    const reason = resolveGuardedLiveReason("process_restart_resume");
+    setStatusText("Resuming guarded-live owner...");
+    try {
+      const run = await fetchJson<Run>("/guarded-live/resume", {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText(`Guarded-live owner resumed on run ${run.config.run_id}.`);
+    } catch (error) {
+      setStatusText(`Guarded-live resume failed: ${(error as Error).message}`);
     }
   }
 
@@ -1639,6 +1684,14 @@ export default function App() {
                     <strong>{guardedLiveSummary.blockerCount}</strong>
                   </div>
                   <div className="metric-tile">
+                    <span>Live owner</span>
+                    <strong>{guardedLive.ownership.state}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Order-book sync</span>
+                    <strong>{formatTimestamp(guardedLiveSummary.latestOrderSyncAt)}</strong>
+                  </div>
+                  <div className="metric-tile">
                     <span>Latest audit</span>
                     <strong>{formatTimestamp(guardedLiveSummary.latestAuditAt)}</strong>
                   </div>
@@ -1659,6 +1712,9 @@ export default function App() {
                 </button>
                 <button className="ghost-button" onClick={() => void recoverGuardedLiveRuntime()} type="button">
                   Recover runtime state
+                </button>
+                <button className="ghost-button" onClick={() => void resumeGuardedLiveRun()} type="button">
+                  Resume live owner
                 </button>
                 <button className="ghost-button" onClick={() => void engageGuardedLiveKillSwitch()} type="button">
                   Engage kill switch
@@ -1699,6 +1755,34 @@ export default function App() {
                       <tr>
                         <th>Running live</th>
                         <td>{guardedLive.running_live_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner state</th>
+                        <td>{guardedLive.ownership.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner run</th>
+                        <td>{guardedLive.ownership.owner_run_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner session</th>
+                        <td>{guardedLive.ownership.owner_session_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner symbol</th>
+                        <td>{guardedLive.ownership.symbol ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Claimed at</th>
+                        <td>{formatTimestamp(guardedLive.ownership.claimed_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last resume</th>
+                        <td>{formatTimestamp(guardedLive.ownership.last_resumed_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last order sync</th>
+                        <td>{formatTimestamp(guardedLive.ownership.last_order_sync_at ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Reconciliation scope</th>
@@ -1961,6 +2045,61 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">No recovered venue orders recorded.</p>
+                  )}
+                  <h3>Durable order book</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>Sync state</th>
+                        <td>{guardedLive.order_book.state}</td>
+                      </tr>
+                      <tr>
+                        <th>Synced at</th>
+                        <td>{formatTimestamp(guardedLive.order_book.synced_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner run</th>
+                        <td>{guardedLive.order_book.owner_run_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Owner session</th>
+                        <td>{guardedLive.order_book.owner_session_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Symbol</th>
+                        <td>{guardedLive.order_book.symbol ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Issues</th>
+                        <td>{guardedLive.order_book.issues.length ? guardedLive.order_book.issues.join(", ") : "none"}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {guardedLive.order_book.open_orders.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Symbol</th>
+                          <th>Side</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.order_book.open_orders.map((order) => (
+                          <tr key={`durable-${order.order_id}`}>
+                            <td>{order.order_id}</td>
+                            <td>{order.symbol}</td>
+                            <td>{order.side}</td>
+                            <td>{order.amount.toFixed(8)}</td>
+                            <td>{order.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No durable guarded-live open orders recorded.</p>
                   )}
                   <h3>Guarded-live audit</h3>
                   {guardedLive.audit_events.length ? (

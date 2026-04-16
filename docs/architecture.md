@@ -141,10 +141,13 @@ Guarded-live control state is persisted separately from run history. That state 
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
 internal runtime exposure plus venue balance/open-order snapshots, persisted runtime recovery
 projections rebuilt from verified venue snapshots, and a guarded-live audit log of operator
-actions. A separate venue execution adapter now submits guarded-live market orders once those gates
-are clear, and the guarded-live worker now syncs tracked venue order lifecycle changes back into
-local orders, fills, positions, and audit notes. Operator controls can now cancel active venue
-orders or replace them with repriced limit orders from persisted live run state.
+actions. It also keeps durable guarded-live session ownership plus a persisted open-order snapshot
+for the current live owner. A separate venue execution adapter now submits guarded-live market
+orders once those gates are clear, and the guarded-live worker now syncs tracked venue order
+lifecycle changes back into local orders, fills, positions, and audit notes. Operator controls can
+cancel active venue orders or replace them with repriced limit orders from persisted live run
+state, and the guarded-live resume flow can reattach the owned live session after restart or fault
+drills.
 
 ## Modes
 
@@ -169,6 +172,8 @@ orders or replace them with repriced limit orders from persisted live run state.
 - the current live order path submits venue market orders, then keeps syncing open and partially
   filled venue orders into persisted run/session history
 - operator controls can cancel active venue orders and replace them with repriced limit orders
+- guarded-live control state persists live session ownership and a durable open-order snapshot so a
+  guarded-live resume action can recover the owned live session after restart or fault drills
 
 ## Control Room
 
@@ -181,6 +186,7 @@ The web app currently surfaces:
 - sandbox worker launch, stop, and rerun restore
 - guarded-live worker launch, stop, and run history
 - guarded-live order cancel/replace controls for active venue orders
+- guarded-live live-owner visibility, durable order-book state, and explicit resume control
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
@@ -192,9 +198,10 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 - guarded-live worker execution exists, but it is still limited to a narrow market-entry path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
-  guarded-live recovery/live launch still stop short of a full venue order-book restore or durable
-  live worker resume
+  guarded-live recovery/live resume still stop short of a full venue-native order-book and session
+  lifecycle restore
 - the system still lacks durable alert delivery and wider operator event coverage
-- venue order lifecycle management is still limited beyond cancel/replace: no durable venue-order-book sync
+- venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
+  flow and no full exchange-order restore
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

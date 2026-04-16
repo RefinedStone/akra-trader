@@ -28,6 +28,8 @@ from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import GuardedLiveRuntimeRecovery
+from akra_trader.domain.models import GuardedLiveOrderBookSync
+from akra_trader.domain.models import GuardedLiveSessionOwnership
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
@@ -506,6 +508,11 @@ class TradingApplication:
         + (", ".join(venue_execution_issues) if venue_execution_issues else "adapter not ready")
         + "."
       )
+    if state.ownership.state in {"owned", "orphaned"} and state.ownership.owner_run_id is not None:
+      blockers.append(
+        "Guarded-live session ownership is still held by "
+        f"{state.ownership.owner_run_id}. Resume or release it before launching a new live worker."
+      )
     if runtime_visibility.alerts:
       blockers.append("Unresolved runtime alerts remain in sandbox operations.")
 
@@ -519,6 +526,8 @@ class TradingApplication:
       kill_switch=state.kill_switch,
       reconciliation=state.reconciliation,
       recovery=state.recovery,
+      ownership=state.ownership,
+      order_book=state.order_book,
       audit_events=audit_events,
       active_runtime_alert_count=len(runtime_visibility.alerts),
       running_sandbox_count=running_sandbox_count,
@@ -644,7 +653,9 @@ class TradingApplication:
     state = self._guarded_live_state.load_state()
     snapshot = self._select_guarded_live_recovery_snapshot(state)
     recovered_exposures, recovery_issues = self._recover_exposures_from_venue_snapshot(snapshot)
-    recovered_open_orders = snapshot.open_orders
+    recovered_open_orders = snapshot.open_orders or state.order_book.open_orders
+    if not snapshot.open_orders and state.order_book.open_orders:
+      recovery_issues = (*recovery_issues, "using_durable_order_book_sync")
 
     if snapshot.verification_state == "unavailable":
       recovery_state = GuardedLiveRuntimeRecovery(
@@ -1017,6 +1028,11 @@ class TradingApplication:
       ),
     )
     saved_run = self._runs.save_run(run)
+    self._claim_guarded_live_session_ownership(
+      run=saved_run,
+      actor="operator",
+      reason=operator_reason,
+    )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_started",
       actor="operator",
@@ -1171,11 +1187,86 @@ class TradingApplication:
       reason="Guarded-live worker stopped by operator. Venue open orders remain operator-managed.",
     )
     saved_run = self._runs.save_run(run)
+    self._release_guarded_live_session_ownership(
+      run=saved_run,
+      actor="operator",
+      reason="operator_stop",
+      ownership_state="released",
+    )
     self._append_guarded_live_audit_event(
       kind="guarded_live_worker_stopped",
       actor="operator",
       summary=f"Guarded-live worker stopped for {run.config.symbols[0]}.",
       detail="Operator stop requested for the guarded-live worker session.",
+      run_id=saved_run.config.run_id,
+      session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
+    )
+    return saved_run
+
+  def resume_guarded_live_run(
+    self,
+    *,
+    actor: str,
+    reason: str,
+  ) -> RunRecord:
+    self._ensure_guarded_live_resume_allowed()
+    state = self._guarded_live_state.load_state()
+    if state.ownership.owner_run_id is None:
+      raise ValueError("No guarded-live session ownership is available to resume.")
+    run = self._runs.get_run(state.ownership.owner_run_id)
+    if run is None:
+      raise LookupError("Owned guarded-live run not found")
+    if run.config.mode != RunMode.LIVE:
+      raise ValueError("Guarded-live ownership does not point to a live run.")
+    if run.status in {RunStatus.STOPPED, RunStatus.COMPLETED}:
+      raise ValueError("Terminal guarded-live runs cannot be resumed.")
+
+    current_time = self._clock()
+    if run.status == RunStatus.FAILED:
+      run.status = RunStatus.RUNNING
+      run.ended_at = None
+    last_processed_candle_at = self._infer_last_processed_candle_at(run)
+    self._run_supervisor.recover_worker_session(
+      run=run,
+      worker_kind=self._guarded_live_worker_kind,
+      heartbeat_interval_seconds=self._guarded_live_worker_heartbeat_interval_seconds,
+      heartbeat_timeout_seconds=self._guarded_live_worker_heartbeat_timeout_seconds,
+      reason="operator_resume",
+      now=current_time,
+      started_at=run.started_at,
+      primed_candle_count=self._infer_sandbox_primed_candle_count(run),
+      processed_tick_count=run.provenance.runtime_session.processed_tick_count if run.provenance.runtime_session else 0,
+      last_processed_candle_at=last_processed_candle_at,
+      last_seen_candle_at=last_processed_candle_at,
+    )
+    self._seed_guarded_live_execution_order_book(state.order_book)
+    try:
+      self._sync_guarded_live_orders(run)
+    except Exception as exc:
+      run.notes.append(
+        f"{current_time.isoformat()} | guarded_live_order_book_resume_warning | {exc}"
+      )
+    self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
+    run.notes.append(
+      f"{current_time.isoformat()} | guarded_live_worker_resumed | {reason}"
+    )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    saved_run = self._runs.save_run(run)
+    self._claim_guarded_live_session_ownership(
+      run=saved_run,
+      actor=actor,
+      reason=reason,
+      resumed=True,
+    )
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_worker_resumed",
+      actor=actor,
+      summary=f"Guarded-live worker resumed for {saved_run.config.symbols[0]}.",
+      detail=f"Reason: {reason}.",
       run_id=saved_run.config.run_id,
       session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
     )
@@ -1209,6 +1300,11 @@ class TradingApplication:
       f"Reason: {reason}. Operator requested cancel for {order.order_id} and venue returned {order.status.value}."
     )
     saved_run = self._runs.save_run(run)
+    self._claim_guarded_live_session_ownership(
+      run=saved_run,
+      actor=actor,
+      reason=reason,
+    )
     self._append_guarded_live_audit_event(
       kind="guarded_live_order_canceled",
       actor=actor,
@@ -1319,6 +1415,11 @@ class TradingApplication:
       f"for {replacement_quantity:.8f} at {price:.8f}."
     )
     saved_run = self._runs.save_run(run)
+    self._claim_guarded_live_session_ownership(
+      run=saved_run,
+      actor=actor,
+      reason=reason,
+    )
     self._append_guarded_live_audit_event(
       kind="guarded_live_order_replaced",
       actor=actor,
@@ -1361,8 +1462,145 @@ class TradingApplication:
         + "."
       )
 
+  def _ensure_guarded_live_resume_allowed(self) -> None:
+    state = self._guarded_live_state.load_state()
+    if state.kill_switch.state == "engaged":
+      raise ValueError("Guarded-live kill switch is engaged. Release it before resuming live execution.")
+    if state.recovery.state not in {"recovered", "recovered_with_warnings"}:
+      raise ValueError("Guarded-live runtime recovery must be recorded before resume.")
+    ready, issues = self._venue_execution.describe_capability()
+    if not ready:
+      raise RuntimeError(
+        "Venue order execution is unavailable: "
+        + (", ".join(issues) if issues else "adapter not ready")
+        + "."
+      )
+    if state.ownership.state not in {"owned", "orphaned"}:
+      raise ValueError("No guarded-live session ownership is available to resume.")
+
   def _persist_guarded_live_state(self, state: GuardedLiveState) -> GuardedLiveState:
     return self._guarded_live_state.save_state(state)
+
+  def _claim_guarded_live_session_ownership(
+    self,
+    *,
+    run: RunRecord,
+    actor: str,
+    reason: str,
+    resumed: bool = False,
+  ) -> None:
+    session = run.provenance.runtime_session
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    existing = state.ownership
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        ownership=GuardedLiveSessionOwnership(
+          state="owned",
+          owner_run_id=run.config.run_id,
+          owner_session_id=session.session_id if session is not None else None,
+          symbol=run.config.symbols[0] if run.config.symbols else None,
+          claimed_at=existing.claimed_at if existing.owner_run_id == run.config.run_id else current_time,
+          claimed_by=existing.claimed_by if existing.owner_run_id == run.config.run_id else actor,
+          last_heartbeat_at=session.last_heartbeat_at if session is not None else current_time,
+          last_order_sync_at=current_time,
+          last_resumed_at=current_time if resumed else existing.last_resumed_at,
+          last_reason=reason,
+          last_released_at=None,
+        ),
+        order_book=self._build_guarded_live_order_book_sync(run=run),
+      )
+    )
+
+  def _release_guarded_live_session_ownership(
+    self,
+    *,
+    run: RunRecord,
+    actor: str,
+    reason: str,
+    ownership_state: str,
+  ) -> None:
+    session = run.provenance.runtime_session
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    existing = state.ownership
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        ownership=GuardedLiveSessionOwnership(
+          state=ownership_state,
+          owner_run_id=run.config.run_id,
+          owner_session_id=session.session_id if session is not None else existing.owner_session_id,
+          symbol=run.config.symbols[0] if run.config.symbols else existing.symbol,
+          claimed_at=existing.claimed_at or run.started_at,
+          claimed_by=existing.claimed_by or actor,
+          last_heartbeat_at=session.last_heartbeat_at if session is not None else existing.last_heartbeat_at,
+          last_order_sync_at=current_time,
+          last_resumed_at=existing.last_resumed_at,
+          last_reason=reason,
+          last_released_at=current_time if ownership_state == "released" else existing.last_released_at,
+        ),
+        order_book=self._build_guarded_live_order_book_sync(run=run),
+      )
+    )
+
+  def _build_guarded_live_order_book_sync(self, *, run: RunRecord) -> GuardedLiveOrderBookSync:
+    session = run.provenance.runtime_session
+    open_orders = self._build_guarded_live_open_orders_from_run(run)
+    current_time = self._clock()
+    return GuardedLiveOrderBookSync(
+      state="synced" if open_orders else "empty",
+      synced_at=current_time,
+      owner_run_id=run.config.run_id,
+      owner_session_id=session.session_id if session is not None else None,
+      symbol=run.config.symbols[0] if run.config.symbols else None,
+      open_orders=open_orders,
+      issues=(),
+    )
+
+  def _build_guarded_live_open_orders_from_run(
+    self,
+    run: RunRecord,
+  ) -> tuple[GuardedLiveVenueOpenOrder, ...]:
+    symbol = run.config.symbols[0] if run.config.symbols else None
+    open_orders: list[GuardedLiveVenueOpenOrder] = []
+    for order in run.orders:
+      if order.status not in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
+        continue
+      open_orders.append(
+        GuardedLiveVenueOpenOrder(
+          order_id=order.order_id,
+          symbol=symbol or order.instrument_id.split(":", 1)[-1],
+          side=order.side.value,
+          amount=self._resolve_guarded_live_order_remaining_quantity(order),
+          status=order.status.value,
+          price=order.requested_price,
+        )
+      )
+    open_orders.sort(key=lambda item: (item.symbol, item.order_id))
+    return tuple(open_orders)
+
+  def _seed_guarded_live_execution_order_book(
+    self,
+    order_book: GuardedLiveOrderBookSync,
+  ) -> None:
+    if not order_book.open_orders:
+      return
+    setter = getattr(self._venue_execution, "set_order_state", None)
+    if not callable(setter):
+      return
+    for order in order_book.open_orders:
+      setter(
+        order.order_id,
+        symbol=order.symbol,
+        side=order.side,
+        amount=order.amount,
+        status=order.status,
+        updated_at=order_book.synced_at or self._clock(),
+        filled_amount=0.0,
+        remaining_amount=order.amount,
+      )
 
   def _prepare_guarded_live_order_action(
     self,
@@ -2189,11 +2427,23 @@ class TradingApplication:
         ticks_processed += advance["ticks_processed"]
         orders_submitted += advance["orders_submitted"]
         self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
+        self._claim_guarded_live_session_ownership(
+          run=run,
+          actor="system",
+          reason=recovery_reason if force_recovery else "worker_heartbeat",
+          resumed=force_recovery,
+        )
       except Exception as exc:
         self._run_supervisor.fail(
           run,
           reason=f"{current_time.isoformat()} | guarded_live_worker_failed | {exc}",
           now=current_time,
+        )
+        self._release_guarded_live_session_ownership(
+          run=run,
+          actor="system",
+          reason=str(exc),
+          ownership_state="orphaned",
         )
         self._append_guarded_live_audit_event(
           kind="guarded_live_worker_failed",

@@ -779,6 +779,71 @@ def test_live_order_replace_endpoint_appends_repriced_limit_order(tmp_path: Path
   assert payload["orders"][1]["quantity"] == 0.3
 
 
+def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path: Path) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+
+  with build_client(database_path, guarded_live_execution_enabled=True) as first_client:
+    app = first_client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 21, 0, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+    first_client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    first_client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = first_client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "owned_session_start",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+
+    status_response = first_client.get("/api/guarded-live")
+
+  assert status_response.status_code == 200
+  status_payload = status_response.json()
+  assert status_payload["ownership"]["state"] == "owned"
+  assert status_payload["ownership"]["owner_run_id"] == run_id
+  assert status_payload["order_book"]["open_orders"][0]["order_id"] == "venue-open-order-1"
+
+  with build_client(database_path, guarded_live_execution_enabled=True) as restarted_client:
+    resume_response = restarted_client.post(
+      "/api/guarded-live/resume",
+      json={"actor": "operator", "reason": "process_restart_resume"},
+    )
+
+  assert resume_response.status_code == 200
+  resume_payload = resume_response.json()
+  assert resume_payload["config"]["run_id"] == run_id
+  assert resume_payload["status"] == "running"
+  assert resume_payload["provenance"]["runtime_session"]["recovery_count"] >= 1
+
+
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 
