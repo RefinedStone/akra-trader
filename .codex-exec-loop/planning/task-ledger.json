@@ -1034,20 +1034,38 @@
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-session-unchanged-group-state-persistence",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Persist unchanged-category expansion choices for each conflict session across dev panel reopen",
-      "description": "Persist the per-category expanded or collapsed choices for unchanged tooltip conflict groups per conflict session, so closing and reopening the dev tuning panel restores the same unchanged-category layout instead of recomputing it from defaults.",
-      "status": "ready",
+      "title": "Unchanged-category expansion choices now persist per conflict session across dev panel reopen",
+      "description": "Completed the per-conflict-session persistence follow-up by storing dev-only conflict preview UI state in local storage keyed by conflict session, restoring both the unchanged-section open state and per-category expanded or collapsed choices when the same conflict session returns after the dev panel is reopened, and preserving saved choices by seeding default collapse state only for groups without stored session state.",
+      "status": "done",
       "base_priority": 77,
-      "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the just-finished global-toggle preservation task and directly named restoring per-category unchanged-group layout when the dev panel is reopened as the likely next refinement, so this should become the next executable queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the per-conflict-session unchanged-group persistence refinement in `apps/web/src/App.tsx`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `feb663f` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:16:30Z",
+      "updated_at": "2026-04-17T09:15:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-preserve-unchanged-group-state"
       ],
       "direction_relation_note": "Builds on the completed unchanged-group toggle preservation by extending tooltip preset conflict-preview continuity across dev-panel close or reopen cycles for the same imported conflict session."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-state-reset-controls",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add explicit reset controls for saved tooltip conflict-view state",
+      "description": "Add explicit reset controls for the dev-only tooltip preset conflict preview's saved view state so operators can clear remembered unchanged-section and per-category expansion choices for the current conflict session and clear all remembered conflict sessions when the persisted layout becomes stale or confusing.",
+      "status": "ready",
+      "base_priority": 76,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed per-conflict-session persistence task and directly named explicit reset controls for saved conflict-view state, per session or for all remembered sessions, as the likely next refinement, so this should become the next executable queue head.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T09:20:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-session-unchanged-group-state-persistence"
+      ],
+      "direction_relation_note": "Builds on the new per-conflict-session conflict-preview persistence by giving operators an explicit recovery path when remembered dev-panel state should be discarded for one session or globally."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-bulk-unchanged-group-controls",
@@ -1056,11 +1074,11 @@
       "description": "Provide bulk expand or collapse controls for unchanged tooltip conflict categories so operators can open or close every unchanged category in one action when they need a full scan instead of one-by-one inspection.",
       "status": "proposed",
       "base_priority": 76,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "Bulk expand-all or collapse-all controls remain a plausible refinement, but the latest main-session reply pointed to per-conflict-session persistence across dev-panel reopen as the more direct next step for the newly stabilized unchanged-category controls.",
+      "dynamic_priority_delta": 2,
+      "priority_reason": "Bulk expand-all or collapse-all controls remain a plausible refinement for large unchanged groups, but the latest main-session reply instead pointed to reset controls for the newly persisted conflict-view state as the more direct follow-up after session-level persistence shipped.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:16:30Z",
+      "updated_at": "2026-04-17T09:20:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-collapse-unchanged-groups"
