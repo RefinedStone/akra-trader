@@ -661,6 +661,35 @@ select {
   word-break: break-word;
 }
 
+.reference-artifact-summary {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.reference-artifact-summary-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.reference-artifact-summary dt {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.reference-artifact-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-strategy {
   margin: 14px 0;
   padding: 16px;

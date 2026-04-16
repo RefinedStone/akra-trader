@@ -172,6 +172,7 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   artifact_kinds = {artifact.kind for artifact in run.provenance.benchmark_artifacts}
   assert "result_snapshot_root" in artifact_kinds
   assert "runtime_log_root" in artifact_kinds
+  assert all(isinstance(artifact.summary, dict) for artifact in run.provenance.benchmark_artifacts)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
   assert run.provenance.market_data.sync_status == "delegated"
@@ -291,6 +292,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.runs[1].reference.integration_mode == "external_runtime"
   assert comparison.runs[1].artifact_paths
   assert comparison.runs[1].benchmark_artifacts
+  assert all(isinstance(artifact.summary, dict) for artifact in comparison.runs[1].benchmark_artifacts)
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
     "total_return_pct",

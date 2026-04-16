@@ -294,6 +294,8 @@ class BenchmarkArtifact:
   format: str | None = None
   exists: bool = True
   is_directory: bool = False
+  summary: dict[str, Any] = field(default_factory=dict)
+  summary_source_path: str | None = None
 
 
 @dataclass

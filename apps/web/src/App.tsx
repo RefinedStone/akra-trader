@@ -47,6 +47,8 @@ type BenchmarkArtifact = {
   format?: string | null;
   exists: boolean;
   is_directory: boolean;
+  summary: Record<string, unknown>;
+  summary_source_path?: string | null;
 };
 
 type Run = {
@@ -1501,20 +1503,36 @@ function ReferenceRunProvenanceSummary({
         {externalCommand.length ? <p>Command: {externalCommand.join(" ")}</p> : null}
         {benchmarkArtifacts.length ? (
           <div className="reference-artifact-list">
-            {benchmarkArtifacts.map((artifact) => (
-              <article className="reference-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
-                <div className="reference-artifact-head">
-                  <strong>{artifact.label}</strong>
-                  <span>{artifact.kind}</span>
-                </div>
-                <p>{artifact.path}</p>
-                <p>
-                  {artifact.is_directory ? "directory" : "file"}
-                  {artifact.format ? ` / ${artifact.format}` : ""}
-                  {artifact.exists ? "" : " / missing"}
-                </p>
-              </article>
-            ))}
+            {benchmarkArtifacts.map((artifact) => {
+              const summaryEntries = formatBenchmarkArtifactSummaryEntries(artifact.summary);
+              return (
+                <article className="reference-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+                  <div className="reference-artifact-head">
+                    <strong>{artifact.label}</strong>
+                    <span>{artifact.kind}</span>
+                  </div>
+                  <p>{artifact.path}</p>
+                  <p>
+                    {artifact.is_directory ? "directory" : "file"}
+                    {artifact.format ? ` / ${artifact.format}` : ""}
+                    {artifact.exists ? "" : " / missing"}
+                  </p>
+                  {artifact.summary_source_path && artifact.summary_source_path !== artifact.path ? (
+                    <p>Summary source: {artifact.summary_source_path}</p>
+                  ) : null}
+                  {summaryEntries.length ? (
+                    <dl className="reference-artifact-summary">
+                      {summaryEntries.map(([key, value]) => (
+                        <div className="reference-artifact-summary-row" key={`${artifact.path}-${key}`}>
+                          <dt>{formatBenchmarkArtifactSummaryLabel(key)}</dt>
+                          <dd>{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
+                </article>
+              );
+            })}
           </div>
         ) : (
           <p>Artifacts: {artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}</p>
@@ -1713,4 +1731,92 @@ function formatRange(start?: string | null, end?: string | null) {
     return "open-ended";
   }
   return `${formatTimestamp(start)} -> ${formatTimestamp(end)}`;
+}
+
+const benchmarkArtifactSummaryOrder = [
+  "strategy_name",
+  "run_id",
+  "exchange",
+  "stake_currency",
+  "timeframe",
+  "timerange",
+  "generated_at",
+  "backtest_start_at",
+  "backtest_end_at",
+  "pair_count",
+  "trade_count",
+  "profit_total_pct",
+  "profit_total_abs",
+  "max_drawdown_pct",
+  "market_change_pct",
+  "manifest_count",
+  "snapshot_count",
+] as const;
+
+const benchmarkArtifactSummaryLabels: Record<string, string> = {
+  strategy_name: "Strategy",
+  run_id: "Run ID",
+  exchange: "Exchange",
+  stake_currency: "Stake",
+  timeframe: "TF",
+  timerange: "Timerange",
+  generated_at: "Generated",
+  backtest_start_at: "Backtest start",
+  backtest_end_at: "Backtest end",
+  pair_count: "Pairs",
+  trade_count: "Trades",
+  profit_total_pct: "Total return",
+  profit_total_abs: "Total PnL",
+  max_drawdown_pct: "Max DD",
+  market_change_pct: "Market move",
+  manifest_count: "Manifests",
+  snapshot_count: "Snapshots",
+};
+
+function formatBenchmarkArtifactSummaryEntries(summary: Record<string, unknown>) {
+  return Object.entries(summary)
+    .map(([key, value]) => [key, formatBenchmarkArtifactSummaryValue(key, value)] as const)
+    .filter(([, value]) => value !== null)
+    .sort(([leftKey], [rightKey]) => {
+      const leftIndex = benchmarkArtifactSummarySortIndex(leftKey);
+      const rightIndex = benchmarkArtifactSummarySortIndex(rightKey);
+      if (leftIndex === rightIndex) {
+        return leftKey.localeCompare(rightKey);
+      }
+      return leftIndex - rightIndex;
+    });
+}
+
+function benchmarkArtifactSummarySortIndex(key: string) {
+  const index = benchmarkArtifactSummaryOrder.indexOf(key as (typeof benchmarkArtifactSummaryOrder)[number]);
+  if (index >= 0) {
+    return index;
+  }
+  return benchmarkArtifactSummaryOrder.length + 100;
+}
+
+function formatBenchmarkArtifactSummaryLabel(key: string) {
+  return benchmarkArtifactSummaryLabels[key] ?? key.replaceAll("_", " ");
+}
+
+function formatBenchmarkArtifactSummaryValue(key: string, value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (typeof value === "boolean") {
+    return value ? "yes" : "no";
+  }
+  if (typeof value === "number") {
+    if (key.endsWith("_pct")) {
+      return `${value}%`;
+    }
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).join(", ");
+  }
+  if (typeof value === "object") {
+    return JSON.stringify(value);
+  }
+  return String(value);
 }
