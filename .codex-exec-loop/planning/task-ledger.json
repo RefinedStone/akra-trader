@@ -151,20 +151,38 @@
     {
       "id": "planning-control-room-binance-gap-window-rollup",
       "direction_id": "control-room-and-ops",
-      "title": "Group or collapse fragmented Binance gap windows in ops status",
-      "description": "Refine the new Binance gap-window diagnostics so symbols with long fragmented histories remain readable in the control room, likely by grouping adjacent windows, collapsing long lists behind a summary, or otherwise reducing UI/API noise while preserving actionable missing-range detail.",
-      "status": "ready",
+      "title": "Fragmented Binance gap windows now collapse into a readable ops summary",
+      "description": "Completed the fragmented-gap follow-up by collapsing long Binance gap-window lists in the control-room quality cell, preserving a few recent exact windows while rolling older fragments into a compact summary line with range and missing-count context, plus matching UI treatment for the collapsed state.",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says there is no blocking work left on exact gap windows and explicitly names grouping or collapsing many gap windows as the next natural follow-up, so this is the clearest executable successor for the queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the fragmented gap-window rollup, verified `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `e03deb3`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:57:04Z",
+      "updated_at": "2026-04-16T14:59:17Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-gap-window-status"
       ],
       "direction_relation_note": "Keeps the control-room gap diagnostics operator-usable as Binance history grows more fragmented, so the new quality surface stays readable instead of turning into raw noise."
+    },
+    {
+      "id": "planning-control-room-binance-gap-window-expand-toggle",
+      "direction_id": "control-room-and-ops",
+      "title": "Add on-demand expand/collapse control for rolled-up Binance gap windows",
+      "description": "Extend the control-room gap quality cell so when older Binance gap windows are collapsed into a summary, operators can still expand the row on demand to inspect the full exact window list without sacrificing default readability.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply says nothing remains blocking for the rollup task and explicitly names an operator expand/collapse control as the natural next follow-up, making it the clearest executable successor for auto-advance.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T14:59:17Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-gap-window-rollup"
+      ],
+      "direction_relation_note": "Builds on the rolled-up gap diagnostics so the control room stays readable by default while preserving access to exact Binance missing-window detail when operators need to investigate."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
