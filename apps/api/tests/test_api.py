@@ -254,6 +254,7 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert "result_snapshot_root" in artifact_kinds
   assert "runtime_log_root" in artifact_kinds
   assert all("summary" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
+  assert all("sections" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   assert all("summary_source_path" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   metric_rows = {row["key"]: row for row in payload["metric_rows"]}
   assert metric_rows["total_return_pct"]["values"][native_run_id] is not None

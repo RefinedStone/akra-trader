@@ -59,18 +59,14 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
     json.dumps(
       {
         "metadata": {
-          "run_id": "freqtrade-backtest-001",
-          "exchange": "binance",
-          "stake_currency": "USDT",
-          "generated_at": "2026-04-17T03:00:00+00:00",
-        },
-        "strategy": {
           "NostalgiaForInfinityX7": {
+            "run_id": "freqtrade-backtest-001",
             "timeframe": "5m",
-            "timerange": "20240101-20240131",
-            "backtest_start_time": 1704067200,
-            "backtest_end_time": 1706659200,
-            "pairlist": ["BTC/USDT", "ETH/USDT"],
+            "timeframe_detail": "1m",
+            "backtest_start_ts": 1704067200,
+            "backtest_end_ts": 1706659200,
+            "backtest_start_time": 1713322800,
+            "notes": "fixture manifest",
           }
         },
       }
@@ -82,13 +78,140 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
       {
         "strategy": {
           "NostalgiaForInfinityX7": {
+            "pairlist": ["BTC/USDT", "ETH/USDT"],
+            "results_per_pair": [
+              {
+                "key": "BTC/USDT",
+                "trades": 20,
+                "profit_total_pct": 12.3,
+                "profit_total_abs": 1234.5,
+                "winrate": 0.7,
+              },
+              {
+                "key": "ETH/USDT",
+                "trades": 22,
+                "profit_total_pct": 6.1,
+                "profit_total_abs": 605.75,
+                "winrate": 0.59,
+              },
+              {
+                "key": "TOTAL",
+                "trades": 42,
+                "profit_total_pct": 18.4,
+                "profit_total_abs": 1840.25,
+                "winrate": 0.65,
+              },
+            ],
+            "results_per_enter_tag": [
+              {
+                "key": "dip_buy",
+                "trades": 30,
+                "profit_total_pct": 11.5,
+                "profit_total_abs": 1150.0,
+                "winrate": 0.66,
+              },
+              {
+                "key": "breakout",
+                "trades": 12,
+                "profit_total_pct": 6.9,
+                "profit_total_abs": 690.25,
+                "winrate": 0.58,
+              },
+            ],
+            "exit_reason_summary": [
+              {
+                "key": "roi",
+                "trades": 28,
+                "profit_total_pct": 14.1,
+                "profit_total_abs": 1410.0,
+                "winrate": 0.78,
+              },
+              {
+                "key": "stop_loss",
+                "trades": 10,
+                "profit_total_pct": -1.9,
+                "profit_total_abs": -190.0,
+                "winrate": 0.1,
+              },
+            ],
+            "left_open_trades": [
+              {
+                "key": "BTC/USDT",
+                "trades": 1,
+                "profit_total_pct": 0.2,
+                "profit_total_abs": 20.0,
+                "winrate": 1.0,
+              },
+            ],
+            "periodic_breakdown": {
+              "day": [
+                {"date": "01/04/2026", "profit_abs": 100.0, "trades": 4},
+                {"date": "02/04/2026", "profit_abs": -25.0, "trades": 2},
+              ],
+              "week": [
+                {"date": "31/03/2026", "profit_abs": 350.0, "trades": 12},
+              ],
+            },
+            "daily_profit": [
+              ["2026-04-01", 100.0],
+              ["2026-04-02", -25.0],
+            ],
+            "wallet_stats": {
+              "start_balance": 10000,
+              "end_balance": 11840.25,
+              "high_balance": 11920.0,
+              "low_balance": 9840.0,
+              "sharpe": 1.8,
+              "sortino": 2.1,
+              "calmar": 1.6,
+              "max_drawdown_account": 0.063,
+              "max_drawdown_abs": 620.0,
+              "drawdown_start": "2026-04-02 00:00:00",
+              "drawdown_end": "2026-04-03 06:00:00",
+            },
+            "best_pair": {
+              "key": "BTC/USDT",
+              "trades": 20,
+              "profit_total_pct": 12.3,
+              "profit_total_abs": 1234.5,
+            },
+            "worst_pair": {
+              "key": "ETH/USDT",
+              "trades": 22,
+              "profit_total_pct": 6.1,
+              "profit_total_abs": 605.75,
+            },
             "total_trades": 42,
+            "profit_total": 0.184,
+            "profit_total_abs": 1840.25,
+            "max_drawdown_account": 0.063,
+            "market_change": 0.112,
+            "stake_currency": "USDT",
+            "exchange": "binance",
+            "timeframe": "5m",
+            "timerange": "20240101-20240131",
+            "backtest_start_ts": 1704067200,
+            "backtest_end_ts": 1706659200,
+          }
+        },
+        "strategy_comparison": [
+          {
+            "key": "NostalgiaForInfinityX7",
+            "trades": 42,
             "profit_total_pct": 18.4,
             "profit_total_abs": 1840.25,
-            "max_drawdown_pct": 6.3,
-            "market_change_pct": 11.2,
-          }
-        }
+            "max_drawdown_account": 0.063,
+            "winrate": 0.65,
+          },
+          {
+            "key": "AltReference",
+            "trades": 39,
+            "profit_total_pct": 11.9,
+            "profit_total_abs": 1195.0,
+            "max_drawdown_account": 0.071,
+            "winrate": 0.61,
+          },
+        ],
       }
     ),
     encoding="utf-8",
@@ -110,23 +233,38 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert root_artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
   assert root_artifact.summary["trade_count"] == 42
   assert root_artifact.summary["profit_total_pct"] == 18.4
+  assert root_artifact.summary["max_drawdown_pct"] == 6.3
+  assert root_artifact.summary["market_change_pct"] == 11.2
   assert root_artifact.summary["timeframe"] == "5m"
   assert root_artifact.summary_source_path == str(snapshot_path)
+  assert root_artifact.sections["strategy_comparison"]["count"] == 2
+  assert root_artifact.sections["pair_metrics"]["best"]["label"] == "BTC/USDT"
+  assert root_artifact.sections["exit_reason_metrics"]["preview"][0]["label"] == "roi"
+  assert root_artifact.sections["daily_profit"]["best"]["date"] == "2026-04-01"
+  assert root_artifact.sections["wallet_stats"]["sharpe"] == 1.8
 
   manifest_artifact = artifact_by_kind["result_manifest"]
   assert manifest_artifact.summary["run_id"] == "freqtrade-backtest-001"
-  assert manifest_artifact.summary["pair_count"] == 2
+  assert manifest_artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
   assert manifest_artifact.summary["backtest_start_at"] == "2024-01-01T00:00:00+00:00"
   assert manifest_artifact.summary_source_path == str(manifest_path)
+  assert manifest_artifact.sections["metadata"]["timeframe_detail"] == "1m"
+  assert manifest_artifact.sections["metadata"]["notes"] == "fixture manifest"
 
   snapshot_artifact = artifact_by_kind["result_snapshot"]
   assert snapshot_artifact.summary["trade_count"] == 42
   assert snapshot_artifact.summary["max_drawdown_pct"] == 6.3
+  assert snapshot_artifact.summary["market_change_pct"] == 11.2
   assert snapshot_artifact.summary["timeframe"] == "5m"
   assert snapshot_artifact.summary_source_path == str(snapshot_path)
+  assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 42
+  assert snapshot_artifact.sections["enter_tag_metrics"]["preview"][0]["label"] == "dip_buy"
+  assert snapshot_artifact.sections["periodic_breakdown"]["day"]["worst"]["profit_total_abs"] == -25.0
+  assert snapshot_artifact.sections["pair_extremes"]["best"]["label"] == "BTC/USDT"
 
   log_artifact = artifact_by_kind["runtime_log"]
   assert log_artifact.summary == {}
+  assert log_artifact.sections == {}
   assert log_artifact.summary_source_path is None
 
 
@@ -142,15 +280,12 @@ def test_reference_adapter_uses_manifest_summary_for_zip_snapshots(tmp_path: Pat
   manifest_path.write_text(
     json.dumps(
       {
-        "strategy": {
+        "metadata": {
           "NostalgiaForInfinityX7": {
             "timeframe": "1h",
-            "timerange": "20240201-20240229",
-            "pairlist": ["BTC/USDT"],
+            "backtest_start_ts": 1706745600,
+            "backtest_end_ts": 1709164800,
           }
-        },
-        "metadata": {
-          "generated_at": "2026-04-17T03:15:00+00:00",
         },
       }
     ),
@@ -163,5 +298,6 @@ def test_reference_adapter_uses_manifest_summary_for_zip_snapshots(tmp_path: Pat
   assert artifact.kind == "result_snapshot"
   assert artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
   assert artifact.summary["timeframe"] == "1h"
-  assert artifact.summary["pair_count"] == 1
+  assert artifact.summary["backtest_start_at"] == "2024-02-01T00:00:00+00:00"
+  assert artifact.sections["metadata"]["timeframe"] == "1h"
   assert artifact.summary_source_path == str(manifest_path)

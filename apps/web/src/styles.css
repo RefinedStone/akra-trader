@@ -690,6 +690,46 @@ select {
   word-break: break-word;
 }
 
+.reference-artifact-sections {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.reference-artifact-section-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(88, 217, 255, 0.1);
+  background: rgba(88, 217, 255, 0.04);
+}
+
+.reference-artifact-section-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.reference-artifact-section-head strong {
+  font-size: 0.82rem;
+  color: var(--text);
+}
+
+.reference-artifact-section-body {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.reference-artifact-section-body p {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-strategy {
   margin: 14px 0;
   padding: 16px;

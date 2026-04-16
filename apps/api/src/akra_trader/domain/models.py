@@ -295,6 +295,7 @@ class BenchmarkArtifact:
   exists: bool = True
   is_directory: bool = False
   summary: dict[str, Any] = field(default_factory=dict)
+  sections: dict[str, Any] = field(default_factory=dict)
   summary_source_path: str | None = None
 
 

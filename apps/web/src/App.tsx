@@ -48,6 +48,7 @@ type BenchmarkArtifact = {
   exists: boolean;
   is_directory: boolean;
   summary: Record<string, unknown>;
+  sections?: Record<string, Record<string, unknown>>;
   summary_source_path?: string | null;
 };
 
@@ -1505,6 +1506,7 @@ function ReferenceRunProvenanceSummary({
           <div className="reference-artifact-list">
             {benchmarkArtifacts.map((artifact) => {
               const summaryEntries = formatBenchmarkArtifactSummaryEntries(artifact.summary);
+              const sectionEntries = formatBenchmarkArtifactSectionEntries(artifact.sections ?? {});
               return (
                 <article className="reference-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
                   <div className="reference-artifact-head">
@@ -1529,6 +1531,22 @@ function ReferenceRunProvenanceSummary({
                         </div>
                       ))}
                     </dl>
+                  ) : null}
+                  {sectionEntries.length ? (
+                    <div className="reference-artifact-sections">
+                      {sectionEntries.map(([key, lines]) => (
+                        <article className="reference-artifact-section-card" key={`${artifact.path}-${key}`}>
+                          <div className="reference-artifact-section-head">
+                            <strong>{formatBenchmarkArtifactSectionLabel(key)}</strong>
+                          </div>
+                          <div className="reference-artifact-section-body">
+                            {lines.map((line) => (
+                              <p key={`${artifact.path}-${key}-${line}`}>{line}</p>
+                            ))}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
                   ) : null}
                 </article>
               );
@@ -1771,6 +1789,48 @@ const benchmarkArtifactSummaryLabels: Record<string, string> = {
   market_change_pct: "Market move",
   manifest_count: "Manifests",
   snapshot_count: "Snapshots",
+  timeframe_detail: "TF detail",
+  notes: "Notes",
+  win_rate_pct: "Win rate",
+  date: "Date",
+  duration: "Duration",
+  drawdown_start: "DD start",
+  drawdown_end: "DD end",
+  start_balance: "Start balance",
+  end_balance: "End balance",
+  high_balance: "High balance",
+  low_balance: "Low balance",
+  sharpe: "Sharpe",
+  sortino: "Sortino",
+  calmar: "Calmar",
+};
+
+const benchmarkArtifactSectionOrder = [
+  "metadata",
+  "strategy_comparison",
+  "pair_metrics",
+  "pair_extremes",
+  "enter_tag_metrics",
+  "exit_reason_metrics",
+  "mixed_tag_metrics",
+  "left_open_metrics",
+  "periodic_breakdown",
+  "daily_profit",
+  "wallet_stats",
+] as const;
+
+const benchmarkArtifactSectionLabels: Record<string, string> = {
+  metadata: "Metadata",
+  strategy_comparison: "Strategy comparison",
+  pair_metrics: "Pair metrics",
+  pair_extremes: "Pair extremes",
+  enter_tag_metrics: "Entry tags",
+  exit_reason_metrics: "Exit reasons",
+  mixed_tag_metrics: "Mixed tags",
+  left_open_metrics: "Left open",
+  periodic_breakdown: "Periodic breakdown",
+  daily_profit: "Daily profit",
+  wallet_stats: "Wallet stats",
 };
 
 function formatBenchmarkArtifactSummaryEntries(summary: Record<string, unknown>) {
@@ -1817,6 +1877,86 @@ function formatBenchmarkArtifactSummaryValue(key: string, value: unknown): strin
   }
   if (typeof value === "object") {
     return JSON.stringify(value);
+  }
+  return String(value);
+}
+
+function formatBenchmarkArtifactSectionEntries(sections: Record<string, Record<string, unknown>>) {
+  return Object.entries(sections)
+    .map(([key, section]) => [key, formatBenchmarkArtifactSectionLines(section)] as const)
+    .filter(([, lines]) => lines.length > 0)
+    .sort(([leftKey], [rightKey]) => {
+      const leftIndex = benchmarkArtifactSectionSortIndex(leftKey);
+      const rightIndex = benchmarkArtifactSectionSortIndex(rightKey);
+      if (leftIndex === rightIndex) {
+        return leftKey.localeCompare(rightKey);
+      }
+      return leftIndex - rightIndex;
+    });
+}
+
+function benchmarkArtifactSectionSortIndex(key: string) {
+  const index = benchmarkArtifactSectionOrder.indexOf(key as (typeof benchmarkArtifactSectionOrder)[number]);
+  if (index >= 0) {
+    return index;
+  }
+  return benchmarkArtifactSectionOrder.length + 100;
+}
+
+function formatBenchmarkArtifactSectionLabel(key: string) {
+  return benchmarkArtifactSectionLabels[key] ?? key.replaceAll("_", " ");
+}
+
+function formatBenchmarkArtifactSectionLines(section: Record<string, unknown>) {
+  return Object.entries(section)
+    .map(([key, value]) => {
+      const inlineValue = formatBenchmarkArtifactSectionValue(value);
+      if (inlineValue === null) {
+        return null;
+      }
+      return `${formatBenchmarkArtifactSummaryLabel(key)}: ${inlineValue}`;
+    })
+    .filter((line): line is string => line !== null);
+}
+
+function formatBenchmarkArtifactSectionValue(value: unknown): string | null {
+  if (value === null || value === undefined || value === "") {
+    return null;
+  }
+  if (Array.isArray(value)) {
+    if (!value.length) {
+      return null;
+    }
+    const preview = value.slice(0, 3).map((item) => formatBenchmarkArtifactInlineValue(item)).join(" | ");
+    if (value.length > 3) {
+      return `${preview} | +${value.length - 3} more`;
+    }
+    return preview;
+  }
+  if (typeof value === "object") {
+    return formatBenchmarkArtifactInlineValue(value);
+  }
+  return String(value);
+}
+
+function formatBenchmarkArtifactInlineValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => formatBenchmarkArtifactInlineValue(item)).join(", ");
+  }
+  if (typeof value === "object") {
+    return Object.entries(value as Record<string, unknown>)
+      .map(([key, nestedValue]) => {
+        const formattedValue = formatBenchmarkArtifactSummaryValue(key, nestedValue);
+        if (formattedValue === null) {
+          return null;
+        }
+        return `${formatBenchmarkArtifactSummaryLabel(key)}=${formattedValue}`;
+      })
+      .filter((entry): entry is string => entry !== null)
+      .join(", ");
   }
   return String(value);
 }
