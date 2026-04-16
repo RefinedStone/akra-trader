@@ -257,18 +257,36 @@
       "direction_id": "runtime-ops",
       "title": "Replace sandbox preview semantics with worker session state, heartbeat, and recovery",
       "description": "Introduce a real worker or session model separate from preview runs, then add heartbeat, restart recovery, and operator-visible runtime state so sandbox stops being a replay preview and can satisfy Gate 2 semantics.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says the paper lane is now separated but still lacks continuous worker, heartbeat, and recovery semantics, making this the clearest immediately executable runtime-ops follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit eb5c543, which replaced sandbox preview semantics with supervised runtime sessions, heartbeat and recovery state, worker maintenance jobs, aligned UI wording, and verification across API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:05:00Z",
+      "updated_at": "2026-04-17T06:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Now becomes the queue head for runtime-ops because paper startup semantics are split, but active worker identity, heartbeat, recovery, and operator-visible session health are still missing."
+      "direction_relation_note": "Closed the worker-session foundation gap for runtime-ops by separating runtime sessions from preview semantics and making heartbeat plus recovery operator-visible, which now enables the remaining continuous-execution and alerting follow-ups."
+    },
+    {
+      "id": "planning-runtime-ops-continuous-execution-worker",
+      "direction_id": "runtime-ops",
+      "title": "Turn sandbox worker sessions into continuous execution workers",
+      "description": "Extend the new supervised sandbox session model into a true continuous execution worker that stays alive across ticks, drives decision cycles from live venue or feed updates, and surfaces recent decisions, lag, positions, and fills as active runtime state rather than a primed preview snapshot.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says worker sessions, heartbeat, and recovery are in place, but sandbox is still not a venue-backed continuous execution worker, making this the clearest immediate queue head.",
+      "depends_on": [
+        "planning-runtime-ops-worker-session-foundation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly advances the remaining runtime-ops gap between supervised session state and real active execution by turning sandbox from a primed session into an ongoing worker with operator-visible runtime outputs."
     },
     {
       "id": "planning-runtime-ops-paper-launch-request-surface",
@@ -296,15 +314,15 @@
       "status": "blocked",
       "base_priority": 83,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out missing alerting and operator-event integration for the new failure-history surface, but the broader alert substrate still depends on runtime worker-state foundations.",
+      "priority_reason": "The latest main-session reply explicitly calls out missing alerting and operator-event integration for heartbeat and recovery state, but the broader alert substrate should follow the new continuous-execution worker so alerts reflect real runtime health rather than primed sessions.",
       "depends_on": [
-        "planning-runtime-ops-worker-session-foundation"
+        "planning-runtime-ops-continuous-execution-worker"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:00:00Z",
+      "updated_at": "2026-04-17T06:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Directly advances the operator-trust direction by giving the control room actionable answers about what is running, what failed, and what the operator should do next."
+      "direction_relation_note": "Directly advances the operator-trust direction by turning continuous-worker heartbeat, recovery, and data-failure signals into actionable alerts and durable operator-visible event records."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
