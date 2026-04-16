@@ -836,20 +836,56 @@
     {
       "id": "planning-reference-lanes-tooltip-preset-portability",
       "direction_id": "reference-lanes-and-benchmarks",
-      "title": "Add preset import/export or URL-backed sharing for tooltip tuning profiles",
-      "description": "Extend the dev-only tooltip tuning preset workflow so saved calibration profiles can move across machines, preferably through import/export payloads or URL-backed sharing, while preserving the current local draft-versus-saved-preset model and keeping malformed shared payloads safely normalized or rejected.",
-      "status": "ready",
+      "title": "Tooltip tuning preset import/export and URL sharing shipped",
+      "description": "Completed the portability follow-up by adding dev-only JSON export/import for the current tuning bundle plus saved presets, generating URL-backed share payloads for the same bundle, hydrating shared tuning state from the URL on load, and preserving versioned normalization so malformed or incompatible payloads fall back safely instead of breaking the tuning panel.",
+      "status": "done",
       "base_priority": 88,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply said nothing essential remains for local preset persistence and explicitly named preset import/export or URL-backed sharing as the likeliest next refinement, making portability the clearest executable successor task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the tooltip preset portability work in `apps/web/src/App.tsx` and `apps/web/src/styles.css`, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `d2961f3` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T17:41:33Z",
+      "updated_at": "2026-04-17T07:15:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-tuning-preset-persistence"
       ],
       "direction_relation_note": "Builds on the completed local preset persistence by making reference-lane tooltip calibration profiles portable across operators and machines instead of remaining browser-local."
+    },
+    {
+      "id": "planning-reference-lanes-single-preset-portability",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Support sharing or exporting a single named tooltip tuning preset",
+      "description": "Refine the dev-only tooltip tuning portability flow so operators can export, import, or generate a share URL for one named preset without always serializing the full draft-plus-presets bundle, while preserving the current normalization and safety checks for malformed payloads.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply marked the broader portability task complete and explicitly called finer-grained sharing, such as exporting a single named preset instead of the whole bundle, the likeliest next refinement, making it the clearest executable successor.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:15:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-preset-portability"
+      ],
+      "direction_relation_note": "Builds on the completed bundle-level portability flow by making reference-lane tooltip calibration sharing more targeted and practical for iterative preset comparisons."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-merge-modes",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Add merge or replace modes when importing shared tooltip tuning bundles",
+      "description": "Extend the dev-only tooltip tuning import flow so shared bundles can either fully replace the current local draft and saved presets or merge into existing presets selectively, instead of always overwriting the whole local bundle.",
+      "status": "proposed",
+      "base_priority": 85,
+      "dynamic_priority_delta": 3,
+      "priority_reason": "The latest main-session reply explicitly named merge/import modes as a likely next refinement, but it is a broader UX and conflict-resolution choice than the immediately executable single-preset sharing follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T07:15:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-preset-portability"
+      ],
+      "direction_relation_note": "Extends the completed bundle portability flow by making shared tooltip calibration imports safer for iterative local tuning sessions that already have saved presets."
     },
     {
       "id": "planning-reference-lanes-tooltip-interaction-telemetry",
