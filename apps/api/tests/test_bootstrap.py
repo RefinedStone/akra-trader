@@ -56,6 +56,7 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
   container = build_container(Settings(market_data_provider="seeded"))
 
   assert isinstance(container.app._market_data, SeededMarketDataAdapter)
+  assert container.background_jobs == ()
 
 
 def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:
@@ -71,18 +72,36 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       captured["tracked_symbols"] = ",".join(tracked_symbols)
       captured["default_candle_limit"] = str(default_candle_limit)
 
+  class FakeMarketDataSyncJob:
+    def __init__(self, market_data, *, timeframes: tuple[str, ...], interval_seconds: int) -> None:
+      captured["sync_timeframes"] = ",".join(timeframes)
+      captured["sync_interval_seconds"] = str(interval_seconds)
+      self._market_data = market_data
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
 
-  build_container(
+  container = build_container(
     Settings(
       runs_database_url="postgresql+psycopg://akra:akra@postgres:5432/akra_trader",
       market_data_provider="binance",
       market_data_symbols=("BTC/USDT",),
+      market_data_sync_timeframes=("5m", "1h"),
+      market_data_sync_interval_seconds=120,
       market_data_default_candle_limit=144,
     )
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["tracked_symbols"] == "BTC/USDT"
+  assert captured["sync_timeframes"] == "5m,1h"
+  assert captured["sync_interval_seconds"] == "120"
   assert captured["default_candle_limit"] == "144"
+  assert len(container.background_jobs) == 1

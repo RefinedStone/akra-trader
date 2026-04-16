@@ -77,6 +77,7 @@ def test_binance_adapter_persists_recent_candles_and_status(tmp_path: Path) -> N
     clock=lambda: now,
   )
 
+  adapter.sync_tracked("5m")
   status = adapter.get_status("5m")
   candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m", limit=4)
   lineage = adapter.describe_lineage(
@@ -114,6 +115,7 @@ def test_binance_adapter_reuses_persisted_candles_when_coverage_is_fresh(tmp_pat
     clock=lambda: now,
   )
 
+  first_adapter.sync_tracked("5m")
   first_adapter.get_candles(symbol="BTC/USDT", timeframe="5m", limit=4)
 
   second_exchange = FakeExchange({("BTC/USDT", "5m"): []})
@@ -147,6 +149,39 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
     clock=lambda: now,
   )
 
+  adapter.sync_tracked("5m")
   status = adapter.get_status("5m")
 
   assert "missing_candles:1" in status.instruments[0].issues
+
+
+def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=25),
+    count=6,
+  )
+  exchange = FakeExchange({("BTC/USDT", "5m"): rows})
+  adapter = BinanceMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    exchange=exchange,
+    default_candle_limit=6,
+    clock=lambda: now,
+  )
+
+  status = adapter.get_status("5m")
+  candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m", limit=4)
+  lineage = adapter.describe_lineage(
+    symbol="BTC/USDT",
+    timeframe="5m",
+    candles=candles,
+    limit=4,
+  )
+
+  assert exchange.calls == []
+  assert status.instruments[0].sync_status == "empty"
+  assert status.instruments[0].candle_count == 0
+  assert candles == []
+  assert lineage.sync_status == "empty"
+  assert "insufficient_candle_coverage" in lineage.issues

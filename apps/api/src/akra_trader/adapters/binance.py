@@ -145,14 +145,6 @@ class BinanceMarketDataAdapter(MarketDataPort):
     end_at: datetime | None = None,
     limit: int | None = None,
   ) -> list[Candle]:
-    self._ensure_candle_coverage(
-      symbol=symbol,
-      timeframe=timeframe,
-      start_at=start_at,
-      end_at=end_at,
-      limit=limit,
-    )
-
     statement = select(market_candles).where(
       and_(
         market_candles.c.venue == self._venue,
@@ -180,7 +172,6 @@ class BinanceMarketDataAdapter(MarketDataPort):
   def get_status(self, timeframe: str) -> MarketDataStatus:
     instruments: list[InstrumentStatus] = []
     for symbol in self._tracked_symbols:
-      self._sync_recent(symbol=symbol, timeframe=timeframe)
       quality = self._build_quality_snapshot(symbol=symbol, timeframe=timeframe)
 
       instruments.append(
@@ -197,6 +188,10 @@ class BinanceMarketDataAdapter(MarketDataPort):
         )
       )
     return MarketDataStatus(provider="binance", venue=self._venue, instruments=instruments)
+
+  def sync_tracked(self, timeframe: str) -> None:
+    for symbol in self._tracked_symbols:
+      self._sync_recent(symbol=symbol, timeframe=timeframe)
 
   def describe_lineage(
     self,
@@ -237,61 +232,6 @@ class BinanceMarketDataAdapter(MarketDataPort):
       asset_type=AssetType.CRYPTO,
       market_type=MarketType.SPOT,
     )
-
-  def _ensure_candle_coverage(
-    self,
-    *,
-    symbol: str,
-    timeframe: str,
-    start_at: datetime | None,
-    end_at: datetime | None,
-    limit: int | None,
-  ) -> None:
-    coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
-    if not self._needs_sync(
-      coverage=coverage,
-      timeframe=timeframe,
-      start_at=start_at,
-      end_at=end_at,
-      limit=limit,
-    ):
-      return
-
-    if start_at is not None or end_at is not None:
-      self._sync_range(
-        symbol=symbol,
-        timeframe=timeframe,
-        start_at=start_at,
-        end_at=end_at,
-        limit=limit,
-      )
-      return
-    self._sync_recent(symbol=symbol, timeframe=timeframe, required_count=limit)
-
-  def _needs_sync(
-    self,
-    *,
-    coverage: CandleCoverage,
-    timeframe: str,
-    start_at: datetime | None,
-    end_at: datetime | None,
-    limit: int | None,
-  ) -> bool:
-    if coverage.last_timestamp is None:
-      return True
-    if start_at is not None and (
-      coverage.first_timestamp is None or coverage.first_timestamp > start_at
-    ):
-      return True
-    if end_at is not None and coverage.last_timestamp < end_at:
-      return True
-    if start_at is None and end_at is None and limit is not None and coverage.candle_count < limit:
-      return True
-    if end_at is None:
-      lag_seconds = self._calculate_lag_seconds(coverage.last_timestamp)
-      if lag_seconds is not None and lag_seconds > self._freshness_threshold_seconds(timeframe):
-        return True
-    return False
 
   def _sync_recent(
     self,

@@ -18,6 +18,8 @@ class Settings:
   runs_database_url: str | None = None
   market_data_database_url: str | None = None
   market_data_symbols: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT")
+  market_data_sync_timeframes: tuple[str, ...] = ("5m",)
+  market_data_sync_interval_seconds: int = 60
   market_data_default_candle_limit: int = 500
 
 
@@ -30,6 +32,12 @@ def load_settings() -> Settings:
     market_data_database_url=os.getenv("AKRA_TRADER_MARKET_DATA_DATABASE_URL") or None,
     market_data_symbols=_parse_csv_env(
       os.getenv("AKRA_TRADER_MARKET_DATA_SYMBOLS", "BTC/USDT,ETH/USDT,SOL/USDT")
+    ),
+    market_data_sync_timeframes=_parse_csv_env(
+      os.getenv("AKRA_TRADER_MARKET_DATA_SYNC_TIMEFRAMES", "5m")
+    ),
+    market_data_sync_interval_seconds=int(
+      os.getenv("AKRA_TRADER_MARKET_DATA_SYNC_INTERVAL_SECONDS", "60")
     ),
     market_data_default_candle_limit=int(
       os.getenv("AKRA_TRADER_MARKET_DATA_DEFAULT_CANDLE_LIMIT", "500")

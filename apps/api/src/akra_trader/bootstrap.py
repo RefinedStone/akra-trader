@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
@@ -11,11 +12,19 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
+from akra_trader.market_data_sync import MarketDataSyncJob
+
+
+class AppLifecycle(Protocol):
+  async def start(self) -> None: ...
+
+  async def stop(self) -> None: ...
 
 
 @dataclass
 class Container:
   app: TradingApplication
+  background_jobs: tuple[AppLifecycle, ...] = ()
 
 
 def build_default_runs_database_url(repo_root: Path) -> str:
@@ -44,6 +53,18 @@ def build_market_data_adapter(settings: Settings, repo_root: Path):
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 
 
+def build_background_jobs(settings: Settings, market_data) -> tuple[AppLifecycle, ...]:
+  if settings.market_data_provider != "binance":
+    return ()
+  return (
+    MarketDataSyncJob(
+      market_data=market_data,
+      timeframes=settings.market_data_sync_timeframes,
+      interval_seconds=settings.market_data_sync_interval_seconds,
+    ),
+  )
+
+
 def build_container(settings: Settings) -> Container:
   repo_root = Path(__file__).resolve().parents[4]
   market_data = build_market_data_adapter(settings, repo_root)
@@ -59,4 +80,7 @@ def build_container(settings: Settings) -> Container:
     runs=runs,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
   )
-  return Container(app=application)
+  return Container(
+    app=application,
+    background_jobs=build_background_jobs(settings, market_data),
+  )
