@@ -1,163 +1,138 @@
 # Technical Roadmap
 
+Rebased to the repository state as of April 17, 2026.
+
 ## Goal
 
-The technical roadmap turns the current architecture into a durable platform without breaking the core boundary rule:
+Advance the current architecture without breaking the core boundary rule:
 
 - domain and application code stay independent from frameworks, exchanges, storage engines, and LLM providers
 
-## Current system baseline
+## Current Baseline
 
-The current implementation already fixes several important design choices:
+Already implemented:
 
-- `StrategyRuntime` is split into feature-building, context-building, and decision steps
-- `DecisionEnginePort` exists for external decision systems
-- `MarketDataPort`, `RunRepositoryPort`, and `StrategyCatalogPort` define the main seams
-- the application already supports native and reference runtime lanes
+- explicit ports for market data, strategy catalog, run storage, references, and decision engines
+- native runtime services split into data, execution, risk, cache, and supervision concerns
+- durable run storage through SQLAlchemy
+- Binance market-data adapter with background sync support
+- reference-runtime delegation for NFI backtests
+- run comparison workflow through API and UI
 
-The main weaknesses are:
+Main weaknesses:
 
-- in-memory persistence
-- seeded data instead of venue-backed ingestion
-- replay-only sandbox execution
-- no long-running worker model
-- no live execution adapter or safety controls
-- no structured experiment metadata beyond the current run record
+- run storage is durable but still payload-centric
+- reproducibility metadata exists but is not yet fully pinned
+- sandbox semantics are replay-oriented rather than worker-oriented
+- observability and audit features are minimal
+- the LLM lane is a contract, not a full research platform
 
 ## Track A: Data Platform
 
-### Target state
+### Already implemented
 
-- market data is venue-backed, versionable, and auditable
-- every run knows which data slice it used
-- the platform can distinguish between data freshness problems and strategy problems
+- Binance-backed adapter behind `MarketDataPort`
+- local SQL storage for candles and sync state
+- resync, deduplication, gap detection, lag reporting, and backfill reporting
+- background sync loop for tracked symbols
 
-### Milestones
+### Needs hardening
 
-- Replace seeded market data with a Binance adapter behind `MarketDataPort`
-- Store instruments, candle batches, ingestion jobs, and freshness metadata in Postgres
-- Define resync, deduplication, and gap-detection rules
-- Add data quality checks for empty series, broken timestamps, and missing bars
-- Add background ingestion jobs for historical catch-up and recent updates
+- stronger dataset identity and checkpointing per run
+- explicit ingestion job history and failure retention
+- clearer separation between read-side market access and write-side ingestion control
 
-### Interface additions
+### Not started yet
 
-- `MarketDataPort` should expand to cover write-side synchronization or a companion ingestion port
-- API should expose ingestion lag, sync status, and recent failures
-
-### Technical decisions to preserve
-
-- execution services read via ports only
-- strategies do not read raw exchange clients directly
+- operator-facing ingestion failure history
+- richer venue coverage beyond the current Binance path
 
 ## Track B: Experiment and Persistence Platform
 
-### Target state
+### Already implemented
 
-- all runs are durable
-- all inputs are reproducible
-- comparison across strategies and parameter sets is straightforward
+- durable run repository
+- persisted run payloads including metrics, orders, fills, positions, notes, equity curve, and provenance
+- run comparison queries
+- strategy version and parameter snapshots in run provenance
 
-### Milestones
+### Needs hardening
 
-- Replace `InMemoryRunRepository` with a Postgres-backed adapter
-- Persist run config, metrics, notes, orders, fills, positions, and equity curve snapshots
-- Add strategy version records and parameter snapshots
-- Add run tags, scenario presets, and comparison queries
-- Add artifact storage references for logs and serialized outputs
+- normalized tables for key run dimensions and metrics
+- durable run tags and scenario presets
+- export-friendly artifact storage model beyond the current provenance payload
 
-### Interface additions
+### Not started yet
 
-- `RunRepositoryPort` will need query methods for comparisons, filtering, and strategy-version history
-- API will need endpoints for run comparison, run tags, and result exports
-
-### Technical decisions to preserve
-
-- run storage remains an adapter concern
-- run reproducibility metadata is stored at run creation time, not reconstructed later
+- full experiment query surface for tags, presets, and scenario history
+- durable user strategy registration history
 
 ## Track C: Strategy Platform
 
-### Target state
+### Already implemented
 
-- strategy runtime lanes are explicit and extensible
-- native rules, NFI references, and LLM decision engines use one shared orchestration model
+- explicit native and reference lanes
+- decision-engine port and template strategy shape
+- metadata normalization for built-in and reference strategies
+- decision envelopes that can already carry trace metadata
 
-### Milestones
+### Needs hardening
 
-- Formalize strategy version lifecycle: draft, active, archived
-- Normalize metadata between native and reference strategies
-- Add trace schema for `StrategyDecisionEnvelope`
-- Add scenario-aware context builders for multi-timeframe and venue-aware features
-- Add prompt-driven decision engine research harness behind `DecisionEnginePort`
+- strategy lifecycle transitions beyond current static metadata fields
+- richer trace schema for human and machine decisions
+- scenario-aware context builders for multi-timeframe or multi-symbol strategies
 
-### Interface additions
+### Not started yet
 
-- `StrategyMetadata` should gain lifecycle and promotion status
-- `StrategyDecisionEnvelope` should gain normalized trace metadata for human and machine decisions
-- `DecisionEnginePort` should support audit-friendly invocation metadata
-
-### Technical decisions to preserve
-
-- feature building and decision making remain separable
-- LLM decisions do not bypass the shared execution pipeline
-- reference strategies remain a distinct lane, not a hidden special case
+- provider-backed decision-engine research harness
+- persistent promotion and archival workflow for strategy versions
 
 ## Track D: Real-Time Execution Platform
 
-### Target state
+### Already implemented
 
-- backtest, sandbox, and live modes share the same orchestration and state transition model
-- differences between modes are adapter-level, not domain-level
+- shared execution mode model across backtest and sandbox concepts
+- native runtime services that can evolve toward worker-based operation
+- API and UI controls for starting and stopping sandbox preview runs
 
-### Milestones
+### Needs hardening
 
-- move from replay-only sandbox mode to long-running worker execution
-- add market stream or timed polling infrastructure
-- add order state machine support for real exchange responses
-- add exchange reconciliation on startup and after failures
-- add live execution adapter and safe promotion flow
+- clear separation between sandbox preview and future continuous workers
+- persisted worker state model that is distinct from replay results
 
-### Interface additions
+### Not started yet
 
-- execution mode separation should be represented in application services or new execution ports
-- API should expose live account status, open orders, reconciliation state, and emergency stop actions
-
-### Technical decisions to preserve
-
-- live trading must use the same decision envelope and risk checks as sandbox mode
-- operators can always force a safe stop
+- long-running sandbox workers
+- live execution adapter
+- reconciliation after restart or faults
+- exchange-native order state handling
 
 ## Track E: Safety, Observability, and Operations
 
-### Target state
+### Already implemented
 
-- the operator can trust the system enough to diagnose issues without shelling into containers first
+- basic market-data health surface
+- reference and run provenance sufficient for research inspection
 
-### Milestones
+### Needs hardening
 
-- structured logs for ingestion, execution, and strategy decisions
-- alerts for stale data, worker failure, rejected orders, and risk breaches
-- audit log for operator actions
-- single-host deployment recipe with service healthchecks and restart policies
-- runbook for incident response and daily operations
+- structured operational events
+- clearer failure surfacing for background sync and runtime errors
+- service-level runbooks and deployment guidance
 
-### Interface additions
+### Not started yet
 
-- add operator event storage and alert endpoints
-- expose health, lag, and status summary APIs for the control room
+- alerts for stale data, worker failure, and risk breaches
+- operator event log
+- live audit trail
+- emergency stop workflow tied to real execution
 
-### Technical decisions to preserve
+## Technical Exit Criteria for the Next Major Milestone
 
-- observability data is part of the product, not an afterthought
-- every live-affecting operator action is logged
+The next milestone should meet these checks:
 
-## 6-Month technical exit criteria
-
-At the end of the roadmap, the codebase should meet these technical checks:
-
-- no core user flow depends on in-memory-only state
-- real market data powers backtest, sandbox, and live lanes
-- native, reference, and decision-engine strategies all fit the same strategy contract
-- one exchange supports a guarded live path with reconciliation and auditability
-- operational health and recent failures are visible through the platform UI and API
+- repeated runs can point to a stable dataset identity
+- strategy and run metadata can be queried without deserializing whole payloads for common cases
+- sandbox semantics are backed by a real worker model instead of replay-only behavior
+- operational failures are visible through platform surfaces rather than only through logs
+- the LLM lane remains isolated until trace storage and replay controls exist

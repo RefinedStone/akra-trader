@@ -1,180 +1,168 @@
 # Product Roadmap
 
+Rebased to the repository state as of April 17, 2026.
+
 ## Objective
 
-Over the next 6 months, `akra-trader` should evolve from an architectural skeleton into a usable single-operator trading research platform for crypto markets, with guarded progression from research to sandbox trading and then to controlled live execution.
+Turn the current research platform into a reliable single-operator trading workstation for crypto research first, then real-time sandbox operation, and only then controlled live execution.
 
-The primary user is a solo developer or quant who needs:
+## North Star
 
-- reproducible backtests
-- fast strategy iteration
-- an operations view for running sandbox and live sessions
-- a safe path to test LLM-assisted decision systems
-
-## Product north star
-
-The platform should let one operator do the following without ad hoc scripts:
+One operator should be able to do the following without ad hoc scripts:
 
 1. ingest and inspect market data
-2. register or update a strategy version
-3. run backtests with stored parameters and reproducible results
+2. register or select a strategy version
+3. run a backtest with stored parameters and durable provenance
 4. compare runs and understand why results differ
-5. monitor a sandbox run in near real time
-6. enable guarded live trading with explicit risk limits
-7. evaluate LLM-driven decisions alongside deterministic strategies
-
-## Release stages
+5. operate a continuous sandbox strategy from one control room
+6. enable guarded live trading with explicit risk controls
+7. evaluate LLM-assisted strategies without weakening deterministic paths
 
 ## Stage 0: Baseline
 
-Current state:
+Status:
 
-- architecture and strategy abstraction exist
-- seeded market data drives the demo engines
-- runs are stored in memory
-- the UI is suitable for inspection, not operations
-- NFI reference strategies can be cataloged and backtest commands can be prepared
+- complete
 
-Exit signal:
+Implemented now:
 
-- roadmap and ADR set is published
-- priorities and acceptance criteria are fixed
+- architecture and ADR baseline
+- strategy lane abstraction
+- reference catalog
+- native runtime core
+- initial control-room UI
 
 ## Stage 1: Research Foundation
 
-Target window:
+Status:
 
-- Weeks 1-4
+- largely complete
 
-User outcome:
+Implemented now:
 
-- a user can load real Binance OHLCV data, run a backtest, and retrieve the run later with the exact config that produced it
+- durable run storage with restart-safe lookup
+- Binance-backed market-data ingestion and status reporting
+- strategy version and parameter snapshots in run provenance
+- market-data lineage stored with runs
+- historical run listing in API and UI
 
-Required outcomes:
+Still missing:
 
-- persistent run storage
-- real market data ingestion
-- strategy version and parameter snapshot storage
-- reproducible run metadata
-- basic historical run listing in UI
+- stronger dataset pinning and checkpoint identity
+- explicit proof that repeated identical inputs reproduce identical outputs
 
-Release criteria:
+Exit gap:
 
-- backtest results survive restart
-- market data can be resynced without corrupting stored candles
-- identical run inputs reproduce identical results
+- a run must record enough immutable data identity to support deterministic rerun claims
 
 ## Stage 2: Research Workflow
 
-Target window:
+Status:
 
-- Weeks 5-8
+- partially complete
 
-User outcome:
+Implemented now:
 
-- a user can treat backtesting as an experiment workflow rather than a one-off action
+- native vs reference benchmark workflow
+- comparison API and control-room comparison surface
+- strategy version filtering in run history
+- reference provenance and artifact summaries
 
-Required outcomes:
+Still missing:
 
-- strategy version lifecycle
+- durable strategy lifecycle management beyond current metadata fields
 - run tags and scenario presets
-- metric comparison across runs
-- benchmark runs for native strategies and NFI reference strategies
-- artifact links for logs, signal traces, and result snapshots
+- richer export and artifact retrieval flows
+- stronger experiment query model than the current payload-centric repository
 
-Release criteria:
+Exit gap:
 
-- a user can compare at least two runs in the UI or API
-- each run stores strategy version, parameters, venue, timeframe, and dataset lineage
-- NFI reference runs and native runs are visibly separated but comparable
+- backtesting still behaves more like stored runs plus comparison than a complete experiment management workflow
 
 ## Stage 3: Real-Time Sandbox Operations
 
-Target window:
+Status:
 
-- Weeks 9-12
+- groundwork only
 
-User outcome:
+Implemented now:
 
-- a user can keep sandbox strategies running continuously and inspect operational health from one dashboard
+- market-data polling loop for Binance
+- sandbox launch and stop controls
+- replay-based sandbox preview runs on the native engine
 
-Required outcomes:
+Still missing:
 
-- continuous market-data stream or polling worker
-- long-running sandbox execution worker
-- alerts for worker failure, stale data, and risk breaches
-- run heartbeat, status transitions, and restart behavior
-- richer control-room views for positions, orders, fills, and lag
+- continuous sandbox workers
+- heartbeat and restart recovery
+- stale-data and worker-failure alerts
+- richer operational views for positions, fills, and lag over time
 
-Release criteria:
+Exit gap:
 
-- sandbox runs can stay active without manual replay triggering
-- operator can stop, restart, and inspect runs from the platform
-- alerting is generated for stale data and worker failure
+- current sandbox semantics are useful for previewing recent behavior, not for continuous operation
 
 ## Stage 4: Controlled Live Trading
 
-Target window:
+Status:
 
-- Weeks 13-18
+- not started in practice
 
-User outcome:
+Implemented now:
 
-- a user can run very limited live trading with strict guardrails and full auditability
+- domain-level `live` execution mode placeholder
+- guardrail intent captured in ADRs and roadmap
 
-Required outcomes:
+Still missing:
 
-- live execution adapter for the first exchange
-- secret management for exchange credentials
-- exposure limits, loss limits, kill switch, and operator approval paths
-- order reconciliation and exchange state synchronization
-- execution audit log and operator event log
+- exchange execution adapter
+- secret handling
+- risk-limit enforcement
+- kill switch
+- reconciliation
+- operator audit log
 
-Release criteria:
+Exit gap:
 
-- live orders are blocked if risk controls are not configured
-- order and position state can be reconciled after restart
-- every live action has an audit record
+- no live order path should be added before safety state, auditability, and restart-safe reconciliation exist
 
 ## Stage 5: LLM Decision Research Lane
 
-Target window:
+Status:
 
-- Parallel from Weeks 9-24
+- interface skeleton only
 
-User outcome:
+Implemented now:
 
-- a user can test LLM-assisted decision making without letting prompt-driven behavior leak into deterministic execution paths
+- `DecisionEnginePort`
+- template external-decision strategy shape
+- shared decision-envelope contract designed to contain traces later
 
-Required outcomes:
+Still missing:
 
-- decision-engine contract finalized
 - prompt template versioning
-- prompt and response trace storage
-- replay harness for evaluating LLM decisions against historical contexts
-- operator review mode before any live usage
+- raw prompt/response trace storage
+- replay harness for historical evaluation
+- provider adapters
+- deterministic fallback or operator review workflow
 
-Release criteria:
+Exit gap:
 
-- LLM strategies can be evaluated in backtest and sandbox modes through the same decision envelope
-- every LLM decision stores rationale, prompt version, and raw response trace
-- a deterministic fallback path exists for every promoted LLM strategy
+- the LLM lane should remain isolated from live promotion until traceability and fallback behavior are real features
 
-## Success measures
+## Success Measures
 
-By the end of the 6-month roadmap, the platform should satisfy these product checks:
+The next meaningful product checkpoint should satisfy these conditions:
 
-- one-click backtest history is available for all recent runs
-- at least one exchange is supported end-to-end for data, sandbox, and guarded live execution
-- NFI reference strategies remain usable as a benchmark lane
-- the UI can answer "what is running, what changed, and why" without shell access
-- LLM strategy research is supported as a first-class but gated lane
+- recent backtests are durable and comparable from the control room
+- one operator can see market-data health and run history without shell access
+- benchmark comparison between native and reference strategies is a normal workflow
+- sandbox semantics are no longer confused with continuous execution
+- roadmap and docs clearly separate implemented capability from planned capability
 
-## Explicit deferrals
-
-The following are intentionally not first-line priorities in this roadmap:
+## Explicit Deferrals
 
 - equal-weight support for stocks and crypto
 - multi-user RBAC or organization workflows
 - multi-node distributed execution
-- optimization for broad public/self-service use
+- public self-service product polish before operator-grade research workflows are stable

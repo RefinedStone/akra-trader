@@ -1,33 +1,14 @@
 # Epic Backlog
 
-This backlog is ordered by product leverage rather than implementation convenience.
+This backlog starts after the foundations already present in the repository as of April 17, 2026.
 
-## Epic 1: Persistent Run Repository
+Already in place:
 
-Priority:
+- durable run storage
+- Binance market-data ingestion baseline
+- native vs reference comparison baseline
 
-- P0
-
-Goal:
-
-- replace the in-memory run repository with durable Postgres-backed storage
-
-Why now:
-
-- every other workflow depends on run history, reproducibility, and restart-safe state
-
-Dependencies:
-
-- database schema definition
-- repository adapter design
-
-Acceptance criteria:
-
-- backtest and sandbox runs survive process restart
-- run config, metrics, orders, fills, positions, and notes are persisted
-- API endpoints continue to work without semantic regression
-
-## Epic 2: Binance Market Data Ingestion
+## Epic 1: Reproducibility and Dataset Lineage Hardening
 
 Priority:
 
@@ -35,24 +16,19 @@ Priority:
 
 Goal:
 
-- replace seeded candles with real Binance data behind `MarketDataPort`
+- make every run point to a stable, auditable data identity instead of a best-effort lineage snapshot
 
 Why now:
 
-- all meaningful backtesting and sandbox execution depends on real venue data
-
-Dependencies:
-
-- instrument metadata schema
-- ingestion job model
+- Stage 1 is mostly complete, but reproducibility claims are still softer than the docs should allow
 
 Acceptance criteria:
 
-- historical candles can be downloaded and incrementally refreshed
-- duplicate and gap conditions are detected
-- market-data status surfaces lag and sync failures
+- runs store a stable dataset or sync-checkpoint identity
+- repeated runs with identical inputs can be validated against the same data boundary
+- lineage gaps are surfaced clearly when deterministic rerun guarantees cannot be made
 
-## Epic 3: Strategy Versioning and Experiment Metadata
+## Epic 2: Experiment Metadata Completion
 
 Priority:
 
@@ -60,23 +36,39 @@ Priority:
 
 Goal:
 
-- treat strategy runs as experiments with durable versioned inputs
+- finish the missing Stage 2 experiment workflow pieces
 
 Why now:
 
-- comparison and LLM research become noisy without version discipline
-
-Dependencies:
-
-- persistent run storage
+- comparison exists, but experiment management is still incomplete
 
 Acceptance criteria:
 
-- every run stores strategy version, parameter snapshot, timeframe, venue, and symbol set
-- strategies can be listed by version and lifecycle state
-- UI and API can filter runs by strategy version
+- run tags and scenario presets are durable
+- core experiment filters do not require scanning full payloads for common queries
+- exports or artifact references are consistent across native and reference runs
 
-## Epic 4: Backtest Comparison Workflow
+## Epic 3: Durable Strategy Lifecycle and Registration
+
+Priority:
+
+- P0
+
+Goal:
+
+- move strategy lifecycle and registration beyond the current process-local catalog behavior
+
+Why now:
+
+- strategy version metadata exists, but user-driven registration and promotion are not durable workflows yet
+
+Acceptance criteria:
+
+- strategy registrations survive restart
+- lifecycle stages such as `draft`, `active`, and `archived` are queryable and enforceable
+- control-room filtering can reflect durable lifecycle state
+
+## Epic 4: Continuous Sandbox Worker
 
 Priority:
 
@@ -84,24 +76,19 @@ Priority:
 
 Goal:
 
-- add run comparison and benchmark workflows for native and NFI reference strategies
+- replace replay-style sandbox semantics with a real continuous execution worker
 
 Why now:
 
-- the platform must become better than one-off shell commands for research work
-
-Dependencies:
-
-- persistent run storage
-- experiment metadata
+- the current sandbox label suggests a stronger operational mode than the implementation actually delivers
 
 Acceptance criteria:
 
-- at least two runs can be compared side by side
-- comparison includes total return, drawdown, win rate, trade count, and notes
-- NFI reference runs appear as a separate runtime lane
+- workers can start, stop, recover, and report heartbeat
+- worker state is stored separately from preview results
+- positions, orders, fills, and recent decisions update through an active runtime path
 
-## Epic 5: Continuous Sandbox Execution Worker
+## Epic 5: Alerts and Operator Events
 
 Priority:
 
@@ -109,22 +96,17 @@ Priority:
 
 Goal:
 
-- convert the current replay-based sandbox mode into a continuous real-time worker system
+- introduce the first operational surfaces required for trustworthy sandbox and live work
 
 Why now:
 
-- sandbox mode is the bridge between research and guarded live trading
-
-Dependencies:
-
-- real market data ingestion
-- persistent run storage
+- continuous operation is not credible without alerting and operator-visible failure state
 
 Acceptance criteria:
 
-- sandbox workers can start, stop, recover, and report heartbeat
-- positions, orders, fills, and recent decisions are visible in the UI
-- stale data and worker failure trigger alerts
+- stale data, sync failures, and worker crashes generate visible alerts
+- operator actions are stored as explicit events
+- the UI can surface recent failures and acknowledgement state
 
 ## Epic 6: Live Execution Guardrails
 
@@ -134,25 +116,19 @@ Priority:
 
 Goal:
 
-- enable first-exchange live execution with hard risk controls
+- add a constrained live lane only after operator safety primitives exist
 
 Why now:
 
-- live trading is a roadmap commitment, but it must arrive as a constrained lane
-
-Dependencies:
-
-- continuous sandbox worker
-- secrets management
-- account synchronization
+- live execution is still entirely absent, but its prerequisites must be implemented in order
 
 Acceptance criteria:
 
-- max exposure, kill switch, and operator stop actions are enforced
-- live trading cannot be enabled without configured guardrails
-- audit records exist for all live order attempts and operator actions
+- live trading is blocked unless safety configuration exists
+- kill-switch behavior is explicit
+- risk limits are enforced before adapter dispatch
 
-## Epic 7: Exchange Reconciliation and Audit Trail
+## Epic 7: Reconciliation and Audit Trail
 
 Priority:
 
@@ -160,24 +136,19 @@ Priority:
 
 Goal:
 
-- make live and sandbox operation restart-safe and diagnosable
+- make sandbox and future live execution restart-safe and diagnosable
 
 Why now:
 
-- without reconciliation, live trading becomes operationally brittle
-
-Dependencies:
-
-- live execution support
-- durable storage
+- worker-based operation and live execution both depend on trustworthy restart behavior
 
 Acceptance criteria:
 
-- the platform can reload open orders and positions after restart
-- mismatches between local and exchange state are surfaced
+- open orders and positions can be reloaded after restart
+- mismatches between internal and exchange state are surfaced
 - audit views exist for operator and system actions
 
-## Epic 8: LLM Decision Engine Research Lane
+## Epic 8: LLM Decision Research Lane
 
 Priority:
 
@@ -185,25 +156,19 @@ Priority:
 
 Goal:
 
-- introduce a controlled path for LLM-based strategy decisions without weakening deterministic execution boundaries
+- turn the existing decision-engine contract into a traceable research lane
 
 Why now:
 
-- strategy abstraction already supports this lane and the research value is high
-
-Dependencies:
-
-- strategy versioning
-- trace storage
-- reproducible historical context replay
+- the abstraction is in place, but the research controls are not
 
 Acceptance criteria:
 
-- `DecisionEnginePort` calls can be recorded with prompt and response metadata
-- LLM decisions can run in backtest and sandbox modes
-- human-review or fallback behavior exists before any live promotion
+- prompt versions, raw responses, and normalized traces are stored
+- historical replay can evaluate decision-engine behavior
+- fallback or operator review is mandatory before any promotion
 
-## Epic 9: Control Room Upgrade
+## Epic 9: Control Room Operations Upgrade
 
 Priority:
 
@@ -211,23 +176,17 @@ Priority:
 
 Goal:
 
-- turn the current dashboard into an operator-grade control room
+- turn the current research UI into an operator-grade operations surface
 
 Why now:
 
-- the platform needs a single place to observe runs, alerts, lag, and strategy state
-
-Dependencies:
-
-- persistent run data
-- sandbox worker
-- alerting and health data
+- the current control room is useful, but it still centers on inspection over operations
 
 Acceptance criteria:
 
-- the UI can show run health, recent alerts, ingestion lag, and decision traces
-- the operator can inspect why a strategy acted, not just that it acted
-- live safety state is visible from the same control room
+- worker health, alerts, lag, and recent decisions are visible together
+- positions, orders, and fills are easier to inspect during active execution
+- live safety state can share the same control room without ambiguity
 
 ## Epic 10: Documentation and Runbooks
 
@@ -237,18 +196,14 @@ Priority:
 
 Goal:
 
-- make system setup, operation, and incident handling explicit and repeatable
+- keep docs aligned with implementation and make daily operation explicit
 
 Why now:
 
-- operational maturity and research repeatability both depend on documentation quality
-
-Dependencies:
-
-- stable service boundaries
+- stale docs already distorted the perceived progress of the project once
 
 Acceptance criteria:
 
-- setup guide covers initial bootstrap and reference repo handling
-- operator runbook covers sandbox and live procedures
-- incident notes cover stale data, worker crash, and exchange mismatch scenarios
+- current-state docs stay aligned with implementation
+- setup guides cover data sync, persistence, and reference runtime handling
+- operator runbooks cover sandbox incidents, stale data, and reconciliation issues

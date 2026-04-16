@@ -1,24 +1,34 @@
 # Architecture
 
-## Core rule
+## Core Rule
 
-Domain and application code do not know about FastAPI, ccxt, SQLAlchemy, or Freqtrade internals.
+Domain and application code do not know about FastAPI, SQLAlchemy, ccxt, or Freqtrade internals.
+
+## Current System Shape
+
+The repository is organized around a small set of stable boundaries:
+
+- domain models and pure services
+- application orchestration
+- ports for external systems
+- adapters for storage, market data, references, and external runtimes
+- runtime services for execution flow and mode handling
 
 ## Layers
 
 ### Domain
 
-- Market model: instrument, candle, order, fill, position, trade, run config
-- Strategy model: metadata, execution state, decision context, decision envelope
-- Pure services: order application, equity curve generation, performance summary
+- market models such as instrument, candle, order, fill, position, trade, and run config
+- strategy models such as metadata, lifecycle, decision context, execution plan, and decision envelope
+- pure services for order application, equity generation, and performance summaries
 
 ### Application
 
-- Strategy registration
-- Backtest execution
-- Sandbox replay execution
-- Run lookup and status changes
-- Market-data status queries
+- strategy listing and registration
+- backtest orchestration
+- replay-based sandbox orchestration
+- run lookup, listing, filtering, and comparison
+- market-data status queries
 
 ### Ports
 
@@ -28,105 +38,121 @@ Domain and application code do not know about FastAPI, ccxt, SQLAlchemy, or Freq
 - `DecisionEnginePort`
 - `ReferenceCatalogPort`
 
-## Strategy abstraction
+## Runtime Core
+
+The native runtime is already split into explicit services:
+
+- `DataEngine`
+  - loads candles through `MarketDataPort`
+  - builds aggregated market-data lineage for the run
+- `ExecutionEngine`
+  - applies reviewed decisions to orders, fills, positions, and equity
+- `RiskEngine`
+  - normalizes execution intent and blocks invalid actions
+- `StateCache`
+  - tracks current cash, position, and marked price within the run
+- `RunSupervisor`
+  - owns run status transitions and mode notes
+- `ExecutionModeService`
+  - normalizes mode naming such as the `paper` alias for `sandbox`
+
+## Strategy Abstraction
 
 The strategy boundary is split on purpose.
 
-### Feature frame
+Canonical flow:
 
-Transforms raw candles into enriched analysis data.
+1. `build_feature_frame`
+2. `build_decision_context`
+3. signal policy
+4. execution policy
+5. `StrategyDecisionEnvelope`
 
-Examples:
+This keeps feature engineering, decision logic, execution intent, and provenance aligned across lanes.
 
-- SMA/EMA/volatility columns
-- multi-timeframe joins
-- sentiment or regime features
-
-### Decision context
-
-Collects the exact slice of information used to decide.
-
-Examples:
-
-- latest feature values
-- current OHLCV view
-- open position state
-- cash, size, parameter snapshot
-
-### Signal policy
-
-Generates the directional trading decision.
-
-Examples:
-
-- crossover / breakout / regime rules
-- delegated LLM choice
-- reference strategy placeholder signals
-
-### Execution policy
-
-Transforms a signal into execution intent.
-
-Examples:
-
-- full-notional entry
-- scale-in permission
-- partial exit permission
-- future stop-loss / take-profit directives
-
-### Decision envelope
-
-Wraps the final signal, execution plan, rationale, and trace metadata.
-
-Examples:
-
-- `BUY` / `SELL` / `HOLD`
-- size fraction and scaling flags
-- human-readable explanation
-- future prompt/response traces for LLM strategies
-
-## Strategy families
+## Strategy Lanes
 
 ### Native
 
-- Fully executed by the platform's native simulation engine
-- Current example: moving-average crossover
+- executed fully by the platform runtime
+- current built-in example: `ma_cross_v1`
 
 ### Freqtrade reference
 
-- Catalog entry points directly to files under `reference/NostalgiaForInfinity`
-- Backtest path delegates to a Freqtrade command assembled from upstream NFI config conventions
-- Preserves the ability to reuse NFI nearly as-is
-- Run records store external provenance such as reference id, version, and command
+- catalog entries point at files under `reference/NostalgiaForInfinity`
+- backtest execution is delegated through a Freqtrade command
+- run provenance stores reference metadata, command, and benchmark artifacts
+- sandbox and live execution are intentionally unsupported for this lane today
 
-### External decision engine
+### Decision engine
 
-- Intended for LLM-based strategies
-- Uses the same feature/context contract
-- Only the final `decide()` step is delegated to an external engine
+- modeled behind `DecisionEnginePort`
+- intended for future LLM-assisted or external policy research
+- current repository state includes the contract and a template strategy, but not the full traceable research stack
 
-## Reference catalog
+## Persistence and Provenance
 
-Third-party repositories are tracked in `reference/catalog.toml`.
+Run persistence is durable today.
 
-Each entry records:
+- `SqlAlchemyRunRepository` stores run payloads in a relational table
+- every persisted run carries config, status, metrics, orders, fills, positions, equity, notes, and provenance
+- provenance can include:
+  - strategy snapshot and parameter snapshot
+  - market-data lineage
+  - reference id and integration mode
+  - external command and artifact paths
+  - benchmark artifact summaries
 
-- reference id
-- license
-- integration mode
-- runtime
-- local checkout path
+This is enough for restart-safe history and comparison, but not yet the final analytics-friendly schema.
 
-This lets the application distinguish between:
+## Market Data
 
-- ideas-only references such as NautilusTrader
-- external-runtime references such as NostalgiaForInfinity
-- direct dependency candidates such as ccxt and yfinance
+Two adapters exist today:
 
-## Near-term extension points
+- `SeededMarketDataAdapter`
+  - used for tests and deterministic fixture flows
+- `BinanceMarketDataAdapter`
+  - backed by ccxt and local SQL storage
+  - tracks sync status, lag, backfill progress, and gap windows
 
-- Replace in-memory run storage with SQLAlchemy/Postgres adapters
-- Replace seeded market data with Binance/ccxt adapters
-- Add continuous sandbox/live workers around the same application services
-- Add prompt logging and audit trails for decision-engine strategies
-- Split the native runtime toward `DataEngine`, `ExecutionEngine`, `RiskEngine`, and `StateCache`
+When Binance is enabled, the API app lifespan starts a `MarketDataSyncJob` that periodically refreshes tracked symbols.
+
+## Modes
+
+### Backtest
+
+- full native run to completion
+- persisted as a completed run
+
+### Sandbox
+
+- current implementation is a replay-based preview of recent bars
+- native-only today
+- marked as `running` for compatibility with a future long-running worker model
+- stoppable through the API and control room
+
+### Live
+
+- represented in the domain model
+- reserved for guarded future implementation
+
+## Control Room
+
+The web app currently surfaces:
+
+- strategy catalog by runtime lane
+- reference catalog
+- market-data health and backfill quality
+- backtest launch
+- sandbox launch and stop
+- run history
+- run comparison and benchmark narratives
+
+The UI is already useful for research inspection, but not yet an operator-grade surface for live or continuous execution.
+
+## Known Limits
+
+- no continuous execution worker yet
+- no alerts, audit trail, or reconciliation flows
+- no durable custom strategy registration history
+- no provider-backed LLM decision lane yet

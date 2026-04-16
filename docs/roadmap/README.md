@@ -1,54 +1,41 @@
 # Roadmap
 
-This folder holds the product and technical planning documents for `akra-trader`.
+This folder holds the current-first planning documents for `akra-trader`.
 
-## Planning principle
+Use [Current State](../status/current-state.md) first. The roadmap documents below describe the remaining work after rebasing the docs to the repository state as of April 17, 2026.
 
-The project is intentionally split into three layers of planning:
+## Current Snapshot
 
-1. Product roadmap
-2. Technical roadmap
-3. Execution backlog
+Implemented foundations:
 
-The product roadmap answers:
+- durable run storage
+- Binance-backed market-data ingestion and sync
+- native backtests
+- replay-based sandbox previews
+- reference catalog and NFI backtest delegation
+- run comparison API and control-room comparison UI
 
-- what user value we are trying to unlock
-- in what order
-- with what release checkpoints
+Primary gaps:
 
-The technical roadmap answers:
+- reproducibility hardening and dataset pinning
+- durable experiment workflow features such as tags, presets, and lifecycle promotion
+- continuous sandbox workers
+- alerts, auditability, and operator tooling
+- live execution guardrails
+- traceable LLM research infrastructure
 
-- which subsystems must mature
-- what architectural constraints remain fixed
-- which interfaces are expected to expand
+## Stage Read
 
-The epic backlog answers:
-
-- what concrete bodies of work should be executed next
-- what each epic depends on
-- what "done" means
-
-## Current snapshot
-
-As of the current baseline, the codebase provides:
-
-- a FastAPI backend with hexagonal boundaries
-- a native backtest and sandbox replay demo engine
-- a strategy contract split into `feature frame -> decision context -> signal policy -> execution policy -> decision envelope`
-- direct NostalgiaForInfinity reference cataloging and delegated Freqtrade backtest execution
-- a lightweight React control room
-
-The platform is not yet production-ready. The key missing capabilities are:
-
-- persistent run storage
-- real market data ingestion
-- experiment versioning and comparison
-- continuous real-time workers
-- live-trading safety controls
-- traceable LLM decision infrastructure
+- Stage 0: complete
+- Stage 1: largely complete
+- Stage 2: partially complete
+- Stage 3: not yet delivered
+- Stage 4: not started
+- Stage 5: scaffold only
 
 ## Documents
 
+- [Current State](../status/current-state.md)
 - [Product Roadmap](product-roadmap.md)
 - [Technical Roadmap](technical-roadmap.md)
 - [Epic Backlog](epic-backlog.md)

@@ -4,6 +4,12 @@
 
 Accepted
 
+## Historical note
+
+This ADR captured the adoption-time baseline.
+
+As of April 17, 2026, the repository already has durable run storage and a Binance-backed market-data adapter, but the reproducibility guarantees described here are still only partially complete.
+
 ## Context
 
 The current platform still relies on in-memory run storage and seeded market data for the native demo
