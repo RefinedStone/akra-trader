@@ -232,6 +232,7 @@ type RunHistoryFilter = {
 };
 
 type ComparisonIntent = "benchmark_validation" | "execution_regression" | "strategy_tuning";
+type ComparisonCueKind = "mode" | "baseline" | "best" | "insight";
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${apiBase}${path}`, {
@@ -1418,6 +1419,10 @@ function RunComparisonPanel({
 
   const [primaryNarrative, ...secondaryNarratives] = comparison.narratives;
   const intentClassName = getComparisonIntentClassName(comparison.intent);
+  const intentTooltip = formatComparisonIntentTooltip(comparison.intent);
+  const baselineTooltip = formatComparisonCueTooltip(comparison.intent, "baseline");
+  const bestTooltip = formatComparisonCueTooltip(comparison.intent, "best");
+  const insightTooltip = formatComparisonCueTooltip(comparison.intent, "insight");
 
   return (
     <section className={`comparison-panel ${intentClassName}`}>
@@ -1431,26 +1436,46 @@ function RunComparisonPanel({
         </div>
         <p className="comparison-baseline">
           <span>Baseline: {comparison.baseline_run_id}</span>
-          <span className="comparison-intent-chip">
+          <span
+            className="comparison-intent-chip comparison-cue comparison-tooltip"
+            data-tooltip={intentTooltip}
+            title={intentTooltip}
+          >
             <span aria-hidden="true" className="comparison-intent-icon" />
             <span>{formatComparisonIntentLabel(comparison.intent)}</span>
           </span>
         </p>
       </div>
       <div aria-label="Comparison legend" className="comparison-legend">
-        <span className="comparison-legend-item comparison-legend-item-mode">
+        <span
+          className="comparison-legend-item comparison-legend-item-mode comparison-cue comparison-tooltip"
+          data-tooltip={intentTooltip}
+          title={intentTooltip}
+        >
           <span aria-hidden="true" className="comparison-intent-icon" />
           <span>{formatComparisonIntentLegend(comparison.intent)}</span>
         </span>
-        <span className="comparison-legend-item">
+        <span
+          className="comparison-legend-item comparison-cue comparison-tooltip"
+          data-tooltip={baselineTooltip}
+          title={baselineTooltip}
+        >
           <span aria-hidden="true" className="comparison-legend-swatch baseline" />
           <span>Baseline run</span>
         </span>
-        <span className="comparison-legend-item">
+        <span
+          className="comparison-legend-item comparison-cue comparison-tooltip"
+          data-tooltip={bestTooltip}
+          title={bestTooltip}
+        >
           <span aria-hidden="true" className="comparison-legend-swatch best" />
           <span>Best metric</span>
         </span>
-        <span className="comparison-legend-item">
+        <span
+          className="comparison-legend-item comparison-cue comparison-tooltip"
+          data-tooltip={insightTooltip}
+          title={insightTooltip}
+        >
           <span aria-hidden="true" className="comparison-legend-swatch insight" />
           <span>Top insight</span>
         </span>
@@ -1459,9 +1484,10 @@ function RunComparisonPanel({
         {comparison.runs.map((run) => (
           <article
             className={`comparison-run-card ${
-              run.run_id === comparison.baseline_run_id ? "baseline" : ""
+              run.run_id === comparison.baseline_run_id ? "baseline comparison-cue-card" : ""
             }`}
             key={run.run_id}
+            title={run.run_id === comparison.baseline_run_id ? baselineTooltip : undefined}
           >
             <div className="comparison-run-head">
               <strong>{run.strategy_name ?? run.strategy_id}</strong>
@@ -1496,11 +1522,20 @@ function RunComparisonPanel({
       </div>
       {primaryNarrative ? (
         <div className="comparison-top-story">
-          <p className="kicker comparison-top-kicker">
+          <p
+            className="kicker comparison-top-kicker comparison-cue comparison-tooltip"
+            data-tooltip={insightTooltip}
+            title={insightTooltip}
+          >
             <span aria-hidden="true" className="comparison-legend-swatch insight" />
             <span>Top insight / {formatComparisonIntentLabel(comparison.intent)}</span>
           </p>
-          <ComparisonNarrativeCard comparison={comparison} featured narrative={primaryNarrative} />
+          <ComparisonNarrativeCard
+            comparison={comparison}
+            featured
+            narrative={primaryNarrative}
+            tooltip={insightTooltip}
+          />
         </div>
       ) : null}
       {secondaryNarratives.length ? (
@@ -1540,6 +1575,14 @@ function RunComparisonPanel({
                         .join(" ") || undefined
                     }
                     key={`${metricRow.key}-${run.run_id}`}
+                    title={
+                      buildComparisonCellTooltip(
+                        comparison.intent,
+                        metricRow.label,
+                        run.run_id === comparison.baseline_run_id,
+                        metricRow.best_run_id === run.run_id,
+                      ) || undefined
+                    }
                   >
                     <strong>
                       {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
@@ -1575,16 +1618,21 @@ function ComparisonNarrativeCard({
   comparison,
   narrative,
   featured = false,
+  tooltip,
 }: {
   comparison: RunComparison;
   narrative: RunComparison["narratives"][number];
   featured?: boolean;
+  tooltip?: string;
 }) {
   const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
   const runLabel = run?.reference?.title ?? run?.strategy_name ?? run?.strategy_id ?? narrative.run_id;
 
   return (
-    <article className={`comparison-story-card ${featured ? "featured" : ""}`}>
+    <article
+      className={`comparison-story-card ${featured ? "featured comparison-cue-card" : ""}`}
+      title={tooltip}
+    >
       <div className="comparison-story-head">
         <span>{formatComparisonNarrativeLabel(narrative.comparison_type)}</span>
         <strong>{runLabel}</strong>
@@ -1856,6 +1904,84 @@ function formatComparisonIntentLegend(value: ComparisonIntent) {
     default:
       return value;
   }
+}
+
+function formatComparisonIntentTooltip(value: ComparisonIntent) {
+  switch (value) {
+    case "benchmark_validation":
+      return "Benchmark validation emphasizes drift from the reference benchmark. Cyan cues point to where native results confirm or diverge from the benchmark.";
+    case "execution_regression":
+      return "Execution regression emphasizes operational drift and regression risk. Ember cues point to where behavior degraded or recovered versus the control run.";
+    case "strategy_tuning":
+      return "Strategy tuning emphasizes optimization edge and tradeoffs. Green cues point to where parameter changes improved or hurt the candidate run.";
+    default:
+      return value;
+  }
+}
+
+function formatComparisonCueTooltip(
+  intent: ComparisonIntent,
+  cue: ComparisonCueKind,
+  metricLabel?: string,
+) {
+  switch (cue) {
+    case "mode":
+      return formatComparisonIntentTooltip(intent);
+    case "baseline":
+      switch (intent) {
+        case "benchmark_validation":
+          return "This baseline run anchors benchmark validation. Read the other runs as benchmark drift versus this control.";
+        case "execution_regression":
+          return "This baseline run is the control execution. Read the other runs as regression or recovery against it.";
+        case "strategy_tuning":
+          return "This baseline run is the incumbent tuning point. Read the other runs as edge or penalty against it.";
+        default:
+          return "This run is the comparison baseline.";
+      }
+    case "best":
+      switch (intent) {
+        case "benchmark_validation":
+          return `${metricLabel ?? "This metric"} is highlighted because it shows the strongest observed outcome here. In validation mode, treat it as benchmark evidence rather than an automatic winner.`;
+        case "execution_regression":
+          return `${metricLabel ?? "This metric"} is highlighted because it shows the strongest observed outcome here. In regression mode, use it to spot recovered or degraded execution behavior quickly.`;
+        case "strategy_tuning":
+          return `${metricLabel ?? "This metric"} is highlighted because it shows the strongest observed outcome here. In tuning mode, use it to spot candidate improvements and tradeoffs quickly.`;
+        default:
+          return `${metricLabel ?? "This metric"} is highlighted because it is the strongest observed outcome in this row.`;
+      }
+    case "insight":
+      switch (intent) {
+        case "benchmark_validation":
+          return "The featured insight summarizes the most important benchmark drift to inspect first.";
+        case "execution_regression":
+          return "The featured insight summarizes the sharpest regression signal to inspect first.";
+        case "strategy_tuning":
+          return "The featured insight summarizes the most actionable tuning edge or penalty first.";
+        default:
+          return "This is the primary comparison insight.";
+      }
+    default:
+      return formatComparisonIntentTooltip(intent);
+  }
+}
+
+function buildComparisonCellTooltip(
+  intent: ComparisonIntent,
+  metricLabel: string,
+  isBaseline: boolean,
+  isBest: boolean,
+) {
+  const messages: string[] = [];
+
+  if (isBaseline) {
+    messages.push(formatComparisonCueTooltip(intent, "baseline"));
+  }
+
+  if (isBest) {
+    messages.push(formatComparisonCueTooltip(intent, "best", metricLabel));
+  }
+
+  return messages.join(" ");
 }
 
 function getComparisonIntentClassName(value: ComparisonIntent) {
