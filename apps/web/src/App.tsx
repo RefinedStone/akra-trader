@@ -4332,13 +4332,57 @@ function formatComparisonTooltipConflictSessionUpdatedAtLabel(value: string | nu
   }
   const date = new Date(timestamp);
   const now = new Date();
-  return `updated ${new Intl.DateTimeFormat(undefined, {
+  const absoluteLabel = new Intl.DateTimeFormat(undefined, {
     ...(date.getFullYear() === now.getFullYear() ? {} : { year: "numeric" }),
     day: "numeric",
     hour: "numeric",
     minute: "2-digit",
     month: "short",
-  }).format(date)}`;
+  }).format(date);
+  const relativeLabel = formatComparisonTooltipConflictSessionRelativeTime(timestamp, now);
+  return relativeLabel
+    ? `updated ${relativeLabel} · ${absoluteLabel}`
+    : `updated ${absoluteLabel}`;
+}
+
+function formatComparisonTooltipConflictSessionRelativeTime(
+  timestamp: number,
+  now: Date,
+) {
+  const elapsedMs = timestamp - now.getTime();
+  const absElapsedMs = Math.abs(elapsedMs);
+  const minuteMs = 60 * 1000;
+  const hourMs = 60 * minuteMs;
+  const dayMs = 24 * hourMs;
+  const weekMs = 7 * dayMs;
+  const monthMs = 30 * dayMs;
+  const yearMs = 365 * dayMs;
+
+  const formatRelative = (value: number, unit: Intl.RelativeTimeFormatUnit) =>
+    new Intl.RelativeTimeFormat(undefined, { numeric: "auto", style: "short" }).format(
+      value,
+      unit,
+    );
+
+  if (absElapsedMs < minuteMs) {
+    return formatRelative(Math.round(elapsedMs / 1000), "second");
+  }
+  if (absElapsedMs < hourMs) {
+    return formatRelative(Math.round(elapsedMs / minuteMs), "minute");
+  }
+  if (absElapsedMs < dayMs) {
+    return formatRelative(Math.round(elapsedMs / hourMs), "hour");
+  }
+  if (absElapsedMs < weekMs) {
+    return formatRelative(Math.round(elapsedMs / dayMs), "day");
+  }
+  if (absElapsedMs < monthMs) {
+    return formatRelative(Math.round(elapsedMs / weekMs), "week");
+  }
+  if (absElapsedMs < yearMs) {
+    return formatRelative(Math.round(elapsedMs / monthMs), "month");
+  }
+  return formatRelative(Math.round(elapsedMs / yearMs), "year");
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {
