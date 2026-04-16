@@ -531,19 +531,73 @@
       "id": "planning-reference-lanes-regime-aware-narrative-ranking",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Make divergence narrative ranking regime-aware by comparison intent",
-      "description": "Refine the newly shipped `insight_score` ordering so benchmark validation, execution regression, and strategy-tuning comparisons can weight drawdown, trade-flow, and related signals differently, with explicit comparison-intent heuristics or inputs, deterministic ranking behavior, and regression coverage that proves the top insight changes appropriately by regime.",
-      "status": "ready",
+      "description": "Completed the comparison-intent follow-up by adding explicit comparison `intent` support across the compare API and control-room toolbar, teaching the application layer to rank divergence narratives differently for `benchmark_validation`, `execution_regression`, and `strategy_tuning`, and locking in regime-specific ranking flips with application and API regression coverage.",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed ranking work and explicitly called out regime-aware weighting as the likely next refinement, making this the clearest executable follow-up for the benchmark comparison queue.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the regime-aware ranking implementation, verified `apps/api` with `./.venv/bin/python -m pytest` (`39 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `55e0735` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T03:40:00Z",
+      "updated_at": "2026-04-17T04:05:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-multi-run-narrative-ranking"
       ],
       "direction_relation_note": "Extends the reference benchmark comparison surface from one-size-fits-all insight ordering into intent-aware prioritization so operators see the most relevant divergence first for the kind of comparison they are running."
+    },
+    {
+      "id": "planning-reference-lanes-intent-aware-narrative-text",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make comparison narrative text itself intent-aware",
+      "description": "Completed the intent-aware narrative-text follow-up by changing comparison-level titles, summaries, and supporting bullets to speak differently for `benchmark_validation`, `execution_regression`, and `strategy_tuning`, so validation emphasizes benchmark evidence, regression emphasizes execution drift, and tuning emphasizes optimization tradeoffs, with regression coverage for intent-specific wording and multi-run intent flips.",
+      "status": "done",
+      "base_priority": 85,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the intent-aware narrative-text implementation in `application.py`, verified `apps/api` with `./.venv/bin/python -m pytest` (`39 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `4144177` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:17:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-regime-aware-narrative-ranking"
+      ],
+      "direction_relation_note": "Builds on intent-aware ranking by making the benchmark comparison narrative itself speak to the operator's comparison goal, so reference-lane divergence interpretation changes meaningfully with the selected regime instead of only changing order."
+    },
+    {
+      "id": "planning-reference-lanes-intent-aware-metric-table-annotation",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make comparison metric annotations intent-aware too",
+      "description": "Completed the metric-annotation follow-up by extending comparison metric rows with row-level `annotation` plus per-run `delta_annotations`, teaching the application layer to emit intent-specific metric copy for `benchmark_validation`, `execution_regression`, and `strategy_tuning`, updating the comparison table to render row annotations and backend-provided delta text, and locking in the new payload and wording with API/application regression coverage.",
+      "status": "done",
+      "base_priority": 86,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the intent-aware metric annotation implementation across `application.py`, comparison models, and the web comparison table, verified `apps/api` with `./.venv/bin/python -m pytest` (`39 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `e1227b9` to `origin/main`.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:30:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-intent-aware-narrative-text"
+      ],
+      "direction_relation_note": "Extends the intent-aware benchmark comparison surface from narrative copy into the metric table itself, so operators get consistent comparison framing in both prose and quantitative annotations."
+    },
+    {
+      "id": "planning-reference-lanes-intent-aware-visual-emphasis",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Make comparison visual emphasis intent-aware",
+      "description": "Refine the comparison presentation so metric cell highlight colors, badges, or equivalent visual emphasis cues change with `benchmark_validation`, `execution_regression`, and `strategy_tuning`, reinforcing whether the operator should read a delta as benchmark drift, execution regression, or tuning edge/penalty, with deterministic backend/frontend mapping and regression coverage for the rendered emphasis states.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed metric-annotation work and explicitly identified intent-aware visual emphasis such as comparison cell highlight colors or row badges by validation, regression, or tuning mode as the next likely refinement, making it the clearest executable follow-up.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T04:31:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-intent-aware-metric-table-annotation"
+      ],
+      "direction_relation_note": "Builds on the intent-aware comparison copy by making the benchmark metric surface visually encode the comparison goal too, so operators do not have to rely on text alone to interpret drift versus optimization signals."
     }
   ]
 }
