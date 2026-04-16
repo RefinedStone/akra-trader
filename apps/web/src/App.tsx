@@ -53,6 +53,23 @@ type Run = {
       last_sync_at?: string | null;
       issues: string[];
     } | null;
+    market_data_by_symbol?: Record<
+      string,
+      {
+        provider: string;
+        venue: string;
+        symbols: string[];
+        timeframe: string;
+        requested_start_at?: string | null;
+        requested_end_at?: string | null;
+        effective_start_at?: string | null;
+        effective_end_at?: string | null;
+        candle_count: number;
+        sync_status: string;
+        last_sync_at?: string | null;
+        issues: string[];
+      }
+    >;
   };
   metrics: Record<string, number>;
   notes: string[];
@@ -484,7 +501,12 @@ function RunSection({
               {run.provenance.external_command.length ? (
                 <p className="run-note">{run.provenance.external_command.join(" ")}</p>
               ) : null}
-              {run.provenance.market_data ? <RunMarketDataLineage lineage={run.provenance.market_data} /> : null}
+              {run.provenance.market_data ? (
+                <RunMarketDataLineage
+                  lineage={run.provenance.market_data}
+                  lineageBySymbol={run.provenance.market_data_by_symbol}
+                />
+              ) : null}
               {onStop && run.status === "running" ? (
                 <button className="ghost-button" onClick={() => void onStop(run.config.run_id)}>
                   Stop
@@ -502,9 +524,13 @@ function RunSection({
 
 function RunMarketDataLineage({
   lineage,
+  lineageBySymbol,
 }: {
   lineage: NonNullable<Run["provenance"]["market_data"]>;
+  lineageBySymbol?: NonNullable<Run["provenance"]["market_data_by_symbol"]>;
 }) {
+  const symbolEntries = Object.entries(lineageBySymbol ?? {});
+
   return (
     <section className="run-lineage">
       <div className="run-lineage-head">
@@ -526,6 +552,27 @@ function RunMarketDataLineage({
         <p>Last sync: {formatTimestamp(lineage.last_sync_at)}</p>
         <p>Issues: {lineage.issues.length ? lineage.issues.join(", ") : "none"}</p>
       </div>
+      {symbolEntries.length ? (
+        <div className="run-lineage-symbols">
+          {symbolEntries.map(([symbol, symbolLineage]) => (
+            <article className="run-lineage-symbol-card" key={symbol}>
+              <div className="run-lineage-symbol-head">
+                <strong>{symbol}</strong>
+                <span>{symbolLineage.sync_status}</span>
+              </div>
+              <div className="run-lineage-symbol-grid">
+                <Metric label="Candles" value={String(symbolLineage.candle_count)} />
+                <Metric label="Provider" value={symbolLineage.provider} />
+                <Metric label="Window" value={formatRange(symbolLineage.effective_start_at, symbolLineage.effective_end_at)} />
+              </div>
+              <p className="run-lineage-symbol-copy">Last sync: {formatTimestamp(symbolLineage.last_sync_at)}</p>
+              <p className="run-lineage-symbol-copy">
+                Issues: {symbolLineage.issues.length ? symbolLineage.issues.join(", ") : "none"}
+              </p>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }

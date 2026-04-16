@@ -371,6 +371,53 @@ select {
   word-break: break-word;
 }
 
+.run-lineage-symbols {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.run-lineage-symbol-card {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(4, 10, 17, 0.48);
+}
+
+.run-lineage-symbol-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+
+.run-lineage-symbol-head strong {
+  font-size: 0.98rem;
+}
+
+.run-lineage-symbol-head span {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+.run-lineage-symbol-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-lineage-symbol-copy {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 @media (max-width: 960px) {
   .hero,
   .grid,
@@ -378,7 +425,8 @@ select {
   .run-list,
   .run-form,
   .run-metrics,
-  .run-lineage-grid {
+  .run-lineage-grid,
+  .run-lineage-symbol-grid {
     grid-template-columns: 1fr;
   }
 
