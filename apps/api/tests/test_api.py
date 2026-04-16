@@ -257,6 +257,7 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["narratives"][0]["rank"] == 1
   assert payload["narratives"][0]["is_primary"] is True
   assert payload["narratives"][0]["insight_score"] > 0
+  assert payload["narratives"][0]["title"].startswith("Strategy tuning")
   artifact_kinds = {artifact["kind"] for artifact in payload["runs"][1]["benchmark_artifacts"]}
   assert "result_snapshot_root" in artifact_kinds
   assert "runtime_log_root" in artifact_kinds

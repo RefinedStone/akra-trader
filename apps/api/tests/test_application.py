@@ -303,7 +303,11 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.narratives[0].rank == 1
   assert comparison.narratives[0].is_primary is True
   assert comparison.narratives[0].insight_score > 0
-  assert "persisted reference benchmark provenance" in comparison.narratives[0].summary
+  assert comparison.narratives[0].title.startswith("Benchmark validation")
+  assert comparison.narratives[0].summary == (
+    "Benchmark validation falls back to persisted reference provenance because direct metric "
+    "deltas are partial."
+  )
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
     "total_return_pct",
@@ -379,9 +383,10 @@ def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(
   assert comparison.narratives[0].comparison_type == "native_vs_reference"
   assert comparison.narratives[0].rank == 1
   assert comparison.narratives[0].is_primary is True
-  assert "return" in comparison.narratives[0].summary
+  assert comparison.narratives[0].title.startswith("Benchmark validation")
+  assert "benchmark drift" in comparison.narratives[0].summary
   assert any(
-    bullet.startswith("Reference context: NostalgiaForInfinityX7 returned 12.4%")
+    bullet.startswith("Benchmark evidence: NostalgiaForInfinityX7 returned 12.4%")
     for bullet in comparison.narratives[0].bullets
   )
 
@@ -478,6 +483,14 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
     ],
     intent="strategy_tuning",
   )
+  execution_regression = app.compare_runs(
+    run_ids=[
+      baseline_run.config.run_id,
+      alternate_native_run.config.run_id,
+      reference_run.config.run_id,
+    ],
+    intent="execution_regression",
+  )
 
   assert benchmark_validation.intent == "benchmark_validation"
   assert [narrative.run_id for narrative in benchmark_validation.narratives] == [
@@ -487,6 +500,12 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
   assert [narrative.rank for narrative in benchmark_validation.narratives] == [1, 2]
   assert benchmark_validation.narratives[0].is_primary is True
   assert benchmark_validation.narratives[0].comparison_type == "native_vs_reference"
+  assert benchmark_validation.narratives[0].title.startswith("Benchmark validation")
+  assert "benchmark drift" in benchmark_validation.narratives[0].summary
+  assert any(
+    bullet.startswith("Benchmark evidence:")
+    for bullet in benchmark_validation.narratives[0].bullets
+  )
 
   assert strategy_tuning.intent == "strategy_tuning"
   assert [narrative.run_id for narrative in strategy_tuning.narratives] == [
@@ -496,6 +515,21 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
   assert [narrative.rank for narrative in strategy_tuning.narratives] == [1, 2]
   assert strategy_tuning.narratives[0].is_primary is True
   assert strategy_tuning.narratives[0].comparison_type == "native_vs_native"
+  assert strategy_tuning.narratives[0].title.startswith("Strategy tuning")
+  assert "optimization tradeoffs" in strategy_tuning.narratives[0].summary
+  assert any(
+    bullet.startswith("Tuning signal:")
+    for bullet in strategy_tuning.narratives[0].bullets
+  )
+
+  assert execution_regression.intent == "execution_regression"
+  assert execution_regression.narratives[0].run_id == alternate_native_run.config.run_id
+  assert execution_regression.narratives[0].title.startswith("Execution regression")
+  assert "execution drift" in execution_regression.narratives[0].summary
+  assert any(
+    bullet.startswith("Execution signal:")
+    for bullet in execution_regression.narratives[0].bullets
+  )
   assert benchmark_validation.narratives[0].insight_score > benchmark_validation.narratives[1].insight_score
   assert strategy_tuning.narratives[0].insight_score > strategy_tuning.narratives[1].insight_score
 

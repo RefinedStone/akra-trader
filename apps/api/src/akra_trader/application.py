@@ -82,6 +82,41 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
   },
 }
 
+COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
+  "benchmark_validation": {
+    "title_prefix": "Benchmark validation",
+    "summary_prefix": "Validation view",
+    "partial_summary": (
+      "Benchmark validation falls back to persisted reference provenance because direct metric "
+      "deltas are partial."
+    ),
+    "lane_prefix": "Validation context",
+    "activity_prefix": "Validation signal",
+    "reference_prefix": "Benchmark evidence",
+  },
+  "execution_regression": {
+    "title_prefix": "Execution regression",
+    "summary_prefix": "Regression view",
+    "partial_summary": (
+      "Execution regression falls back to persisted reference provenance because direct execution "
+      "deltas are partial."
+    ),
+    "lane_prefix": "Regression context",
+    "activity_prefix": "Execution signal",
+    "reference_prefix": "Reference baseline",
+  },
+  "strategy_tuning": {
+    "title_prefix": "Strategy tuning",
+    "summary_prefix": "Tuning view",
+    "partial_summary": (
+      "Strategy tuning falls back to benchmark provenance because direct optimization deltas are partial."
+    ),
+    "lane_prefix": "Tuning context",
+    "activity_prefix": "Tuning signal",
+    "reference_prefix": "Benchmark backdrop",
+  },
+}
+
 
 class TradingApplication:
   def __init__(
@@ -594,6 +629,7 @@ def _build_comparison_narrative(
   trade_count_delta = _metric_row_delta(metric_row_by_key, "trade_count", run.config.run_id)
 
   title = _build_comparison_narrative_title(
+    intent=intent,
     comparison_type=comparison_type,
     target_subject=target_subject,
     baseline_label=baseline_label,
@@ -601,6 +637,7 @@ def _build_comparison_narrative(
     max_drawdown_delta=max_drawdown_delta,
   )
   summary = _build_comparison_narrative_summary(
+    intent=intent,
     comparison_type=comparison_type,
     baseline_run=baseline_run,
     run=run,
@@ -611,6 +648,7 @@ def _build_comparison_narrative(
     trade_count_delta=trade_count_delta,
   )
   bullets = _build_comparison_narrative_bullets(
+    intent=intent,
     comparison_type=comparison_type,
     baseline_run=baseline_run,
     run=run,
@@ -705,42 +743,71 @@ def _normalize_comparison_intent(intent: str | None) -> str:
 
 def _build_comparison_narrative_title(
   *,
+  intent: str,
   comparison_type: str,
   target_subject: str,
   baseline_label: str,
   total_return_delta: float | int | None,
   max_drawdown_delta: float | int | None,
 ) -> str | None:
+  copy = COMPARISON_INTENT_COPY[intent]
   versus_baseline = "the baseline" if comparison_type != "native_vs_reference" else f"the native/reference baseline {baseline_label}"
   if total_return_delta is not None and max_drawdown_delta is not None:
+    if intent == "benchmark_validation":
+      if total_return_delta > 0 and max_drawdown_delta <= 0:
+        return f"{copy['title_prefix']} favors {target_subject}: higher return without extra drawdown versus {versus_baseline}."
+      if total_return_delta > 0 and max_drawdown_delta > 0:
+        return f"{copy['title_prefix']} shows {target_subject} running hotter than {versus_baseline}: more return, but deeper drawdown."
+      if total_return_delta < 0 and max_drawdown_delta <= 0:
+        return f"{copy['title_prefix']} shows {target_subject} staying safer than {versus_baseline}, but giving up return."
+      if total_return_delta < 0 and max_drawdown_delta > 0:
+        return f"{copy['title_prefix']} flags {target_subject} as off-benchmark versus {versus_baseline}."
+      return f"{copy['title_prefix']} shows {target_subject} holding close to {versus_baseline}."
+    if intent == "execution_regression":
+      if total_return_delta > 0 and max_drawdown_delta <= 0:
+        return f"{copy['title_prefix']} sees {target_subject} diverging from {versus_baseline}, but not as a degradation."
+      if total_return_delta > 0 and max_drawdown_delta > 0:
+        return f"{copy['title_prefix']} shows {target_subject} changing risk behavior versus {versus_baseline}."
+      if total_return_delta < 0 and max_drawdown_delta <= 0:
+        return f"{copy['title_prefix']} shows {target_subject} throttling risk versus {versus_baseline}."
+      if total_return_delta < 0 and max_drawdown_delta > 0:
+        return f"{copy['title_prefix']} flags {target_subject} as a clear degradation versus {versus_baseline}."
+      return f"{copy['title_prefix']} sees only limited drift in {target_subject} versus {versus_baseline}."
     if total_return_delta > 0 and max_drawdown_delta <= 0:
-      return f"{target_subject} beat {versus_baseline} on both return and drawdown."
+      return f"{copy['title_prefix']} clearly prefers {target_subject} over {versus_baseline}."
     if total_return_delta > 0 and max_drawdown_delta > 0:
-      return f"{target_subject} found more return than {versus_baseline}, but with deeper drawdown."
+      return f"{copy['title_prefix']} treats {target_subject} as the higher-upside variant versus {versus_baseline}, with a drawdown tradeoff."
     if total_return_delta < 0 and max_drawdown_delta <= 0:
-      return f"{target_subject} gave up return while containing drawdown versus {versus_baseline}."
+      return f"{copy['title_prefix']} treats {target_subject} as the more defensive variant versus {versus_baseline}."
     if total_return_delta < 0 and max_drawdown_delta > 0:
-      return f"{target_subject} lagged {versus_baseline} on both return and drawdown."
-    return f"{target_subject} held close to {versus_baseline} on return and drawdown."
+      return f"{copy['title_prefix']} finds little upside in {target_subject} versus {versus_baseline}."
+    return f"{copy['title_prefix']} keeps {target_subject} near-neutral against {versus_baseline}."
   if total_return_delta is not None:
+    if intent == "strategy_tuning":
+      if total_return_delta > 0:
+        return f"{copy['title_prefix']} prefers {target_subject} for return potential versus {versus_baseline}."
+      if total_return_delta < 0:
+        return f"{copy['title_prefix']} sees {target_subject} as lower-upside than {versus_baseline}."
+      return f"{copy['title_prefix']} sees no return edge between {target_subject} and {versus_baseline}."
     if total_return_delta > 0:
-      return f"{target_subject} outperformed {versus_baseline} on total return."
+      return f"{copy['title_prefix']} shows {target_subject} ahead of {versus_baseline} on total return."
     if total_return_delta < 0:
-      return f"{target_subject} trailed {versus_baseline} on total return."
-    return f"{target_subject} matched {versus_baseline} on total return."
+      return f"{copy['title_prefix']} shows {target_subject} trailing {versus_baseline} on total return."
+    return f"{copy['title_prefix']} shows {target_subject} matching {versus_baseline} on total return."
   if max_drawdown_delta is not None:
     if max_drawdown_delta < 0:
-      return f"{target_subject} contained drawdown better than {versus_baseline}."
+      return f"{copy['title_prefix']} shows {target_subject} containing drawdown better than {versus_baseline}."
     if max_drawdown_delta > 0:
-      return f"{target_subject} ran with deeper drawdown than {versus_baseline}."
-    return f"{target_subject} matched {versus_baseline} on drawdown."
+      return f"{copy['title_prefix']} shows {target_subject} running with deeper drawdown than {versus_baseline}."
+    return f"{copy['title_prefix']} shows {target_subject} matching {versus_baseline} on drawdown."
   if comparison_type == "native_vs_reference":
-    return f"{target_subject} is the comparison counterpart to {baseline_label}."
-  return f"{target_subject} is being read against {baseline_label}."
+    return f"{copy['title_prefix']} frames {target_subject} as the comparison counterpart to {baseline_label}."
+  return f"{copy['title_prefix']} reads {target_subject} against {baseline_label}."
 
 
 def _build_comparison_narrative_summary(
   *,
+  intent: str,
   comparison_type: str,
   baseline_run: RunRecord,
   run: RunRecord,
@@ -750,6 +817,7 @@ def _build_comparison_narrative_summary(
   win_rate_delta: float | int | None,
   trade_count_delta: float | int | None,
 ) -> str | None:
+  copy = COMPARISON_INTENT_COPY[intent]
   metric_shifts: list[str] = []
   if total_return_delta is not None:
     metric_shifts.append(f"return {_format_metric_delta(total_return_delta, 'pct_points')}")
@@ -760,20 +828,22 @@ def _build_comparison_narrative_summary(
   if trade_count_delta is not None:
     metric_shifts.append(f"trades {_format_metric_delta(trade_count_delta, 'count')}")
   if metric_shifts:
-    return f"Against {baseline_label}, the comparison shifted by {', '.join(metric_shifts)}."
+    if intent == "benchmark_validation":
+      return f"{copy['summary_prefix']} treats these shifts as benchmark drift against {baseline_label}: {', '.join(metric_shifts)}."
+    if intent == "execution_regression":
+      return f"{copy['summary_prefix']} interprets these changes as execution drift against {baseline_label}: {', '.join(metric_shifts)}."
+    return f"{copy['summary_prefix']} reads these changes as optimization tradeoffs against {baseline_label}: {', '.join(metric_shifts)}."
 
   if comparison_type == "native_vs_reference" and _has_reference_context(run, baseline_run):
-    return (
-      "Direct metric deltas are partial here, so this comparison leans on native engine metrics "
-      "plus persisted reference benchmark provenance."
-    )
+    return copy["partial_summary"]
   if run.status != baseline_run.status:
-    return f"Status diverged as well: {run.status} versus {baseline_run.status}."
+    return f"{copy['summary_prefix']} also notes a status split: {run.status} versus {baseline_run.status}."
   return None
 
 
 def _build_comparison_narrative_bullets(
   *,
+  intent: str,
   comparison_type: str,
   baseline_run: RunRecord,
   run: RunRecord,
@@ -785,6 +855,7 @@ def _build_comparison_narrative_bullets(
   bullets: list[str] = []
 
   lane_context = _build_lane_context_bullet(
+    intent=intent,
     comparison_type=comparison_type,
     baseline_run=baseline_run,
     run=run,
@@ -793,6 +864,7 @@ def _build_comparison_narrative_bullets(
     bullets.append(lane_context)
 
   activity_context = _build_activity_context_bullet(
+    intent=intent,
     run=run,
     trade_count_delta=trade_count_delta,
     win_rate_delta=win_rate_delta,
@@ -800,39 +872,43 @@ def _build_comparison_narrative_bullets(
   if activity_context is not None:
     bullets.append(activity_context)
 
-  reference_story = _build_reference_story_bullet(baseline_run=baseline_run, run=run)
+  reference_story = _build_reference_story_bullet(intent=intent, baseline_run=baseline_run, run=run)
   if reference_story is not None:
     bullets.append(reference_story)
 
   if not bullets and comparison_type == "native_vs_reference":
-    bullets.append(f"{target_label} is the reference/native counterpart to {baseline_label}.")
+    bullets.append(f"{COMPARISON_INTENT_COPY[intent]['lane_prefix']}: {target_label} is the reference/native counterpart to {baseline_label}.")
   return bullets[:3]
 
 
 def _build_lane_context_bullet(
   *,
+  intent: str,
   comparison_type: str,
   baseline_run: RunRecord,
   run: RunRecord,
 ) -> str | None:
   if comparison_type != "native_vs_reference":
     return None
+  copy = COMPARISON_INTENT_COPY[intent]
   reference_run = run if run.provenance.lane == "reference" else baseline_run
   native_run = baseline_run if reference_run is run else run
   reference_label = _comparison_run_label(reference_run)
   integration_mode = reference_run.provenance.integration_mode or "external_runtime"
   return (
-    f"Lane context: native engine {_comparison_run_label(native_run)} is being read against "
+    f"{copy['lane_prefix']}: native engine {_comparison_run_label(native_run)} is being read against "
     f"reference benchmark {reference_label} via {integration_mode}."
   )
 
 
 def _build_activity_context_bullet(
   *,
+  intent: str,
   run: RunRecord,
   trade_count_delta: float | int | None,
   win_rate_delta: float | int | None,
 ) -> str | None:
+  copy = COMPARISON_INTENT_COPY[intent]
   trade_count = _resolve_run_metric_value(run, "trade_count")
   win_rate = _resolve_run_metric_value(run, "win_rate_pct")
   segments: list[str] = []
@@ -848,14 +924,16 @@ def _build_activity_context_bullet(
     segments.append(segment)
   if not segments:
     return None
-  return "; ".join(segments) + "."
+  return f"{copy['activity_prefix']}: " + "; ".join(segments) + "."
 
 
 def _build_reference_story_bullet(
   *,
+  intent: str,
   baseline_run: RunRecord,
   run: RunRecord,
 ) -> str | None:
+  copy = COMPARISON_INTENT_COPY[intent]
   reference_run = None
   if run.provenance.lane == "reference":
     reference_run = run
@@ -869,7 +947,7 @@ def _build_reference_story_bullet(
   for key in ("headline", "signal_context", "exit_context", "market_context", "pair_context", "portfolio_context"):
     value = benchmark_story.get(key)
     if isinstance(value, str) and value:
-      return f"Reference context: {value}"
+      return f"{copy['reference_prefix']}: {value}"
   return None
 
 
