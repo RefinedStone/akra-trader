@@ -443,10 +443,14 @@ function BackfillQualityStatus({
 }: {
   instrument: MarketDataStatus["instruments"][number];
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
-  const gapLines = summarizeGapWindows(instrument.backfill_gap_windows);
+  const canToggleGapWindows = instrument.backfill_gap_windows.length > MAX_VISIBLE_GAP_WINDOWS;
+  const gapLines = expanded
+    ? formatGapWindows(instrument.backfill_gap_windows)
+    : summarizeGapWindows(instrument.backfill_gap_windows);
   return (
     <div className="progress-stack">
       <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
@@ -466,6 +470,17 @@ function BackfillQualityStatus({
             </span>
           ))}
         </div>
+      ) : null}
+      {canToggleGapWindows ? (
+        <button
+          className="progress-toggle"
+          onClick={() => setExpanded((current) => !current)}
+          type="button"
+        >
+          {expanded
+            ? "Collapse gaps"
+            : `Show all ${instrument.backfill_gap_windows.length} gaps`}
+        </button>
       ) : null}
       <div className="progress-track" aria-hidden="true">
         <span
@@ -489,11 +504,7 @@ function summarizeGapWindows(
   gapWindows: MarketDataStatus["instruments"][number]["backfill_gap_windows"],
 ) {
   if (gapWindows.length <= MAX_VISIBLE_GAP_WINDOWS) {
-    return gapWindows.map((gap, index) => ({
-      key: `${gap.start_at}-${gap.end_at}-${index}`,
-      kind: "exact" as const,
-      label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
-    }));
+    return formatGapWindows(gapWindows);
   }
 
   const recentWindows = gapWindows.slice(-(MAX_VISIBLE_GAP_WINDOWS - 1));
@@ -513,12 +524,18 @@ function summarizeGapWindows(
         `${formatRange(collapsedWindows[0].start_at, lastCollapsedWindow.end_at)} | ` +
         `${collapsedMissing} missing`,
     },
-    ...recentWindows.map((gap, index) => ({
-      key: `${gap.start_at}-${gap.end_at}-${index}`,
-      kind: "exact" as const,
-      label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
-    })),
+    ...formatGapWindows(recentWindows),
   ];
+}
+
+function formatGapWindows(
+  gapWindows: MarketDataStatus["instruments"][number]["backfill_gap_windows"],
+) {
+  return gapWindows.map((gap, index) => ({
+    key: `${gap.start_at}-${gap.end_at}-${index}`,
+    kind: "exact" as const,
+    label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
+  }));
 }
 
 function StrategyColumn({

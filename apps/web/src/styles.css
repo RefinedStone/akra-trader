@@ -315,6 +315,21 @@ select {
   color: var(--cyan);
 }
 
+.progress-toggle {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--amber);
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.76rem;
+  font-family: "IBM Plex Mono", monospace;
+}
+
+.progress-toggle:hover {
+  opacity: 0.85;
+}
+
 .progress-track {
   height: 6px;
   border-radius: 999px;
