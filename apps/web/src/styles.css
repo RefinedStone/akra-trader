@@ -1047,6 +1047,11 @@ select {
   color: rgba(255, 241, 214, 0.96);
 }
 
+.comparison-dev-state-controls {
+  display: grid;
+  gap: 8px;
+}
+
 .comparison-dev-feedback {
   margin: 0;
   color: rgba(255, 255, 255, 0.72);

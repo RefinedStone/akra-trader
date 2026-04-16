@@ -2609,6 +2609,7 @@ function RunComparisonPanel({
           onResolvePendingPresetImportConflict={resolvePendingTooltipPresetImportConflict}
           onReset={resetTooltipTuning}
           onSavePreset={saveTooltipPreset}
+          onSetShareFeedback={setTooltipShareFeedback}
           pendingPresetImportConflict={pendingTooltipPresetImportConflict}
           presetDraftName={tooltipPresetDraftName}
           presets={tooltipTuningPresets}
@@ -2943,6 +2944,7 @@ function ComparisonTooltipTuningPanel({
   onResolvePendingPresetImportConflict,
   onReset,
   onSavePreset,
+  onSetShareFeedback,
 }: {
   pendingPresetImportConflict: ComparisonTooltipPendingPresetImportConflict | null;
   presetDraftName: string;
@@ -2967,6 +2969,7 @@ function ComparisonTooltipTuningPanel({
   onResolvePendingPresetImportConflict: (action: "overwrite" | "rename" | "skip") => void;
   onReset: () => void;
   onSavePreset: () => void;
+  onSetShareFeedback: (value: string | null) => void;
 }) {
   const [conflictSessionUiStateMap, setConflictSessionUiStateMap] = useState<
     Record<string, ComparisonTooltipConflictSessionUiState>
@@ -2998,6 +3001,7 @@ function ComparisonTooltipTuningPanel({
   const currentConflictSessionUiState = conflictSessionKey
     ? conflictSessionUiStateMap[conflictSessionKey] ?? null
     : null;
+  const savedConflictSessionCount = Object.keys(conflictSessionUiStateMap).length;
   const showUnchangedConflictRows =
     currentConflictSessionUiState?.show_unchanged_conflict_rows ?? false;
   const collapsedUnchangedConflictGroups =
@@ -3072,6 +3076,28 @@ function ComparisonTooltipTuningPanel({
             group.rows.length >= COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD),
       },
     }));
+  };
+
+  const resetCurrentConflictSessionUiState = () => {
+    if (!conflictSessionKey || !currentConflictSessionUiState) {
+      onSetShareFeedback("No saved view state exists for the current conflict session.");
+      return;
+    }
+    setConflictSessionUiStateMap((current) => {
+      const next = { ...current };
+      delete next[conflictSessionKey];
+      return next;
+    });
+    onSetShareFeedback("Reset saved view state for the current conflict session.");
+  };
+
+  const resetAllConflictSessionUiState = () => {
+    if (!savedConflictSessionCount) {
+      onSetShareFeedback("No saved conflict-view state exists to reset.");
+      return;
+    }
+    setConflictSessionUiStateMap({});
+    onSetShareFeedback("Reset all saved conflict-view state.");
   };
 
   return (
@@ -3188,6 +3214,29 @@ function ComparisonTooltipTuningPanel({
             value={shareDraft}
           />
         </label>
+        <div className="comparison-dev-state-controls">
+          <p className="comparison-dev-feedback">
+            Saved conflict views: {savedConflictSessionCount}
+          </p>
+          <div className="comparison-dev-actions comparison-dev-actions-inline">
+            <button
+              className="ghost-button comparison-dev-reset"
+              disabled={!currentConflictSessionUiState}
+              onClick={resetCurrentConflictSessionUiState}
+              type="button"
+            >
+              Reset current view
+            </button>
+            <button
+              className="ghost-button comparison-dev-reset"
+              disabled={!savedConflictSessionCount}
+              onClick={resetAllConflictSessionUiState}
+              type="button"
+            >
+              Reset all saved views
+            </button>
+          </div>
+        </div>
         {pendingPresetImportConflict ? (
           <div className="comparison-dev-conflict-card">
             <p className="comparison-dev-conflict-title">
