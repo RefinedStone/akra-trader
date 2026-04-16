@@ -21,16 +21,16 @@
       "direction_id": "data-trust-and-lineage",
       "title": "Expose sync checkpoints and failure history in market-data status",
       "description": "Extend the market-data status surface so operators can inspect the latest sync checkpoint, freshness boundary, and recent failure history without shell access, closing the remaining visibility gap called out after dataset identity hardening.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 96,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out missing sync checkpoint and failure-history visibility in `market-data status`, and the data-trust direction lists operator-visible freshness and failures as a success criterion.",
+      "priority_reason": "Completed in main session commit 18a6f4c, which added checkpoint and failure-history persistence, surfaced the data in the control-room status board, and locked the behavior with API and UI tests.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:29:52Z",
+      "updated_at": "2026-04-17T00:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Directly advances the remaining data-trust requirement that freshness, gaps, and failure history be actionable from product surfaces rather than shell inspection."
     },
@@ -55,20 +55,21 @@
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
       "direction_id": "experiment-os",
-      "title": "Add explicit rerun workflow from stored dataset identity",
-      "description": "Create an operator-visible rerun path that takes a stored `dataset_identity` and reproduces the same market-data boundary explicitly, instead of relying on implicit shell reconstruction, so equivalence checks become a first-class experiment workflow.",
-      "status": "proposed",
-      "base_priority": 91,
+      "title": "Link run provenance directly to sync checkpoints and rerun boundaries",
+      "description": "Extend run provenance so each run directly references or pins the market-data sync checkpoint now exposed in status, then use that stable boundary to drive explicit rerun equivalence instead of relying on indirect dataset reconstruction.",
+      "status": "ready",
+      "base_priority": 95,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply identifies explicit rerun by stored dataset identity as the other concrete remaining gap, but only one next queued task should be promoted now and market-data status visibility is the more immediate operator-facing blocker.",
+      "priority_reason": "The latest main-session reply names missing linkage between run provenance and the new market-data sync checkpoint as the clearest remaining executable gap, and it is the most direct follow-up now that the status surface work is done.",
       "depends_on": [
-        "planning-data-trust-dataset-identity-hardening"
+        "planning-data-trust-dataset-identity-hardening",
+        "planning-data-trust-market-data-status-history-surface"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:29:52Z",
+      "updated_at": "2026-04-17T00:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Bridges data-trust provenance to experiment-os execution by turning stable dataset identity into a repeatable rerun and comparison entrypoint."
+      "direction_relation_note": "Bridges data-trust checkpoint identity to experiment-os rerun flows by making the newly surfaced sync boundary first-class run provenance."
     },
     {
       "id": "planning-experiment-os-strategy-lifecycle-registration",
@@ -110,18 +111,18 @@
     {
       "id": "planning-operator-trust-alerts-and-event-log",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add operator alerts and structured operator-event visibility",
-      "description": "Create the operator-facing alert and event substrate for stale data, sync failures, worker failures, and promotion decisions so daily and incident workflows can be handled from product surfaces rather than shell knowledge.",
-      "status": "proposed",
-      "base_priority": 81,
+      "title": "Connect failure history to operator alerts and event visibility",
+      "description": "Build the operator-facing alert and event path that turns surfaced market-data failure history, stale-data conditions, worker failures, and promotion decisions into durable actionable records instead of passive status text.",
+      "status": "blocked",
+      "base_priority": 83,
       "dynamic_priority_delta": 0,
-      "priority_reason": "Current-state lists alerts and operator events as Immediate Next Priority 4 before live-path work, but they should sit behind initial worker-session and data-trust foundations.",
+      "priority_reason": "The latest main-session reply explicitly calls out missing alerting and operator-event integration for the new failure-history surface, but the broader alert substrate still depends on runtime worker-state foundations.",
       "depends_on": [
         "planning-runtime-ops-worker-session-foundation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:20:10Z",
+      "updated_at": "2026-04-17T00:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Directly advances the operator-trust direction by giving the control room actionable answers about what is running, what failed, and what the operator should do next."
     },
