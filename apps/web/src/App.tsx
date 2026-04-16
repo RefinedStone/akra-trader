@@ -1423,13 +1423,37 @@ function RunComparisonPanel({
     <section className={`comparison-panel ${intentClassName}`}>
       <div className="comparison-head">
         <div>
-          <p className="kicker">Comparison deck</p>
+          <p className="kicker comparison-mode-kicker">
+            <span aria-hidden="true" className="comparison-intent-icon" />
+            <span>Comparison deck</span>
+          </p>
           <h3>Native and reference backtests, side by side</h3>
         </div>
         <p className="comparison-baseline">
           <span>Baseline: {comparison.baseline_run_id}</span>
-          <span className="comparison-intent-chip">{formatComparisonIntentLabel(comparison.intent)}</span>
+          <span className="comparison-intent-chip">
+            <span aria-hidden="true" className="comparison-intent-icon" />
+            <span>{formatComparisonIntentLabel(comparison.intent)}</span>
+          </span>
         </p>
+      </div>
+      <div aria-label="Comparison legend" className="comparison-legend">
+        <span className="comparison-legend-item comparison-legend-item-mode">
+          <span aria-hidden="true" className="comparison-intent-icon" />
+          <span>{formatComparisonIntentLegend(comparison.intent)}</span>
+        </span>
+        <span className="comparison-legend-item">
+          <span aria-hidden="true" className="comparison-legend-swatch baseline" />
+          <span>Baseline run</span>
+        </span>
+        <span className="comparison-legend-item">
+          <span aria-hidden="true" className="comparison-legend-swatch best" />
+          <span>Best metric</span>
+        </span>
+        <span className="comparison-legend-item">
+          <span aria-hidden="true" className="comparison-legend-swatch insight" />
+          <span>Top insight</span>
+        </span>
       </div>
       <div className="comparison-run-grid">
         {comparison.runs.map((run) => (
@@ -1472,7 +1496,10 @@ function RunComparisonPanel({
       </div>
       {primaryNarrative ? (
         <div className="comparison-top-story">
-          <p className="kicker">Top insight / {formatComparisonIntentLabel(comparison.intent)}</p>
+          <p className="kicker comparison-top-kicker">
+            <span aria-hidden="true" className="comparison-legend-swatch insight" />
+            <span>Top insight / {formatComparisonIntentLabel(comparison.intent)}</span>
+          </p>
           <ComparisonNarrativeCard comparison={comparison} featured narrative={primaryNarrative} />
         </div>
       ) : null}
@@ -1813,6 +1840,19 @@ function formatComparisonIntentLabel(value: ComparisonIntent) {
       return "Execution regression";
     case "strategy_tuning":
       return "Strategy tuning";
+    default:
+      return value;
+  }
+}
+
+function formatComparisonIntentLegend(value: ComparisonIntent) {
+  switch (value) {
+    case "benchmark_validation":
+      return "Benchmark drift cues";
+    case "execution_regression":
+      return "Regression risk cues";
+    case "strategy_tuning":
+      return "Tuning edge cues";
     default:
       return value;
   }
