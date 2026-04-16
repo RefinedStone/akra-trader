@@ -59,11 +59,15 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox worker sessions
 - separate sandbox worker sessions and paper sessions with their own filters, stop controls, and rerun-boundary actions
+- runtime alert and audit panel for stale sandbox heartbeats, worker failures, and recent runtime
+  events
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
 
 - sandbox runs are now supervised worker sessions that keep processing newly arrived candles with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
+- operator visibility is derived from runtime session state and run notes, but it is not yet a
+  durable event store or notification channel
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic
@@ -72,8 +76,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ## Not Implemented Yet
 
-- operator alerts for stale data, sync failures, worker crashes, and risk breaches
-- operator event log and audit trail
+- durable operator event storage and external alert delivery
+- operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - live exchange execution adapter and kill-switch workflow
 - reconciliation against live exchange state after restart or faults
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
@@ -82,6 +86,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Add operator alerts, audit metadata, and recovery surfacing around the new sandbox worker model.
-4. Add alerts, operator events, and audit primitives before any live path work.
+3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
+4. Expand operator controls and audit coverage before any live path work.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

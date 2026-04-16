@@ -28,6 +28,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         await job.stop()
 
   app = FastAPI(title=app_settings.app_name, lifespan=lifespan)
+  app.state.container = container
   app.add_middleware(
     CORSMiddleware,
     allow_origins=[app_settings.cors_origin],

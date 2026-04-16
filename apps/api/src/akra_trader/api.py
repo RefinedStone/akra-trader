@@ -257,6 +257,11 @@ def create_router(container: Container) -> APIRouter:
     status = app.get_market_data_status(timeframe)
     return asdict(status)
 
+  @router.get("/operator/visibility")
+  def get_operator_visibility(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    visibility = app.get_operator_visibility()
+    return asdict(visibility)
+
   return router
 
 

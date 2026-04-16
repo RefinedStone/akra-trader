@@ -328,6 +328,12 @@ select {
   gap: 16px;
 }
 
+.status-grid-two-column {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
 .metric-tile {
   padding: 14px 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);

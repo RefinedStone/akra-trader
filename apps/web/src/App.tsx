@@ -266,6 +266,33 @@ type MarketDataStatus = {
   }[];
 };
 
+type OperatorVisibility = {
+  generated_at: string;
+  alerts: {
+    alert_id: string;
+    severity: string;
+    category: string;
+    summary: string;
+    detail: string;
+    detected_at: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    status: string;
+    source: string;
+  }[];
+  audit_events: {
+    event_id: string;
+    timestamp: string;
+    actor: string;
+    kind: string;
+    summary: string;
+    detail: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    source: string;
+  }[];
+};
+
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
@@ -631,6 +658,7 @@ export default function App() {
   const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
+  const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
@@ -649,13 +677,14 @@ export default function App() {
   async function loadAll() {
     setStatusText("Refreshing data plane...");
     try {
-      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, paperResponse, marketResponse] = await Promise.all([
+      const [strategiesResponse, referencesResponse, backtestsResponse, sandboxResponse, paperResponse, marketResponse, operatorResponse] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
         fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
         fetchJson<Run[]>(buildRunsPath("sandbox", sandboxRunFilter)),
         fetchJson<Run[]>(buildRunsPath("paper", paperRunFilter)),
         fetchJson<MarketDataStatus>("/market-data/status"),
+        fetchJson<OperatorVisibility>("/operator/visibility"),
       ]);
       setStrategies(strategiesResponse);
       setReferences(referencesResponse);
@@ -663,6 +692,7 @@ export default function App() {
       setSandboxRuns(sandboxResponse);
       setPaperRuns(paperResponse);
       setMarketStatus(marketResponse);
+      setOperatorVisibility(operatorResponse);
       setStatusText("Control room synchronized.");
     } catch (error) {
       setStatusText(`Load failed: ${(error as Error).message}`);
@@ -823,6 +853,20 @@ export default function App() {
           .at(-1) ?? null,
     };
   }, [marketStatus]);
+
+  const operatorSummary = useMemo(() => {
+    if (!operatorVisibility) {
+      return null;
+    }
+    const criticalCount = operatorVisibility.alerts.filter((alert) => alert.severity === "critical").length;
+    const warningCount = operatorVisibility.alerts.filter((alert) => alert.severity === "warning").length;
+    return {
+      alertCount: operatorVisibility.alerts.length,
+      criticalCount,
+      warningCount,
+      latestAuditAt: operatorVisibility.audit_events[0]?.timestamp ?? null,
+    };
+  }, [operatorVisibility]);
 
   async function handleBacktestSubmit(event: FormEvent) {
     event.preventDefault();
@@ -1122,6 +1166,101 @@ export default function App() {
             </div>
           ) : (
             <p>No data status loaded.</p>
+          )}
+        </section>
+
+        <section className="panel panel-wide">
+          <p className="kicker">Operator trust</p>
+          <h2>Runtime alerts and audit</h2>
+          {operatorVisibility ? (
+            <div className="status-grid">
+              {operatorSummary ? (
+                <>
+                  <div className="metric-tile">
+                    <span>Active alerts</span>
+                    <strong>{operatorSummary.alertCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Critical</span>
+                    <strong>{operatorSummary.criticalCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Warnings</span>
+                    <strong>{operatorSummary.warningCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Latest audit</span>
+                    <strong>{formatTimestamp(operatorSummary.latestAuditAt)}</strong>
+                  </div>
+                </>
+              ) : null}
+              <div className="status-grid-two-column">
+                <div>
+                  <h3>Active alerts</h3>
+                  {operatorVisibility.alerts.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Severity</th>
+                          <th>Category</th>
+                          <th>Summary</th>
+                          <th>Detected</th>
+                          <th>Run</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {operatorVisibility.alerts.map((alert) => (
+                          <tr key={alert.alert_id}>
+                            <td>{alert.severity}</td>
+                            <td>{alert.category}</td>
+                            <td>
+                              <strong>{alert.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                            </td>
+                            <td>{formatTimestamp(alert.detected_at)}</td>
+                            <td>{alert.run_id ?? "n/a"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No active runtime alerts.</p>
+                  )}
+                </div>
+                <div>
+                  <h3>Recent audit</h3>
+                  {operatorVisibility.audit_events.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>Actor</th>
+                          <th>Kind</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {operatorVisibility.audit_events.slice(0, 8).map((event) => (
+                          <tr key={event.event_id}>
+                            <td>{formatTimestamp(event.timestamp)}</td>
+                            <td>{event.actor}</td>
+                            <td>{event.kind}</td>
+                            <td>
+                              <strong>{event.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{event.detail}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No runtime audit events recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p>No operator visibility loaded.</p>
           )}
         </section>
 

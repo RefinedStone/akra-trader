@@ -454,6 +454,40 @@ class MarketDataStatus:
 
 
 @dataclass(frozen=True)
+class OperatorAlert:
+  alert_id: str
+  severity: str
+  category: str
+  summary: str
+  detail: str
+  detected_at: datetime
+  run_id: str | None = None
+  session_id: str | None = None
+  status: str = "active"
+  source: str = "runtime"
+
+
+@dataclass(frozen=True)
+class OperatorAuditEvent:
+  event_id: str
+  timestamp: datetime
+  actor: str
+  kind: str
+  summary: str
+  detail: str
+  run_id: str | None = None
+  session_id: str | None = None
+  source: str = "runtime"
+
+
+@dataclass(frozen=True)
+class OperatorVisibility:
+  generated_at: datetime
+  alerts: tuple[OperatorAlert, ...] = ()
+  audit_events: tuple[OperatorAuditEvent, ...] = ()
+
+
+@dataclass(frozen=True)
 class GapWindow:
   start_at: datetime
   end_at: datetime

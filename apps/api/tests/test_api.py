@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import UTC
+from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -223,6 +225,62 @@ def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> N
   assert payload["instruments"][0]["backfill_contiguous_complete"] is None
   assert payload["instruments"][0]["backfill_contiguous_missing_candles"] is None
   assert payload["instruments"][0]["backfill_gap_windows"] == []
+
+
+def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    clock = lambda: datetime(2025, 1, 3, 13, 0, tzinfo=UTC)
+    app._clock = clock
+    app._sandbox_worker_heartbeat_timeout_seconds = 15
+    app.start_sandbox_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      replay_bars=24,
+    )
+    app._clock = lambda: datetime(2025, 1, 3, 13, 0, 20, tzinfo=UTC)
+
+    response = client.get("/api/operator/visibility")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["alerts"][0]["category"] == "stale_runtime"
+  assert payload["alerts"][0]["severity"] == "warning"
+  assert payload["audit_events"][0]["kind"] == "sandbox_worker_stale"
+
+
+def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    app.start_sandbox_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      replay_bars=24,
+    )
+
+    def fail_worker(*, run):
+      raise RuntimeError("worker crash")
+
+    app._load_sandbox_worker_candles = fail_worker
+    app.maintain_sandbox_worker_sessions()
+
+    response = client.get("/api/operator/visibility")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["alerts"][0]["category"] == "worker_failure"
+  assert payload["alerts"][0]["severity"] == "critical"
+  assert any(event["kind"] == "sandbox_worker_failed" for event in payload["audit_events"])
 
 
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:

@@ -561,6 +561,87 @@ def test_sandbox_worker_does_not_reprocess_same_latest_candle(tmp_path: Path) ->
   assert second_update.provenance.runtime_session.last_processed_candle_at == new_candle.timestamp
 
 
+def test_operator_visibility_flags_stale_sandbox_worker_runtime(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 11, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    sandbox_worker_heartbeat_interval_seconds=5,
+    sandbox_worker_heartbeat_timeout_seconds=15,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  clock.advance(timedelta(seconds=20))
+
+  visibility = app.get_operator_visibility()
+
+  assert len(visibility.alerts) == 1
+  assert visibility.alerts[0].category == "stale_runtime"
+  assert visibility.alerts[0].severity == "warning"
+  assert visibility.alerts[0].run_id == run.config.run_id
+  assert len(visibility.audit_events) >= 2
+  assert visibility.audit_events[0].kind == "sandbox_worker_stale"
+  assert visibility.audit_events[0].run_id == run.config.run_id
+
+
+def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+
+  def fail_worker(*, run: RunRecord) -> list[Candle]:
+    raise RuntimeError("worker crash")
+
+  monkeypatch.setattr(app, "_load_sandbox_worker_candles", fail_worker)
+  app.maintain_sandbox_worker_sessions()
+  failed_visibility = app.get_operator_visibility()
+
+  assert len(failed_visibility.alerts) == 1
+  assert failed_visibility.alerts[0].category == "worker_failure"
+  assert failed_visibility.alerts[0].severity == "critical"
+  assert failed_visibility.alerts[0].run_id == run.config.run_id
+  assert any(event.kind == "sandbox_worker_failed" for event in failed_visibility.audit_events)
+
+  stopped = app.stop_sandbox_run(run.config.run_id)
+  stopped_visibility = app.get_operator_visibility()
+
+  assert stopped is not None
+  assert any(event.kind == "sandbox_worker_stopped" for event in stopped_visibility.audit_events)
+
+
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(

@@ -14,6 +14,9 @@ from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import OperatorAlert
+from akra_trader.domain.models import OperatorAuditEvent
+from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
@@ -360,6 +363,21 @@ class TradingApplication:
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
+
+  def get_operator_visibility(self) -> OperatorVisibility:
+    current_time = self._clock()
+    alerts: list[OperatorAlert] = []
+    audit_events: list[OperatorAuditEvent] = []
+    for run in self._runs.list_runs(mode=RunMode.SANDBOX.value):
+      alerts.extend(self._build_operator_alerts_for_run(run=run, current_time=current_time))
+      audit_events.extend(self._build_operator_audit_events_for_run(run=run, current_time=current_time))
+    alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
+    audit_events.sort(key=lambda event: event.timestamp, reverse=True)
+    return OperatorVisibility(
+      generated_at=current_time,
+      alerts=tuple(alerts),
+      audit_events=tuple(audit_events),
+    )
 
   def run_backtest(
     self,
@@ -828,6 +846,178 @@ class TradingApplication:
     if market_data is None:
       return 0
     return market_data.candle_count
+
+  def _build_operator_alerts_for_run(
+    self,
+    *,
+    run: RunRecord,
+    current_time: datetime,
+  ) -> list[OperatorAlert]:
+    session = run.provenance.runtime_session
+    if session is None:
+      return []
+
+    alerts: list[OperatorAlert] = []
+    symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
+    failed_event = self._latest_runtime_note_event(run=run, kind="sandbox_worker_failed")
+    if failed_event is not None or session.lifecycle_state == "failed" or run.status == RunStatus.FAILED:
+      detected_at = (
+        failed_event["timestamp"]
+        or run.ended_at
+        or session.last_heartbeat_at
+        or run.started_at
+      )
+      detail = failed_event["detail"] if failed_event is not None else (
+        run.notes[-1] if run.notes else "Sandbox worker entered a failed runtime state."
+      )
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"runtime-failed:{run.config.run_id}:{detected_at.isoformat()}",
+          severity="critical",
+          category="worker_failure",
+          summary=f"Sandbox worker failed for {symbol}.",
+          detail=detail,
+          detected_at=detected_at,
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+        )
+      )
+
+    heartbeat_at = session.last_heartbeat_at or session.started_at
+    heartbeat_age_seconds = (current_time - heartbeat_at).total_seconds()
+    if (
+      run.status == RunStatus.RUNNING
+      and session.lifecycle_state == "active"
+      and heartbeat_age_seconds > session.heartbeat_timeout_seconds
+    ):
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"runtime-stale:{run.config.run_id}:{current_time.isoformat()}",
+          severity="warning",
+          category="stale_runtime",
+          summary=f"Sandbox worker heartbeat is stale for {symbol}.",
+          detail=(
+            f"Last heartbeat at {heartbeat_at.isoformat()} exceeded the "
+            f"{session.heartbeat_timeout_seconds}s timeout while the run remains active."
+          ),
+          detected_at=current_time,
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+        )
+      )
+    return alerts
+
+  def _build_operator_audit_events_for_run(
+    self,
+    *,
+    run: RunRecord,
+    current_time: datetime,
+  ) -> list[OperatorAuditEvent]:
+    session = run.provenance.runtime_session
+    if session is None:
+      return []
+
+    events: list[OperatorAuditEvent] = [
+      OperatorAuditEvent(
+        event_id=f"runtime-started:{run.config.run_id}:{session.started_at.isoformat()}",
+        timestamp=session.started_at,
+        actor="system",
+        kind="sandbox_worker_started",
+        summary=f"Sandbox worker started for {run.config.symbols[0]}.",
+        detail=(
+          f"Session {session.session_id} started with {session.primed_candle_count} primed candles "
+          f"and {session.processed_tick_count} processed ticks."
+        ),
+        run_id=run.config.run_id,
+        session_id=session.session_id,
+      )
+    ]
+
+    for note in run.notes:
+      if note == "Sandbox run stopped by operator.":
+        timestamp = run.ended_at or current_time
+        events.append(
+          OperatorAuditEvent(
+            event_id=f"audit:sandbox_worker_stopped:{run.config.run_id}:{timestamp.isoformat()}",
+            timestamp=timestamp,
+            actor="operator",
+            kind="sandbox_worker_stopped",
+            summary=self._build_runtime_audit_summary(run=run, kind="sandbox_worker_stopped"),
+            detail=note,
+            run_id=run.config.run_id,
+            session_id=session.session_id,
+          )
+        )
+        continue
+      if parsed := self._parse_runtime_note_event(note):
+        events.append(
+          OperatorAuditEvent(
+            event_id=f"audit:{parsed['kind']}:{run.config.run_id}:{parsed['timestamp'].isoformat()}",
+            timestamp=parsed["timestamp"],
+            actor="system",
+            kind=parsed["kind"],
+            summary=self._build_runtime_audit_summary(run=run, kind=parsed["kind"]),
+            detail=parsed["detail"],
+            run_id=run.config.run_id,
+            session_id=session.session_id,
+          )
+        )
+
+    heartbeat_at = session.last_heartbeat_at or session.started_at
+    if (
+      run.status == RunStatus.RUNNING
+      and session.lifecycle_state == "active"
+      and (current_time - heartbeat_at).total_seconds() > session.heartbeat_timeout_seconds
+    ):
+      events.append(
+        OperatorAuditEvent(
+          event_id=f"audit:sandbox_worker_stale:{run.config.run_id}:{current_time.isoformat()}",
+          timestamp=current_time,
+          actor="system",
+          kind="sandbox_worker_stale",
+          summary=f"Sandbox worker stale state detected for {run.config.symbols[0]}.",
+          detail=(
+            f"Heartbeat timeout exceeded after {session.heartbeat_timeout_seconds}s without an update."
+          ),
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+        )
+      )
+    return events
+
+  def _latest_runtime_note_event(
+    self,
+    *,
+    run: RunRecord,
+    kind: str,
+  ) -> dict[str, datetime | str] | None:
+    for note in reversed(run.notes):
+      parsed = self._parse_runtime_note_event(note)
+      if parsed is not None and parsed["kind"] == kind:
+        return parsed
+    return None
+
+  def _parse_runtime_note_event(self, note: str) -> dict[str, datetime | str] | None:
+    parts = note.split(" | ", 2)
+    if len(parts) == 3:
+      timestamp_raw, kind, detail = parts
+      if kind.startswith("sandbox_worker_"):
+        return {
+          "timestamp": datetime.fromisoformat(timestamp_raw),
+          "kind": kind,
+          "detail": detail,
+        }
+    return None
+
+  @staticmethod
+  def _build_runtime_audit_summary(*, run: RunRecord, kind: str) -> str:
+    symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
+    summary_by_kind = {
+      "sandbox_worker_recovered": f"Sandbox worker recovered for {symbol}.",
+      "sandbox_worker_failed": f"Sandbox worker failed for {symbol}.",
+      "sandbox_worker_stopped": f"Sandbox worker stopped by operator for {symbol}.",
+    }
+    return summary_by_kind.get(kind, f"Sandbox worker runtime event for {symbol}.")
 
   def _simulate_run(
     self,

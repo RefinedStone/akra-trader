@@ -17,6 +17,8 @@ Implemented now:
   and status reporting
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
   relaunch stored boundaries into backtest, sandbox, or paper flows
+- operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts, and
+  runtime audit events
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -72,6 +74,7 @@ Defaults:
 - `GET /api/runs/{run_id}/positions`
 - `GET /api/runs/{run_id}/metrics`
 - `GET /api/market-data/status`
+- `GET /api/operator/visibility`
 
 ## Runtime Notes
 
@@ -83,6 +86,8 @@ Defaults:
   longer share the same storage bucket
 - sandbox runs now start as native worker sessions, then continuously apply new candle ticks with
   persisted heartbeat and recovery state
+- operator visibility now surfaces stale sandbox heartbeats, worker failures, and runtime audit
+  entries directly in the control room
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

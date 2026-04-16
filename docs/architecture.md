@@ -29,6 +29,7 @@ The repository is organized around a small set of stable boundaries:
 - supervised sandbox worker-session orchestration
 - run lookup, listing, filtering, and comparison
 - market-data status queries
+- operator visibility queries for runtime alerts and audit events
 
 ### Ports
 
@@ -128,6 +129,10 @@ The API app lifespan always starts a sandbox worker maintenance job that heartbe
 sessions and applies restart recovery. When Binance is enabled, the app also starts a
 `MarketDataSyncJob` that periodically refreshes tracked symbols.
 
+The application also derives operator visibility from sandbox runtime state. Failed worker sessions
+and stale heartbeats surface as control-room alerts, and worker lifecycle notes are normalized into
+recent audit events for operator review.
+
 ## Modes
 
 ### Backtest
@@ -158,6 +163,7 @@ The web app currently surfaces:
 - market-data health and backfill quality
 - backtest launch
 - sandbox worker launch, stop, and rerun restore
+- runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - run history
 - run comparison and benchmark narratives
 
@@ -166,6 +172,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 ## Known Limits
 
 - no venue-backed continuous execution worker yet
-- no alerts, audit trail, or reconciliation flows
+- runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions; the
+  system still lacks durable alert delivery, wider operator event coverage, and reconciliation flows
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet
