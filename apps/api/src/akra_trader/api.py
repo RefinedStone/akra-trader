@@ -48,6 +48,18 @@ class SandboxRunRequest(BaseModel):
   parameters: dict[str, Any] = Field(default_factory=dict)
 
 
+class LiveRunRequest(BaseModel):
+  strategy_id: str
+  symbol: str
+  timeframe: str = "5m"
+  initial_cash: float = 10_000
+  fee_rate: float = 0.001
+  slippage_bps: float = 3
+  replay_bars: int = 96
+  operator_reason: str = "guarded_live_launch"
+  parameters: dict[str, Any] = Field(default_factory=dict)
+
+
 class GuardedLiveActionRequest(BaseModel):
   actor: str = "operator"
   reason: str = "manual_operator_action"
@@ -238,6 +250,34 @@ def create_router(container: Container) -> APIRouter:
   @router.post("/runs/paper/{run_id}/stop")
   def stop_paper_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
     run = app.stop_paper_run(run_id)
+    if run is None:
+      raise HTTPException(status_code=404, detail="Run not found")
+    return serialize_run(run)
+
+  @router.post("/runs/live")
+  def start_live_run(
+    request: LiveRunRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      run = app.start_live_run(
+        strategy_id=request.strategy_id,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        initial_cash=request.initial_cash,
+        fee_rate=request.fee_rate,
+        slippage_bps=request.slippage_bps,
+        parameters=request.parameters,
+        replay_bars=request.replay_bars,
+        operator_reason=request.operator_reason,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_run(run)
+
+  @router.post("/runs/live/{run_id}/stop")
+  def stop_live_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    run = app.stop_live_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
     return serialize_run(run)

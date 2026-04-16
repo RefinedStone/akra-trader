@@ -756,6 +756,7 @@ export default function App() {
   const [backtests, setBacktests] = useState<Run[]>([]);
   const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
+  const [liveRuns, setLiveRuns] = useState<Run[]>([]);
   const [marketStatus, setMarketStatus] = useState<MarketDataStatus | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
@@ -763,9 +764,11 @@ export default function App() {
   const [guardedLiveReason, setGuardedLiveReason] = useState("operator_safety_drill");
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
+  const [liveForm, setLiveForm] = useState(defaultRunForm);
   const [backtestRunFilter, setBacktestRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [paperRunFilter, setPaperRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
+  const [liveRunFilter, setLiveRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>([]);
   const [comparisonIntent, setComparisonIntent] = useState<ComparisonIntent>(DEFAULT_COMPARISON_INTENT);
   const [runComparison, setRunComparison] = useState<RunComparison | null>(null);
@@ -784,6 +787,7 @@ export default function App() {
         backtestsResponse,
         sandboxResponse,
         paperResponse,
+        liveResponse,
         marketResponse,
         operatorResponse,
         guardedLiveResponse,
@@ -793,6 +797,7 @@ export default function App() {
         fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
         fetchJson<Run[]>(buildRunsPath("sandbox", sandboxRunFilter)),
         fetchJson<Run[]>(buildRunsPath("paper", paperRunFilter)),
+        fetchJson<Run[]>(buildRunsPath("live", liveRunFilter)),
         fetchJson<MarketDataStatus>("/market-data/status"),
         fetchJson<OperatorVisibility>("/operator/visibility"),
         fetchJson<GuardedLiveStatus>("/guarded-live"),
@@ -802,6 +807,7 @@ export default function App() {
       setBacktests(backtestsResponse);
       setSandboxRuns(sandboxResponse);
       setPaperRuns(paperResponse);
+      setLiveRuns(liveResponse);
       setMarketStatus(marketResponse);
       setOperatorVisibility(operatorResponse);
       setGuardedLive(guardedLiveResponse);
@@ -813,7 +819,7 @@ export default function App() {
 
   useEffect(() => {
     void loadAll();
-  }, [backtestRunFilter, sandboxRunFilter, paperRunFilter]);
+  }, [backtestRunFilter, sandboxRunFilter, paperRunFilter, liveRunFilter]);
 
   useEffect(() => {
     if (!strategies.length) {
@@ -822,6 +828,7 @@ export default function App() {
     const preferredNative = strategies.find((strategy) => strategy.runtime === "native") ?? strategies[0];
     setBacktestForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
     setSandboxForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
+    setLiveForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
   }, [strategies]);
 
   useEffect(() => {
@@ -831,6 +838,7 @@ export default function App() {
     setBacktestRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
     setSandboxRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
     setPaperRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
+    setLiveRunFilter((current) => normalizeRunHistoryFilter(current, strategies));
   }, [strategies]);
 
   useEffect(() => {
@@ -1025,6 +1033,26 @@ export default function App() {
     }
   }
 
+  async function handleLiveSubmit(event: FormEvent) {
+    event.preventDefault();
+    const operatorReason = resolveGuardedLiveReason("guarded_live_launch");
+    setStatusText("Starting guarded-live worker...");
+    try {
+      await fetchJson<Run>("/runs/live", {
+        method: "POST",
+        body: JSON.stringify({
+          ...liveForm,
+          parameters: {},
+          replay_bars: 96,
+          operator_reason: operatorReason,
+        }),
+      });
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Guarded-live start failed: ${(error as Error).message}`);
+    }
+  }
+
   async function stopSandboxRun(runId: string) {
     setStatusText(`Stopping sandbox worker ${runId}...`);
     try {
@@ -1042,6 +1070,16 @@ export default function App() {
       await loadAll();
     } catch (error) {
       setStatusText(`Paper stop failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function stopLiveRun(runId: string) {
+    setStatusText(`Stopping guarded-live worker ${runId}...`);
+    try {
+      await fetchJson<Run>(`/runs/live/${runId}/stop`, { method: "POST" });
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Guarded-live stop failed: ${(error as Error).message}`);
     }
   }
 
@@ -1234,6 +1272,17 @@ export default function App() {
           <p className="kicker">Sandbox</p>
           <h2>Start sandbox worker</h2>
           <RunForm form={sandboxForm} setForm={setSandboxForm} strategies={strategies.filter((strategy) => strategy.runtime === "native")} onSubmit={handleSandboxSubmit} />
+        </section>
+
+        <section className="panel">
+          <p className="kicker">Guarded live</p>
+          <h2>Start live worker</h2>
+          <RunForm
+            form={liveForm}
+            setForm={setLiveForm}
+            strategies={strategies.filter((strategy) => strategy.runtime === "native")}
+            onSubmit={handleLiveSubmit}
+          />
         </section>
 
         <section className="panel panel-wide">
@@ -1915,6 +1964,14 @@ export default function App() {
             },
           ]}
           onStop={stopPaperRun}
+        />
+        <RunSection
+          title="Guarded live runs"
+          runs={liveRuns}
+          strategies={strategies}
+          filter={liveRunFilter}
+          setFilter={setLiveRunFilter}
+          onStop={stopLiveRun}
         />
       </main>
     </div>

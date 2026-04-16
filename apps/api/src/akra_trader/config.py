@@ -8,6 +8,10 @@ def _parse_csv_env(value: str) -> tuple[str, ...]:
   return tuple(item.strip() for item in value.split(",") if item.strip())
 
 
+def _parse_bool_env(value: str) -> bool:
+  return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(frozen=True)
 class Settings:
   app_name: str = "Akra Trader API"
@@ -24,6 +28,9 @@ class Settings:
   market_data_historical_candle_limit: int = 2_000
   sandbox_worker_heartbeat_interval_seconds: int = 15
   sandbox_worker_heartbeat_timeout_seconds: int = 45
+  guarded_live_execution_enabled: bool = False
+  guarded_live_worker_heartbeat_interval_seconds: int = 15
+  guarded_live_worker_heartbeat_timeout_seconds: int = 45
   binance_api_key: str | None = None
   binance_api_secret: str | None = None
 
@@ -55,6 +62,15 @@ def load_settings() -> Settings:
     ),
     sandbox_worker_heartbeat_timeout_seconds=int(
       os.getenv("AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
+    ),
+    guarded_live_execution_enabled=_parse_bool_env(
+      os.getenv("AKRA_TRADER_GUARDED_LIVE_EXECUTION_ENABLED", "false")
+    ),
+    guarded_live_worker_heartbeat_interval_seconds=int(
+      os.getenv("AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_INTERVAL_SECONDS", "15")
+    ),
+    guarded_live_worker_heartbeat_timeout_seconds=int(
+      os.getenv("AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
     ),
     binance_api_key=os.getenv("AKRA_TRADER_BINANCE_API_KEY") or None,
     binance_api_secret=os.getenv("AKRA_TRADER_BINANCE_API_SECRET") or None,

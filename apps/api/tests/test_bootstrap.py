@@ -82,6 +82,58 @@ def test_build_container_uses_seeded_provider_when_requested(monkeypatch) -> Non
   assert len(container.background_jobs) == 1
 
 
+def test_build_container_adds_guarded_live_worker_job_when_enabled(monkeypatch) -> None:
+  captured: dict[str, str] = {}
+
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeSandboxWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      captured["sandbox_interval_seconds"] = str(interval_seconds)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
+  class FakeGuardedLiveWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      captured["guarded_live_interval_seconds"] = str(interval_seconds)
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+  monkeypatch.setattr("akra_trader.bootstrap.GuardedLiveWorkerSessionsJob", FakeGuardedLiveWorkerSessionsJob)
+
+  container = build_container(
+    Settings(
+      market_data_provider="seeded",
+      guarded_live_execution_enabled=True,
+      sandbox_worker_heartbeat_interval_seconds=11,
+      guarded_live_worker_heartbeat_interval_seconds=19,
+    )
+  )
+
+  assert len(container.background_jobs) == 2
+  assert captured["sandbox_interval_seconds"] == "11"
+  assert captured["guarded_live_interval_seconds"] == "19"
+
+
 def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:
   captured: dict[str, str] = {}
 

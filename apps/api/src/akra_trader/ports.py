@@ -7,6 +7,8 @@ import pandas as pd
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GuardedLiveState
+from akra_trader.domain.models import GuardedLiveVenueOrderRequest
+from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
@@ -119,3 +121,12 @@ class GuardedLiveStatePort(Protocol):
 
 class VenueStatePort(Protocol):
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot: ...
+
+
+class VenueExecutionPort(Protocol):
+  def describe_capability(self) -> tuple[bool, tuple[str, ...]]: ...
+
+  def submit_market_order(
+    self,
+    request: GuardedLiveVenueOrderRequest,
+  ) -> GuardedLiveVenueOrderResult: ...

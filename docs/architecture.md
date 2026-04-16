@@ -27,10 +27,11 @@ The repository is organized around a small set of stable boundaries:
 - strategy listing and registration
 - backtest orchestration
 - supervised sandbox worker-session orchestration
+- guarded-live worker orchestration behind kill-switch, reconciliation, and recovery gates
 - run lookup, listing, filtering, and comparison
 - market-data status queries
 - operator visibility queries for runtime alerts and audit events
-- guarded-live kill-switch and reconciliation orchestration
+- guarded-live kill-switch, reconciliation, recovery, and live execution orchestration
 
 ### Ports
 
@@ -140,7 +141,8 @@ Guarded-live control state is persisted separately from run history. That state 
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
 internal runtime exposure plus venue balance/open-order snapshots, persisted runtime recovery
 projections rebuilt from verified venue snapshots, and a guarded-live audit log of operator
-actions.
+actions. A separate venue execution adapter now submits guarded-live market orders once those gates
+are clear.
 
 ## Modes
 
@@ -160,8 +162,9 @@ actions.
 
 ### Live
 
-- represented in the domain model
-- reserved for guarded future implementation
+- guarded-live worker sessions are now available for native strategies
+- launch is blocked until kill switch, reconciliation, recovery, and venue-execution gates are clear
+- the current live order path submits venue market orders and persists the resulting run/session history
 
 ## Control Room
 
@@ -172,6 +175,7 @@ The web app currently surfaces:
 - market-data health and backfill quality
 - backtest launch
 - sandbox worker launch, stop, and rerun restore
+- guarded-live worker launch, stop, and run history
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
@@ -181,10 +185,11 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 ## Known Limits
 
-- no venue-backed continuous execution worker yet
+- guarded-live worker execution exists, but it is limited to a narrow market-order path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
-  guarded-live recovery only rebuilds persisted control-plane state rather than resuming a real
-  venue-backed live worker
+  guarded-live recovery/live launch still stop short of a full venue order-book restore or durable
+  live worker resume
 - the system still lacks durable alert delivery and wider operator event coverage
+- venue order lifecycle management is still limited: no cancel/replace path or durable venue-order sync
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

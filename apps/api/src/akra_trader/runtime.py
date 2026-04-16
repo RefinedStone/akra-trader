@@ -70,7 +70,7 @@ class ExecutionModeService:
     if mode == RunMode.PAPER:
       return "Paper run starts from the latest simulated market snapshot and remains isolated from venue-backed live execution."
     if mode == RunMode.LIVE:
-      return "Live mode is reserved for guarded venue-backed execution."
+      return "Guarded-live worker is active on the venue order path with persisted safety-gate state."
     return None
 
   @staticmethod
@@ -278,6 +278,9 @@ class ExecutionEngine:
   def __init__(self, risk_engine: RiskEngine | None = None) -> None:
     self._risk_engine = risk_engine or RiskEngine()
 
+  def review_decision(self, decision: StrategyDecisionEnvelope) -> StrategyDecisionEnvelope:
+    return self._risk_engine.review(decision)
+
   def apply_decision(
     self,
     *,
@@ -287,7 +290,7 @@ class ExecutionEngine:
     cache: StateCache,
     market_price: float,
   ) -> None:
-    reviewed = self._risk_engine.review(decision)
+    reviewed = self.review_decision(decision)
     cash, position, order, fill, closed_trade = apply_signal(
       run_id=config.run_id,
       instrument_id=cache.instrument_id,

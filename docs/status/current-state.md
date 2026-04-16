@@ -51,6 +51,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - run provenance now links native runs to sync checkpoints and rerun boundary identities
 - explicit rerun from stored rerun boundaries into backtest, sandbox, or paper execution with
   match-or-drift tracking
+- guarded-live worker launch behind reconciliation, recovery, and configuration gates
+- venue-backed guarded-live market-order submission with persisted live run history
 
 ### Control room
 
@@ -58,7 +60,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - reference catalog panel
 - market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
 - launch forms for backtests and native sandbox worker sessions
+- launch form for guarded-live workers once live gates are clear
 - separate sandbox worker sessions and paper sessions with their own filters, stop controls, and rerun-boundary actions
+- separate guarded-live run history with stop controls
 - runtime alert and audit panel for stale sandbox heartbeats, worker failures, and recent runtime
   events
 - guarded-live panel with persisted kill-switch state, candidacy blockers, reconciliation findings,
@@ -72,7 +76,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - operator visibility is derived from runtime session state and run notes, but it is not yet a
   durable event store or notification channel
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
-  recovery currently rebuilds persisted control-plane state rather than reviving a live venue worker
+  recovery/live launch currently rebuild persisted control-plane state before attaching a narrow
+  guarded-live worker rather than reviving a full venue order book or session lifecycle
 - custom strategy registration exists, but registration metadata is process-local rather than durable
 - run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
 - native run provenance now pins dataset identity and supports explicit rerun, but deterministic
@@ -83,7 +88,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 - durable operator event storage and external alert delivery
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
-- live exchange execution adapter
+- full live order lifecycle management such as cancel/replace and durable venue order sync
 - reconciliation against live exchange state after restart or faults
 - live-worker restart recovery that resumes actual venue-backed execution from recovered state
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
@@ -93,5 +98,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from recovered control-plane state into restart-safe live reconciliation and live-path audit coverage.
+4. Expand guarded-live controls from narrow market-order execution into restart-safe live reconciliation and wider live-path audit coverage.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

@@ -541,6 +541,32 @@ class GuardedLiveVenueOpenOrder:
 
 
 @dataclass(frozen=True)
+class GuardedLiveVenueOrderRequest:
+  run_id: str
+  session_id: str
+  venue: str
+  symbol: str
+  side: str
+  amount: float
+  order_type: str = "market"
+  reference_price: float | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveVenueOrderResult:
+  order_id: str
+  venue: str
+  symbol: str
+  side: str
+  amount: float
+  status: str
+  submitted_at: datetime
+  average_fill_price: float | None = None
+  fee_paid: float | None = None
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveVenueStateSnapshot:
   provider: str
   venue: str

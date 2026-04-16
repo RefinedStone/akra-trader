@@ -25,11 +25,13 @@ Implemented now:
   exposure before live candidacy discussion
 - guarded-live runtime recovery can rebuild persisted runtime exposure and open-order state from the
   latest verified venue snapshot after a restart or fault drill
+- guarded-live live-worker sessions can start behind reconciliation, recovery, and configuration
+  gates, then submit venue market orders through a dedicated execution adapter
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
 
-- live trading adapters
+- full venue order lifecycle management such as cancel/replace and durable order sync
 - external alert delivery and wider operator event storage
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -52,6 +54,9 @@ Useful environment variables:
 - `AKRA_TRADER_MARKET_DATA_SYNC_INTERVAL_SECONDS`
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
+- `AKRA_TRADER_GUARDED_LIVE_EXECUTION_ENABLED`
+- `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_INTERVAL_SECONDS`
+- `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
 - `AKRA_TRADER_BINANCE_API_KEY`
 - `AKRA_TRADER_BINANCE_API_SECRET`
 
@@ -78,6 +83,8 @@ Defaults:
 - `POST /api/runs/sandbox/{run_id}/stop`
 - `POST /api/runs/paper`
 - `POST /api/runs/paper/{run_id}/stop`
+- `POST /api/runs/live`
+- `POST /api/runs/live/{run_id}/stop`
 - `GET /api/runs/{run_id}/orders`
 - `GET /api/runs/{run_id}/positions`
 - `GET /api/runs/{run_id}/metrics`
@@ -107,6 +114,9 @@ Defaults:
   snapshots, and mismatch findings when external venue state does not line up with local runtime
 - guarded-live recovery can reuse the last verified venue snapshot to rebuild persisted runtime
   exposures and open orders after restart-or-fault drills, while still recording recovery issues
+- guarded-live workers now start only after reconciliation, recovery, and config gates are clear,
+  then keep a venue-backed worker session alive and submit market orders through the live execution
+  adapter
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

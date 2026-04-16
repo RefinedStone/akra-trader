@@ -5,7 +5,6 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-
 from akra_trader.config import Settings
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
@@ -14,10 +13,15 @@ from akra_trader.domain.models import Position
 from akra_trader.main import create_app
 
 
-def build_client(database_path: Path) -> TestClient:
+def build_client(
+  database_path: Path,
+  *,
+  guarded_live_execution_enabled: bool = False,
+) -> TestClient:
   settings = Settings(
     runs_database_url=f"sqlite:///{database_path}",
     market_data_provider="seeded",
+    guarded_live_execution_enabled=guarded_live_execution_enabled,
   )
   return TestClient(create_app(settings))
 
@@ -500,6 +504,81 @@ def test_guarded_live_recovery_endpoint_recovers_from_stored_verified_snapshot_a
   assert payload["recovery"]["state"] == "recovered"
   assert payload["recovery"]["source_verification_state"] == "verified"
   assert payload["recovery"]["exposures"][0]["symbol"] == "ETH/USDT"
+
+
+def test_live_endpoints_launch_and_stop_guarded_live_worker_after_gates_clear(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 0, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),
+        ),
+      )
+    )
+
+    blocked_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "pre_gate_attempt",
+      },
+    )
+    assert blocked_response.status_code == 400
+    assert "blocked" in blocked_response.json()["detail"]
+
+    reconcile_response = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    assert reconcile_response.status_code == 200
+
+    recovery_response = client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    assert recovery_response.status_code == 200
+
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "guarded_live_launch",
+      },
+    )
+
+    assert live_response.status_code == 200
+    payload = live_response.json()
+    assert payload["config"]["mode"] == "live"
+    assert payload["status"] == "running"
+    assert payload["provenance"]["runtime_session"]["worker_kind"] == "guarded_live_native_worker"
+    assert payload["notes"][0].startswith("Guarded live worker primed from recovered venue state")
+
+    run_id = payload["config"]["run_id"]
+    stop_response = client.post(f"/api/runs/live/{run_id}/stop")
+
+  assert stop_response.status_code == 200
+  stopped_payload = stop_response.json()
+  assert stopped_payload["status"] == "stopped"
+  assert stopped_payload["provenance"]["runtime_session"]["lifecycle_state"] == "stopped"
 
 
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:

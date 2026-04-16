@@ -13,16 +13,25 @@ from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
+from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
+from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import OrderStatus
+from akra_trader.domain.models import SignalAction
+from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import StrategyDecisionEnvelope
+from akra_trader.domain.models import StrategyMetadata
+from akra_trader.domain.models import WarmupSpec
+from akra_trader.strategies.base import Strategy
 
 
 class FakeExchange:
@@ -75,6 +84,35 @@ class StaticVenueStateAdapter:
 
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
     return self._snapshot
+
+
+class AlwaysBuyStrategy(Strategy):
+  def describe(self) -> StrategyMetadata:
+    return StrategyMetadata(
+      strategy_id="always_buy_v1",
+      name="Always Buy",
+      version="1.0.0",
+      runtime="native",
+      asset_types=(AssetType.CRYPTO,),
+      supported_timeframes=("5m",),
+      parameter_schema={},
+      description="Test helper strategy that always emits a buy signal.",
+    )
+
+  def warmup_spec(self) -> WarmupSpec:
+    return WarmupSpec(required_bars=2)
+
+  def decide(self, context) -> StrategyDecisionEnvelope:
+    return StrategyDecisionEnvelope(
+      signal=SignalDecision(
+        timestamp=context.timestamp,
+        action=SignalAction.BUY,
+        size_fraction=0.25,
+        reason="always_buy",
+      ),
+      rationale="always_buy",
+      context=context,
+    )
 
 
 def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
@@ -896,6 +934,142 @@ def test_guarded_live_runtime_recovery_uses_last_verified_venue_snapshot_after_f
   assert status.recovery.exposures[0].quantity == 0.75
   assert status.recovery.open_orders[0].order_id == "venue-order-2"
   assert status.audit_events[0].kind == "guarded_live_runtime_recovered"
+
+
+def test_guarded_live_launch_requires_clear_reconciliation_and_recovery(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  venue_state = StaticVenueStateAdapter(
+    GuardedLiveVenueStateSnapshot(
+      provider="seeded",
+      venue="binance",
+      verification_state="verified",
+      captured_at=datetime(2025, 1, 3, 18, 0, tzinfo=UTC),
+      balances=(
+        GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),
+      ),
+    )
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    venue_state=venue_state,
+    venue_execution=SeededVenueExecutionAdapter(),
+    guarded_live_execution_enabled=True,
+  )
+
+  with pytest.raises(ValueError, match="reconciliation"):
+    app.start_live_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+    )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+
+  with pytest.raises(ValueError, match="runtime recovery"):
+    app.start_live_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+    )
+
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="guarded_live_drill",
+  )
+
+  assert run.status == RunStatus.RUNNING
+  assert run.config.mode == RunMode.LIVE
+  assert run.provenance.runtime_session is not None
+  assert run.provenance.runtime_session.worker_kind == "guarded_live_native_worker"
+  assert run.notes[0].startswith("Guarded live worker primed from recovered venue state")
+
+
+def test_guarded_live_worker_submits_venue_order_on_new_candle(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 19, 0, tzinfo=UTC))
+  market_data = MutableSeededMarketDataAdapter()
+  venue_execution = SeededVenueExecutionAdapter(clock=clock)
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(builtins=(AlwaysBuyStrategy,)),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),
+        ),
+      )
+    ),
+    venue_execution=venue_execution,
+    guarded_live_execution_enabled=True,
+    guarded_live_worker_heartbeat_interval_seconds=5,
+    guarded_live_worker_heartbeat_timeout_seconds=15,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="always_buy_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+    operator_reason="guarded_live_buy_test",
+  )
+
+  latest_candle = market_data.get_candles(symbol="ETH/USDT", timeframe="5m")[-1]
+  new_candle = Candle(
+    timestamp=latest_candle.timestamp + timedelta(minutes=5),
+    open=latest_candle.close,
+    high=latest_candle.close * 1.001,
+    low=latest_candle.close * 0.999,
+    close=latest_candle.close * 1.0005,
+    volume=latest_candle.volume + 25,
+  )
+  market_data.append_candle(symbol="ETH/USDT", candle=new_candle)
+  clock.advance(timedelta(seconds=5))
+
+  result = app.maintain_guarded_live_worker_sessions()
+  updated = app.get_run(run.config.run_id)
+  guarded_live_status = app.get_guarded_live_status()
+
+  assert result == {"maintained": 1, "recovered": 0, "ticks_processed": 1, "orders_submitted": 1}
+  assert len(venue_execution.submitted_orders) == 1
+  assert updated is not None
+  assert updated.orders[-1].order_id == "seeded-live-order-1"
+  assert updated.orders[-1].status == OrderStatus.FILLED
+  assert len(updated.fills) == 1
+  assert updated.positions["binance:ETH/USDT"].is_open
+  assert updated.provenance.runtime_session is not None
+  assert updated.provenance.runtime_session.processed_tick_count == 1
+  assert any(event.kind == "guarded_live_order_submitted" for event in guarded_live_status.audit_events)
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

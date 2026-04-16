@@ -11,10 +11,13 @@ from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
+from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
+from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.adapters.venue_state import BinanceVenueStateAdapter
 from akra_trader.adapters.venue_state import SeededVenueStateAdapter
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
+from akra_trader.guarded_live_workers import GuardedLiveWorkerSessionsJob
 from akra_trader.market_data_sync import MarketDataSyncJob
 from akra_trader.sandbox_workers import SandboxWorkerSessionsJob
 
@@ -70,6 +73,17 @@ def build_venue_state_adapter(settings: Settings):
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 
 
+def build_venue_execution_adapter(settings: Settings):
+  if settings.market_data_provider == "seeded":
+    return SeededVenueExecutionAdapter()
+  if settings.market_data_provider == "binance":
+    return BinanceVenueExecutionAdapter(
+      api_key=settings.binance_api_key,
+      api_secret=settings.binance_api_secret,
+    )
+  raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
+
+
 def build_background_jobs(
   settings: Settings,
   market_data,
@@ -81,6 +95,13 @@ def build_background_jobs(
       interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     )
   ]
+  if settings.guarded_live_execution_enabled:
+    jobs.append(
+      GuardedLiveWorkerSessionsJob(
+        application,
+        interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
+      )
+    )
   if settings.market_data_provider == "binance":
     jobs.append(
       MarketDataSyncJob(
@@ -104,6 +125,7 @@ def build_container(settings: Settings) -> Container:
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
   venue_state = build_venue_state_adapter(settings)
+  venue_execution = build_venue_execution_adapter(settings)
   application = TradingApplication(
     market_data=market_data,
     strategies=strategies,
@@ -111,9 +133,13 @@ def build_container(settings: Settings) -> Container:
     runs=runs,
     guarded_live_state=guarded_live_state,
     venue_state=venue_state,
+    venue_execution=venue_execution,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+    guarded_live_execution_enabled=settings.guarded_live_execution_enabled,
     sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,
+    guarded_live_worker_heartbeat_interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
+    guarded_live_worker_heartbeat_timeout_seconds=settings.guarded_live_worker_heartbeat_timeout_seconds,
   )
   return Container(
     app=application,

@@ -19,6 +19,8 @@ from akra_trader.domain.models import GuardedLiveInternalStateSnapshot
 from akra_trader.domain.models import GuardedLiveReconciliation
 from akra_trader.domain.models import GuardedLiveReconciliationFinding
 from akra_trader.domain.models import GuardedLiveRecoveredExposure
+from akra_trader.domain.models import GuardedLiveVenueOrderRequest
+from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveStatus
 from akra_trader.domain.models import GuardedLiveVenueBalance
@@ -27,9 +29,14 @@ from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import GuardedLiveRuntimeRecovery
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import Order
+from akra_trader.domain.models import OrderSide
+from akra_trader.domain.models import OrderStatus
+from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorVisibility
+from akra_trader.domain.models import Position
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
@@ -42,6 +49,8 @@ from akra_trader.domain.models import StrategyParameterSnapshot
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.domain.models import StrategySnapshot
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
+from akra_trader.domain.services import apply_signal
+from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
 from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import GuardedLiveStatePort
@@ -50,6 +59,7 @@ from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.ports import StrategyRuntime
+from akra_trader.ports import VenueExecutionPort
 from akra_trader.ports import VenueStatePort
 from akra_trader.runtime import DataEngine
 from akra_trader.runtime import ExecutionEngine
@@ -234,6 +244,7 @@ COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
 
 class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
+  _guarded_live_worker_kind = "guarded_live_native_worker"
   _guarded_live_balance_tolerance = 1e-9
 
   class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
@@ -260,6 +271,16 @@ class TradingApplication:
         issues=("venue_state_port_unconfigured",),
       )
 
+  class _UnavailableVenueExecutionAdapter(VenueExecutionPort):
+    def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
+      return False, ("venue_execution_port_unconfigured",)
+
+    def submit_market_order(
+      self,
+      request: GuardedLiveVenueOrderRequest,
+    ) -> GuardedLiveVenueOrderResult:
+      raise RuntimeError("Venue execution port is not configured.")
+
   def __init__(
     self,
     *,
@@ -269,13 +290,17 @@ class TradingApplication:
     runs: RunRepositoryPort,
     guarded_live_state: GuardedLiveStatePort | None = None,
     venue_state: VenueStatePort | None = None,
+    venue_execution: VenueExecutionPort | None = None,
     freqtrade_reference: FreqtradeReferenceAdapter | None = None,
     mode_service: ExecutionModeService | None = None,
     data_engine: DataEngine | None = None,
     execution_engine: ExecutionEngine | None = None,
     run_supervisor: RunSupervisor | None = None,
+    guarded_live_execution_enabled: bool = False,
     sandbox_worker_heartbeat_interval_seconds: int = 15,
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
+    guarded_live_worker_heartbeat_interval_seconds: int = 15,
+    guarded_live_worker_heartbeat_timeout_seconds: int = 45,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._clock = clock or (lambda: datetime.now(UTC))
@@ -285,13 +310,21 @@ class TradingApplication:
     self._runs = runs
     self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
     self._venue_state = venue_state or self._UnavailableVenueStateAdapter(self._clock)
+    self._venue_execution = venue_execution or self._UnavailableVenueExecutionAdapter()
     self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
     self._data_engine = data_engine or DataEngine(market_data)
     self._execution_engine = execution_engine or ExecutionEngine()
     self._run_supervisor = run_supervisor or RunSupervisor()
+    self._guarded_live_execution_enabled = guarded_live_execution_enabled
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
+    self._guarded_live_worker_heartbeat_interval_seconds = (
+      guarded_live_worker_heartbeat_interval_seconds
+    )
+    self._guarded_live_worker_heartbeat_timeout_seconds = (
+      guarded_live_worker_heartbeat_timeout_seconds
+    )
 
   def list_strategies(
     self,
@@ -430,17 +463,27 @@ class TradingApplication:
     running_sandbox_count = self._count_running_runs(RunMode.SANDBOX)
     running_paper_count = self._count_running_runs(RunMode.PAPER)
     running_live_count = self._count_running_runs(RunMode.LIVE)
+    venue_execution_ready, venue_execution_issues = self._venue_execution.describe_capability()
 
     blockers: list[str] = []
+    if not self._guarded_live_execution_enabled:
+      blockers.append("Guarded-live venue execution is disabled in configuration.")
     if state.kill_switch.state == "engaged":
       blockers.append("Kill switch is engaged for operator-controlled runtime sessions.")
     if state.reconciliation.state != "clear":
       blockers.append("Guarded-live reconciliation has not been cleared.")
+    if state.recovery.state not in {"recovered", "recovered_with_warnings"}:
+      blockers.append("Guarded-live runtime recovery has not been recorded from venue snapshots.")
     if state.recovery.state == "failed":
       blockers.append("Guarded-live runtime recovery failed after the latest restart or fault drill.")
+    if not venue_execution_ready:
+      blockers.append(
+        "Venue order execution is unavailable: "
+        + (", ".join(venue_execution_issues) if venue_execution_issues else "adapter not ready")
+        + "."
+      )
     if runtime_visibility.alerts:
       blockers.append("Unresolved runtime alerts remain in sandbox operations.")
-    blockers.append("Venue-backed live execution is not implemented.")
 
     audit_events = tuple(
       sorted(state.audit_events, key=lambda event: event.timestamp, reverse=True)
@@ -748,6 +791,35 @@ class TradingApplication:
       end_at=end_at,
     )
 
+  def start_live_run(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    operator_reason: str = "guarded_live_launch",
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    return self._start_live_session(
+      strategy_id=strategy_id,
+      symbol=symbol,
+      timeframe=timeframe,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      parameters=parameters,
+      replay_bars=replay_bars,
+      operator_reason=operator_reason,
+      start_at=start_at,
+      end_at=end_at,
+    )
+
   def _start_sandbox_session(
     self,
     *,
@@ -811,6 +883,131 @@ class TradingApplication:
       start_at=start_at,
       end_at=end_at,
     )
+
+  def _start_live_session(
+    self,
+    *,
+    strategy_id: str,
+    symbol: str,
+    timeframe: str,
+    initial_cash: float,
+    fee_rate: float,
+    slippage_bps: float,
+    parameters: dict,
+    replay_bars: int | None = 96,
+    operator_reason: str,
+    start_at: datetime | None = None,
+    end_at: datetime | None = None,
+  ) -> RunRecord:
+    self._ensure_guarded_live_worker_start_allowed()
+    state = self._guarded_live_state.load_state()
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    config = RunConfig(
+      run_id=str(uuid4()),
+      mode=RunMode.LIVE,
+      strategy_id=metadata.strategy_id,
+      strategy_version=metadata.version,
+      venue="binance",
+      symbols=(symbol,),
+      timeframe=timeframe,
+      parameters=parameters,
+      initial_cash=initial_cash,
+      fee_rate=fee_rate,
+      slippage_bps=slippage_bps,
+      start_at=start_at,
+      end_at=end_at,
+    )
+    if metadata.runtime == "freqtrade_reference":
+      run = RunRecord(
+        config=config,
+        status=RunStatus.FAILED,
+        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+      )
+      run.notes.append(
+        "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
+        "Guarded live remains on the native venue-backed worker path."
+      )
+      return self._runs.save_run(run)
+
+    loaded = self._data_engine.load_frame(config=config, active_bars=replay_bars)
+    run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
+    run.provenance.market_data = loaded.lineage
+    run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
+    self._attach_rerun_boundary(run)
+    data = loaded.frame
+    if data.empty:
+      run.notes.append("No candles available for the requested range.")
+      run.status = RunStatus.FAILED
+      return self._runs.save_run(run)
+
+    enriched = strategy.build_feature_frame(data, config.parameters)
+    required_bars = max(strategy.warmup_spec().required_bars, 2)
+    if len(enriched) < required_bars:
+      run.status = RunStatus.FAILED
+      run.notes.append(
+        f"Guarded live worker requires at least {required_bars} candles to prime the current strategy state."
+      )
+      return self._runs.save_run(run)
+
+    latest_row = enriched.iloc[-1]
+    latest_timestamp = latest_row["timestamp"].to_pydatetime()
+    latest_market_price = float(latest_row["close"])
+    cache = self._build_guarded_live_cache(
+      config=config,
+      state=state,
+      fallback_cash=initial_cash,
+      latest_market_price=latest_market_price,
+    )
+    self._seed_guarded_live_runtime_state(
+      run=run,
+      state=state,
+      cache=cache,
+      timestamp=latest_timestamp,
+      market_price=latest_market_price,
+    )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    self._run_supervisor.start_mode(
+      run=run,
+      mode=RunMode.LIVE,
+      mode_service=self._mode_service,
+      replay_bars=None,
+    )
+    primed_candle_count = run.provenance.market_data.candle_count if run.provenance.market_data is not None else 0
+    self._run_supervisor.start_worker_session(
+      run=run,
+      worker_kind=self._guarded_live_worker_kind,
+      heartbeat_interval_seconds=self._guarded_live_worker_heartbeat_interval_seconds,
+      heartbeat_timeout_seconds=self._guarded_live_worker_heartbeat_timeout_seconds,
+      now=self._clock(),
+      primed_candle_count=primed_candle_count,
+      processed_tick_count=0,
+      last_processed_candle_at=latest_timestamp,
+      last_seen_candle_at=latest_timestamp,
+    )
+    run.notes.insert(
+      0,
+      (
+        "Guarded live worker primed from recovered venue state and the latest market snapshot "
+        f"using {primed_candle_count} candles."
+      ),
+    )
+    saved_run = self._runs.save_run(run)
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_worker_started",
+      actor="operator",
+      summary=f"Guarded-live worker started for {symbol}.",
+      detail=(
+        f"Reason: {operator_reason}. Strategy {strategy_id} launched with "
+        f"{len(saved_run.orders)} recovered/open order(s)."
+      ),
+      run_id=saved_run.config.run_id,
+      session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
+    )
+    return saved_run
 
   def _start_native_session(
     self,
@@ -944,6 +1141,25 @@ class TradingApplication:
     self._run_supervisor.stop(run, reason="Paper run stopped by operator.")
     return self._runs.save_run(run)
 
+  def stop_live_run(self, run_id: str) -> RunRecord | None:
+    run = self._runs.get_run(run_id)
+    if run is None:
+      return None
+    self._run_supervisor.stop(
+      run,
+      reason="Guarded-live worker stopped by operator. Venue open orders remain operator-managed.",
+    )
+    saved_run = self._runs.save_run(run)
+    self._append_guarded_live_audit_event(
+      kind="guarded_live_worker_stopped",
+      actor="operator",
+      summary=f"Guarded-live worker stopped for {run.config.symbols[0]}.",
+      detail="Operator stop requested for the guarded-live worker session.",
+      run_id=saved_run.config.run_id,
+      session_id=saved_run.provenance.runtime_session.session_id if saved_run.provenance.runtime_session else None,
+    )
+    return saved_run
+
   def _ensure_operator_control_runtime_allowed(self, mode: RunMode) -> None:
     if mode not in {RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE}:
       return
@@ -952,6 +1168,14 @@ class TradingApplication:
       raise ValueError(
         "Guarded-live kill switch is engaged. Release it before starting operator-controlled runtime sessions."
       )
+
+  def _ensure_guarded_live_worker_start_allowed(self) -> None:
+    self._ensure_operator_control_runtime_allowed(RunMode.LIVE)
+    status = self.get_guarded_live_status()
+    if status.running_live_count > 0:
+      raise ValueError("A guarded-live worker is already running. Stop it before launching another.")
+    if status.blockers:
+      raise ValueError("Guarded-live launch is blocked: " + " ".join(status.blockers))
 
   def _persist_guarded_live_state(self, state: GuardedLiveState) -> GuardedLiveState:
     return self._guarded_live_state.save_state(state)
@@ -1024,6 +1248,137 @@ class TradingApplication:
     candidates.sort(key=lambda instrument: (instrument.quote_currency != "USDT", instrument.symbol))
     return candidates[0]
 
+  def _append_guarded_live_audit_event(
+    self,
+    *,
+    kind: str,
+    actor: str,
+    summary: str,
+    detail: str,
+    run_id: str | None = None,
+    session_id: str | None = None,
+  ) -> None:
+    current_time = self._clock()
+    state = self._guarded_live_state.load_state()
+    event = OperatorAuditEvent(
+      event_id=f"{kind}:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind=kind,
+      summary=summary,
+      detail=detail,
+      run_id=run_id,
+      session_id=session_id,
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        audit_events=(event, *state.audit_events),
+      )
+    )
+
+  def _build_guarded_live_cache(
+    self,
+    *,
+    config: RunConfig,
+    state: GuardedLiveState,
+    fallback_cash: float,
+    latest_market_price: float,
+  ) -> StateCache:
+    instrument_id = f"{config.venue}:{config.symbols[0]}"
+    quote_asset = config.symbols[0].split("/", 1)[1] if "/" in config.symbols[0] else "USDT"
+    cash = self._resolve_guarded_live_cash_balance(
+      state=state,
+      quote_asset=quote_asset,
+      fallback_cash=fallback_cash,
+    )
+    cache = StateCache(instrument_id=instrument_id, cash=cash)
+    recovered_exposure = next(
+      (exposure for exposure in state.recovery.exposures if exposure.instrument_id == instrument_id),
+      None,
+    )
+    if recovered_exposure is not None and recovered_exposure.quantity > self._guarded_live_balance_tolerance:
+      recovered_at = state.recovery.recovered_at or self._clock()
+      cache.apply(
+        cash=cash,
+        position=Position(
+          instrument_id=instrument_id,
+          quantity=recovered_exposure.quantity,
+          average_price=latest_market_price,
+          opened_at=recovered_at,
+          updated_at=recovered_at,
+        ),
+      )
+    return cache
+
+  def _resolve_guarded_live_cash_balance(
+    self,
+    *,
+    state: GuardedLiveState,
+    quote_asset: str,
+    fallback_cash: float,
+  ) -> float:
+    snapshot = state.reconciliation.venue_snapshot
+    if snapshot is None:
+      return fallback_cash
+    for balance in snapshot.balances:
+      if balance.asset == quote_asset:
+        return balance.free if balance.free is not None else balance.total
+    return fallback_cash
+
+  def _seed_guarded_live_runtime_state(
+    self,
+    *,
+    run: RunRecord,
+    state: GuardedLiveState,
+    cache: StateCache,
+    timestamp: datetime,
+    market_price: float,
+  ) -> None:
+    if cache.position is not None and cache.position.is_open:
+      run.positions[cache.position.instrument_id] = cache.position
+
+    symbol = run.config.symbols[0]
+    recovered_order_count = 0
+    for recovered_order in state.recovery.open_orders:
+      if recovered_order.symbol != symbol:
+        continue
+      if recovered_order.status.lower() in {"closed", "filled", "canceled", "cancelled", "rejected"}:
+        continue
+      recovered_order_count += 1
+      run.orders.append(
+        Order(
+          run_id=run.config.run_id,
+          instrument_id=f"{run.config.venue}:{symbol}",
+          side=self._resolve_order_side(recovered_order.side),
+          quantity=recovered_order.amount,
+          requested_price=recovered_order.price or market_price,
+          order_type=OrderType.LIMIT if recovered_order.price is not None else OrderType.MARKET,
+          status=OrderStatus.OPEN,
+          order_id=recovered_order.order_id,
+          created_at=state.recovery.recovered_at or self._clock(),
+        )
+      )
+
+    run.equity_curve.append(
+      build_equity_point(
+        timestamp=timestamp,
+        cash=cache.cash,
+        position=cache.position if cache.position and cache.position.is_open else None,
+        market_price=market_price,
+      )
+    )
+    run.notes.append(
+      "Recovered guarded-live runtime state with "
+      f"{1 if cache.position is not None and cache.position.is_open else 0} exposure(s) "
+      f"and {recovered_order_count} open venue order(s)."
+    )
+
+  @staticmethod
+  def _resolve_order_side(side: str) -> OrderSide:
+    return OrderSide.SELL if side.lower() == OrderSide.SELL.value else OrderSide.BUY
+
   def _count_running_runs(self, mode: RunMode) -> int:
     return sum(
       1
@@ -1036,6 +1391,7 @@ class TradingApplication:
     for mode, label in (
       (RunMode.SANDBOX, "Sandbox worker"),
       (RunMode.PAPER, "Paper session"),
+      (RunMode.LIVE, "Guarded-live worker"),
     ):
       for run in self._runs.list_runs(mode=mode.value):
         if run.status != RunStatus.RUNNING:
@@ -1074,21 +1430,6 @@ class TradingApplication:
         )
       )
 
-    running_live_runs = [
-      run
-      for run in self._runs.list_runs(mode=RunMode.LIVE.value)
-      if run.status == RunStatus.RUNNING
-    ]
-    if running_live_runs:
-      findings.append(
-        GuardedLiveReconciliationFinding(
-          kind="unexpected_live_runs",
-          severity="critical",
-          summary=f"{len(running_live_runs)} live run(s) are active before guarded-live support exists.",
-          detail="Live execution is not implemented, so any active live run indicates a control-plane mismatch.",
-        )
-      )
-
     inconsistent_sandbox_runs = [
       run
       for run in self._runs.list_runs(mode=RunMode.SANDBOX.value)
@@ -1103,6 +1444,23 @@ class TradingApplication:
             f"{len(inconsistent_sandbox_runs)} sandbox run(s) are missing persisted runtime session state."
           ),
           detail="Continuous sandbox workers must keep runtime-session state for restart safety and auditability.",
+        )
+      )
+
+    inconsistent_live_runs = [
+      run
+      for run in self._runs.list_runs(mode=RunMode.LIVE.value)
+      if run.status == RunStatus.RUNNING and run.provenance.runtime_session is None
+    ]
+    if inconsistent_live_runs:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="live_runtime_session_missing",
+          severity="critical",
+          summary=(
+            f"{len(inconsistent_live_runs)} live run(s) are missing persisted runtime session state."
+          ),
+          detail="Guarded-live workers must keep runtime-session state for restart safety and venue auditability.",
         )
       )
 
@@ -1124,6 +1482,27 @@ class TradingApplication:
             f"{len(stale_terminal_sessions)} terminal sandbox run(s) still report an active runtime session."
           ),
           detail="Terminal runs should not keep active worker-session state after stop, failure, or completion.",
+        )
+      )
+
+    stale_terminal_live_sessions = [
+      run
+      for run in self._runs.list_runs(mode=RunMode.LIVE.value)
+      if (
+        run.status in {RunStatus.STOPPED, RunStatus.FAILED, RunStatus.COMPLETED}
+        and run.provenance.runtime_session is not None
+        and run.provenance.runtime_session.lifecycle_state == "active"
+      )
+    ]
+    if stale_terminal_live_sessions:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="terminal_live_runtime_session_active",
+          severity="warning",
+          summary=(
+            f"{len(stale_terminal_live_sessions)} terminal live run(s) still report an active runtime session."
+          ),
+          detail="Terminal guarded-live runs should not keep active worker-session state after stop or failure.",
         )
       )
 
@@ -1445,6 +1824,265 @@ class TradingApplication:
     if market_data is None:
       return 0
     return market_data.candle_count
+
+  def maintain_guarded_live_worker_sessions(
+    self,
+    *,
+    force_recovery: bool = False,
+    recovery_reason: str = "heartbeat_timeout",
+  ) -> dict[str, int]:
+    if not self._guarded_live_execution_enabled:
+      return {
+        "maintained": 0,
+        "recovered": 0,
+        "ticks_processed": 0,
+        "orders_submitted": 0,
+      }
+
+    maintained = 0
+    recovered = 0
+    ticks_processed = 0
+    orders_submitted = 0
+    current_time = self._clock()
+    for run in self._runs.list_runs(mode=RunMode.LIVE.value):
+      if run.status != RunStatus.RUNNING:
+        continue
+      try:
+        if force_recovery or self._run_supervisor.needs_worker_recovery(run=run, now=current_time):
+          self._run_supervisor.recover_worker_session(
+            run=run,
+            worker_kind=self._guarded_live_worker_kind,
+            heartbeat_interval_seconds=self._guarded_live_worker_heartbeat_interval_seconds,
+            heartbeat_timeout_seconds=self._guarded_live_worker_heartbeat_timeout_seconds,
+            reason=recovery_reason,
+            now=current_time,
+            started_at=run.started_at,
+            primed_candle_count=self._infer_sandbox_primed_candle_count(run),
+            processed_tick_count=run.provenance.runtime_session.processed_tick_count if run.provenance.runtime_session else 0,
+            last_processed_candle_at=self._infer_last_processed_candle_at(run),
+            last_seen_candle_at=self._infer_last_processed_candle_at(run),
+          )
+          run.notes.append(
+            f"{current_time.isoformat()} | guarded_live_worker_recovered | {recovery_reason}"
+          )
+          self._append_guarded_live_audit_event(
+            kind="guarded_live_worker_recovered",
+            actor="system",
+            summary=f"Guarded-live worker recovered for {run.config.symbols[0]}.",
+            detail=f"Recovery reason: {recovery_reason}.",
+            run_id=run.config.run_id,
+            session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+          )
+          recovered += 1
+
+        advance = self._advance_guarded_live_worker_run(run)
+        ticks_processed += advance["ticks_processed"]
+        orders_submitted += advance["orders_submitted"]
+        self._run_supervisor.heartbeat_worker_session(run=run, now=current_time)
+      except Exception as exc:
+        self._run_supervisor.fail(
+          run,
+          reason=f"{current_time.isoformat()} | guarded_live_worker_failed | {exc}",
+          now=current_time,
+        )
+        self._append_guarded_live_audit_event(
+          kind="guarded_live_worker_failed",
+          actor="system",
+          summary=f"Guarded-live worker failed for {run.config.symbols[0]}.",
+          detail=str(exc),
+          run_id=run.config.run_id,
+          session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+        )
+      self._runs.save_run(run)
+      maintained += 1
+
+    return {
+      "maintained": maintained,
+      "recovered": recovered,
+      "ticks_processed": ticks_processed,
+      "orders_submitted": orders_submitted,
+    }
+
+  def _advance_guarded_live_worker_run(self, run: RunRecord) -> dict[str, int]:
+    session = run.provenance.runtime_session
+    if session is None:
+      return {"ticks_processed": 0, "orders_submitted": 0}
+
+    strategy = self._strategies.load(run.config.strategy_id)
+    parameters = self._resolve_execution_parameters(run)
+    candles = self._load_sandbox_worker_candles(run=run)
+    if not candles:
+      return {"ticks_processed": 0, "orders_submitted": 0}
+
+    latest_seen_candle_at = candles[-1].timestamp
+    self._run_supervisor.record_worker_market_progress(
+      run=run,
+      last_seen_candle_at=latest_seen_candle_at,
+    )
+    if (
+      session.last_processed_candle_at is not None
+      and latest_seen_candle_at <= session.last_processed_candle_at
+    ):
+      return {"ticks_processed": 0, "orders_submitted": 0}
+
+    enriched = strategy.build_feature_frame(candles_to_frame(candles), parameters)
+    warmup = strategy.warmup_spec().required_bars
+    if len(enriched) < max(warmup, 2):
+      return {"ticks_processed": 0, "orders_submitted": 0}
+
+    cache = self._restore_state_cache(run)
+    latest_processed_candle_at = session.last_processed_candle_at
+    processed_ticks = 0
+    orders_submitted = 0
+    for index in range(max(warmup, 2), len(enriched)):
+      history = enriched.iloc[: index + 1]
+      latest_row = history.iloc[-1]
+      latest_timestamp = latest_row["timestamp"].to_pydatetime()
+      if latest_processed_candle_at is not None and latest_timestamp <= latest_processed_candle_at:
+        continue
+      state = cache.snapshot(
+        timestamp=latest_timestamp,
+        parameters=parameters,
+      )
+      decision = strategy.evaluate(history, parameters, state)
+      orders_submitted += self._apply_guarded_live_decision(
+        run=run,
+        decision=decision,
+        cache=cache,
+        market_price=float(latest_row["close"]),
+      )
+      processed_ticks += 1
+      latest_processed_candle_at = latest_timestamp
+
+    if processed_ticks == 0:
+      return {"ticks_processed": 0, "orders_submitted": 0}
+
+    self._run_supervisor.record_worker_market_progress(
+      run=run,
+      last_seen_candle_at=latest_seen_candle_at,
+      last_processed_candle_at=latest_processed_candle_at,
+      processed_tick_count_increment=processed_ticks,
+    )
+    run.metrics = summarize_performance(
+      initial_cash=run.config.initial_cash,
+      equity_curve=run.equity_curve,
+      closed_trades=run.closed_trades,
+    )
+    return {"ticks_processed": processed_ticks, "orders_submitted": orders_submitted}
+
+  def _apply_guarded_live_decision(
+    self,
+    *,
+    run: RunRecord,
+    decision,
+    cache: StateCache,
+    market_price: float,
+  ) -> int:
+    reviewed = self._execution_engine.review_decision(decision)
+    cash, position, order, fill, closed_trade = apply_signal(
+      run_id=run.config.run_id,
+      instrument_id=cache.instrument_id,
+      signal=reviewed.signal,
+      execution=reviewed.execution,
+      market_price=market_price,
+      position=cache.position,
+      cash=cache.cash,
+      fee_rate=run.config.fee_rate,
+      slippage_bps=run.config.slippage_bps,
+    )
+
+    submitted_orders = 0
+    effective_price = market_price
+    if order is not None:
+      venue_result = self._submit_guarded_live_market_order(
+        run=run,
+        order=order,
+        market_price=market_price,
+      )
+      if venue_result.status != "filled":
+        raise RuntimeError(f"Venue market order did not fill immediately: {venue_result.status}")
+      order.order_id = venue_result.order_id
+      order.created_at = venue_result.submitted_at
+      order.status = OrderStatus.FILLED
+      order.filled_at = venue_result.submitted_at
+      if venue_result.average_fill_price is not None:
+        order.average_fill_price = venue_result.average_fill_price
+        effective_price = venue_result.average_fill_price
+      if venue_result.fee_paid is not None:
+        order.fee_paid = venue_result.fee_paid
+      if fill is not None:
+        fill = replace(
+          fill,
+          order_id=order.order_id,
+          price=effective_price,
+          fee_paid=venue_result.fee_paid if venue_result.fee_paid is not None else fill.fee_paid,
+          timestamp=venue_result.submitted_at,
+        )
+      if closed_trade is not None:
+        closed_trade = replace(
+          closed_trade,
+          exit_price=effective_price,
+          fee_paid=venue_result.fee_paid if venue_result.fee_paid is not None else closed_trade.fee_paid,
+          closed_at=venue_result.submitted_at,
+        )
+      run.orders.append(order)
+      if fill is not None:
+        run.fills.append(fill)
+      if position is not None:
+        run.positions[position.instrument_id] = position
+      if closed_trade is not None:
+        run.closed_trades.append(closed_trade)
+      submitted_orders = 1
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_order_submitted",
+        actor="system",
+        summary=f"Guarded-live venue order submitted for {run.config.symbols[0]}.",
+        detail=(
+          f"{reviewed.signal.action.value} {order.quantity:.8f} {run.config.symbols[0]} "
+          f"via {venue_result.order_id}."
+        ),
+        run_id=run.config.run_id,
+        session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
+      )
+
+    cache.mark_price(effective_price)
+    cache.apply(
+      cash=cash,
+      position=position if position is not None and position.is_open else None,
+    )
+    run.equity_curve.append(
+      build_equity_point(
+        timestamp=reviewed.signal.timestamp,
+        cash=cache.cash,
+        position=cache.position if cache.position and cache.position.is_open else None,
+        market_price=effective_price,
+      )
+    )
+    run.notes.append(
+      f"{reviewed.context.timestamp.isoformat()} | {reviewed.signal.action.value} | {reviewed.rationale}"
+    )
+    return submitted_orders
+
+  def _submit_guarded_live_market_order(
+    self,
+    *,
+    run: RunRecord,
+    order: Order,
+    market_price: float,
+  ) -> GuardedLiveVenueOrderResult:
+    session = run.provenance.runtime_session
+    if session is None:
+      raise RuntimeError("guarded_live_runtime_session_missing")
+    request = GuardedLiveVenueOrderRequest(
+      run_id=run.config.run_id,
+      session_id=session.session_id,
+      venue=run.config.venue,
+      symbol=run.config.symbols[0],
+      side=order.side.value,
+      amount=order.quantity,
+      reference_price=market_price,
+    )
+    return self._venue_execution.submit_market_order(request)
 
   def _build_operator_alerts_for_run(
     self,
