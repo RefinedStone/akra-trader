@@ -357,6 +357,7 @@ type ComparisonTooltipConflictSessionSummarySession = {
   hash: string | null;
   includes_current: boolean;
   label: string;
+  metadata: string[];
   session_key: string;
 };
 type ComparisonTooltipTuningShareImport =
@@ -3354,7 +3355,21 @@ function ComparisonTooltipTuningPanel({
                                 className="comparison-dev-session-detail-item"
                                 key={session.session_key}
                               >
-                                <span>{session.label}</span>
+                                <div className="comparison-dev-session-detail-copy">
+                                  <span className="comparison-dev-session-detail-label">
+                                    {session.label}
+                                  </span>
+                                  <span className="comparison-dev-session-detail-meta">
+                                    {session.metadata.map((item) => (
+                                      <span
+                                        className="comparison-dev-session-detail-chip"
+                                        key={item}
+                                      >
+                                        {item}
+                                      </span>
+                                    ))}
+                                  </span>
+                                </div>
                                 {session.includes_current ? (
                                   <span className="comparison-dev-session-summary-badge">
                                     current
@@ -4175,6 +4190,7 @@ function buildComparisonTooltipConflictSessionSummaries(
       hash: parsed.hash,
       includes_current: includesCurrent,
       label: "",
+      metadata: [],
       session_key: sessionKey,
     });
     accumulator[presetName] = current;
@@ -4208,6 +4224,10 @@ function buildComparisonTooltipConflictSessionSummaries(
             index,
             summary.session_count,
           ),
+          metadata: formatComparisonTooltipConflictSessionMetadata(
+            sessions[session.session_key],
+            session.hash,
+          ),
         })),
     }));
 }
@@ -4240,13 +4260,43 @@ function formatComparisonTooltipConflictSessionSummarySession(
   index: number,
   totalSessions: number,
 ) {
-  const hashLabel = session.hash ? session.hash.slice(0, 8) : null;
   if (totalSessions === 1) {
-    return hashLabel ? `Saved session · ${hashLabel}` : "Saved session";
+    return "Saved session";
   }
-  return hashLabel
-    ? `Saved session ${index + 1} · ${hashLabel}`
-    : `Saved session ${index + 1}`;
+  return `Saved session ${index + 1}`;
+}
+
+function formatComparisonTooltipConflictSessionMetadata(
+  session: ComparisonTooltipConflictSessionUiState,
+  hash: string | null,
+) {
+  const metadata: string[] = [];
+  if (hash) {
+    metadata.push(`ID ${hash.slice(0, 8)}`);
+  }
+  metadata.push(
+    session.show_unchanged_conflict_rows ? "unchanged rows visible" : "unchanged rows hidden",
+  );
+
+  const groupStates = Object.values(session.collapsed_unchanged_groups);
+  const collapsedCount = groupStates.filter(Boolean).length;
+  const expandedCount = groupStates.length - collapsedCount;
+
+  if (!groupStates.length) {
+    metadata.push("default group layout");
+    return metadata;
+  }
+
+  if (expandedCount && collapsedCount) {
+    metadata.push(`${expandedCount} expanded, ${collapsedCount} collapsed`);
+    return metadata;
+  }
+  if (expandedCount) {
+    metadata.push(`${expandedCount} expanded group${expandedCount === 1 ? "" : "s"}`);
+    return metadata;
+  }
+  metadata.push(`${collapsedCount} collapsed group${collapsedCount === 1 ? "" : "s"}`);
+  return metadata;
 }
 
 function hashComparisonTooltipConflictSessionRaw(value: string) {
