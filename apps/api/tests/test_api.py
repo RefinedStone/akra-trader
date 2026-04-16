@@ -7,6 +7,10 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from akra_trader.config import Settings
+from akra_trader.domain.models import GuardedLiveVenueBalance
+from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import Position
 from akra_trader.main import create_app
 
 
@@ -16,6 +20,14 @@ def build_client(database_path: Path) -> TestClient:
     market_data_provider="seeded",
   )
   return TestClient(create_app(settings))
+
+
+class StaticVenueStateAdapter:
+  def __init__(self, snapshot: GuardedLiveVenueStateSnapshot) -> None:
+    self._snapshot = snapshot
+
+  def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
+    return self._snapshot
 
 
 def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
@@ -351,8 +363,75 @@ def test_guarded_live_status_survives_app_restart(tmp_path: Path) -> None:
   payload = response.json()
   assert payload["kill_switch"]["state"] == "engaged"
   assert payload["reconciliation"]["checked_by"] == "operator"
+  assert payload["reconciliation"]["scope"] == "venue_state"
+  assert payload["reconciliation"]["venue_snapshot"]["provider"] == "seeded"
+  assert payload["reconciliation"]["venue_snapshot"]["verification_state"] == "verified"
   assert any(event["kind"] == "guarded_live_reconciliation_ran" for event in payload["audit_events"])
   assert any(event["kind"] == "guarded_live_kill_switch_engaged" for event in payload["audit_events"])
+
+
+def test_guarded_live_reconciliation_endpoint_surfaces_venue_balance_mismatch(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    run = app.start_sandbox_run(
+      strategy_id="ma_cross_v1",
+      symbol="ETH/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      replay_bars=24,
+    )
+    run.positions = {
+      "binance:ETH/USDT": Position(
+        instrument_id="binance:ETH/USDT",
+        quantity=1.25,
+        average_price=2_000.0,
+        opened_at=datetime(2025, 1, 3, 16, 0, tzinfo=UTC),
+        updated_at=datetime(2025, 1, 3, 16, 0, tzinfo=UTC),
+      )
+    }
+    app._runs.save_run(run)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 16, 5, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="ETH", total=0.5, free=0.5, used=0.0),
+          GuardedLiveVenueBalance(asset="USDT", total=9_000.0, free=9_000.0, used=0.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_100.0,
+          ),
+        ),
+      )
+    )
+
+    response = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "venue_state_drill"},
+    )
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["reconciliation"]["venue_snapshot"]["verification_state"] == "verified"
+  assert any(
+    finding["kind"] == "venue_balance_mismatch"
+    for finding in payload["reconciliation"]["findings"]
+  )
+  assert any(
+    finding["kind"] == "venue_open_order_mismatch"
+    for finding in payload["reconciliation"]["findings"]
+  )
 
 
 def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:

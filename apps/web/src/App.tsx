@@ -318,6 +318,38 @@ type GuardedLiveStatus = {
       summary: string;
       detail: string;
     }[];
+    internal_snapshot?: {
+      captured_at: string;
+      running_run_ids: string[];
+      exposures: {
+        run_id: string;
+        mode: string;
+        instrument_id: string;
+        quantity: number;
+      }[];
+      open_order_count: number;
+    } | null;
+    venue_snapshot?: {
+      provider: string;
+      venue: string;
+      verification_state: string;
+      captured_at?: string | null;
+      balances: {
+        asset: string;
+        total: number;
+        free?: number | null;
+        used?: number | null;
+      }[];
+      open_orders: {
+        order_id: string;
+        symbol: string;
+        side: string;
+        amount: number;
+        status: string;
+        price?: number | null;
+      }[];
+      issues: string[];
+    } | null;
   };
   audit_events: {
     event_id: string;
@@ -1401,6 +1433,10 @@ export default function App() {
                     <strong>{guardedLive.active_runtime_alert_count}</strong>
                   </div>
                   <div className="metric-tile">
+                    <span>Venue verification</span>
+                    <strong>{guardedLive.reconciliation.venue_snapshot?.verification_state ?? "n/a"}</strong>
+                  </div>
+                  <div className="metric-tile">
                     <span>Last reconciliation</span>
                     <strong>{formatTimestamp(guardedLiveSummary.latestReconciliationAt)}</strong>
                   </div>
@@ -1467,6 +1503,26 @@ export default function App() {
                         <th>Running live</th>
                         <td>{guardedLive.running_live_count}</td>
                       </tr>
+                      <tr>
+                        <th>Reconciliation scope</th>
+                        <td>{guardedLive.reconciliation.scope}</td>
+                      </tr>
+                      <tr>
+                        <th>Venue snapshot</th>
+                        <td>
+                          {guardedLive.reconciliation.venue_snapshot
+                            ? `${guardedLive.reconciliation.venue_snapshot.provider} / ${guardedLive.reconciliation.venue_snapshot.venue}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Venue verified</th>
+                        <td>{guardedLive.reconciliation.venue_snapshot?.verification_state ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Venue captured</th>
+                        <td>{formatTimestamp(guardedLive.reconciliation.venue_snapshot?.captured_at ?? null)}</td>
+                      </tr>
                     </tbody>
                   </table>
                   <h3>Candidate blockers</h3>
@@ -1515,6 +1571,116 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">{guardedLive.reconciliation.summary}</p>
+                  )}
+                  <h3>Venue snapshot</h3>
+                  {guardedLive.reconciliation.venue_snapshot ? (
+                    <table className="data-table">
+                      <tbody>
+                        <tr>
+                          <th>Provider</th>
+                          <td>{guardedLive.reconciliation.venue_snapshot.provider}</td>
+                        </tr>
+                        <tr>
+                          <th>Venue</th>
+                          <td>{guardedLive.reconciliation.venue_snapshot.venue}</td>
+                        </tr>
+                        <tr>
+                          <th>State</th>
+                          <td>{guardedLive.reconciliation.venue_snapshot.verification_state}</td>
+                        </tr>
+                        <tr>
+                          <th>Captured</th>
+                          <td>{formatTimestamp(guardedLive.reconciliation.venue_snapshot.captured_at ?? null)}</td>
+                        </tr>
+                        <tr>
+                          <th>Issues</th>
+                          <td>
+                            {guardedLive.reconciliation.venue_snapshot.issues.length
+                              ? guardedLive.reconciliation.venue_snapshot.issues.join(", ")
+                              : "none"}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No venue snapshot recorded yet.</p>
+                  )}
+                  <h3>Internal exposures</h3>
+                  {guardedLive.reconciliation.internal_snapshot?.exposures?.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Run</th>
+                          <th>Mode</th>
+                          <th>Instrument</th>
+                          <th>Quantity</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.reconciliation.internal_snapshot.exposures.map((exposure) => (
+                          <tr key={`${exposure.run_id}-${exposure.instrument_id}`}>
+                            <td>{exposure.run_id}</td>
+                            <td>{exposure.mode}</td>
+                            <td>{exposure.instrument_id}</td>
+                            <td>{exposure.quantity.toFixed(8)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No internal open exposures recorded.</p>
+                  )}
+                  <h3>Venue balances</h3>
+                  {guardedLive.reconciliation.venue_snapshot?.balances?.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Asset</th>
+                          <th>Total</th>
+                          <th>Free</th>
+                          <th>Used</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.reconciliation.venue_snapshot.balances.map((balance) => (
+                          <tr key={balance.asset}>
+                            <td>{balance.asset}</td>
+                            <td>{balance.total.toFixed(8)}</td>
+                            <td>{balance.free === null || balance.free === undefined ? "n/a" : balance.free.toFixed(8)}</td>
+                            <td>{balance.used === null || balance.used === undefined ? "n/a" : balance.used.toFixed(8)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No venue balances captured.</p>
+                  )}
+                  <h3>Venue open orders</h3>
+                  {guardedLive.reconciliation.venue_snapshot?.open_orders?.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Order</th>
+                          <th>Symbol</th>
+                          <th>Side</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.reconciliation.venue_snapshot.open_orders.map((order) => (
+                          <tr key={order.order_id}>
+                            <td>{order.order_id}</td>
+                            <td>{order.symbol}</td>
+                            <td>{order.side}</td>
+                            <td>{order.amount.toFixed(8)}</td>
+                            <td>{order.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No venue open orders captured.</p>
                   )}
                   <h3>Guarded-live audit</h3>
                   {guardedLive.audit_events.length ? (

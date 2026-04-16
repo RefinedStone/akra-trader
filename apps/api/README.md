@@ -21,6 +21,8 @@ Implemented now:
   runtime audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, and guarded-live
   audit events in the control plane
+- guarded-live reconciliation records venue-state snapshots and compares them against local runtime
+  exposure before live candidacy discussion
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -48,6 +50,8 @@ Useful environment variables:
 - `AKRA_TRADER_MARKET_DATA_SYNC_INTERVAL_SECONDS`
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
+- `AKRA_TRADER_BINANCE_API_KEY`
+- `AKRA_TRADER_BINANCE_API_SECRET`
 
 Defaults:
 
@@ -96,6 +100,8 @@ Defaults:
   entries directly in the control room
 - guarded-live controls now persist kill-switch state, can stop running sandbox/paper sessions, and
   record operator reconciliation drills before any live candidacy discussion
+- guarded-live reconciliation now stores internal exposure snapshots, venue balance/open-order
+  snapshots, and mismatch findings when external venue state does not line up with local runtime
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

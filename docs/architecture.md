@@ -37,6 +37,7 @@ The repository is organized around a small set of stable boundaries:
 - `MarketDataPort`
 - `RunRepositoryPort`
 - `GuardedLiveStatePort`
+- `VenueStatePort`
 - `StrategyCatalogPort`
 - `DecisionEnginePort`
 - `ReferenceCatalogPort`
@@ -136,8 +137,9 @@ and stale heartbeats surface as control-room alerts, and worker lifecycle notes 
 recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
-kill switch for operator-controlled runtime sessions, reconciliation results for local control-plane
-checks, and a guarded-live audit log of operator actions.
+kill switch for operator-controlled runtime sessions, reconciliation results that now include
+internal runtime exposure plus venue balance/open-order snapshots, and a guarded-live audit log of
+operator actions.
 
 ## Modes
 
@@ -170,7 +172,7 @@ The web app currently surfaces:
 - backtest launch
 - sandbox worker launch, stop, and rerun restore
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
-- guarded-live kill switch, candidacy blockers, reconciliation findings, and guarded-live audit history
+- guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
 - run comparison and benchmark narratives
 
@@ -180,7 +182,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 
 - no venue-backed continuous execution worker yet
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
-  guarded-live reconciliation is still limited to local control-plane checks rather than venue state
+  guarded-live reconciliation still stops at snapshot comparison rather than restart-safe live state recovery
 - the system still lacks durable alert delivery and wider operator event coverage
 - no durable custom strategy registration history
 - no provider-backed LLM decision lane yet

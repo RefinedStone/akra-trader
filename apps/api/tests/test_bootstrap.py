@@ -93,6 +93,20 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
     def __init__(self, database_url: str) -> None:
       captured["guarded_live_database_url"] = database_url
 
+  class FakeBinanceVenueStateAdapter:
+    def __init__(
+      self,
+      *,
+      tracked_symbols: tuple[str, ...],
+      api_key: str | None,
+      api_secret: str | None,
+      venue: str = "binance",
+    ) -> None:
+      captured["venue_state_symbols"] = ",".join(tracked_symbols)
+      captured["venue_state_api_key"] = api_key or ""
+      captured["venue_state_api_secret"] = api_secret or ""
+      captured["venue_state_venue"] = venue
+
   class FakeBinanceMarketDataAdapter:
     def __init__(
       self,
@@ -133,6 +147,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueStateAdapter", FakeBinanceVenueStateAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
 
@@ -146,12 +161,17 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       market_data_default_candle_limit=144,
       market_data_historical_candle_limit=720,
       sandbox_worker_heartbeat_interval_seconds=11,
+      binance_api_key="test-key",
+      binance_api_secret="test-secret",
     )
   )
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["tracked_symbols"] == "BTC/USDT"
+  assert captured["venue_state_symbols"] == "BTC/USDT"
+  assert captured["venue_state_api_key"] == "test-key"
+  assert captured["venue_state_api_secret"] == "test-secret"
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"
   assert captured["sandbox_interval_seconds"] == "11"

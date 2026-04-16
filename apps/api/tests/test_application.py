@@ -16,6 +16,10 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.application import TradingApplication
 from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import GuardedLiveVenueBalance
+from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import Position
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
@@ -63,6 +67,14 @@ class MutableClock:
 class MutableSeededMarketDataAdapter(SeededMarketDataAdapter):
   def append_candle(self, *, symbol: str, candle: Candle) -> None:
     self._candles[symbol].append(candle)
+
+
+class StaticVenueStateAdapter:
+  def __init__(self, snapshot: GuardedLiveVenueStateSnapshot) -> None:
+    self._snapshot = snapshot
+
+  def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
+    return self._snapshot
 
 
 def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
@@ -747,6 +759,81 @@ def test_guarded_live_reconciliation_records_runtime_findings(tmp_path: Path) ->
   )
   assert status.audit_events[0].kind == "guarded_live_reconciliation_ran"
   assert "Guarded-live reconciliation has not been cleared." in status.blockers
+
+
+def test_guarded_live_reconciliation_verifies_venue_state_against_internal_exposure(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 0, tzinfo=UTC))
+  venue_snapshot = GuardedLiveVenueStateSnapshot(
+    provider="seeded",
+    venue="binance",
+    verification_state="verified",
+    captured_at=clock(),
+    balances=(
+      GuardedLiveVenueBalance(asset="ETH", total=0.25, free=0.2, used=0.05),
+      GuardedLiveVenueBalance(asset="USDT", total=9_500.0, free=9_500.0, used=0.0),
+    ),
+    open_orders=(
+      GuardedLiveVenueOpenOrder(
+        order_id="venue-order-1",
+        symbol="ETH/USDT",
+        side="buy",
+        amount=0.25,
+        status="open",
+        price=2_100.0,
+      ),
+    ),
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(venue_snapshot),
+  )
+
+  run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  run.positions = {
+    "binance:ETH/USDT": Position(
+      instrument_id="binance:ETH/USDT",
+      quantity=1.0,
+      average_price=2_000.0,
+      opened_at=clock(),
+      updated_at=clock(),
+    )
+  }
+  runs.save_run(run)
+
+  status = app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="venue_state_drill",
+  )
+
+  assert status.reconciliation.scope == "venue_state"
+  assert status.reconciliation.venue_snapshot is not None
+  assert status.reconciliation.venue_snapshot.verification_state == "verified"
+  assert status.reconciliation.internal_snapshot is not None
+  assert status.reconciliation.internal_snapshot.exposures[0].instrument_id == "binance:ETH/USDT"
+  assert any(
+    finding.kind == "venue_balance_mismatch"
+    for finding in status.reconciliation.findings
+  )
+  assert any(
+    finding.kind == "venue_open_order_mismatch"
+    for finding in status.reconciliation.findings
+  )
 
 
 def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:

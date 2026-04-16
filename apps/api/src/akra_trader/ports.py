@@ -7,6 +7,7 @@ import pandas as pd
 
 from akra_trader.domain.models import Candle
 from akra_trader.domain.models import GuardedLiveState
+from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
@@ -114,3 +115,7 @@ class GuardedLiveStatePort(Protocol):
   def load_state(self) -> GuardedLiveState: ...
 
   def save_state(self, state: GuardedLiveState) -> GuardedLiveState: ...
+
+
+class VenueStatePort(Protocol):
+  def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot: ...

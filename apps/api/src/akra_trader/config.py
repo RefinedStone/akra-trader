@@ -24,6 +24,8 @@ class Settings:
   market_data_historical_candle_limit: int = 2_000
   sandbox_worker_heartbeat_interval_seconds: int = 15
   sandbox_worker_heartbeat_timeout_seconds: int = 45
+  binance_api_key: str | None = None
+  binance_api_secret: str | None = None
 
 
 def load_settings() -> Settings:
@@ -54,4 +56,6 @@ def load_settings() -> Settings:
     sandbox_worker_heartbeat_timeout_seconds=int(
       os.getenv("AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
     ),
+    binance_api_key=os.getenv("AKRA_TRADER_BINANCE_API_KEY") or None,
+    binance_api_secret=os.getenv("AKRA_TRADER_BINANCE_API_SECRET") or None,
   )

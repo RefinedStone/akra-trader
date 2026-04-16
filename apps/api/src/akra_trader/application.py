@@ -14,10 +14,15 @@ from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import GuardedLiveKillSwitch
+from akra_trader.domain.models import GuardedLiveInternalExposure
+from akra_trader.domain.models import GuardedLiveInternalStateSnapshot
 from akra_trader.domain.models import GuardedLiveReconciliation
 from akra_trader.domain.models import GuardedLiveReconciliationFinding
 from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveStatus
+from akra_trader.domain.models import GuardedLiveVenueBalance
+from akra_trader.domain.models import GuardedLiveVenueOpenOrder
+from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
@@ -42,6 +47,7 @@ from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.ports import StrategyRuntime
+from akra_trader.ports import VenueStatePort
 from akra_trader.runtime import DataEngine
 from akra_trader.runtime import ExecutionEngine
 from akra_trader.runtime import ExecutionModeService
@@ -225,6 +231,7 @@ COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
 
 class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
+  _guarded_live_balance_tolerance = 1e-9
 
   class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
     def __init__(self) -> None:
@@ -237,6 +244,19 @@ class TradingApplication:
       self._state = state
       return state
 
+  class _UnavailableVenueStateAdapter(VenueStatePort):
+    def __init__(self, clock: Callable[[], datetime]) -> None:
+      self._clock = clock
+
+    def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
+      return GuardedLiveVenueStateSnapshot(
+        provider="unconfigured",
+        venue="unconfigured",
+        verification_state="unavailable",
+        captured_at=self._clock(),
+        issues=("venue_state_port_unconfigured",),
+      )
+
   def __init__(
     self,
     *,
@@ -245,6 +265,7 @@ class TradingApplication:
     references: ReferenceCatalogPort,
     runs: RunRepositoryPort,
     guarded_live_state: GuardedLiveStatePort | None = None,
+    venue_state: VenueStatePort | None = None,
     freqtrade_reference: FreqtradeReferenceAdapter | None = None,
     mode_service: ExecutionModeService | None = None,
     data_engine: DataEngine | None = None,
@@ -254,11 +275,13 @@ class TradingApplication:
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
+    self._clock = clock or (lambda: datetime.now(UTC))
     self._market_data = market_data
     self._strategies = strategies
     self._references = references
     self._runs = runs
     self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
+    self._venue_state = venue_state or self._UnavailableVenueStateAdapter(self._clock)
     self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
     self._data_engine = data_engine or DataEngine(market_data)
@@ -266,7 +289,6 @@ class TradingApplication:
     self._run_supervisor = run_supervisor or RunSupervisor()
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
-    self._clock = clock or (lambda: datetime.now(UTC))
 
   def list_strategies(
     self,
@@ -516,18 +538,20 @@ class TradingApplication:
   ) -> GuardedLiveStatus:
     current_time = self._clock()
     state = self._guarded_live_state.load_state()
-    findings = self._build_guarded_live_reconciliation_findings()
+    internal_snapshot, venue_snapshot, findings = self._build_guarded_live_reconciliation_result()
     reconciliation = GuardedLiveReconciliation(
       state="clear" if not findings else "issues_detected",
       checked_at=current_time,
       checked_by=actor,
-      scope="control_plane",
+      scope="venue_state",
       summary=(
-        "Guarded-live reconciliation found no local control-plane mismatches."
+        "Guarded-live reconciliation verified venue state against local runtime state."
         if not findings
-        else f"Guarded-live reconciliation found {len(findings)} control-plane issue(s)."
+        else f"Guarded-live reconciliation found {len(findings)} venue-state issue(s)."
       ),
       findings=tuple(findings),
+      internal_snapshot=internal_snapshot,
+      venue_snapshot=venue_snapshot,
     )
     event = OperatorAuditEvent(
       event_id=f"guarded-live-reconciliation-ran:{current_time.isoformat()}",
@@ -886,7 +910,20 @@ class TradingApplication:
     return stopped_runs
 
   def _build_guarded_live_reconciliation_findings(self) -> list[GuardedLiveReconciliationFinding]:
+    _, _, findings = self._build_guarded_live_reconciliation_result()
+    return findings
+
+  def _build_guarded_live_reconciliation_result(
+    self,
+  ) -> tuple[
+    GuardedLiveInternalStateSnapshot,
+    GuardedLiveVenueStateSnapshot,
+    list[GuardedLiveReconciliationFinding],
+  ]:
     findings: list[GuardedLiveReconciliationFinding] = []
+    internal_snapshot = self._build_guarded_live_internal_snapshot()
+    venue_snapshot = self._venue_state.capture_snapshot()
+
     runtime_visibility = self.get_operator_visibility()
     if runtime_visibility.alerts:
       findings.append(
@@ -950,7 +987,158 @@ class TradingApplication:
           detail="Terminal runs should not keep active worker-session state after stop, failure, or completion.",
         )
       )
+
+    if venue_snapshot.verification_state != "verified":
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="venue_snapshot_unavailable",
+          severity="critical" if venue_snapshot.verification_state == "unavailable" else "warning",
+          summary=(
+            "Venue-state verification is unavailable."
+            if venue_snapshot.verification_state == "unavailable"
+            else "Venue-state verification completed with partial data."
+          ),
+          detail=(
+            ", ".join(venue_snapshot.issues)
+            if venue_snapshot.issues
+            else "The venue adapter did not return a fully verified account snapshot."
+          ),
+        )
+      )
+
+    findings.extend(
+      self._build_guarded_live_venue_mismatch_findings(
+        internal_snapshot=internal_snapshot,
+        venue_snapshot=venue_snapshot,
+      )
+    )
+    return internal_snapshot, venue_snapshot, findings
+
+  def _build_guarded_live_internal_snapshot(self) -> GuardedLiveInternalStateSnapshot:
+    captured_at = self._clock()
+    exposures: list[GuardedLiveInternalExposure] = []
+    open_order_count = 0
+    running_run_ids: list[str] = []
+
+    for mode in (RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE):
+      for run in self._runs.list_runs(mode=mode.value):
+        if run.status == RunStatus.RUNNING:
+          running_run_ids.append(run.config.run_id)
+        open_order_count += sum(1 for order in run.orders if order.status.value == "open")
+        for position in run.positions.values():
+          if not position.is_open:
+            continue
+          exposures.append(
+            GuardedLiveInternalExposure(
+              run_id=run.config.run_id,
+              mode=run.config.mode.value,
+              instrument_id=position.instrument_id,
+              quantity=position.quantity,
+            )
+          )
+
+    return GuardedLiveInternalStateSnapshot(
+      captured_at=captured_at,
+      running_run_ids=tuple(sorted(running_run_ids)),
+      exposures=tuple(sorted(exposures, key=lambda exposure: (exposure.instrument_id, exposure.run_id))),
+      open_order_count=open_order_count,
+    )
+
+  def _build_guarded_live_venue_mismatch_findings(
+    self,
+    *,
+    internal_snapshot: GuardedLiveInternalStateSnapshot,
+    venue_snapshot: GuardedLiveVenueStateSnapshot,
+  ) -> list[GuardedLiveReconciliationFinding]:
+    findings: list[GuardedLiveReconciliationFinding] = []
+    if venue_snapshot.verification_state == "unavailable":
+      return findings
+    tolerance = self._guarded_live_balance_tolerance
+
+    internal_exposure_by_asset = self._aggregate_internal_exposure_by_asset(internal_snapshot.exposures)
+    quote_assets = self._collect_internal_quote_assets(internal_snapshot.exposures)
+    venue_balance_by_asset = {
+      balance.asset: balance.total
+      for balance in venue_snapshot.balances
+      if abs(balance.total) > tolerance
+    }
+
+    for asset, expected_quantity in sorted(internal_exposure_by_asset.items()):
+      actual_quantity = venue_balance_by_asset.get(asset, 0.0)
+      if abs(actual_quantity - expected_quantity) <= tolerance:
+        continue
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="venue_balance_mismatch",
+          severity="critical",
+          summary=f"Venue balance for {asset} does not match local open exposure.",
+          detail=(
+            f"Internal runtime exposure expects {expected_quantity:.8f} {asset}, "
+            f"but venue snapshot reported {actual_quantity:.8f}."
+          ),
+        )
+      )
+
+    ignored_quote_assets = {"USD", "USDT", "USDC", "BUSD", *quote_assets}
+    for asset, venue_quantity in sorted(venue_balance_by_asset.items()):
+      if asset in internal_exposure_by_asset or asset in ignored_quote_assets:
+        continue
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="unexpected_venue_balance_exposure",
+          severity="critical",
+          summary=f"Venue snapshot contains unexpected {asset} exposure.",
+          detail=(
+            f"Venue snapshot reported {venue_quantity:.8f} {asset} with no matching local runtime exposure."
+          ),
+        )
+      )
+
+    venue_open_order_count = len(venue_snapshot.open_orders)
+    if internal_snapshot.open_order_count != venue_open_order_count:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="venue_open_order_mismatch",
+          severity="critical",
+          summary="Venue open-order count does not match local runtime expectations.",
+          detail=(
+            f"Local runtime expects {internal_snapshot.open_order_count} open orders, "
+            f"but venue snapshot reported {venue_open_order_count}."
+          ),
+        )
+      )
+
     return findings
+
+  def _aggregate_internal_exposure_by_asset(
+    self,
+    exposures: tuple[GuardedLiveInternalExposure, ...],
+  ) -> dict[str, float]:
+    aggregated: dict[str, float] = {}
+    for exposure in exposures:
+      asset = self._base_asset_from_instrument_id(exposure.instrument_id)
+      aggregated[asset] = aggregated.get(asset, 0.0) + exposure.quantity
+    return aggregated
+
+  def _collect_internal_quote_assets(
+    self,
+    exposures: tuple[GuardedLiveInternalExposure, ...],
+  ) -> set[str]:
+    quote_assets: set[str] = set()
+    for exposure in exposures:
+      quote_assets.add(self._quote_asset_from_instrument_id(exposure.instrument_id))
+    return quote_assets
+
+  @staticmethod
+  def _base_asset_from_instrument_id(instrument_id: str) -> str:
+    symbol = instrument_id.split(":", 1)[1] if ":" in instrument_id else instrument_id
+    return symbol.split("/", 1)[0]
+
+  @staticmethod
+  def _quote_asset_from_instrument_id(instrument_id: str) -> str:
+    symbol = instrument_id.split(":", 1)[1] if ":" in instrument_id else instrument_id
+    parts = symbol.split("/", 1)
+    return parts[1] if len(parts) == 2 else "unknown"
 
   def maintain_sandbox_worker_sessions(
     self,

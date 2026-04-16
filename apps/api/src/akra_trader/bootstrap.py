@@ -11,6 +11,8 @@ from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
+from akra_trader.adapters.venue_state import BinanceVenueStateAdapter
+from akra_trader.adapters.venue_state import SeededVenueStateAdapter
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
 from akra_trader.market_data_sync import MarketDataSyncJob
@@ -56,6 +58,18 @@ def build_market_data_adapter(settings: Settings, repo_root: Path):
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 
 
+def build_venue_state_adapter(settings: Settings):
+  if settings.market_data_provider == "seeded":
+    return SeededVenueStateAdapter()
+  if settings.market_data_provider == "binance":
+    return BinanceVenueStateAdapter(
+      tracked_symbols=settings.market_data_symbols,
+      api_key=settings.binance_api_key,
+      api_secret=settings.binance_api_secret,
+    )
+  raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
+
+
 def build_background_jobs(
   settings: Settings,
   market_data,
@@ -89,12 +103,14 @@ def build_container(settings: Settings) -> Container:
   guarded_live_state = SqlAlchemyGuardedLiveStateRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
+  venue_state = build_venue_state_adapter(settings)
   application = TradingApplication(
     market_data=market_data,
     strategies=strategies,
     references=references,
     runs=runs,
     guarded_live_state=guarded_live_state,
+    venue_state=venue_state,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
     sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,

@@ -507,13 +507,60 @@ class GuardedLiveReconciliationFinding:
 
 
 @dataclass(frozen=True)
+class GuardedLiveInternalExposure:
+  run_id: str
+  mode: str
+  instrument_id: str
+  quantity: float
+
+
+@dataclass(frozen=True)
+class GuardedLiveInternalStateSnapshot:
+  captured_at: datetime
+  running_run_ids: tuple[str, ...] = ()
+  exposures: tuple[GuardedLiveInternalExposure, ...] = ()
+  open_order_count: int = 0
+
+
+@dataclass(frozen=True)
+class GuardedLiveVenueBalance:
+  asset: str
+  total: float
+  free: float | None = None
+  used: float | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveVenueOpenOrder:
+  order_id: str
+  symbol: str
+  side: str
+  amount: float
+  status: str
+  price: float | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveVenueStateSnapshot:
+  provider: str
+  venue: str
+  verification_state: str = "unavailable"
+  captured_at: datetime | None = None
+  balances: tuple[GuardedLiveVenueBalance, ...] = ()
+  open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class GuardedLiveReconciliation:
   state: str = "not_started"
   checked_at: datetime | None = None
   checked_by: str | None = None
-  scope: str = "control_plane"
+  scope: str = "venue_state"
   summary: str = "No guarded-live reconciliation has run yet."
   findings: tuple[GuardedLiveReconciliationFinding, ...] = ()
+  internal_snapshot: GuardedLiveInternalStateSnapshot | None = None
+  venue_snapshot: GuardedLiveVenueStateSnapshot | None = None
 
 
 @dataclass(frozen=True)
