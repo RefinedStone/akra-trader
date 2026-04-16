@@ -1458,6 +1458,8 @@ function RunComparisonPanel({
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
+    cellHeight: number;
+    cellWidth: number;
     metricRowKey: string;
     runColumnKey: string;
     time: number;
@@ -1638,7 +1640,10 @@ function RunComparisonPanel({
     metricRowKey: string,
     runColumnKey: string,
   ) => {
+    const cellRect = event.currentTarget.getBoundingClientRect();
     metricPointerSampleRef.current = {
+      cellHeight: cellRect.height,
+      cellWidth: cellRect.width,
       metricRowKey,
       runColumnKey,
       time: event.timeStamp,
@@ -1652,7 +1657,10 @@ function RunComparisonPanel({
     metricRowKey: string,
     runColumnKey: string,
   ) => {
+    const cellRect = event.currentTarget.getBoundingClientRect();
     const sample = {
+      cellHeight: cellRect.height,
+      cellWidth: cellRect.width,
       metricRowKey,
       runColumnKey,
       time: event.timeStamp,
@@ -1672,18 +1680,32 @@ function RunComparisonPanel({
     const signedDeltaY = sample.y - previousSample.y;
     const horizontalVelocity = deltaX / deltaTime;
     const verticalVelocity = deltaY / deltaTime;
+    const pointerSpeed = Math.hypot(deltaX, deltaY) / deltaTime;
+    const averageCellWidth = (sample.cellWidth + previousSample.cellWidth) / 2;
+    const averageCellHeight = (sample.cellHeight + previousSample.cellHeight) / 2;
+    const sweepTimeThreshold = getAdaptiveMetricSweepTimeThreshold(pointerSpeed);
+    const horizontalDistanceThreshold = getAdaptiveMetricSweepDistanceThreshold(
+      averageCellWidth,
+      pointerSpeed,
+      "horizontal",
+    );
+    const verticalDistanceThreshold = getAdaptiveMetricSweepDistanceThreshold(
+      averageCellHeight,
+      pointerSpeed,
+      "vertical",
+    );
     const isSameMetricRow = previousSample.metricRowKey === metricRowKey;
     const isSameRunColumn = previousSample.runColumnKey === runColumnKey;
     const isHorizontalSweep =
       isSameMetricRow &&
-      deltaTime <= 90 &&
-      deltaX >= 24 &&
+      deltaTime <= sweepTimeThreshold &&
+      deltaX >= horizontalDistanceThreshold &&
       deltaX >= deltaY * 2 &&
       horizontalVelocity >= 0.42;
     const isVerticalSweep =
       isSameRunColumn &&
-      deltaTime <= 90 &&
-      deltaY >= 18 &&
+      deltaTime <= sweepTimeThreshold &&
+      deltaY >= verticalDistanceThreshold &&
       deltaY >= deltaX * 2 &&
       verticalVelocity >= 0.34;
     const columnSweepAxis = signedDeltaY >= 0 ? "column_down" : "column_up";
@@ -2246,6 +2268,23 @@ function buildComparisonTooltipId(baseId: string, ...parts: Array<string | null 
 
 function getComparisonTooltipBoundaryRect(target: HTMLElement) {
   return target.closest(".comparison-table-wrap")?.getBoundingClientRect() ?? null;
+}
+
+function getAdaptiveMetricSweepTimeThreshold(pointerSpeed: number) {
+  return clampComparisonNumber(72 + pointerSpeed * 42, 72, 126);
+}
+
+function getAdaptiveMetricSweepDistanceThreshold(
+  cellSize: number,
+  pointerSpeed: number,
+  axis: "horizontal" | "vertical",
+) {
+  const baseRatio = axis === "horizontal" ? 0.32 : 0.42;
+  const minimum = axis === "horizontal" ? 16 : 12;
+  const maximum = axis === "horizontal" ? 44 : 34;
+  const baseThreshold = clampComparisonNumber(cellSize * baseRatio, minimum, maximum);
+  const speedAdjustment = clampComparisonNumber(1.18 - pointerSpeed * 0.28, 0.72, 1.12);
+  return baseThreshold * speedAdjustment;
 }
 
 function clampComparisonNumber(value: number, minimum: number, maximum: number) {
