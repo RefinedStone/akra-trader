@@ -1161,19 +1161,37 @@
       "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-session-updated-at",
       "direction_id": "reference-lanes-and-benchmarks",
       "title": "Show each saved session's last updated time in the reset summary",
-      "description": "Persist and surface when each saved tooltip conflict-view session was last updated so the `Reset all saved views` confirmation summary can distinguish recent remembered layouts from older ones without relying on short ids alone.",
-      "status": "ready",
+      "description": "Completed the saved-reset-summary recency follow-up by persisting `updated_at` for saved tooltip conflict-view sessions, keeping older saved sessions backward-compatible when no timestamp exists, surfacing each session's last updated time in the reset-summary metadata chips, and ordering grouped session entries with the current session first and newer saved sessions ahead of older ones.",
+      "status": "done",
       "base_priority": 79,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply said nothing essential remains for the completed metadata-chip task and explicitly named persisting plus showing each saved session's last updated time as the likeliest next refinement, making it the clearest immediately executable follow-up.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the saved-session `updated_at` persistence and reset-summary display refinement, verified `npm run typecheck` and `npm run build` in `apps/web`, and pushed commit `150be6e` to `origin/main`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T18:37:14Z",
+      "updated_at": "2026-04-16T18:39:35Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-reference-lanes-tooltip-import-conflict-reset-all-session-metadata"
       ],
       "direction_relation_note": "Builds on the clearer saved-session metadata chips by adding recency context, so operators can tell whether remembered conflict-view layouts are recent or stale before a destructive reset."
+    },
+    {
+      "id": "planning-reference-lanes-tooltip-import-conflict-reset-all-relative-time",
+      "direction_id": "reference-lanes-and-benchmarks",
+      "title": "Show relative time alongside saved session update timestamps in the reset summary",
+      "description": "Add relative recency labels such as `updated 5m ago` next to the absolute saved-session update time in the `Reset all saved views` confirmation summary so operators can scan recent versus stale remembered tooltip conflict layouts faster without parsing timestamps alone.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply said nothing essential remains for the completed `updated_at` work and directly called relative time alongside the absolute timestamp the likeliest next refinement, so this is the clearest executable follow-up to promote into the queue.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T18:39:35Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-reference-lanes-tooltip-import-conflict-reset-all-session-updated-at"
+      ],
+      "direction_relation_note": "Builds on the shipped absolute timestamp chips by adding faster visual recency scanning for saved tooltip conflict-view sessions before operators confirm a destructive reset."
     },
     {
       "id": "planning-reference-lanes-tooltip-import-conflict-contextual-reset-scopes",
