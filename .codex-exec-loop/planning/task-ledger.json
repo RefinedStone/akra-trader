@@ -169,20 +169,38 @@
     {
       "id": "planning-control-room-binance-gap-window-expand-toggle",
       "direction_id": "control-room-and-ops",
-      "title": "Add on-demand expand/collapse control for rolled-up Binance gap windows",
-      "description": "Extend the control-room gap quality cell so when older Binance gap windows are collapsed into a summary, operators can still expand the row on demand to inspect the full exact window list without sacrificing default readability.",
-      "status": "ready",
+      "title": "On-demand expand/collapse control for rolled-up Binance gap windows shipped",
+      "description": "Completed the rolled-gap follow-up by adding an inline `Show all N gaps` / collapse control to the control-room quality cell so rolled-up Binance gap windows stay collapsed by default but can be expanded on demand to inspect the full exact list, with matching inline control styling in the web UI.",
+      "status": "done",
       "base_priority": 83,
-      "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply says nothing remains blocking for the rollup task and explicitly names an operator expand/collapse control as the natural next follow-up, making it the clearest executable successor for auto-advance.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the expand/collapse control, verified `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `85ffbdb`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:59:17Z",
+      "updated_at": "2026-04-17T00:00:00Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-control-room-binance-gap-window-rollup"
       ],
       "direction_relation_note": "Builds on the rolled-up gap diagnostics so the control room stays readable by default while preserving access to exact Binance missing-window detail when operators need to investigate."
+    },
+    {
+      "id": "planning-control-room-binance-gap-window-expand-state-persistence",
+      "direction_id": "control-room-and-ops",
+      "title": "Preserve expanded Binance gap-window rows across refreshes",
+      "description": "Persist the control-room expand/collapse state for rolled-up Binance gap-window rows so operators inspecting long exact gap lists do not lose context when the page auto-refreshes or when they manually refresh the view.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply says the expand-toggle task is fully complete and explicitly identifies refresh-safe expand/collapse persistence as the next likely operator-facing follow-up, so it becomes the clearest executable successor for auto-advance.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:00:00Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-gap-window-expand-toggle"
+      ],
+      "direction_relation_note": "Extends the control-room gap diagnostics so operator investigation survives periodic UI refreshes instead of collapsing long Binance gap lists mid-review."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
