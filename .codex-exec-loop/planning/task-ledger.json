@@ -97,20 +97,38 @@
     {
       "id": "planning-control-room-binance-backfill-ops-status",
       "direction_id": "control-room-and-ops",
-      "title": "Expose Binance historical backfill target and completion in ops status",
-      "description": "Extend the operator-facing market-data status surfaces so they distinguish a merely recent sync from historically complete coverage, including the configured historical candle target, current coverage/progress, and tests that lock the new status semantics through the API and any surfaced control-room views.",
-      "status": "ready",
+      "title": "Binance historical backfill target and completion now exposed in ops status",
+      "description": "Completed the operator-facing backfill status follow-up by extending the API `InstrumentStatus` shape with historical target, completion ratio, and completion flag fields, populating them for Binance-backed symbols while keeping seeded payloads compatible, and surfacing both summary tiles and per-instrument progress bars in the control-room market-data table.",
+      "status": "done",
       "base_priority": 87,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply says no blocking code remains and directly identifies exposing backfill target/progress in ops status as the next likely follow-up, making it the clearest executable successor task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Main session completed the backfill visibility work, verified `apps/api` with `pytest` (`28 passed`) plus `npm run typecheck` and `npm run build` in `apps/web`, and committed the change as `69893ae`.",
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-16T14:53:30Z",
+      "updated_at": "2026-04-16T14:54:30Z",
       "source_turn_id": null,
       "depends_on": [
         "planning-research-foundation-binance-historical-backfill"
       ],
       "direction_relation_note": "Advances the control-room goal that operators can tell whether Binance data is only recently refreshed or fully backfilled to the configured historical target."
+    },
+    {
+      "id": "planning-control-room-binance-backfill-quality-status",
+      "direction_id": "control-room-and-ops",
+      "title": "Differentiate Binance backfill count completion from contiguous coverage quality in ops",
+      "description": "Extend market-data ops status so operators can see whether a symbol has merely reached the configured historical candle count or also satisfies contiguous-gap quality expectations, including API status semantics and control-room cues that separate numeric target completion from usable historical continuity.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply says the just-finished task has no remaining work and explicitly names distinguishing count-based completion from contiguous-quality completion in ops as the next follow-up, so this is the clearest executable successor.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-16T14:54:30Z",
+      "source_turn_id": null,
+      "depends_on": [
+        "planning-control-room-binance-backfill-ops-status"
+      ],
+      "direction_relation_note": "Pushes the control-room ops surface from simple backfill progress toward operator-trustworthy data quality signals about whether historical coverage is actually continuous enough to rely on."
     },
     {
       "id": "planning-research-foundation-binance-prewarm-config",
