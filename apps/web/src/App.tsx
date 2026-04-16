@@ -1440,6 +1440,7 @@ function RunComparisonPanel({
             className="comparison-intent-chip comparison-cue comparison-tooltip"
             data-tooltip={intentTooltip}
             title={intentTooltip}
+            tabIndex={0}
           >
             <span aria-hidden="true" className="comparison-intent-icon" />
             <span>{formatComparisonIntentLabel(comparison.intent)}</span>
@@ -1451,6 +1452,7 @@ function RunComparisonPanel({
           className="comparison-legend-item comparison-legend-item-mode comparison-cue comparison-tooltip"
           data-tooltip={intentTooltip}
           title={intentTooltip}
+          tabIndex={0}
         >
           <span aria-hidden="true" className="comparison-intent-icon" />
           <span>{formatComparisonIntentLegend(comparison.intent)}</span>
@@ -1459,6 +1461,7 @@ function RunComparisonPanel({
           className="comparison-legend-item comparison-cue comparison-tooltip"
           data-tooltip={baselineTooltip}
           title={baselineTooltip}
+          tabIndex={0}
         >
           <span aria-hidden="true" className="comparison-legend-swatch baseline" />
           <span>Baseline run</span>
@@ -1467,6 +1470,7 @@ function RunComparisonPanel({
           className="comparison-legend-item comparison-cue comparison-tooltip"
           data-tooltip={bestTooltip}
           title={bestTooltip}
+          tabIndex={0}
         >
           <span aria-hidden="true" className="comparison-legend-swatch best" />
           <span>Best metric</span>
@@ -1475,6 +1479,7 @@ function RunComparisonPanel({
           className="comparison-legend-item comparison-cue comparison-tooltip"
           data-tooltip={insightTooltip}
           title={insightTooltip}
+          tabIndex={0}
         >
           <span aria-hidden="true" className="comparison-legend-swatch insight" />
           <span>Top insight</span>
@@ -1484,9 +1489,13 @@ function RunComparisonPanel({
         {comparison.runs.map((run) => (
           <article
             className={`comparison-run-card ${
-              run.run_id === comparison.baseline_run_id ? "baseline comparison-cue-card" : ""
+              run.run_id === comparison.baseline_run_id
+                ? "baseline comparison-cue-card comparison-tooltip"
+                : ""
             }`}
             key={run.run_id}
+            data-tooltip={run.run_id === comparison.baseline_run_id ? baselineTooltip : undefined}
+            tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
             title={run.run_id === comparison.baseline_run_id ? baselineTooltip : undefined}
           >
             <div className="comparison-run-head">
@@ -1526,6 +1535,7 @@ function RunComparisonPanel({
             className="kicker comparison-top-kicker comparison-cue comparison-tooltip"
             data-tooltip={insightTooltip}
             title={insightTooltip}
+            tabIndex={0}
           >
             <span aria-hidden="true" className="comparison-legend-swatch insight" />
             <span>Top insight / {formatComparisonIntentLabel(comparison.intent)}</span>
@@ -1564,39 +1574,45 @@ function RunComparisonPanel({
                     <small className="comparison-metric-annotation">{metricRow.annotation}</small>
                   ) : null}
                 </th>
-                {comparison.runs.map((run) => (
-                  <td
-                    className={
-                      [
-                        metricRow.best_run_id === run.run_id ? "comparison-best" : "",
-                        run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
-                      ]
-                        .filter(Boolean)
-                        .join(" ") || undefined
-                    }
-                    key={`${metricRow.key}-${run.run_id}`}
-                    title={
-                      buildComparisonCellTooltip(
-                        comparison.intent,
-                        metricRow.label,
-                        run.run_id === comparison.baseline_run_id,
-                        metricRow.best_run_id === run.run_id,
-                      ) || undefined
-                    }
-                  >
-                    <strong>
-                      {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
-                    </strong>
-                    <span className="comparison-delta">
-                      {run.run_id === comparison.baseline_run_id
-                        ? metricRow.delta_annotations[run.run_id] ?? "baseline"
-                        : metricRow.delta_annotations[run.run_id] ?? formatComparisonDelta(
-                            metricRow.deltas_vs_baseline[run.run_id],
-                            metricRow.unit,
-                          )}
-                    </span>
-                  </td>
-                ))}
+                {comparison.runs.map((run) => {
+                  const cellTooltip =
+                    buildComparisonCellTooltip(
+                      comparison.intent,
+                      metricRow.label,
+                      run.run_id === comparison.baseline_run_id,
+                      metricRow.best_run_id === run.run_id,
+                    ) || undefined;
+                  const cellClassName =
+                    [
+                      metricRow.best_run_id === run.run_id ? "comparison-best" : "",
+                      run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
+                      cellTooltip ? "comparison-cue comparison-tooltip comparison-cell-cue" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ") || undefined;
+
+                  return (
+                    <td
+                      className={cellClassName}
+                      data-tooltip={cellTooltip}
+                      key={`${metricRow.key}-${run.run_id}`}
+                      tabIndex={cellTooltip ? 0 : undefined}
+                      title={cellTooltip}
+                    >
+                      <strong>
+                        {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
+                      </strong>
+                      <span className="comparison-delta">
+                        {run.run_id === comparison.baseline_run_id
+                          ? metricRow.delta_annotations[run.run_id] ?? "baseline"
+                          : metricRow.delta_annotations[run.run_id] ?? formatComparisonDelta(
+                              metricRow.deltas_vs_baseline[run.run_id],
+                              metricRow.unit,
+                            )}
+                      </span>
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             <tr>
@@ -1630,7 +1646,11 @@ function ComparisonNarrativeCard({
 
   return (
     <article
-      className={`comparison-story-card ${featured ? "featured comparison-cue-card" : ""}`}
+      className={`comparison-story-card ${
+        featured ? "featured comparison-cue-card comparison-tooltip" : ""
+      }`}
+      data-tooltip={tooltip}
+      tabIndex={tooltip ? 0 : undefined}
       title={tooltip}
     >
       <div className="comparison-story-head">
