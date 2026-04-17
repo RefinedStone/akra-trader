@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit ea06cb9 still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but broader venue-native channel or session continuation is the first numbered remainder and venue-native amend semantics still sit closer to active guarded-live supervision scope.",
+      "priority_reason": "The latest main-session reply after commit 9237149 still explicitly lists wider live-path alerting and durable operator audit or event delivery as one of the three remaining guarded-live gaps, but the direct executable queue head is still the push-native multi-venue session transport follow-up before alert-delivery expansion.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:17:54Z",
+      "updated_at": "2026-04-17T01:51:26Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit ea06cb9 still explicitly calls out that live order management stops at cancel or replace and does not yet support venue-native amend semantics, but broader venue-native channel or session continuation remains the first direct executable follow-up from the completed Binance restore expansion.",
+      "priority_reason": "The latest main-session reply after commit 9237149 still explicitly says live order management stops at cancel or replace and lacks venue-native amend flow, but the newly narrowed push-native multi-venue session transport follow-up remains the first executable guarded-live task before amend semantics.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:17:54Z",
+      "updated_at": "2026-04-17T01:51:26Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -653,18 +653,54 @@
       "direction_id": "guarded-live-execution",
       "title": "Broaden guarded-live continuation beyond the current Binance channel restore",
       "description": "Build on the completed full order-book recovery and deeper channel restore by extending guarded-live recovery beyond the current Binance multi-stream plus exchange-backed ticker, trades, and ohlcv restore, deciding and implementing the next venue-native channel or session continuation layer so resumed live supervision does not stop at adapter-specific reseeding.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply after commit ea06cb9 explicitly says the restore now covers Binance multi-stream plus exchange-backed ticker, trades, and ohlcv recovery, but broader venue-native channel or session continuation is still the first remaining item, making it the clearest next executable queue head.",
+      "priority_reason": "Completed in main session commit 2c83cc3, which expanded guarded-live session handoff with channel continuation state, counts, and timestamps plus persisted market-channel snapshots for trade, aggTrade, book ticker, mini ticker, and kline restore across failover, restart resume, and live stream sync, then surfaced the continuation state in the control room and verified the path with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-full-order-book-continuation-and-deeper-channel-restore"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:17:54Z",
+      "updated_at": "2026-04-17T01:32:11Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from a restored Binance-specific handoff toward a broader venue-native continuation model, keeping restart recovery focused on authoritative channel or session continuity before lower-priority amend and alerting follow-ups."
+      "direction_relation_note": "Closed the next guarded-live continuation gap by carrying persisted market-channel continuation state through Binance failover, restart, and sync flows, which now leaves wider venue-native session transport beyond the current Binance-native scope, plus amend semantics and durable live-path alert delivery, as the remaining candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-wider-venue-native-session-transport-after-binance-continuation",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend guarded-live beyond Binance-native continuation into wider venue session transport",
+      "description": "Build on the completed Binance continuation-state and market-channel snapshot restore by widening guarded-live session transport beyond a Binance-only continuation path. The delivered scope allows Binance-native websocket continuation where available and falls back to generic CCXT polling transport when venue execution is available but Binance stream continuation is not, so guarded-live recovery no longer hard-stops on one adapter's restore semantics.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "Completed in main session commit 9237149, which widened guarded-live handoff from Binance-native continuation to transport-aware fallback, added generic CCXT polling continuation with depth, ticker, trade, and OHLCV coverage, fixed polling depth to replace snapshots atomically, wired the venue poll interval config, and verified the result with API pytest plus web typecheck and build.",
+      "depends_on": [
+        "planning-guarded-live-wider-venue-native-channel-session-continuation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:51:26Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the immediate post-Binance continuation gap by adding a transport-aware fallback path beyond Binance-native websocket restore, which now leaves true push-native multi-venue session transport, amend semantics, and durable live-path alert delivery as the remaining guarded-live candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-push-native-multi-venue-session-transport",
+      "direction_id": "guarded-live-execution",
+      "title": "Replace polling fallback with push-native multi-venue guarded-live session transport",
+      "description": "Build on the completed Binance-native continuation plus generic CCXT polling fallback by adding a true push-native multi-venue session transport layer for guarded-live continuation, so wider venue support does not depend on polling-based market reconstruction when a venue can provide authoritative streaming session continuity.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply after commit 9237149 explicitly says the remaining continuation gap is wider push-native multi-venue session transport beyond the current Binance-native websocket plus generic polling fallback, making it the clearest executable next task.",
+      "depends_on": [
+        "planning-guarded-live-wider-venue-native-session-transport-after-binance-continuation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:51:26Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from transport-aware fallback into authoritative multi-venue streaming continuity, preserving the sequencing where push-native session transport still comes before venue-native amend semantics and durable alert-delivery expansion."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
