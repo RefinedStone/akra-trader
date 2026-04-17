@@ -1076,6 +1076,31 @@ class OperatorIncidentAllquietRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentMoogsoftRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentMoogsoftRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentMoogsoftRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentMoogsoftRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -1159,6 +1184,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   allquiet: OperatorIncidentAllquietRecoveryState = field(
     default_factory=OperatorIncidentAllquietRecoveryState
+  )
+  moogsoft: OperatorIncidentMoogsoftRecoveryState = field(
+    default_factory=OperatorIncidentMoogsoftRecoveryState
   )
   updated_at: datetime | None = None
 

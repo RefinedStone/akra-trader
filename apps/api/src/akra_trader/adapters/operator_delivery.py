@@ -94,6 +94,8 @@ def _normalize_target(target: str) -> str | None:
     return "onpage_incidents"
   if normalized in {"allquiet", "all_quiet", "allquiet_incidents", "allquiet_alerts", "operator_allquiet"}:
     return "allquiet_incidents"
+  if normalized in {"moogsoft", "moogsoft_incidents", "moogsoft_alerts", "operator_moogsoft"}:
+    return "moogsoft_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -187,6 +189,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     allquiet_api_url: str = "https://api.allquiet.app/v1",
     allquiet_recovery_engine_url_template: str | None = None,
     allquiet_recovery_engine_token: str | None = None,
+    moogsoft_api_token: str | None = None,
+    moogsoft_api_url: str = "https://api.moogsoft.com/v1",
+    moogsoft_recovery_engine_url_template: str | None = None,
+    moogsoft_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -288,6 +294,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._allquiet_api_url = allquiet_api_url.rstrip("/")
     self._allquiet_recovery_engine_url_template = allquiet_recovery_engine_url_template
     self._allquiet_recovery_engine_token = allquiet_recovery_engine_token
+    self._moogsoft_api_token = moogsoft_api_token
+    self._moogsoft_api_url = moogsoft_api_url.rstrip("/")
+    self._moogsoft_recovery_engine_url_template = moogsoft_recovery_engine_url_template
+    self._moogsoft_recovery_engine_token = moogsoft_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -341,6 +351,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("onpage")
     if self._allquiet_api_token:
       providers.append("allquiet")
+    if self._moogsoft_api_token:
+      providers.append("moogsoft")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -473,6 +485,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if target == "allquiet_incidents":
         records.append(
           self._deliver_allquiet(
+            incident=incident,
+            attempt_number=attempt_number,
+            phase=phase,
+          )
+        )
+        continue
+      if target == "moogsoft_incidents":
+        records.append(
+          self._deliver_moogsoft(
             incident=incident,
             attempt_number=attempt_number,
             phase=phase,
@@ -716,6 +737,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "moogsoft":
+      return (
+        self._sync_moogsoft_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsgenie":
       return (
         self._sync_opsgenie_workflow(
@@ -796,6 +828,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_onpage_workflow_state(incident=incident)
     if normalized_provider == "allquiet":
       return self._pull_allquiet_workflow_state(incident=incident)
+    if normalized_provider == "moogsoft":
+      return self._pull_moogsoft_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -1064,6 +1098,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     url: str,
   ) -> urllib_request.Request:
     token = self._allquiet_recovery_engine_token or self._allquiet_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_moogsoft_recovery_engine_request(
+    self,
+    *,
+    url: str,
+  ) -> urllib_request.Request:
+    token = self._moogsoft_recovery_engine_token or self._moogsoft_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -1398,6 +1445,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_allquiet_recovery_engine_request(url=url)
+    elif provider == "moogsoft":
+      url = self._format_recovery_engine_url(
+        url_template=self._moogsoft_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_moogsoft_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -6537,6 +6595,272 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_moogsoft(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._moogsoft_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:moogsoft_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="moogsoft_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="moogsoft_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_moogsoft_delivery_request(
+      incident=incident,
+      reference=reference,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:moogsoft_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="moogsoft_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"moogsoft_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:moogsoft_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="moogsoft_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"moogsoft_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_moogsoft_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    target = "moogsoft_workflow"
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._moogsoft_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="moogsoft_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="moogsoft_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="moogsoft",
+        external_reference=None,
+        source=incident.source,
+      )
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_moogsoft_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"moogsoft_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"moogsoft_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="moogsoft",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_moogsoft_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._moogsoft_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_moogsoft_pull_request(
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    alert_payload = self._extract_mapping(
+      payload.get("result"),
+      payload.get("data"),
+      payload.get("alert"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      alert_payload.get("attributes"),
+      alert_payload.get("alert"),
+      alert_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      alert_payload.get("metadata"),
+      attributes.get("metadata"),
+      attributes.get("details"),
+      alert_payload.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "priority": self._first_non_empty_string(
+        alert_payload.get("priority"),
+        alert_payload.get("severity"),
+        attributes.get("priority"),
+      ),
+      "escalation_policy": self._first_non_empty_string(
+        alert_payload.get("escalation_policy"),
+        alert_payload.get("escalationPolicy"),
+        alert_payload.get("policy"),
+        alert_payload.get("source"),
+        attributes.get("source"),
+      ),
+      "assignee": self._first_non_empty_string(
+        alert_payload.get("assignee"),
+        alert_payload.get("owner"),
+        attributes.get("assignee"),
+        self._extract_mapping(alert_payload.get("owner")).get("display_name"),
+        self._extract_mapping(alert_payload.get("owner")).get("name"),
+      ),
+      "url": self._first_non_empty_string(
+        alert_payload.get("url"),
+        attributes.get("url"),
+        alert_payload.get("html_url"),
+      ),
+      "updated_at": self._first_non_empty_string(
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+      "external_reference": self._first_non_empty_string(
+        alert_payload.get("external_reference"),
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="moogsoft",
+      workflow_reference=self._first_non_empty_string(
+        alert_payload.get("alert_id"),
+        alert_payload.get("id"),
+        alert_payload.get("alertId"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        provider_payload.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        alert_payload.get("alert_status"),
+        alert_payload.get("status"),
+        alert_payload.get("state"),
+        attributes.get("alert_status"),
+        attributes.get("status"),
+        attributes.get("state"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        alert_payload.get("summary"),
+        alert_payload.get("subject"),
+        attributes.get("summary"),
+        incident.summary,
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        provider_payload.get("updated_at"),
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -8048,6 +8372,68 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   @staticmethod
   def _resolve_allquiet_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  @staticmethod
+  def _resolve_moogsoft_alert_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "escalated",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_moogsoft_ownership_phase(assignee: str | None) -> str:
+    if assignee:
+      return "assigned"
+    return "unassigned"
+
+  @staticmethod
+  def _resolve_moogsoft_priority_phase(priority: str | None) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_moogsoft_escalation_phase(escalation_policy: str | None) -> str:
+    if escalation_policy:
+      return "configured"
+    return "unconfigured"
+
+  @staticmethod
+  def _resolve_moogsoft_workflow_phase(
     *,
     lifecycle_state: str | None,
     workflow_state: str,
@@ -10244,6 +10630,119 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           updated_at,
         ),
       }
+    elif provider == "moogsoft":
+      moogsoft_priority = self._first_non_empty_string(
+        provider_specific_recovery.get("priority"),
+        provider_payload.get("priority"),
+        provider_payload.get("severity"),
+        provider_payload.get("urgency"),
+      )
+      moogsoft_escalation_policy = self._first_non_empty_string(
+        provider_specific_recovery.get("escalation_policy"),
+        provider_payload.get("escalation_policy"),
+        provider_payload.get("escalationPolicy"),
+        provider_payload.get("policy"),
+        provider_payload.get("source"),
+      )
+      moogsoft_assignee = self._first_non_empty_string(
+        provider_specific_recovery.get("assignee"),
+        provider_payload.get("assignee"),
+        provider_payload.get("owner"),
+        self._extract_mapping(provider_payload.get("owner")).get("display_name"),
+      )
+      moogsoft_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("alert_status"),
+        provider_payload.get("status"),
+        provider_payload.get("state"),
+      ) or "unknown"
+      moogsoft_alert_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("alert_phase"),
+        self._resolve_moogsoft_alert_phase(moogsoft_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "moogsoft",
+        "moogsoft": {
+          "alert_id": self._first_non_empty_string(
+            provider_specific_recovery.get("alert_id"),
+            provider_payload.get("alert_id"),
+            provider_payload.get("alertId"),
+            provider_payload.get("id"),
+            workflow_reference,
+          ),
+          "external_reference": external_reference,
+          "alert_status": moogsoft_status,
+          "priority": moogsoft_priority,
+          "escalation_policy": moogsoft_escalation_policy,
+          "assignee": moogsoft_assignee,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "alert_phase": moogsoft_alert_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_moogsoft_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=moogsoft_status,
+            ),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_moogsoft_ownership_phase(moogsoft_assignee),
+            "priority_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("priority_phase"),
+            ) or self._resolve_moogsoft_priority_phase(moogsoft_priority),
+            "escalation_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("escalation_phase"),
+            ) or self._resolve_moogsoft_escalation_phase(moogsoft_escalation_policy),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          moogsoft_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
     elif provider == "opsgenie":
       opsgenie_owner = self._first_non_empty_string(
         provider_specific_recovery.get("owner"),
@@ -11166,6 +11665,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           "last_transition_at": (
             provider_recovery.allquiet.phase_graph.last_transition_at.isoformat()
             if provider_recovery.allquiet.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
+      "moogsoft": {
+        "alert_id": provider_recovery.moogsoft.alert_id,
+        "external_reference": provider_recovery.moogsoft.external_reference,
+        "alert_status": provider_recovery.moogsoft.alert_status,
+        "priority": provider_recovery.moogsoft.priority,
+        "escalation_policy": provider_recovery.moogsoft.escalation_policy,
+        "assignee": provider_recovery.moogsoft.assignee,
+        "url": provider_recovery.moogsoft.url,
+        "updated_at": (
+          provider_recovery.moogsoft.updated_at.isoformat()
+          if provider_recovery.moogsoft.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "alert_phase": provider_recovery.moogsoft.phase_graph.alert_phase,
+          "workflow_phase": provider_recovery.moogsoft.phase_graph.workflow_phase,
+          "ownership_phase": provider_recovery.moogsoft.phase_graph.ownership_phase,
+          "priority_phase": provider_recovery.moogsoft.phase_graph.priority_phase,
+          "escalation_phase": provider_recovery.moogsoft.phase_graph.escalation_phase,
+          "last_transition_at": (
+            provider_recovery.moogsoft.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.moogsoft.phase_graph.last_transition_at is not None
             else None
           ),
         },
@@ -14139,6 +14664,149 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported allquiet workflow action: {action}")
 
+  def _build_moogsoft_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      (
+        f"{self._moogsoft_api_url}/alerts/{encoded_reference}"
+        f"?identifier_type={reference_type}"
+      ),
+      headers={
+        "Authorization": f"Bearer {self._moogsoft_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
+  def _build_moogsoft_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._moogsoft_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._moogsoft_api_url}/alerts/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    return urllib_request.Request(
+      f"{self._moogsoft_api_url}/alerts",
+      data=json.dumps(
+        {
+          "alert": {
+            "summary": incident.summary[:255],
+            "description": incident.detail,
+            "status": "pending",
+            "priority": self._map_moogsoft_priority(incident.severity),
+            "external_reference": reference,
+            "source": "akra_trader",
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_moogsoft_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._moogsoft_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._moogsoft_api_url}/alerts/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps({"actor": actor, "note": detail}).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._moogsoft_api_url}/alerts/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {"actor": actor, "note": f"{detail}{self._format_workflow_payload_context(payload)}"}
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._moogsoft_api_url}/alerts/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated alert to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._moogsoft_api_url}/alerts/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    raise ValueError(f"unsupported moogsoft workflow action: {action}")
+
   def _build_opsgenie_pull_request(
     self,
     *,
@@ -14561,6 +15229,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   @staticmethod
   def _map_allquiet_priority(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "high"
+    if normalized in {"warning", "warn"}:
+      return "medium"
+    return "low"
+
+  @staticmethod
+  def _map_moogsoft_priority(severity: str) -> str:
     normalized = severity.lower()
     if normalized in {"critical", "error"}:
       return "high"

@@ -90,6 +90,8 @@ from akra_trader.domain.models import OperatorIncidentOnpageRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentOnpageRecoveryState
 from akra_trader.domain.models import OperatorIncidentAllquietRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentAllquietRecoveryState
+from akra_trader.domain.models import OperatorIncidentMoogsoftRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentMoogsoftRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1773,6 +1775,17 @@ class TradingApplication:
             aligned_provider_recovery,
             allquiet=replace(
               aligned_provider_recovery.allquiet,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "moogsoft"
+          and provider_recovery.moogsoft.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            moogsoft=replace(
+              aligned_provider_recovery.moogsoft,
               alert_status="delivered",
             ),
           )
@@ -4919,6 +4932,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_moogsoft_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_moogsoft_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_moogsoft_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_moogsoft_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_moogsoft_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_moogsoft_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentMoogsoftRecoveryState,
+  ) -> OperatorIncidentMoogsoftRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_moogsoft_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_moogsoft_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentMoogsoftRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_moogsoft_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_moogsoft_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_moogsoft_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -7188,6 +7334,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "allquiet"
+    moogsoft_schema = existing.moogsoft
+    moogsoft_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("moogsoft"),
+      payload.get("moogsoft"),
+      payload.get("moogsoft_alert"),
+    )
+    if normalized_provider == "moogsoft" or moogsoft_payload:
+      moogsoft_status = self._first_non_empty_string(
+        moogsoft_payload.get("alert_status"),
+        moogsoft_payload.get("status"),
+        moogsoft_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.moogsoft.alert_status,
+      ) or "unknown"
+      moogsoft_schema = OperatorIncidentMoogsoftRecoveryState(
+        alert_id=self._first_non_empty_string(
+          moogsoft_payload.get("alert_id"),
+          moogsoft_payload.get("id"),
+          moogsoft_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.moogsoft.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          moogsoft_payload.get("external_reference"),
+          moogsoft_payload.get("reference"),
+          reference,
+          existing.moogsoft.external_reference,
+        ),
+        alert_status=moogsoft_status,
+        priority=self._first_non_empty_string(
+          moogsoft_payload.get("priority"),
+          moogsoft_payload.get("severity"),
+          moogsoft_payload.get("urgency"),
+          existing.moogsoft.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          moogsoft_payload.get("escalation_policy"),
+          moogsoft_payload.get("escalationPolicy"),
+          moogsoft_payload.get("policy"),
+          moogsoft_payload.get("source"),
+          existing.moogsoft.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          moogsoft_payload.get("assignee"),
+          moogsoft_payload.get("owner"),
+          moogsoft_payload.get("assigned_to"),
+          existing.moogsoft.assignee,
+        ),
+        url=self._first_non_empty_string(
+          moogsoft_payload.get("url"),
+          moogsoft_payload.get("html_url"),
+          moogsoft_payload.get("link"),
+          existing.moogsoft.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(moogsoft_payload.get("updated_at"))
+          or existing.moogsoft.updated_at
+        ),
+        phase_graph=self._build_moogsoft_recovery_phase_graph(
+          payload=moogsoft_payload,
+          alert_status=moogsoft_status,
+          priority=self._first_non_empty_string(
+            moogsoft_payload.get("priority"),
+            moogsoft_payload.get("severity"),
+            moogsoft_payload.get("urgency"),
+            existing.moogsoft.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            moogsoft_payload.get("escalation_policy"),
+            moogsoft_payload.get("escalationPolicy"),
+            moogsoft_payload.get("policy"),
+            moogsoft_payload.get("source"),
+            existing.moogsoft.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            moogsoft_payload.get("assignee"),
+            moogsoft_payload.get("owner"),
+            moogsoft_payload.get("assigned_to"),
+            existing.moogsoft.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.moogsoft,
+        ),
+      )
+      provider_schema_kind = "moogsoft"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -7266,6 +7505,7 @@ class TradingApplication:
       betterstack=betterstack_schema,
       onpage=onpage_schema,
       allquiet=allquiet_schema,
+      moogsoft=moogsoft_schema,
       updated_at=synced_at,
     )
 
@@ -7569,6 +7809,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.allquiet,
+        ),
+      ),
+      moogsoft=replace(
+        provider_recovery.moogsoft,
+        phase_graph=self._build_moogsoft_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.moogsoft.alert_status,
+          priority=provider_recovery.moogsoft.priority,
+          escalation_policy=provider_recovery.moogsoft.escalation_policy,
+          assignee=provider_recovery.moogsoft.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.moogsoft,
         ),
       ),
     )
@@ -11967,6 +12221,10 @@ class TradingApplication:
       return "allquiet"
     if normalized in {"allquiet_incidents", "operator_allquiet"}:
       return "allquiet"
+    if normalized in {"moogsoft_alerts", "operator_moogsoft"}:
+      return "moogsoft"
+    if normalized in {"moogsoft_incidents", "operator_moogsoft"}:
+      return "moogsoft"
     return normalized or None
 
   @staticmethod
@@ -12166,6 +12424,8 @@ class TradingApplication:
       return "onpage"
     if "allquiet_incidents" in combined or "allquiet_alerts" in combined:
       return "allquiet"
+    if "moogsoft_incidents" in combined or "moogsoft_alerts" in combined:
+      return "moogsoft"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

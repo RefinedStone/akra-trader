@@ -241,6 +241,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_allquiet_recovery_engine_url_template
     ),
     allquiet_recovery_engine_token=settings.operator_alert_allquiet_recovery_engine_token,
+    moogsoft_api_token=settings.operator_alert_moogsoft_api_token,
+    moogsoft_api_url=settings.operator_alert_moogsoft_api_url,
+    moogsoft_recovery_engine_url_template=(
+      settings.operator_alert_moogsoft_recovery_engine_url_template
+    ),
+    moogsoft_recovery_engine_token=settings.operator_alert_moogsoft_recovery_engine_token,
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
     opsgenie_recovery_engine_url_template=(
