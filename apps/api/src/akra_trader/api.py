@@ -455,6 +455,24 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return asdict(status)
 
+  @router.post("/guarded-live/incidents/{event_id}/remediate")
+  def remediate_guarded_live_incident(
+    event_id: str,
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      status = app.remediate_guarded_live_incident(
+        event_id=event_id,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return asdict(status)
+
   @router.post("/guarded-live/incidents/{event_id}/escalate")
   def escalate_guarded_live_incident(
     event_id: str,

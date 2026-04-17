@@ -110,6 +110,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - durable guarded-live incidents now also persist external provider/reference state, provider
   workflow state/reference, external sync timestamps, and paging status from external callbacks
   plus local provider-native workflow actions
+- market-data guarded-live incidents now also persist remediation state/kind/runbook metadata and
+  can auto-request provider-owned `remediate` workflows, with the same remediation state exposed
+  through delivery history and operator controls
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
   repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
   breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and
@@ -126,9 +129,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   and outbound delivery attempts with bounded retry/backoff state, but it is not yet a full
   external incident-management system
 - incident workflow now includes operator acknowledgment, retry suppression, manual escalation, and
-  auto escalation after ack-timeout or retry exhaustion, and incidents now carry a persisted paging
-  policy id/provider plus provider-workflow state, but provider-managed policy ownership is still
-  limited
+  auto escalation after ack-timeout or retry exhaustion, while market-data incidents also support
+  explicit remediation requests, and incidents now carry a persisted paging policy id/provider plus
+  provider-workflow state, but provider-managed policy ownership is still limited
 - external paging workflows can now sync `triggered`, `acknowledged`, `escalated`, and `resolved`
   events back into local incident state, and local acknowledge/escalate actions can now push
   provider-native workflow updates back out, but the integration is still not a full

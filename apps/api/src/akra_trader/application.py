@@ -46,6 +46,7 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentRemediation
 from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import ReferenceSource
@@ -133,6 +134,15 @@ class _IncidentPagingPolicy:
   initial_targets: tuple[str, ...]
   escalation_targets: tuple[str, ...]
   resolution_targets: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _IncidentRemediationPlan:
+  kind: str
+  owner: str
+  summary: str
+  detail: str
+  runbook: str
 
 COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
   "benchmark_validation": {
@@ -1033,6 +1043,65 @@ class TradingApplication:
       summary=f"Guarded-live incident acknowledged for {incident.alert_id}.",
       detail=(
         f"Reason: {reason}. Incident {event_id} acknowledged and pending retries suppressed. "
+        f"Provider workflow: {updated_incident.provider_workflow_state}."
+      ),
+      run_id=incident.run_id,
+      session_id=incident.session_id,
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        incident_events=incident_events,
+        delivery_history=delivery_history,
+        audit_events=(audit_event, *state.audit_events),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def remediate_guarded_live_incident(
+    self,
+    *,
+    event_id: str,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state, _ = self._refresh_guarded_live_alert_state(current_time=current_time)
+    incident = self._require_active_guarded_live_incident(state=state, event_id=event_id)
+    if incident.remediation.state == "not_applicable":
+      raise ValueError("Guarded-live incident does not expose a remediation workflow")
+
+    delivery_history = self._suppress_pending_incident_retries(
+      delivery_history=state.delivery_history,
+      incident_event_id=event_id,
+      reason="manual_remediation_requested",
+      phase="provider_remediate",
+    )
+    updated_incident, remediation_records = self._request_incident_remediation(
+      incident=incident,
+      delivery_history=delivery_history,
+      current_time=current_time,
+      actor=actor,
+      detail=reason,
+    )
+    delivery_history = tuple((*remediation_records, *delivery_history))
+    incident_events = self._replace_incident_event(
+      incident_events=state.incident_events,
+      updated_incident=updated_incident,
+    )
+    incident_events = self._apply_incident_delivery_state(
+      incident_events=incident_events,
+      delivery_history=delivery_history,
+    )
+    audit_event = OperatorAuditEvent(
+      event_id=f"guarded-live-incident-remediation-requested:{event_id}:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_incident_remediation_requested",
+      summary=f"Guarded-live remediation requested for {incident.alert_id}.",
+      detail=(
+        f"Reason: {reason}. Remediation state: {updated_incident.remediation.state}. "
         f"Provider workflow: {updated_incident.provider_workflow_state}."
       ),
       run_id=incident.run_id,
@@ -5410,6 +5479,7 @@ class TradingApplication:
 
     for alert in merged_history:
       policy = self._resolve_incident_paging_policy(alert=alert)
+      remediation = self._build_incident_remediation(alert=alert, policy=policy)
       previous = previous_by_id.get(alert.alert_id)
       if alert.status == "active" and (previous is None or previous.status != "active"):
         incident_events.append(
@@ -5439,6 +5509,7 @@ class TradingApplication:
             ),
             paging_status="pending" if policy.provider else "not_configured",
             provider_workflow_state="idle" if policy.provider else "not_configured",
+            remediation=remediation,
           )
         )
         continue
@@ -5462,6 +5533,7 @@ class TradingApplication:
             acknowledgment_state="not_applicable",
             escalation_state="not_applicable",
             paging_status="pending" if policy.provider else "not_configured",
+            remediation=remediation,
           )
         )
 
@@ -5478,6 +5550,123 @@ class TradingApplication:
       return None
     normalized = provider.strip().lower().replace("-", "_")
     return normalized or None
+
+  @staticmethod
+  def _alert_supports_remediation(*, alert: OperatorAlert) -> bool:
+    return alert.source == "guarded_live" and alert.category.startswith("market_data_")
+
+  @staticmethod
+  def _market_data_remediation_plan(*, category: str) -> _IncidentRemediationPlan:
+    if category == "market_data_freshness":
+      return _IncidentRemediationPlan(
+        kind="recent_sync",
+        owner="provider",
+        summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+        detail=(
+          "Trigger provider-owned recent sync for the affected timeframe, then confirm the "
+          "latest checkpoint, sync timestamp, and freshness window have recovered."
+        ),
+        runbook="market_data.sync_recent",
+      )
+    if category == "market_data_quality":
+      return _IncidentRemediationPlan(
+        kind="historical_backfill",
+        owner="provider",
+        summary="Backfill the historical window to the configured target coverage.",
+        detail=(
+          "Run provider-owned historical backfill, then verify target coverage and completion "
+          "ratio against the guarded-live backfill policy."
+        ),
+        runbook="market_data.backfill_history",
+      )
+    if category in {"market_data_candle_continuity", "market_data_candle_sequence", "market_data_kline_consistency"}:
+      return _IncidentRemediationPlan(
+        kind="candle_repair",
+        owner="provider",
+        summary="Repair candle continuity and restore the affected kline sequence.",
+        detail=(
+          "Backfill the affected candle range, verify contiguous candle boundaries, and confirm "
+          "the kline stream has resumed with valid ordering."
+        ),
+        runbook="market_data.repair_candles",
+      )
+    if category == "market_data_venue":
+      return _IncidentRemediationPlan(
+        kind="venue_fault_review",
+        owner="provider",
+        summary="Review upstream venue faults and re-run the affected sync path.",
+        detail=(
+          "Escalate the venue-specific upstream fault, then retry provider-owned market-data sync "
+          "for the affected instrument and timeframe."
+        ),
+        runbook="market_data.review_venue_fault",
+      )
+    if category in {"market_data_channel_consistency", "market_data_channel_restore"}:
+      return _IncidentRemediationPlan(
+        kind="channel_restore",
+        owner="provider",
+        summary="Restore stale or missing guarded-live market-data channels.",
+        detail=(
+          "Restart or resubscribe the affected market-data channels, then confirm the guarded-live "
+          "handoff is receiving fresh events for every covered channel."
+        ),
+        runbook="market_data.restore_channels",
+      )
+    if category in {
+      "market_data_ladder_integrity",
+      "market_data_venue_ladder_integrity",
+      "market_data_ladder_bridge_integrity",
+      "market_data_ladder_sequence_integrity",
+      "market_data_ladder_snapshot_refresh",
+      "market_data_depth_ladder",
+      "market_data_book_consistency",
+    }:
+      return _IncidentRemediationPlan(
+        kind="order_book_rebuild",
+        owner="provider",
+        summary="Rebuild the venue ladder and restore order-book integrity checks.",
+        detail=(
+          "Trigger provider-owned depth snapshot rebuild, replay the exchange bridge rules, and "
+          "verify the local ladder, top-of-book, and snapshot refresh state are healthy again."
+        ),
+        runbook="market_data.rebuild_order_book",
+      )
+    return _IncidentRemediationPlan(
+      kind="market_data_review",
+      owner="provider",
+      summary="Review the affected market-data policy path and restore normal coverage.",
+      detail=(
+        "Inspect the degraded guarded-live market-data path, trigger the provider-owned recovery "
+        "workflow, and verify the affected policy has recovered."
+      ),
+      runbook="market_data.review_policy_fault",
+    )
+
+  def _build_incident_remediation(
+    self,
+    *,
+    alert: OperatorAlert,
+    policy: _IncidentPagingPolicy,
+  ) -> OperatorIncidentRemediation:
+    if not self._alert_supports_remediation(alert=alert):
+      return OperatorIncidentRemediation()
+    plan = self._market_data_remediation_plan(category=alert.category)
+    owner = "provider" if policy.provider and plan.owner == "provider" else "operator"
+    if alert.status == "resolved":
+      state = "completed"
+    elif owner == "provider":
+      state = "suggested"
+    else:
+      state = "operator_review"
+    return OperatorIncidentRemediation(
+      state=state,
+      kind=plan.kind,
+      owner=owner,
+      summary=plan.summary,
+      detail=plan.detail,
+      runbook=plan.runbook,
+      provider=self._normalize_paging_provider(policy.provider),
+    )
 
   def _resolve_incident_paging_policy(self, *, alert: OperatorAlert) -> _IncidentPagingPolicy:
     severity = alert.severity.strip().lower()
@@ -5574,6 +5763,16 @@ class TradingApplication:
         )
       )
       delivery_records.extend(records)
+      if incident.kind == "incident_opened":
+        persisted_events[-1], remediation_records = self._request_incident_remediation(
+          incident=persisted_events[-1],
+          delivery_history=tuple(delivery_records),
+          current_time=current_time,
+          actor="system",
+          detail="incident_opened",
+        )
+        if remediation_records:
+          delivery_records.extend(remediation_records)
     return tuple(persisted_events), tuple(delivery_records)
 
   def _retry_guarded_live_incident_deliveries(
@@ -5643,6 +5842,11 @@ class TradingApplication:
       incident = incidents_by_id.get(latest.incident_event_id)
       if incident is None:
         continue
+      if incident.kind == "incident_opened" and not self._incident_is_still_active(
+        incident=incident,
+        incident_events=incident_events,
+      ):
+        continue
       if (
         incident.kind == "incident_opened"
         and incident.acknowledgment_state == "acknowledged"
@@ -5706,10 +5910,154 @@ class TradingApplication:
             if latest_provider_record is not None and latest_provider_record.external_reference is not None
             else incident.provider_workflow_reference
           ),
+          remediation=self._refresh_incident_remediation_state(
+            incident=incident,
+            latest_by_key=latest_by_key,
+          ),
         )
       )
     refreshed.sort(key=lambda event: event.timestamp, reverse=True)
     return tuple(refreshed)
+
+  def _refresh_incident_remediation_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    latest_by_key: dict[tuple[str, str, str], OperatorIncidentDelivery],
+  ) -> OperatorIncidentRemediation:
+    remediation = incident.remediation
+    if remediation.state == "not_applicable":
+      return remediation
+    remediation_records = tuple(
+      record
+      for key, record in latest_by_key.items()
+      if key[0] == incident.event_id and key[2] == "provider_remediate"
+    )
+    if not remediation_records:
+      return remediation
+    latest_record = self._latest_provider_workflow_record(records=remediation_records)
+    next_state = self._resolve_remediation_delivery_state(
+      records=remediation_records,
+      current_state=remediation.state,
+    )
+    return replace(
+      remediation,
+      state=next_state,
+      last_attempted_at=(
+        latest_record.attempted_at if latest_record is not None else remediation.last_attempted_at
+      ),
+      provider=(
+        latest_record.external_provider
+        if latest_record is not None and latest_record.external_provider is not None
+        else remediation.provider
+      ),
+      reference=(
+        latest_record.external_reference
+        if latest_record is not None and latest_record.external_reference is not None
+        else remediation.reference
+      ),
+    )
+
+  def _request_incident_remediation(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+    actor: str,
+    detail: str,
+  ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...]]:
+    remediation = incident.remediation
+    if incident.kind != "incident_opened" or remediation.state in {"not_applicable", "completed"}:
+      return incident, ()
+
+    detail_copy = detail.strip() or remediation.detail or remediation.summary or "remediation_requested"
+    requested_remediation = replace(
+      remediation,
+      requested_at=current_time,
+      requested_by=actor,
+      last_attempted_at=current_time,
+    )
+    if remediation.owner != "provider":
+      return replace(incident, remediation=requested_remediation), ()
+
+    provider = requested_remediation.provider or incident.paging_provider or incident.external_provider
+    if provider is None:
+      return (
+        replace(
+          incident,
+          remediation=replace(
+            requested_remediation,
+            state="not_configured",
+          ),
+        ),
+        (),
+      )
+    normalized_provider = self._normalize_paging_provider(provider)
+    supported_providers = {
+      self._normalize_paging_provider(candidate)
+      for candidate in self._operator_alert_delivery.list_supported_workflow_providers()
+    }
+    if normalized_provider not in supported_providers:
+      return (
+        replace(
+          incident,
+          remediation=replace(
+            requested_remediation,
+            state="not_supported",
+            provider=normalized_provider,
+          ),
+        ),
+        (),
+      )
+
+    records = self._operator_alert_delivery.sync_incident_workflow(
+      incident=incident,
+      provider=normalized_provider or provider,
+      action="remediate",
+      actor=actor,
+      detail=detail_copy,
+      attempt_number=1,
+    )
+    records = self._apply_delivery_retry_policy(
+      records=records,
+      current_time=current_time,
+    )
+    latest = self._latest_provider_workflow_record(records=records)
+    updated_incident = replace(
+      incident,
+      remediation=replace(
+        requested_remediation,
+        state=self._resolve_remediation_delivery_state(
+          records=records,
+          current_state=requested_remediation.state,
+        ),
+        provider=normalized_provider,
+        reference=(
+          latest.external_reference
+          if latest is not None and latest.external_reference is not None
+          else requested_remediation.reference
+        ),
+      ),
+    )
+    return updated_incident, records
+
+  def _resolve_remediation_delivery_state(
+    self,
+    *,
+    records: tuple[OperatorIncidentDelivery, ...],
+    current_state: str,
+  ) -> str:
+    delivery_state = self._resolve_incident_delivery_state(records=records)
+    mapping = {
+      "delivered": "requested",
+      "partial": "requested",
+      "retrying": "retrying",
+      "failed": "failed",
+      "suppressed": "suppressed",
+      "not_configured": current_state,
+    }
+    return mapping.get(delivery_state, current_state)
 
   def _refresh_guarded_live_incident_workflow(
     self,

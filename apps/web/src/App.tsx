@@ -348,6 +348,19 @@ type OperatorVisibility = {
     provider_workflow_state: string;
     provider_workflow_action?: string | null;
     provider_workflow_last_attempted_at?: string | null;
+    remediation: {
+      state: string;
+      kind?: string | null;
+      owner?: string | null;
+      summary?: string | null;
+      detail?: string | null;
+      runbook?: string | null;
+      requested_at?: string | null;
+      requested_by?: string | null;
+      last_attempted_at?: string | null;
+      provider?: string | null;
+      reference?: string | null;
+    };
   }[];
   delivery_history: {
     delivery_id: string;
@@ -446,6 +459,19 @@ type GuardedLiveStatus = {
     provider_workflow_state: string;
     provider_workflow_action?: string | null;
     provider_workflow_last_attempted_at?: string | null;
+    remediation: {
+      state: string;
+      kind?: string | null;
+      owner?: string | null;
+      summary?: string | null;
+      detail?: string | null;
+      runbook?: string | null;
+      requested_at?: string | null;
+      requested_by?: string | null;
+      last_attempted_at?: string | null;
+      provider?: string | null;
+      reference?: string | null;
+    };
   }[];
   delivery_history: {
     delivery_id: string;
@@ -1646,6 +1672,21 @@ export default function App() {
     }
   }
 
+  async function remediateGuardedLiveIncident(eventId: string) {
+    const reason = resolveGuardedLiveReason("incident_remediation_requested");
+    setStatusText(`Requesting guarded-live remediation for ${eventId}...`);
+    try {
+      await fetchJson<GuardedLiveStatus>(`/guarded-live/incidents/${encodeURIComponent(eventId)}/remediate`, {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText(`Guarded-live remediation requested for ${eventId}.`);
+    } catch (error) {
+      setStatusText(`Incident remediation failed: ${(error as Error).message}`);
+    }
+  }
+
   async function escalateGuardedLiveIncident(eventId: string) {
     const reason = resolveGuardedLiveReason("incident_escalated");
     setStatusText(`Escalating guarded-live incident ${eventId}...`);
@@ -2034,6 +2075,17 @@ export default function App() {
                                 ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
                                 : ""}
                             </p>
+                            {event.remediation.state !== "not_applicable" ? (
+                              <p className="run-lineage-symbol-copy">
+                                Remediation: {event.remediation.state}
+                                {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
+                                {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
+                                {event.remediation.requested_by ? ` by ${event.remediation.requested_by}` : ""}
+                                {event.remediation.last_attempted_at
+                                  ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
+                                  : ""}
+                              </p>
+                            ) : null}
                           </td>
                         </tr>
                       ))}
@@ -3108,6 +3160,26 @@ export default function App() {
                                   ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
                                   : ""}
                               </p>
+                              {event.remediation.state !== "not_applicable" ? (
+                                <>
+                                  <p className="run-lineage-symbol-copy">
+                                    Remediation: {event.remediation.state}
+                                    {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
+                                    {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
+                                    {event.remediation.requested_by
+                                      ? ` by ${event.remediation.requested_by}`
+                                      : ""}
+                                    {event.remediation.last_attempted_at
+                                      ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
+                                      : ""}
+                                  </p>
+                                  {event.remediation.detail ? (
+                                    <p className="run-lineage-symbol-copy">
+                                      Remediation detail: {event.remediation.detail}
+                                    </p>
+                                  ) : null}
+                                </>
+                              ) : null}
                               {event.acknowledgment_reason ? (
                                 <p className="run-lineage-symbol-copy">
                                   Ack reason: {event.acknowledgment_reason}
@@ -3122,6 +3194,15 @@ export default function App() {
                             <td>
                               {event.kind === "incident_opened" && activeGuardedLiveAlertIds.has(event.alert_id) ? (
                                 <>
+                                  {event.remediation.state !== "not_applicable" ? (
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => void remediateGuardedLiveIncident(event.event_id)}
+                                      type="button"
+                                    >
+                                      Request remediation
+                                    </button>
+                                  ) : null}
                                   <button
                                     className="ghost-button"
                                     disabled={event.acknowledgment_state === "acknowledged"}

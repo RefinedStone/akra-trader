@@ -488,6 +488,21 @@ class OperatorAuditEvent:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentRemediation:
+  state: str = "not_applicable"
+  kind: str | None = None
+  owner: str | None = None
+  summary: str | None = None
+  detail: str | None = None
+  runbook: str | None = None
+  requested_at: datetime | None = None
+  requested_by: str | None = None
+  last_attempted_at: datetime | None = None
+  provider: str | None = None
+  reference: str | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentEvent:
   event_id: str
   alert_id: str
@@ -523,6 +538,7 @@ class OperatorIncidentEvent:
   provider_workflow_state: str = "not_configured"
   provider_workflow_action: str | None = None
   provider_workflow_last_attempted_at: datetime | None = None
+  remediation: OperatorIncidentRemediation = field(default_factory=OperatorIncidentRemediation)
 
 
 @dataclass(frozen=True)

@@ -686,6 +686,16 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         "run_id": incident.run_id,
         "session_id": incident.session_id,
         "source": incident.source,
+        "remediation": {
+          "state": incident.remediation.state,
+          "kind": incident.remediation.kind,
+          "owner": incident.remediation.owner,
+          "summary": incident.remediation.summary,
+          "detail": incident.remediation.detail,
+          "runbook": incident.remediation.runbook,
+          "provider": incident.remediation.provider,
+          "reference": incident.remediation.reference,
+        },
       }
     ).encode("utf-8")
 
@@ -703,6 +713,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
                 f"*{incident.summary}*\n"
                 f"{incident.detail}\n"
                 f"`{incident.kind}` • `{incident.alert_id}` • `{incident.source}`"
+                + (
+                  f"\nRemediation: {incident.remediation.summary} "
+                  f"(`{incident.remediation.runbook or 'n/a'}`)"
+                  if incident.remediation.state != "not_applicable" and incident.remediation.summary
+                  else ""
+                )
               ),
             },
           }
@@ -728,6 +744,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "run_id": incident.run_id,
             "session_id": incident.session_id,
             "event_id": incident.event_id,
+            "remediation_state": incident.remediation.state,
+            "remediation_kind": incident.remediation.kind,
+            "remediation_runbook": incident.remediation.runbook,
+            "remediation_summary": incident.remediation.summary,
           },
         },
       }
@@ -772,6 +792,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "incident_kind": incident.kind,
             "run_id": incident.run_id,
             "session_id": incident.session_id,
+            "remediation_state": incident.remediation.state,
+            "remediation_kind": incident.remediation.kind,
+            "remediation_runbook": incident.remediation.runbook,
+            "remediation_summary": incident.remediation.summary,
           },
           "tags": ["akra", incident.source, incident.severity.lower()],
         }
@@ -840,6 +864,23 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         headers=headers,
         method="POST",
       )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"https://api.pagerduty.com/incidents/{encoded_reference}/notes",
+        data=json.dumps(
+          {
+            "note": {
+              "content": (
+                f"Akra requested remediation. Actor: {actor}. "
+                f"Summary: {incident.remediation.summary or incident.summary}. "
+                f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              ),
+            }
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
     raise ValueError(f"unsupported pagerduty workflow action: {action}")
 
   def _build_opsgenie_workflow_request(
@@ -894,6 +935,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "note": (
               f"Akra escalated incident to level {incident.escalation_level}. "
               f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._opsgenie_api_url}/v2/alerts/{encoded_reference}/notes{suffix}",
+        data=json.dumps(
+          {
+            "user": actor,
+            "source": incident.source,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
             ),
           }
         ).encode("utf-8"),

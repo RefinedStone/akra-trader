@@ -65,7 +65,7 @@ Implemented now:
   acknowledgment, manual/automatic escalation, and retry/backoff scheduling
 - durable incidents now persist paging policy selection, provider workflow state/reference, and
   can sync provider callbacks plus local provider-native workflow actions bidirectionally through
-  the operator incident sync endpoint and guarded-live acknowledge/escalate actions
+  the operator incident sync endpoint and guarded-live acknowledge/escalate/remediate actions
 - guarded-live launch wiring and venue-state reconciliation can now target a configured supported
   venue independently from the market-data provider, while seeded fixture flows still default to a
   Binance-shaped live venue in tests
@@ -169,6 +169,7 @@ Defaults:
 - `POST /api/guarded-live/reconciliation`
 - `POST /api/guarded-live/recovery`
 - `POST /api/guarded-live/incidents/{event_id}/acknowledge`
+- `POST /api/guarded-live/incidents/{event_id}/remediate`
 - `POST /api/guarded-live/incidents/{event_id}/escalate`
 - `POST /api/guarded-live/resume`
 
@@ -216,11 +217,15 @@ Defaults:
   application applies bounded exponential backoff before retrying due targets on subsequent
   guarded-live state refreshes
 - guarded-live incident records now persist acknowledgment and escalation state, support operator
-  `acknowledge` and `escalate` actions, suppress pending retries after acknowledgment, and can
-  auto-escalate to configured escalation targets after retry exhaustion or ack-timeout windows
+  `acknowledge`, `remediate`, and `escalate` actions, suppress pending retries after
+  acknowledgment, and can auto-escalate to configured escalation targets after retry exhaustion or
+  ack-timeout windows
 - severity-aware paging policy orchestration can now choose initial and escalation targets plus a
   native paging provider, and guarded-live incident records persist the selected policy id,
   provider workflow state/action, and provider workflow reference
+- market-data incidents now also persist remediation state/kind/runbook, auto-request
+  provider-owned `remediate` workflow actions for supported paging providers, and expose the same
+  remediation state through delivery history plus the guarded-live operator surface
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, or `resolved`
   incident sync events into the durable guarded-live incident history, including provider workflow
   references, while local acknowledge/escalate actions can also push provider-native workflow

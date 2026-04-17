@@ -1177,6 +1177,164 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
 
 
+def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflow(
+  tmp_path: Path,
+) -> None:
+  class FakeProviderWorkflowDeliveryAdapter:
+    def list_targets(self) -> tuple[str, ...]:
+      return ("pagerduty_events",)
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = targets or self.list_targets()
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_delivery:{target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          external_provider="pagerduty",
+          external_reference=incident.external_reference or incident.alert_id,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return (
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{provider}_workflow:{action}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=f"{provider}_workflow",
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_provider_workflow:{action}:{detail}",
+          attempt_number=attempt_number,
+          phase=f"provider_{action}",
+          provider_action=action,
+          external_provider=provider,
+          external_reference=incident.provider_workflow_reference or incident.external_reference or incident.alert_id,
+          source=incident.source,
+        ),
+      )
+
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._operator_alert_delivery = FakeProviderWorkflowDeliveryAdapter()
+    app._operator_alert_paging_policy_default_provider = "pagerduty"
+    app._operator_alert_paging_policy_warning_targets = ("pagerduty_events",)
+    app._operator_alert_paging_policy_critical_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "market_data_remediation_surface"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "market_data_remediation_surface"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "market_data_remediation_surface",
+      },
+    )
+    assert live_response.status_code == 200
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 10, tzinfo=UTC),
+            sync_status="stale",
+            lag_seconds=1_200,
+            last_sync_at=datetime(2025, 1, 3, 18, 15, tzinfo=UTC),
+            issues=("freshness_threshold_exceeded:1200:600",),
+          ),
+        ],
+      ),
+    )
+    app._market_data = market_data
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert incident["remediation"]["kind"] == "recent_sync"
+    assert incident["remediation"]["state"] == "requested"
+    assert incident["remediation"]["runbook"] == "market_data.sync_recent"
+    assert incident["remediation"]["provider"] == "pagerduty"
+    assert any(
+      record["incident_event_id"] == incident["event_id"] and record["phase"] == "provider_remediate"
+      for record in guarded_live_response.json()["delivery_history"]
+    )
+
+    remediated = client.post(
+      f"/api/guarded-live/incidents/{incident['event_id']}/remediate",
+      json={"actor": "operator", "reason": "manual_market_data_resync"},
+    )
+    assert remediated.status_code == 200
+    refreshed = next(
+      event
+      for event in remediated.json()["incident_events"]
+      if event["event_id"] == incident["event_id"]
+    )
+    assert refreshed["remediation"]["state"] == "requested"
+    assert refreshed["remediation"]["requested_by"] == "operator"
+
+
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(
   tmp_path: Path,
 ) -> None:

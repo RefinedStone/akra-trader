@@ -6,6 +6,7 @@ from datetime import datetime
 
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentRemediation
 
 
 class FakeResponse:
@@ -128,6 +129,12 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
     external_reference="guarded-live:reconciliation",
     provider_workflow_reference="PDINC-123",
     escalation_level=2,
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="recent_sync",
+      summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+      runbook="market_data.sync_recent",
+    ),
   )
 
   acknowledge = adapter.sync_incident_workflow(
@@ -145,6 +152,13 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
     actor="operator",
     detail="handoff_to_manager",
   )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="pagerduty",
+    action="remediate",
+    actor="operator",
+    detail="restart_sync_and_verify_checkpoint",
+  )
 
   assert adapter.list_supported_workflow_providers() == ("pagerduty",)
   assert acknowledge[0].target == "pagerduty_workflow"
@@ -152,9 +166,11 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   assert acknowledge[0].external_reference == "PDINC-123"
   assert acknowledge[0].attempt_number == 2
   assert escalate[0].provider_action == "escalate"
+  assert remediate[0].provider_action == "remediate"
 
   acknowledge_request = requests[0]
   escalate_request = requests[1]
+  remediate_request = requests[2]
   assert acknowledge_request[0].endswith("/incidents/PDINC-123")
   assert acknowledge_request[1] == "PUT"
   assert acknowledge_request[3]["From"] == "akra-ops@example.com"
@@ -165,6 +181,10 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   assert escalate_request[1] == "POST"
   escalate_payload = json.loads(escalate_request[2].decode("utf-8"))
   assert "level 2" in escalate_payload["note"]["content"]
+  assert remediate_request[0].endswith("/incidents/PDINC-123/notes")
+  remediate_payload = json.loads(remediate_request[2].decode("utf-8"))
+  assert "requested remediation" in remediate_payload["note"]["content"]
+  assert "market_data.sync_recent" in remediate_payload["note"]["content"]
 
 
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
@@ -251,6 +271,12 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     external_reference="guarded-live:reconciliation",
     provider_workflow_reference="OG-123",
     escalation_level=3,
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="recent_sync",
+      summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+      runbook="market_data.sync_recent",
+    ),
   )
 
   acknowledge = adapter.sync_incident_workflow(
@@ -274,16 +300,28 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     actor="operator",
     detail="fixed",
   )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="opsgenie",
+    action="remediate",
+    actor="operator",
+    detail="restart_sync_and_verify_checkpoint",
+  )
 
   assert adapter.list_supported_workflow_providers() == ("opsgenie",)
   assert acknowledge[0].target == "opsgenie_workflow"
   assert acknowledge[0].external_reference == "OG-123"
   assert escalate[0].provider_action == "escalate"
   assert resolve[0].provider_action == "resolve"
+  assert remediate[0].provider_action == "remediate"
 
   assert requests[0][0].endswith("/v2/alerts/OG-123/acknowledge?identifierType=id")
   assert requests[0][1] == "POST"
   assert requests[1][0].endswith("/v2/alerts/OG-123/notes?identifierType=id")
   assert requests[2][0].endswith("/v2/alerts/OG-123/close?identifierType=id")
+  assert requests[3][0].endswith("/v2/alerts/OG-123/notes?identifierType=id")
   escalate_payload = json.loads(requests[1][2].decode("utf-8"))
   assert "level 3" in escalate_payload["note"]
+  remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  assert "requested remediation" in remediate_payload["note"]
+  assert "market_data.sync_recent" in remediate_payload["note"]

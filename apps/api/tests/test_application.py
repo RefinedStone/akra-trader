@@ -159,6 +159,11 @@ class FakeOperatorAlertDeliveryAdapter:
       delivered_attempts = self._attempts_by_target.get(target, 0) + 1
       self._attempts_by_target[target] = delivered_attempts
       should_fail = delivered_attempts <= self._failures_before_success.get(target, 0)
+      external_provider = None
+      if target == "pagerduty_events":
+        external_provider = "pagerduty"
+      elif target == "opsgenie_alerts":
+        external_provider = "opsgenie"
       records.append(
         OperatorIncidentDelivery(
           delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
@@ -175,6 +180,8 @@ class FakeOperatorAlertDeliveryAdapter:
           ),
           attempt_number=attempt_number,
           phase=phase,
+          external_provider=external_provider,
+          external_reference=incident.external_reference or incident.alert_id if external_provider else None,
           source=incident.source,
         )
       )
@@ -196,7 +203,11 @@ class FakeOperatorAlertDeliveryAdapter:
     delivered_attempts = self._workflow_attempts_by_key.get(key, 0) + 1
     self._workflow_attempts_by_key[key] = delivered_attempts
     should_fail = delivered_attempts <= self._workflow_failures_before_success.get(action, 0)
-    workflow_reference = incident.provider_workflow_reference or incident.external_reference
+    workflow_reference = incident.provider_workflow_reference
+    if workflow_reference is None and provider != "pagerduty":
+      workflow_reference = incident.external_reference
+    if workflow_reference is None and action == "remediate":
+      workflow_reference = incident.external_reference or incident.alert_id
     if workflow_reference is None:
       should_fail = True
     return (
@@ -1297,6 +1308,117 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   assert any(
     record.alert_id == "guarded-live:market-data-continuity:binance:5m"
     for record in guarded_live_status.delivery_history
+  )
+
+
+def test_market_data_incidents_request_remediation_and_provider_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 30, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    supported_workflow_providers=("pagerduty",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="market_data_remediation_provider_workflow",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  guarded_live_status = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert incident.remediation.kind == "recent_sync"
+  assert incident.remediation.state == "requested"
+  assert incident.remediation.summary == "Refresh the live timeframe sync window and verify freshness thresholds."
+  assert incident.remediation.runbook == "market_data.sync_recent"
+  assert incident.remediation.provider == "pagerduty"
+  assert incident.remediation.reference == "guarded-live:market-data:5m"
+  assert incident.remediation.requested_by == "system"
+  assert any(
+    workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
+    for workflow_event_id, provider, action, _ in delivery.workflow_attempts
+  )
+  remediation_delivery = next(
+    record
+    for record in guarded_live_status.delivery_history
+    if record.incident_event_id == incident.event_id and record.phase == "provider_remediate"
+  )
+  assert remediation_delivery.external_provider == "pagerduty"
+
+  updated_status = app.remediate_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="manual_market_data_resync",
+  )
+  refreshed_incident = next(
+    event
+    for event in updated_status.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert refreshed_incident.remediation.state == "requested"
+  assert refreshed_incident.remediation.requested_by == "operator"
+  assert any(
+    workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
+    for workflow_event_id, provider, action, _ in delivery.workflow_attempts[1:]
+  )
+  assert any(
+    event.kind == "guarded_live_incident_remediation_requested"
+    for event in updated_status.audit_events
   )
 
 
