@@ -15,6 +15,7 @@ from akra_trader.domain.models import GuardedLiveKlineChannelSnapshot
 from akra_trader.domain.models import GuardedLiveOrderBookLevel
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import GuardedLiveVenueBalance
@@ -60,15 +61,47 @@ class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
   def __init__(self) -> None:
     super().__init__()
     self._status_by_timeframe: dict[str, MarketDataStatus] = {}
+    self._remediation_status_by_key: dict[tuple[str, str], MarketDataStatus] = {}
 
   def set_status(self, *, timeframe: str, status: MarketDataStatus) -> None:
     self._status_by_timeframe[timeframe] = status
+
+  def set_remediation_status(
+    self,
+    *,
+    kind: str,
+    timeframe: str,
+    status: MarketDataStatus,
+  ) -> None:
+    self._remediation_status_by_key[(kind, timeframe)] = status
 
   def get_status(self, timeframe: str) -> MarketDataStatus:
     status = self._status_by_timeframe.get(timeframe)
     if status is not None:
       return status
     return super().get_status(timeframe)
+
+  def remediate(
+    self,
+    *,
+    kind: str,
+    symbol: str,
+    timeframe: str,
+  ) -> MarketDataRemediationResult:
+    current_time = datetime.now(UTC)
+    remediated_status = self._remediation_status_by_key.get((kind, timeframe))
+    if remediated_status is not None:
+      self._status_by_timeframe[timeframe] = remediated_status
+      return MarketDataRemediationResult(
+        kind=kind,
+        symbol=symbol,
+        timeframe=timeframe,
+        status="executed",
+        started_at=current_time,
+        finished_at=current_time,
+        detail=f"{kind}:{symbol}:{timeframe}:status_repaired",
+      )
+    return super().remediate(kind=kind, symbol=symbol, timeframe=timeframe)
 
 
 def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
@@ -1303,6 +1336,27 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
         ],
       ),
     )
+    market_data.set_remediation_status(
+      kind="recent_sync",
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+            sync_status="synced",
+            lag_seconds=0,
+            last_sync_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+            issues=(),
+          ),
+        ],
+      ),
+    )
     app._market_data = market_data
 
     guarded_live_response = client.get("/api/guarded-live")
@@ -1331,8 +1385,17 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
       for event in remediated.json()["incident_events"]
       if event["event_id"] == incident["event_id"]
     )
-    assert refreshed["remediation"]["state"] == "requested"
+    assert refreshed["remediation"]["state"] == "executed"
     assert refreshed["remediation"]["requested_by"] == "operator"
+    assert "recent_sync:ETH/USDT:5m:status_repaired" in refreshed["remediation"]["detail"]
+    assert any(
+      event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
+      for event in remediated.json()["incident_events"]
+    )
+    assert all(
+      alert["alert_id"] != "guarded-live:market-data:5m"
+      for alert in remediated.json()["active_alerts"]
+    )
 
 
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(

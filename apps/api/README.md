@@ -225,7 +225,9 @@ Defaults:
   provider workflow state/action, and provider workflow reference
 - market-data incidents now also persist remediation state/kind/runbook, auto-request
   provider-owned `remediate` workflow actions for supported paging providers, and expose the same
-  remediation state through delivery history plus the guarded-live operator surface
+  remediation state through delivery history plus the guarded-live operator surface. Explicit
+  remediation requests now execute real recent-sync, backfill, and candle-repair jobs against the
+  active market-data provider before the guarded-live incident state is refreshed again.
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, or `resolved`
   incident sync events into the durable guarded-live incident history, including provider workflow
   references, while local acknowledge/escalate actions can also push provider-native workflow

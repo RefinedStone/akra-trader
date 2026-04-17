@@ -33,6 +33,7 @@ from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import SyncCheckpoint
@@ -290,6 +291,89 @@ class CcxtMarketDataAdapter(MarketDataPort):
         target_candle_count=self._historical_candle_limit,
       )
 
+  def remediate(
+    self,
+    *,
+    kind: str,
+    symbol: str,
+    timeframe: str,
+  ) -> MarketDataRemediationResult:
+    started_at = self._clock()
+    detail = "market_data_remediation_not_supported"
+    status = "not_supported"
+    try:
+      if kind == "recent_sync":
+        successful = self._sync_recent(symbol=symbol, timeframe=timeframe)
+      elif kind == "historical_backfill":
+        recent_successful = self._sync_recent(symbol=symbol, timeframe=timeframe)
+        backfill_successful = self._backfill_history(
+          symbol=symbol,
+          timeframe=timeframe,
+          target_candle_count=self._historical_candle_limit,
+        )
+        successful = recent_successful and backfill_successful
+      elif kind == "candle_repair":
+        recent_successful = self._sync_recent(symbol=symbol, timeframe=timeframe)
+        repaired_windows = self._repair_gap_windows(symbol=symbol, timeframe=timeframe)
+        backfill_successful = self._backfill_history(
+          symbol=symbol,
+          timeframe=timeframe,
+          target_candle_count=self._historical_candle_limit,
+        )
+        successful = recent_successful and backfill_successful
+        status = "executed" if successful else "failed"
+        detail = self._build_remediation_detail(
+          kind=kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          repaired_windows=repaired_windows,
+        )
+        return MarketDataRemediationResult(
+          kind=kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          status=status,
+          started_at=started_at,
+          finished_at=self._clock(),
+          detail=detail,
+        )
+      elif kind in {"venue_fault_review", "market_data_review"}:
+        recent_successful = self._sync_recent(symbol=symbol, timeframe=timeframe)
+        backfill_successful = self._backfill_history(
+          symbol=symbol,
+          timeframe=timeframe,
+          target_candle_count=self._historical_candle_limit,
+        )
+        successful = recent_successful and backfill_successful
+      else:
+        return MarketDataRemediationResult(
+          kind=kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          status=status,
+          started_at=started_at,
+          finished_at=self._clock(),
+          detail=detail,
+        )
+      status = "executed" if successful else "failed"
+      detail = self._build_remediation_detail(
+        kind=kind,
+        symbol=symbol,
+        timeframe=timeframe,
+      )
+    except Exception as exc:
+      status = "failed"
+      detail = f"market_data_remediation_failed:{exc}"
+    return MarketDataRemediationResult(
+      kind=kind,
+      symbol=symbol,
+      timeframe=timeframe,
+      status=status,
+      started_at=started_at,
+      finished_at=self._clock(),
+      detail=detail,
+    )
+
   def describe_lineage(
     self,
     *,
@@ -350,6 +434,11 @@ class CcxtMarketDataAdapter(MarketDataPort):
       asset_type=AssetType.CRYPTO,
       market_type=MarketType.SPOT,
     )
+
+  @staticmethod
+  def _symbol_from_instrument_id(instrument_id: str) -> str:
+    _, _, symbol = instrument_id.partition(":")
+    return symbol or instrument_id
 
   def _sync_recent(
     self,
@@ -886,6 +975,63 @@ class CcxtMarketDataAdapter(MarketDataPort):
     for failure in recent_failures:
       issues.extend(self._classify_failure_semantics(failure.error))
     return tuple(dict.fromkeys(issues))
+
+  def _repair_gap_windows(self, *, symbol: str, timeframe: str) -> int:
+    coverage = self._read_coverage(symbol=symbol, timeframe=timeframe)
+    backfill = self._build_backfill_snapshot(
+      symbol=symbol,
+      timeframe=timeframe,
+      coverage=coverage,
+    )
+    repaired_windows = 0
+    for window in backfill.gap_windows:
+      if self._sync_range(
+        symbol=symbol,
+        timeframe=timeframe,
+        start_at=window.start_at,
+        end_at=window.end_at,
+        limit=window.missing_candles,
+      ):
+        repaired_windows += 1
+    return repaired_windows
+
+  def _build_remediation_detail(
+    self,
+    *,
+    kind: str,
+    symbol: str,
+    timeframe: str,
+    repaired_windows: int | None = None,
+  ) -> str:
+    status = self.get_status(timeframe)
+    instrument = next(
+      (
+        candidate
+        for candidate in status.instruments
+        if self._symbol_from_instrument_id(candidate.instrument_id) == symbol
+      ),
+      None,
+    )
+    if instrument is None:
+      return f"{kind}:{symbol}:{timeframe}:instrument_status_unavailable"
+    detail_parts = [
+      f"{kind}:{symbol}:{timeframe}",
+      f"sync_status={instrument.sync_status}",
+      f"candle_count={instrument.candle_count}",
+    ]
+    if instrument.last_sync_at is not None:
+      detail_parts.append(f"last_sync_at={instrument.last_sync_at.isoformat()}")
+    if instrument.lag_seconds is not None:
+      detail_parts.append(f"lag_seconds={instrument.lag_seconds}")
+    if repaired_windows is not None:
+      detail_parts.append(f"repaired_gap_windows={repaired_windows}")
+    if instrument.backfill_contiguous_missing_candles is not None:
+      detail_parts.append(
+        f"remaining_missing_candles={instrument.backfill_contiguous_missing_candles}"
+      )
+    if instrument.issues:
+      detail_parts.append(f"issues={','.join(instrument.issues[:4])}")
+    return " | ".join(detail_parts)
 
   def _classify_failure_semantics(self, error: str) -> tuple[str, ...]:
     normalized = error.lower()

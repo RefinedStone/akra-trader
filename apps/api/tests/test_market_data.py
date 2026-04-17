@@ -232,6 +232,72 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
   assert "gap_windows:1" in status.instruments[0].issues
 
 
+def test_binance_adapter_recent_sync_remediation_executes_and_refreshes_status(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=25),
+    count=6,
+  )
+  exchange = FakeExchange({("BTC/USDT", "5m"): rows})
+  adapter = BinanceMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    exchange=exchange,
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now,
+  )
+
+  result = adapter.remediate(
+    kind="recent_sync",
+    symbol="BTC/USDT",
+    timeframe="5m",
+  )
+  status = adapter.get_status("5m")
+
+  assert result.status == "executed"
+  assert "sync_status=synced" in result.detail
+  assert status.instruments[0].sync_status == "synced"
+  assert status.instruments[0].candle_count == 6
+
+
+def test_binance_adapter_candle_repair_remediation_closes_gap_windows(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  gap_rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=30),
+    count=6,
+    gap_after_index=2,
+  )
+  full_rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=30),
+    count=7,
+  )
+  adapter = BinanceMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    tracked_symbols=("BTC/USDT",),
+    exchange=FakeExchange({("BTC/USDT", "5m"): gap_rows}),
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    exchange_batch_limit=6,
+    clock=lambda: now,
+  )
+
+  adapter.sync_tracked("5m")
+  adapter._exchange = FakeExchange({("BTC/USDT", "5m"): full_rows})
+
+  result = adapter.remediate(
+    kind="candle_repair",
+    symbol="BTC/USDT",
+    timeframe="5m",
+  )
+  status = adapter.get_status("5m")
+
+  assert result.status == "executed"
+  assert "repaired_gap_windows=1" in result.detail
+  assert status.instruments[0].backfill_contiguous_missing_candles == 0
+  assert status.instruments[0].backfill_gap_windows == ()
+
+
 def test_binance_adapter_status_exposes_checkpoint_and_recent_failure_history(tmp_path: Path) -> None:
   now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
   rows = build_ohlcv_rows(

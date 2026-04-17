@@ -38,6 +38,7 @@ from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.domain.models import Fill
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import Order
 from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
@@ -1072,6 +1073,12 @@ class TradingApplication:
     if incident.remediation.state == "not_applicable":
       raise ValueError("Guarded-live incident does not expose a remediation workflow")
 
+    incident, local_results = self._execute_local_incident_remediation(
+      incident=incident,
+      actor=actor,
+      current_time=current_time,
+    )
+
     delivery_history = self._suppress_pending_incident_retries(
       delivery_history=state.delivery_history,
       incident_event_id=event_id,
@@ -1102,7 +1109,8 @@ class TradingApplication:
       summary=f"Guarded-live remediation requested for {incident.alert_id}.",
       detail=(
         f"Reason: {reason}. Remediation state: {updated_incident.remediation.state}. "
-        f"Provider workflow: {updated_incident.provider_workflow_state}."
+        f"Provider workflow: {updated_incident.provider_workflow_state}. "
+        f"Local execution: {self._summarize_local_remediation_results(local_results)}."
       ),
       run_id=incident.run_id,
       session_id=incident.session_id,
@@ -6048,6 +6056,8 @@ class TradingApplication:
     records: tuple[OperatorIncidentDelivery, ...],
     current_state: str,
   ) -> str:
+    if current_state in {"executed", "partial", "failed", "skipped", "completed"}:
+      return current_state
     delivery_state = self._resolve_incident_delivery_state(records=records)
     mapping = {
       "delivered": "requested",
@@ -6058,6 +6068,148 @@ class TradingApplication:
       "not_configured": current_state,
     }
     return mapping.get(delivery_state, current_state)
+
+  def _execute_local_incident_remediation(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    actor: str,
+    current_time: datetime,
+  ) -> tuple[OperatorIncidentEvent, tuple[MarketDataRemediationResult, ...]]:
+    remediation = incident.remediation
+    if remediation.kind not in {
+      "recent_sync",
+      "historical_backfill",
+      "candle_repair",
+      "venue_fault_review",
+      "market_data_review",
+    }:
+      return incident, ()
+    timeframe, symbols = self._resolve_market_data_remediation_targets(incident=incident)
+    if timeframe is None or not symbols:
+      return incident, ()
+
+    results_list: list[MarketDataRemediationResult] = []
+    for symbol in symbols:
+      try:
+        results_list.append(
+          self._market_data.remediate(
+            kind=remediation.kind,
+            symbol=symbol,
+            timeframe=timeframe,
+          )
+        )
+      except Exception as exc:
+        results_list.append(
+          MarketDataRemediationResult(
+            kind=remediation.kind,
+            symbol=symbol,
+            timeframe=timeframe,
+            status="failed",
+            started_at=current_time,
+            finished_at=current_time,
+            detail=f"market_data_remediation_failed:{exc}",
+          )
+        )
+    results = tuple(results_list)
+    if not results:
+      return incident, ()
+
+    last_attempted_at = max((result.finished_at for result in results), default=current_time)
+    updated_remediation = replace(
+      remediation,
+      state=self._resolve_local_remediation_state(results=results),
+      requested_at=current_time,
+      requested_by=actor,
+      last_attempted_at=last_attempted_at,
+      detail=self._summarize_local_remediation_results(results),
+    )
+    return replace(incident, remediation=updated_remediation), results
+
+  def _resolve_market_data_remediation_targets(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> tuple[str | None, tuple[str, ...]]:
+    remediation = incident.remediation
+    timeframe: str | None = None
+    venue: str | None = None
+    alert_parts = incident.alert_id.split(":")
+    if remediation.kind == "recent_sync" and len(alert_parts) == 3 and alert_parts[1] == "market-data":
+      timeframe = alert_parts[2]
+    elif remediation.kind in {
+      "historical_backfill",
+      "candle_repair",
+      "venue_fault_review",
+      "market_data_review",
+    } and len(alert_parts) == 4 and alert_parts[1].startswith("market-data-"):
+      venue = alert_parts[2]
+      timeframe = alert_parts[3]
+
+    symbols: list[str] = []
+    if incident.run_id is not None and (run := self._runs.get_run(incident.run_id)) is not None:
+      timeframe = timeframe or run.config.timeframe
+      venue = venue or run.config.venue
+      return timeframe, tuple(dict.fromkeys(run.config.symbols))
+
+    if timeframe is None:
+      return None, ()
+
+    try:
+      status = self._market_data.get_status(timeframe)
+    except Exception:
+      status = None
+    if status is not None:
+      venue = venue or status.venue
+      for instrument in status.instruments:
+        symbol = self._symbol_from_instrument_id(instrument.instrument_id)
+        if symbol not in symbols:
+          symbols.append(symbol)
+
+    if venue is not None and incident.run_id is None:
+      live_runs = [
+        run
+        for run in self._runs.list_runs(mode=RunMode.LIVE.value)
+        if run.config.timeframe == timeframe and run.config.venue == venue
+      ]
+      if live_runs:
+        live_symbols = [
+          symbol
+          for run in live_runs
+          for symbol in run.config.symbols
+          if symbol in symbols or not symbols
+        ]
+        if live_symbols:
+          symbols = list(dict.fromkeys(live_symbols))
+
+    return timeframe, tuple(dict.fromkeys(symbols))
+
+  @staticmethod
+  def _resolve_local_remediation_state(
+    *,
+    results: tuple[MarketDataRemediationResult, ...],
+  ) -> str:
+    executed = sum(result.status in {"executed", "skipped"} for result in results)
+    failed = sum(result.status == "failed" for result in results)
+    if failed and executed:
+      return "partial"
+    if failed:
+      return "failed"
+    if results and all(result.status == "skipped" for result in results):
+      return "skipped"
+    return "executed"
+
+  @staticmethod
+  def _summarize_local_remediation_results(
+    results: tuple[MarketDataRemediationResult, ...],
+  ) -> str:
+    if not results:
+      return "not_executed"
+    detail_copy = [result.detail for result in results if result.detail]
+    summary = " ".join(detail_copy[:2]) if detail_copy else "local_remediation_executed"
+    if len(detail_copy) > 2:
+      summary += f" Additional jobs: {len(detail_copy) - 2}."
+    return summary
 
   def _refresh_guarded_live_incident_workflow(
     self,

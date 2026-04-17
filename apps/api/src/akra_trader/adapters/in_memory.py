@@ -15,6 +15,7 @@ from akra_trader.domain.models import Candle
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import RunRecord
@@ -153,6 +154,24 @@ class SeededMarketDataAdapter(MarketDataPort):
       candle_count=len(candles),
       sync_status="fixture",
       issues=tuple(issues),
+    )
+
+  def remediate(
+    self,
+    *,
+    kind: str,
+    symbol: str,
+    timeframe: str,
+  ) -> MarketDataRemediationResult:
+    current_time = datetime.now(UTC)
+    return MarketDataRemediationResult(
+      kind=kind,
+      symbol=symbol,
+      timeframe=timeframe,
+      status="skipped",
+      started_at=current_time,
+      finished_at=current_time,
+      detail="seeded_market_data_provider_has_no_live_remediation_jobs",
     )
 
 

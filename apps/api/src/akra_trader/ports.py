@@ -15,6 +15,7 @@ from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
+from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
@@ -75,6 +76,14 @@ class MarketDataPort(Protocol):
   ) -> MarketDataLineage: ...
 
   def get_status(self, timeframe: str) -> MarketDataStatus: ...
+
+  def remediate(
+    self,
+    *,
+    kind: str,
+    symbol: str,
+    timeframe: str,
+  ) -> MarketDataRemediationResult: ...
 
 
 class StrategyCatalogPort(Protocol):
