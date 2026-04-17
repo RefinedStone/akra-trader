@@ -500,7 +500,18 @@ class OperatorIncidentEvent:
   session_id: str | None = None
   source: str = "guarded_live"
   delivery_targets: tuple[str, ...] = ()
+  escalation_targets: tuple[str, ...] = ()
   delivery_state: str = "pending"
+  acknowledgment_state: str = "not_applicable"
+  acknowledged_at: datetime | None = None
+  acknowledged_by: str | None = None
+  acknowledgment_reason: str | None = None
+  escalation_level: int = 0
+  escalation_state: str = "not_applicable"
+  last_escalated_at: datetime | None = None
+  last_escalated_by: str | None = None
+  escalation_reason: str | None = None
+  next_escalation_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -515,6 +526,7 @@ class OperatorIncidentDelivery:
   detail: str
   attempt_number: int = 1
   next_retry_at: datetime | None = None
+  phase: str = "initial"
   source: str = "guarded_live"
 
 

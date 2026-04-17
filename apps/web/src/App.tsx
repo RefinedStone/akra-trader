@@ -325,7 +325,18 @@ type OperatorVisibility = {
     session_id?: string | null;
     source: string;
     delivery_targets: string[];
+    escalation_targets: string[];
     delivery_state: string;
+    acknowledgment_state: string;
+    acknowledged_at?: string | null;
+    acknowledged_by?: string | null;
+    acknowledgment_reason?: string | null;
+    escalation_level: number;
+    escalation_state: string;
+    last_escalated_at?: string | null;
+    last_escalated_by?: string | null;
+    escalation_reason?: string | null;
+    next_escalation_at?: string | null;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -338,6 +349,7 @@ type OperatorVisibility = {
     detail: string;
     attempt_number: number;
     next_retry_at?: string | null;
+    phase: string;
     source: string;
   }[];
   audit_events: {
@@ -397,7 +409,18 @@ type GuardedLiveStatus = {
     session_id?: string | null;
     source: string;
     delivery_targets: string[];
+    escalation_targets: string[];
     delivery_state: string;
+    acknowledgment_state: string;
+    acknowledged_at?: string | null;
+    acknowledged_by?: string | null;
+    acknowledgment_reason?: string | null;
+    escalation_level: number;
+    escalation_state: string;
+    last_escalated_at?: string | null;
+    last_escalated_by?: string | null;
+    escalation_reason?: string | null;
+    next_escalation_at?: string | null;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -410,6 +433,7 @@ type GuardedLiveStatus = {
     detail: string;
     attempt_number: number;
     next_retry_at?: string | null;
+    phase: string;
     source: string;
   }[];
   kill_switch: {
@@ -1284,6 +1308,11 @@ export default function App() {
     };
   }, [guardedLive]);
 
+  const activeGuardedLiveAlertIds = useMemo(
+    () => new Set((guardedLive?.active_alerts ?? []).map((alert) => alert.alert_id)),
+    [guardedLive],
+  );
+
   function resolveGuardedLiveReason(fallback: string) {
     const trimmed = guardedLiveReason.trim();
     return trimmed.length ? trimmed : fallback;
@@ -1571,6 +1600,36 @@ export default function App() {
       setStatusText(`Guarded-live owner resumed on run ${run.config.run_id}.`);
     } catch (error) {
       setStatusText(`Guarded-live resume failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function acknowledgeGuardedLiveIncident(eventId: string) {
+    const reason = resolveGuardedLiveReason("incident_acknowledged");
+    setStatusText(`Acknowledging guarded-live incident ${eventId}...`);
+    try {
+      await fetchJson<GuardedLiveStatus>(`/guarded-live/incidents/${encodeURIComponent(eventId)}/acknowledge`, {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText(`Guarded-live incident ${eventId} acknowledged.`);
+    } catch (error) {
+      setStatusText(`Incident acknowledgment failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function escalateGuardedLiveIncident(eventId: string) {
+    const reason = resolveGuardedLiveReason("incident_escalated");
+    setStatusText(`Escalating guarded-live incident ${eventId}...`);
+    try {
+      await fetchJson<GuardedLiveStatus>(`/guarded-live/incidents/${encodeURIComponent(eventId)}/escalate`, {
+        method: "POST",
+        body: JSON.stringify({ actor: "operator", reason }),
+      });
+      await loadAll();
+      setStatusText(`Guarded-live incident ${eventId} escalated.`);
+    } catch (error) {
+      setStatusText(`Incident escalation failed: ${(error as Error).message}`);
     }
   }
 
@@ -1916,6 +1975,16 @@ export default function App() {
                               Delivery: {event.delivery_state}
                               {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
                             </p>
+                            <p className="run-lineage-symbol-copy">
+                              Ack: {event.acknowledgment_state}
+                              {event.acknowledged_by ? ` by ${event.acknowledged_by}` : ""}
+                              {event.acknowledged_at ? ` at ${formatTimestamp(event.acknowledged_at)}` : ""}
+                            </p>
+                            <p className="run-lineage-symbol-copy">
+                              Escalation: level {event.escalation_level} / {event.escalation_state}
+                              {event.last_escalated_by ? ` by ${event.last_escalated_by}` : ""}
+                              {event.last_escalated_at ? ` at ${formatTimestamp(event.last_escalated_at)}` : ""}
+                            </p>
                           </td>
                         </tr>
                       ))}
@@ -1975,19 +2044,20 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
-                        <tr key={`delivery-${record.delivery_id}`}>
-                          <td>{formatTimestamp(record.attempted_at)}</td>
-                          <td>{record.target}</td>
-                          <td>{record.status}</td>
-                          <td>{record.attempt_number}</td>
-                          <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
-                          <td>
-                            <strong>{record.incident_kind}</strong>
-                            <p className="run-lineage-symbol-copy">{record.detail}</p>
-                          </td>
-                        </tr>
-                      ))}
+                        {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
+                          <tr key={`delivery-${record.delivery_id}`}>
+                            <td>{formatTimestamp(record.attempted_at)}</td>
+                            <td>{record.target}</td>
+                            <td>{record.status}</td>
+                            <td>{record.attempt_number}</td>
+                            <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
+                            <td>
+                              <strong>{record.incident_kind}</strong>
+                              <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                              <p className="run-lineage-symbol-copy">{record.detail}</p>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 ) : (
@@ -2927,6 +2997,7 @@ export default function App() {
                           <th>Kind</th>
                           <th>Severity</th>
                           <th>Summary</th>
+                          <th>Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2942,6 +3013,53 @@ export default function App() {
                                 Delivery: {event.delivery_state}
                                 {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
                               </p>
+                              <p className="run-lineage-symbol-copy">
+                                Ack: {event.acknowledgment_state}
+                                {event.acknowledged_by ? ` by ${event.acknowledged_by}` : ""}
+                                {event.acknowledged_at ? ` at ${formatTimestamp(event.acknowledged_at)}` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Escalation: level {event.escalation_level} / {event.escalation_state}
+                                {event.last_escalated_by ? ` by ${event.last_escalated_by}` : ""}
+                                {event.last_escalated_at ? ` at ${formatTimestamp(event.last_escalated_at)}` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Next escalation: {formatTimestamp(event.next_escalation_at ?? null)}
+                                {event.escalation_targets.length ? ` via ${event.escalation_targets.join(", ")}` : ""}
+                              </p>
+                              {event.acknowledgment_reason ? (
+                                <p className="run-lineage-symbol-copy">
+                                  Ack reason: {event.acknowledgment_reason}
+                                </p>
+                              ) : null}
+                              {event.escalation_reason ? (
+                                <p className="run-lineage-symbol-copy">
+                                  Escalation reason: {event.escalation_reason}
+                                </p>
+                              ) : null}
+                            </td>
+                            <td>
+                              {event.kind === "incident_opened" && activeGuardedLiveAlertIds.has(event.alert_id) ? (
+                                <>
+                                  <button
+                                    className="ghost-button"
+                                    disabled={event.acknowledgment_state === "acknowledged"}
+                                    onClick={() => void acknowledgeGuardedLiveIncident(event.event_id)}
+                                    type="button"
+                                  >
+                                    Acknowledge
+                                  </button>
+                                  <button
+                                    className="ghost-button"
+                                    onClick={() => void escalateGuardedLiveIncident(event.event_id)}
+                                    type="button"
+                                  >
+                                    Escalate
+                                  </button>
+                                </>
+                              ) : (
+                                <span className="run-lineage-symbol-copy">No action</span>
+                              )}
                             </td>
                           </tr>
                         ))}
@@ -2973,6 +3091,7 @@ export default function App() {
                             <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
                             <td>
                               <strong>{record.incident_kind}</strong>
+                              <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
                               <p className="run-lineage-symbol-copy">{record.detail}</p>
                             </td>
                           </tr>

@@ -138,8 +138,9 @@ flows. Failed worker sessions and stale heartbeats surface as control-room alert
 control/session faults now persist as live-path alert history with active/resolved lifecycle state
 and delivery targets, alert transitions now emit durable incident-opened/resolved events plus
 outbound delivery attempt history, failed deliveries now carry retry scheduling state through
-attempt numbers plus bounded exponential backoff timestamps, and worker lifecycle notes plus
-guarded-live control events are normalized into recent audit events for operator review.
+attempt numbers plus bounded exponential backoff timestamps, durable incidents now also carry
+acknowledgment and escalation state, and worker lifecycle notes plus guarded-live control events
+are normalized into recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
@@ -170,7 +171,9 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   order-session adapters run against Binance, Coinbase, or Kraken while candle reads stay on a
   separate market-data source.
   Incident delivery is handled behind a dedicated delivery port that can currently fan out to
-  console logging, generic webhooks, Slack incoming webhooks, and PagerDuty Events API targets.
+  console logging, generic webhooks, Slack incoming webhooks, and PagerDuty Events API targets,
+  while the application layer owns acknowledgment, escalation timing, retry suppression, and
+  phase-aware retry/backoff rules.
 
 ## Modes
 
@@ -236,11 +239,12 @@ The web app currently surfaces:
   delivery history
 - guarded-live kill switch, candidacy blockers, guarded-live alert history, venue-state
   verification snapshots, reconciliation findings, durable incident events, outbound delivery
-  history, and guarded-live audit history
+  history, guarded-live incident acknowledgment/escalation actions, and guarded-live audit history
 - run history
 - run comparison and benchmark narratives
 
-The UI is already useful for research inspection, but not yet an operator-grade surface for live or continuous execution.
+The UI is already useful for research inspection and early incident operations, but not yet a full
+operator-grade surface for live or continuous execution.
 
 ## Known Limits
 
@@ -250,7 +254,8 @@ The UI is already useful for research inspection, but not yet an operator-grade 
   Binance multi-stream account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline
   session coverage plus exchange-backed ticker/trade/ohlcv restore, persisted market-channel
   continuation, Binance/Coinbase push-market continuation, and order lifecycle supervision
-- the system still lacks durable alert delivery and wider operator event coverage
+- the system still lacks full external incident-management workflow coverage, richer escalation
+  ladders, and wider operator event coverage
 - venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
   flow and no full exchange-order restore
 - no durable custom strategy registration history

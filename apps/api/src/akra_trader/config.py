@@ -33,6 +33,7 @@ class Settings:
   guarded_live_worker_heartbeat_interval_seconds: int = 15
   guarded_live_worker_heartbeat_timeout_seconds: int = 45
   operator_alert_delivery_targets: tuple[str, ...] = ("console",)
+  operator_alert_escalation_targets: tuple[str, ...] = ()
   operator_alert_webhook_url: str | None = None
   operator_alert_slack_webhook_url: str | None = None
   operator_alert_pagerduty_integration_key: str | None = None
@@ -41,6 +42,9 @@ class Settings:
   operator_alert_delivery_initial_backoff_seconds: int = 15
   operator_alert_delivery_max_backoff_seconds: int = 300
   operator_alert_delivery_backoff_multiplier: float = 2.0
+  operator_alert_incident_ack_timeout_seconds: int = 300
+  operator_alert_incident_max_escalations: int = 2
+  operator_alert_incident_escalation_backoff_multiplier: float = 2.0
   guarded_live_api_key: str | None = None
   guarded_live_api_secret: str | None = None
   binance_api_key: str | None = None
@@ -88,6 +92,9 @@ def load_settings() -> Settings:
     operator_alert_delivery_targets=_parse_csv_env(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_TARGETS", "console")
     ),
+    operator_alert_escalation_targets=_parse_csv_env(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_ESCALATION_TARGETS", "")
+    ),
     operator_alert_webhook_url=os.getenv("AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_URL") or None,
     operator_alert_slack_webhook_url=os.getenv("AKRA_TRADER_OPERATOR_ALERT_SLACK_WEBHOOK_URL") or None,
     operator_alert_pagerduty_integration_key=(
@@ -107,6 +114,15 @@ def load_settings() -> Settings:
     ),
     operator_alert_delivery_backoff_multiplier=float(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER", "2.0")
+    ),
+    operator_alert_incident_ack_timeout_seconds=int(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENT_ACK_TIMEOUT_SECONDS", "300")
+    ),
+    operator_alert_incident_max_escalations=int(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENT_MAX_ESCALATIONS", "2")
+    ),
+    operator_alert_incident_escalation_backoff_multiplier=float(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENT_ESCALATION_BACKOFF_MULTIPLIER", "2.0")
     ),
     guarded_live_api_key=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_KEY") or None,
     guarded_live_api_secret=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_SECRET") or None,

@@ -397,6 +397,42 @@ def create_router(container: Container) -> APIRouter:
     status = app.recover_guarded_live_runtime_state(actor=request.actor, reason=request.reason)
     return asdict(status)
 
+  @router.post("/guarded-live/incidents/{event_id}/acknowledge")
+  def acknowledge_guarded_live_incident(
+    event_id: str,
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      status = app.acknowledge_guarded_live_incident(
+        event_id=event_id,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return asdict(status)
+
+  @router.post("/guarded-live/incidents/{event_id}/escalate")
+  def escalate_guarded_live_incident(
+    event_id: str,
+    request: GuardedLiveActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      status = app.escalate_guarded_live_incident(
+        event_id=event_id,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return asdict(status)
+
   @router.post("/guarded-live/resume")
   def resume_guarded_live_run(
     request: GuardedLiveActionRequest,

@@ -164,21 +164,25 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
     def list_targets(self) -> tuple[str, ...]:
       return ("operator_console",)
 
-    def deliver(self, *, incident):
+    def deliver(self, *, incident, targets=None, attempt_number: int = 1, phase: str = "initial"):
       return ()
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.OperatorAlertDeliveryAdapter", FakeOperatorAlertDeliveryAdapter)
 
-  build_container(
+  container = build_container(
     Settings(
       market_data_provider="seeded",
       operator_alert_delivery_targets=("console", "slack", "pagerduty", "webhook"),
+      operator_alert_escalation_targets=("pagerduty", "slack"),
       operator_alert_webhook_url="https://ops.example.com/alert",
       operator_alert_slack_webhook_url="https://hooks.slack.example/services/ops",
       operator_alert_pagerduty_integration_key="pagerduty-key",
       operator_alert_webhook_timeout_seconds=7,
+      operator_alert_incident_ack_timeout_seconds=180,
+      operator_alert_incident_max_escalations=3,
+      operator_alert_incident_escalation_backoff_multiplier=3.0,
     )
   )
 
@@ -187,6 +191,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["slack_webhook_url"] == "https://hooks.slack.example/services/ops"
   assert captured["pagerduty_integration_key"] == "pagerduty-key"
   assert captured["webhook_timeout_seconds"] == "7"
+  assert container.app._operator_alert_escalation_targets == ("pagerduty", "slack")
+  assert container.app._operator_alert_incident_ack_timeout_seconds == 180
+  assert container.app._operator_alert_incident_max_escalations == 3
+  assert container.app._operator_alert_incident_escalation_backoff_multiplier == 3.0
 
 
 def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:

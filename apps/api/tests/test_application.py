@@ -115,6 +115,7 @@ class FakeOperatorAlertDeliveryAdapter:
     incident: OperatorIncidentEvent,
     targets: tuple[str, ...] | None = None,
     attempt_number: int = 1,
+    phase: str = "initial",
   ) -> tuple[OperatorIncidentDelivery, ...]:
     self.delivered_incidents.append(incident)
     resolved_targets = targets or self._targets
@@ -139,6 +140,7 @@ class FakeOperatorAlertDeliveryAdapter:
             else f"fake_delivery:{target}:attempt-{attempt_number}"
           ),
           attempt_number=attempt_number,
+          phase=phase,
           source=incident.source,
         )
       )
@@ -1029,6 +1031,147 @@ def test_guarded_live_delivery_retries_failed_outbound_target_with_backoff(
     if event.event_id == incident.event_id
   )
   assert retried_incident.delivery_state == "delivered"
+
+
+def test_acknowledge_guarded_live_incident_suppresses_pending_retries(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 15, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("slack_webhook",),
+    failures_before_success={"slack_webhook": 4},
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_delivery_initial_backoff_seconds=30,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="ack_flow")
+  visibility = app.get_guarded_live_status()
+  incident = next(
+    event for event in visibility.incident_events
+    if event.alert_id == "guarded-live:reconciliation" and event.kind == "incident_opened"
+  )
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="on_call_ack",
+  )
+  updated = next(
+    event for event in acknowledged.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated.acknowledgment_state == "acknowledged"
+  assert updated.acknowledged_by == "operator"
+  assert updated.acknowledgment_reason == "on_call_ack"
+  assert updated.next_escalation_at is None
+  suppressed = next(
+    record for record in acknowledged.delivery_history
+    if record.incident_event_id == incident.event_id and record.status == "retry_suppressed"
+  )
+  assert suppressed.target == "slack_webhook"
+  assert any(event.kind == "guarded_live_incident_acknowledged" for event in acknowledged.audit_events)
+
+  attempts_before = len(delivery.delivery_attempts)
+  clock.advance(timedelta(minutes=10))
+  after_wait = app.get_guarded_live_status()
+  assert len(delivery.delivery_attempts) == attempts_before
+  after_wait_incident = next(
+    event for event in after_wait.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert after_wait_incident.acknowledgment_state == "acknowledged"
+
+
+def test_guarded_live_incident_auto_escalates_after_retry_exhaustion(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 30, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("operator_webhook",),
+    failures_before_success={"operator_webhook": 3, "pagerduty_events": 0},
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_delivery_max_attempts=2,
+    operator_alert_delivery_initial_backoff_seconds=15,
+    operator_alert_escalation_targets=("pagerduty_events",),
+    operator_alert_incident_ack_timeout_seconds=300,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="auto_escalation")
+  first = app.get_guarded_live_status()
+  incident = next(
+    event for event in first.incident_events
+    if event.alert_id == "guarded-live:reconciliation" and event.kind == "incident_opened"
+  )
+  assert incident.delivery_state == "retrying"
+
+  clock.advance(timedelta(seconds=15))
+  exhausted = app.get_guarded_live_status()
+  exhausted_attempts = [
+    record
+    for record in exhausted.delivery_history
+    if record.incident_event_id == incident.event_id and record.phase == "initial"
+  ]
+  assert exhausted_attempts[0].attempt_number == 2
+  assert exhausted_attempts[0].status == "failed"
+
+  escalated = app.get_guarded_live_status()
+  updated = next(
+    event for event in escalated.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated.escalation_level == 1
+  assert updated.escalation_state == "escalated"
+  assert updated.last_escalated_by == "system"
+  assert updated.escalation_reason == "retry_budget_exhausted"
+  escalation_delivery = next(
+    record
+    for record in escalated.delivery_history
+    if record.incident_event_id == incident.event_id and record.phase == "escalation"
+  )
+  assert escalation_delivery.target == "pagerduty_events"
+  assert escalation_delivery.status == "delivered"
+  assert any(event.kind == "guarded_live_incident_escalated" for event in escalated.audit_events)
 
 
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(

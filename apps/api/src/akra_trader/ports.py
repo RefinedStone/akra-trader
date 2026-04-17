@@ -133,6 +133,7 @@ class OperatorAlertDeliveryPort(Protocol):
     incident: OperatorIncidentEvent,
     targets: tuple[str, ...] | None = None,
     attempt_number: int = 1,
+    phase: str = "initial",
   ) -> tuple[OperatorIncidentDelivery, ...]: ...
 
 

@@ -422,6 +422,65 @@ def test_guarded_live_endpoints_manage_kill_switch_and_block_runtime_starts(tmp_
     assert released_payload["audit_events"][0]["kind"] == "guarded_live_kill_switch_released"
 
 
+def test_guarded_live_incident_endpoints_acknowledge_and_escalate(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._operator_alert_escalation_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 13, 15, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.4, free=0.4, used=0.0),),
+      )
+    )
+    reconcile = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "incident_actions"},
+    )
+    assert reconcile.status_code == 200
+    incident = next(
+      event
+      for event in reconcile.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:reconciliation"
+    )
+
+    acknowledged = client.post(
+      f"/api/guarded-live/incidents/{incident['event_id']}/acknowledge",
+      json={"actor": "operator", "reason": "on_call_ack"},
+    )
+    assert acknowledged.status_code == 200
+    acknowledged_incident = next(
+      event
+      for event in acknowledged.json()["incident_events"]
+      if event["event_id"] == incident["event_id"]
+    )
+    assert acknowledged_incident["acknowledgment_state"] == "acknowledged"
+    assert acknowledged_incident["acknowledged_by"] == "operator"
+    assert acknowledged_incident["acknowledgment_reason"] == "on_call_ack"
+
+    escalated = client.post(
+      f"/api/guarded-live/incidents/{incident['event_id']}/escalate",
+      json={"actor": "operator", "reason": "manager_page"},
+    )
+    assert escalated.status_code == 200
+    escalated_incident = next(
+      event
+      for event in escalated.json()["incident_events"]
+      if event["event_id"] == incident["event_id"]
+    )
+    assert escalated_incident["escalation_level"] == 1
+    assert escalated_incident["last_escalated_by"] == "operator"
+    assert escalated_incident["escalation_reason"] == "manager_page"
+    escalation_delivery = next(
+      record
+      for record in escalated.json()["delivery_history"]
+      if record["incident_event_id"] == incident["event_id"] and record["phase"] == "escalation"
+    )
+    assert escalation_delivery["target"] == "pagerduty_events"
+
+
 def test_guarded_live_status_survives_app_restart(tmp_path: Path) -> None:
   database_path = tmp_path / "runs.sqlite3"
 

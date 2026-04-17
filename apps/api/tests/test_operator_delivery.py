@@ -51,6 +51,7 @@ def test_operator_alert_delivery_adapter_supports_slack_and_pagerduty_targets() 
   assert [record.target for record in records] == ["slack_webhook", "pagerduty_events"]
   assert all(record.status == "delivered" for record in records)
   assert all(record.attempt_number == 2 for record in records)
+  assert all(record.phase == "initial" for record in records)
 
   slack_request = next(item for item in requests if "slack.example" in item[0])
   pagerduty_request = next(item for item in requests if "pagerduty.com" in item[0])

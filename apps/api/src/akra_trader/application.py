@@ -358,6 +358,7 @@ class TradingApplication:
       incident: OperatorIncidentEvent,
       targets: tuple[str, ...] | None = None,
       attempt_number: int = 1,
+      phase: str = "initial",
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return ()
 
@@ -387,6 +388,10 @@ class TradingApplication:
     operator_alert_delivery_initial_backoff_seconds: int = 15,
     operator_alert_delivery_max_backoff_seconds: int = 300,
     operator_alert_delivery_backoff_multiplier: float = 2.0,
+    operator_alert_escalation_targets: tuple[str, ...] = (),
+    operator_alert_incident_ack_timeout_seconds: int = 300,
+    operator_alert_incident_max_escalations: int = 2,
+    operator_alert_incident_escalation_backoff_multiplier: float = 2.0,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._clock = clock or (lambda: datetime.now(UTC))
@@ -426,6 +431,21 @@ class TradingApplication:
     )
     self._operator_alert_delivery_backoff_multiplier = max(
       operator_alert_delivery_backoff_multiplier,
+      1.0,
+    )
+    self._operator_alert_escalation_targets = tuple(
+      dict.fromkeys(operator_alert_escalation_targets)
+    )
+    self._operator_alert_incident_ack_timeout_seconds = max(
+      operator_alert_incident_ack_timeout_seconds,
+      1,
+    )
+    self._operator_alert_incident_max_escalations = max(
+      operator_alert_incident_max_escalations,
+      1,
+    )
+    self._operator_alert_incident_escalation_backoff_multiplier = max(
+      operator_alert_incident_escalation_backoff_multiplier,
       1.0,
     )
 
@@ -673,28 +693,40 @@ class TradingApplication:
       merged_history=merged_history,
       current_time=current_time,
     )
-    persisted_incident_events = tuple((*incident_events, *state.incident_events))
     delivery_records = state.delivery_history
     new_incident_events, new_delivery_records = self._deliver_guarded_live_incident_events(
       incident_events=incident_events,
       current_time=current_time,
     )
     delivery_records = tuple((*new_delivery_records, *delivery_records))
+    workflow_incident_events, workflow_delivery_history, workflow_audit_events = (
+      self._refresh_guarded_live_incident_workflow(
+        incident_events=tuple((*new_incident_events, *state.incident_events)),
+        delivery_history=delivery_records,
+        current_time=current_time,
+      )
+    )
+    delivery_records = workflow_delivery_history
+    refreshed_incident_events = self._apply_incident_delivery_state(
+      incident_events=workflow_incident_events,
+      delivery_history=delivery_records,
+    )
     retry_delivery_records = self._retry_guarded_live_incident_deliveries(
-      incident_events=tuple((*new_incident_events, *persisted_incident_events[len(incident_events):])),
+      incident_events=refreshed_incident_events,
       delivery_history=delivery_records,
       current_time=current_time,
     )
     if retry_delivery_records:
       delivery_records = tuple((*retry_delivery_records, *delivery_records))
-    refreshed_incident_events = self._apply_incident_delivery_state(
-      incident_events=tuple((*new_incident_events, *state.incident_events)),
-      delivery_history=delivery_records,
-    )
+      refreshed_incident_events = self._apply_incident_delivery_state(
+        incident_events=refreshed_incident_events,
+        delivery_history=delivery_records,
+      )
     if (
       merged_history != state.alert_history
       or refreshed_incident_events != state.incident_events
       or delivery_records != state.delivery_history
+      or bool(workflow_audit_events)
     ):
       state = self._persist_guarded_live_state(
         replace(
@@ -702,6 +734,7 @@ class TradingApplication:
           alert_history=merged_history,
           incident_events=refreshed_incident_events,
           delivery_history=delivery_records,
+          audit_events=tuple((*workflow_audit_events, *state.audit_events)),
         )
       )
     return state, active_alerts
@@ -884,6 +917,104 @@ class TradingApplication:
         reconciliation=refreshed_reconciliation,
         recovery=recovery_state,
         audit_events=(event, *state.audit_events),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def acknowledge_guarded_live_incident(
+    self,
+    *,
+    event_id: str,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state, _ = self._refresh_guarded_live_alert_state(current_time=current_time)
+    incident = self._require_active_guarded_live_incident(state=state, event_id=event_id)
+    if incident.acknowledgment_state == "acknowledged":
+      return self.get_guarded_live_status()
+
+    updated_incident = replace(
+      incident,
+      acknowledgment_state="acknowledged",
+      acknowledged_at=current_time,
+      acknowledged_by=actor,
+      acknowledgment_reason=reason,
+      next_escalation_at=None,
+    )
+    incident_events = self._replace_incident_event(
+      incident_events=state.incident_events,
+      updated_incident=updated_incident,
+    )
+    delivery_history = self._suppress_pending_incident_retries(
+      delivery_history=state.delivery_history,
+      incident_event_id=event_id,
+      reason="acknowledged_by_operator",
+    )
+    incident_events = self._apply_incident_delivery_state(
+      incident_events=incident_events,
+      delivery_history=delivery_history,
+    )
+    audit_event = OperatorAuditEvent(
+      event_id=f"guarded-live-incident-acknowledged:{event_id}:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_incident_acknowledged",
+      summary=f"Guarded-live incident acknowledged for {incident.alert_id}.",
+      detail=f"Reason: {reason}. Incident {event_id} acknowledged and pending retries suppressed.",
+      run_id=incident.run_id,
+      session_id=incident.session_id,
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        incident_events=incident_events,
+        delivery_history=delivery_history,
+        audit_events=(audit_event, *state.audit_events),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def escalate_guarded_live_incident(
+    self,
+    *,
+    event_id: str,
+    actor: str,
+    reason: str,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state, _ = self._refresh_guarded_live_alert_state(current_time=current_time)
+    incident = self._require_active_guarded_live_incident(state=state, event_id=event_id)
+    if incident.escalation_level >= self._operator_alert_incident_max_escalations:
+      raise ValueError("incident escalation limit reached")
+
+    (
+      updated_incident,
+      delivery_history,
+      escalation_audit_event,
+    ) = self._escalate_incident_event(
+      incident=incident,
+      delivery_history=state.delivery_history,
+      current_time=current_time,
+      actor=actor,
+      reason=reason,
+      trigger="manual_operator_escalation",
+    )
+    incident_events = self._replace_incident_event(
+      incident_events=state.incident_events,
+      updated_incident=updated_incident,
+    )
+    incident_events = self._apply_incident_delivery_state(
+      incident_events=incident_events,
+      delivery_history=delivery_history,
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        incident_events=incident_events,
+        delivery_history=delivery_history,
+        audit_events=(escalation_audit_event, *state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -3737,6 +3868,16 @@ class TradingApplication:
             session_id=alert.session_id,
             source=alert.source,
             delivery_targets=outbound_targets,
+            escalation_targets=self._operator_alert_escalation_targets,
+            acknowledgment_state="unacknowledged",
+            escalation_state=(
+              "pending" if self._operator_alert_escalation_targets else "not_configured"
+            ),
+            next_escalation_at=(
+              alert.detected_at + timedelta(seconds=self._operator_alert_incident_ack_timeout_seconds)
+              if self._operator_alert_escalation_targets
+              else None
+            ),
           )
         )
         continue
@@ -3755,6 +3896,8 @@ class TradingApplication:
             session_id=alert.session_id,
             source=alert.source,
             delivery_targets=outbound_targets,
+            acknowledgment_state="not_applicable",
+            escalation_state="not_applicable",
           )
         )
 
@@ -3772,7 +3915,9 @@ class TradingApplication:
     for incident in incident_events:
       records = self._operator_alert_delivery.deliver(
         incident=incident,
+        targets=incident.delivery_targets,
         attempt_number=1,
+        phase="initial",
       )
       records = self._apply_delivery_retry_policy(
         records=records,
@@ -3806,10 +3951,18 @@ class TradingApplication:
       incident = incidents_by_id.get(incident_event_id)
       if incident is None:
         continue
+      latest = self._latest_incident_delivery_record(
+        delivery_history=delivery_history,
+        incident_event_id=incident_event_id,
+        target=target,
+      )
+      if latest is None:
+        continue
       records = self._operator_alert_delivery.deliver(
         incident=incident,
         targets=(target,),
         attempt_number=attempt_number,
+        phase=latest.phase,
       )
       retries.extend(
         self._apply_delivery_retry_policy(
@@ -3827,25 +3980,22 @@ class TradingApplication:
     current_time: datetime,
   ) -> tuple[tuple[str, str, int], ...]:
     due_retries: list[tuple[str, str, int]] = []
-    latest_by_key: dict[tuple[str, str], OperatorIncidentDelivery] = {}
-    for record in delivery_history:
-      key = (record.incident_event_id, record.target)
-      existing = latest_by_key.get(key)
-      if existing is None or record.attempt_number > existing.attempt_number:
-        latest_by_key[key] = record
+    incidents_by_id = {incident.event_id: incident for incident in incident_events}
+    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
 
-    for incident in incident_events:
-      for target in incident.delivery_targets:
-        latest = latest_by_key.get((incident.event_id, target))
-        if latest is None:
-          continue
-        if latest.status != "retry_scheduled" or latest.next_retry_at is None:
-          continue
-        if latest.next_retry_at > current_time:
-          continue
-        if latest.attempt_number >= self._operator_alert_delivery_max_attempts:
-          continue
-        due_retries.append((incident.event_id, target, latest.attempt_number + 1))
+    for latest in latest_by_key.values():
+      incident = incidents_by_id.get(latest.incident_event_id)
+      if incident is None:
+        continue
+      if incident.kind == "incident_opened" and incident.acknowledgment_state == "acknowledged":
+        continue
+      if latest.status != "retry_scheduled" or latest.next_retry_at is None:
+        continue
+      if latest.next_retry_at > current_time:
+        continue
+      if latest.attempt_number >= self._operator_alert_delivery_max_attempts:
+        continue
+      due_retries.append((latest.incident_event_id, latest.target, latest.attempt_number + 1))
     due_retries.sort()
     return tuple(due_retries)
 
@@ -3855,19 +4005,14 @@ class TradingApplication:
     incident_events: tuple[OperatorIncidentEvent, ...],
     delivery_history: tuple[OperatorIncidentDelivery, ...],
   ) -> tuple[OperatorIncidentEvent, ...]:
-    latest_by_key: dict[tuple[str, str], OperatorIncidentDelivery] = {}
-    for record in delivery_history:
-      key = (record.incident_event_id, record.target)
-      existing = latest_by_key.get(key)
-      if existing is None or record.attempt_number > existing.attempt_number:
-        latest_by_key[key] = record
+    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
 
     refreshed: list[OperatorIncidentEvent] = []
     for incident in incident_events:
       records = tuple(
-        latest_by_key[(incident.event_id, target)]
-        for target in incident.delivery_targets
-        if (incident.event_id, target) in latest_by_key
+        record
+        for key, record in latest_by_key.items()
+        if key[0] == incident.event_id
       )
       refreshed.append(
         replace(
@@ -3877,6 +4022,64 @@ class TradingApplication:
       )
     refreshed.sort(key=lambda event: event.timestamp, reverse=True)
     return tuple(refreshed)
+
+  def _refresh_guarded_live_incident_workflow(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[
+    tuple[OperatorIncidentEvent, ...],
+    tuple[OperatorIncidentDelivery, ...],
+    tuple[OperatorAuditEvent, ...],
+  ]:
+    updated_incidents = incident_events
+    effective_delivery_history = delivery_history
+    audit_events: list[OperatorAuditEvent] = []
+
+    for incident in incident_events:
+      if incident.kind != "incident_opened":
+        continue
+      if (
+        not self._incident_is_still_active(
+          incident=incident,
+          incident_events=updated_incidents,
+        )
+        or incident.acknowledgment_state == "acknowledged"
+      ):
+        continue
+      if incident.escalation_level >= self._operator_alert_incident_max_escalations:
+        continue
+
+      trigger: str | None = None
+      reason: str | None = None
+      if self._incident_has_exhausted_initial_delivery(
+        incident=incident,
+        delivery_history=effective_delivery_history,
+      ):
+        trigger = "delivery_exhausted"
+        reason = "retry_budget_exhausted"
+      elif incident.next_escalation_at is not None and incident.next_escalation_at <= current_time:
+        trigger = "ack_timeout"
+        reason = "ack_timeout_elapsed"
+      if trigger is None or reason is None:
+        continue
+
+      updated_incident, effective_delivery_history, audit_event = self._escalate_incident_event(
+        incident=incident,
+        delivery_history=effective_delivery_history,
+        current_time=current_time,
+        actor="system",
+        reason=reason,
+        trigger=trigger,
+      )
+      updated_incidents = self._replace_incident_event(
+        incident_events=updated_incidents,
+        updated_incident=updated_incident,
+      )
+      audit_events.append(audit_event)
+    return updated_incidents, effective_delivery_history, tuple(audit_events)
 
   def _apply_delivery_retry_policy(
     self,
@@ -3916,13 +4119,202 @@ class TradingApplication:
     if not records:
       return "not_configured"
     statuses = {record.status for record in records}
-    if statuses == {"delivered"}:
+    if statuses <= {"delivered", "retry_suppressed"} and "delivered" in statuses:
       return "delivered"
     if "retry_scheduled" in statuses:
       return "retrying"
+    if statuses == {"retry_suppressed"}:
+      return "suppressed"
     if "delivered" in statuses:
       return "partial"
     return "failed"
+
+  @staticmethod
+  def _latest_delivery_records_by_key(
+    *,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+  ) -> dict[tuple[str, str, str], OperatorIncidentDelivery]:
+    latest_by_key: dict[tuple[str, str, str], OperatorIncidentDelivery] = {}
+    for record in delivery_history:
+      key = (record.incident_event_id, record.target, record.phase)
+      existing = latest_by_key.get(key)
+      if existing is None or record.attempt_number > existing.attempt_number:
+        latest_by_key[key] = record
+    return latest_by_key
+
+  def _latest_incident_delivery_record(
+    self,
+    *,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    incident_event_id: str,
+    target: str,
+  ) -> OperatorIncidentDelivery | None:
+    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
+    candidates = [
+      record
+      for key, record in latest_by_key.items()
+      if key[0] == incident_event_id and key[1] == target
+    ]
+    if not candidates:
+      return None
+    candidates.sort(key=lambda record: (record.phase == "escalation", record.attempt_number), reverse=True)
+    return candidates[0]
+
+  @staticmethod
+  def _replace_incident_event(
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    updated_incident: OperatorIncidentEvent,
+  ) -> tuple[OperatorIncidentEvent, ...]:
+    replaced = [
+      updated_incident if incident.event_id == updated_incident.event_id else incident
+      for incident in incident_events
+    ]
+    replaced.sort(key=lambda event: event.timestamp, reverse=True)
+    return tuple(replaced)
+
+  @staticmethod
+  def _incident_is_still_active(
+    *,
+    incident: OperatorIncidentEvent,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+  ) -> bool:
+    if incident.kind != "incident_opened":
+      return False
+    for candidate in incident_events:
+      if candidate.alert_id != incident.alert_id or candidate.kind != "incident_resolved":
+        continue
+      if candidate.timestamp >= incident.timestamp:
+        return False
+    return True
+
+  def _require_active_guarded_live_incident(
+    self,
+    *,
+    state: GuardedLiveState,
+    event_id: str,
+  ) -> OperatorIncidentEvent:
+    incident = next((event for event in state.incident_events if event.event_id == event_id), None)
+    if incident is None:
+      raise LookupError("Guarded-live incident not found")
+    if incident.kind != "incident_opened":
+      raise ValueError("Only active incident_opened records can be acknowledged or escalated")
+    if not self._incident_is_still_active(incident=incident, incident_events=state.incident_events):
+      raise ValueError("Guarded-live incident is no longer active")
+    return incident
+
+  @staticmethod
+  def _suppress_pending_incident_retries(
+    *,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    incident_event_id: str,
+    reason: str,
+    phase: str | None = None,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    updated: list[OperatorIncidentDelivery] = []
+    for record in delivery_history:
+      if record.incident_event_id != incident_event_id:
+        updated.append(record)
+        continue
+      if phase is not None and record.phase != phase:
+        updated.append(record)
+        continue
+      if record.status != "retry_scheduled":
+        updated.append(record)
+        continue
+      updated.append(
+        replace(
+          record,
+          status="retry_suppressed",
+          next_retry_at=None,
+          detail=f"{record.detail}; retry_suppressed:{reason}",
+        )
+      )
+    return tuple(updated)
+
+  def _incident_has_exhausted_initial_delivery(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+  ) -> bool:
+    latest_by_key = self._latest_delivery_records_by_key(delivery_history=delivery_history)
+    initial_records = [
+      record
+      for key, record in latest_by_key.items()
+      if key[0] == incident.event_id and key[2] == "initial"
+    ]
+    return any(record.status == "failed" for record in initial_records)
+
+  def _escalate_incident_event(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+    actor: str,
+    reason: str,
+    trigger: str,
+  ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...], OperatorAuditEvent]:
+    escalation_targets = incident.escalation_targets or incident.delivery_targets
+    if not escalation_targets:
+      raise ValueError("incident escalation has no configured delivery targets")
+
+    updated_delivery_history = self._suppress_pending_incident_retries(
+      delivery_history=delivery_history,
+      incident_event_id=incident.event_id,
+      reason=f"escalated:{trigger}",
+      phase="initial",
+    )
+    next_level = incident.escalation_level + 1
+    next_escalation_at = None
+    if (
+      incident.acknowledgment_state != "acknowledged"
+      and next_level < self._operator_alert_incident_max_escalations
+    ):
+      next_escalation_at = current_time + timedelta(
+        seconds=self._resolve_incident_escalation_backoff_seconds(next_level)
+      )
+
+    updated_incident = replace(
+      incident,
+      escalation_level=next_level,
+      escalation_state="escalated",
+      last_escalated_at=current_time,
+      last_escalated_by=actor,
+      escalation_reason=reason,
+      next_escalation_at=next_escalation_at,
+    )
+    escalation_deliveries = self._operator_alert_delivery.deliver(
+      incident=updated_incident,
+      targets=escalation_targets,
+      attempt_number=1,
+      phase="escalation",
+    )
+    escalation_deliveries = self._apply_delivery_retry_policy(
+      records=escalation_deliveries,
+      current_time=current_time,
+    )
+    audit_event = OperatorAuditEvent(
+      event_id=f"guarded-live-incident-escalated:{incident.event_id}:{current_time.isoformat()}",
+      timestamp=current_time,
+      actor=actor,
+      kind="guarded_live_incident_escalated",
+      summary=f"Guarded-live incident escalated for {incident.alert_id}.",
+      detail=(
+        f"Trigger: {trigger}. Reason: {reason}. Escalation level {next_level} "
+        f"sent via {', '.join(escalation_targets)}."
+      ),
+      run_id=incident.run_id,
+      session_id=incident.session_id,
+      source="guarded_live",
+    )
+    return updated_incident, tuple((*escalation_deliveries, *updated_delivery_history)), audit_event
+
+  def _resolve_incident_escalation_backoff_seconds(self, escalation_level: int) -> int:
+    multiplier = self._operator_alert_incident_escalation_backoff_multiplier ** max(escalation_level - 1, 0)
+    backoff = int(self._operator_alert_incident_ack_timeout_seconds * multiplier)
+    return min(backoff, self._operator_alert_delivery_max_backoff_seconds)
 
   def _build_live_operator_alerts_for_run(
     self,

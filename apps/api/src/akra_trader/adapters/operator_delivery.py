@@ -65,21 +65,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     incident: OperatorIncidentEvent,
     targets: tuple[str, ...] | None = None,
     attempt_number: int = 1,
+    phase: str = "initial",
   ) -> tuple[OperatorIncidentDelivery, ...]:
     records: list[OperatorIncidentDelivery] = []
     resolved_targets = targets or self._targets
     for target in resolved_targets:
       if target == "operator_console":
-        records.append(self._deliver_console(incident=incident, attempt_number=attempt_number))
+        records.append(self._deliver_console(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "operator_webhook":
-        records.append(self._deliver_webhook(incident=incident, attempt_number=attempt_number))
+        records.append(self._deliver_webhook(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "slack_webhook":
-        records.append(self._deliver_slack(incident=incident, attempt_number=attempt_number))
+        records.append(self._deliver_slack(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "pagerduty_events":
-        records.append(self._deliver_pagerduty(incident=incident, attempt_number=attempt_number))
+        records.append(self._deliver_pagerduty(incident=incident, attempt_number=attempt_number, phase=phase))
     return tuple(records)
 
   def _deliver_console(
@@ -87,6 +88,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     *,
     incident: OperatorIncidentEvent,
     attempt_number: int,
+    phase: str,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
     LOGGER.warning(
@@ -118,6 +120,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       attempted_at=attempted_at,
       detail="logged_to_operator_console",
       attempt_number=attempt_number,
+      phase=phase,
       source=incident.source,
     )
 
@@ -126,6 +129,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     *,
     incident: OperatorIncidentEvent,
     attempt_number: int,
+    phase: str,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
     if not self._webhook_url:
@@ -139,6 +143,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail="webhook_url_unconfigured",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
 
@@ -161,6 +166,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"webhook_status:{status_code}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
     except (urllib_error.URLError, TimeoutError, ValueError) as exc:
@@ -174,6 +180,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"webhook_delivery_failed:{exc}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
 
@@ -182,6 +189,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     *,
     incident: OperatorIncidentEvent,
     attempt_number: int,
+    phase: str,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
     if not self._slack_webhook_url:
@@ -195,6 +203,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail="slack_webhook_url_unconfigured",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
     request = urllib_request.Request(
@@ -216,6 +225,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"slack_status:{status_code}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
     except (urllib_error.URLError, TimeoutError, ValueError) as exc:
@@ -229,6 +239,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"slack_delivery_failed:{exc}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
 
@@ -237,6 +248,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     *,
     incident: OperatorIncidentEvent,
     attempt_number: int,
+    phase: str,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
     if not self._pagerduty_integration_key:
@@ -250,6 +262,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail="pagerduty_integration_key_unconfigured",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
     request = urllib_request.Request(
@@ -271,6 +284,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"pagerduty_status:{status_code}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
     except (urllib_error.URLError, TimeoutError, ValueError) as exc:
@@ -284,6 +298,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         attempted_at=attempted_at,
         detail=f"pagerduty_delivery_failed:{exc}",
         attempt_number=attempt_number,
+        phase=phase,
         source=incident.source,
       )
 
