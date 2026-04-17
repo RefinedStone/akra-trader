@@ -383,18 +383,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Extend durable incident workflow to risk breaches and broader live-path faults",
       "description": "Expand the new durable incident workflow beyond the current guarded-live incident set by persisting risk-breach and adjacent live-path fault lifecycle state, surfacing those wider operator-visible incident categories, and making them inspectable through the same incident and delivery history instead of only current in-memory status or narrow guarded-live alerts.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 9,
-      "priority_reason": "With commit 0c56893 completing the immediate provider-breadth step, the latest main-session reply now leaves risk breaches and broader live-path faults outside the durable paging-policy workflow as the clearest next executable queue head.",
+      "priority_reason": "Completed in main session commit 2474ba5, which extended live-run alert derivation and durable incident history to cover risk_breach, runtime_recovery, and order_sync categories, surfaced them in operator APIs and control-room views, and verified the workflow with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:55:00Z",
+      "updated_at": "2026-04-17T13:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending the same durable incident and delivery-history discipline from guarded-live incidents into risk breaches and adjacent live-path faults."
+      "direction_relation_note": "Closed the next durable incident-scope gap for operator trust by extending persisted incident and delivery history through risk breaches, recovery loops, and stale order-sync faults, which now leaves wider market-data freshness and broader risk-surface incident coverage as the clearest follow-up."
+    },
+    {
+      "id": "planning-operator-trust-expand-durable-incident-coverage-to-market-data-and-risk-surface",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extend durable incident coverage to market-data freshness policy and wider risk surface",
+      "description": "Build on the newly broadened durable incident workflow by promoting wider market-data freshness policy breaches and the next broader risk-surface faults into the same persisted incident, delivery-history, and operator-visible lifecycle model, so important runtime hazards do not stop at status text or narrow guarded-live categories.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply explicitly says durable incident scope now covers worker failure or staleness, risk breach, recovery loop, and stale order sync, leaving wider market-data freshness policy and broader risk surface as the clearest immediate executable follow-up.",
+      "depends_on": [
+        "planning-operator-trust-sandbox-durable-alert-history"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T13:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with runtime reality by extending the same durable incident discipline from newly covered live-path faults into the next operator-actionable freshness and risk hazards."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -471,20 +489,20 @@
     {
       "id": "planning-operator-trust-expand-provider-native-escalation-coverage",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Expand provider-native escalation coverage beyond PagerDuty and Opsgenie",
-      "description": "Build on the generalized provider-native incident workflow by adding additional incident providers and richer provider-owned escalation semantics, so durable paging-policy orchestration does not stop at the current PagerDuty and Opsgenie feature set.",
+      "title": "Expand provider-managed incident ownership beyond PagerDuty and Opsgenie",
+      "description": "Build on the generalized provider-native incident workflow by adding additional incident providers and fuller provider-managed ownership semantics, so durable paging-policy orchestration does not stop at the current PagerDuty and Opsgenie feature set or remain partially local when the provider should own the downstream lifecycle.",
       "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply says provider-native orchestration now reaches PagerDuty and Opsgenie, but wider provider coverage and richer provider-owned escalation workflow still remain after commit 0c56893.",
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply says external incident-management integration exists already, but provider-managed ownership as a broader operating path still remains beyond the current PagerDuty and Opsgenie-native workflow after commit 2474ba5.",
       "depends_on": [
         "planning-operator-trust-generalize-provider-native-incident-orchestration"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:55:00Z",
+      "updated_at": "2026-04-17T13:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic incident handling by treating PagerDuty and Opsgenie as the first provider-native workflow set rather than the final scope."
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic incident handling by treating PagerDuty and Opsgenie as the first provider-managed ownership set rather than the final scope."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
