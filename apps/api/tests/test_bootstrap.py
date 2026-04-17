@@ -169,6 +169,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       rootly_api_url: str,
       rootly_recovery_engine_url_template: str | None,
       rootly_recovery_engine_token: str | None,
+      blameless_api_token: str | None,
+      blameless_api_url: str,
+      blameless_recovery_engine_url_template: str | None,
+      blameless_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -195,6 +199,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["rootly_api_url"] = rootly_api_url
       captured["rootly_recovery_engine_url_template"] = rootly_recovery_engine_url_template or ""
       captured["rootly_recovery_engine_token"] = rootly_recovery_engine_token or ""
+      captured["blameless_api_token"] = blameless_api_token or ""
+      captured["blameless_api_url"] = blameless_api_url
+      captured["blameless_recovery_engine_url_template"] = blameless_recovery_engine_url_template or ""
+      captured["blameless_recovery_engine_token"] = blameless_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -267,6 +275,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://rootly.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_rootly_recovery_engine_token="rootly-recovery-token",
+      operator_alert_blameless_api_token="blameless-token",
+      operator_alert_blameless_api_url="https://api.blameless.example",
+      operator_alert_blameless_recovery_engine_url_template=(
+        "https://blameless.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_blameless_recovery_engine_token="blameless-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -306,6 +320,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["rootly_api_url"] == "https://api.rootly.example"
   assert captured["rootly_recovery_engine_url_template"] == "https://rootly.example/recovery/{workflow_reference_urlencoded}"
   assert captured["rootly_recovery_engine_token"] == "rootly-recovery-token"
+  assert captured["blameless_api_token"] == "blameless-token"
+  assert captured["blameless_api_url"] == "https://api.blameless.example"
+  assert captured["blameless_recovery_engine_url_template"] == "https://blameless.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["blameless_recovery_engine_token"] == "blameless-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"

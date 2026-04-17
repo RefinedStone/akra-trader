@@ -37,6 +37,8 @@ def _normalize_target(target: str) -> str | None:
     return "firehydrant_incidents"
   if normalized in {"rootly", "root_ly", "rootly_incidents", "operator_rootly"}:
     return "rootly_incidents"
+  if normalized in {"blameless", "blameless_incidents", "operator_blameless"}:
+    return "blameless_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -66,6 +68,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     rootly_api_url: str = "https://api.rootly.com",
     rootly_recovery_engine_url_template: str | None = None,
     rootly_recovery_engine_token: str | None = None,
+    blameless_api_token: str | None = None,
+    blameless_api_url: str = "https://api.blameless.com",
+    blameless_recovery_engine_url_template: str | None = None,
+    blameless_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -99,6 +105,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._rootly_api_url = rootly_api_url.rstrip("/")
     self._rootly_recovery_engine_url_template = rootly_recovery_engine_url_template
     self._rootly_recovery_engine_token = rootly_recovery_engine_token
+    self._blameless_api_token = blameless_api_token
+    self._blameless_api_url = blameless_api_url.rstrip("/")
+    self._blameless_recovery_engine_url_template = blameless_recovery_engine_url_template
+    self._blameless_recovery_engine_token = blameless_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -120,6 +130,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("firehydrant")
     if self._rootly_api_token:
       providers.append("rootly")
+    if self._blameless_api_token:
+      providers.append("blameless")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -155,6 +167,9 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         continue
       if target == "rootly_incidents":
         records.append(self._deliver_rootly(incident=incident, attempt_number=attempt_number, phase=phase))
+        continue
+      if target == "blameless_incidents":
+        records.append(self._deliver_blameless(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "opsgenie_alerts":
         records.append(self._deliver_opsgenie(incident=incident, attempt_number=attempt_number, phase=phase))
@@ -217,6 +232,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "blameless":
+      return (
+        self._sync_blameless_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsgenie":
       return (
         self._sync_opsgenie_workflow(
@@ -265,6 +291,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_firehydrant_workflow_state(incident=incident)
     if normalized_provider == "rootly":
       return self._pull_rootly_workflow_state(incident=incident)
+    if normalized_provider == "blameless":
+      return self._pull_blameless_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -354,6 +382,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   def _build_rootly_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
     token = self._rootly_recovery_engine_token or self._rootly_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_blameless_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    token = self._blameless_recovery_engine_token or self._blameless_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -512,6 +549,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_rootly_recovery_engine_request(url=url)
+    elif provider == "blameless":
+      url = self._format_recovery_engine_url(
+        url_template=self._blameless_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_blameless_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -1527,6 +1575,245 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_blameless(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._blameless_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:blameless_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="blameless_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="blameless_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_blameless_delivery_request(incident=incident, reference=reference)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:blameless_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="blameless_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"blameless_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:blameless_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="blameless_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"blameless_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_blameless_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    target = "blameless_workflow"
+    if not self._blameless_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="blameless_workflow_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="blameless_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="blameless",
+        external_reference=None,
+        source=incident.source,
+      )
+    request = self._build_blameless_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"blameless_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"blameless_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="blameless",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_blameless_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._blameless_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_blameless_pull_request(reference=reference, reference_type=reference_type)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    incident_payload = self._extract_mapping(
+      payload.get("data"),
+      payload.get("incident"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      incident_payload.get("attributes"),
+      incident_payload.get("incident"),
+      incident_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      attributes.get("metadata"),
+      attributes.get("details"),
+      attributes.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "severity": self._first_non_empty_string(
+        attributes.get("severity"),
+        self._extract_mapping(attributes.get("severity")).get("name"),
+      ),
+      "commander": self._first_non_empty_string(
+        attributes.get("commander"),
+        self._extract_mapping(attributes.get("commander")).get("name"),
+        self._extract_mapping(attributes.get("owner")).get("name"),
+      ),
+      "visibility": self._first_non_empty_string(
+        attributes.get("visibility"),
+        attributes.get("visibility_mode"),
+      ),
+      "url": self._first_non_empty_string(
+        attributes.get("url"),
+        attributes.get("html_url"),
+      ),
+      "updated_at": attributes.get("updated_at"),
+      "external_reference": self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="blameless",
+      workflow_reference=self._first_non_empty_string(
+        incident_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        attributes.get("status"),
+        payload.get("status"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        attributes.get("title"),
+        attributes.get("summary"),
+        attributes.get("description"),
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        attributes.get("updated_at"),
+        attributes.get("created_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -2100,6 +2387,63 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return "incident_active"
     return "idle"
 
+  @staticmethod
+  def _resolve_blameless_incident_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_blameless_command_phase(commander: str | None) -> str:
+    return "assigned" if commander else "unassigned"
+
+  @staticmethod
+  def _resolve_blameless_visibility_phase(visibility: str | None) -> str:
+    normalized = (visibility or "").strip().lower().replace(" ", "_")
+    if normalized in {"public", "private", "internal"}:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_blameless_severity_phase(severity: str | None) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    return normalized or "unknown"
+
+  @staticmethod
+  def _resolve_blameless_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
   def _build_provider_pull_sync(
     self,
     *,
@@ -2505,6 +2849,106 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           provider_telemetry.get("state"),
           provider_recovery.get("job_state"),
           rootly_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
+    elif provider == "blameless":
+      blameless_severity = self._first_non_empty_string(
+        provider_specific_recovery.get("severity"),
+        provider_payload.get("severity"),
+      )
+      blameless_commander = self._first_non_empty_string(
+        provider_specific_recovery.get("commander"),
+        provider_payload.get("commander"),
+        self._extract_mapping(provider_payload.get("owner")).get("name"),
+      )
+      blameless_visibility = self._first_non_empty_string(
+        provider_specific_recovery.get("visibility"),
+        provider_payload.get("visibility"),
+        provider_payload.get("visibility_mode"),
+      )
+      blameless_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("status"),
+      ) or "unknown"
+      blameless_incident_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("incident_phase"),
+        self._resolve_blameless_incident_phase(blameless_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "blameless",
+        "blameless": {
+          "incident_id": workflow_reference,
+          "external_reference": external_reference,
+          "incident_status": blameless_status,
+          "severity": blameless_severity,
+          "commander": blameless_commander,
+          "visibility": blameless_visibility,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "incident_phase": blameless_incident_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_blameless_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=blameless_status,
+            ),
+            "command_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("command_phase"),
+            ) or self._resolve_blameless_command_phase(blameless_commander),
+            "visibility_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("visibility_phase"),
+            ) or self._resolve_blameless_visibility_phase(blameless_visibility),
+            "severity_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("severity_phase"),
+            ) or self._resolve_blameless_severity_phase(blameless_severity),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          blameless_status,
         ),
         "job_url": self._first_non_empty_string(
           provider_telemetry.get("job_url"),
@@ -3026,6 +3470,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           ),
         },
       },
+      "blameless": {
+        "incident_id": provider_recovery.blameless.incident_id,
+        "external_reference": provider_recovery.blameless.external_reference,
+        "incident_status": provider_recovery.blameless.incident_status,
+        "severity": provider_recovery.blameless.severity,
+        "commander": provider_recovery.blameless.commander,
+        "visibility": provider_recovery.blameless.visibility,
+        "url": provider_recovery.blameless.url,
+        "updated_at": (
+          provider_recovery.blameless.updated_at.isoformat()
+          if provider_recovery.blameless.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "incident_phase": provider_recovery.blameless.phase_graph.incident_phase,
+          "workflow_phase": provider_recovery.blameless.phase_graph.workflow_phase,
+          "command_phase": provider_recovery.blameless.phase_graph.command_phase,
+          "visibility_phase": provider_recovery.blameless.phase_graph.visibility_phase,
+          "severity_phase": provider_recovery.blameless.phase_graph.severity_phase,
+          "last_transition_at": (
+            provider_recovery.blameless.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.blameless.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
     }
 
   @staticmethod
@@ -3409,6 +3879,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       method="GET",
     )
 
+  def _build_blameless_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      f"{self._blameless_api_url}/v1/incidents/{encoded_reference}?identifier_type={reference_type}",
+      headers={
+        "Authorization": f"Bearer {self._blameless_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
   def _build_pagerduty_workflow_request(
     self,
     *,
@@ -3637,6 +4123,138 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         method="POST",
       )
     raise ValueError(f"unsupported rootly workflow action: {action}")
+
+  def _build_blameless_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._blameless_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._blameless_api_url}/v1/incidents/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._blameless_api_url}/v1/incidents",
+      data=json.dumps(
+        {
+          "incident": {
+            "title": incident.summary[:255],
+            "summary": incident.detail,
+            "status": "open",
+            "severity": self._map_blameless_severity(incident.severity),
+            "visibility": "private",
+            "external_reference": reference,
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_blameless_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._blameless_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._blameless_api_url}/v1/incidents/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._blameless_api_url}/v1/incidents/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._blameless_api_url}/v1/incidents/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated incident to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._blameless_api_url}/v1/incidents/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported blameless workflow action: {action}")
 
   def _build_opsgenie_pull_request(
     self,
@@ -3931,3 +4549,14 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "sev_warning"
     return "sev_info"
+
+  @staticmethod
+  def _map_blameless_severity(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized == "critical":
+      return "sev1"
+    if normalized in {"error", "high"}:
+      return "sev2"
+    if normalized in {"warning", "warn"}:
+      return "sev3"
+    return "sev4"

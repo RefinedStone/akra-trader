@@ -676,6 +676,31 @@ class OperatorIncidentRootlyRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentBlamelessRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  commander: str | None = None
+  visibility: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentBlamelessRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentBlamelessRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentBlamelessRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  command_phase: str = "unknown"
+  visibility_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -711,6 +736,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   rootly: OperatorIncidentRootlyRecoveryState = field(
     default_factory=OperatorIncidentRootlyRecoveryState
+  )
+  blameless: OperatorIncidentBlamelessRecoveryState = field(
+    default_factory=OperatorIncidentBlamelessRecoveryState
   )
   updated_at: datetime | None = None
 

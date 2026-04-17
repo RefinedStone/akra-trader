@@ -502,6 +502,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        blameless: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          commander?: string | null;
+          visibility?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            command_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -751,6 +769,24 @@ type GuardedLiveStatus = {
             incident_phase: string;
             workflow_phase: string;
             acknowledgment_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        blameless: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          commander?: string | null;
+          visibility?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            command_phase: string;
             visibility_phase: string;
             severity_phase: string;
             last_transition_at?: string | null;
@@ -8250,6 +8286,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  blameless: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    commander?: string | null;
+    visibility?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      command_phase: string;
+      visibility_phase: string;
+      severity_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8395,6 +8449,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Rootly schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "blameless") {
+    const details = [
+      providerRecovery.blameless.incident_id ? `incident ${providerRecovery.blameless.incident_id}` : null,
+      providerRecovery.blameless.incident_status !== "unknown"
+        ? `status ${providerRecovery.blameless.incident_status}`
+        : null,
+      providerRecovery.blameless.severity ? `severity ${providerRecovery.blameless.severity}` : null,
+      providerRecovery.blameless.commander ? `commander ${providerRecovery.blameless.commander}` : null,
+      providerRecovery.blameless.visibility ? `visibility ${providerRecovery.blameless.visibility}` : null,
+      providerRecovery.blameless.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.blameless.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.blameless.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.blameless.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.blameless.phase_graph.command_phase !== "unknown"
+        ? `command ${providerRecovery.blameless.phase_graph.command_phase}`
+        : null,
+      providerRecovery.blameless.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.blameless.updated_at)}`
+        : null,
+      providerRecovery.blameless.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.blameless.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Blameless schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

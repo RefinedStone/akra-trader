@@ -58,6 +58,8 @@ from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryState
 from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentRootlyRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentRootlyRecoveryState
+from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1568,6 +1570,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "blameless"
+          and provider_recovery.blameless.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            blameless=replace(
+              aligned_provider_recovery.blameless,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2671,6 +2684,127 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_blameless_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_blameless_command_phase(commander: str | None, existing_phase: str) -> str:
+    if commander:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_blameless_visibility_phase(visibility: str | None, existing_phase: str) -> str:
+    normalized = (visibility or "").strip().lower().replace(" ", "_")
+    if normalized in {"public", "private", "internal"}:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_blameless_severity_phase(severity: str | None, existing_phase: str) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_blameless_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_blameless_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity: str | None,
+    commander: str | None,
+    visibility: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentBlamelessRecoveryState,
+  ) -> OperatorIncidentBlamelessRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_blameless_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_blameless_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentBlamelessRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      command_phase=self._first_non_empty_string(
+        payload.get("command_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("command_phase"),
+      ) or self._resolve_blameless_command_phase(
+        commander,
+        existing.phase_graph.command_phase,
+      ),
+      visibility_phase=self._first_non_empty_string(
+        payload.get("visibility_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("visibility_phase"),
+      ) or self._resolve_blameless_visibility_phase(
+        visibility,
+        existing.phase_graph.visibility_phase,
+      ),
+      severity_phase=self._first_non_empty_string(
+        payload.get("severity_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("severity_phase"),
+      ) or self._resolve_blameless_severity_phase(
+        severity,
+        existing.phase_graph.severity_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -2690,6 +2824,7 @@ class TradingApplication:
     OperatorIncidentIncidentIoRecoveryState,
     OperatorIncidentFireHydrantRecoveryState,
     OperatorIncidentRootlyRecoveryState,
+    OperatorIncidentBlamelessRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -3083,6 +3218,81 @@ class TradingApplication:
       ),
     )
 
+    blameless_payload = self._merge_payload_mappings(
+      schema_payload.get("blameless"),
+      schema_payload.get("blame_less"),
+      payload.get("blameless"),
+      payload.get("blameless_incident"),
+      payload.get("blame_less"),
+    )
+    blameless_status = self._first_non_empty_string(
+      blameless_payload.get("incident_status"),
+      blameless_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.blameless.incident_status,
+    ) or "unknown"
+    blameless = OperatorIncidentBlamelessRecoveryState(
+      incident_id=self._first_non_empty_string(
+        blameless_payload.get("incident_id"),
+        blameless_payload.get("id"),
+        workflow_reference,
+        existing.blameless.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        blameless_payload.get("external_reference"),
+        blameless_payload.get("reference"),
+        reference,
+        existing.blameless.external_reference,
+      ),
+      incident_status=blameless_status,
+      severity=self._first_non_empty_string(
+        blameless_payload.get("severity"),
+        existing.blameless.severity,
+      ),
+      commander=self._first_non_empty_string(
+        blameless_payload.get("commander"),
+        blameless_payload.get("owner"),
+        existing.blameless.commander,
+      ),
+      visibility=self._first_non_empty_string(
+        blameless_payload.get("visibility"),
+        blameless_payload.get("visibility_mode"),
+        existing.blameless.visibility,
+      ),
+      url=self._first_non_empty_string(
+        blameless_payload.get("url"),
+        blameless_payload.get("html_url"),
+        existing.blameless.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(blameless_payload.get("updated_at"))
+        or existing.blameless.updated_at
+      ),
+      phase_graph=self._build_blameless_recovery_phase_graph(
+        payload=blameless_payload,
+        incident_status=blameless_status,
+        severity=self._first_non_empty_string(
+          blameless_payload.get("severity"),
+          existing.blameless.severity,
+        ),
+        commander=self._first_non_empty_string(
+          blameless_payload.get("commander"),
+          blameless_payload.get("owner"),
+          existing.blameless.commander,
+        ),
+        visibility=self._first_non_empty_string(
+          blameless_payload.get("visibility"),
+          blameless_payload.get("visibility_mode"),
+          existing.blameless.visibility,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.blameless,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -3091,6 +3301,7 @@ class TradingApplication:
         existing.incidentio,
         existing.firehydrant,
         existing.rootly,
+        existing.blameless,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -3100,6 +3311,7 @@ class TradingApplication:
         existing.incidentio,
         existing.firehydrant,
         existing.rootly,
+        existing.blameless,
       )
     if normalized_provider == "incidentio":
       return (
@@ -3109,6 +3321,7 @@ class TradingApplication:
         incidentio,
         existing.firehydrant,
         existing.rootly,
+        existing.blameless,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -3118,6 +3331,7 @@ class TradingApplication:
         existing.incidentio,
         firehydrant,
         existing.rootly,
+        existing.blameless,
       )
     if normalized_provider == "rootly":
       return (
@@ -3127,6 +3341,17 @@ class TradingApplication:
         existing.incidentio,
         existing.firehydrant,
         rootly,
+        existing.blameless,
+      )
+    if normalized_provider == "blameless":
+      return (
+        "blameless",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        blameless,
       )
     return (
       existing.provider_schema_kind,
@@ -3135,6 +3360,7 @@ class TradingApplication:
       existing.incidentio,
       existing.firehydrant,
       existing.rootly,
+      existing.blameless,
     )
 
   def _build_provider_recovery_state(
@@ -3209,7 +3435,15 @@ class TradingApplication:
       existing.reference,
       remediation.reference,
     )
-    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema, firehydrant_schema, rootly_schema = (
+    (
+      provider_schema_kind,
+      pagerduty_schema,
+      opsgenie_schema,
+      incidentio_schema,
+      firehydrant_schema,
+      rootly_schema,
+      blameless_schema,
+    ) = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
       payload=payload,
@@ -3289,6 +3523,7 @@ class TradingApplication:
       incidentio=incidentio_schema,
       firehydrant=firehydrant_schema,
       rootly=rootly_schema,
+      blameless=blameless_schema,
       updated_at=synced_at,
     )
 
@@ -3368,6 +3603,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.rootly,
+        ),
+      ),
+      blameless=replace(
+        provider_recovery.blameless,
+        phase_graph=self._build_blameless_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.blameless.incident_status,
+          severity=provider_recovery.blameless.severity,
+          commander=provider_recovery.blameless.commander,
+          visibility=provider_recovery.blameless.visibility,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.blameless,
         ),
       ),
     )
@@ -7709,6 +7958,8 @@ class TradingApplication:
       return "firehydrant"
     if normalized == "root_ly":
       return "rootly"
+    if normalized == "blame_less":
+      return "blameless"
     return normalized or None
 
   @staticmethod
@@ -7876,6 +8127,8 @@ class TradingApplication:
       return "firehydrant"
     if "rootly_incidents" in combined:
       return "rootly"
+    if "blameless_incidents" in combined:
+      return "blameless"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None
