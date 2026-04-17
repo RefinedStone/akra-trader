@@ -778,20 +778,20 @@
     {
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After the repository-level provider-managed remediation coverage now extends through the current Spike.sh-era provider set, deepen the local typed recovery model so provider-authoritative sync and typed recovery schemas can preserve richer provider-private remediation-engine phase graphs, native metrics, and engine-owned state machines instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
+      "description": "Build on the now-broader provider-managed remediation set by deepening the local typed recovery model so provider-authoritative sync, direct polling, and typed recovery schemas can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
-      "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply says the current repo now has provider-authoritative sync, typed recovery schemas, direct polling, native phase graphs, and paging-provider inference wired through Spike.sh, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply again listed wider provider coverage first.",
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, direct polling, native phase graphs, and paging-provider inference now extend through IncidentHub, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply listed wider provider coverage first and this deeper mirroring second.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T12:45:00Z",
+      "updated_at": "2026-04-18T13:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through Spike.sh."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through IncidentHub."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1265,19 +1265,55 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-spikesh",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Spike.sh",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, and Spike.sh adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current twenty-three providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, and Spike.sh adapters to DutyCalls, adding the `dutycalls_incidents` delivery target, workflow sync, provider pull-sync, recovery-engine direct polling, typed recovery schemas, native phase-graph handling, paging-provider inference, provider-authoritative remediation sync generalization, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty-four providers.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 28,
-      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage as the first remaining item after commit cf434a8 on 2026-04-18, so the next provider-breadth expansion beyond Spike.sh becomes the new ready queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit a134957, which expanded provider-managed remediation coverage through DutyCalls across operator delivery, application wiring, provider pull-sync, recovery-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-moogsoft"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T12:45:00Z",
+      "updated_at": "2026-04-18T13:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Spike.sh as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Spike.sh to DutyCalls, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-dutycalls",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond DutyCalls",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, and DutyCalls adapters to IncidentHub, adding the `incidenthub_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty-five providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 29,
+      "priority_reason": "Completed in main session commit 6767614, which expanded provider-managed remediation coverage through IncidentHub across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-spikesh"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T13:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond DutyCalls to IncidentHub, which now leaves the next provider expansion and deeper provider-native remediation mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-incidenthub",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond IncidentHub",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, and IncidentHub adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current twenty-five providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 30,
+      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage beyond IncidentHub as the first remaining item after commit 6767614 on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head for builtin next-task progression while deeper telemetry mirroring remains a secondary proposal.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-dutycalls"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T13:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating IncidentHub as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
