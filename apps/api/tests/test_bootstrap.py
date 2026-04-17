@@ -213,6 +213,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       signl4_api_url: str,
       signl4_recovery_engine_url_template: str | None,
       signl4_recovery_engine_token: str | None,
+      ilert_api_token: str | None,
+      ilert_api_url: str,
+      ilert_recovery_engine_url_template: str | None,
+      ilert_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -301,6 +305,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         signl4_recovery_engine_url_template or ""
       )
       captured["signl4_recovery_engine_token"] = signl4_recovery_engine_token or ""
+      captured["ilert_api_token"] = ilert_api_token or ""
+      captured["ilert_api_url"] = ilert_api_url
+      captured["ilert_recovery_engine_url_template"] = (
+        ilert_recovery_engine_url_template or ""
+      )
+      captured["ilert_recovery_engine_token"] = ilert_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -443,6 +453,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://signl4.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_signl4_recovery_engine_token="signl4-recovery-token",
+      operator_alert_ilert_api_token="ilert-token",
+      operator_alert_ilert_api_url="https://api.ilert.example",
+      operator_alert_ilert_recovery_engine_url_template=(
+        "https://ilert.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_ilert_recovery_engine_token="ilert-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -532,6 +548,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["signl4_api_url"] == "https://api.signl4.example"
   assert captured["signl4_recovery_engine_url_template"] == "https://signl4.example/recovery/{workflow_reference_urlencoded}"
   assert captured["signl4_recovery_engine_token"] == "signl4-recovery-token"
+  assert captured["ilert_api_token"] == "ilert-token"
+  assert captured["ilert_api_url"] == "https://api.ilert.example"
+  assert captured["ilert_recovery_engine_url_template"] == "https://ilert.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["ilert_recovery_engine_token"] == "ilert-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"

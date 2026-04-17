@@ -976,6 +976,31 @@ class OperatorIncidentSignl4RecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentIlertRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentIlertRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentIlertRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentIlertRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -1047,6 +1072,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   signl4: OperatorIncidentSignl4RecoveryState = field(
     default_factory=OperatorIncidentSignl4RecoveryState
+  )
+  ilert: OperatorIncidentIlertRecoveryState = field(
+    default_factory=OperatorIncidentIlertRecoveryState
   )
   updated_at: datetime | None = None
 
