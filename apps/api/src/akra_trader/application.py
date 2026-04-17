@@ -62,6 +62,8 @@ from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryPhaseGrap
 from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryState
 from akra_trader.domain.models import OperatorIncidentXmattersRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentXmattersRecoveryState
+from akra_trader.domain.models import OperatorIncidentServicenowRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentServicenowRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1594,6 +1596,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "servicenow"
+          and provider_recovery.servicenow.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            servicenow=replace(
+              aligned_provider_recovery.servicenow,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2938,6 +2951,133 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_servicenow_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "new",
+      "open",
+      "acknowledged",
+      "in_progress",
+      "on_hold",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_servicenow_assignment_phase(
+    assigned_to: str | None,
+    assignment_group: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assigned_to:
+      return "assigned_to_user"
+    if assignment_group:
+      return "assigned_to_group"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_servicenow_priority_phase(priority: str | None, existing_phase: str) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_servicenow_group_phase(assignment_group: str | None, existing_phase: str) -> str:
+    if assignment_group:
+      return "group_configured"
+    return existing_phase or "group_unconfigured"
+
+  @staticmethod
+  def _resolve_servicenow_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"new", "open", "in_progress", "on_hold"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_servicenow_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    priority: str | None,
+    assigned_to: str | None,
+    assignment_group: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentServicenowRecoveryState,
+  ) -> OperatorIncidentServicenowRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_servicenow_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_servicenow_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentServicenowRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      assignment_phase=self._first_non_empty_string(
+        payload.get("assignment_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("assignment_phase"),
+      ) or self._resolve_servicenow_assignment_phase(
+        assigned_to,
+        assignment_group,
+        existing.phase_graph.assignment_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_servicenow_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      group_phase=self._first_non_empty_string(
+        payload.get("group_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("group_phase"),
+      ) or self._resolve_servicenow_group_phase(
+        assignment_group,
+        existing.phase_graph.group_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -2959,6 +3099,7 @@ class TradingApplication:
     OperatorIncidentRootlyRecoveryState,
     OperatorIncidentBlamelessRecoveryState,
     OperatorIncidentXmattersRecoveryState,
+    OperatorIncidentServicenowRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -3502,6 +3643,82 @@ class TradingApplication:
       ),
     )
 
+    servicenow_payload = self._merge_payload_mappings(
+      schema_payload.get("servicenow"),
+      schema_payload.get("service_now"),
+      payload.get("servicenow"),
+      payload.get("servicenow_incident"),
+      payload.get("service_now"),
+    )
+    servicenow_status = self._first_non_empty_string(
+      servicenow_payload.get("incident_status"),
+      servicenow_payload.get("status"),
+      servicenow_payload.get("state"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.servicenow.incident_status,
+    ) or "unknown"
+    servicenow = OperatorIncidentServicenowRecoveryState(
+      incident_number=self._first_non_empty_string(
+        servicenow_payload.get("incident_number"),
+        servicenow_payload.get("number"),
+        workflow_reference,
+        existing.servicenow.incident_number,
+      ),
+      external_reference=self._first_non_empty_string(
+        servicenow_payload.get("external_reference"),
+        servicenow_payload.get("reference"),
+        reference,
+        existing.servicenow.external_reference,
+      ),
+      incident_status=servicenow_status,
+      priority=self._first_non_empty_string(
+        servicenow_payload.get("priority"),
+        existing.servicenow.priority,
+      ),
+      assigned_to=self._first_non_empty_string(
+        servicenow_payload.get("assigned_to"),
+        servicenow_payload.get("owner"),
+        existing.servicenow.assigned_to,
+      ),
+      assignment_group=self._first_non_empty_string(
+        servicenow_payload.get("assignment_group"),
+        servicenow_payload.get("group"),
+        existing.servicenow.assignment_group,
+      ),
+      url=self._first_non_empty_string(
+        servicenow_payload.get("url"),
+        servicenow_payload.get("html_url"),
+        existing.servicenow.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(servicenow_payload.get("updated_at"))
+        or existing.servicenow.updated_at
+      ),
+      phase_graph=self._build_servicenow_recovery_phase_graph(
+        payload=servicenow_payload,
+        incident_status=servicenow_status,
+        priority=self._first_non_empty_string(
+          servicenow_payload.get("priority"),
+          existing.servicenow.priority,
+        ),
+        assigned_to=self._first_non_empty_string(
+          servicenow_payload.get("assigned_to"),
+          servicenow_payload.get("owner"),
+          existing.servicenow.assigned_to,
+        ),
+        assignment_group=self._first_non_empty_string(
+          servicenow_payload.get("assignment_group"),
+          servicenow_payload.get("group"),
+          existing.servicenow.assignment_group,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.servicenow,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -3512,6 +3729,7 @@ class TradingApplication:
         existing.rootly,
         existing.blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -3523,6 +3741,7 @@ class TradingApplication:
         existing.rootly,
         existing.blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "incidentio":
       return (
@@ -3534,6 +3753,7 @@ class TradingApplication:
         existing.rootly,
         existing.blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -3545,6 +3765,7 @@ class TradingApplication:
         existing.rootly,
         existing.blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "rootly":
       return (
@@ -3556,6 +3777,7 @@ class TradingApplication:
         rootly,
         existing.blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "blameless":
       return (
@@ -3567,6 +3789,7 @@ class TradingApplication:
         existing.rootly,
         blameless,
         existing.xmatters,
+        existing.servicenow,
       )
     if normalized_provider == "xmatters":
       return (
@@ -3578,6 +3801,19 @@ class TradingApplication:
         existing.rootly,
         existing.blameless,
         xmatters,
+        existing.servicenow,
+      )
+    if normalized_provider == "servicenow":
+      return (
+        "servicenow",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        existing.xmatters,
+        servicenow,
       )
     return (
       existing.provider_schema_kind,
@@ -3588,6 +3824,7 @@ class TradingApplication:
       existing.rootly,
       existing.blameless,
       existing.xmatters,
+      existing.servicenow,
     )
 
   def _build_provider_recovery_state(
@@ -3671,6 +3908,7 @@ class TradingApplication:
       rootly_schema,
       blameless_schema,
       xmatters_schema,
+      servicenow_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
@@ -3753,6 +3991,7 @@ class TradingApplication:
       rootly=rootly_schema,
       blameless=blameless_schema,
       xmatters=xmatters_schema,
+      servicenow=servicenow_schema,
       updated_at=synced_at,
     )
 
@@ -3860,6 +4099,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.xmatters,
+        ),
+      ),
+      servicenow=replace(
+        provider_recovery.servicenow,
+        phase_graph=self._build_servicenow_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.servicenow.incident_status,
+          priority=provider_recovery.servicenow.priority,
+          assigned_to=provider_recovery.servicenow.assigned_to,
+          assignment_group=provider_recovery.servicenow.assignment_group,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.servicenow,
         ),
       ),
     )
@@ -8205,6 +8458,8 @@ class TradingApplication:
       return "blameless"
     if normalized == "x_matters":
       return "xmatters"
+    if normalized == "service_now":
+      return "servicenow"
     return normalized or None
 
   @staticmethod
@@ -8376,6 +8631,8 @@ class TradingApplication:
       return "blameless"
     if "xmatters_incidents" in combined:
       return "xmatters"
+    if "servicenow_incidents" in combined:
+      return "servicenow"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

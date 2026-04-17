@@ -177,6 +177,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       xmatters_api_url: str,
       xmatters_recovery_engine_url_template: str | None,
       xmatters_recovery_engine_token: str | None,
+      servicenow_api_token: str | None,
+      servicenow_api_url: str,
+      servicenow_recovery_engine_url_template: str | None,
+      servicenow_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -211,6 +215,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["xmatters_api_url"] = xmatters_api_url
       captured["xmatters_recovery_engine_url_template"] = xmatters_recovery_engine_url_template or ""
       captured["xmatters_recovery_engine_token"] = xmatters_recovery_engine_token or ""
+      captured["servicenow_api_token"] = servicenow_api_token or ""
+      captured["servicenow_api_url"] = servicenow_api_url
+      captured["servicenow_recovery_engine_url_template"] = servicenow_recovery_engine_url_template or ""
+      captured["servicenow_recovery_engine_token"] = servicenow_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -295,6 +303,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://xmatters.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_xmatters_recovery_engine_token="xmatters-recovery-token",
+      operator_alert_servicenow_api_token="servicenow-token",
+      operator_alert_servicenow_api_url="https://api.servicenow.example",
+      operator_alert_servicenow_recovery_engine_url_template=(
+        "https://servicenow.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_servicenow_recovery_engine_token="servicenow-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -342,6 +356,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["xmatters_api_url"] == "https://api.xmatters.example"
   assert captured["xmatters_recovery_engine_url_template"] == "https://xmatters.example/recovery/{workflow_reference_urlencoded}"
   assert captured["xmatters_recovery_engine_token"] == "xmatters-recovery-token"
+  assert captured["servicenow_api_token"] == "servicenow-token"
+  assert captured["servicenow_api_url"] == "https://api.servicenow.example"
+  assert captured["servicenow_recovery_engine_url_template"] == "https://servicenow.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["servicenow_recovery_engine_token"] == "servicenow-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"

@@ -538,6 +538,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        servicenow: {
+          incident_number?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assigned_to?: string | null;
+          assignment_group?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            priority_phase: string;
+            group_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -825,6 +843,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             priority_phase: string;
             response_plan_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        servicenow: {
+          incident_number?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assigned_to?: string | null;
+          assignment_group?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            priority_phase: string;
+            group_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8358,6 +8394,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  servicenow: {
+    incident_number?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    priority?: string | null;
+    assigned_to?: string | null;
+    assignment_group?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      assignment_phase: string;
+      priority_phase: string;
+      group_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8559,6 +8613,39 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `xMatters schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "servicenow") {
+    const details = [
+      providerRecovery.servicenow.incident_number
+        ? `incident ${providerRecovery.servicenow.incident_number}`
+        : null,
+      providerRecovery.servicenow.incident_status !== "unknown"
+        ? `status ${providerRecovery.servicenow.incident_status}`
+        : null,
+      providerRecovery.servicenow.priority ? `priority ${providerRecovery.servicenow.priority}` : null,
+      providerRecovery.servicenow.assigned_to
+        ? `assigned to ${providerRecovery.servicenow.assigned_to}`
+        : null,
+      providerRecovery.servicenow.assignment_group
+        ? `group ${providerRecovery.servicenow.assignment_group}`
+        : null,
+      providerRecovery.servicenow.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.servicenow.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.servicenow.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.servicenow.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.servicenow.phase_graph.assignment_phase !== "unknown"
+        ? `assignment ${providerRecovery.servicenow.phase_graph.assignment_phase}`
+        : null,
+      providerRecovery.servicenow.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.servicenow.updated_at)}`
+        : null,
+      providerRecovery.servicenow.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.servicenow.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `ServiceNow schema: ${details.join(" / ")}` : null;
   }
   return null;
 }
