@@ -347,36 +347,90 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Connect persisted live-path alerts to outbound delivery and durable incident events",
       "description": "Use the new persisted guarded-live alert history as the source of truth for notification-ready delivery by wiring active or resolved live-path alerts into explicit outbound channels or durable incident-event records, so operator safety signals can leave the control room and survive downstream handling workflows.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly says persisted alert history still is not connected to external alert channels or durable event delivery, making this the clearest executable follow-up and the next automatic queue head after commit 823da11.",
+      "priority_reason": "Completed in main session commit cfcbdd8, which wired persisted guarded-live alerts into durable incident_opened and incident_resolved events, executed outbound delivery attempts across configured targets, surfaced incident and delivery history in operator APIs and panels, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:05:00Z",
+      "updated_at": "2026-04-17T10:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by turning persisted live-path alerts from control-room state into delivery-capable incident signals that can drive operator response outside the immediate UI session."
+      "direction_relation_note": "Closed the next live-path alerting gap for operator trust by turning persisted guarded-live alerts into durable incidents and outbound delivery records, which now leaves richer destination adapters, retry policy, sandbox parity, and fuller incident-management workflows as the remaining follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-richer-incident-destinations-and-delivery-retries",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add richer incident destinations and retry or backoff policy to outbound alert delivery",
+      "description": "Build on the new console and webhook delivery path by adding richer incident destinations such as Slack or PagerDuty plus explicit retry or backoff behavior, so durable guarded-live incidents can reach real operator response channels without depending on a single best-effort delivery attempt.",
+      "status": "done",
+      "base_priority": 82,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "Completed in main session commit c56b00c, which added Slack webhook, generic webhook, PagerDuty Events API, and console delivery targets, persisted delivery attempt counters plus next-retry timestamps, and executed bounded exponential backoff retries through guarded-live alert refresh.",
+      "depends_on": [
+        "planning-operator-trust-outbound-alert-delivery-integration"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T11:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the richer delivery-target and bounded retry gap for operator trust by moving durable incidents onto real operator-response channels with persisted retry state, which now leaves acknowledgment, escalation, broader incident workflow, and wider alert-surface coverage as the next follow-ups."
     },
     {
       "id": "planning-operator-trust-sandbox-durable-alert-history",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Extend durable alert history from guarded-live into sandbox runtime visibility",
-      "description": "Bring sandbox runtime alerts up to the same durable-history standard as guarded-live by persisting active and resolved sandbox alert lifecycle state and surfacing that history through operator visibility, rather than relying only on current in-memory runtime status.",
+      "title": "Broaden operator alert surface and durable history beyond guarded-live incidents",
+      "description": "Expand operator-facing alert coverage beyond the current guarded-live incident set by persisting sandbox and adjacent runtime alert lifecycle state, surfacing wider operator-visible alert categories, and making those alerts inspectable without relying only on current in-memory status or narrow live-path incidents.",
       "status": "proposed",
       "base_priority": 79,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply explicitly calls out that durable alert history is still live-path centric and sandbox remains mostly runtime-state visibility, but outbound delivery from the newly persisted live-path alerts is the more immediate next task.",
+      "dynamic_priority_delta": 7,
+      "priority_reason": "Commit faaa129 closed guarded-live incident acknowledgment, escalation, and phase-aware retry, but the latest main-session reply says broader risk-breach and adjacent live-path faults still are not covered by the same durable incident workflow, so this remains the next operator-trust expansion after the external incident-management follow-up.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:05:00Z",
+      "updated_at": "2026-04-17T12:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending durable alert lifecycle records beyond guarded-live so sandbox incidents remain inspectable across restarts and operator sessions."
+      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending durable alert lifecycle records and operator-visible alert categories beyond the current guarded-live incident subset."
+    },
+    {
+      "id": "planning-operator-trust-external-incident-workflow-and-escalation",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extend durable incidents into acknowledgment, escalation, and advanced retry workflow",
+      "description": "Build on the new durable incident and delivery history by adding incident-management workflow primitives such as acknowledgment, escalation, operator-visible incident state transitions, and more advanced retry or backoff policy controls, so incidents are managed through a real response lifecycle instead of stopping at delivery-attempt logging.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "Completed in main session commit faaa129, which added durable incident acknowledgment state, escalation level and timing, phase-aware delivery retry suppression after acknowledgment, operator-facing acknowledge and escalate APIs, control-room actions, config knobs, and documentation plus test coverage.",
+      "depends_on": [
+        "planning-operator-trust-richer-incident-destinations-and-delivery-retries"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the first full incident-response lifecycle gap for operator trust by turning durable incidents into operator-managed objects with acknowledgment, escalation, and retry-governance state, which now leaves external incident-system sync or paging orchestration and wider alert-surface coverage as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-external-incident-management-sync-and-paging",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Sync durable incidents with external incident-management and paging workflow",
+      "description": "Extend the newly completed local acknowledgment and escalation workflow beyond the control plane by adding external incident-management synchronization, richer escalation ladders, and paging-policy orchestration semantics, so durable incidents stay aligned with downstream response systems instead of ending at local operator actions.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply lists external incident-management acknowledgment sync, richer escalation ladders, and paging-policy orchestration as the first remaining gap after commit faaa129, so this is the clearest next executable queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-operator-trust-external-incident-workflow-and-escalation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust from local incident handling to durable downstream coordination by making acknowledgment and escalation state interoperable with external paging and incident-response systems."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
@@ -493,14 +547,14 @@
       "description": "Evaluate whether the current cancel-plus-new-limit replace flow is sufficient for guarded-live candidacy or whether venue-native atomic amend support is required, then implement the chosen contract with matching audit and operator wording if native amend semantics are mandatory.",
       "status": "proposed",
       "base_priority": 76,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit f143ed5 still says live order management lacks venue-native amend flow, but the newly exposed market-data provider generalization work remains the first executable guarded-live follow-up before amend semantics.",
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply still explicitly calls out venue-native amend flow as unfinished wider live-path coverage, but the operator-side acknowledgment and escalation workflow is the clearer immediate queue head after commit c56b00c.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:47:17Z",
+      "updated_at": "2026-04-17T11:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
