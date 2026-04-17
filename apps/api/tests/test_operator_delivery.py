@@ -609,3 +609,288 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert requests[1][0] == "https://opsgenie-engine.example/recovery/og-job-7"
   assert requests[1][1] == "GET"
   assert requests[1][2]["Authorization"] == "GenieKey opsgenie-recovery-key"
+
+
+def test_operator_alert_delivery_adapter_supports_incidentio_target_and_resolution() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("incidentio",),
+    incidentio_api_token="incidentio-token",
+    incidentio_api_url="https://api.incidentio.example",
+    webhook_timeout_seconds=6,
+    urlopen=fake_urlopen,
+  )
+  opened = OperatorIncidentEvent(
+    event_id="incident-opened-incidentio-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 14, 15, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live worker failed for ETH/USDT.",
+    detail="live worker crash",
+  )
+  resolved = OperatorIncidentEvent(
+    event_id="incident-resolved-incidentio-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 14, 16, tzinfo=UTC),
+    kind="incident_resolved",
+    severity="warning",
+    summary="Resolved: Guarded-live worker failed for ETH/USDT.",
+    detail="live worker recovered",
+    external_reference="guarded-live:worker-failed:run-1",
+  )
+
+  opened_records = adapter.deliver(incident=opened)
+  resolved_records = adapter.deliver(incident=resolved)
+
+  assert adapter.list_targets() == ("incidentio_incidents",)
+  assert opened_records[0].target == "incidentio_incidents"
+  assert opened_records[0].external_provider == "incidentio"
+  assert resolved_records[0].external_reference == "guarded-live:worker-failed:run-1"
+
+  create_request = requests[0]
+  resolve_request = requests[1]
+  assert create_request[0] == "https://api.incidentio.example/v2/incidents"
+  assert create_request[1] == "POST"
+  assert create_request[3]["Authorization"] == "Bearer incidentio-token"
+  create_payload = json.loads(create_request[2].decode("utf-8"))
+  assert create_payload["incident"]["external_reference"] == "guarded-live:worker-failed:run-1"
+  assert create_payload["incident"]["severity"] == "critical"
+
+  assert resolve_request[0].endswith(
+    "/v2/incidents/guarded-live%3Aworker-failed%3Arun-1/actions/resolve?identifier_type=external_reference"
+  )
+  assert resolve_request[1] == "POST"
+  resolve_payload = json.loads(resolve_request[2].decode("utf-8"))
+  assert resolve_payload["message"] == "live worker recovered"
+
+
+def test_operator_alert_delivery_adapter_syncs_incidentio_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("incidentio",),
+    incidentio_api_token="incidentio-token",
+    incidentio_api_url="https://api.incidentio.example",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-incidentio-2",
+    alert_id="guarded-live:reconciliation",
+    timestamp=datetime(2025, 1, 3, 14, 20, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live reconciliation has unresolved findings.",
+    detail="reconciliation drift",
+    external_provider="incidentio",
+    external_reference="guarded-live:reconciliation",
+    provider_workflow_reference="INC-123",
+    escalation_level=2,
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="recent_sync",
+      summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+      runbook="market_data.sync_recent",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        lifecycle_state="recovering",
+        provider="incidentio",
+        job_id="io-job-existing",
+        channels=("kline",),
+        symbols=("ETH/USDT",),
+        timeframe="5m",
+        verification=OperatorIncidentProviderRecoveryVerification(state="pending"),
+      ),
+    ),
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="incidentio",
+    action="acknowledge",
+    actor="operator",
+    detail="triaged",
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="incidentio",
+    action="escalate",
+    actor="operator",
+    detail="handoff",
+  )
+  resolve = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="incidentio",
+    action="resolve",
+    actor="operator",
+    detail="fixed",
+    payload={"job_id": "io-job-1", "verification": {"state": "passed"}},
+  )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="incidentio",
+    action="remediate",
+    actor="operator",
+    detail="restart_sync_and_verify_checkpoint",
+    payload={"job_id": "io-job-2", "channels": ["kline", "depth"]},
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("incidentio",)
+  assert acknowledge[0].target == "incidentio_workflow"
+  assert acknowledge[0].external_reference == "INC-123"
+  assert escalate[0].provider_action == "escalate"
+  assert resolve[0].provider_action == "resolve"
+  assert remediate[0].provider_action == "remediate"
+
+  assert requests[0][0].endswith("/v2/incidents/INC-123/actions/acknowledge?identifier_type=id")
+  assert requests[0][1] == "POST"
+  assert requests[1][0].endswith("/v2/incidents/INC-123/actions/escalate?identifier_type=id")
+  assert requests[2][0].endswith("/v2/incidents/INC-123/actions/resolve?identifier_type=id")
+  assert requests[3][0].endswith("/v2/incidents/INC-123/actions/remediate?identifier_type=id")
+  escalate_payload = json.loads(requests[1][2].decode("utf-8"))
+  assert "level 2" in escalate_payload["message"]
+  remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  resolve_payload = json.loads(requests[2][2].decode("utf-8"))
+  assert "requested remediation" in remediate_payload["message"]
+  assert "market_data.sync_recent" in remediate_payload["message"]
+  assert '"job_id": "io-job-2"' in remediate_payload["message"]
+  assert '"job_id": "io-job-1"' in resolve_payload["message"]
+  assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
+
+
+def test_operator_alert_delivery_adapter_pulls_incidentio_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    if request.full_url == "https://api.incidentio.example/v2/incidents/INC-123?identifier_type=id":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "incident": {
+              "id": "INC-123",
+              "external_reference": "guarded-live:market-data:5m",
+              "status": "acknowledged",
+              "name": "Guarded-live market-data incident",
+              "updated_at": "2025-01-03T14:20:00Z",
+              "severity": "critical",
+              "mode": "standard",
+              "visibility": "public",
+              "url": "https://incident.io/incidents/INC-123",
+              "assignee": {"name": "On-call engineer"},
+              "metadata": {
+                "remediation_state": "provider_recovered",
+                "remediation_provider_payload": {
+                  "job_id": "io-job-9",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                  "verification": {"state": "passed"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovered",
+                  "job_id": "io-job-9",
+                  "channels": ["depth", "kline"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "verification_state": "passed",
+                  "status_machine_state": "provider_running",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "completed",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "completed",
+                  "progress_percent": 70,
+                  "attempt_count": 1,
+                  "current_step": "incident_body",
+                  "last_message": "incident body copy still stale",
+                  "external_run_id": "io-body-9",
+                },
+                "remediation_provider_telemetry_url": "https://incidentio-engine.example/recovery/io-job-9",
+              },
+            }
+          }
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://incidentio-engine.example/recovery/io-job-9":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "data": {
+              "state": "completed",
+              "progress_percent": 100,
+              "attempt_count": 2,
+              "current_step": "verification",
+              "last_message": "incident.io engine completed verification",
+              "external_run_id": "io-engine-9",
+              "updated_at": "2025-01-03T14:21:00Z",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    return FakeResponse(404)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("incidentio",),
+    incidentio_api_token="incidentio-token",
+    incidentio_api_url="https://api.incidentio.example",
+    incidentio_recovery_engine_url_template="https://incidentio-engine.example/recovery/{job_id_urlencoded}",
+    incidentio_recovery_engine_token="incidentio-recovery-token",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-incidentio-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 14, 20, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="incidentio",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="INC-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="incidentio",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "incidentio"
+  assert snapshot.workflow_reference == "INC-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "provider_recovered"
+  assert snapshot.payload["job_id"] == "io-job-9"
+  assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert snapshot.payload["provider_schema"]["kind"] == "incidentio"
+  assert snapshot.payload["provider_schema"]["incidentio"]["incident_id"] == "INC-123"
+  assert snapshot.payload["provider_schema"]["incidentio"]["incident_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["incidentio"]["phase_graph"]["incident_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["incidentio"]["phase_graph"]["workflow_phase"] == "awaiting_local_verification"
+  assert snapshot.payload["provider_schema"]["incidentio"]["phase_graph"]["assignment_phase"] == "assigned"
+  assert snapshot.payload["provider_schema"]["incidentio"]["phase_graph"]["visibility_phase"] == "public"
+  assert snapshot.payload["telemetry"]["source"] == "provider_engine"
+  assert snapshot.payload["telemetry"]["state"] == "completed"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 100
+  assert snapshot.payload["telemetry"]["attempt_count"] == 2
+  assert snapshot.payload["telemetry"]["current_step"] == "verification"
+  assert snapshot.payload["telemetry"]["last_message"] == "incident.io engine completed verification"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "io-engine-9"
+  assert requests[0][0].endswith("/v2/incidents/INC-123?identifier_type=id")
+  assert requests[0][1] == "GET"
+  assert requests[0][2]["Authorization"] == "Bearer incidentio-token"
+  assert requests[1][0] == "https://incidentio-engine.example/recovery/io-job-9"
+  assert requests[1][1] == "GET"
+  assert requests[1][2]["Authorization"] == "Bearer incidentio-recovery-token"

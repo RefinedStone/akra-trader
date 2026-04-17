@@ -41,6 +41,10 @@ class Settings:
   operator_alert_pagerduty_from_email: str | None = None
   operator_alert_pagerduty_recovery_engine_url_template: str | None = None
   operator_alert_pagerduty_recovery_engine_token: str | None = None
+  operator_alert_incidentio_api_token: str | None = None
+  operator_alert_incidentio_api_url: str = "https://api.incident.io"
+  operator_alert_incidentio_recovery_engine_url_template: str | None = None
+  operator_alert_incidentio_recovery_engine_token: str | None = None
   operator_alert_opsgenie_api_key: str | None = None
   operator_alert_opsgenie_api_url: str = "https://api.opsgenie.com"
   operator_alert_opsgenie_recovery_engine_url_template: str | None = None
@@ -125,6 +129,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_pagerduty_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_incidentio_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_API_TOKEN") or None
+    ),
+    operator_alert_incidentio_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_API_URL",
+      "https://api.incident.io",
+    ),
+    operator_alert_incidentio_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_incidentio_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsgenie_api_key=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY") or None

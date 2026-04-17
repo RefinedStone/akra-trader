@@ -48,6 +48,8 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentIncidentIoRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentIncidentIoRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryState
@@ -1529,6 +1531,17 @@ class TradingApplication:
               alert_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "incidentio"
+          and provider_recovery.incidentio.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            incidentio=replace(
+              aligned_provider_recovery.incidentio,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2134,6 +2147,136 @@ class TradingApplication:
       last_transition_at=last_transition_at,
     )
 
+  @staticmethod
+  def _normalize_incidentio_incident_phase(
+    incident_status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (incident_status or "").strip().lower().replace(" ", "_")
+    if normalized in {"active", "acknowledged", "resolved", "closed"}:
+      return normalized
+    if normalized in {"triaged"}:
+      return "acknowledged"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_incidentio_assignment_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "unassigned"
+
+  @staticmethod
+  def _resolve_incidentio_visibility_phase(
+    visibility: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (visibility or "").strip().lower().replace(" ", "_")
+    if normalized in {"public", "private", "internal"}:
+      return normalized
+    return existing_phase
+
+  @staticmethod
+  def _resolve_incidentio_severity_phase(
+    severity: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized in {"critical", "high", "warning", "medium", "low", "info"}:
+      return normalized
+    return existing_phase
+
+  @staticmethod
+  def _resolve_incidentio_workflow_phase(
+    *,
+    lifecycle_state: str,
+    workflow_action: str | None,
+    incident_phase: str,
+    existing_phase: str,
+  ) -> str:
+    if workflow_action == "resolve" or incident_phase in {"resolved", "closed"} or lifecycle_state == "resolved":
+      return "resolved_back_synced"
+    if lifecycle_state == "verified":
+      return "verified_pending_resolve"
+    if lifecycle_state == "recovered":
+      return "awaiting_local_verification"
+    if lifecycle_state == "recovering":
+      return "provider_recovering"
+    if lifecycle_state == "requested" or workflow_action == "remediate":
+      return "remediation_requested"
+    if lifecycle_state == "failed":
+      return "recovery_failed"
+    if workflow_action == "acknowledge" or incident_phase == "acknowledged":
+      return "incident_acknowledged"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "idle"
+
+  def _build_incidentio_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity: str | None,
+    mode: str | None,
+    visibility: str | None,
+    assignee: str | None,
+    lifecycle_state: str,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentIncidentIoRecoveryState,
+  ) -> OperatorIncidentIncidentIoRecoveryPhaseGraph:
+    phase_payload = self._extract_payload_mapping(payload.get("phase_graph"))
+    incident_phase = self._first_non_empty_string(
+      phase_payload.get("incident_phase"),
+      self._normalize_incidentio_incident_phase(incident_status, existing.phase_graph.incident_phase),
+      existing.phase_graph.incident_phase,
+    ) or "unknown"
+    workflow_phase = self._first_non_empty_string(
+      phase_payload.get("workflow_phase"),
+      self._resolve_incidentio_workflow_phase(
+        lifecycle_state=lifecycle_state,
+        workflow_action=status_machine.workflow_action,
+        incident_phase=incident_phase,
+        existing_phase=existing.phase_graph.workflow_phase,
+      ),
+      existing.phase_graph.workflow_phase,
+    ) or "unknown"
+    assignment_phase = self._first_non_empty_string(
+      phase_payload.get("assignment_phase"),
+      self._resolve_incidentio_assignment_phase(assignee, existing.phase_graph.assignment_phase),
+      existing.phase_graph.assignment_phase,
+    ) or "unknown"
+    visibility_phase = self._first_non_empty_string(
+      phase_payload.get("visibility_phase"),
+      self._resolve_incidentio_visibility_phase(visibility, existing.phase_graph.visibility_phase),
+      existing.phase_graph.visibility_phase,
+    ) or "unknown"
+    severity_phase = self._first_non_empty_string(
+      phase_payload.get("severity_phase"),
+      self._resolve_incidentio_severity_phase(severity, existing.phase_graph.severity_phase),
+      mode,
+      existing.phase_graph.severity_phase,
+    ) or "unknown"
+    last_transition_at = (
+      self._parse_payload_datetime(phase_payload.get("last_transition_at"))
+      or self._parse_payload_datetime(payload.get("updated_at"))
+      or existing.phase_graph.last_transition_at
+      or synced_at
+    )
+    return OperatorIncidentIncidentIoRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      assignment_phase=assignment_phase,
+      visibility_phase=visibility_phase,
+      severity_phase=severity_phase,
+      last_transition_at=last_transition_at,
+    )
+
   def _build_provider_recovery_telemetry(
     self,
     *,
@@ -2244,7 +2387,12 @@ class TradingApplication:
     workflow_reference: str | None,
     reference: str | None,
     existing: OperatorIncidentProviderRecoveryState,
-  ) -> tuple[str | None, OperatorIncidentPagerDutyRecoveryState, OperatorIncidentOpsgenieRecoveryState]:
+  ) -> tuple[
+    str | None,
+    OperatorIncidentPagerDutyRecoveryState,
+    OperatorIncidentOpsgenieRecoveryState,
+    OperatorIncidentIncidentIoRecoveryState,
+  ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
 
@@ -2405,11 +2553,94 @@ class TradingApplication:
       ),
     )
 
+    incidentio_payload = self._merge_payload_mappings(
+      schema_payload.get("incidentio"),
+      schema_payload.get("incident_io"),
+      payload.get("incidentio"),
+      payload.get("incidentio_incident"),
+      payload.get("incident_io"),
+    )
+    incidentio_status = self._first_non_empty_string(
+      incidentio_payload.get("incident_status"),
+      incidentio_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.incidentio.incident_status,
+    ) or "unknown"
+    incidentio = OperatorIncidentIncidentIoRecoveryState(
+      incident_id=self._first_non_empty_string(
+        incidentio_payload.get("incident_id"),
+        incidentio_payload.get("id"),
+        workflow_reference,
+        existing.incidentio.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        incidentio_payload.get("external_reference"),
+        incidentio_payload.get("reference"),
+        reference,
+        existing.incidentio.external_reference,
+      ),
+      incident_status=incidentio_status,
+      severity=self._first_non_empty_string(
+        incidentio_payload.get("severity"),
+        existing.incidentio.severity,
+      ),
+      mode=self._first_non_empty_string(
+        incidentio_payload.get("mode"),
+        existing.incidentio.mode,
+      ),
+      visibility=self._first_non_empty_string(
+        incidentio_payload.get("visibility"),
+        existing.incidentio.visibility,
+      ),
+      assignee=self._first_non_empty_string(
+        incidentio_payload.get("assignee"),
+        incidentio_payload.get("owner"),
+        existing.incidentio.assignee,
+      ),
+      url=self._first_non_empty_string(
+        incidentio_payload.get("url"),
+        incidentio_payload.get("html_url"),
+        existing.incidentio.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(incidentio_payload.get("updated_at"))
+        or existing.incidentio.updated_at
+      ),
+      phase_graph=self._build_incidentio_recovery_phase_graph(
+        payload=incidentio_payload,
+        incident_status=incidentio_status,
+        severity=self._first_non_empty_string(
+          incidentio_payload.get("severity"),
+          existing.incidentio.severity,
+        ),
+        mode=self._first_non_empty_string(
+          incidentio_payload.get("mode"),
+          existing.incidentio.mode,
+        ),
+        visibility=self._first_non_empty_string(
+          incidentio_payload.get("visibility"),
+          existing.incidentio.visibility,
+        ),
+        assignee=self._first_non_empty_string(
+          incidentio_payload.get("assignee"),
+          incidentio_payload.get("owner"),
+          existing.incidentio.assignee,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.incidentio,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
-      return "pagerduty", pagerduty, existing.opsgenie
+      return "pagerduty", pagerduty, existing.opsgenie, existing.incidentio
     if normalized_provider == "opsgenie":
-      return "opsgenie", existing.pagerduty, opsgenie
-    return existing.provider_schema_kind, existing.pagerduty, existing.opsgenie
+      return "opsgenie", existing.pagerduty, opsgenie, existing.incidentio
+    if normalized_provider == "incidentio":
+      return "incidentio", existing.pagerduty, existing.opsgenie, incidentio
+    return existing.provider_schema_kind, existing.pagerduty, existing.opsgenie, existing.incidentio
 
   def _build_provider_recovery_state(
     self,
@@ -2483,7 +2714,8 @@ class TradingApplication:
       existing.reference,
       remediation.reference,
     )
-    provider_schema_kind, pagerduty_schema, opsgenie_schema = self._build_provider_recovery_provider_schema(
+    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema = (
+      self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
       payload=payload,
       lifecycle_state=lifecycle_state,
@@ -2498,6 +2730,7 @@ class TradingApplication:
       ),
       reference=reference,
       existing=existing,
+      )
     )
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
@@ -2558,6 +2791,7 @@ class TradingApplication:
       provider_schema_kind=provider_schema_kind,
       pagerduty=pagerduty_schema,
       opsgenie=opsgenie_schema,
+      incidentio=incidentio_schema,
       updated_at=synced_at,
     )
 
@@ -2594,6 +2828,21 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.opsgenie,
+        ),
+      ),
+      incidentio=replace(
+        provider_recovery.incidentio,
+        phase_graph=self._build_incidentio_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.incidentio.incident_status,
+          severity=provider_recovery.incidentio.severity,
+          mode=provider_recovery.incidentio.mode,
+          visibility=provider_recovery.incidentio.visibility,
+          assignee=provider_recovery.incidentio.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.incidentio,
         ),
       ),
     )
@@ -6928,7 +7177,9 @@ class TradingApplication:
   def _normalize_paging_provider(provider: str | None) -> str | None:
     if provider is None:
       return None
-    normalized = provider.strip().lower().replace("-", "_")
+    normalized = provider.strip().lower().replace("-", "_").replace(".", "_")
+    if normalized == "incident_io":
+      return "incidentio"
     return normalized or None
 
   @staticmethod
@@ -7090,6 +7341,8 @@ class TradingApplication:
     combined = {target.strip().lower().replace("-", "_") for target in (*initial_targets, *escalation_targets)}
     if "pagerduty_events" in combined:
       return "pagerduty"
+    if "incidentio_incidents" in combined:
+      return "incidentio"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

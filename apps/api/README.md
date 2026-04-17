@@ -75,7 +75,7 @@ Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
 - full external incident-management workflow such as provider-managed incident ownership beyond the
-  current PagerDuty/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
+  current PagerDuty/incident.io/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
   paging policy management
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -111,6 +111,10 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_FROM_EMAIL`
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_RECOVERY_ENGINE_URL_TEMPLATE`
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_RECOVERY_ENGINE_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_API_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_API_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_RECOVERY_ENGINE_URL_TEMPLATE`
+- `AKRA_TRADER_OPERATOR_ALERT_INCIDENTIO_RECOVERY_ENGINE_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY`
 - `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_RECOVERY_ENGINE_URL_TEMPLATE`
@@ -241,10 +245,10 @@ Defaults:
   on incident remediation state as both raw payload and typed provider recovery state
   (`job_id`, channels, symbols, timeframe, verification result) plus a provider-side status
   machine that tracks workflow phase, job phase, sync state, last provider event, and attempt
-  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/Opsgenie
+  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/incident.io/Opsgenie
   incident/alert body so provider-stored workflow and recovery details become the authoritative
   reconciliation source even when callbacks lag. The typed recovery state now also preserves
-  provider-specific schemas for PagerDuty incident metadata and Opsgenie alert metadata instead of
+  provider-specific schemas for PagerDuty incidents, incident.io incidents, and Opsgenie alerts instead of
   flattening every provider into one generic shape, and each provider schema now carries its own
   native recovery phase graph instead of relying only on the shared recovery machine. Provider
   pull-sync now also lifts remediation telemetry such as progress, current step, attempt count,
@@ -253,7 +257,7 @@ Defaults:
   are configured, pull-sync also polls those endpoints and lets engine telemetry override stale
   incident-body copies. That typed state surfaces in the guarded-live incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
-  across PagerDuty and Opsgenie
+  across PagerDuty, incident.io, and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

@@ -445,6 +445,25 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        incidentio: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          mode?: string | null;
+          visibility?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -639,6 +658,25 @@ type GuardedLiveStatus = {
             acknowledgment_phase: string;
             ownership_phase: string;
             visibility_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        incidentio: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          mode?: string | null;
+          visibility?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8079,6 +8117,25 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  incidentio: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    mode?: string | null;
+    visibility?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      assignment_phase: string;
+      visibility_phase: string;
+      severity_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8137,6 +8194,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Opsgenie schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "incidentio") {
+    const details = [
+      providerRecovery.incidentio.incident_id ? `incident ${providerRecovery.incidentio.incident_id}` : null,
+      providerRecovery.incidentio.incident_status !== "unknown"
+        ? `status ${providerRecovery.incidentio.incident_status}`
+        : null,
+      providerRecovery.incidentio.severity ? `severity ${providerRecovery.incidentio.severity}` : null,
+      providerRecovery.incidentio.assignee ? `assignee ${providerRecovery.incidentio.assignee}` : null,
+      providerRecovery.incidentio.visibility ? `visibility ${providerRecovery.incidentio.visibility}` : null,
+      providerRecovery.incidentio.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.incidentio.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.incidentio.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.incidentio.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.incidentio.phase_graph.assignment_phase !== "unknown"
+        ? `assignment ${providerRecovery.incidentio.phase_graph.assignment_phase}`
+        : null,
+      providerRecovery.incidentio.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.incidentio.updated_at)}`
+        : null,
+      providerRecovery.incidentio.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.incidentio.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `incident.io schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

@@ -195,14 +195,14 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   remediation record as both raw payload and typed provider recovery state. That typed recovery
   state now includes a provider-side status machine covering workflow phase, job phase, sync
   status, last provider event, and attempt count, and guarded-live refresh also pull-syncs the
-  current provider incident/alert body so PagerDuty/Opsgenie-held recovery metadata can reconcile
+  current provider incident/alert body so PagerDuty/incident.io/Opsgenie-held recovery metadata can reconcile
   local state authoritatively when callbacks lag. The same remediation state now keeps
-  provider-specific typed branches for PagerDuty incident fields and Opsgenie alert fields so the
+  provider-specific typed branches for PagerDuty incident fields, incident.io incident fields, and Opsgenie alert fields so the
   control plane does not collapse provider-owned recovery metadata into one generic schema, and
   those branches now carry provider-native recovery phase graphs alongside the shared status
   machine. Authoritative pull-sync also lifts provider remediation telemetry into typed recovery
   state so progress, step, attempt, and provider-run details survive callback lag and local state
-  refreshes. When configured, PagerDuty and Opsgenie remediation-engine endpoints are also polled
+  refreshes. When configured, PagerDuty, incident.io, and Opsgenie remediation-engine endpoints are also polled
   directly, and that engine telemetry becomes the authoritative recovery source over stale
   incident-body copies. Local
   acknowledge/remediate/escalate actions can push provider-native workflow updates back out when

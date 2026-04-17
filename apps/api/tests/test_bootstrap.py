@@ -157,6 +157,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       pagerduty_from_email: str | None,
       pagerduty_recovery_engine_url_template: str | None,
       pagerduty_recovery_engine_token: str | None,
+      incidentio_api_token: str | None,
+      incidentio_api_url: str,
+      incidentio_recovery_engine_url_template: str | None,
+      incidentio_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -171,6 +175,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["pagerduty_from_email"] = pagerduty_from_email or ""
       captured["pagerduty_recovery_engine_url_template"] = pagerduty_recovery_engine_url_template or ""
       captured["pagerduty_recovery_engine_token"] = pagerduty_recovery_engine_token or ""
+      captured["incidentio_api_token"] = incidentio_api_token or ""
+      captured["incidentio_api_url"] = incidentio_api_url
+      captured["incidentio_recovery_engine_url_template"] = incidentio_recovery_engine_url_template or ""
+      captured["incidentio_recovery_engine_token"] = incidentio_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -225,6 +233,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://pagerduty.example/recovery/{job_id_urlencoded}"
       ),
       operator_alert_pagerduty_recovery_engine_token="pagerduty-recovery-token",
+      operator_alert_incidentio_api_token="incidentio-token",
+      operator_alert_incidentio_api_url="https://api.incidentio.example",
+      operator_alert_incidentio_recovery_engine_url_template=(
+        "https://incidentio.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_incidentio_recovery_engine_token="incidentio-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -252,6 +266,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["pagerduty_from_email"] == "akra-ops@example.com"
   assert captured["pagerduty_recovery_engine_url_template"] == "https://pagerduty.example/recovery/{job_id_urlencoded}"
   assert captured["pagerduty_recovery_engine_token"] == "pagerduty-recovery-token"
+  assert captured["incidentio_api_token"] == "incidentio-token"
+  assert captured["incidentio_api_url"] == "https://api.incidentio.example"
+  assert captured["incidentio_recovery_engine_url_template"] == "https://incidentio.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["incidentio_recovery_engine_token"] == "incidentio-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"
