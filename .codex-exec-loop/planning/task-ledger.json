@@ -617,36 +617,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add local remediation job coverage for guarded-live stream and handoff faults",
       "description": "Extend the completed market-data remediation loop beyond sync, backfill, and candle-repair incidents by attaching real local recovery jobs or verification flows to guarded-live stream and handoff `market_data_*` faults such as channel restore, order-book rebuild, and adjacent feed-handoff incidents, so those incidents no longer remain mainly provider-workflow owned when the platform can drive or verify recovery directly.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says the main remaining executable gap after commit 1442cb0 is that guarded-live stream and handoff faults such as channel restore and order-book rebuild still rely mainly on provider workflow ownership, making direct local remediation-job coverage the clearest next queued task.",
+      "priority_reason": "Completed in main session commit ecd4e87, which added real local remediation coverage for guarded-live channel_restore and order_book_rebuild incidents by re-handoffing live venue sessions, forcing session sync, persisting repaired ownership state, recording remediation audit events, and aligning API plus operator-facing tests and docs with same-loop incident resolution.",
       "depends_on": [
         "planning-operator-trust-provider-remediation-callback-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:30:19Z",
+      "updated_at": "2026-04-17T11:49:38Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by extending the now-closed remediation callback loop into the remaining stream-specific recovery paths, keeping guarded-live market-data incidents on one durable local-plus-provider recovery model instead of splitting stream faults back to provider-only ownership."
+      "direction_relation_note": "Closed the guarded-live stream and handoff local-remediation gap for operator trust by giving channel_restore and order_book_rebuild incidents real local recovery execution and durable audit closure, which now leaves richer provider payload consumption and deeper bidirectional provider-managed remediation orchestration as the direct follow-up."
     },
     {
       "id": "planning-operator-trust-provider-remediation-orchestration-depth",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Deepen provider-specific remediation payload handling and bidirectional recovery orchestration",
-      "description": "Build on the completed remediation callback sync by interpreting richer provider-specific remediation payloads and extending provider-owned recovery orchestration beyond lifecycle mirroring into a fuller bidirectional contract, so external remediation systems and local incident recovery can coordinate detailed execution state instead of only sharing coarse requested, started, completed, or failed updates.",
-      "status": "proposed",
+      "title": "Consume richer provider recovery payloads and complete bidirectional remediation orchestration",
+      "description": "Build on the completed local guarded-live remediation loop by consuming richer provider-specific recovery payloads for channel restore, order-book rebuild, and adjacent provider-managed stream faults, then extend provider-owned remediation beyond coarse lifecycle mirroring into a true bidirectional contract where local incident state and external recovery execution can exchange detailed execution, verification, and ownership state end to end.",
+      "status": "ready",
       "base_priority": 81,
-      "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply explicitly leaves deeper provider-specific remediation payload interpretation and full bidirectional provider-owned recovery orchestration as unfinished work, but stream and handoff local remediation coverage is the more immediate executable queue head.",
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply explicitly says what remains after commit ecd4e87 is richer provider-specific recovery payload handling plus deeper bidirectional provider-managed recovery orchestration, making this the clearest next executable follow-up now that local channel_restore and order_book_rebuild remediation closes in the same loop.",
       "depends_on": [
-        "planning-operator-trust-provider-remediation-callback-sync"
+        "planning-operator-trust-stream-fault-remediation-job-coverage"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:30:19Z",
+      "updated_at": "2026-04-17T11:49:38Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving past coarse callback synchronization toward a richer provider-owned recovery contract where detailed external remediation semantics stay aligned with local incident ownership and closure."
+      "direction_relation_note": "Advances operator trust past coarse callback synchronization by making provider-managed remediation exchange richer recovery semantics with the now-completed local stream-fault repair loop, so external systems and local incident closure stay aligned end to end."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
