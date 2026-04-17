@@ -21,9 +21,10 @@ Implemented now:
   guarded-live live-path alerts including risk breaches, repeated runtime recovery loops, stale
   live order sync, market-data freshness/quality/venue-policy breaches, channel-level
   market-data consistency/restore breaches from guarded-live venue-session coverage, venue-specific
-  book/kline consistency faults, deeper depth-ladder and candle-sequence faults, persisted
-  live-path alert history, durable incident events, outbound delivery history, and merged runtime
-  plus guarded-live audit events
+  book/kline consistency faults, exchange-specific ladder integrity faults, deeper
+  depth-ladder/candle-sequence faults, and multi-candle continuity faults, persisted live-path
+  alert history, durable incident events, outbound delivery history, and merged runtime plus
+  guarded-live audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
   history, durable incident events, outbound delivery history, and guarded-live audit events in the
   control plane
@@ -200,9 +201,9 @@ Defaults:
   repeated live-session recovery loops, stale active-order sync, and market-data freshness faults
   such as stale sync, richer backfill-quality semantics, repeated sync failures, and venue-specific
   upstream fault classifications, plus channel-level depth/order-book gaps, stale market-channel
-  coverage, restore failures, venue-specific book/kline consistency faults, and deeper
-  depth-ladder/candle-sequence faults from venue session handoff state so those faults flow into
-  the same durable incident and delivery history
+  coverage, restore failures, venue-specific book/kline consistency faults, exchange-specific
+  ladder integrity faults, deeper depth-ladder/candle-sequence faults, and multi-candle
+  continuity faults so those faults flow into the same durable incident and delivery history
 - guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
   delivery attempts through configured operator delivery targets such as console logging, generic
   webhook delivery, Slack webhook delivery, PagerDuty Events API delivery, or Opsgenie Alert API

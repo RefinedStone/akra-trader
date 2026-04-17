@@ -111,8 +111,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
   breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and
   venue-specific upstream fault classifications, plus guarded-live venue-session channel
-  consistency, restore degradation, venue-specific book/kline consistency faults, and deeper
-  depth-ladder/candle-sequence semantics, instead of only generic runtime control faults
+  consistency, restore degradation, venue-specific book/kline consistency faults, exchange-specific
+  ladder integrity faults, deeper depth-ladder/candle-sequence semantics, and multi-candle
+  continuity faults, instead of only generic runtime control faults
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas

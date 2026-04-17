@@ -1228,19 +1228,29 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   guarded_live_status = app.get_guarded_live_status()
 
   active_categories = {alert.category for alert in visibility.alerts if alert.source == "guarded_live"}
-  assert {"market_data_freshness", "market_data_quality", "market_data_venue", "risk_breach"} <= active_categories
+  assert {
+    "market_data_freshness",
+    "market_data_quality",
+    "market_data_candle_continuity",
+    "market_data_venue",
+    "risk_breach",
+  } <= active_categories
   market_data_alert = next(
     alert for alert in visibility.alerts
     if alert.category == "market_data_freshness"
   )
   assert "ETH/USDT lagged 1200s." in market_data_alert.detail
-  assert "missing candle" in market_data_alert.detail
   market_data_quality_alert = next(
     alert for alert in visibility.alerts
     if alert.category == "market_data_quality"
   )
   assert "backfill target covers 72.00%" in market_data_quality_alert.detail
-  assert "contiguous backfill quality is 91.00%" in market_data_quality_alert.detail
+  market_data_continuity_alert = next(
+    alert for alert in visibility.alerts
+    if alert.category == "market_data_candle_continuity"
+  )
+  assert "has 3 missing candle(s) across 1 gap window(s)." in market_data_continuity_alert.detail
+  assert "contiguous backfill quality is 91.00%" in market_data_continuity_alert.detail
   market_data_venue_alert = next(
     alert for alert in visibility.alerts
     if alert.category == "market_data_venue"
@@ -1264,6 +1274,11 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   )
   assert any(
     event.kind == "incident_opened"
+    and event.alert_id == "guarded-live:market-data-continuity:binance:5m"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    event.kind == "incident_opened"
     and event.alert_id == "guarded-live:market-data-venue:binance:5m"
     for event in guarded_live_status.incident_events
   )
@@ -1277,6 +1292,10 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   )
   assert any(
     record.alert_id == "guarded-live:market-data-quality:binance:5m"
+    for record in guarded_live_status.delivery_history
+  )
+  assert any(
+    record.alert_id == "guarded-live:market-data-continuity:binance:5m"
     for record in guarded_live_status.delivery_history
   )
 
@@ -1357,15 +1376,23 @@ def test_operator_visibility_promotes_channel_level_market_data_incidents(
     for alert in visibility.alerts
     if alert.run_id == run.config.run_id and alert.source == "guarded_live"
   }
-  assert {"market_data_channel_consistency", "market_data_channel_restore"} <= categories
+  assert {"market_data_channel_consistency", "market_data_channel_restore", "market_data_ladder_integrity"} <= categories
 
   consistency_alert = next(
     alert for alert in visibility.alerts
     if alert.run_id == run.config.run_id and alert.category == "market_data_channel_consistency"
   )
-  assert "depth/order-book continuity recorded 1 gap(s)." in consistency_alert.detail
-  assert "binance depth stream gap detected between update ids 25 and 29." in consistency_alert.detail
   assert "trade ticks is stale" in consistency_alert.detail
+  assert "depth/order-book updates is stale" in consistency_alert.detail
+  assert "kline candles has not produced any events within 45s" in consistency_alert.detail
+
+  ladder_integrity_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "market_data_ladder_integrity"
+  )
+  assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert.detail
+  assert "binance ladder integrity required 2 snapshot rebuild(s)." in ladder_integrity_alert.detail
+  assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert.detail
 
   restore_alert = next(
     alert for alert in visibility.alerts
@@ -1386,11 +1413,20 @@ def test_operator_visibility_promotes_channel_level_market_data_incidents(
     for event in guarded_live_status.incident_events
   )
   assert any(
+    event.kind == "incident_opened"
+    and event.alert_id == f"guarded-live:market-data-ladder-integrity:{run.config.run_id}"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
     record.alert_id == f"guarded-live:market-data-channel-consistency:{run.config.run_id}"
     for record in guarded_live_status.delivery_history
   )
   assert any(
     record.alert_id == f"guarded-live:market-data-channel-restore:{run.config.run_id}"
+    for record in guarded_live_status.delivery_history
+  )
+  assert any(
+    record.alert_id == f"guarded-live:market-data-ladder-integrity:{run.config.run_id}"
     for record in guarded_live_status.delivery_history
   )
 

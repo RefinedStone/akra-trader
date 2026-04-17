@@ -4167,10 +4167,11 @@ class TradingApplication:
         continue
 
       critical_details: list[str] = []
-      warning_details: list[str] = []
       quality_details: list[str] = []
+      continuity_details: list[str] = []
       venue_details: list[str] = []
       quality_has_critical = False
+      continuity_has_critical = False
       venue_has_critical = False
       detected_candidates: list[datetime] = []
       for instrument in relevant_instruments:
@@ -4198,7 +4199,7 @@ class TradingApplication:
         if missing_candles is None and instrument.backfill_gap_windows:
           missing_candles = sum(window.missing_candles for window in instrument.backfill_gap_windows)
         if missing_candles and missing_candles > 0:
-          warning_details.append(
+          continuity_details.append(
             f"{symbol} has {missing_candles} missing candle(s) across "
             f"{len(instrument.backfill_gap_windows)} gap window(s)."
           )
@@ -4217,7 +4218,7 @@ class TradingApplication:
           instrument.backfill_contiguous_completion_ratio is not None
           and instrument.backfill_contiguous_complete is False
         ):
-          quality_details.append(
+          continuity_details.append(
             f"{symbol} contiguous backfill quality is "
             f"{instrument.backfill_contiguous_completion_ratio * 100:.2f}%."
           )
@@ -4225,7 +4226,7 @@ class TradingApplication:
             instrument.backfill_contiguous_completion_ratio
             < self._guarded_live_market_data_contiguous_completion_floor
           ):
-            quality_has_critical = True
+            continuity_has_critical = True
         if instrument.failure_count_24h > 0:
           venue_details.append(
             f"{symbol} recorded {instrument.failure_count_24h} sync failure(s) in the last 24h."
@@ -4251,7 +4252,7 @@ class TradingApplication:
           ):
             venue_has_critical = True
 
-      detail_copy = list(dict.fromkeys((*critical_details, *warning_details)))
+      detail_copy = list(dict.fromkeys(critical_details))
       detected_at = max(detected_candidates) if detected_candidates else current_time
       if detail_copy:
         alerts.append(
@@ -4280,6 +4281,23 @@ class TradingApplication:
             detail=(
               " ".join(quality_detail_copy[:3])
               + (f" Additional issues: {len(quality_detail_copy) - 3}." if len(quality_detail_copy) > 3 else "")
+            ),
+            detected_at=detected_at,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
+      continuity_detail_copy = list(dict.fromkeys(continuity_details))
+      if continuity_detail_copy:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data-continuity:{status.venue}:{timeframe}",
+            severity="critical" if continuity_has_critical else "warning",
+            category="market_data_candle_continuity",
+            summary=f"Guarded-live multi-candle continuity requires review for {status.venue} {timeframe}.",
+            detail=(
+              " ".join(continuity_detail_copy[:3])
+              + (f" Additional issues: {len(continuity_detail_copy) - 3}." if len(continuity_detail_copy) > 3 else "")
             ),
             detected_at=detected_at,
             source="guarded_live",
@@ -4353,6 +4371,31 @@ class TradingApplication:
           ),
           detail=self._summarize_guarded_live_issue_copy(consistency_details),
           detected_at=consistency_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    ladder_integrity_details, ladder_integrity_detected_at, ladder_integrity_has_critical = (
+      self._collect_guarded_live_ladder_integrity_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if ladder_integrity_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-ladder-integrity:{run_id or 'unknown'}",
+          severity="critical" if ladder_integrity_has_critical else "warning",
+          category="market_data_ladder_integrity",
+          summary=(
+            f"Guarded-live exchange ladder integrity requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(ladder_integrity_details),
+          detected_at=ladder_integrity_detected_at,
           run_id=run_id,
           session_id=session_id,
           source="guarded_live",
@@ -4515,21 +4558,6 @@ class TradingApplication:
         critical=True,
       )
 
-    if handoff.order_book_gap_count > 0:
-      gap_detail = f"depth/order-book continuity recorded {handoff.order_book_gap_count} gap(s)."
-      if handoff.order_book_last_update_id is not None:
-        gap_detail += f" Last update id: {handoff.order_book_last_update_id}."
-      add_finding(
-        gap_detail,
-        detected_at=handoff.order_book_last_rebuilt_at or handoff.last_sync_at or handoff.handed_off_at,
-      )
-
-    for issue_detail in self._extract_guarded_live_channel_gap_semantics(issues=handoff.issues):
-      add_finding(
-        issue_detail,
-        detected_at=handoff.order_book_last_rebuilt_at or handoff.last_sync_at or handoff.handed_off_at,
-      )
-
     for channel_name, event_at, critical_channel in self._resolve_guarded_live_market_channel_activity(
       handoff=handoff
     ):
@@ -4550,6 +4578,42 @@ class TradingApplication:
 
     detected_at = max(detected_candidates) if detected_candidates else current_time
     return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  def _collect_guarded_live_ladder_integrity_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    venue = handoff.venue or "venue"
+    detected_at = handoff.order_book_last_rebuilt_at or handoff.last_depth_event_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if handoff.order_book_gap_count > 0:
+      gap_detail = f"{venue} ladder integrity recorded {handoff.order_book_gap_count} depth gap(s)."
+      if handoff.order_book_last_update_id is not None:
+        gap_detail += f" Last update id: {handoff.order_book_last_update_id}."
+      add_finding(gap_detail, critical=True)
+
+    if handoff.order_book_rebuild_count > 0:
+      add_finding(
+        f"{venue} ladder integrity required {handoff.order_book_rebuild_count} snapshot rebuild(s).",
+      )
+
+    for issue_detail in self._extract_guarded_live_ladder_integrity_semantics(issues=handoff.issues):
+      add_finding(issue_detail, critical=True)
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
 
   def _collect_guarded_live_channel_restore_findings(
     self,
@@ -4975,6 +5039,20 @@ class TradingApplication:
         )
       else:
         findings.append(f"{venue} depth stream gap detected.")
+    return tuple(dict.fromkeys(findings))
+
+  @staticmethod
+  def _extract_guarded_live_ladder_integrity_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings = list(TradingApplication._extract_guarded_live_channel_gap_semantics(issues=issues))
+    for issue in issues:
+      if "_order_book_snapshot_failed:" not in issue:
+        continue
+      venue, payload = issue.split("_order_book_snapshot_failed:", 1)
+      reason = payload.replace("_", " ") if payload else "unknown"
+      findings.append(f"{venue} ladder snapshot rebuild failed: {reason}.")
     return tuple(dict.fromkeys(findings))
 
   @staticmethod
