@@ -241,7 +241,9 @@ Defaults:
   incident/alert body so provider-stored workflow and recovery details become the authoritative
   reconciliation source even when callbacks lag. The typed recovery state now also preserves
   provider-specific schemas for PagerDuty incident metadata and Opsgenie alert metadata instead of
-  flattening every provider into one generic shape. That typed state surfaces in the guarded-live
+  flattening every provider into one generic shape, and each provider schema now carries its own
+  native recovery phase graph instead of relying only on the shared recovery machine. That typed
+  state surfaces in the guarded-live
   incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
   across PagerDuty and Opsgenie

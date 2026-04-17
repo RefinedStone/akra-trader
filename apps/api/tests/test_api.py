@@ -1647,6 +1647,7 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert updated_incident["remediation"]["provider_recovery"]["provider_schema_kind"] == "pagerduty"
     assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_id"] == "PDINC-REC-901"
     assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_status"] == "delivered"
+    assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["phase_graph"]["workflow_phase"] == "verified_pending_resolve"
     assert updated_incident["remediation"]["provider_recovery"]["symbols"] == ["ETH/USDT"]
     assert updated_incident["remediation"]["provider_recovery"]["timeframe"] == "5m"
     assert updated_incident["remediation"]["provider_recovery"]["verification"]["state"] == "passed"

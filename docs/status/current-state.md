@@ -124,7 +124,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
   phase, job phase, sync state, last event, and attempt count. That recovery state now also keeps
   provider-specific typed schemas for PagerDuty incidents and Opsgenie alerts instead of only a
-  flattened generic payload. When local verification closes the
+  flattened generic payload, and each provider branch now carries its own native recovery phase
+  graph alongside the shared machine. When local verification closes the
   incident, the provider-native remediation workflow is resolved back out through the same
   bidirectional incident channel
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,

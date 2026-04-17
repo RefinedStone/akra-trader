@@ -49,7 +49,9 @@ from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryState
+from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryState
+from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1530,20 +1532,23 @@ class TradingApplication:
           updated_incident,
           remediation=replace(
             updated_incident.remediation,
-            provider_recovery=replace(
-              aligned_provider_recovery,
-              status_machine=self._build_provider_recovery_status_machine(
-                existing=aligned_provider_recovery.status_machine,
-                remediation_state=updated_incident.remediation.state,
-                event_kind=aligned_provider_recovery.status_machine.last_event_kind,
-                workflow_state="delivered",
-                workflow_action=provider_phase.removeprefix("provider_"),
-                job_state=aligned_provider_recovery.status_machine.job_state,
-                sync_state=aligned_provider_recovery.status_machine.sync_state,
-                detail=aligned_provider_recovery.status_machine.last_detail,
-                event_at=synced_at,
-                attempt_number=aligned_provider_recovery.status_machine.attempt_number,
+            provider_recovery=self._refresh_provider_recovery_phase_graphs(
+              provider_recovery=replace(
+                aligned_provider_recovery,
+                status_machine=self._build_provider_recovery_status_machine(
+                  existing=aligned_provider_recovery.status_machine,
+                  remediation_state=updated_incident.remediation.state,
+                  event_kind=aligned_provider_recovery.status_machine.last_event_kind,
+                  workflow_state="delivered",
+                  workflow_action=provider_phase.removeprefix("provider_"),
+                  job_state=aligned_provider_recovery.status_machine.job_state,
+                  sync_state=aligned_provider_recovery.status_machine.sync_state,
+                  detail=aligned_provider_recovery.status_machine.last_detail,
+                  event_at=synced_at,
+                  attempt_number=aligned_provider_recovery.status_machine.attempt_number,
+                ),
               ),
+              synced_at=synced_at,
             ),
           ),
         )
@@ -1869,11 +1874,253 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_pagerduty_incident_phase(
+    incident_status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (incident_status or "").strip().lower().replace(" ", "_")
+    if normalized in {"triggered", "acknowledged", "resolved"}:
+      return normalized
+    return existing_phase
+
+  @staticmethod
+  def _resolve_pagerduty_responder_phase(incident_phase: str) -> str:
+    if incident_phase == "triggered":
+      return "awaiting_acknowledgment"
+    if incident_phase == "acknowledged":
+      return "engaged"
+    if incident_phase == "resolved":
+      return "resolved"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_pagerduty_urgency_phase(urgency: str | None, existing_phase: str) -> str:
+    normalized = (urgency or "").strip().lower().replace(" ", "_")
+    if normalized in {"high"}:
+      return "high_urgency"
+    if normalized in {"low"}:
+      return "low_urgency"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_pagerduty_workflow_phase(
+    *,
+    lifecycle_state: str,
+    workflow_action: str | None,
+    incident_phase: str,
+    existing_phase: str,
+  ) -> str:
+    if workflow_action == "resolve" or incident_phase == "resolved" or lifecycle_state == "resolved":
+      return "resolved_back_synced"
+    if lifecycle_state == "verified":
+      return "verified_pending_resolve"
+    if lifecycle_state == "recovered":
+      return "awaiting_local_verification"
+    if lifecycle_state == "recovering":
+      return "provider_recovering"
+    if lifecycle_state == "requested" or workflow_action == "remediate":
+      return "remediation_requested"
+    if lifecycle_state == "failed":
+      return "recovery_failed"
+    if workflow_action == "acknowledge" or incident_phase == "acknowledged":
+      return "incident_acknowledged"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "idle"
+
+  def _build_pagerduty_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    urgency: str | None,
+    lifecycle_state: str,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentPagerDutyRecoveryState,
+  ) -> OperatorIncidentPagerDutyRecoveryPhaseGraph:
+    phase_payload = self._extract_payload_mapping(payload.get("phase_graph"))
+    incident_phase = self._first_non_empty_string(
+      phase_payload.get("incident_phase"),
+      self._normalize_pagerduty_incident_phase(incident_status, existing.phase_graph.incident_phase),
+      existing.phase_graph.incident_phase,
+    ) or "unknown"
+    workflow_phase = self._first_non_empty_string(
+      phase_payload.get("workflow_phase"),
+      self._resolve_pagerduty_workflow_phase(
+        lifecycle_state=lifecycle_state,
+        workflow_action=status_machine.workflow_action,
+        incident_phase=incident_phase,
+        existing_phase=existing.phase_graph.workflow_phase,
+      ),
+      existing.phase_graph.workflow_phase,
+    ) or "unknown"
+    responder_phase = self._first_non_empty_string(
+      phase_payload.get("responder_phase"),
+      self._resolve_pagerduty_responder_phase(incident_phase),
+      existing.phase_graph.responder_phase,
+    ) or "unknown"
+    urgency_phase = self._first_non_empty_string(
+      phase_payload.get("urgency_phase"),
+      self._resolve_pagerduty_urgency_phase(urgency, existing.phase_graph.urgency_phase),
+      existing.phase_graph.urgency_phase,
+    ) or "unknown"
+    last_transition_at = (
+      self._parse_payload_datetime(phase_payload.get("last_transition_at"))
+      or self._parse_payload_datetime(payload.get("last_status_change_at"))
+      or existing.phase_graph.last_transition_at
+      or synced_at
+    )
+    return OperatorIncidentPagerDutyRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      responder_phase=responder_phase,
+      urgency_phase=urgency_phase,
+      last_transition_at=last_transition_at,
+    )
+
+  @staticmethod
+  def _normalize_opsgenie_alert_phase(
+    alert_status: str | None,
+    acknowledged: bool | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (alert_status or "").strip().lower().replace(" ", "_")
+    if normalized in {"open", "acknowledged", "closed"}:
+      return normalized
+    if acknowledged is True:
+      return "acknowledged"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_opsgenie_acknowledgment_phase(
+    alert_phase: str,
+    acknowledged: bool | None,
+  ) -> str:
+    if alert_phase == "closed":
+      return "closed"
+    if acknowledged is True or alert_phase == "acknowledged":
+      return "acknowledged"
+    if alert_phase == "open":
+      return "pending_acknowledgment"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_opsgenie_ownership_phase(
+    owner: str | None,
+    teams: tuple[str, ...],
+    existing_phase: str,
+  ) -> str:
+    if owner:
+      return "assigned"
+    if teams:
+      return "team_routed"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_opsgenie_visibility_phase(seen: bool | None, existing_phase: str) -> str:
+    if seen is True:
+      return "seen"
+    if seen is False:
+      return "unseen"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_opsgenie_workflow_phase(
+    *,
+    lifecycle_state: str,
+    workflow_action: str | None,
+    alert_phase: str,
+    existing_phase: str,
+  ) -> str:
+    if workflow_action == "resolve" or alert_phase == "closed" or lifecycle_state == "resolved":
+      return "closed_back_synced"
+    if lifecycle_state == "verified":
+      return "verified_pending_close"
+    if lifecycle_state == "recovered":
+      return "awaiting_local_verification"
+    if lifecycle_state == "recovering":
+      return "provider_recovering"
+    if lifecycle_state == "requested" or workflow_action == "remediate":
+      return "recovery_requested"
+    if lifecycle_state == "failed":
+      return "recovery_failed"
+    if alert_phase == "acknowledged":
+      return "alert_acknowledged"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "idle"
+
+  def _build_opsgenie_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    owner: str | None,
+    acknowledged: bool | None,
+    seen: bool | None,
+    teams: tuple[str, ...],
+    lifecycle_state: str,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentOpsgenieRecoveryState,
+  ) -> OperatorIncidentOpsgenieRecoveryPhaseGraph:
+    phase_payload = self._extract_payload_mapping(payload.get("phase_graph"))
+    alert_phase = self._first_non_empty_string(
+      phase_payload.get("alert_phase"),
+      self._normalize_opsgenie_alert_phase(alert_status, acknowledged, existing.phase_graph.alert_phase),
+      existing.phase_graph.alert_phase,
+    ) or "unknown"
+    workflow_phase = self._first_non_empty_string(
+      phase_payload.get("workflow_phase"),
+      self._resolve_opsgenie_workflow_phase(
+        lifecycle_state=lifecycle_state,
+        workflow_action=status_machine.workflow_action,
+        alert_phase=alert_phase,
+        existing_phase=existing.phase_graph.workflow_phase,
+      ),
+      existing.phase_graph.workflow_phase,
+    ) or "unknown"
+    acknowledgment_phase = self._first_non_empty_string(
+      phase_payload.get("acknowledgment_phase"),
+      self._resolve_opsgenie_acknowledgment_phase(alert_phase, acknowledged),
+      existing.phase_graph.acknowledgment_phase,
+    ) or "unknown"
+    ownership_phase = self._first_non_empty_string(
+      phase_payload.get("ownership_phase"),
+      self._resolve_opsgenie_ownership_phase(owner, teams, existing.phase_graph.ownership_phase),
+      existing.phase_graph.ownership_phase,
+    ) or "unknown"
+    visibility_phase = self._first_non_empty_string(
+      phase_payload.get("visibility_phase"),
+      self._resolve_opsgenie_visibility_phase(seen, existing.phase_graph.visibility_phase),
+      existing.phase_graph.visibility_phase,
+    ) or "unknown"
+    last_transition_at = (
+      self._parse_payload_datetime(phase_payload.get("last_transition_at"))
+      or self._parse_payload_datetime(payload.get("updated_at"))
+      or self._parse_payload_datetime(payload.get("updatedAt"))
+      or existing.phase_graph.last_transition_at
+      or synced_at
+    )
+    return OperatorIncidentOpsgenieRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      acknowledgment_phase=acknowledgment_phase,
+      ownership_phase=ownership_phase,
+      visibility_phase=visibility_phase,
+      last_transition_at=last_transition_at,
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
     provider: str,
     payload: dict[str, Any],
+    lifecycle_state: str,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
     workflow_state: str | None,
     workflow_reference: str | None,
     reference: str | None,
@@ -1938,6 +2185,18 @@ class TradingApplication:
         self._parse_payload_datetime(pagerduty_payload.get("last_status_change_at"))
         or existing.pagerduty.last_status_change_at
       ),
+      phase_graph=self._build_pagerduty_recovery_phase_graph(
+        payload=pagerduty_payload,
+        incident_status=pagerduty_status,
+        urgency=self._first_non_empty_string(
+          pagerduty_payload.get("urgency"),
+          existing.pagerduty.urgency,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.pagerduty,
+      ),
     )
 
     opsgenie_payload = self._merge_payload_mappings(
@@ -1997,6 +2256,33 @@ class TradingApplication:
         self._parse_payload_datetime(opsgenie_payload.get("updated_at"))
         or self._parse_payload_datetime(opsgenie_payload.get("updatedAt"))
         or existing.opsgenie.updated_at
+      ),
+      phase_graph=self._build_opsgenie_recovery_phase_graph(
+        payload=opsgenie_payload,
+        alert_status=opsgenie_status,
+        owner=self._first_non_empty_string(
+          opsgenie_payload.get("owner"),
+          existing.opsgenie.owner,
+        ),
+        acknowledged=(
+          opsgenie_payload.get("acknowledged")
+          if isinstance(opsgenie_payload.get("acknowledged"), bool)
+          else existing.opsgenie.acknowledged
+        ),
+        seen=(
+          opsgenie_payload.get("seen")
+          if isinstance(opsgenie_payload.get("seen"), bool)
+          else existing.opsgenie.seen
+        ),
+        teams=self._extract_string_tuple(
+          opsgenie_payload.get("teams"),
+          opsgenie_payload.get("team"),
+          existing.opsgenie.teams,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.opsgenie,
       ),
     )
 
@@ -2075,6 +2361,9 @@ class TradingApplication:
     provider_schema_kind, pagerduty_schema, opsgenie_schema = self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
       payload=payload,
+      lifecycle_state=lifecycle_state,
+      status_machine=status_machine,
+      synced_at=synced_at,
       workflow_state=status_machine.workflow_state,
       workflow_reference=self._first_non_empty_string(
         workflow_reference,
@@ -2144,6 +2433,43 @@ class TradingApplication:
       pagerduty=pagerduty_schema,
       opsgenie=opsgenie_schema,
       updated_at=synced_at,
+    )
+
+  def _refresh_provider_recovery_phase_graphs(
+    self,
+    *,
+    provider_recovery: OperatorIncidentProviderRecoveryState,
+    synced_at: datetime,
+  ) -> OperatorIncidentProviderRecoveryState:
+    return replace(
+      provider_recovery,
+      pagerduty=replace(
+        provider_recovery.pagerduty,
+        phase_graph=self._build_pagerduty_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.pagerduty.incident_status,
+          urgency=provider_recovery.pagerduty.urgency,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.pagerduty,
+        ),
+      ),
+      opsgenie=replace(
+        provider_recovery.opsgenie,
+        phase_graph=self._build_opsgenie_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.opsgenie.alert_status,
+          owner=provider_recovery.opsgenie.owner,
+          acknowledged=provider_recovery.opsgenie.acknowledged,
+          seen=provider_recovery.opsgenie.seen,
+          teams=provider_recovery.opsgenie.teams,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.opsgenie,
+        ),
+      ),
     )
 
   def _apply_external_remediation_sync(
@@ -6933,20 +7259,23 @@ class TradingApplication:
         if latest_record is not None and latest_record.external_reference is not None
         else remediation.reference
       ),
-      provider_recovery=replace(
-        remediation.provider_recovery,
-        status_machine=self._build_provider_recovery_status_machine(
-          existing=remediation.provider_recovery.status_machine,
-          remediation_state=next_state,
-          event_kind=remediation.provider_recovery.status_machine.last_event_kind,
-          workflow_state=self._resolve_incident_delivery_state(records=remediation_records),
-          workflow_action=(
-            latest_record.provider_action if latest_record is not None else remediation.provider_recovery.status_machine.workflow_action
+      provider_recovery=self._refresh_provider_recovery_phase_graphs(
+        provider_recovery=replace(
+          remediation.provider_recovery,
+          status_machine=self._build_provider_recovery_status_machine(
+            existing=remediation.provider_recovery.status_machine,
+            remediation_state=next_state,
+            event_kind=remediation.provider_recovery.status_machine.last_event_kind,
+            workflow_state=self._resolve_incident_delivery_state(records=remediation_records),
+            workflow_action=(
+              latest_record.provider_action if latest_record is not None else remediation.provider_recovery.status_machine.workflow_action
+            ),
+            attempt_number=latest_record.attempt_number if latest_record is not None else remediation.provider_recovery.status_machine.attempt_number,
+            detail=latest_record.detail if latest_record is not None else remediation.provider_recovery.status_machine.last_detail,
+            event_at=latest_record.attempted_at if latest_record is not None else remediation.provider_recovery.status_machine.last_event_at,
           ),
-          attempt_number=latest_record.attempt_number if latest_record is not None else remediation.provider_recovery.status_machine.attempt_number,
-          detail=latest_record.detail if latest_record is not None else remediation.provider_recovery.status_machine.last_detail,
-          event_at=latest_record.attempted_at if latest_record is not None else remediation.provider_recovery.status_machine.last_event_at,
         ),
+        synced_at=latest_record.attempted_at if latest_record is not None else self._clock(),
       ),
     )
 
@@ -7163,36 +7492,39 @@ class TradingApplication:
       requested_by=actor,
       last_attempted_at=last_attempted_at,
       detail=local_detail,
-      provider_recovery=replace(
-        remediation.provider_recovery,
-        lifecycle_state=self._provider_recovery_lifecycle_for_remediation_state(local_state),
-        detail=local_detail,
-        status_machine=self._build_provider_recovery_status_machine(
-          existing=remediation.provider_recovery.status_machine,
-          remediation_state=local_state,
-          event_kind=(
-            "local_verification_executed"
-            if local_state in {"executed", "completed", "partial", "skipped"}
-            else "local_verification_failed"
-          ),
-          workflow_state=remediation.provider_recovery.status_machine.workflow_state,
-          workflow_action=remediation.provider_recovery.status_machine.workflow_action,
-          job_state=(
-            "verified"
-            if local_state in {"executed", "completed"}
-            else ("partial" if local_state == "partial" else ("skipped" if local_state == "skipped" else "failed"))
-          ),
-          sync_state=(
-            "bidirectional_synced"
-            if remediation.provider_recovery.provider is not None
-            and local_state in {"executed", "completed", "partial", "skipped"}
-            else ("local_failed" if local_state == "failed" else "local_only")
-          ),
+      provider_recovery=self._refresh_provider_recovery_phase_graphs(
+        provider_recovery=replace(
+          remediation.provider_recovery,
+          lifecycle_state=self._provider_recovery_lifecycle_for_remediation_state(local_state),
           detail=local_detail,
-          event_at=last_attempted_at,
-          attempt_number=remediation.provider_recovery.status_machine.attempt_number,
+          status_machine=self._build_provider_recovery_status_machine(
+            existing=remediation.provider_recovery.status_machine,
+            remediation_state=local_state,
+            event_kind=(
+              "local_verification_executed"
+              if local_state in {"executed", "completed", "partial", "skipped"}
+              else "local_verification_failed"
+            ),
+            workflow_state=remediation.provider_recovery.status_machine.workflow_state,
+            workflow_action=remediation.provider_recovery.status_machine.workflow_action,
+            job_state=(
+              "verified"
+              if local_state in {"executed", "completed"}
+              else ("partial" if local_state == "partial" else ("skipped" if local_state == "skipped" else "failed"))
+            ),
+            sync_state=(
+              "bidirectional_synced"
+              if remediation.provider_recovery.provider is not None
+              and local_state in {"executed", "completed", "partial", "skipped"}
+              else ("local_failed" if local_state == "failed" else "local_only")
+            ),
+            detail=local_detail,
+            event_at=last_attempted_at,
+            attempt_number=remediation.provider_recovery.status_machine.attempt_number,
+          ),
+          updated_at=last_attempted_at,
         ),
-        updated_at=last_attempted_at,
+        synced_at=last_attempted_at,
       ),
     )
     return replace(incident, remediation=updated_remediation), results

@@ -285,6 +285,9 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.payload["provider_schema"]["kind"] == "pagerduty"
   assert snapshot.payload["provider_schema"]["pagerduty"]["incident_id"] == "PDINC-123"
   assert snapshot.payload["provider_schema"]["pagerduty"]["incident_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["incident_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["workflow_phase"] == "awaiting_local_verification"
+  assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["responder_phase"] == "engaged"
   assert requests[0][0].endswith("/incidents/PDINC-123")
   assert requests[0][1] == "GET"
   assert requests[0][2]["From"] == "akra-ops@example.com"
@@ -518,5 +521,8 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.payload["provider_schema"]["kind"] == "opsgenie"
   assert snapshot.payload["provider_schema"]["opsgenie"]["alert_id"] == "OG-123"
   assert snapshot.payload["provider_schema"]["opsgenie"]["alert_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["alert_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["workflow_phase"] == "provider_recovering"
+  assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["acknowledgment_phase"] == "acknowledged"
   assert requests[0][0].endswith("/v2/alerts/OG-123?identifierType=id")
   assert requests[0][1] == "GET"

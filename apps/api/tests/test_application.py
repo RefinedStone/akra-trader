@@ -1775,6 +1775,8 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   assert updated_incident.remediation.provider_recovery.provider_schema_kind == "pagerduty"
   assert updated_incident.remediation.provider_recovery.pagerduty.incident_id == "PDINC-REC-1"
   assert updated_incident.remediation.provider_recovery.pagerduty.incident_status == "delivered"
+  assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.workflow_phase == "verified_pending_resolve"
+  assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.incident_phase == "unknown"
   assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
   assert updated_incident.remediation.provider_recovery.symbols == ("ETH/USDT",)
   assert updated_incident.remediation.provider_recovery.timeframe == "5m"
@@ -1976,6 +1978,8 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
   assert updated_incident.remediation.provider_recovery.provider_schema_kind == "pagerduty"
   assert updated_incident.remediation.provider_recovery.pagerduty.incident_id == "PDINC-PULL-1"
   assert updated_incident.remediation.provider_recovery.pagerduty.incident_status == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.incident_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.workflow_phase == "verified_pending_resolve"
   assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
   assert updated_incident.remediation.provider_recovery.status_machine.workflow_state == "acknowledged"
   assert updated_incident.remediation.provider_recovery.status_machine.sync_state == "bidirectional_synced"
@@ -2111,6 +2115,9 @@ def test_external_opsgenie_recovery_sync_populates_opsgenie_typed_schema(
   assert updated_incident.remediation.provider_recovery.opsgenie.priority == "P3"
   assert updated_incident.remediation.provider_recovery.opsgenie.owner == "oncall-primary"
   assert updated_incident.remediation.provider_recovery.opsgenie.teams == ("market-data",)
+  assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.alert_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.workflow_phase == "provider_recovering"
+  assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.ownership_phase == "assigned"
 
 
 def test_guarded_live_channel_restore_incidents_auto_run_local_session_remediation(

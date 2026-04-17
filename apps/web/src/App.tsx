@@ -403,6 +403,13 @@ type OperatorVisibility = {
           escalation_policy_summary?: string | null;
           html_url?: string | null;
           last_status_change_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            responder_phase: string;
+            urgency_phase: string;
+            last_transition_at?: string | null;
+          };
         };
         opsgenie: {
           alert_id?: string | null;
@@ -415,6 +422,14 @@ type OperatorVisibility = {
           tiny_id?: string | null;
           teams: string[];
           updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            acknowledgment_phase: string;
+            ownership_phase: string;
+            visibility_phase: string;
+            last_transition_at?: string | null;
+          };
         };
       };
     };
@@ -571,6 +586,13 @@ type GuardedLiveStatus = {
           escalation_policy_summary?: string | null;
           html_url?: string | null;
           last_status_change_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            responder_phase: string;
+            urgency_phase: string;
+            last_transition_at?: string | null;
+          };
         };
         opsgenie: {
           alert_id?: string | null;
@@ -583,6 +605,14 @@ type GuardedLiveStatus = {
           tiny_id?: string | null;
           teams: string[];
           updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            acknowledgment_phase: string;
+            ownership_phase: string;
+            visibility_phase: string;
+            last_transition_at?: string | null;
+          };
         };
       };
     };
@@ -7986,6 +8016,13 @@ function formatProviderRecoverySchema(providerRecovery: {
     service_summary?: string | null;
     escalation_policy_summary?: string | null;
     last_status_change_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      responder_phase: string;
+      urgency_phase: string;
+      last_transition_at?: string | null;
+    };
   };
   opsgenie: {
     alert_id?: string | null;
@@ -7995,6 +8032,14 @@ function formatProviderRecoverySchema(providerRecovery: {
     owner?: string | null;
     teams: string[];
     updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      acknowledgment_phase: string;
+      ownership_phase: string;
+      visibility_phase: string;
+      last_transition_at?: string | null;
+    };
   };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
@@ -8008,8 +8053,20 @@ function formatProviderRecoverySchema(providerRecovery: {
       providerRecovery.pagerduty.escalation_policy_summary
         ? `policy ${providerRecovery.pagerduty.escalation_policy_summary}`
         : null,
+      providerRecovery.pagerduty.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.pagerduty.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.pagerduty.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.pagerduty.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.pagerduty.phase_graph.responder_phase !== "unknown"
+        ? `responder ${providerRecovery.pagerduty.phase_graph.responder_phase}`
+        : null,
       providerRecovery.pagerduty.last_status_change_at
         ? `changed ${formatTimestamp(providerRecovery.pagerduty.last_status_change_at)}`
+        : null,
+      providerRecovery.pagerduty.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.pagerduty.phase_graph.last_transition_at)}`
         : null,
     ].filter(Boolean);
     return details.length ? `PagerDuty schema: ${details.join(" / ")}` : null;
@@ -8025,8 +8082,20 @@ function formatProviderRecoverySchema(providerRecovery: {
       providerRecovery.opsgenie.teams.length
         ? `teams ${providerRecovery.opsgenie.teams.join(", ")}`
         : null,
+      providerRecovery.opsgenie.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.opsgenie.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.opsgenie.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.opsgenie.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.opsgenie.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.opsgenie.phase_graph.ownership_phase}`
+        : null,
       providerRecovery.opsgenie.updated_at
         ? `updated ${formatTimestamp(providerRecovery.opsgenie.updated_at)}`
+        : null,
+      providerRecovery.opsgenie.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.opsgenie.phase_graph.last_transition_at)}`
         : null,
     ].filter(Boolean);
     return details.length ? `Opsgenie schema: ${details.join(" / ")}` : null;

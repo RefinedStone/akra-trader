@@ -540,6 +540,18 @@ class OperatorIncidentPagerDutyRecoveryState:
   escalation_policy_summary: str | None = None
   html_url: str | None = None
   last_status_change_at: datetime | None = None
+  phase_graph: "OperatorIncidentPagerDutyRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentPagerDutyRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentPagerDutyRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  responder_phase: str = "unknown"
+  urgency_phase: str = "unknown"
+  last_transition_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -554,6 +566,19 @@ class OperatorIncidentOpsgenieRecoveryState:
   tiny_id: str | None = None
   teams: tuple[str, ...] = ()
   updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentOpsgenieRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentOpsgenieRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentOpsgenieRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  acknowledgment_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  visibility_phase: str = "unknown"
+  last_transition_at: datetime | None = None
 
 
 @dataclass(frozen=True)

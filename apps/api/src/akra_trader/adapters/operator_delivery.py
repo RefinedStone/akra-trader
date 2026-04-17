@@ -777,6 +777,113 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  @staticmethod
+  def _resolve_pagerduty_incident_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {"triggered", "acknowledged", "resolved"}:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_pagerduty_responder_phase(incident_phase: str) -> str:
+    if incident_phase == "triggered":
+      return "awaiting_acknowledgment"
+    if incident_phase == "acknowledged":
+      return "engaged"
+    if incident_phase == "resolved":
+      return "resolved"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_pagerduty_urgency_phase(urgency: str | None) -> str:
+    normalized = (urgency or "").strip().lower().replace(" ", "_")
+    if normalized == "high":
+      return "high_urgency"
+    if normalized == "low":
+      return "low_urgency"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_pagerduty_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state == "resolved":
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    return "idle"
+
+  @staticmethod
+  def _resolve_opsgenie_alert_phase(status: str | None, acknowledged: bool | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {"open", "acknowledged", "closed"}:
+      return normalized
+    if acknowledged is True:
+      return "acknowledged"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_opsgenie_acknowledgment_phase(alert_phase: str, acknowledged: bool | None) -> str:
+    if alert_phase == "closed":
+      return "closed"
+    if acknowledged is True or alert_phase == "acknowledged":
+      return "acknowledged"
+    if alert_phase == "open":
+      return "pending_acknowledgment"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_opsgenie_ownership_phase(owner: str | None, teams: list[str]) -> str:
+    if owner:
+      return "assigned"
+    if teams:
+      return "team_routed"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_opsgenie_visibility_phase(seen: bool | None) -> str:
+    if seen is True:
+      return "seen"
+    if seen is False:
+      return "unseen"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_opsgenie_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state == "closed":
+      return "closed_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_close"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "recovery_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "alert_acknowledged"
+    return "idle"
+
   def _build_provider_pull_sync(
     self,
     *,
@@ -799,12 +906,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       provider_payload.get("provider_recovery"),
       provider_payload.get("recovery"),
     )
+    provider_specific_recovery = self._extract_mapping(provider_recovery.get(provider))
     status_machine_payload = self._extract_mapping(
       provider_recovery.get("status_machine"),
       provider_payload.get("status_machine"),
     )
     provider_schema_payload: dict[str, Any] = {}
     if provider == "pagerduty":
+      pagerduty_urgency = self._first_non_empty_string(
+        provider_specific_recovery.get("urgency"),
+        provider_payload.get("urgency"),
+        self._extract_mapping(provider_payload.get("incident")).get("urgency"),
+      )
+      pagerduty_incident_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("incident_phase"),
+        self._resolve_pagerduty_incident_phase(workflow_state),
+      ) or "unknown"
       provider_schema_payload = {
         "kind": "pagerduty",
         "pagerduty": {
@@ -843,9 +960,70 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             if self._parse_provider_datetime(provider_payload.get("last_status_change_at")) is not None
             else None
           ),
+          "phase_graph": {
+            "incident_phase": pagerduty_incident_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_pagerduty_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=workflow_state,
+            ),
+            "responder_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("responder_phase"),
+            ) or self._resolve_pagerduty_responder_phase(pagerduty_incident_phase),
+            "urgency_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("urgency_phase"),
+            ) or self._resolve_pagerduty_urgency_phase(pagerduty_urgency),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("last_status_change_at"),
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("last_status_change_at"),
+              ) is not None
+              else None
+            ),
+          },
         },
       }
     elif provider == "opsgenie":
+      opsgenie_owner = self._first_non_empty_string(
+        provider_specific_recovery.get("owner"),
+        provider_payload.get("owner"),
+        self._extract_mapping(provider_payload.get("owner_user")).get("username"),
+      )
+      opsgenie_acknowledged = (
+        provider_specific_recovery.get("acknowledged")
+        if isinstance(provider_specific_recovery.get("acknowledged"), bool)
+        else (
+          provider_payload.get("acknowledged")
+          if isinstance(provider_payload.get("acknowledged"), bool)
+          else None
+        )
+      )
+      opsgenie_seen = (
+        provider_specific_recovery.get("seen")
+        if isinstance(provider_specific_recovery.get("seen"), bool)
+        else (
+          provider_payload.get("seen")
+          if isinstance(provider_payload.get("seen"), bool)
+          else None
+        )
+      )
+      opsgenie_teams = self._extract_string_list(
+        provider_specific_recovery.get("teams"),
+        provider_payload.get("teams"),
+        provider_payload.get("team"),
+      )
+      opsgenie_alert_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("alert_phase"),
+        self._resolve_opsgenie_alert_phase(workflow_state, opsgenie_acknowledged),
+      ) or "unknown"
       provider_schema_payload = {
         "kind": "opsgenie",
         "opsgenie": {
@@ -886,6 +1064,40 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             ) is not None
             else None
           ),
+          "phase_graph": {
+            "alert_phase": opsgenie_alert_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_opsgenie_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=workflow_state,
+            ),
+            "acknowledgment_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("acknowledgment_phase"),
+            ) or self._resolve_opsgenie_acknowledgment_phase(opsgenie_alert_phase, opsgenie_acknowledged),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_opsgenie_ownership_phase(opsgenie_owner, opsgenie_teams),
+            "visibility_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("visibility_phase"),
+            ) or self._resolve_opsgenie_visibility_phase(opsgenie_seen),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                provider_payload.get("updatedAt"),
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                provider_payload.get("updatedAt"),
+              ) is not None
+              else None
+            ),
+          },
         },
       }
     merged_payload: dict[str, Any] = dict(remediation_payload)
@@ -1056,6 +1268,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           if provider_recovery.pagerduty.last_status_change_at is not None
           else None
         ),
+        "phase_graph": {
+          "incident_phase": provider_recovery.pagerduty.phase_graph.incident_phase,
+          "workflow_phase": provider_recovery.pagerduty.phase_graph.workflow_phase,
+          "responder_phase": provider_recovery.pagerduty.phase_graph.responder_phase,
+          "urgency_phase": provider_recovery.pagerduty.phase_graph.urgency_phase,
+          "last_transition_at": (
+            provider_recovery.pagerduty.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.pagerduty.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
       },
       "opsgenie": {
         "alert_id": provider_recovery.opsgenie.alert_id,
@@ -1072,6 +1295,18 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           if provider_recovery.opsgenie.updated_at is not None
           else None
         ),
+        "phase_graph": {
+          "alert_phase": provider_recovery.opsgenie.phase_graph.alert_phase,
+          "workflow_phase": provider_recovery.opsgenie.phase_graph.workflow_phase,
+          "acknowledgment_phase": provider_recovery.opsgenie.phase_graph.acknowledgment_phase,
+          "ownership_phase": provider_recovery.opsgenie.phase_graph.ownership_phase,
+          "visibility_phase": provider_recovery.opsgenie.phase_graph.visibility_phase,
+          "last_transition_at": (
+            provider_recovery.opsgenie.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.opsgenie.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
       },
     }
 
