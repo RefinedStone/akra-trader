@@ -80,6 +80,7 @@ def build_venue_execution_adapter(settings: Settings):
     return BinanceVenueExecutionAdapter(
       api_key=settings.binance_api_key,
       api_secret=settings.binance_api_secret,
+      poll_interval_seconds=settings.guarded_live_venue_poll_interval_seconds,
     )
   raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
 

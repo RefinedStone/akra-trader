@@ -68,6 +68,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   order-book resync state, rebuild counts, full recovered bid/ask levels, channel-restore
   timing/counts, channel-continuation timing/counts, persisted trade/aggregate-trade/book-ticker/
   mini-ticker/kline snapshots, and top-of-book levels
+- guarded-live handoff can now widen beyond Binance-native continuation into a generic CCXT polling
+  transport when native streaming is unavailable, preserving depth/ticker/trade/OHLCV continuation
+  state and explicit transport ownership metadata
 
 ### Control room
 
@@ -99,7 +102,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   persisted control-plane state, but it still does not revive broader venue-native stream or market
   session coverage beyond Binance multi-stream
   account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline events plus exchange-backed
-  ticker/trade/ohlcv restore and persisted market-channel continuation
+  ticker/trade/ohlcv restore, persisted market-channel continuation, and generic polling fallback
 - guarded-live order sync now persists lifecycle progression, a durable open-order snapshot, and
   session ownership for resume, but it still does not restore a full exchange session lifecycle
 - custom strategy registration exists, but registration metadata is process-local rather than durable
@@ -124,5 +127,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from supervised Binance multi-stream account/order/depth/kline transport into wider live-path audit coverage and broader venue-native session management.
+4. Expand guarded-live controls from the current Binance-plus-generic-transport session supervision into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

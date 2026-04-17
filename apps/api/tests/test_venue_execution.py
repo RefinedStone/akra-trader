@@ -12,6 +12,7 @@ from datetime import timedelta
 from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
 from akra_trader.adapters.venue_execution import BinanceWebSocketMarketStreamClient
 from akra_trader.adapters.venue_execution import BinanceWebSocketUserDataStreamClient
+from akra_trader.adapters.venue_execution import GENERIC_POLLING_VENUE_STREAM_COVERAGE
 
 
 class MutableClock:
@@ -57,14 +58,26 @@ class FakeExecutionExchange:
     fetch_rows: list[dict[str, object]],
     order_books: list[dict[str, object]] | None = None,
     ticker: dict[str, object] | None = None,
+    ticker_sequence: list[dict[str, object]] | None = None,
     trades: list[dict[str, object]] | None = None,
+    trades_sequence: list[list[dict[str, object]]] | None = None,
     ohlcv: list[list[object]] | None = None,
+    ohlcv_sequence: list[list[list[object]]] | None = None,
   ) -> None:
     self._fetch_rows = fetch_rows
     self._order_books = list(order_books or [])
     self._ticker = dict(ticker or {})
+    self._ticker_sequence = [dict(entry) for entry in (ticker_sequence or [])]
     self._trades = list(trades or [])
+    self._trades_sequence = [
+      [dict(trade) for trade in snapshot]
+      for snapshot in (trades_sequence or [])
+    ]
     self._ohlcv = [list(candle) for candle in (ohlcv or [])]
+    self._ohlcv_sequence = [
+      [list(candle) for candle in snapshot]
+      for snapshot in (ohlcv_sequence or [])
+    ]
     self.fetch_order_book_calls = 0
     self.fetch_ticker_calls = 0
     self.fetch_trades_calls = 0
@@ -92,16 +105,28 @@ class FakeExecutionExchange:
 
   def fetch_ticker(self, symbol, params=None) -> dict[str, object]:
     self.fetch_ticker_calls += 1
+    if self._ticker_sequence:
+      if len(self._ticker_sequence) == 1:
+        return dict(self._ticker_sequence[0])
+      return dict(self._ticker_sequence.pop(0))
     if not self._ticker:
       raise AssertionError("fetch_ticker called without a prepared ticker")
     return dict(self._ticker)
 
   def fetch_trades(self, symbol, since=None, limit=None, params=None) -> list[dict[str, object]]:
     self.fetch_trades_calls += 1
+    if self._trades_sequence:
+      if len(self._trades_sequence) == 1:
+        return [dict(trade) for trade in self._trades_sequence[0]]
+      return [dict(trade) for trade in self._trades_sequence.pop(0)]
     return [dict(trade) for trade in self._trades]
 
   def fetch_ohlcv(self, symbol, timeframe="1m", since=None, limit=None, params=None) -> list[list[object]]:
     self.fetch_ohlcv_calls += 1
+    if self._ohlcv_sequence:
+      if len(self._ohlcv_sequence) == 1:
+        return [list(candle) for candle in self._ohlcv_sequence[0]]
+      return [list(candle) for candle in self._ohlcv_sequence.pop(0)]
     return [list(candle) for candle in self._ohlcv]
 
   def fetch_closed_orders(self, symbol=None, since=None, limit=None, params=None) -> list[dict[str, object]]:
@@ -660,6 +685,167 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert released.channel_continuation_count == second_sync.handoff.channel_continuation_count
   assert released.failover_count == 1
   assert second_stream_session.closed is True
+
+
+def test_binance_adapter_falls_back_to_generic_polling_transport() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 500,
+        "bids": [[2498.1, 0.60], [2498.0, 0.55]],
+        "asks": [[2498.7, 0.45], [2498.8, 0.52]],
+      },
+      {
+        "nonce": 501,
+        "bids": [[2498.3, 0.75], [2498.2, 0.50]],
+        "asks": [[2498.9, 0.40], [2499.0, 0.58]],
+      },
+    ],
+    ticker_sequence=[
+      {
+        "timestamp": int(current_time.timestamp() * 1000),
+        "bid": 2498.2,
+        "bidVolume": 0.7,
+        "ask": 2498.8,
+        "askVolume": 0.5,
+        "open": 2496.4,
+        "last": 2498.5,
+        "high": 2499.0,
+        "low": 2496.1,
+        "baseVolume": 21.0,
+        "quoteVolume": 52468.5,
+      },
+      {
+        "timestamp": int((current_time + timedelta(seconds=20)).timestamp() * 1000),
+        "bid": 2498.45,
+        "bidVolume": 0.82,
+        "ask": 2498.95,
+        "askVolume": 0.61,
+        "open": 2496.4,
+        "last": 2498.72,
+        "high": 2499.2,
+        "low": 2496.1,
+        "baseVolume": 23.4,
+        "quoteVolume": 58469.9,
+      },
+    ],
+    trades_sequence=[
+      [
+        {
+          "id": "poll-trade-1",
+          "price": 2498.45,
+          "amount": 0.16,
+          "timestamp": int(current_time.timestamp() * 1000),
+        }
+      ],
+      [
+        {
+          "id": "poll-trade-2",
+          "price": 2498.7,
+          "amount": 0.22,
+          "timestamp": int((current_time + timedelta(seconds=20)).timestamp() * 1000),
+        }
+      ],
+    ],
+    ohlcv_sequence=[
+      [
+        [int(current_time.timestamp() * 1000), 2497.8, 2498.9, 2497.5, 2498.4, 8.0]
+      ],
+      [
+        [
+          int((current_time + timedelta(minutes=5)).timestamp() * 1000),
+          2498.4,
+          2499.2,
+          2498.0,
+          2498.9,
+          9.5,
+        ]
+      ],
+    ],
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    exchange=exchange,
+    clock=clock,
+    poll_interval_seconds=15,
+  )
+
+  ready, issues = adapter.describe_capability()
+
+  assert ready is True
+  assert issues == ()
+
+  handoff = adapter.handoff_session(
+    symbol="ETH/USDT",
+    timeframe="5m",
+    owner_run_id="run-live-poll",
+    owner_session_id="worker-live-poll",
+    owned_order_ids=(),
+  )
+
+  assert handoff.state == "active"
+  assert handoff.source == "venue_polling_transport"
+  assert handoff.transport == "generic_ccxt_polling_transport"
+  assert handoff.supervision_state == "polling"
+  assert handoff.coverage == GENERIC_POLLING_VENUE_STREAM_COVERAGE
+  assert "venue_stream_transport_fallback:generic_ccxt_polling_transport" in handoff.issues
+  assert handoff.order_book_state == "snapshot_rebuilt"
+  assert handoff.order_book_last_update_id == 500
+  assert handoff.channel_restore_state == "restored_from_exchange"
+  assert handoff.channel_continuation_state == "restored_from_exchange"
+  assert handoff.trade_snapshot is not None
+  assert handoff.trade_snapshot.event_id == "poll-trade-1"
+  assert handoff.book_ticker_snapshot is not None
+  assert handoff.book_ticker_snapshot.bid_price == 2498.2
+  assert handoff.mini_ticker_snapshot is not None
+  assert handoff.mini_ticker_snapshot.close_price == 2498.5
+  assert handoff.kline_snapshot is not None
+  assert handoff.kline_snapshot.close_price == 2498.4
+
+  clock.advance(timedelta(seconds=20))
+  sync = adapter.sync_session(handoff=handoff, order_ids=())
+
+  assert sync.state == "active"
+  assert sync.handoff.transport == "generic_ccxt_polling_transport"
+  assert sync.handoff.source == "venue_polling_transport"
+  assert sync.handoff.supervision_state == "polling"
+  assert sync.handoff.failover_count == 0
+  assert sync.handoff.coverage == GENERIC_POLLING_VENUE_STREAM_COVERAGE
+  assert sync.handoff.order_book_state == "streaming"
+  assert sync.handoff.order_book_last_update_id == 501
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_bids[:2]) == (
+    (2498.3, 0.75),
+    (2498.2, 0.5),
+  )
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_asks[:2]) == (
+    (2498.9, 0.4),
+    (2499.0, 0.58),
+  )
+  assert sync.handoff.order_book_best_bid_price == 2498.45
+  assert sync.handoff.order_book_best_ask_price == 2498.95
+  assert sync.handoff.channel_continuation_state == "streaming"
+  assert sync.handoff.channel_continuation_count == 1
+  assert sync.handoff.trade_snapshot is not None
+  assert sync.handoff.trade_snapshot.event_id == "poll-trade-2"
+  assert sync.handoff.aggregate_trade_snapshot is not None
+  assert sync.handoff.aggregate_trade_snapshot.event_id == "poll-trade-2"
+  assert sync.handoff.book_ticker_snapshot is not None
+  assert sync.handoff.book_ticker_snapshot.bid_price == 2498.45
+  assert sync.handoff.book_ticker_snapshot.ask_price == 2498.95
+  assert sync.handoff.mini_ticker_snapshot is not None
+  assert sync.handoff.mini_ticker_snapshot.close_price == 2498.72
+  assert sync.handoff.kline_snapshot is not None
+  assert sync.handoff.kline_snapshot.close_price == 2498.9
+  assert sync.handoff.channel_last_continued_at == sync.handoff.kline_snapshot.close_at
+  assert sync.handoff.last_market_event_at == sync.handoff.kline_snapshot.close_at
+  assert sync.handoff.last_depth_event_at == clock()
+  assert sync.handoff.last_trade_event_at == clock()
+  assert sync.handoff.last_aggregate_trade_event_at == clock()
+  assert sync.handoff.last_book_ticker_event_at == clock()
+  assert sync.handoff.last_mini_ticker_event_at == clock()
+  assert sync.handoff.last_kline_event_at == sync.handoff.kline_snapshot.close_at
 
 
 def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap() -> None:
