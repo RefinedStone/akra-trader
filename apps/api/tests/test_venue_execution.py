@@ -346,9 +346,18 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
       "bidVolume": 1.2,
       "ask": 2501.05,
       "askVolume": 0.9,
+      "open": 2492.5,
+      "last": 2500.2,
+      "high": 2504.5,
+      "low": 2489.7,
+      "baseVolume": 125.0,
+      "quoteVolume": 312400.0,
     },
     trades=[
       {
+        "id": "trade-restore-1",
+        "price": 2500.1,
+        "amount": 0.42,
         "timestamp": int(current_time.timestamp() * 1000),
       }
     ],
@@ -411,6 +420,24 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert handoff.channel_restore_state == "restored_from_exchange"
   assert handoff.channel_restore_count == 1
   assert handoff.channel_last_restored_at == current_time
+  assert handoff.channel_continuation_state == "restored_from_exchange"
+  assert handoff.channel_continuation_count == 1
+  assert handoff.channel_last_continued_at == current_time
+  assert handoff.trade_snapshot is not None
+  assert handoff.trade_snapshot.event_id == "trade-restore-1"
+  assert handoff.trade_snapshot.price == 2500.1
+  assert handoff.trade_snapshot.quantity == 0.42
+  assert handoff.aggregate_trade_snapshot is not None
+  assert handoff.aggregate_trade_snapshot.price == 2500.1
+  assert handoff.book_ticker_snapshot is not None
+  assert handoff.book_ticker_snapshot.bid_price == 2498.95
+  assert handoff.book_ticker_snapshot.ask_price == 2501.05
+  assert handoff.mini_ticker_snapshot is not None
+  assert handoff.mini_ticker_snapshot.close_price == 2500.2
+  assert handoff.mini_ticker_snapshot.base_volume == 125.0
+  assert handoff.kline_snapshot is not None
+  assert handoff.kline_snapshot.timeframe == "5m"
+  assert handoff.kline_snapshot.close_price == 2500.0
   assert handoff.last_market_event_at == current_time
   assert handoff.last_trade_event_at == current_time
   assert handoff.last_aggregate_trade_event_at == current_time
@@ -463,6 +490,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert first_sync.handoff.channel_restore_state == "restored_from_exchange"
   assert first_sync.handoff.channel_restore_count == 2
   assert first_sync.handoff.channel_last_restored_at == clock()
+  assert first_sync.handoff.channel_continuation_state == "restored_from_exchange"
+  assert first_sync.handoff.channel_continuation_count == 2
+  assert first_sync.handoff.channel_last_continued_at == clock()
   assert first_sync.handoff.last_failover_at == clock()
   assert first_sync.handoff.last_account_event_at == clock()
   assert first_sync.synced_orders[0].status == "partially_filled"
@@ -482,6 +512,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
       "e": "trade",
       "E": int(clock().timestamp() * 1000),
       "T": int(clock().timestamp() * 1000),
+      "t": 17,
+      "p": "2499.70",
+      "q": "0.35",
     }
   )
   second_stream_session.push(
@@ -489,6 +522,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
       "e": "aggTrade",
       "E": int(clock().timestamp() * 1000),
       "T": int(clock().timestamp() * 1000),
+      "a": 23,
+      "p": "2499.65",
+      "q": "0.55",
     }
   )
   second_stream_session.push(
@@ -505,6 +541,12 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     {
       "e": "24hrMiniTicker",
       "E": int(clock().timestamp() * 1000),
+      "o": "2494.00",
+      "c": "2500.70",
+      "h": "2503.00",
+      "l": "2492.50",
+      "v": "123.40",
+      "q": "308500.00",
     }
   )
   second_stream_session.push(
@@ -526,6 +568,12 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
         "i": "5m",
         "t": int(clock().timestamp() * 1000),
         "T": int(clock().timestamp() * 1000),
+        "o": "2497.90",
+        "h": "2501.10",
+        "l": "2497.50",
+        "c": "2500.40",
+        "v": "18.25",
+        "x": True,
       },
     }
   )
@@ -563,6 +611,25 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert second_sync.handoff.order_book_best_bid_quantity == 1.25
   assert second_sync.handoff.order_book_best_ask_price == 2500.6
   assert second_sync.handoff.order_book_best_ask_quantity == 0.95
+  assert second_sync.handoff.channel_continuation_state == "streaming"
+  assert second_sync.handoff.channel_continuation_count == 2
+  assert second_sync.handoff.channel_last_continued_at == clock()
+  assert second_sync.handoff.trade_snapshot is not None
+  assert second_sync.handoff.trade_snapshot.event_id == "17"
+  assert second_sync.handoff.trade_snapshot.price == 2499.7
+  assert second_sync.handoff.trade_snapshot.quantity == 0.35
+  assert second_sync.handoff.aggregate_trade_snapshot is not None
+  assert second_sync.handoff.aggregate_trade_snapshot.event_id == "23"
+  assert second_sync.handoff.aggregate_trade_snapshot.price == 2499.65
+  assert second_sync.handoff.book_ticker_snapshot is not None
+  assert second_sync.handoff.book_ticker_snapshot.bid_price == 2499.5
+  assert second_sync.handoff.book_ticker_snapshot.ask_price == 2500.5
+  assert second_sync.handoff.mini_ticker_snapshot is not None
+  assert second_sync.handoff.mini_ticker_snapshot.close_price == 2500.7
+  assert second_sync.handoff.mini_ticker_snapshot.quote_volume == 308500.0
+  assert second_sync.handoff.kline_snapshot is not None
+  assert second_sync.handoff.kline_snapshot.close_price == 2500.4
+  assert second_sync.handoff.kline_snapshot.closed is True
   assert tuple((level.price, level.quantity) for level in second_sync.handoff.order_book_bids[:2]) == (
     (2499.4, 1.25),
     (2499.1, 0.9),
@@ -589,6 +656,8 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert released.order_book_state == "released"
   assert released.channel_restore_state == second_sync.handoff.channel_restore_state
   assert released.channel_restore_count == second_sync.handoff.channel_restore_count
+  assert released.channel_continuation_state == "released"
+  assert released.channel_continuation_count == second_sync.handoff.channel_continuation_count
   assert released.failover_count == 1
   assert second_stream_session.closed is True
 
@@ -616,9 +685,18 @@ def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap
       "bidVolume": 0.5,
       "ask": 2498.8,
       "askVolume": 0.45,
+      "open": 2496.0,
+      "last": 2498.4,
+      "high": 2499.1,
+      "low": 2495.8,
+      "baseVolume": 22.0,
+      "quoteVolume": 54963.0,
     },
     trades=[
       {
+        "id": "trade-gap-1",
+        "price": 2498.35,
+        "amount": 0.18,
         "timestamp": int(current_time.timestamp() * 1000),
       }
     ],
@@ -693,6 +771,14 @@ def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap
   assert second_sync.handoff.channel_restore_state == "restored_from_exchange"
   assert second_sync.handoff.channel_restore_count == 2
   assert second_sync.handoff.channel_last_restored_at == clock()
+  assert second_sync.handoff.channel_continuation_state == "restored_from_exchange"
+  assert second_sync.handoff.channel_continuation_count == 2
+  assert second_sync.handoff.channel_last_continued_at == clock()
+  assert second_sync.handoff.trade_snapshot is not None
+  assert second_sync.handoff.trade_snapshot.event_id == "trade-gap-1"
+  assert second_sync.handoff.book_ticker_snapshot is not None
+  assert second_sync.handoff.mini_ticker_snapshot is not None
+  assert second_sync.handoff.kline_snapshot is not None
   assert "binance_order_book_gap_detected:25:29" in second_sync.handoff.issues
 
 
@@ -714,9 +800,18 @@ def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after
       "bidVolume": 0.7,
       "ask": 2500.25,
       "askVolume": 0.8,
+      "open": 2498.4,
+      "last": 2500.0,
+      "high": 2501.0,
+      "low": 2498.0,
+      "baseVolume": 12.0,
+      "quoteVolume": 30005.0,
     },
     trades=[
       {
+        "id": "trade-persisted-1",
+        "price": 2500.05,
+        "amount": 0.21,
         "timestamp": int(current_time.timestamp() * 1000),
       }
     ],
@@ -743,6 +838,10 @@ def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after
   assert handoff.order_book_last_update_id == 40
   assert len(handoff.order_book_bids) == 2
   assert len(handoff.order_book_asks) == 2
+  assert handoff.channel_continuation_state == "restored_from_exchange"
+  assert handoff.channel_continuation_count == 1
+  assert handoff.trade_snapshot is not None
+  assert handoff.trade_snapshot.event_id == "trade-persisted-1"
 
   clock.advance(timedelta(seconds=45))
   restart_exchange = FakeExecutionExchange(
@@ -753,9 +852,18 @@ def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after
       "bidVolume": 0.9,
       "ask": 2500.3,
       "askVolume": 0.85,
+      "open": 2499.0,
+      "last": 2500.15,
+      "high": 2500.8,
+      "low": 2498.9,
+      "baseVolume": 14.0,
+      "quoteVolume": 35002.0,
     },
     trades=[
       {
+        "id": "trade-persisted-2",
+        "price": 2500.12,
+        "amount": 0.33,
         "timestamp": int(clock().timestamp() * 1000),
       }
     ],
@@ -773,6 +881,43 @@ def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after
       "pu": 40,
       "b": [["2499.95", "0.80"]],
       "a": [["2500.15", "0.65"]],
+    }
+  )
+  restart_stream_session.push(
+    {
+      "e": "bookTicker",
+      "E": int(clock().timestamp() * 1000),
+      "b": "2499.98",
+      "B": "0.72",
+      "a": "2500.18",
+      "A": "0.61",
+    }
+  )
+  restart_stream_session.push(
+    {
+      "e": "trade",
+      "E": int(clock().timestamp() * 1000),
+      "T": int(clock().timestamp() * 1000),
+      "t": 44,
+      "p": "2500.16",
+      "q": "0.27",
+    }
+  )
+  restart_stream_session.push(
+    {
+      "e": "kline",
+      "E": int(clock().timestamp() * 1000),
+      "k": {
+        "i": "5m",
+        "t": int(clock().timestamp() * 1000),
+        "T": int(clock().timestamp() * 1000),
+        "o": "2499.80",
+        "h": "2500.40",
+        "l": "2499.60",
+        "c": "2500.20",
+        "v": "9.50",
+        "x": False,
+      },
     }
   )
   restarted_adapter = BinanceVenueExecutionAdapter(
@@ -794,8 +939,21 @@ def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after
   assert sync.handoff.order_book_last_update_id == 42
   assert sync.handoff.order_book_gap_count == 1
   assert sync.handoff.order_book_rebuild_count == 1
-  assert sync.handoff.order_book_best_bid_price == 2499.95
-  assert sync.handoff.order_book_best_ask_price == 2500.15
+  assert sync.handoff.order_book_best_bid_price == 2499.98
+  assert sync.handoff.order_book_best_ask_price == 2500.18
+  assert sync.handoff.channel_continuation_state == "streaming"
+  assert sync.handoff.channel_continuation_count == 3
+  assert sync.handoff.channel_last_continued_at == clock()
+  assert sync.handoff.trade_snapshot is not None
+  assert sync.handoff.trade_snapshot.event_id == "44"
+  assert sync.handoff.trade_snapshot.price == 2500.16
+  assert sync.handoff.book_ticker_snapshot is not None
+  assert sync.handoff.book_ticker_snapshot.bid_price == 2499.98
+  assert sync.handoff.mini_ticker_snapshot is not None
+  assert sync.handoff.mini_ticker_snapshot.close_price == 2500.15
+  assert sync.handoff.kline_snapshot is not None
+  assert sync.handoff.kline_snapshot.close_price == 2500.2
+  assert sync.handoff.kline_snapshot.closed is False
   assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_bids[:3]) == (
     (2499.95, 0.8),
     (2499.9, 0.55),

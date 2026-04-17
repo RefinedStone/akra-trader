@@ -1718,6 +1718,7 @@ class TradingApplication:
       f"{current_time.isoformat()} | guarded_live_venue_session_handed_off | "
       f"source={handoff.source}; transport={handoff.transport}; state={handoff.state}; "
       f"supervision={handoff.supervision_state}; order_book={handoff.order_book_state}; "
+      f"continuation={handoff.channel_continuation_state}; "
       f"failovers={handoff.failover_count}; reason={reason}"
     )
     self._append_guarded_live_audit_event(
@@ -2969,7 +2970,8 @@ class TradingApplication:
         f"state={next_handoff.state}; active_orders={next_handoff.active_order_count}; "
         f"cursor={next_handoff.cursor or 'n/a'}; supervision={next_handoff.supervision_state}; "
         f"order_book={next_handoff.order_book_state}; failovers={next_handoff.failover_count}; "
-        f"coverage={','.join(next_handoff.coverage) or 'none'}"
+        f"coverage={','.join(next_handoff.coverage) or 'none'}; "
+        f"continuation={next_handoff.channel_continuation_state}"
       )
       if (
         next_handoff.order_book_best_bid_price is not None

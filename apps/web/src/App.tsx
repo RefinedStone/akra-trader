@@ -496,6 +496,49 @@ type GuardedLiveStatus = {
     channel_restore_state: string;
     channel_restore_count: number;
     channel_last_restored_at?: string | null;
+    channel_continuation_state: string;
+    channel_continuation_count: number;
+    channel_last_continued_at?: string | null;
+    trade_snapshot?: {
+      event_id?: string | null;
+      price?: number | null;
+      quantity?: number | null;
+      event_at?: string | null;
+    } | null;
+    aggregate_trade_snapshot?: {
+      event_id?: string | null;
+      price?: number | null;
+      quantity?: number | null;
+      event_at?: string | null;
+    } | null;
+    book_ticker_snapshot?: {
+      bid_price?: number | null;
+      bid_quantity?: number | null;
+      ask_price?: number | null;
+      ask_quantity?: number | null;
+      event_at?: string | null;
+    } | null;
+    mini_ticker_snapshot?: {
+      open_price?: number | null;
+      close_price?: number | null;
+      high_price?: number | null;
+      low_price?: number | null;
+      base_volume?: number | null;
+      quote_volume?: number | null;
+      event_at?: string | null;
+    } | null;
+    kline_snapshot?: {
+      timeframe?: string | null;
+      open_at?: string | null;
+      close_at?: string | null;
+      open_price?: number | null;
+      high_price?: number | null;
+      low_price?: number | null;
+      close_price?: number | null;
+      volume?: number | null;
+      closed: boolean;
+      event_at?: string | null;
+    } | null;
     last_market_event_at?: string | null;
     last_depth_event_at?: string | null;
     last_kline_event_at?: string | null;
@@ -2319,6 +2362,18 @@ export default function App() {
                         <td>{formatTimestamp(guardedLive.session_handoff.channel_last_restored_at ?? null)}</td>
                       </tr>
                       <tr>
+                        <th>Channel continuation</th>
+                        <td>{guardedLive.session_handoff.channel_continuation_state}</td>
+                      </tr>
+                      <tr>
+                        <th>Continuation count</th>
+                        <td>{guardedLive.session_handoff.channel_continuation_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Last continued at</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.channel_last_continued_at ?? null)}</td>
+                      </tr>
+                      <tr>
                         <th>Best bid</th>
                         <td>
                           {guardedLive.session_handoff.order_book_best_bid_price != null
@@ -2448,6 +2503,83 @@ export default function App() {
                     ) : (
                       <p className="empty-state">No recovered venue order-book levels recorded.</p>
                     )}
+                  <h3>Recovered market channels</h3>
+                  <table className="data-table">
+                    <tbody>
+                      <tr>
+                        <th>Trade tick</th>
+                        <td>
+                          {guardedLive.session_handoff.trade_snapshot
+                            ? `${formatFixedNumber(guardedLive.session_handoff.trade_snapshot.price)} @ ${formatFixedNumber(guardedLive.session_handoff.trade_snapshot.quantity)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Aggregate trade</th>
+                        <td>
+                          {guardedLive.session_handoff.aggregate_trade_snapshot
+                            ? `${formatFixedNumber(guardedLive.session_handoff.aggregate_trade_snapshot.price)} @ ${formatFixedNumber(guardedLive.session_handoff.aggregate_trade_snapshot.quantity)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Book ticker</th>
+                        <td>
+                          {guardedLive.session_handoff.book_ticker_snapshot
+                            ? `${formatFixedNumber(guardedLive.session_handoff.book_ticker_snapshot.bid_price)} @ ${formatFixedNumber(guardedLive.session_handoff.book_ticker_snapshot.bid_quantity)} / ${formatFixedNumber(guardedLive.session_handoff.book_ticker_snapshot.ask_price)} @ ${formatFixedNumber(guardedLive.session_handoff.book_ticker_snapshot.ask_quantity)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Mini ticker</th>
+                        <td>
+                          {guardedLive.session_handoff.mini_ticker_snapshot
+                            ? `open ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.open_price)}, close ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.close_price)}, high ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.high_price)}, low ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.low_price)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Mini ticker volume</th>
+                        <td>
+                          {guardedLive.session_handoff.mini_ticker_snapshot
+                            ? `base ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.base_volume)}, quote ${formatFixedNumber(guardedLive.session_handoff.mini_ticker_snapshot.quote_volume)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Kline snapshot</th>
+                        <td>
+                          {guardedLive.session_handoff.kline_snapshot
+                            ? `${guardedLive.session_handoff.kline_snapshot.timeframe ?? "n/a"} | o ${formatFixedNumber(guardedLive.session_handoff.kline_snapshot.open_price)}, h ${formatFixedNumber(guardedLive.session_handoff.kline_snapshot.high_price)}, l ${formatFixedNumber(guardedLive.session_handoff.kline_snapshot.low_price)}, c ${formatFixedNumber(guardedLive.session_handoff.kline_snapshot.close_price)}, v ${formatFixedNumber(guardedLive.session_handoff.kline_snapshot.volume)}, closed ${guardedLive.session_handoff.kline_snapshot.closed ? "yes" : "no"}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Trade snapshot time</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.trade_snapshot?.event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Aggregate trade time</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.aggregate_trade_snapshot?.event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Book ticker time</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.book_ticker_snapshot?.event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Mini ticker time</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.mini_ticker_snapshot?.event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Kline open / close</th>
+                        <td>
+                          {guardedLive.session_handoff.kline_snapshot
+                            ? `${formatTimestamp(guardedLive.session_handoff.kline_snapshot.open_at ?? null)} -> ${formatTimestamp(guardedLive.session_handoff.kline_snapshot.close_at ?? null)}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                   <h3>Durable order book</h3>
                   <table className="data-table">
                     <tbody>
@@ -6763,6 +6895,13 @@ function formatEditableNumber(value: number) {
     return String(value);
   }
   return value.toFixed(8).replace(/\.?0+$/, "");
+}
+
+function formatFixedNumber(value?: number | null) {
+  if (value === null || value === undefined) {
+    return "n/a";
+  }
+  return value.toFixed(8);
 }
 
 function buildLiveOrderDraftKey(runId: string, orderId: string) {

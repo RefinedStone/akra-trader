@@ -7,6 +7,7 @@ from queue import Queue
 import threading
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from typing import Any
 from typing import Callable
 from typing import Protocol
@@ -16,7 +17,11 @@ from urllib import request as urllib_request
 
 import ccxt
 
+from akra_trader.domain.models import GuardedLiveBookTickerChannelSnapshot
+from akra_trader.domain.models import GuardedLiveKlineChannelSnapshot
+from akra_trader.domain.models import GuardedLiveMiniTickerChannelSnapshot
 from akra_trader.domain.models import GuardedLiveOrderBookLevel
+from akra_trader.domain.models import GuardedLiveTradeChannelSnapshot
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
@@ -681,6 +686,9 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       supervision_state="streaming",
       order_book_state="synthetic",
       channel_restore_state="synthetic",
+      channel_continuation_state="synthetic",
+      channel_continuation_count=1,
+      channel_last_continued_at=current_time,
       coverage=("execution_reports",),
       active_order_count=self._count_active_orders(symbol=symbol),
       issues=(),
@@ -735,6 +743,16 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       channel_restore_state=existing.channel_restore_state or handoff.channel_restore_state or "synthetic",
       channel_restore_count=existing.channel_restore_count or handoff.channel_restore_count,
       channel_last_restored_at=existing.channel_last_restored_at or handoff.channel_last_restored_at,
+      channel_continuation_state=(
+        existing.channel_continuation_state or handoff.channel_continuation_state or "synthetic"
+      ),
+      channel_continuation_count=existing.channel_continuation_count or handoff.channel_continuation_count,
+      channel_last_continued_at=existing.channel_last_continued_at or handoff.channel_last_continued_at,
+      trade_snapshot=existing.trade_snapshot or handoff.trade_snapshot,
+      aggregate_trade_snapshot=existing.aggregate_trade_snapshot or handoff.aggregate_trade_snapshot,
+      book_ticker_snapshot=existing.book_ticker_snapshot or handoff.book_ticker_snapshot,
+      mini_ticker_snapshot=existing.mini_ticker_snapshot or handoff.mini_ticker_snapshot,
+      kline_snapshot=existing.kline_snapshot or handoff.kline_snapshot,
       failover_count=existing.failover_count or handoff.failover_count,
       last_failover_at=existing.last_failover_at or handoff.last_failover_at,
       coverage=existing.coverage or handoff.coverage or ("execution_reports",),
@@ -803,6 +821,14 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       channel_restore_state=handoff.channel_restore_state,
       channel_restore_count=handoff.channel_restore_count,
       channel_last_restored_at=handoff.channel_last_restored_at,
+      channel_continuation_state="released",
+      channel_continuation_count=handoff.channel_continuation_count,
+      channel_last_continued_at=handoff.channel_last_continued_at,
+      trade_snapshot=handoff.trade_snapshot,
+      aggregate_trade_snapshot=handoff.aggregate_trade_snapshot,
+      book_ticker_snapshot=handoff.book_ticker_snapshot,
+      mini_ticker_snapshot=handoff.mini_ticker_snapshot,
+      kline_snapshot=handoff.kline_snapshot,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
@@ -1269,6 +1295,18 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       channel_restore_state=str(channel_restore["state"]),
       channel_restore_count=1 if channel_restore["restored_at"] is not None else 0,
       channel_last_restored_at=channel_restore["restored_at"],
+      channel_continuation_state=(
+        "restored_from_exchange"
+        if channel_restore["restored_at"] is not None
+        else "inactive"
+      ),
+      channel_continuation_count=1 if channel_restore["restored_at"] is not None else 0,
+      channel_last_continued_at=channel_restore["restored_at"],
+      trade_snapshot=channel_restore["trade_snapshot"],
+      aggregate_trade_snapshot=channel_restore["aggregate_trade_snapshot"],
+      book_ticker_snapshot=channel_restore["book_ticker_snapshot"],
+      mini_ticker_snapshot=channel_restore["mini_ticker_snapshot"],
+      kline_snapshot=channel_restore["kline_snapshot"],
       coverage=BINANCE_VENUE_STREAM_COVERAGE,
       last_market_event_at=channel_restore["last_market_event_at"],
       last_kline_event_at=channel_restore["last_kline_event_at"],
@@ -1317,6 +1355,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     channel_restore_state = handoff.channel_restore_state or "inactive"
     channel_restore_count = handoff.channel_restore_count
     channel_last_restored_at = handoff.channel_last_restored_at
+    channel_continuation_state = handoff.channel_continuation_state or "inactive"
+    channel_continuation_count = handoff.channel_continuation_count
+    channel_last_continued_at = handoff.channel_last_continued_at
+    trade_snapshot = handoff.trade_snapshot
+    aggregate_trade_snapshot = handoff.aggregate_trade_snapshot
+    book_ticker_snapshot = handoff.book_ticker_snapshot
+    mini_ticker_snapshot = handoff.mini_ticker_snapshot
+    kline_snapshot = handoff.kline_snapshot
     last_event_at = handoff.last_event_at
     last_market_event_at = handoff.last_market_event_at
     last_depth_event_at = handoff.last_depth_event_at
@@ -1345,6 +1391,10 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         order_book_best_ask_price, order_book_best_ask_quantity = local_book.best_ask
         order_book_bids = handoff.order_book_bids
         order_book_asks = handoff.order_book_asks
+        if self._handoff_has_channel_snapshots(handoff):
+          channel_continuation_state = "persisted_recovered"
+          channel_continuation_count += 1
+          channel_last_continued_at = current_time
       else:
         rebuild = self._rebuild_local_order_book_from_snapshot(
           symbol=handoff.symbol or "",
@@ -1414,6 +1464,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         if channel_restore["restored_at"] is not None:
           channel_restore_count += 1
           channel_last_restored_at = channel_restore["restored_at"]
+          channel_continuation_state = "restored_from_exchange"
+          channel_continuation_count += 1
+          channel_last_continued_at = channel_restore["restored_at"]
+          trade_snapshot = channel_restore["trade_snapshot"] or trade_snapshot
+          aggregate_trade_snapshot = channel_restore["aggregate_trade_snapshot"] or aggregate_trade_snapshot
+          book_ticker_snapshot = channel_restore["book_ticker_snapshot"] or book_ticker_snapshot
+          mini_ticker_snapshot = channel_restore["mini_ticker_snapshot"] or mini_ticker_snapshot
+          kline_snapshot = channel_restore["kline_snapshot"] or kline_snapshot
         last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
         last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
         last_aggregate_trade_event_at = _max_datetime(
@@ -1473,18 +1531,45 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       if event_type == "trade":
         last_market_event_at = event_at
         last_trade_event_at = event_at
+        trade_snapshot = GuardedLiveTradeChannelSnapshot(
+          event_id=_coerce_string(event.get("t")),
+          price=_coerce_float(event.get("p")),
+          quantity=_coerce_float(event.get("q")),
+          event_at=event_at,
+        )
+        channel_continuation_state = "streaming"
+        channel_last_continued_at = event_at
         event_count += 1
         last_event_at = event_at
         continue
       if event_type == "aggTrade":
         last_market_event_at = event_at
         last_aggregate_trade_event_at = event_at
+        aggregate_trade_snapshot = GuardedLiveTradeChannelSnapshot(
+          event_id=_coerce_string(event.get("a")),
+          price=_coerce_float(event.get("p")),
+          quantity=_coerce_float(event.get("q")),
+          event_at=event_at,
+        )
+        channel_continuation_state = "streaming"
+        channel_last_continued_at = event_at
         event_count += 1
         last_event_at = event_at
         continue
       if event_type == "24hrMiniTicker":
         last_market_event_at = event_at
         last_mini_ticker_event_at = event_at
+        mini_ticker_snapshot = GuardedLiveMiniTickerChannelSnapshot(
+          open_price=_coerce_float(event.get("o")),
+          close_price=_coerce_float(event.get("c")),
+          high_price=_coerce_float(event.get("h")),
+          low_price=_coerce_float(event.get("l")),
+          base_volume=_coerce_float(event.get("v")),
+          quote_volume=_coerce_float(event.get("q")),
+          event_at=event_at,
+        )
+        channel_continuation_state = "streaming"
+        channel_last_continued_at = event_at
         event_count += 1
         last_event_at = event_at
         continue
@@ -1503,6 +1588,15 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
           order_book_best_ask_price = book_ask_price
         if book_ask_quantity is not None:
           order_book_best_ask_quantity = book_ask_quantity
+        book_ticker_snapshot = GuardedLiveBookTickerChannelSnapshot(
+          bid_price=book_bid_price,
+          bid_quantity=book_bid_quantity,
+          ask_price=book_ask_price,
+          ask_quantity=book_ask_quantity,
+          event_at=event_at,
+        )
+        channel_continuation_state = "streaming"
+        channel_last_continued_at = event_at
         event_count += 1
         last_event_at = event_at
         continue
@@ -1581,6 +1675,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
           if channel_restore["restored_at"] is not None:
             channel_restore_count += 1
             channel_last_restored_at = channel_restore["restored_at"]
+            channel_continuation_state = "restored_from_exchange"
+            channel_continuation_count += 1
+            channel_last_continued_at = channel_restore["restored_at"]
+            trade_snapshot = channel_restore["trade_snapshot"] or trade_snapshot
+            aggregate_trade_snapshot = channel_restore["aggregate_trade_snapshot"] or aggregate_trade_snapshot
+            book_ticker_snapshot = channel_restore["book_ticker_snapshot"] or book_ticker_snapshot
+            mini_ticker_snapshot = channel_restore["mini_ticker_snapshot"] or mini_ticker_snapshot
+            kline_snapshot = channel_restore["kline_snapshot"] or kline_snapshot
           last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
           last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
           last_aggregate_trade_event_at = _max_datetime(
@@ -1632,6 +1734,13 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       if event_type == "kline":
         last_market_event_at = event_at
         last_kline_event_at = event_at
+        kline_snapshot = _build_kline_snapshot_from_stream_event(
+          event=event,
+          timeframe=handoff.timeframe or "5m",
+          fallback_event_at=event_at,
+        )
+        channel_continuation_state = "streaming"
+        channel_last_continued_at = event_at
         event_count += 1
         last_event_at = event_at
         continue
@@ -1691,6 +1800,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         if channel_restore["restored_at"] is not None:
           channel_restore_count += 1
           channel_last_restored_at = channel_restore["restored_at"]
+          channel_continuation_state = "restored_from_exchange"
+          channel_continuation_count += 1
+          channel_last_continued_at = channel_restore["restored_at"]
+          trade_snapshot = channel_restore["trade_snapshot"] or trade_snapshot
+          aggregate_trade_snapshot = channel_restore["aggregate_trade_snapshot"] or aggregate_trade_snapshot
+          book_ticker_snapshot = channel_restore["book_ticker_snapshot"] or book_ticker_snapshot
+          mini_ticker_snapshot = channel_restore["mini_ticker_snapshot"] or mini_ticker_snapshot
+          kline_snapshot = channel_restore["kline_snapshot"] or kline_snapshot
         last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
         last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
         last_aggregate_trade_event_at = _max_datetime(
@@ -1764,6 +1881,18 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       channel_restore_state=channel_restore_state,
       channel_restore_count=channel_restore_count,
       channel_last_restored_at=channel_last_restored_at,
+      channel_continuation_state=(
+        "released"
+        if next_state == "released"
+        else "unavailable" if next_state == "unavailable" else channel_continuation_state
+      ),
+      channel_continuation_count=channel_continuation_count,
+      channel_last_continued_at=channel_last_continued_at,
+      trade_snapshot=trade_snapshot,
+      aggregate_trade_snapshot=aggregate_trade_snapshot,
+      book_ticker_snapshot=book_ticker_snapshot,
+      mini_ticker_snapshot=mini_ticker_snapshot,
+      kline_snapshot=kline_snapshot,
       failover_count=failover_count,
       last_failover_at=last_failover_at,
       coverage=coverage,
@@ -1842,6 +1971,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       channel_restore_state=handoff.channel_restore_state,
       channel_restore_count=handoff.channel_restore_count,
       channel_last_restored_at=handoff.channel_last_restored_at,
+      channel_continuation_state="released",
+      channel_continuation_count=handoff.channel_continuation_count,
+      channel_last_continued_at=handoff.channel_last_continued_at,
+      trade_snapshot=handoff.trade_snapshot,
+      aggregate_trade_snapshot=handoff.aggregate_trade_snapshot,
+      book_ticker_snapshot=handoff.book_ticker_snapshot,
+      mini_ticker_snapshot=handoff.mini_ticker_snapshot,
+      kline_snapshot=handoff.kline_snapshot,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
@@ -2145,6 +2282,19 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self._local_order_books[order_book_key] = book
     return book
 
+  @staticmethod
+  def _handoff_has_channel_snapshots(handoff: GuardedLiveVenueSessionHandoff) -> bool:
+    return any(
+      snapshot is not None
+      for snapshot in (
+        handoff.trade_snapshot,
+        handoff.aggregate_trade_snapshot,
+        handoff.book_ticker_snapshot,
+        handoff.mini_ticker_snapshot,
+        handoff.kline_snapshot,
+      )
+    )
+
   def _restore_market_channels_from_exchange(
     self,
     *,
@@ -2168,6 +2318,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         "best_bid_quantity": None,
         "best_ask_price": None,
         "best_ask_quantity": None,
+        "trade_snapshot": None,
+        "aggregate_trade_snapshot": None,
+        "book_ticker_snapshot": None,
+        "mini_ticker_snapshot": None,
+        "kline_snapshot": None,
       }
     issues: list[str] = []
     restored_any = False
@@ -2181,6 +2336,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     best_bid_quantity: float | None = None
     best_ask_price: float | None = None
     best_ask_quantity: float | None = None
+    trade_snapshot: GuardedLiveTradeChannelSnapshot | None = None
+    aggregate_trade_snapshot: GuardedLiveTradeChannelSnapshot | None = None
+    book_ticker_snapshot: GuardedLiveBookTickerChannelSnapshot | None = None
+    mini_ticker_snapshot: GuardedLiveMiniTickerChannelSnapshot | None = None
+    kline_snapshot: GuardedLiveKlineChannelSnapshot | None = None
     try:
       exchange = self._resolve_exchange()
     except Exception as exc:
@@ -2198,6 +2358,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         "best_bid_quantity": None,
         "best_ask_price": None,
         "best_ask_quantity": None,
+        "trade_snapshot": None,
+        "aggregate_trade_snapshot": None,
+        "book_ticker_snapshot": None,
+        "mini_ticker_snapshot": None,
+        "kline_snapshot": None,
       }
     try:
       ticker = exchange.fetch_ticker(symbol, {})
@@ -2209,6 +2374,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       best_bid_quantity = _coerce_float(ticker.get("bidVolume"))
       best_ask_price = _coerce_float(ticker.get("ask"))
       best_ask_quantity = _coerce_float(ticker.get("askVolume"))
+      book_ticker_snapshot = _build_book_ticker_snapshot_from_ticker_row(
+        ticker,
+        fallback_event_at=ticker_at,
+      )
+      mini_ticker_snapshot = _build_mini_ticker_snapshot_from_ticker_row(
+        ticker,
+        fallback_event_at=ticker_at,
+      )
       restored_any = True
     except Exception as exc:
       issues.append(f"binance_market_channel_restore_failed:ticker:{reason}:{exc}")
@@ -2220,6 +2393,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         last_trade_event_at = trade_at
         last_aggregate_trade_event_at = trade_at
         last_market_event_at = _max_datetime(last_market_event_at, trade_at)
+        trade_snapshot = _build_trade_snapshot_from_exchange_trade_row(
+          trade,
+          fallback_event_at=trade_at,
+        )
+        aggregate_trade_snapshot = trade_snapshot
         restored_any = True
     except Exception as exc:
       issues.append(f"binance_market_channel_restore_failed:trades:{reason}:{exc}")
@@ -2229,6 +2407,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         candle_at = _coerce_ohlcv_timestamp(candles[-1][0], timeframe=timeframe) or current_time
         last_kline_event_at = candle_at
         last_market_event_at = _max_datetime(last_market_event_at, candle_at)
+        kline_snapshot = _build_kline_snapshot_from_ohlcv_row(
+          candles[-1],
+          timeframe=timeframe,
+          fallback_event_at=current_time,
+        )
         restored_any = True
     except Exception as exc:
       issues.append(f"binance_market_channel_restore_failed:ohlcv:{reason}:{exc}")
@@ -2246,6 +2429,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       "best_bid_quantity": best_bid_quantity,
       "best_ask_price": best_ask_price,
       "best_ask_quantity": best_ask_quantity,
+      "trade_snapshot": trade_snapshot,
+      "aggregate_trade_snapshot": aggregate_trade_snapshot,
+      "book_ticker_snapshot": book_ticker_snapshot,
+      "mini_ticker_snapshot": mini_ticker_snapshot,
+      "kline_snapshot": kline_snapshot,
     }
 
   @staticmethod
@@ -2585,6 +2773,13 @@ def _coerce_int(value: Any) -> int | None:
     return None
 
 
+def _coerce_string(value: Any) -> str | None:
+  if value is None:
+    return None
+  text = str(value)
+  return text if text else None
+
+
 def _coerce_first_depth_level(value: Any) -> tuple[float | None, float | None]:
   if not isinstance(value, list) or not value:
     return None, None
@@ -2651,6 +2846,94 @@ def _build_local_order_book_from_snapshot_row(
   )
 
 
+def _build_trade_snapshot_from_exchange_trade_row(
+  row: dict[str, Any],
+  *,
+  fallback_event_at: datetime,
+) -> GuardedLiveTradeChannelSnapshot:
+  return GuardedLiveTradeChannelSnapshot(
+    event_id=_coerce_string(row.get("id")),
+    price=_coerce_float(row.get("price")),
+    quantity=_coerce_float(row.get("amount")),
+    event_at=_coerce_datetime(row.get("datetime"), row.get("timestamp")) or fallback_event_at,
+  )
+
+
+def _build_book_ticker_snapshot_from_ticker_row(
+  row: dict[str, Any],
+  *,
+  fallback_event_at: datetime,
+) -> GuardedLiveBookTickerChannelSnapshot:
+  return GuardedLiveBookTickerChannelSnapshot(
+    bid_price=_coerce_float(row.get("bid")),
+    bid_quantity=_coerce_float(row.get("bidVolume")),
+    ask_price=_coerce_float(row.get("ask")),
+    ask_quantity=_coerce_float(row.get("askVolume")),
+    event_at=_coerce_datetime(row.get("datetime"), row.get("timestamp")) or fallback_event_at,
+  )
+
+
+def _build_mini_ticker_snapshot_from_ticker_row(
+  row: dict[str, Any],
+  *,
+  fallback_event_at: datetime,
+) -> GuardedLiveMiniTickerChannelSnapshot:
+  return GuardedLiveMiniTickerChannelSnapshot(
+    open_price=_coerce_float(row.get("open")),
+    close_price=_coerce_float(row.get("last")) or _coerce_float(row.get("close")),
+    high_price=_coerce_float(row.get("high")),
+    low_price=_coerce_float(row.get("low")),
+    base_volume=_coerce_float(row.get("baseVolume")),
+    quote_volume=_coerce_float(row.get("quoteVolume")),
+    event_at=_coerce_datetime(row.get("datetime"), row.get("timestamp")) or fallback_event_at,
+  )
+
+
+def _build_kline_snapshot_from_stream_event(
+  *,
+  event: dict[str, Any],
+  timeframe: str,
+  fallback_event_at: datetime,
+) -> GuardedLiveKlineChannelSnapshot:
+  kline_row = _extract_nested_value(event, ("k",))
+  if not isinstance(kline_row, dict):
+    return GuardedLiveKlineChannelSnapshot(timeframe=timeframe, event_at=fallback_event_at)
+  return GuardedLiveKlineChannelSnapshot(
+    timeframe=_coerce_string(kline_row.get("i")) or timeframe,
+    open_at=_coerce_datetime(None, kline_row.get("t")),
+    close_at=_coerce_datetime(None, kline_row.get("T")),
+    open_price=_coerce_float(kline_row.get("o")),
+    high_price=_coerce_float(kline_row.get("h")),
+    low_price=_coerce_float(kline_row.get("l")),
+    close_price=_coerce_float(kline_row.get("c")),
+    volume=_coerce_float(kline_row.get("v")),
+    closed=bool(kline_row.get("x")),
+    event_at=_coerce_datetime(None, event.get("E")) or fallback_event_at,
+  )
+
+
+def _build_kline_snapshot_from_ohlcv_row(
+  row: list[Any],
+  *,
+  timeframe: str,
+  fallback_event_at: datetime,
+) -> GuardedLiveKlineChannelSnapshot:
+  open_at = _coerce_ohlcv_timestamp(row[0] if row else None, timeframe=timeframe)
+  close_at = _coerce_ohlcv_close_timestamp(row[0] if row else None, timeframe=timeframe)
+  return GuardedLiveKlineChannelSnapshot(
+    timeframe=timeframe,
+    open_at=open_at,
+    close_at=close_at,
+    open_price=_coerce_float(row[1] if len(row) > 1 else None),
+    high_price=_coerce_float(row[2] if len(row) > 2 else None),
+    low_price=_coerce_float(row[3] if len(row) > 3 else None),
+    close_price=_coerce_float(row[4] if len(row) > 4 else None),
+    volume=_coerce_float(row[5] if len(row) > 5 else None),
+    closed=True,
+    event_at=close_at or open_at or fallback_event_at,
+  )
+
+
 def _serialize_order_book_side(
   levels: dict[float, float],
   *,
@@ -2682,3 +2965,31 @@ def _coerce_ohlcv_timestamp(value: Any, *, timeframe: str) -> datetime | None:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
   except ValueError:
     return None
+
+
+def _coerce_ohlcv_close_timestamp(value: Any, *, timeframe: str) -> datetime | None:
+  opened_at = _coerce_ohlcv_timestamp(value, timeframe=timeframe)
+  if opened_at is None:
+    return None
+  delta = _timeframe_to_timedelta(timeframe)
+  if delta is None:
+    return opened_at
+  return opened_at + delta
+
+
+def _timeframe_to_timedelta(timeframe: str) -> timedelta | None:
+  if not timeframe:
+    return None
+  unit = timeframe[-1]
+  amount = _coerce_int(timeframe[:-1])
+  if amount is None or amount <= 0:
+    return None
+  if unit == "m":
+    return timedelta(minutes=amount)
+  if unit == "h":
+    return timedelta(hours=amount)
+  if unit == "d":
+    return timedelta(days=amount)
+  if unit == "w":
+    return timedelta(weeks=amount)
+  return None

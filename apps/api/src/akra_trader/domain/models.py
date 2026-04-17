@@ -552,6 +552,48 @@ class GuardedLiveOrderBookLevel:
 
 
 @dataclass(frozen=True)
+class GuardedLiveTradeChannelSnapshot:
+  event_id: str | None = None
+  price: float | None = None
+  quantity: float | None = None
+  event_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveBookTickerChannelSnapshot:
+  bid_price: float | None = None
+  bid_quantity: float | None = None
+  ask_price: float | None = None
+  ask_quantity: float | None = None
+  event_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveMiniTickerChannelSnapshot:
+  open_price: float | None = None
+  close_price: float | None = None
+  high_price: float | None = None
+  low_price: float | None = None
+  base_volume: float | None = None
+  quote_volume: float | None = None
+  event_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class GuardedLiveKlineChannelSnapshot:
+  timeframe: str | None = None
+  open_at: datetime | None = None
+  close_at: datetime | None = None
+  open_price: float | None = None
+  high_price: float | None = None
+  low_price: float | None = None
+  close_price: float | None = None
+  volume: float | None = None
+  closed: bool = False
+  event_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class GuardedLiveVenueOrderRequest:
   run_id: str
   session_id: str
@@ -692,6 +734,14 @@ class GuardedLiveVenueSessionHandoff:
   channel_restore_state: str = "inactive"
   channel_restore_count: int = 0
   channel_last_restored_at: datetime | None = None
+  channel_continuation_state: str = "inactive"
+  channel_continuation_count: int = 0
+  channel_last_continued_at: datetime | None = None
+  trade_snapshot: GuardedLiveTradeChannelSnapshot | None = None
+  aggregate_trade_snapshot: GuardedLiveTradeChannelSnapshot | None = None
+  book_ticker_snapshot: GuardedLiveBookTickerChannelSnapshot | None = None
+  mini_ticker_snapshot: GuardedLiveMiniTickerChannelSnapshot | None = None
+  kline_snapshot: GuardedLiveKlineChannelSnapshot | None = None
   last_market_event_at: datetime | None = None
   last_depth_event_at: datetime | None = None
   last_kline_event_at: datetime | None = None
