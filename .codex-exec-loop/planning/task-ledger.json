@@ -490,19 +490,37 @@
       "id": "planning-operator-trust-venue-specific-ladder-integrity-and-multi-candle-continuity-incidents",
       "direction_id": "operator-trust-and-discipline",
       "title": "Separate exchange-specific ladder integrity and multi-candle continuity incidents",
-      "description": "Build on the new market_data_depth_ladder and market_data_candle_sequence incidents by splitting any remaining exchange-specific ladder integrity semantics and deeper multi-candle continuity faults into their own durable incident categories, so venue-specific order-book corruption or candle-progression breaks do not remain bundled under the current first deep-semantics pass.",
-      "status": "ready",
+      "description": "Build on the new market_data_depth_ladder and market_data_candle_sequence incidents by splitting the next remaining exchange-specific ladder integrity semantics and deeper multi-candle continuity faults into their own durable incident categories, so venue-specific order-book corruption or candle-progression breaks do not remain bundled under the current first deep-semantics pass.",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says venue-specific deeper multi-candle continuity and exchange-specific ladder integrity semantics are still not separated into incidents after commit 578581a, making this the clearest immediate executable follow-up before moving on to remediation ownership wiring.",
+      "priority_reason": "Completed in main session commit a85aba6, which promoted exchange-specific depth gap, snapshot rebuild, and snapshot failure semantics into a durable market_data_ladder_integrity incident, split missing-candle and contiguous backfill hazards into market_data_candle_continuity, and updated tests plus operator-facing docs.",
       "depends_on": [
         "planning-operator-trust-deeper-book-ladder-and-candle-sequence-incidents"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:05:00Z",
+      "updated_at": "2026-04-17T19:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with venue-native data quality by extending the new deep ladder and candle incidents into the remaining exchange-specific integrity and multi-candle continuity semantics that operators still need to distinguish."
+      "direction_relation_note": "Closed the next venue-specific integrity split for operator trust by promoting ladder-integrity and candle-continuity incidents, which now leaves only deeper venue-native ladder semantics and remediation ownership as the follow-up work."
+    },
+    {
+      "id": "planning-operator-trust-venue-native-ladder-integrity-semantics",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Separate venue-native ladder integrity semantics beyond generic gap and rebuild incidents",
+      "description": "Build on the new market_data_ladder_integrity incident by splitting the remaining venue-native ladder integrity semantics into more specific durable incidents, so exchange-specific depth corruption, sequencing, or snapshot-contract faults do not remain bundled under the current gap, rebuild, and snapshot failure coverage.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply says ladder integrity is now covered only at the gap, rebuild, and snapshot failure level, while deeper venue-specific ladder semantics still need their own incidents, making this the clearest immediate executable next task ahead of remediation wiring.",
+      "depends_on": [
+        "planning-operator-trust-venue-specific-ladder-integrity-and-multi-candle-continuity-incidents"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T19:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with venue-native market-data behavior by finishing the remaining order-book integrity split that the latest incident refactor still leaves bundled together."
     },
     {
       "id": "planning-operator-trust-market-data-incident-remediation-workflows",
@@ -512,13 +530,13 @@
       "status": "proposed",
       "base_priority": 81,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the remaining exchange-specific ladder integrity and multi-candle continuity incident split is the more direct next step before response ownership wiring.",
+      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the newly isolated venue-native ladder semantics remain the more direct next step before response ownership wiring.",
       "depends_on": [
-        "planning-operator-trust-venue-specific-ladder-integrity-and-multi-candle-continuity-incidents"
+        "planning-operator-trust-venue-native-ladder-integrity-semantics"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:05:00Z",
+      "updated_at": "2026-04-17T19:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust from better classification into actionable incident response ownership by tying durable market-data incidents to remediation paths rather than leaving them as passive alerts."
     },
