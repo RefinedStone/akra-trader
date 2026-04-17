@@ -808,6 +808,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        dutycalls: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1369,6 +1387,24 @@ type GuardedLiveStatus = {
           };
         };
         spikesh: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        dutycalls: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9204,6 +9240,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  dutycalls: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9881,6 +9935,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Spike.sh schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "dutycalls") {
+    const details = [
+      providerRecovery.dutycalls.alert_id ? `alert ${providerRecovery.dutycalls.alert_id}` : null,
+      providerRecovery.dutycalls.alert_status !== "unknown"
+        ? `status ${providerRecovery.dutycalls.alert_status}`
+        : null,
+      providerRecovery.dutycalls.priority ? `priority ${providerRecovery.dutycalls.priority}` : null,
+      providerRecovery.dutycalls.escalation_policy
+        ? `policy ${providerRecovery.dutycalls.escalation_policy}`
+        : null,
+      providerRecovery.dutycalls.assignee ? `assignee ${providerRecovery.dutycalls.assignee}` : null,
+      providerRecovery.dutycalls.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.dutycalls.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.dutycalls.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.dutycalls.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.dutycalls.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.dutycalls.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.dutycalls.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.dutycalls.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.dutycalls.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.dutycalls.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `DutyCalls schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

@@ -94,6 +94,8 @@ from akra_trader.domain.models import OperatorIncidentMoogsoftRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentMoogsoftRecoveryState
 from akra_trader.domain.models import OperatorIncidentSpikeshRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentSpikeshRecoveryState
+from akra_trader.domain.models import OperatorIncidentDutyCallsRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentDutyCallsRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1799,6 +1801,17 @@ class TradingApplication:
             aligned_provider_recovery,
             spikesh=replace(
               aligned_provider_recovery.spikesh,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "dutycalls"
+          and provider_recovery.dutycalls.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            dutycalls=replace(
+              aligned_provider_recovery.dutycalls,
               alert_status="delivered",
             ),
           )
@@ -5211,6 +5224,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_dutycalls_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_dutycalls_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_dutycalls_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_dutycalls_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_dutycalls_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_dutycalls_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentDutyCallsRecoveryState,
+  ) -> OperatorIncidentDutyCallsRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_dutycalls_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_dutycalls_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentDutyCallsRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_dutycalls_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_dutycalls_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_dutycalls_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -7666,6 +7812,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "spikesh"
+    dutycalls_schema = existing.dutycalls
+    dutycalls_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("dutycalls"),
+      payload.get("dutycalls"),
+      payload.get("dutycalls_alert"),
+    )
+    if normalized_provider == "dutycalls" or dutycalls_payload:
+      dutycalls_status = self._first_non_empty_string(
+        dutycalls_payload.get("alert_status"),
+        dutycalls_payload.get("status"),
+        dutycalls_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.dutycalls.alert_status,
+      ) or "unknown"
+      dutycalls_schema = OperatorIncidentDutyCallsRecoveryState(
+        alert_id=self._first_non_empty_string(
+          dutycalls_payload.get("alert_id"),
+          dutycalls_payload.get("id"),
+          dutycalls_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.dutycalls.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          dutycalls_payload.get("external_reference"),
+          dutycalls_payload.get("reference"),
+          reference,
+          existing.dutycalls.external_reference,
+        ),
+        alert_status=dutycalls_status,
+        priority=self._first_non_empty_string(
+          dutycalls_payload.get("priority"),
+          dutycalls_payload.get("severity"),
+          dutycalls_payload.get("urgency"),
+          existing.dutycalls.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          dutycalls_payload.get("escalation_policy"),
+          dutycalls_payload.get("escalationPolicy"),
+          dutycalls_payload.get("policy"),
+          dutycalls_payload.get("source"),
+          existing.dutycalls.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          dutycalls_payload.get("assignee"),
+          dutycalls_payload.get("owner"),
+          dutycalls_payload.get("assigned_to"),
+          existing.dutycalls.assignee,
+        ),
+        url=self._first_non_empty_string(
+          dutycalls_payload.get("url"),
+          dutycalls_payload.get("html_url"),
+          dutycalls_payload.get("link"),
+          existing.dutycalls.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(dutycalls_payload.get("updated_at"))
+          or existing.dutycalls.updated_at
+        ),
+        phase_graph=self._build_dutycalls_recovery_phase_graph(
+          payload=dutycalls_payload,
+          alert_status=dutycalls_status,
+          priority=self._first_non_empty_string(
+            dutycalls_payload.get("priority"),
+            dutycalls_payload.get("severity"),
+            dutycalls_payload.get("urgency"),
+            existing.dutycalls.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            dutycalls_payload.get("escalation_policy"),
+            dutycalls_payload.get("escalationPolicy"),
+            dutycalls_payload.get("policy"),
+            dutycalls_payload.get("source"),
+            existing.dutycalls.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            dutycalls_payload.get("assignee"),
+            dutycalls_payload.get("owner"),
+            dutycalls_payload.get("assigned_to"),
+            existing.dutycalls.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.dutycalls,
+        ),
+      )
+      provider_schema_kind = "dutycalls"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -7746,6 +7985,7 @@ class TradingApplication:
       allquiet=allquiet_schema,
       moogsoft=moogsoft_schema,
       spikesh=spikesh_schema,
+      dutycalls=dutycalls_schema,
       updated_at=synced_at,
     )
 
@@ -8077,6 +8317,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.spikesh,
+        ),
+      ),
+      dutycalls=replace(
+        provider_recovery.dutycalls,
+        phase_graph=self._build_dutycalls_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.dutycalls.alert_status,
+          priority=provider_recovery.dutycalls.priority,
+          escalation_policy=provider_recovery.dutycalls.escalation_policy,
+          assignee=provider_recovery.dutycalls.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.dutycalls,
         ),
       ),
     )
@@ -12483,6 +12737,10 @@ class TradingApplication:
       return "spikesh"
     if normalized in {"spikesh_incidents", "operator_spikesh"}:
       return "spikesh"
+    if normalized in {"dutycalls_alerts", "duty_calls", "operator_dutycalls"}:
+      return "dutycalls"
+    if normalized in {"dutycalls_incidents", "operator_dutycalls"}:
+      return "dutycalls"
     return normalized or None
 
   @staticmethod
@@ -12686,6 +12944,8 @@ class TradingApplication:
       return "moogsoft"
     if "spikesh_incidents" in combined or "spikesh_alerts" in combined:
       return "spikesh"
+    if "dutycalls_incidents" in combined or "dutycalls_alerts" in combined:
+      return "dutycalls"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

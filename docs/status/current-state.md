@@ -102,7 +102,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   restore visibility, persisted market-channel continuation visibility, top-of-book visibility,
   guarded-live resume controls, and guarded-live audit history
 - outbound incident delivery can now fan out to console, generic webhook, Slack webhook,
-  PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, Zenduty, and Opsgenie targets with persisted delivery-attempt history, attempt counts, and
+  PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, Zenduty, and Opsgenie targets with persisted delivery-attempt history, attempt counts, and
   retry timing
 - durable guarded-live incidents now persist acknowledgment state, escalation state, next
   escalation timing, operator actions for acknowledge/escalate workflows, and paging policy
@@ -118,16 +118,16 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   incidents so recovered market-data faults can resolve in the same control-room loop. External
   provider recovery callbacks can also sync remediation lifecycle state, richer provider recovery
   payloads, and trigger the local verification pass before the same loop is refreshed. Guarded-live
-  refresh now also pull-syncs PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/Zenduty/Opsgenie incident bodies so provider-held workflow and
+  refresh now also pull-syncs PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/Zenduty/Opsgenie incident bodies so provider-held workflow and
   recovery metadata can reconcile remediation state authoritatively when callbacks lag. Those
   payloads are now promoted into typed remediation recovery state with job/reference, channels,
   symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
   phase, job phase, sync state, last event, and attempt count. That recovery state now also keeps
-  provider-specific typed schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, iLert alerts, Better Stack alerts, OnPage alerts, All Quiet alerts, Moogsoft alerts, Spike.sh alerts, Zenduty incidents, and Opsgenie alerts instead of only a
+  provider-specific typed schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, iLert alerts, Better Stack alerts, OnPage alerts, All Quiet alerts, Moogsoft alerts, Spike.sh alerts, DutyCalls alerts, Zenduty incidents, and Opsgenie alerts instead of only a
   flattened generic payload, and each provider branch now carries its own native recovery phase
   graph alongside the shared machine. Authoritative provider pull-sync now also promotes recovery
   telemetry like progress, step, attempt count, provider run id, and last message into typed
-  recovery state. When configured, PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/Zenduty/Opsgenie remediation-engine endpoints are also polled
+  recovery state. When configured, PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/Zenduty/Opsgenie remediation-engine endpoints are also polled
   directly so engine telemetry overrides stale copies embedded in incident bodies. When local verification closes the
   incident, the provider-native remediation workflow is resolved back out through the same
   bidirectional incident channel
@@ -172,7 +172,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ## Not Implemented Yet
 
 - full external incident-management workflow such as provider-managed ownership beyond the current
-  PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, richer destinations,
+  PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, richer destinations,
   and more advanced retry policies
 - operator alerts for wider market-data freshness policies and broader risk surfaces beyond the
   current guarded-live worker-failure, stale-runtime, market-data-freshness, risk-breach,
@@ -188,6 +188,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Expand operator delivery from the current console/webhook/Slack/PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/Zenduty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
+3. Expand operator delivery from the current console/webhook/Slack/PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/Zenduty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
 4. Expand guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

@@ -1126,6 +1126,31 @@ class OperatorIncidentSpikeshRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentDutyCallsRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentDutyCallsRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentDutyCallsRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentDutyCallsRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -1215,6 +1240,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   spikesh: OperatorIncidentSpikeshRecoveryState = field(
     default_factory=OperatorIncidentSpikeshRecoveryState
+  )
+  dutycalls: OperatorIncidentDutyCallsRecoveryState = field(
+    default_factory=OperatorIncidentDutyCallsRecoveryState
   )
   updated_at: datetime | None = None
 
