@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit c9e2265 still explicitly lists wider live-path alerting and durable operator audit or event delivery as a remaining guarded-live gap, but multi-venue launch and reconciliation generalization is the clearer immediate queue head before alert-delivery expansion.",
+      "priority_reason": "The latest main-session reply after commit f143ed5 still explicitly lists wider live-path alerting and durable operator audit or event delivery as a remaining guarded-live gap, but the newly exposed market-data provider generalization work is the clearer immediate queue head before alert-delivery expansion.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:30:00Z",
+      "updated_at": "2026-04-17T02:47:17Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit c9e2265 still says live order management lacks venue-native amend flow, but multi-venue launch and reconciliation generalization remains the first executable guarded-live follow-up before amend semantics.",
+      "priority_reason": "The latest main-session reply after commit f143ed5 still says live order management lacks venue-native amend flow, but the newly exposed market-data provider generalization work remains the first executable guarded-live follow-up before amend semantics.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:30:00Z",
+      "updated_at": "2026-04-17T02:47:17Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -743,18 +743,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Generalize guarded-live launch wiring and venue-state reconciliation across supported venues",
       "description": "Broaden the guarded-live multi-venue path beyond transport-layer coverage by generalizing live launch wiring, venue-state reconciliation, and runtime attachment semantics so Binance and the newly expanded Coinbase-authenticated path, plus later venues such as Kraken, can use the same guarded-live candidacy flow without venue-specific launch or recovery dead ends.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply after commit c9e2265 explicitly says guarded-live live launch and venue-state or reconciliation wiring are still not venue-generalized and remain Binance-centric, making this the clearest executable next task now that Coinbase authenticated session transport is complete.",
+      "priority_reason": "Completed in main session commit f143ed5, which introduced guarded-live venue-specific config credentials, generalized launch and recovery wiring away from market-data-provider assumptions, reused a generic ccxt venue-state snapshot path across Binance, Coinbase, and Kraken, and added mismatch findings when reconciliation snapshot venue differs from the configured guarded-live venue.",
       "depends_on": [
         "planning-guarded-live-multi-venue-authenticated-session-transport"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:30:00Z",
+      "updated_at": "2026-04-17T02:47:17Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live venue breadth honest by requiring launch, recovery, and reconciliation semantics to generalize with the transport layer instead of leaving multi-venue support stranded at adapter-specific session ingestion."
+    },
+    {
+      "id": "planning-guarded-live-market-data-provider-generalization",
+      "direction_id": "guarded-live-execution",
+      "title": "Generalize guarded-live market-data provider assumptions beyond seeded and Binance",
+      "description": "Finish the newly generalized multi-venue guarded-live path by removing the remaining seeded- and Binance-centric assumptions from the market-data provider layer, so supported live venues can reuse one runtime market-data boundary instead of depending on provider-specific shortcuts that reintroduce venue dead ends after launch and reconciliation were generalized.",
+      "status": "ready",
+      "base_priority": 85,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply after commit f143ed5 says guarded-live launch wiring and venue-state reconciliation are now generalized, and explicitly identifies the remaining market-data provider layer as still seeded or Binance-centric, making this the clearest executable next task.",
+      "depends_on": [
+        "planning-guarded-live-multi-venue-launch-and-reconciliation-generalization"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T02:47:17Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends guarded-live venue breadth past launch and reconciliation by aligning the runtime market-data boundary with the same supported-venue contract, preventing multi-venue live candidacy from staying partially Binance-shaped in provider code."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
