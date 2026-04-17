@@ -26,6 +26,7 @@ services:
       .venv/bin/uvicorn akra_trader.main:app --host 0.0.0.0 --port 8000"
     volumes:
       - .:/workspace
+      - api_venv:/workspace/apps/api/.venv
     ports:
       - "8000:8000"
     depends_on:
@@ -42,6 +43,7 @@ services:
       VITE_API_BASE_URL: http://localhost:8000/api
     volumes:
       - .:/workspace
+      - web_node_modules:/workspace/apps/web/node_modules
     ports:
       - "5173:5173"
     depends_on:
@@ -49,3 +51,5 @@ services:
 
 volumes:
   postgres_data:
+  api_venv:
+  web_node_modules:
