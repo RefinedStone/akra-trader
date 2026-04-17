@@ -158,6 +158,11 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
     action="remediate",
     actor="operator",
     detail="restart_sync_and_verify_checkpoint",
+    payload={
+      "job_id": "pd-job-1",
+      "channels": ["kline", "depth"],
+      "verification": {"state": "passed"},
+    },
   )
 
   assert adapter.list_supported_workflow_providers() == ("pagerduty",)
@@ -185,6 +190,8 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   remediate_payload = json.loads(remediate_request[2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["note"]["content"]
   assert "market_data.sync_recent" in remediate_payload["note"]["content"]
+  assert '"job_id": "pd-job-1"' in remediate_payload["note"]["content"]
+  assert '"channels": ["kline", "depth"]' in remediate_payload["note"]["content"]
 
 
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
@@ -299,6 +306,7 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     action="resolve",
     actor="operator",
     detail="fixed",
+    payload={"job_id": "og-job-1", "verification": {"state": "passed"}},
   )
   remediate = adapter.sync_incident_workflow(
     incident=incident,
@@ -306,6 +314,7 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     action="remediate",
     actor="operator",
     detail="restart_sync_and_verify_checkpoint",
+    payload={"job_id": "og-job-2", "channels": ["kline", "depth"]},
   )
 
   assert adapter.list_supported_workflow_providers() == ("opsgenie",)
@@ -323,5 +332,8 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
   escalate_payload = json.loads(requests[1][2].decode("utf-8"))
   assert "level 3" in escalate_payload["note"]
   remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  resolve_payload = json.loads(requests[2][2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["note"]
   assert "market_data.sync_recent" in remediate_payload["note"]
+  assert '"job_id": "og-job-2"' in remediate_payload["note"]
+  assert '"job_id": "og-job-1"' in resolve_payload["note"]

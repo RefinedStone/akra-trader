@@ -500,6 +500,8 @@ class OperatorIncidentRemediation:
   last_attempted_at: datetime | None = None
   provider: str | None = None
   reference: str | None = None
+  provider_payload: dict[str, Any] = field(default_factory=dict)
+  provider_payload_updated_at: datetime | None = None
 
 
 @dataclass(frozen=True)

@@ -233,8 +233,10 @@ Defaults:
   so stream-side incidents can close the loop without waiting on provider-only workflow state.
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, `resolved`, and
   remediation lifecycle sync events into the durable guarded-live incident history, including
-  provider workflow references, while local acknowledge/escalate actions can also push provider-native workflow
-  actions back out when the provider supports them across PagerDuty and Opsgenie
+  provider workflow references plus richer provider recovery payloads. Those payloads now persist
+  on incident remediation state, surface in the guarded-live incident table, and are reused when
+  local remediation closes the loop so provider-native workflow `resolve` actions are pushed back
+  out after successful verification across PagerDuty and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

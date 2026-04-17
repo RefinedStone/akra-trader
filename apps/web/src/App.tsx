@@ -360,6 +360,8 @@ type OperatorVisibility = {
       last_attempted_at?: string | null;
       provider?: string | null;
       reference?: string | null;
+      provider_payload: Record<string, unknown>;
+      provider_payload_updated_at?: string | null;
     };
   }[];
   delivery_history: {
@@ -471,6 +473,8 @@ type GuardedLiveStatus = {
       last_attempted_at?: string | null;
       provider?: string | null;
       reference?: string | null;
+      provider_payload: Record<string, unknown>;
+      provider_payload_updated_at?: string | null;
     };
   }[];
   delivery_history: {
@@ -2076,15 +2080,25 @@ export default function App() {
                                 : ""}
                             </p>
                             {event.remediation.state !== "not_applicable" ? (
-                              <p className="run-lineage-symbol-copy">
-                                Remediation: {event.remediation.state}
-                                {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
-                                {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
-                                {event.remediation.requested_by ? ` by ${event.remediation.requested_by}` : ""}
-                                {event.remediation.last_attempted_at
-                                  ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
-                                  : ""}
-                              </p>
+                              <>
+                                <p className="run-lineage-symbol-copy">
+                                  Remediation: {event.remediation.state}
+                                  {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
+                                  {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
+                                  {event.remediation.requested_by ? ` by ${event.remediation.requested_by}` : ""}
+                                  {event.remediation.last_attempted_at
+                                    ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
+                                    : ""}
+                                </p>
+                                {Object.keys(event.remediation.provider_payload).length ? (
+                                  <p className="run-lineage-symbol-copy">
+                                    Provider recovery payload: {formatParameterMap(event.remediation.provider_payload)}
+                                    {event.remediation.provider_payload_updated_at
+                                      ? ` at ${formatTimestamp(event.remediation.provider_payload_updated_at)}`
+                                      : ""}
+                                  </p>
+                                ) : null}
+                              </>
                             ) : null}
                           </td>
                         </tr>
@@ -3176,6 +3190,14 @@ export default function App() {
                                   {event.remediation.detail ? (
                                     <p className="run-lineage-symbol-copy">
                                       Remediation detail: {event.remediation.detail}
+                                    </p>
+                                  ) : null}
+                                  {Object.keys(event.remediation.provider_payload).length ? (
+                                    <p className="run-lineage-symbol-copy">
+                                      Provider recovery payload: {formatParameterMap(event.remediation.provider_payload)}
+                                      {event.remediation.provider_payload_updated_at
+                                        ? ` at ${formatTimestamp(event.remediation.provider_payload_updated_at)}`
+                                        : ""}
                                     </p>
                                   ) : null}
                                 </>

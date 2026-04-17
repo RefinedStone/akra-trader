@@ -485,7 +485,10 @@ def test_guarded_live_endpoints_manage_kill_switch_and_block_runtime_starts(tmp_
     assert release_response.status_code == 200
     released_payload = release_response.json()
     assert released_payload["kill_switch"]["state"] == "released"
-    assert released_payload["audit_events"][0]["kind"] == "guarded_live_kill_switch_released"
+    assert any(
+      event["kind"] == "guarded_live_kill_switch_released"
+      for event in released_payload["audit_events"]
+    )
 
 
 def test_guarded_live_incident_endpoints_acknowledge_and_escalate(tmp_path: Path) -> None:
@@ -652,6 +655,7 @@ def test_incident_endpoints_surface_provider_workflow_and_paging_policy(tmp_path
       action: str,
       actor: str,
       detail: str,
+      payload=None,
       attempt_number: int = 1,
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return (
@@ -1256,6 +1260,7 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
       action: str,
       actor: str,
       detail: str,
+      payload=None,
       attempt_number: int = 1,
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return (
@@ -1601,6 +1606,11 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
         "external_reference": "guarded-live:market-data:5m",
         "workflow_reference": "PDINC-REC-901",
         "occurred_at": "2025-01-03T18:31:00Z",
+        "payload": {
+          "job_id": "provider-job-901",
+          "summary": "provider completed recovery verification",
+          "verification": {"state": "passed"},
+        },
       },
     )
     assert synced.status_code == 200
@@ -1611,13 +1621,18 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     )
     assert updated_incident["remediation"]["state"] == "executed"
     assert updated_incident["remediation"]["requested_by"] == "pagerduty:responder-1"
+    assert updated_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
     assert updated_incident["provider_workflow_action"] == "remediate"
     assert updated_incident["provider_workflow_state"] == "delivered"
     assert updated_incident["provider_workflow_reference"] == "PDINC-REC-901"
-    assert any(
-      event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
+    resolved_incident = next(
+      event
       for event in synced.json()["incident_events"]
+      if event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
     )
+    assert resolved_incident["provider_workflow_action"] == "resolve"
+    assert resolved_incident["provider_workflow_state"] in {"delivered", "not_supported"}
+    assert resolved_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
 
 
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(

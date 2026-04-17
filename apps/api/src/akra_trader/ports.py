@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 from typing import Protocol
 
 import pandas as pd
@@ -155,6 +156,7 @@ class OperatorAlertDeliveryPort(Protocol):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None = None,
     attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]: ...
 

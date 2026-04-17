@@ -4,6 +4,7 @@ import json
 import logging
 from datetime import UTC
 from datetime import datetime
+from typing import Any
 from typing import Callable
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
@@ -113,6 +114,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None = None,
     attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]:
     normalized_provider = provider.strip().lower().replace("-", "_")
@@ -124,6 +126,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           action=normalized_action,
           actor=actor,
           detail=detail,
+          payload=payload,
           attempt_number=attempt_number,
         ),
       )
@@ -134,6 +137,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           action=normalized_action,
           actor=actor,
           detail=detail,
+          payload=payload,
           attempt_number=attempt_number,
         ),
       )
@@ -391,6 +395,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None,
     attempt_number: int,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
@@ -436,6 +441,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       action=action,
       actor=actor,
       detail=detail,
+      payload=payload,
       workflow_reference=workflow_reference,
     )
     try:
@@ -543,6 +549,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None,
     attempt_number: int,
   ) -> OperatorIncidentDelivery:
     attempted_at = self._clock()
@@ -588,6 +595,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       action=action,
       actor=actor,
       detail=detail,
+      payload=payload,
       reference=reference,
       reference_type=reference_type,
     )
@@ -695,6 +703,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           "runbook": incident.remediation.runbook,
           "provider": incident.remediation.provider,
           "reference": incident.remediation.reference,
+          "provider_payload": incident.remediation.provider_payload,
+          "provider_payload_updated_at": (
+            incident.remediation.provider_payload_updated_at.isoformat()
+            if incident.remediation.provider_payload_updated_at is not None
+            else None
+          ),
         },
       }
     ).encode("utf-8")
@@ -748,6 +762,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_kind": incident.remediation.kind,
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
+            "remediation_provider_payload": incident.remediation.provider_payload,
           },
         },
       }
@@ -796,6 +811,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_kind": incident.remediation.kind,
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
+            "remediation_provider_payload": incident.remediation.provider_payload,
           },
           "tags": ["akra", incident.source, incident.severity.lower()],
         }
@@ -811,6 +827,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None,
     workflow_reference: str,
   ) -> urllib_request.Request:
     encoded_reference = urllib_parse.quote(workflow_reference, safe="")
@@ -874,6 +891,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
                 f"Akra requested remediation. Actor: {actor}. "
                 f"Summary: {incident.remediation.summary or incident.summary}. "
                 f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+                f"{self._format_workflow_payload_context(payload)}"
               ),
             }
           }
@@ -890,6 +908,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None,
     reference: str,
     reference_type: str,
   ) -> urllib_request.Request:
@@ -919,7 +938,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           {
             "user": actor,
             "source": incident.source,
-            "note": detail,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
           }
         ).encode("utf-8"),
         headers=headers,
@@ -951,6 +970,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "note": (
               f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
               f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
             ),
           }
         ).encode("utf-8"),
@@ -958,6 +978,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         method="POST",
       )
     raise ValueError(f"unsupported opsgenie workflow action: {action}")
+
+  @staticmethod
+  def _format_workflow_payload_context(payload: dict[str, Any] | None) -> str:
+    if not payload:
+      return ""
+    return f" Context: {json.dumps(payload, default=str, sort_keys=True)}"
 
   @staticmethod
   def _map_pagerduty_severity(severity: str) -> str:

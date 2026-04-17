@@ -5,6 +5,7 @@ from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -166,6 +167,7 @@ class FakeOperatorAlertDeliveryAdapter:
     self.delivered_incidents: list[OperatorIncidentEvent] = []
     self.delivery_attempts: list[tuple[str, str, int]] = []
     self.workflow_attempts: list[tuple[str, str, str, int]] = []
+    self.workflow_payloads: list[tuple[str, str, str, dict[str, Any] | None]] = []
     self._failures_before_success = dict(failures_before_success or {})
     self._workflow_failures_before_success = dict(workflow_failures_before_success or {})
     self._attempts_by_target: dict[str, int] = {}
@@ -230,9 +232,11 @@ class FakeOperatorAlertDeliveryAdapter:
     action: str,
     actor: str,
     detail: str,
+    payload: dict[str, Any] | None = None,
     attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]:
     self.workflow_attempts.append((incident.event_id, provider, action, attempt_number))
+    self.workflow_payloads.append((incident.event_id, provider, action, payload))
     target = f"{provider}_workflow"
     key = (provider, action)
     delivered_attempts = self._workflow_attempts_by_key.get(key, 0) + 1
@@ -1712,6 +1716,12 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
     external_reference=incident.alert_id,
     workflow_reference="PDINC-REC-1",
     occurred_at=clock.current + timedelta(minutes=1),
+    payload={
+      "job_id": "recovery-job-1",
+      "summary": "provider verified market-data recovery",
+      "channels": ["kline", "depth"],
+      "verification": {"state": "passed"},
+    },
   )
 
   updated_incident = next(
@@ -1721,17 +1731,46 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   )
   assert updated_incident.remediation.state == "executed"
   assert updated_incident.remediation.requested_by == "pagerduty:pagerduty"
+  assert updated_incident.remediation.provider_payload == {
+    "job_id": "recovery-job-1",
+    "summary": "provider verified market-data recovery",
+    "channels": ["kline", "depth"],
+    "verification": {"state": "passed"},
+  }
   assert updated_incident.provider_workflow_action == "remediate"
   assert updated_incident.provider_workflow_state == "delivered"
   assert updated_incident.provider_workflow_reference == "PDINC-REC-1"
-  assert any(
-    event.kind == "incident_resolved" and event.alert_id == incident.alert_id
+  resolved_incident = next(
+    event
     for event in synced.incident_events
+    if event.kind == "incident_resolved" and event.alert_id == incident.alert_id
   )
+  assert resolved_incident.provider_workflow_action == "resolve"
+  assert resolved_incident.provider_workflow_state == "delivered"
+  assert resolved_incident.provider_workflow_reference == "PDINC-REC-1"
+  assert resolved_incident.remediation.provider_payload["job_id"] == "recovery-job-1"
   assert any(
     record.phase == "provider_remediate"
     and record.external_reference == "PDINC-REC-1"
     for record in synced.delivery_history
+  )
+  assert any(
+    record.incident_event_id == resolved_incident.event_id
+    and record.phase == "provider_resolve"
+    and record.external_reference == "PDINC-REC-1"
+    for record in synced.delivery_history
+  )
+  assert any(
+    workflow_event_id == resolved_incident.event_id and provider == "pagerduty" and action == "resolve"
+    for workflow_event_id, provider, action, _ in delivery.workflow_attempts
+  )
+  assert any(
+    workflow_event_id == resolved_incident.event_id
+    and provider == "pagerduty"
+    and action == "resolve"
+    and payload is not None
+    and payload.get("remediation", {}).get("provider_payload", {}).get("job_id") == "recovery-job-1"
+    for workflow_event_id, provider, action, payload in delivery.workflow_payloads
   )
   assert any(
     event.kind == "guarded_live_incident_external_synced"

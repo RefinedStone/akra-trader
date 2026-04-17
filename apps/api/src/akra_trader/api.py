@@ -81,6 +81,7 @@ class ExternalIncidentSyncRequest(BaseModel):
   workflow_reference: str | None = None
   occurred_at: datetime | None = None
   escalation_level: int | None = Field(default=None, ge=1)
+  payload: dict[str, Any] = Field(default_factory=dict)
 
 
 def create_router(container: Container) -> APIRouter:
@@ -391,6 +392,7 @@ def create_router(container: Container) -> APIRouter:
         workflow_reference=request.workflow_reference,
         occurred_at=request.occurred_at,
         escalation_level=request.escalation_level,
+        payload=request.payload,
       )
     except PermissionError as exc:
       raise HTTPException(status_code=403, detail=str(exc)) from exc

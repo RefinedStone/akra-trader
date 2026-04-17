@@ -186,6 +186,7 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       action: str,
       actor: str,
       detail: str,
+      payload=None,
       attempt_number: int = 1,
     ):
       return ()
