@@ -1413,6 +1413,119 @@ def test_operator_visibility_endpoint_separates_venue_native_ladder_integrity_in
     )
 
 
+def test_operator_visibility_endpoint_separates_exchange_specific_ladder_integrity_incidents(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 19, 5, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "exchange_specific_ladder_integrity_visibility",
+      },
+    )
+    assert live_response.status_code == 200
+    run_id = live_response.json()["config"]["run_id"]
+
+    state = app._guarded_live_state.load_state()
+    owner_session_id = (
+      state.ownership.owner_session_id
+      or state.session_handoff.owner_session_id
+      or "worker-live-binance-market"
+    )
+    app._guarded_live_state.save_state(
+      replace(
+        state,
+        ownership=replace(
+          state.ownership,
+          state="owned",
+          owner_run_id=run_id,
+          owner_session_id=owner_session_id,
+        ),
+        session_handoff=replace(
+          state.session_handoff,
+          state="active",
+          venue="binance",
+          owner_run_id=run_id,
+          owner_session_id=owner_session_id,
+          coverage=("depth_updates",),
+          handed_off_at=datetime(2025, 1, 3, 19, 4, tzinfo=UTC),
+          last_sync_at=datetime(2025, 1, 3, 19, 4, 40, tzinfo=UTC),
+          last_depth_event_at=datetime(2025, 1, 3, 19, 4, 50, tzinfo=UTC),
+          order_book_state="snapshot_rebuilt",
+          order_book_gap_count=1,
+          order_book_rebuild_count=1,
+          order_book_last_update_id=34,
+          order_book_last_rebuilt_at=datetime(2025, 1, 3, 19, 4, 45, tzinfo=UTC),
+          issues=(
+            "binance_order_book_gap_detected:25:29",
+            "binance_order_book_bridge_previous_mismatch:25:29",
+            "binance_order_book_bridge_range_mismatch:26:31:34",
+          ),
+        ),
+      )
+    )
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    alerts = visibility_response.json()["alerts"]
+    categories = {
+      alert["category"]
+      for alert in alerts
+      if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
+    }
+    assert {"market_data_ladder_integrity", "market_data_exchange_ladder_integrity"} <= categories
+
+    ladder_integrity_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_integrity"
+    )
+    assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert["detail"]
+    assert "binance ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_alert["detail"]
+    assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert["detail"]
+    assert "bridge expected previous update id" not in ladder_integrity_alert["detail"]
+
+    exchange_ladder_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_exchange_ladder_integrity"
+    )
+    assert "binance depth bridge expected previous update id 25 but received 29." in exchange_ladder_alert["detail"]
+    assert "binance depth bridge range 31-34 does not cover expected next update id 26." in exchange_ladder_alert["detail"]
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident_events = guarded_live_response.json()["incident_events"]
+    assert any(
+      event["alert_id"] == f"guarded-live:market-data-exchange-ladder-integrity:{run_id}"
+      for event in incident_events
+    )
+
+
 def test_operator_visibility_endpoint_surfaces_book_and_kline_consistency_incidents(
   tmp_path: Path,
 ) -> None:

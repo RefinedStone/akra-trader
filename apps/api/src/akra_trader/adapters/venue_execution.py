@@ -2728,6 +2728,12 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         depth_bids = _coerce_depth_levels(event.get("b"))
         depth_asks = _coerce_depth_levels(event.get("a"))
         if bool(event.get("_snapshot_depth")):
+          issues.extend(
+            self._exchange_specific_snapshot_refresh_issues(
+              previous_update_id=local_book.last_update_id if local_book is not None else order_book_last_update_id,
+              next_update_id=depth_last_update_id or depth_first_update_id,
+            )
+          )
           local_book = _build_local_order_book_from_snapshot_row(
             symbol=handoff.symbol or "",
             row={
@@ -2788,6 +2794,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
             f"{self._order_book_issue_prefix()}_gap_detected:"
             f"{order_book_last_update_id or 'none'}:"
             f"{depth_previous_update_id or depth_first_update_id or 'none'}"
+          )
+          issues.extend(
+            self._exchange_specific_continuity_issues(
+              local_book=local_book,
+              first_update_id=depth_first_update_id,
+              last_update_id=depth_last_update_id,
+              previous_update_id=depth_previous_update_id,
+            )
           )
           rebuild = self._rebuild_local_order_book_from_snapshot(
             symbol=handoff.symbol or "",
@@ -3493,6 +3507,51 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
 
   def _order_book_issue_prefix(self) -> str:
     return f"{self._venue or 'venue'}_order_book"
+
+  def _exchange_specific_snapshot_refresh_issues(
+    self,
+    *,
+    previous_update_id: int | None,
+    next_update_id: int | None,
+  ) -> tuple[str, ...]:
+    if self._venue not in {"coinbase", "kraken"}:
+      return ()
+    if previous_update_id is None:
+      return ()
+    return (
+      f"{self._order_book_issue_prefix()}_snapshot_refresh:"
+      f"{previous_update_id}:{next_update_id or 'none'}",
+    )
+
+  def _exchange_specific_continuity_issues(
+    self,
+    *,
+    local_book: LocalOrderBookState | None,
+    first_update_id: int | None,
+    last_update_id: int | None,
+    previous_update_id: int | None,
+  ) -> tuple[str, ...]:
+    if local_book is None or local_book.last_update_id is None:
+      return ()
+
+    prefix = self._order_book_issue_prefix()
+    if self._venue == "binance":
+      if previous_update_id is not None and previous_update_id != local_book.last_update_id:
+        return (
+          f"{prefix}_bridge_previous_mismatch:{local_book.last_update_id}:{previous_update_id}",
+        )
+      expected_next = local_book.last_update_id + 1
+      return (
+        f"{prefix}_bridge_range_mismatch:{expected_next}:{first_update_id or 'none'}:{last_update_id or 'none'}",
+      )
+
+    if self._venue == "coinbase":
+      return (
+        f"{prefix}_sequence_mismatch:"
+        f"{local_book.last_update_id}:{previous_update_id or 'none'}:{last_update_id or first_update_id or 'none'}",
+      )
+
+    return ()
 
   def _inspect_order_book_snapshot(
     self,

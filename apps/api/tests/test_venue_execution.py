@@ -1011,6 +1011,80 @@ def test_coinbase_adapter_marks_venue_specific_ladder_snapshot_issues() -> None:
   assert "coinbase_order_book_snapshot_non_monotonic:asks:2:2501.1:2501.2" in handoff.issues
 
 
+def test_coinbase_adapter_marks_exchange_specific_ladder_rules_on_snapshot_refresh() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 700,
+        "bids": [[21931.98, 1.10], [21931.70, 0.90]],
+        "asks": [[21933.98, 1.25], [21934.20, 0.95]],
+      }
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 21931.98,
+      "bidVolume": 1.1,
+      "ask": 21933.98,
+      "askVolume": 1.25,
+      "open": 21900.0,
+      "last": 21932.98,
+      "high": 22010.0,
+      "low": 21835.0,
+      "baseVolume": 16038.0,
+      "quoteVolume": 351749098.0,
+    },
+    trades=[
+      {
+        "id": "coinbase-trade-restore-1",
+        "price": 21932.98,
+        "amount": 0.30,
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 21920.0, 21940.0, 21910.0, 21932.5, 12.0]
+    ],
+  )
+  stream_session = FakeStreamSession(
+    "coinbase-market-refresh",
+    transport="coinbase_advanced_trade_market_websocket",
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    venue="coinbase",
+    exchange=exchange,
+    venue_stream_client=FakeStreamClient(stream_session),
+    clock=clock,
+  )
+
+  handoff = adapter.handoff_session(
+    symbol="BTC/USD",
+    timeframe="5m",
+    owner_run_id="run-live-coinbase-refresh",
+    owner_session_id="worker-live-coinbase-refresh",
+    owned_order_ids=(),
+  )
+
+  clock.advance(timedelta(seconds=30))
+  stream_session.push(
+    {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+      "U": 701,
+      "u": 701,
+      "pu": 700,
+      "b": [["21934.00", "0.95"]],
+      "a": [["21934.20", "1.05"]],
+      "_snapshot_depth": True,
+    }
+  )
+  sync = adapter.sync_session(handoff=handoff, order_ids=())
+
+  assert "coinbase_order_book_snapshot_refresh:700:701" in sync.handoff.issues
+
+
 def test_coinbase_adapter_extends_authenticated_account_and_order_transport(monkeypatch) -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
@@ -1632,6 +1706,7 @@ def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap
   assert second_sync.handoff.mini_ticker_snapshot is not None
   assert second_sync.handoff.kline_snapshot is not None
   assert "binance_order_book_gap_detected:25:29" in second_sync.handoff.issues
+  assert "binance_order_book_bridge_previous_mismatch:25:29" in second_sync.handoff.issues
 
 
 def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after_restart() -> None:
