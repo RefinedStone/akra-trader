@@ -109,8 +109,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   plus local provider-native workflow actions
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
   repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
-  breaches such as stale sync, gap windows, and repeated sync failures instead of only generic
-  runtime control faults
+  breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and
+  venue-specific upstream fault classifications instead of only generic runtime control faults
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas

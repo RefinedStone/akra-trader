@@ -228,6 +228,8 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
   assert status.instruments[0].backfill_gap_windows[0].end_at == now - timedelta(minutes=15)
   assert status.instruments[0].backfill_gap_windows[0].missing_candles == 1
   assert "missing_candles:1" in status.instruments[0].issues
+  assert "contiguous_backfill_incomplete:1" in status.instruments[0].issues
+  assert "gap_windows:1" in status.instruments[0].issues
 
 
 def test_binance_adapter_status_exposes_checkpoint_and_recent_failure_history(tmp_path: Path) -> None:
@@ -270,6 +272,8 @@ def test_binance_adapter_status_exposes_checkpoint_and_recent_failure_history(tm
   assert degraded_instrument.recent_failures[0].operation == "sync_recent"
   assert "upstream fetch failed" in degraded_instrument.recent_failures[0].error
   assert "last_sync_failed" in degraded_instrument.issues
+  assert "recent_sync_failure:1" in degraded_instrument.issues
+  assert "binance_upstream_fault" in degraded_instrument.issues
 
 
 def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path) -> None:

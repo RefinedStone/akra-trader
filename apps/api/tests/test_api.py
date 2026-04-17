@@ -1089,6 +1089,11 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
               ),
             ),
             failure_count_24h=2,
+            backfill_target_candles=400,
+            backfill_completion_ratio=0.72,
+            backfill_complete=False,
+            backfill_contiguous_completion_ratio=0.91,
+            backfill_contiguous_complete=False,
             backfill_contiguous_missing_candles=3,
             backfill_gap_windows=(
               GapWindow(
@@ -1097,7 +1102,16 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
                 missing_candles=3,
               ),
             ),
-            issues=("lagging", "missing_candles:3"),
+            issues=(
+              "lagging",
+              "freshness_threshold_exceeded:1200:600",
+              "missing_candles:3",
+              "backfill_target_incomplete:288:400",
+              "contiguous_backfill_incomplete:3",
+              "gap_windows:1",
+              "repeated_sync_failures:2",
+              "binance_timeout",
+            ),
           ),
         ],
       ),
@@ -1125,10 +1139,16 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     assert visibility_response.status_code == 200
     alerts = visibility_response.json()["alerts"]
     categories = {alert["category"] for alert in alerts if alert.get("source") == "guarded_live"}
-    assert {"market_data_freshness", "risk_breach"} <= categories
+    assert {"market_data_freshness", "market_data_quality", "market_data_venue", "risk_breach"} <= categories
     market_data_alert = next(alert for alert in alerts if alert["category"] == "market_data_freshness")
     assert "ETH/USDT lagged 1200s." in market_data_alert["detail"]
     assert "missing candle" in market_data_alert["detail"]
+    market_data_quality_alert = next(alert for alert in alerts if alert["category"] == "market_data_quality")
+    assert "backfill target covers 72.00%" in market_data_quality_alert["detail"]
+    assert "contiguous backfill quality is 91.00%" in market_data_quality_alert["detail"]
+    market_data_venue_alert = next(alert for alert in alerts if alert["category"] == "market_data_venue")
+    assert "recorded 2 sync failure(s)" in market_data_venue_alert["detail"]
+    assert "venue semantics: timeout" in market_data_venue_alert["detail"]
     risk_alert = next(
       alert for alert in alerts
       if alert.get("run_id") == run.config.run_id and alert["category"] == "risk_breach"
@@ -1140,6 +1160,8 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
     assert any(event["alert_id"] == "guarded-live:market-data:5m" for event in incident_events)
+    assert any(event["alert_id"] == "guarded-live:market-data-quality:binance:5m" for event in incident_events)
+    assert any(event["alert_id"] == "guarded-live:market-data-venue:binance:5m" for event in incident_events)
     assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
 
 

@@ -269,7 +269,13 @@ class CcxtMarketDataAdapter(MarketDataPort):
           backfill_contiguous_complete=backfill.contiguous_complete,
           backfill_contiguous_missing_candles=backfill.contiguous_missing_candles,
           backfill_gap_windows=backfill.gap_windows,
-          issues=quality.issues,
+          issues=self._build_status_issues(
+            timeframe=timeframe,
+            quality=quality,
+            backfill=backfill,
+            recent_failures=recent_failures,
+            failure_count_24h=failure_count_24h,
+          ),
         )
       )
     return MarketDataStatus(provider=self._provider, venue=self._venue, instruments=instruments)
@@ -774,6 +780,9 @@ class CcxtMarketDataAdapter(MarketDataPort):
     elif lag_seconds is not None and lag_seconds > self._freshness_threshold_seconds(timeframe):
       sync_status = "stale"
       issues.append("lagging")
+      issues.append(
+        f"freshness_threshold_exceeded:{lag_seconds}:{self._freshness_threshold_seconds(timeframe)}"
+      )
     if missing_candles > 0:
       issues.append(f"missing_candles:{missing_candles}")
     return QualitySnapshot(
@@ -847,6 +856,83 @@ class CcxtMarketDataAdapter(MarketDataPort):
       contiguous_missing_candles=missing_candles,
       gap_windows=gap_windows,
     )
+
+  def _build_status_issues(
+    self,
+    *,
+    timeframe: str,
+    quality: QualitySnapshot,
+    backfill: BackfillSnapshot,
+    recent_failures: tuple[SyncFailure, ...],
+    failure_count_24h: int,
+  ) -> tuple[str, ...]:
+    issues = list(quality.issues)
+    if (
+      backfill.target_candles is not None
+      and backfill.target_candles > 0
+      and quality.coverage.candle_count > 0
+      and backfill.complete is False
+    ):
+      issues.append(
+        f"backfill_target_incomplete:{quality.coverage.candle_count}:{backfill.target_candles}"
+      )
+    if backfill.contiguous_missing_candles is not None and backfill.contiguous_missing_candles > 0:
+      issues.append(f"contiguous_backfill_incomplete:{backfill.contiguous_missing_candles}")
+      issues.append(f"gap_windows:{len(backfill.gap_windows)}")
+    if failure_count_24h > 0:
+      issues.append(
+        f"{'repeated_sync_failures' if failure_count_24h > 1 else 'recent_sync_failure'}:{failure_count_24h}"
+      )
+    for failure in recent_failures:
+      issues.extend(self._classify_failure_semantics(failure.error))
+    return tuple(dict.fromkeys(issues))
+
+  def _classify_failure_semantics(self, error: str) -> tuple[str, ...]:
+    normalized = error.lower()
+    semantics: list[str] = []
+    if "timeout" in normalized or "timed out" in normalized:
+      semantics.append(f"{self._venue}_timeout")
+    if (
+      "rate limit" in normalized
+      or "too many requests" in normalized
+      or "429" in normalized
+      or "throttle" in normalized
+    ):
+      semantics.append(f"{self._venue}_rate_limited")
+    if (
+      "network" in normalized
+      or "connection" in normalized
+      or "socket" in normalized
+      or "dns" in normalized
+    ):
+      semantics.append(f"{self._venue}_network_fault")
+    if (
+      "auth" in normalized
+      or "api key" in normalized
+      or "api-key" in normalized
+      or "signature" in normalized
+      or "forbidden" in normalized
+      or "unauthorized" in normalized
+      or "permission denied" in normalized
+    ):
+      semantics.append(f"{self._venue}_auth_fault")
+    if (
+      "invalid symbol" in normalized
+      or "unknown symbol" in normalized
+      or "symbol not found" in normalized
+      or "market not found" in normalized
+      or "unknown market" in normalized
+    ):
+      semantics.append(f"{self._venue}_symbol_unavailable")
+    if (
+      "maintenance" in normalized
+      or "service unavailable" in normalized
+      or "system upgrade" in normalized
+    ):
+      semantics.append(f"{self._venue}_maintenance")
+    if not semantics:
+      semantics.append(f"{self._venue}_upstream_fault")
+    return tuple(dict.fromkeys(semantics))
 
   def _count_missing_candles(self, *, symbol: str, timeframe: str) -> int:
     timestamps = self._read_timestamps(symbol=symbol, timeframe=timeframe)

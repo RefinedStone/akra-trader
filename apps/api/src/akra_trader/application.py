@@ -267,6 +267,9 @@ class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
   _guarded_live_worker_kind = "guarded_live_native_worker"
   _guarded_live_balance_tolerance = 1e-9
+  _guarded_live_market_data_failure_burst_threshold = 2
+  _guarded_live_market_data_backfill_completion_floor = 0.9
+  _guarded_live_market_data_contiguous_completion_floor = 0.98
   _guarded_live_drawdown_breach_pct = 35.0
   _guarded_live_loss_breach_pct = 20.0
   _guarded_live_gross_open_risk_ratio = 1.1
@@ -4156,6 +4159,10 @@ class TradingApplication:
 
       critical_details: list[str] = []
       warning_details: list[str] = []
+      quality_details: list[str] = []
+      venue_details: list[str] = []
+      quality_has_critical = False
+      venue_has_critical = False
       detected_candidates: list[datetime] = []
       for instrument in relevant_instruments:
         symbol = self._symbol_from_instrument_id(instrument.instrument_id)
@@ -4186,35 +4193,107 @@ class TradingApplication:
             f"{symbol} has {missing_candles} missing candle(s) across "
             f"{len(instrument.backfill_gap_windows)} gap window(s)."
           )
+        if (
+          instrument.backfill_target_candles is not None
+          and instrument.backfill_completion_ratio is not None
+          and instrument.backfill_complete is False
+        ):
+          quality_details.append(
+            f"{symbol} backfill target covers {instrument.backfill_completion_ratio * 100:.2f}% "
+            f"of {instrument.backfill_target_candles} candles."
+          )
+          if instrument.backfill_completion_ratio < self._guarded_live_market_data_backfill_completion_floor:
+            quality_has_critical = True
+        if (
+          instrument.backfill_contiguous_completion_ratio is not None
+          and instrument.backfill_contiguous_complete is False
+        ):
+          quality_details.append(
+            f"{symbol} contiguous backfill quality is "
+            f"{instrument.backfill_contiguous_completion_ratio * 100:.2f}%."
+          )
+          if (
+            instrument.backfill_contiguous_completion_ratio
+            < self._guarded_live_market_data_contiguous_completion_floor
+          ):
+            quality_has_critical = True
         if instrument.failure_count_24h > 0:
-          warning_details.append(
+          venue_details.append(
             f"{symbol} recorded {instrument.failure_count_24h} sync failure(s) in the last 24h."
           )
+          if instrument.failure_count_24h >= self._guarded_live_market_data_failure_burst_threshold:
+            venue_has_critical = True
         elif instrument.recent_failures:
           latest_failure = instrument.recent_failures[0]
-          warning_details.append(
+          venue_details.append(
             f"{symbol} last failure was {latest_failure.operation}: {latest_failure.error}."
           )
+        venue_semantics = self._extract_market_data_venue_semantics(
+          venue=status.venue,
+          issues=instrument.issues,
+        )
+        if venue_semantics:
+          venue_details.append(
+            f"{symbol} venue semantics: {', '.join(venue_semantics)}."
+          )
+          if any(
+            semantic in {"authentication fault", "symbol unavailable"}
+            for semantic in venue_semantics
+          ):
+            venue_has_critical = True
 
       detail_copy = list(dict.fromkeys((*critical_details, *warning_details)))
-      if not detail_copy:
-        continue
       detected_at = max(detected_candidates) if detected_candidates else current_time
-      alerts.append(
-        OperatorAlert(
-          alert_id=f"guarded-live:market-data:{timeframe}",
-          severity="critical" if critical_details else "warning",
-          category="market_data_freshness",
-          summary=f"Guarded-live market-data freshness policy is degraded for {timeframe}.",
-          detail=(
-            " ".join(detail_copy[:3])
-            + (f" Additional issues: {len(detail_copy) - 3}." if len(detail_copy) > 3 else "")
-          ),
-          detected_at=detected_at,
-          source="guarded_live",
-          delivery_targets=delivery_targets,
+      if detail_copy:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data:{timeframe}",
+            severity="critical" if critical_details else "warning",
+            category="market_data_freshness",
+            summary=f"Guarded-live market-data freshness policy is degraded for {timeframe}.",
+            detail=(
+              " ".join(detail_copy[:3])
+              + (f" Additional issues: {len(detail_copy) - 3}." if len(detail_copy) > 3 else "")
+            ),
+            detected_at=detected_at,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
         )
-      )
+      quality_detail_copy = list(dict.fromkeys(quality_details))
+      if quality_detail_copy:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data-quality:{status.venue}:{timeframe}",
+            severity="critical" if quality_has_critical else "warning",
+            category="market_data_quality",
+            summary=f"Guarded-live market-data quality policy is degraded for {status.venue} {timeframe}.",
+            detail=(
+              " ".join(quality_detail_copy[:3])
+              + (f" Additional issues: {len(quality_detail_copy) - 3}." if len(quality_detail_copy) > 3 else "")
+            ),
+            detected_at=detected_at,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
+      venue_detail_copy = list(dict.fromkeys(venue_details))
+      if venue_detail_copy:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data-venue:{status.venue}:{timeframe}",
+            severity="critical" if venue_has_critical else "warning",
+            category="market_data_venue",
+            summary=f"Guarded-live market-data venue semantics require review for {status.venue} {timeframe}.",
+            detail=(
+              " ".join(venue_detail_copy[:3])
+              + (f" Additional issues: {len(venue_detail_copy) - 3}." if len(venue_detail_copy) > 3 else "")
+            ),
+            detected_at=detected_at,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
     return alerts
 
   def _resolve_guarded_live_market_data_timeframes(
@@ -5195,6 +5274,31 @@ class TradingApplication:
   @staticmethod
   def _symbol_from_instrument_id(instrument_id: str) -> str:
     return instrument_id.split(":", 1)[1] if ":" in instrument_id else instrument_id
+
+  @staticmethod
+  def _extract_market_data_venue_semantics(
+    *,
+    venue: str,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    prefix = f"{venue}_"
+    semantics: list[str] = []
+    for issue in issues:
+      if not issue.startswith(prefix):
+        continue
+      semantic = issue.removeprefix(prefix)
+      semantics.append(
+        {
+          "timeout": "timeout",
+          "rate_limited": "rate limit",
+          "network_fault": "network fault",
+          "auth_fault": "authentication fault",
+          "symbol_unavailable": "symbol unavailable",
+          "maintenance": "maintenance",
+          "upstream_fault": "upstream fault",
+        }.get(semantic, semantic.replace("_", " "))
+      )
+    return tuple(dict.fromkeys(semantics))
 
   @staticmethod
   def _merge_operator_alert_history(
