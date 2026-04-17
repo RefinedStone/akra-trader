@@ -131,6 +131,8 @@ class OperatorAlertDeliveryPort(Protocol):
     self,
     *,
     incident: OperatorIncidentEvent,
+    targets: tuple[str, ...] | None = None,
+    attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]: ...
 
 

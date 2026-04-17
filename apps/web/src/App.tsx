@@ -336,6 +336,8 @@ type OperatorVisibility = {
     status: string;
     attempted_at: string;
     detail: string;
+    attempt_number: number;
+    next_retry_at?: string | null;
     source: string;
   }[];
   audit_events: {
@@ -406,6 +408,8 @@ type GuardedLiveStatus = {
     status: string;
     attempted_at: string;
     detail: string;
+    attempt_number: number;
+    next_retry_at?: string | null;
     source: string;
   }[];
   kill_switch: {
@@ -1965,6 +1969,8 @@ export default function App() {
                         <th>When</th>
                         <th>Target</th>
                         <th>Status</th>
+                        <th>Attempt</th>
+                        <th>Next retry</th>
                         <th>Detail</th>
                       </tr>
                     </thead>
@@ -1974,6 +1980,8 @@ export default function App() {
                           <td>{formatTimestamp(record.attempted_at)}</td>
                           <td>{record.target}</td>
                           <td>{record.status}</td>
+                          <td>{record.attempt_number}</td>
+                          <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
                           <td>
                             <strong>{record.incident_kind}</strong>
                             <p className="run-lineage-symbol-copy">{record.detail}</p>
@@ -2950,6 +2958,8 @@ export default function App() {
                           <th>When</th>
                           <th>Target</th>
                           <th>Status</th>
+                          <th>Attempt</th>
+                          <th>Next retry</th>
                           <th>Detail</th>
                         </tr>
                       </thead>
@@ -2959,6 +2969,8 @@ export default function App() {
                             <td>{formatTimestamp(record.attempted_at)}</td>
                             <td>{record.target}</td>
                             <td>{record.status}</td>
+                            <td>{record.attempt_number}</td>
+                            <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
                             <td>
                               <strong>{record.incident_kind}</strong>
                               <p className="run-lineage-symbol-copy">{record.detail}</p>

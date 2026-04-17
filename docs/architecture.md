@@ -137,8 +137,9 @@ The application also derives operator visibility from runtime state across sandb
 flows. Failed worker sessions and stale heartbeats surface as control-room alerts, guarded-live
 control/session faults now persist as live-path alert history with active/resolved lifecycle state
 and delivery targets, alert transitions now emit durable incident-opened/resolved events plus
-outbound delivery attempt history, and worker lifecycle notes plus guarded-live control events are
-normalized into recent audit events for operator review.
+outbound delivery attempt history, failed deliveries now carry retry scheduling state through
+attempt numbers plus bounded exponential backoff timestamps, and worker lifecycle notes plus
+guarded-live control events are normalized into recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
@@ -168,6 +169,8 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   live venue instead of inheriting the market-data provider, which lets supported venue-state and
   order-session adapters run against Binance, Coinbase, or Kraken while candle reads stay on a
   separate market-data source.
+  Incident delivery is handled behind a dedicated delivery port that can currently fan out to
+  console logging, generic webhooks, Slack incoming webhooks, and PagerDuty Events API targets.
 
 ## Modes
 

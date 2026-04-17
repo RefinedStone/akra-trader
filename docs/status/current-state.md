@@ -98,13 +98,16 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   order-book resync state, snapshot rebuild visibility, recovered bid/ask ladders, deeper channel
   restore visibility, persisted market-channel continuation visibility, top-of-book visibility,
   guarded-live resume controls, and guarded-live audit history
+- outbound incident delivery can now fan out to console, generic webhook, Slack webhook, and
+  PagerDuty targets with persisted delivery-attempt history, attempt counts, and retry timing
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
 
 - sandbox runs are now supervised worker sessions that keep processing newly arrived candles with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
 - operator visibility now persists guarded-live live-path alert history, durable incident events,
-  and outbound delivery attempts, but it is not yet a full external incident-management system
+  and outbound delivery attempts with bounded retry/backoff state, but it is not yet a full
+  external incident-management system
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
   recovery/live resume currently restores tracked venue order lifecycle state before falling back to
   persisted control-plane state, but it still does not revive broader venue-native stream or market
@@ -122,7 +125,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ## Not Implemented Yet
 
-- durable operator event storage and external alert delivery
+- full external incident-management workflow such as acknowledgment, escalation, richer destinations,
+  and more advanced retry policies
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
 - broader venue-native session continuation beyond Binance multi-stream
@@ -135,6 +139,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
+3. Expand operator delivery from the current console/webhook/Slack/PagerDuty fan-out into richer incident-management workflows and wider audit coverage.
 4. Expand guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

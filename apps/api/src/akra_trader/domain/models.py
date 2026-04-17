@@ -513,6 +513,8 @@ class OperatorIncidentDelivery:
   status: str
   attempted_at: datetime
   detail: str
+  attempt_number: int = 1
+  next_retry_at: datetime | None = None
   source: str = "guarded_live"
 
 

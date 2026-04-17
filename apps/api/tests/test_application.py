@@ -92,9 +92,19 @@ class StaticVenueStateAdapter:
 
 
 class FakeOperatorAlertDeliveryAdapter:
-  def __init__(self, *, targets: tuple[str, ...] = ("operator_console",)) -> None:
+  def __init__(
+    self,
+    *,
+    targets: tuple[str, ...] = ("operator_console",),
+    failures_before_success: dict[str, int] | None = None,
+    clock=None,
+  ) -> None:
     self._targets = targets
     self.delivered_incidents: list[OperatorIncidentEvent] = []
+    self.delivery_attempts: list[tuple[str, str, int]] = []
+    self._failures_before_success = dict(failures_before_success or {})
+    self._attempts_by_target: dict[str, int] = {}
+    self._clock = clock
 
   def list_targets(self) -> tuple[str, ...]:
     return self._targets
@@ -103,22 +113,36 @@ class FakeOperatorAlertDeliveryAdapter:
     self,
     *,
     incident: OperatorIncidentEvent,
+    targets: tuple[str, ...] | None = None,
+    attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]:
     self.delivered_incidents.append(incident)
-    return tuple(
-      OperatorIncidentDelivery(
-        delivery_id=f"{incident.event_id}:{target}",
-        incident_event_id=incident.event_id,
-        alert_id=incident.alert_id,
-        incident_kind=incident.kind,
-        target=target,
-        status="delivered",
-        attempted_at=incident.timestamp,
-        detail=f"fake_delivery:{target}",
-        source=incident.source,
+    resolved_targets = targets or self._targets
+    records: list[OperatorIncidentDelivery] = []
+    for target in resolved_targets:
+      self.delivery_attempts.append((incident.event_id, target, attempt_number))
+      delivered_attempts = self._attempts_by_target.get(target, 0) + 1
+      self._attempts_by_target[target] = delivered_attempts
+      should_fail = delivered_attempts <= self._failures_before_success.get(target, 0)
+      records.append(
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="failed" if should_fail else "delivered",
+          attempted_at=self._clock() if callable(self._clock) else incident.timestamp,
+          detail=(
+            f"fake_failure:{target}:attempt-{attempt_number}"
+            if should_fail
+            else f"fake_delivery:{target}:attempt-{attempt_number}"
+          ),
+          attempt_number=attempt_number,
+          source=incident.source,
+        )
       )
-      for target in self._targets
-    )
+    return tuple(records)
 
 
 def build_guarded_live_repository(tmp_path: Path):
@@ -923,6 +947,88 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
     for record in guarded_live_status.delivery_history
   )
   assert any(incident.alert_id == failure_alert.alert_id for incident in delivery.delivered_incidents)
+
+
+def test_guarded_live_delivery_retries_failed_outbound_target_with_backoff(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 0, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("operator_webhook", "slack_webhook"),
+    failures_before_success={"slack_webhook": 1},
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_delivery_initial_backoff_seconds=30,
+    operator_alert_delivery_max_backoff_seconds=300,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),
+        ),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  first_visibility = app.get_operator_visibility()
+  assert not first_visibility.delivery_history
+
+  app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="retryable_delivery_open",
+  )
+  visibility = app.get_operator_visibility()
+  incident = next(
+    event for event in visibility.incident_events
+    if event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.delivery_state == "retrying"
+  first_slack_attempt = next(
+    record for record in visibility.delivery_history
+    if record.target == "slack_webhook" and record.incident_event_id == incident.event_id
+  )
+  assert first_slack_attempt.status == "retry_scheduled"
+  assert first_slack_attempt.attempt_number == 1
+  assert first_slack_attempt.next_retry_at == clock.current + timedelta(seconds=30)
+
+  clock.advance(timedelta(seconds=29))
+  not_yet_retried = app.get_operator_visibility()
+  slack_attempts = [
+    record
+    for record in not_yet_retried.delivery_history
+    if record.target == "slack_webhook" and record.incident_event_id == incident.event_id
+  ]
+  assert len(slack_attempts) == 1
+
+  clock.advance(timedelta(seconds=1))
+  retried = app.get_operator_visibility()
+  slack_attempts = [
+    record
+    for record in retried.delivery_history
+    if record.target == "slack_webhook" and record.incident_event_id == incident.event_id
+  ]
+  assert len(slack_attempts) == 2
+  assert slack_attempts[0].attempt_number == 2
+  assert slack_attempts[0].status == "delivered"
+  retried_incident = next(
+    event for event in retried.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert retried_incident.delivery_state == "delivered"
 
 
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(

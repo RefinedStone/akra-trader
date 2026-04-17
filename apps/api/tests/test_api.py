@@ -342,6 +342,8 @@ def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_pa
     assert active_payload["incident_events"][0]["alert_id"] == "guarded-live:reconciliation"
     assert active_payload["delivery_history"][0]["target"] == "operator_console"
     assert active_payload["delivery_history"][0]["status"] == "delivered"
+    assert active_payload["delivery_history"][0]["attempt_number"] == 1
+    assert active_payload["delivery_history"][0]["next_retry_at"] is None
     assert any(event["kind"] == "guarded_live_reconciliation_ran" for event in active_payload["audit_events"])
 
     app._venue_state = StaticVenueStateAdapter(

@@ -51,6 +51,8 @@ Implemented now:
   available, Coinbase Advanced Trade can now supply authenticated user/account order transport plus
   public heartbeat/ticker/trade/level2/candle continuation, and Kraken spot can supply public
   heartbeat/ticker/trade/book/ohlc continuation through the same handoff surface
+- guarded-live incident delivery now supports console, generic webhook, Slack webhook, and
+  PagerDuty Events API targets with persisted attempt history plus retry/backoff scheduling
 - guarded-live launch wiring and venue-state reconciliation can now target a configured supported
   venue independently from the market-data provider, while seeded fixture flows still default to a
   Binance-shaped live venue in tests
@@ -59,7 +61,7 @@ Implemented now:
 Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
-- external alert delivery and wider operator event storage
+- full external incident-management workflow such as acknowledgment, escalation, and richer retry policies
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
 
@@ -88,6 +90,12 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_TARGETS`
 - `AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS`
+- `AKRA_TRADER_OPERATOR_ALERT_SLACK_WEBHOOK_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_INTEGRATION_KEY`
+- `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_ATTEMPTS`
+- `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_INITIAL_BACKOFF_SECONDS`
+- `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_BACKOFF_SECONDS`
+- `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER`
 - `AKRA_TRADER_GUARDED_LIVE_API_KEY`
 - `AKRA_TRADER_GUARDED_LIVE_API_SECRET`
 - `AKRA_TRADER_BINANCE_API_KEY`
@@ -162,8 +170,12 @@ Defaults:
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
 - guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
-  delivery attempts through configured operator delivery targets such as console logging or webhook
-  delivery, while persisting the attempt history for operator review
+  delivery attempts through configured operator delivery targets such as console logging, generic
+  webhook delivery, Slack webhook delivery, or PagerDuty Events API delivery, while persisting the
+  attempt history for operator review
+- failed outbound incident deliveries now persist `attempt_number` and `next_retry_at`, and the
+  application applies bounded exponential backoff before retrying due targets on subsequent
+  guarded-live state refreshes
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

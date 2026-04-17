@@ -117,6 +117,8 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
   return OperatorAlertDeliveryAdapter(
     targets=settings.operator_alert_delivery_targets,
     webhook_url=settings.operator_alert_webhook_url,
+    slack_webhook_url=settings.operator_alert_slack_webhook_url,
+    pagerduty_integration_key=settings.operator_alert_pagerduty_integration_key,
     webhook_timeout_seconds=settings.operator_alert_webhook_timeout_seconds,
   )
 
@@ -180,6 +182,10 @@ def build_container(settings: Settings) -> Container:
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,
     guarded_live_worker_heartbeat_interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
     guarded_live_worker_heartbeat_timeout_seconds=settings.guarded_live_worker_heartbeat_timeout_seconds,
+    operator_alert_delivery_max_attempts=settings.operator_alert_delivery_max_attempts,
+    operator_alert_delivery_initial_backoff_seconds=settings.operator_alert_delivery_initial_backoff_seconds,
+    operator_alert_delivery_max_backoff_seconds=settings.operator_alert_delivery_max_backoff_seconds,
+    operator_alert_delivery_backoff_multiplier=settings.operator_alert_delivery_backoff_multiplier,
   )
   return Container(
     app=application,

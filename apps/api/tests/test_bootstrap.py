@@ -151,10 +151,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       *,
       targets: tuple[str, ...],
       webhook_url: str | None,
+      slack_webhook_url: str | None,
+      pagerduty_integration_key: str | None,
       webhook_timeout_seconds: int,
     ) -> None:
       captured["targets"] = ",".join(targets)
       captured["webhook_url"] = webhook_url or ""
+      captured["slack_webhook_url"] = slack_webhook_url or ""
+      captured["pagerduty_integration_key"] = pagerduty_integration_key or ""
       captured["webhook_timeout_seconds"] = str(webhook_timeout_seconds)
 
     def list_targets(self) -> tuple[str, ...]:
@@ -170,14 +174,18 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   build_container(
     Settings(
       market_data_provider="seeded",
-      operator_alert_delivery_targets=("console", "webhook"),
+      operator_alert_delivery_targets=("console", "slack", "pagerduty", "webhook"),
       operator_alert_webhook_url="https://ops.example.com/alert",
+      operator_alert_slack_webhook_url="https://hooks.slack.example/services/ops",
+      operator_alert_pagerduty_integration_key="pagerduty-key",
       operator_alert_webhook_timeout_seconds=7,
     )
   )
 
-  assert captured["targets"] == "console,webhook"
+  assert captured["targets"] == "console,slack,pagerduty,webhook"
   assert captured["webhook_url"] == "https://ops.example.com/alert"
+  assert captured["slack_webhook_url"] == "https://hooks.slack.example/services/ops"
+  assert captured["pagerduty_integration_key"] == "pagerduty-key"
   assert captured["webhook_timeout_seconds"] == "7"
 
 

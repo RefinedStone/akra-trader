@@ -5,6 +5,7 @@ from dataclasses import asdict
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from numbers import Number
 from typing import Callable
 from uuid import uuid4
@@ -355,6 +356,8 @@ class TradingApplication:
       self,
       *,
       incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return ()
 
@@ -380,6 +383,10 @@ class TradingApplication:
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
     guarded_live_worker_heartbeat_interval_seconds: int = 15,
     guarded_live_worker_heartbeat_timeout_seconds: int = 45,
+    operator_alert_delivery_max_attempts: int = 4,
+    operator_alert_delivery_initial_backoff_seconds: int = 15,
+    operator_alert_delivery_max_backoff_seconds: int = 300,
+    operator_alert_delivery_backoff_multiplier: float = 2.0,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._clock = clock or (lambda: datetime.now(UTC))
@@ -407,6 +414,19 @@ class TradingApplication:
     )
     self._guarded_live_worker_heartbeat_timeout_seconds = (
       guarded_live_worker_heartbeat_timeout_seconds
+    )
+    self._operator_alert_delivery_max_attempts = max(operator_alert_delivery_max_attempts, 1)
+    self._operator_alert_delivery_initial_backoff_seconds = max(
+      operator_alert_delivery_initial_backoff_seconds,
+      1,
+    )
+    self._operator_alert_delivery_max_backoff_seconds = max(
+      operator_alert_delivery_max_backoff_seconds,
+      self._operator_alert_delivery_initial_backoff_seconds,
+    )
+    self._operator_alert_delivery_backoff_multiplier = max(
+      operator_alert_delivery_backoff_multiplier,
+      1.0,
     )
 
   def list_strategies(
@@ -653,20 +673,35 @@ class TradingApplication:
       merged_history=merged_history,
       current_time=current_time,
     )
-    delivered_incident_events, delivery_records = self._deliver_guarded_live_incident_events(
+    persisted_incident_events = tuple((*incident_events, *state.incident_events))
+    delivery_records = state.delivery_history
+    new_incident_events, new_delivery_records = self._deliver_guarded_live_incident_events(
       incident_events=incident_events,
+      current_time=current_time,
+    )
+    delivery_records = tuple((*new_delivery_records, *delivery_records))
+    retry_delivery_records = self._retry_guarded_live_incident_deliveries(
+      incident_events=tuple((*new_incident_events, *persisted_incident_events[len(incident_events):])),
+      delivery_history=delivery_records,
+      current_time=current_time,
+    )
+    if retry_delivery_records:
+      delivery_records = tuple((*retry_delivery_records, *delivery_records))
+    refreshed_incident_events = self._apply_incident_delivery_state(
+      incident_events=tuple((*new_incident_events, *state.incident_events)),
+      delivery_history=delivery_records,
     )
     if (
       merged_history != state.alert_history
-      or delivered_incident_events
-      or delivery_records
+      or refreshed_incident_events != state.incident_events
+      or delivery_records != state.delivery_history
     ):
       state = self._persist_guarded_live_state(
         replace(
           state,
           alert_history=merged_history,
-          incident_events=tuple((*delivered_incident_events, *state.incident_events)),
-          delivery_history=tuple((*delivery_records, *state.delivery_history)),
+          incident_events=refreshed_incident_events,
+          delivery_history=delivery_records,
         )
       )
     return state, active_alerts
@@ -3730,11 +3765,19 @@ class TradingApplication:
     self,
     *,
     incident_events: tuple[OperatorIncidentEvent, ...],
+    current_time: datetime,
   ) -> tuple[tuple[OperatorIncidentEvent, ...], tuple[OperatorIncidentDelivery, ...]]:
     persisted_events: list[OperatorIncidentEvent] = []
     delivery_records: list[OperatorIncidentDelivery] = []
     for incident in incident_events:
-      records = self._operator_alert_delivery.deliver(incident=incident)
+      records = self._operator_alert_delivery.deliver(
+        incident=incident,
+        attempt_number=1,
+      )
+      records = self._apply_delivery_retry_policy(
+        records=records,
+        current_time=current_time,
+      )
       delivery_state = self._resolve_incident_delivery_state(records=records)
       persisted_events.append(
         replace(
@@ -3746,6 +3789,125 @@ class TradingApplication:
       delivery_records.extend(records)
     return tuple(persisted_events), tuple(delivery_records)
 
+  def _retry_guarded_live_incident_deliveries(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    retries: list[OperatorIncidentDelivery] = []
+    incidents_by_id = {incident.event_id: incident for incident in incident_events}
+    for incident_event_id, target, attempt_number in self._collect_due_incident_retries(
+      incident_events=incident_events,
+      delivery_history=delivery_history,
+      current_time=current_time,
+    ):
+      incident = incidents_by_id.get(incident_event_id)
+      if incident is None:
+        continue
+      records = self._operator_alert_delivery.deliver(
+        incident=incident,
+        targets=(target,),
+        attempt_number=attempt_number,
+      )
+      retries.extend(
+        self._apply_delivery_retry_policy(
+          records=records,
+          current_time=current_time,
+        )
+      )
+    return tuple(retries)
+
+  def _collect_due_incident_retries(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[tuple[str, str, int], ...]:
+    due_retries: list[tuple[str, str, int]] = []
+    latest_by_key: dict[tuple[str, str], OperatorIncidentDelivery] = {}
+    for record in delivery_history:
+      key = (record.incident_event_id, record.target)
+      existing = latest_by_key.get(key)
+      if existing is None or record.attempt_number > existing.attempt_number:
+        latest_by_key[key] = record
+
+    for incident in incident_events:
+      for target in incident.delivery_targets:
+        latest = latest_by_key.get((incident.event_id, target))
+        if latest is None:
+          continue
+        if latest.status != "retry_scheduled" or latest.next_retry_at is None:
+          continue
+        if latest.next_retry_at > current_time:
+          continue
+        if latest.attempt_number >= self._operator_alert_delivery_max_attempts:
+          continue
+        due_retries.append((incident.event_id, target, latest.attempt_number + 1))
+    due_retries.sort()
+    return tuple(due_retries)
+
+  def _apply_incident_delivery_state(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+  ) -> tuple[OperatorIncidentEvent, ...]:
+    latest_by_key: dict[tuple[str, str], OperatorIncidentDelivery] = {}
+    for record in delivery_history:
+      key = (record.incident_event_id, record.target)
+      existing = latest_by_key.get(key)
+      if existing is None or record.attempt_number > existing.attempt_number:
+        latest_by_key[key] = record
+
+    refreshed: list[OperatorIncidentEvent] = []
+    for incident in incident_events:
+      records = tuple(
+        latest_by_key[(incident.event_id, target)]
+        for target in incident.delivery_targets
+        if (incident.event_id, target) in latest_by_key
+      )
+      refreshed.append(
+        replace(
+          incident,
+          delivery_state=self._resolve_incident_delivery_state(records=records),
+        )
+      )
+    refreshed.sort(key=lambda event: event.timestamp, reverse=True)
+    return tuple(refreshed)
+
+  def _apply_delivery_retry_policy(
+    self,
+    *,
+    records: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    updated: list[OperatorIncidentDelivery] = []
+    for record in records:
+      if record.status != "failed":
+        updated.append(record)
+        continue
+      if record.attempt_number >= self._operator_alert_delivery_max_attempts:
+        updated.append(record)
+        continue
+      updated.append(
+        replace(
+          record,
+          status="retry_scheduled",
+          next_retry_at=current_time + timedelta(
+            seconds=self._resolve_delivery_backoff_seconds(record.attempt_number)
+          ),
+        )
+      )
+    return tuple(updated)
+
+  def _resolve_delivery_backoff_seconds(self, attempt_number: int) -> int:
+    multiplier = self._operator_alert_delivery_backoff_multiplier ** max(attempt_number - 1, 0)
+    backoff = int(self._operator_alert_delivery_initial_backoff_seconds * multiplier)
+    return min(backoff, self._operator_alert_delivery_max_backoff_seconds)
+
   @staticmethod
   def _resolve_incident_delivery_state(
     *,
@@ -3756,6 +3918,8 @@ class TradingApplication:
     statuses = {record.status for record in records}
     if statuses == {"delivered"}:
       return "delivered"
+    if "retry_scheduled" in statuses:
+      return "retrying"
     if "delivered" in statuses:
       return "partial"
     return "failed"

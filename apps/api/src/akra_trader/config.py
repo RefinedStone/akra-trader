@@ -34,7 +34,13 @@ class Settings:
   guarded_live_worker_heartbeat_timeout_seconds: int = 45
   operator_alert_delivery_targets: tuple[str, ...] = ("console",)
   operator_alert_webhook_url: str | None = None
+  operator_alert_slack_webhook_url: str | None = None
+  operator_alert_pagerduty_integration_key: str | None = None
   operator_alert_webhook_timeout_seconds: int = 5
+  operator_alert_delivery_max_attempts: int = 4
+  operator_alert_delivery_initial_backoff_seconds: int = 15
+  operator_alert_delivery_max_backoff_seconds: int = 300
+  operator_alert_delivery_backoff_multiplier: float = 2.0
   guarded_live_api_key: str | None = None
   guarded_live_api_secret: str | None = None
   binance_api_key: str | None = None
@@ -83,8 +89,24 @@ def load_settings() -> Settings:
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_TARGETS", "console")
     ),
     operator_alert_webhook_url=os.getenv("AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_URL") or None,
+    operator_alert_slack_webhook_url=os.getenv("AKRA_TRADER_OPERATOR_ALERT_SLACK_WEBHOOK_URL") or None,
+    operator_alert_pagerduty_integration_key=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_INTEGRATION_KEY") or None
+    ),
     operator_alert_webhook_timeout_seconds=int(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS", "5")
+    ),
+    operator_alert_delivery_max_attempts=int(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_ATTEMPTS", "4")
+    ),
+    operator_alert_delivery_initial_backoff_seconds=int(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_INITIAL_BACKOFF_SECONDS", "15")
+    ),
+    operator_alert_delivery_max_backoff_seconds=int(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_BACKOFF_SECONDS", "300")
+    ),
+    operator_alert_delivery_backoff_multiplier=float(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER", "2.0")
     ),
     guarded_live_api_key=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_KEY") or None,
     guarded_live_api_secret=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_SECRET") or None,
