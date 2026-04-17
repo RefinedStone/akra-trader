@@ -455,18 +455,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Promote venue-specific book and kline consistency faults into durable incidents",
       "description": "Build on the new channel-level market-data incident coverage by separating venue-specific deeper book-stream and kline integrity rules into their own durable incident semantics, so order-book divergence, kline corruption, or similar per-venue data-quality faults are tracked explicitly instead of remaining implicit under generic channel consistency alerts.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly says channel semantics now cover handoff, gap, and restore failure, but venue-specific deeper book and kline consistency rules are still not split into separate incidents, making this the clearest immediate executable follow-up after commit b772166.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 8b9b8d3, which added guarded-live session_handoff checks that promote top-of-book, book_ticker_snapshot, and kline_snapshot consistency faults into durable market_data_book_consistency and market_data_kline_consistency incidents, covering crossed local book, crossed book-ticker, local-vs-book-ticker conflicts, timeframe mismatch, close-before-open, and OHLC range violations with API tests, docs, pytest, typecheck, and build verification.",
       "depends_on": [
         "planning-operator-trust-channel-level-market-data-quality-incidents"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T14:05:00Z",
+      "updated_at": "2026-04-17T18:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with venue reality by extending durable market-data incidents from generic channel handoff faults into explicit venue-specific book and kline integrity failures that operators need to distinguish and respond to."
+      "direction_relation_note": "Closed the first venue-specific book and kline integrity gap for operator trust by promoting top-of-book and basic OHLC-shape faults into durable incidents, which now leaves deeper depth-ladder or candle-sequence semantics and remediation ownership as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-deeper-book-ladder-and-candle-sequence-incidents",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Split deeper depth-ladder and candle-sequence semantics into durable incidents",
+      "description": "Extend the new venue-specific market_data_book_consistency and market_data_kline_consistency coverage beyond crossed quotes and invalid OHLC shape by incidentizing deeper depth-ladder divergence and candle-sequence semantics, so per-venue book corruption or malformed candle progression is tracked explicitly instead of remaining implicit under the first-pass consistency checks.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly says the new venue-specific book and kline incidentization still stops at crossed quotes and invalid OHLC shape, while deeper depth-ladder and candle-sequence semantics are not yet separated into incidents, making this the clearest immediate executable follow-up after commit 8b9b8d3.",
+      "depends_on": [
+        "planning-operator-trust-venue-specific-book-kline-quality-incidents"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T18:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with venue-specific data quality by extending the new book and kline incident categories from first-pass consistency faults into deeper ladder and candle-progression semantics that operators still need to distinguish."
     },
     {
       "id": "planning-operator-trust-market-data-incident-remediation-workflows",
@@ -475,14 +493,14 @@
       "description": "Build on the richer market-data incident categories by wiring those incidents into explicit automatic remediation hooks, operator runbook actions, or provider-owned workflow semantics, so freshness, quality, and venue incidents can trigger durable recovery ownership instead of remaining classification-only records.",
       "status": "proposed",
       "base_priority": 81,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but venue-specific book and kline incidentization is the more direct next step before response ownership wiring.",
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the remaining deeper depth-ladder and candle-sequence incident split is the more direct next step before response ownership wiring.",
       "depends_on": [
-        "planning-operator-trust-channel-level-market-data-quality-incidents"
+        "planning-operator-trust-venue-specific-book-kline-quality-incidents"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T14:05:00Z",
+      "updated_at": "2026-04-17T18:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust from better classification into actionable incident response ownership by tying durable market-data incidents to remediation paths rather than leaving them as passive alerts."
     },
