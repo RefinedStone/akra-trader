@@ -197,6 +197,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       splunk_oncall_api_url: str,
       splunk_oncall_recovery_engine_url_template: str | None,
       splunk_oncall_recovery_engine_token: str | None,
+      jira_service_management_api_token: str | None,
+      jira_service_management_api_url: str,
+      jira_service_management_recovery_engine_url_template: str | None,
+      jira_service_management_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -259,6 +263,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         splunk_oncall_recovery_engine_url_template or ""
       )
       captured["splunk_oncall_recovery_engine_token"] = splunk_oncall_recovery_engine_token or ""
+      captured["jira_service_management_api_token"] = jira_service_management_api_token or ""
+      captured["jira_service_management_api_url"] = jira_service_management_api_url
+      captured["jira_service_management_recovery_engine_url_template"] = (
+        jira_service_management_recovery_engine_url_template or ""
+      )
+      captured["jira_service_management_recovery_engine_token"] = (
+        jira_service_management_recovery_engine_token or ""
+      )
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -377,6 +389,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://splunk-oncall.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_splunk_oncall_recovery_engine_token="splunk-oncall-recovery-token",
+      operator_alert_jira_service_management_api_token="jsm-token",
+      operator_alert_jira_service_management_api_url="https://api.jsm.example",
+      operator_alert_jira_service_management_recovery_engine_url_template=(
+        "https://jsm.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_jira_service_management_recovery_engine_token="jsm-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -450,6 +468,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["splunk_oncall_api_url"] == "https://api.splunkoncall.example"
   assert captured["splunk_oncall_recovery_engine_url_template"] == "https://splunk-oncall.example/recovery/{workflow_reference_urlencoded}"
   assert captured["splunk_oncall_recovery_engine_token"] == "splunk-oncall-recovery-token"
+  assert captured["jira_service_management_api_token"] == "jsm-token"
+  assert captured["jira_service_management_api_url"] == "https://api.jsm.example"
+  assert captured["jira_service_management_recovery_engine_url_template"] == "https://jsm.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["jira_service_management_recovery_engine_token"] == "jsm-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"

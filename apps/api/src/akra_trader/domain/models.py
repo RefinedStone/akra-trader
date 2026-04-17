@@ -876,6 +876,31 @@ class OperatorIncidentSplunkOnCallRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentJiraServiceManagementRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  priority: str | None = None
+  assignee: str | None = None
+  service_project: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentJiraServiceManagementRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentJiraServiceManagementRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentJiraServiceManagementRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  assignment_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  project_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -935,6 +960,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   splunk_oncall: OperatorIncidentSplunkOnCallRecoveryState = field(
     default_factory=OperatorIncidentSplunkOnCallRecoveryState
+  )
+  jira_service_management: OperatorIncidentJiraServiceManagementRecoveryState = field(
+    default_factory=OperatorIncidentJiraServiceManagementRecoveryState
   )
   updated_at: datetime | None = None
 

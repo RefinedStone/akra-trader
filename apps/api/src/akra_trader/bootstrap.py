@@ -191,6 +191,14 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_splunk_oncall_recovery_engine_url_template
     ),
     splunk_oncall_recovery_engine_token=settings.operator_alert_splunk_oncall_recovery_engine_token,
+    jira_service_management_api_token=settings.operator_alert_jira_service_management_api_token,
+    jira_service_management_api_url=settings.operator_alert_jira_service_management_api_url,
+    jira_service_management_recovery_engine_url_template=(
+      settings.operator_alert_jira_service_management_recovery_engine_url_template
+    ),
+    jira_service_management_recovery_engine_token=(
+      settings.operator_alert_jira_service_management_recovery_engine_token
+    ),
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
     opsgenie_recovery_engine_url_template=(

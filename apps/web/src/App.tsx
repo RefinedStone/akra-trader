@@ -628,6 +628,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        jira_service_management: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assignee?: string | null;
+          service_project?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            priority_phase: string;
+            project_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1023,6 +1041,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             routing_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        jira_service_management: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assignee?: string | null;
+          service_project?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            assignment_phase: string;
+            priority_phase: string;
+            project_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8664,6 +8700,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  jira_service_management: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    priority?: string | null;
+    assignee?: string | null;
+    service_project?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      assignment_phase: string;
+      priority_phase: string;
+      project_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9042,6 +9096,43 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Splunk On-Call schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "jira_service_management") {
+    const details = [
+      providerRecovery.jira_service_management.incident_id
+        ? `incident ${providerRecovery.jira_service_management.incident_id}`
+        : null,
+      providerRecovery.jira_service_management.incident_status !== "unknown"
+        ? `status ${providerRecovery.jira_service_management.incident_status}`
+        : null,
+      providerRecovery.jira_service_management.priority
+        ? `priority ${providerRecovery.jira_service_management.priority}`
+        : null,
+      providerRecovery.jira_service_management.assignee
+        ? `assignee ${providerRecovery.jira_service_management.assignee}`
+        : null,
+      providerRecovery.jira_service_management.service_project
+        ? `project ${providerRecovery.jira_service_management.service_project}`
+        : null,
+      providerRecovery.jira_service_management.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.jira_service_management.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.jira_service_management.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.jira_service_management.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.jira_service_management.phase_graph.assignment_phase !== "unknown"
+        ? `assignment ${providerRecovery.jira_service_management.phase_graph.assignment_phase}`
+        : null,
+      providerRecovery.jira_service_management.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.jira_service_management.updated_at)}`
+        : null,
+      providerRecovery.jira_service_management.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(
+            providerRecovery.jira_service_management.phase_graph.last_transition_at
+          )}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Jira Service Management schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [
