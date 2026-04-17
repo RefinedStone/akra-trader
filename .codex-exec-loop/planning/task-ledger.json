@@ -688,37 +688,55 @@
       "id": "planning-operator-trust-provider-recovery-authoritative-pull-sync",
       "direction_id": "operator-trust-and-discipline",
       "title": "Make provider recovery state provider-authoritative through pull-sync reconciliation",
-      "description": "Build on the completed generic provider recovery status machine by reconciling remediation state against the provider recovery engine's own transition graph through authoritative pull-sync or refresh semantics, so local state does not rely only on pushed callbacks, mirrored transitions, or local resolve closure when the provider remains the source of truth for recovery progress and terminal outcomes.",
-      "status": "ready",
+      "description": "Build on the completed generic provider recovery status machine by reconciling remediation state against the provider recovery engine's own transition graph through authoritative pull-sync or refresh semantics, so local state does not rely only on pushed callbacks, mirrored transitions, or local resolve closure when the provider remains the source of truth for recovery progress and terminal outcomes. This was completed by adding provider-side pull-sync models and fetch paths, reconciling guarded-live refresh against provider-owned incident or alert state, preserving provider-authoritative recovery state during local refresh, and allowing local verification plus remediation closure when provider pull-sync reports recovery completion.",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says the new recovery status machine still mirrors provider state rather than pulling the provider recovery engine's authoritative transition graph, making provider-authoritative pull-sync the clearest executable next task immediately after commit bbc11f3.",
+      "priority_reason": "Completed in main session commit ab8d0d0, which made PagerDuty and Opsgenie provider recovery pull-sync authoritative during guarded-live refresh, preserved provider-owned recovery state over local delivery-history refresh, and verified the behavior with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-operator-trust-provider-recovery-status-machine-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:20:00Z",
+      "updated_at": "2026-04-17T21:30:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Directly advances operator trust by ensuring provider-owned remediation state is reconciled from the provider's authoritative recovery engine rather than remaining a best-effort local mirror of callbacks and resolve events."
+      "direction_relation_note": "Closed the provider-authoritative pull-sync gap for operator trust by making guarded-live reconciliation read provider-owned incident or alert state directly, which now leaves provider-native typed schema depth and any deeper provider-owned remediation-engine polling as the next follow-ups."
     },
     {
       "id": "planning-operator-trust-venue-specific-provider-recovery-typed-state",
       "direction_id": "operator-trust-and-discipline",
       "title": "Split provider recovery state into venue-specific typed schemas",
       "description": "Build on the completed generic typed provider recovery model by separating venue-specific recovery payloads into deeper typed schemas for exchange- or provider-owned recovery flows, so remediation logic and operator surfaces can reason about venue-native recovery semantics without collapsing distinct provider contracts into one generic job or target shape.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 80,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply still explicitly calls out PagerDuty- and Opsgenie-specific recovery phase schemas as remaining work after commit bbc11f3, but provider-authoritative pull-sync is the more direct next executable task because it closes source-of-truth synchronization on top of the newly completed generic status machine.",
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply explicitly says PagerDuty- and Opsgenie-specific recovery phase schemas are still normalized into one shared recovery machine after commit ab8d0d0, making provider-native typed schema depth the clearest executable next task now that provider-authoritative pull-sync is complete.",
       "depends_on": [
         "planning-operator-trust-typed-provider-recovery-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:20:00Z",
+      "updated_at": "2026-04-17T21:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by keeping typed remediation state honest about provider- and venue-native recovery semantics instead of flattening all external recovery engines into one generic contract."
+    },
+    {
+      "id": "planning-operator-trust-deeper-provider-remediation-engine-sync",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extend recovery reconciliation beyond incident surfaces into deeper provider remediation engines",
+      "description": "Build on the completed provider-authoritative incident or alert pull-sync by polling or reconciling any deeper provider-owned remediation engine transition graph where recovery execution state outlives or diverges from the provider incident body itself, so local guarded-live closure does not assume the incident surface is the full source of truth when the provider exposes a richer internal recovery workflow.",
+      "status": "proposed",
+      "base_priority": 79,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly says recovery orchestration still depends on the provider incident or alert surface and does not yet poll a deeper provider-owned remediation engine, but the provider-native typed schema split is the clearer immediate executable queue head because it refines the just-shipped pull-sync contract without introducing a new provider-engine scope.",
+      "depends_on": [
+        "planning-operator-trust-provider-recovery-authoritative-pull-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T21:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with provider-owned recovery truth by distinguishing incident-surface reconciliation from any richer provider remediation engine that may own deeper execution states."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
