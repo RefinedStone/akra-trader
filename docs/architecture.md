@@ -187,6 +187,9 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   workflow actions when the selected provider supports them. Incident-open auto remediation and
   explicit remediation requests can now both execute real provider market-data jobs such as recent
   sync, historical backfill, and candle repair before the guarded-live alert state is recomputed.
+  Guarded-live stream/handoff incidents now also execute local channel-restore and order-book
+  rebuild session jobs so venue-session faults can be repaired inside the same durable incident
+  loop instead of relying on provider workflow state alone.
   External incident-management systems can sync paging and remediation-lifecycle events back through
   a guarded API endpoint, and local acknowledge/remediate/
   escalate actions can push provider-native workflow updates back out when the selected provider

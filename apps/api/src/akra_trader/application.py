@@ -798,13 +798,14 @@ class TradingApplication:
       or delivery_records != state.delivery_history
       or bool(workflow_audit_events)
     ):
+      latest_state = self._guarded_live_state.load_state()
       state = self._persist_guarded_live_state(
         replace(
-          state,
+          latest_state,
           alert_history=merged_history,
           incident_events=refreshed_incident_events,
           delivery_history=delivery_records,
-          audit_events=tuple((*workflow_audit_events, *state.audit_events)),
+          audit_events=tuple((*workflow_audit_events, *latest_state.audit_events)),
         )
       )
     if auto_remediation_executed and allow_post_remediation_recompute:
@@ -1122,12 +1123,13 @@ class TradingApplication:
       session_id=incident.session_id,
       source="guarded_live",
     )
+    latest_state = self._guarded_live_state.load_state()
     self._persist_guarded_live_state(
       replace(
-        state,
+        latest_state,
         incident_events=incident_events,
         delivery_history=delivery_history,
-        audit_events=(audit_event, *state.audit_events),
+        audit_events=(audit_event, *latest_state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -6233,41 +6235,48 @@ class TradingApplication:
     current_time: datetime,
   ) -> tuple[OperatorIncidentEvent, tuple[MarketDataRemediationResult, ...]]:
     remediation = incident.remediation
-    if remediation.kind not in {
+    if remediation.kind in {
       "recent_sync",
       "historical_backfill",
       "candle_repair",
       "venue_fault_review",
       "market_data_review",
     }:
-      return incident, ()
-    timeframe, symbols = self._resolve_market_data_remediation_targets(incident=incident)
-    if timeframe is None or not symbols:
-      return incident, ()
+      timeframe, symbols = self._resolve_market_data_remediation_targets(incident=incident)
+      if timeframe is None or not symbols:
+        return incident, ()
 
-    results_list: list[MarketDataRemediationResult] = []
-    for symbol in symbols:
-      try:
-        results_list.append(
-          self._market_data.remediate(
-            kind=remediation.kind,
-            symbol=symbol,
-            timeframe=timeframe,
+      results_list: list[MarketDataRemediationResult] = []
+      for symbol in symbols:
+        try:
+          results_list.append(
+            self._market_data.remediate(
+              kind=remediation.kind,
+              symbol=symbol,
+              timeframe=timeframe,
+            )
           )
-        )
-      except Exception as exc:
-        results_list.append(
-          MarketDataRemediationResult(
-            kind=remediation.kind,
-            symbol=symbol,
-            timeframe=timeframe,
-            status="failed",
-            started_at=current_time,
-            finished_at=current_time,
-            detail=f"market_data_remediation_failed:{exc}",
+        except Exception as exc:
+          results_list.append(
+            MarketDataRemediationResult(
+              kind=remediation.kind,
+              symbol=symbol,
+              timeframe=timeframe,
+              status="failed",
+              started_at=current_time,
+              finished_at=current_time,
+              detail=f"market_data_remediation_failed:{exc}",
+            )
           )
-        )
-    results = tuple(results_list)
+      results = tuple(results_list)
+    elif remediation.kind in {"channel_restore", "order_book_rebuild"}:
+      results = self._execute_local_guarded_live_session_remediation(
+        incident=incident,
+        actor=actor,
+        current_time=current_time,
+      )
+    else:
+      return incident, ()
     if not results:
       return incident, ()
 
@@ -6281,6 +6290,199 @@ class TradingApplication:
       detail=self._summarize_local_remediation_results(results),
     )
     return replace(incident, remediation=updated_remediation), results
+
+  def _execute_local_guarded_live_session_remediation(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    actor: str,
+    current_time: datetime,
+  ) -> tuple[MarketDataRemediationResult, ...]:
+    state = self._guarded_live_state.load_state()
+    run = self._resolve_guarded_live_remediation_run(incident=incident, state=state)
+    symbol, timeframe = self._resolve_guarded_live_remediation_identity(
+      run=run,
+      state=state,
+    )
+    remediation_kind = incident.remediation.kind
+    if run is None:
+      return (
+        MarketDataRemediationResult(
+          kind=remediation_kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          status="failed",
+          started_at=current_time,
+          finished_at=current_time,
+          detail=f"{remediation_kind}:{symbol}:{timeframe}:guarded_live_run_unavailable",
+        ),
+      )
+
+    session = run.provenance.runtime_session
+    remediation_reason = f"incident_remediation:{remediation_kind}"
+    try:
+      handoff = self._activate_guarded_live_venue_session(
+        run=run,
+        reason=remediation_reason,
+      )
+      session_sync = self._sync_guarded_live_session(run=run, handoff=handoff)
+      next_handoff = session_sync["handoff"]
+      run = self._runs.save_run(run)
+      refreshed_state = self._build_guarded_live_state_for_local_session_remediation(
+        state=self._guarded_live_state.load_state(),
+        run=run,
+        actor=actor,
+        reason=remediation_reason,
+        session_handoff=next_handoff,
+      )
+      self._persist_guarded_live_state(refreshed_state)
+      detail = self._summarize_guarded_live_session_remediation_result(
+        remediation_kind=remediation_kind,
+        handoff=next_handoff,
+      )
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_incident_local_remediation_executed",
+        actor=actor,
+        summary=f"Guarded-live local remediation executed for {incident.alert_id}.",
+        detail=detail,
+        run_id=run.config.run_id,
+        session_id=session.session_id if session is not None else None,
+      )
+      return (
+        MarketDataRemediationResult(
+          kind=remediation_kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          status="executed",
+          started_at=current_time,
+          finished_at=self._clock(),
+          detail=detail,
+        ),
+      )
+    except Exception as exc:
+      detail = f"{remediation_kind}:{symbol}:{timeframe}:guarded_live_session_remediation_failed:{exc}"
+      self._append_guarded_live_audit_event(
+        kind="guarded_live_incident_local_remediation_failed",
+        actor=actor,
+        summary=f"Guarded-live local remediation failed for {incident.alert_id}.",
+        detail=detail,
+        run_id=run.config.run_id,
+        session_id=session.session_id if session is not None else None,
+      )
+      return (
+        MarketDataRemediationResult(
+          kind=remediation_kind,
+          symbol=symbol,
+          timeframe=timeframe,
+          status="failed",
+          started_at=current_time,
+          finished_at=self._clock(),
+          detail=detail,
+        ),
+      )
+
+  def _resolve_guarded_live_remediation_run(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    state: GuardedLiveState,
+  ) -> RunRecord | None:
+    if incident.run_id is not None and (run := self._runs.get_run(incident.run_id)) is not None:
+      return run
+    owner_run_id = state.session_handoff.owner_run_id or state.ownership.owner_run_id
+    if owner_run_id is None:
+      return None
+    return self._runs.get_run(owner_run_id)
+
+  @staticmethod
+  def _resolve_guarded_live_remediation_identity(
+    *,
+    run: RunRecord | None,
+    state: GuardedLiveState,
+  ) -> tuple[str, str]:
+    if run is not None:
+      symbol = run.config.symbols[0] if run.config.symbols else "unknown"
+      timeframe = run.config.timeframe or "unknown"
+      return symbol, timeframe
+    symbol = state.session_handoff.symbol or state.ownership.symbol or "unknown"
+    timeframe = state.session_handoff.timeframe or "unknown"
+    return symbol, timeframe
+
+  def _build_guarded_live_state_for_local_session_remediation(
+    self,
+    *,
+    state: GuardedLiveState,
+    run: RunRecord,
+    actor: str,
+    reason: str,
+    session_handoff: GuardedLiveVenueSessionHandoff,
+  ) -> GuardedLiveState:
+    session = run.provenance.runtime_session
+    current_time = self._clock()
+    existing = state.ownership
+    return replace(
+      state,
+      ownership=GuardedLiveSessionOwnership(
+        state="owned",
+        owner_run_id=run.config.run_id,
+        owner_session_id=session.session_id if session is not None else existing.owner_session_id,
+        symbol=run.config.symbols[0] if run.config.symbols else existing.symbol,
+        claimed_at=existing.claimed_at if existing.owner_run_id == run.config.run_id else current_time,
+        claimed_by=existing.claimed_by if existing.owner_run_id == run.config.run_id else actor,
+        last_heartbeat_at=session.last_heartbeat_at if session is not None else existing.last_heartbeat_at,
+        last_order_sync_at=current_time,
+        last_resumed_at=existing.last_resumed_at,
+        last_reason=reason,
+        last_released_at=None,
+      ),
+      order_book=self._build_guarded_live_order_book_sync(run=run),
+      session_restore=self._resolve_guarded_live_session_restore_state(
+        run=run,
+        existing=state.session_restore,
+      ),
+      session_handoff=self._resolve_guarded_live_session_handoff_state(
+        run=run,
+        existing=state.session_handoff,
+        session_handoff=session_handoff,
+      ),
+    )
+
+  @staticmethod
+  def _summarize_guarded_live_session_remediation_result(
+    *,
+    remediation_kind: str,
+    handoff: GuardedLiveVenueSessionHandoff,
+  ) -> str:
+    symbol = handoff.symbol or "unknown"
+    timeframe = handoff.timeframe or "unknown"
+    if remediation_kind == "channel_restore":
+      detail = (
+        f"{remediation_kind}:{symbol}:{timeframe}:channel_restore={handoff.channel_restore_state};"
+        f"continuation={handoff.channel_continuation_state};"
+        f"transport={handoff.transport};source={handoff.source};state={handoff.state}"
+      )
+      if handoff.channel_last_restored_at is not None:
+        detail += f";restored_at={handoff.channel_last_restored_at.isoformat()}"
+      if handoff.channel_last_continued_at is not None:
+        detail += f";continued_at={handoff.channel_last_continued_at.isoformat()}"
+      if handoff.issues:
+        detail += f";issues={','.join(handoff.issues[:3])}"
+      return detail
+    detail = (
+      f"{remediation_kind}:{symbol}:{timeframe}:order_book={handoff.order_book_state};"
+      f"transport={handoff.transport};source={handoff.source};state={handoff.state};"
+      f"rebuilds={handoff.order_book_rebuild_count};gaps={handoff.order_book_gap_count}"
+    )
+    if handoff.order_book_last_rebuilt_at is not None:
+      detail += f";rebuilt_at={handoff.order_book_last_rebuilt_at.isoformat()}"
+    if handoff.order_book_best_bid_price is not None or handoff.order_book_best_ask_price is not None:
+      detail += (
+        f";top_of_book={handoff.order_book_best_bid_price or 0.0:.8f}/"
+        f"{handoff.order_book_best_ask_price or 0.0:.8f}"
+      )
+    if handoff.issues:
+      detail += f";issues={','.join(handoff.issues[:3])}"
+    return detail
 
   def _resolve_market_data_remediation_targets(
     self,

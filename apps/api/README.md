@@ -228,7 +228,9 @@ Defaults:
   remediation state through delivery history plus the guarded-live operator surface. Incident-open
   auto-remediation can now run the same real recent-sync, backfill, and candle-repair jobs when a
   supported market-data incident first appears, and explicit remediation requests still run those
-  jobs before the guarded-live incident state is refreshed again.
+  jobs before the guarded-live incident state is refreshed again. Guarded-live stream/handoff
+  faults now also run local session remediation jobs for channel restore and order-book rebuild,
+  so stream-side incidents can close the loop without waiting on provider-only workflow state.
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, `resolved`, and
   remediation lifecycle sync events into the durable guarded-live incident history, including
   provider workflow references, while local acknowledge/escalate actions can also push provider-native workflow

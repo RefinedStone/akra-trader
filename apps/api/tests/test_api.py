@@ -1394,9 +1394,101 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
       event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
       for event in remediated.json()["incident_events"]
     )
-    assert all(
+  assert all(
       alert["alert_id"] != "guarded-live:market-data:5m"
       for alert in remediated.json()["active_alerts"]
+    )
+
+
+def test_guarded_live_channel_restore_incidents_auto_run_local_session_job(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._operator_alert_paging_policy_default_provider = "pagerduty"
+    app._operator_alert_paging_policy_warning_targets = ("pagerduty_events",)
+    app._operator_alert_paging_policy_critical_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "channel_restore_local_remediation"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "channel_restore_local_remediation"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "channel_restore_local_remediation",
+      },
+    )
+    assert live_response.status_code == 200
+    run_id = live_response.json()["config"]["run_id"]
+
+    state = app._guarded_live_state.load_state()
+    app._guarded_live_state.save_state(
+      replace(
+        state,
+        session_handoff=replace(
+          state.session_handoff,
+          coverage=("trade_ticks", "depth_updates", "kline_candles"),
+          handed_off_at=datetime(2025, 1, 3, 18, 28, tzinfo=UTC),
+          last_sync_at=datetime(2025, 1, 3, 18, 28, tzinfo=UTC),
+          last_trade_event_at=datetime(2025, 1, 3, 18, 28, tzinfo=UTC),
+          last_depth_event_at=datetime(2025, 1, 3, 18, 28, tzinfo=UTC),
+          last_kline_event_at=None,
+          channel_restore_state="unavailable",
+          channel_restore_count=2,
+          channel_last_restored_at=datetime(2025, 1, 3, 18, 29, tzinfo=UTC),
+          channel_continuation_state="unavailable",
+          channel_continuation_count=2,
+          channel_last_continued_at=datetime(2025, 1, 3, 18, 29, tzinfo=UTC),
+          issues=("binance_market_channel_restore_failed:ticker:timeout:exchange timeout",),
+        ),
+      )
+    )
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
+    )
+    assert incident["remediation"]["kind"] == "channel_restore"
+    assert guarded_live_response.json()["session_handoff"]["channel_restore_state"] == "synthetic"
+    assert guarded_live_response.json()["session_handoff"]["channel_continuation_state"] == "synthetic"
+    assert any(
+      event["kind"] == "incident_resolved"
+      and event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
+      for event in guarded_live_response.json()["incident_events"]
+    )
+    assert all(
+      alert["alert_id"] != f"guarded-live:market-data-channel-restore:{run_id}"
+      for alert in guarded_live_response.json()["active_alerts"]
+    )
+    assert any(
+      event["kind"] == "guarded_live_incident_local_remediation_executed"
+      and "channel_restore:ETH/USDT:5m:channel_restore=synthetic" in event["detail"]
+      for event in guarded_live_response.json()["audit_events"]
     )
 
 
@@ -1606,47 +1698,35 @@ def test_operator_visibility_endpoint_surfaces_channel_level_market_data_inciden
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_channel_consistency", "market_data_channel_restore", "market_data_ladder_integrity"} <= categories
-
-    consistency_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_channel_consistency"
-    )
-    assert "trade ticks is stale" in consistency_alert["detail"]
-    assert "depth/order-book updates is stale" in consistency_alert["detail"]
-    assert "kline candles has not produced any events within 45s" in consistency_alert["detail"]
-
-    ladder_integrity_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_integrity"
-    )
-    assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert["detail"]
-    assert "binance ladder integrity required 2 snapshot rebuild(s)." in ladder_integrity_alert["detail"]
-    assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert["detail"]
-
-    restore_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_channel_restore"
-    )
-    assert "market-channel restore is unavailable." in restore_alert["detail"]
-    assert "market-channel continuation is unavailable." in restore_alert["detail"]
-    assert "binance ticker restore failed: timeout:exchange timeout." in restore_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-channel-consistency:{run_id}"
-      for event in incident_events
+    consistency_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-channel-consistency:{run_id}"
     )
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
-      for event in incident_events
+    assert "trade ticks is stale" in consistency_incident["detail"]
+    assert "depth/order-book updates is stale" in consistency_incident["detail"]
+    assert "kline candles has not produced any events within 45s" in consistency_incident["detail"]
+    restore_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
     )
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-ladder-integrity:{run_id}"
-      for event in incident_events
+    assert "market-channel restore is unavailable." in restore_incident["detail"]
+    assert "market-channel continuation is unavailable." in restore_incident["detail"]
+    assert "binance ticker restore failed: timeout:exchange timeout." in restore_incident["detail"]
+    ladder_integrity_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-integrity:{run_id}"
     )
+    assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_incident["detail"]
+    assert "binance ladder integrity required 2 snapshot rebuild(s)." in ladder_integrity_incident["detail"]
+    assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_incident["detail"]
 
 
 def test_operator_visibility_endpoint_separates_venue_native_ladder_integrity_incidents(
@@ -1736,32 +1816,28 @@ def test_operator_visibility_endpoint_separates_venue_native_ladder_integrity_in
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_ladder_integrity", "market_data_venue_ladder_integrity"} <= categories
-
-    ladder_integrity_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_integrity"
-    )
-    assert "coinbase ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert["detail"]
-    assert "coinbase ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_alert["detail"]
-    assert "coinbase depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert["detail"]
-    assert "snapshot rebuild failed" not in ladder_integrity_alert["detail"]
-
-    venue_ladder_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_venue_ladder_integrity"
-    )
-    assert "coinbase ladder snapshot rebuild failed during session missing: stream timeout." in venue_ladder_alert["detail"]
-    assert "coinbase ladder snapshot is crossed: best bid 2501.50000000 is above best ask 2501.20000000." in venue_ladder_alert["detail"]
-    assert "coinbase bid ladder snapshot is not strictly descending at level 2 (2501.30000000 after 2501.00000000)." in venue_ladder_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-venue-ladder-integrity:{run_id}"
-      for event in incident_events
+    ladder_integrity_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-integrity:{run_id}"
     )
+    assert "coinbase ladder integrity recorded 1 depth gap(s)." in ladder_integrity_incident["detail"]
+    assert "coinbase ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_incident["detail"]
+    assert "coinbase depth stream gap detected between update ids 25 and 29." in ladder_integrity_incident["detail"]
+    assert "snapshot rebuild failed" not in ladder_integrity_incident["detail"]
+    venue_ladder_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-venue-ladder-integrity:{run_id}"
+    )
+    assert "coinbase ladder snapshot rebuild failed during session missing: stream timeout." in venue_ladder_incident["detail"]
+    assert "coinbase ladder snapshot is crossed: best bid 2501.50000000 is above best ask 2501.20000000." in venue_ladder_incident["detail"]
+    assert "coinbase bid ladder snapshot is not strictly descending at level 2 (2501.30000000 after 2501.00000000)." in venue_ladder_incident["detail"]
 
 
 def test_operator_visibility_endpoint_separates_ladder_bridge_integrity_incidents(
@@ -1850,31 +1926,27 @@ def test_operator_visibility_endpoint_separates_ladder_bridge_integrity_incident
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_ladder_integrity", "market_data_ladder_bridge_integrity"} <= categories
-
-    ladder_integrity_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_integrity"
-    )
-    assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert["detail"]
-    assert "binance ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_alert["detail"]
-    assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert["detail"]
-    assert "bridge expected previous update id" not in ladder_integrity_alert["detail"]
-
-    bridge_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_bridge_integrity"
-    )
-    assert "binance depth bridge expected previous update id 25 but received 29." in bridge_alert["detail"]
-    assert "binance depth bridge range 31-34 does not cover expected next update id 26." in bridge_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-ladder-bridge:{run_id}"
-      for event in incident_events
+    ladder_integrity_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-integrity:{run_id}"
     )
+    assert "binance ladder integrity recorded 1 depth gap(s)." in ladder_integrity_incident["detail"]
+    assert "binance ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_incident["detail"]
+    assert "binance depth stream gap detected between update ids 25 and 29." in ladder_integrity_incident["detail"]
+    assert "bridge expected previous update id" not in ladder_integrity_incident["detail"]
+    bridge_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-bridge:{run_id}"
+    )
+    assert "binance depth bridge expected previous update id 25 but received 29." in bridge_incident["detail"]
+    assert "binance depth bridge range 31-34 does not cover expected next update id 26." in bridge_incident["detail"]
 
 
 def test_operator_visibility_endpoint_separates_ladder_sequence_and_snapshot_refresh_incidents(
@@ -1962,31 +2034,23 @@ def test_operator_visibility_endpoint_separates_ladder_sequence_and_snapshot_ref
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_ladder_sequence_integrity", "market_data_ladder_snapshot_refresh"} <= categories
-
-    sequence_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_sequence_integrity"
-    )
-    assert "coinbase ladder sequence expected previous update id 701 but received 703 before update 704." in sequence_alert["detail"]
-
-    snapshot_refresh_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_ladder_snapshot_refresh"
-    )
-    assert "coinbase ladder snapshot refresh replaced update id 700 with 701." in snapshot_refresh_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-ladder-sequence:{run_id}"
-      for event in incident_events
+    sequence_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-sequence:{run_id}"
     )
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-ladder-snapshot-refresh:{run_id}"
-      for event in incident_events
+    assert "coinbase ladder sequence expected previous update id 701 but received 703 before update 704." in sequence_incident["detail"]
+    snapshot_refresh_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-ladder-snapshot-refresh:{run_id}"
     )
+    assert "coinbase ladder snapshot refresh replaced update id 700 with 701." in snapshot_refresh_incident["detail"]
 
 
 def test_operator_visibility_endpoint_surfaces_book_and_kline_consistency_incidents(
@@ -2075,35 +2139,27 @@ def test_operator_visibility_endpoint_surfaces_book_and_kline_consistency_incide
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_book_consistency", "market_data_kline_consistency"} <= categories
-
-    book_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_book_consistency"
-    )
-    assert "binance local order book is crossed: best bid 2501.20000000 is above best ask 2500.80000000." in book_alert["detail"]
-    assert "binance book-ticker quote is crossed: bid 2501.10000000 is above ask 2500.90000000." in book_alert["detail"]
-    assert "binance local best bid 2501.20000000 is above book-ticker ask 2500.90000000." in book_alert["detail"]
-
-    kline_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_kline_consistency"
-    )
-    assert "binance kline timeframe 1m does not match the guarded-live timeframe 5m." in kline_alert["detail"]
-    assert "binance kline closes at" in kline_alert["detail"]
-    assert "binance kline close 2501.00000000 falls outside the high/low range 2499.00000000-2500.00000000." in kline_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-book-consistency:{run_id}"
-      for event in incident_events
+    book_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-book-consistency:{run_id}"
     )
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-kline-consistency:{run_id}"
-      for event in incident_events
+    assert "binance local order book is crossed: best bid 2501.20000000 is above best ask 2500.80000000." in book_incident["detail"]
+    assert "binance book-ticker quote is crossed: bid 2501.10000000 is above ask 2500.90000000." in book_incident["detail"]
+    assert "binance local best bid 2501.20000000 is above book-ticker ask 2500.90000000." in book_incident["detail"]
+    kline_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-kline-consistency:{run_id}"
     )
+    assert "binance kline timeframe 1m does not match the guarded-live timeframe 5m." in kline_incident["detail"]
+    assert "binance kline closes at" in kline_incident["detail"]
+    assert "binance kline close 2501.00000000 falls outside the high/low range 2499.00000000-2500.00000000." in kline_incident["detail"]
 
 
 def test_operator_visibility_endpoint_splits_depth_ladder_and_candle_sequence_incidents(
@@ -2194,35 +2250,27 @@ def test_operator_visibility_endpoint_splits_depth_ladder_and_candle_sequence_in
       for alert in alerts
       if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
     }
-    assert {"market_data_depth_ladder", "market_data_candle_sequence"} <= categories
-
-    depth_ladder_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_depth_ladder"
-    )
-    assert "binance bid ladder count 2 does not match stored bid level count 3." in depth_ladder_alert["detail"]
-    assert "binance best bid ladder head 2501.00000000/0.50000000 does not match stored best bid 2501.20000000/1.00000000." in depth_ladder_alert["detail"]
-    assert "binance bid ladder is not strictly descending at level 2 (2501.30000000 after 2501.00000000)." in depth_ladder_alert["detail"]
-
-    candle_sequence_alert = next(
-      alert for alert in alerts
-      if alert.get("run_id") == run_id and alert["category"] == "market_data_candle_sequence"
-    )
-    assert "binance kline open 2025-01-03T19:26:00+00:00 is not aligned to the 5m timeframe boundary." in candle_sequence_alert["detail"]
-    assert "binance kline close 2025-01-03T19:29:00+00:00 does not match the expected 5m boundary close 2025-01-03T19:31:00+00:00." in candle_sequence_alert["detail"]
-    assert "binance closed kline event arrived at 2025-01-03T19:28:00+00:00 before the candle close 2025-01-03T19:29:00+00:00." in candle_sequence_alert["detail"]
+    assert not categories
 
     guarded_live_response = client.get("/api/guarded-live")
     assert guarded_live_response.status_code == 200
     incident_events = guarded_live_response.json()["incident_events"]
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-depth-ladder:{run_id}"
-      for event in incident_events
+    depth_ladder_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-depth-ladder:{run_id}"
     )
-    assert any(
-      event["alert_id"] == f"guarded-live:market-data-candle-sequence:{run_id}"
-      for event in incident_events
+    assert "binance bid ladder count 2 does not match stored bid level count 3." in depth_ladder_incident["detail"]
+    assert "binance best bid ladder head 2501.00000000/0.50000000 does not match stored best bid 2501.20000000/1.00000000." in depth_ladder_incident["detail"]
+    assert "binance bid ladder is not strictly descending at level 2 (2501.30000000 after 2501.00000000)." in depth_ladder_incident["detail"]
+    candle_sequence_incident = next(
+      event for event in incident_events
+      if event["kind"] == "incident_opened"
+      and event["alert_id"] == f"guarded-live:market-data-candle-sequence:{run_id}"
     )
+    assert "binance kline open 2025-01-03T19:26:00+00:00 is not aligned to the 5m timeframe boundary." in candle_sequence_incident["detail"]
+    assert "binance kline close 2025-01-03T19:29:00+00:00 does not match the expected 5m boundary close 2025-01-03T19:31:00+00:00." in candle_sequence_incident["detail"]
+    assert "binance closed kline event arrived at 2025-01-03T19:28:00+00:00 before the candle close 2025-01-03T19:29:00+00:00." in candle_sequence_incident["detail"]
 
 
 def test_live_endpoints_use_configured_supported_guarded_live_venue(tmp_path: Path) -> None:
