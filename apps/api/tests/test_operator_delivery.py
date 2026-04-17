@@ -52,6 +52,9 @@ def test_operator_alert_delivery_adapter_supports_slack_and_pagerduty_targets() 
   assert all(record.status == "delivered" for record in records)
   assert all(record.attempt_number == 2 for record in records)
   assert all(record.phase == "initial" for record in records)
+  pagerduty_record = next(record for record in records if record.target == "pagerduty_events")
+  assert pagerduty_record.external_provider == "pagerduty"
+  assert pagerduty_record.external_reference == incident.alert_id
 
   slack_request = next(item for item in requests if "slack.example" in item[0])
   pagerduty_request = next(item for item in requests if "pagerduty.com" in item[0])

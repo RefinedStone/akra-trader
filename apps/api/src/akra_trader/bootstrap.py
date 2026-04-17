@@ -186,6 +186,7 @@ def build_container(settings: Settings) -> Container:
     operator_alert_delivery_initial_backoff_seconds=settings.operator_alert_delivery_initial_backoff_seconds,
     operator_alert_delivery_max_backoff_seconds=settings.operator_alert_delivery_max_backoff_seconds,
     operator_alert_delivery_backoff_multiplier=settings.operator_alert_delivery_backoff_multiplier,
+    operator_alert_external_sync_token=settings.operator_alert_external_sync_token,
     operator_alert_escalation_targets=settings.operator_alert_escalation_targets,
     operator_alert_incident_ack_timeout_seconds=settings.operator_alert_incident_ack_timeout_seconds,
     operator_alert_incident_max_escalations=settings.operator_alert_incident_max_escalations,

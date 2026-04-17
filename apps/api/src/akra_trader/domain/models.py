@@ -512,6 +512,11 @@ class OperatorIncidentEvent:
   last_escalated_by: str | None = None
   escalation_reason: str | None = None
   next_escalation_at: datetime | None = None
+  external_provider: str | None = None
+  external_reference: str | None = None
+  external_status: str = "not_synced"
+  external_last_synced_at: datetime | None = None
+  paging_status: str = "not_configured"
 
 
 @dataclass(frozen=True)
@@ -527,6 +532,8 @@ class OperatorIncidentDelivery:
   attempt_number: int = 1
   next_retry_at: datetime | None = None
   phase: str = "initial"
+  external_provider: str | None = None
+  external_reference: str | None = None
   source: str = "guarded_live"
 
 

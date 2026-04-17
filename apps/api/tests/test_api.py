@@ -20,12 +20,14 @@ def build_client(
   *,
   guarded_live_execution_enabled: bool = False,
   guarded_live_venue: str | None = None,
+  operator_alert_external_sync_token: str | None = None,
 ) -> TestClient:
   settings = Settings(
     runs_database_url=f"sqlite:///{database_path}",
     market_data_provider="seeded",
     guarded_live_execution_enabled=guarded_live_execution_enabled,
     guarded_live_venue=guarded_live_venue,
+    operator_alert_external_sync_token=operator_alert_external_sync_token,
   )
   return TestClient(create_app(settings))
 
@@ -479,6 +481,67 @@ def test_guarded_live_incident_endpoints_acknowledge_and_escalate(tmp_path: Path
       if record["incident_event_id"] == incident["event_id"] and record["phase"] == "escalation"
     )
     assert escalation_delivery["target"] == "pagerduty_events"
+
+
+def test_external_incident_sync_endpoint_updates_paging_state_and_requires_token(tmp_path: Path) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    guarded_live_execution_enabled=True,
+    operator_alert_external_sync_token="shared-token",
+  ) as client:
+    app = client.app.state.container.app
+    app._operator_alert_escalation_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 13, 15, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.4, free=0.4, used=0.0),),
+      )
+    )
+    reconcile = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "external_incident_sync"},
+    )
+    assert reconcile.status_code == 200
+
+    forbidden = client.post(
+      "/api/operator/incidents/external-sync",
+      json={
+        "provider": "pagerduty",
+        "event_kind": "acknowledged",
+        "actor": "responder-1",
+        "detail": "pd_ack",
+        "alert_id": "guarded-live:reconciliation",
+      },
+    )
+    assert forbidden.status_code == 403
+
+    synced = client.post(
+      "/api/operator/incidents/external-sync",
+      headers={"X-Akra-Incident-Sync-Token": "shared-token"},
+      json={
+        "provider": "pagerduty",
+        "event_kind": "acknowledged",
+        "actor": "responder-1",
+        "detail": "pd_ack",
+        "alert_id": "guarded-live:reconciliation",
+        "external_reference": "guarded-live:reconciliation",
+        "occurred_at": "2025-01-03T13:16:00Z",
+      },
+    )
+    assert synced.status_code == 200
+    incident = next(
+      event
+      for event in synced.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:reconciliation"
+    )
+    assert incident["acknowledgment_state"] == "acknowledged"
+    assert incident["acknowledged_by"] == "pagerduty:responder-1"
+    assert incident["external_provider"] == "pagerduty"
+    assert incident["external_status"] == "acknowledged"
+    assert incident["paging_status"] == "acknowledged"
 
 
 def test_guarded_live_status_survives_app_restart(tmp_path: Path) -> None:

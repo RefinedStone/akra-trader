@@ -337,6 +337,11 @@ type OperatorVisibility = {
     last_escalated_by?: string | null;
     escalation_reason?: string | null;
     next_escalation_at?: string | null;
+    external_provider?: string | null;
+    external_reference?: string | null;
+    external_status: string;
+    external_last_synced_at?: string | null;
+    paging_status: string;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -350,6 +355,8 @@ type OperatorVisibility = {
     attempt_number: number;
     next_retry_at?: string | null;
     phase: string;
+    external_provider?: string | null;
+    external_reference?: string | null;
     source: string;
   }[];
   audit_events: {
@@ -421,6 +428,11 @@ type GuardedLiveStatus = {
     last_escalated_by?: string | null;
     escalation_reason?: string | null;
     next_escalation_at?: string | null;
+    external_provider?: string | null;
+    external_reference?: string | null;
+    external_status: string;
+    external_last_synced_at?: string | null;
+    paging_status: string;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -434,6 +446,8 @@ type GuardedLiveStatus = {
     attempt_number: number;
     next_retry_at?: string | null;
     phase: string;
+    external_provider?: string | null;
+    external_reference?: string | null;
     source: string;
   }[];
   kill_switch: {
@@ -1985,6 +1999,17 @@ export default function App() {
                               {event.last_escalated_by ? ` by ${event.last_escalated_by}` : ""}
                               {event.last_escalated_at ? ` at ${formatTimestamp(event.last_escalated_at)}` : ""}
                             </p>
+                            <p className="run-lineage-symbol-copy">
+                              External: {event.external_status}
+                              {event.external_provider ? ` via ${event.external_provider}` : ""}
+                              {event.external_reference ? ` (${event.external_reference})` : ""}
+                              {event.external_last_synced_at
+                                ? ` at ${formatTimestamp(event.external_last_synced_at)}`
+                                : ""}
+                            </p>
+                            <p className="run-lineage-symbol-copy">
+                              Paging: {event.paging_status}
+                            </p>
                           </td>
                         </tr>
                       ))}
@@ -2054,6 +2079,10 @@ export default function App() {
                             <td>
                               <strong>{record.incident_kind}</strong>
                               <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                              <p className="run-lineage-symbol-copy">
+                                External: {record.external_provider ?? "n/a"}
+                                {record.external_reference ? ` (${record.external_reference})` : ""}
+                              </p>
                               <p className="run-lineage-symbol-copy">{record.detail}</p>
                             </td>
                           </tr>
@@ -3027,6 +3056,17 @@ export default function App() {
                                 Next escalation: {formatTimestamp(event.next_escalation_at ?? null)}
                                 {event.escalation_targets.length ? ` via ${event.escalation_targets.join(", ")}` : ""}
                               </p>
+                              <p className="run-lineage-symbol-copy">
+                                External: {event.external_status}
+                                {event.external_provider ? ` via ${event.external_provider}` : ""}
+                                {event.external_reference ? ` (${event.external_reference})` : ""}
+                                {event.external_last_synced_at
+                                  ? ` at ${formatTimestamp(event.external_last_synced_at)}`
+                                  : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Paging: {event.paging_status}
+                              </p>
                               {event.acknowledgment_reason ? (
                                 <p className="run-lineage-symbol-copy">
                                   Ack reason: {event.acknowledgment_reason}
@@ -3092,6 +3132,10 @@ export default function App() {
                             <td>
                               <strong>{record.incident_kind}</strong>
                               <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                              <p className="run-lineage-symbol-copy">
+                                External: {record.external_provider ?? "n/a"}
+                                {record.external_reference ? ` (${record.external_reference})` : ""}
+                              </p>
                               <p className="run-lineage-symbol-copy">{record.detail}</p>
                             </td>
                           </tr>

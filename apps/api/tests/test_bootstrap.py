@@ -180,6 +180,7 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       operator_alert_slack_webhook_url="https://hooks.slack.example/services/ops",
       operator_alert_pagerduty_integration_key="pagerduty-key",
       operator_alert_webhook_timeout_seconds=7,
+      operator_alert_external_sync_token="shared-token",
       operator_alert_incident_ack_timeout_seconds=180,
       operator_alert_incident_max_escalations=3,
       operator_alert_incident_escalation_backoff_multiplier=3.0,
@@ -191,6 +192,7 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["slack_webhook_url"] == "https://hooks.slack.example/services/ops"
   assert captured["pagerduty_integration_key"] == "pagerduty-key"
   assert captured["webhook_timeout_seconds"] == "7"
+  assert container.app._operator_alert_external_sync_token == "shared-token"
   assert container.app._operator_alert_escalation_targets == ("pagerduty", "slack")
   assert container.app._operator_alert_incident_ack_timeout_seconds == 180
   assert container.app._operator_alert_incident_max_escalations == 3

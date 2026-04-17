@@ -263,6 +263,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         detail="pagerduty_integration_key_unconfigured",
         attempt_number=attempt_number,
         phase=phase,
+        external_provider="pagerduty",
+        external_reference=incident.external_reference or incident.alert_id,
         source=incident.source,
       )
     request = urllib_request.Request(
@@ -285,6 +287,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         detail=f"pagerduty_status:{status_code}",
         attempt_number=attempt_number,
         phase=phase,
+        external_provider="pagerduty",
+        external_reference=incident.external_reference or incident.alert_id,
         source=incident.source,
       )
     except (urllib_error.URLError, TimeoutError, ValueError) as exc:
@@ -299,6 +303,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         detail=f"pagerduty_delivery_failed:{exc}",
         attempt_number=attempt_number,
         phase=phase,
+        external_provider="pagerduty",
+        external_reference=incident.external_reference or incident.alert_id,
         source=incident.source,
       )
 

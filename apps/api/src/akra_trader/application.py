@@ -388,6 +388,7 @@ class TradingApplication:
     operator_alert_delivery_initial_backoff_seconds: int = 15,
     operator_alert_delivery_max_backoff_seconds: int = 300,
     operator_alert_delivery_backoff_multiplier: float = 2.0,
+    operator_alert_external_sync_token: str | None = None,
     operator_alert_escalation_targets: tuple[str, ...] = (),
     operator_alert_incident_ack_timeout_seconds: int = 300,
     operator_alert_incident_max_escalations: int = 2,
@@ -433,6 +434,7 @@ class TradingApplication:
       operator_alert_delivery_backoff_multiplier,
       1.0,
     )
+    self._operator_alert_external_sync_token = operator_alert_external_sync_token
     self._operator_alert_escalation_targets = tuple(
       dict.fromkeys(operator_alert_escalation_targets)
     )
@@ -1015,6 +1017,147 @@ class TradingApplication:
         incident_events=incident_events,
         delivery_history=delivery_history,
         audit_events=(escalation_audit_event, *state.audit_events),
+      )
+    )
+    return self.get_guarded_live_status()
+
+  def require_operator_alert_external_sync_token(self, token: str | None) -> None:
+    if self._operator_alert_external_sync_token is None:
+      return
+    if token != self._operator_alert_external_sync_token:
+      raise PermissionError("invalid operator incident sync token")
+
+  def sync_guarded_live_incident_from_external(
+    self,
+    *,
+    provider: str,
+    event_kind: str,
+    actor: str,
+    detail: str,
+    alert_id: str | None = None,
+    external_reference: str | None = None,
+    occurred_at: datetime | None = None,
+    escalation_level: int | None = None,
+  ) -> GuardedLiveStatus:
+    current_time = self._clock()
+    state, _ = self._refresh_guarded_live_alert_state(current_time=current_time)
+    synced_at = occurred_at or current_time
+    normalized_provider = provider.strip().lower().replace(" ", "_")
+    normalized_kind = event_kind.strip().lower().replace("-", "_")
+    incident = self._find_guarded_live_incident_for_external_sync(
+      state=state,
+      alert_id=alert_id,
+      external_reference=external_reference,
+    )
+    effective_reference = external_reference or incident.external_reference or alert_id or incident.alert_id
+    detail_copy = detail.strip() or f"{normalized_provider}_{normalized_kind}"
+    updated_incident = replace(
+      incident,
+      external_provider=normalized_provider,
+      external_reference=effective_reference,
+      external_last_synced_at=synced_at,
+    )
+    delivery_history = state.delivery_history
+
+    if normalized_kind == "triggered":
+      updated_incident = replace(
+        updated_incident,
+        external_status="triggered",
+        paging_status="triggered",
+      )
+    elif normalized_kind == "acknowledged":
+      if updated_incident.acknowledgment_state != "acknowledged":
+        updated_incident = replace(
+          updated_incident,
+          acknowledgment_state="acknowledged",
+          acknowledged_at=synced_at,
+          acknowledged_by=f"{normalized_provider}:{actor}",
+          acknowledgment_reason=detail_copy,
+          next_escalation_at=None,
+        )
+      updated_incident = replace(
+        updated_incident,
+        external_status="acknowledged",
+        paging_status="acknowledged",
+      )
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_acknowledged:{normalized_provider}",
+      )
+    elif normalized_kind == "escalated":
+      next_level = max(updated_incident.escalation_level + 1, escalation_level or 1)
+      next_level = min(next_level, self._operator_alert_incident_max_escalations)
+      next_escalation_at = None
+      if (
+        updated_incident.acknowledgment_state != "acknowledged"
+        and next_level < self._operator_alert_incident_max_escalations
+      ):
+        next_escalation_at = synced_at + timedelta(
+          seconds=self._resolve_incident_escalation_backoff_seconds(next_level)
+        )
+      updated_incident = replace(
+        updated_incident,
+        escalation_level=next_level,
+        escalation_state="escalated",
+        last_escalated_at=synced_at,
+        last_escalated_by=f"{normalized_provider}:{actor}",
+        escalation_reason=detail_copy,
+        next_escalation_at=next_escalation_at,
+        external_status="escalated",
+        paging_status="escalated",
+      )
+    elif normalized_kind == "resolved":
+      if updated_incident.acknowledgment_state != "acknowledged":
+        updated_incident = replace(
+          updated_incident,
+          acknowledgment_state="acknowledged",
+          acknowledged_at=synced_at,
+          acknowledged_by=f"{normalized_provider}:{actor}",
+          acknowledgment_reason=detail_copy,
+        )
+      updated_incident = replace(
+        updated_incident,
+        external_status="resolved",
+        paging_status="resolved",
+        next_escalation_at=None,
+      )
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_resolved:{normalized_provider}",
+      )
+    else:
+      raise ValueError(f"unsupported external incident event kind: {event_kind}")
+
+    incident_events = self._replace_incident_event(
+      incident_events=state.incident_events,
+      updated_incident=updated_incident,
+    )
+    incident_events = self._apply_incident_delivery_state(
+      incident_events=incident_events,
+      delivery_history=delivery_history,
+    )
+    audit_event = OperatorAuditEvent(
+      event_id=f"guarded-live-incident-external-sync:{incident.event_id}:{synced_at.isoformat()}",
+      timestamp=synced_at,
+      actor=f"{normalized_provider}:{actor}",
+      kind="guarded_live_incident_external_synced",
+      summary=f"Guarded-live incident synced from external paging workflow for {incident.alert_id}.",
+      detail=(
+        f"External event {normalized_kind} synced from {normalized_provider}. "
+        f"Reference: {effective_reference}. Detail: {detail_copy}."
+      ),
+      run_id=incident.run_id,
+      session_id=incident.session_id,
+      source="guarded_live",
+    )
+    self._persist_guarded_live_state(
+      replace(
+        state,
+        incident_events=incident_events,
+        delivery_history=delivery_history,
+        audit_events=(audit_event, *state.audit_events),
       )
     )
     return self.get_guarded_live_status()
@@ -3924,11 +4067,18 @@ class TradingApplication:
         current_time=current_time,
       )
       delivery_state = self._resolve_incident_delivery_state(records=records)
+      external_record = next((record for record in records if record.external_provider is not None), None)
       persisted_events.append(
         replace(
           incident,
           delivery_state=delivery_state,
           delivery_targets=incident.delivery_targets or self._operator_alert_delivery.list_targets(),
+          external_provider=(
+            external_record.external_provider if external_record is not None else incident.external_provider
+          ),
+          external_reference=(
+            external_record.external_reference if external_record is not None else incident.external_reference
+          ),
         )
       )
       delivery_records.extend(records)
@@ -4202,6 +4352,39 @@ class TradingApplication:
     if not self._incident_is_still_active(incident=incident, incident_events=state.incident_events):
       raise ValueError("Guarded-live incident is no longer active")
     return incident
+
+  def _find_guarded_live_incident_for_external_sync(
+    self,
+    *,
+    state: GuardedLiveState,
+    alert_id: str | None,
+    external_reference: str | None,
+  ) -> OperatorIncidentEvent:
+    candidates = [
+      incident
+      for incident in state.incident_events
+      if incident.kind == "incident_opened"
+      and (
+        (alert_id is not None and incident.alert_id == alert_id)
+        or (
+          external_reference is not None
+          and (
+            incident.external_reference == external_reference
+            or incident.alert_id == external_reference
+          )
+        )
+      )
+    ]
+    if not candidates:
+      raise LookupError("Guarded-live incident not found for external sync")
+    candidates.sort(
+      key=lambda incident: (
+        self._incident_is_still_active(incident=incident, incident_events=state.incident_events),
+        incident.timestamp,
+      ),
+      reverse=True,
+    )
+    return candidates[0]
 
   @staticmethod
   def _suppress_pending_incident_retries(

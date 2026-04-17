@@ -54,6 +54,8 @@ Implemented now:
 - guarded-live incident delivery now supports console, generic webhook, Slack webhook, and
   PagerDuty Events API targets with persisted attempt history, operator acknowledgment,
   manual/automatic escalation, and retry/backoff scheduling
+- durable incidents can now sync external acknowledgment, escalation, and resolution events back
+  into local incident state through the operator incident sync endpoint and shared-token gating
 - guarded-live launch wiring and venue-state reconciliation can now target a configured supported
   venue independently from the market-data provider, while seeded fixture flows still default to a
   Binance-shaped live venue in tests
@@ -62,7 +64,7 @@ Implemented now:
 Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
-- full external incident-management workflow such as cross-system acknowledgment sync, richer escalation ladders, and paging policy management
+- full external incident-management workflow such as richer provider-native acknowledgment sync, richer escalation ladders, and paging policy management
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
 
@@ -97,6 +99,7 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_INITIAL_BACKOFF_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_BACKOFF_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER`
+- `AKRA_TRADER_OPERATOR_ALERT_EXTERNAL_SYNC_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_ESCALATION_TARGETS`
 - `AKRA_TRADER_OPERATOR_ALERT_INCIDENT_ACK_TIMEOUT_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_INCIDENT_MAX_ESCALATIONS`
@@ -138,6 +141,7 @@ Defaults:
 - `GET /api/runs/{run_id}/metrics`
 - `GET /api/market-data/status`
 - `GET /api/operator/visibility`
+- `POST /api/operator/incidents/external-sync`
 - `GET /api/guarded-live`
 - `POST /api/guarded-live/kill-switch/engage`
 - `POST /api/guarded-live/kill-switch/release`
@@ -186,6 +190,10 @@ Defaults:
 - guarded-live incident records now persist acknowledgment and escalation state, support operator
   `acknowledge` and `escalate` actions, suppress pending retries after acknowledgment, and can
   auto-escalate to configured escalation targets after retry exhaustion or ack-timeout windows
+- external paging systems can now push `triggered`, `acknowledged`, `escalated`, or `resolved`
+  incident sync events into the durable guarded-live incident history, which updates external
+  provider/reference state, paging status, audit history, and retry suppression without overriding
+  local alert truth
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

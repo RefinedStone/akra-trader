@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import FastAPI
+from fastapi import Header
 from fastapi import HTTPException
 from fastapi import Query
 from pydantic import BaseModel
@@ -68,6 +69,17 @@ class GuardedLiveActionRequest(BaseModel):
 class GuardedLiveOrderReplaceRequest(GuardedLiveActionRequest):
   price: float = Field(gt=0)
   quantity: float | None = Field(default=None, gt=0)
+
+
+class ExternalIncidentSyncRequest(BaseModel):
+  provider: str
+  event_kind: str
+  actor: str = "external"
+  detail: str = "external_incident_sync"
+  alert_id: str | None = None
+  external_reference: str | None = None
+  occurred_at: datetime | None = None
+  escalation_level: int | None = Field(default=None, ge=1)
 
 
 def create_router(container: Container) -> APIRouter:
@@ -359,6 +371,32 @@ def create_router(container: Container) -> APIRouter:
   def get_operator_visibility(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
     visibility = app.get_operator_visibility()
     return asdict(visibility)
+
+  @router.post("/operator/incidents/external-sync")
+  def sync_external_incident(
+    request: ExternalIncidentSyncRequest,
+    x_akra_incident_sync_token: str | None = Header(default=None, alias="X-Akra-Incident-Sync-Token"),
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      app.require_operator_alert_external_sync_token(x_akra_incident_sync_token)
+      status = app.sync_guarded_live_incident_from_external(
+        provider=request.provider,
+        event_kind=request.event_kind,
+        actor=request.actor,
+        detail=request.detail,
+        alert_id=request.alert_id,
+        external_reference=request.external_reference,
+        occurred_at=request.occurred_at,
+        escalation_level=request.escalation_level,
+      )
+    except PermissionError as exc:
+      raise HTTPException(status_code=403, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return asdict(status)
 
   @router.get("/guarded-live")
   def get_guarded_live_status(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:

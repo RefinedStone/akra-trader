@@ -1174,6 +1174,87 @@ def test_guarded_live_incident_auto_escalates_after_retry_exhaustion(
   assert any(event.kind == "guarded_live_incident_escalated" for event in escalated.audit_events)
 
 
+def test_external_incident_sync_acknowledges_and_preserves_local_alert_truth(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 45, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    failures_before_success={"pagerduty_events": 3},
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_delivery_initial_backoff_seconds=30,
+    operator_alert_external_sync_token="shared-token",
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="external_pd_sync")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.delivery_state == "retrying"
+
+  acked = app.sync_guarded_live_incident_from_external(
+    provider="pagerduty",
+    event_kind="acknowledged",
+    actor="responder-1",
+    detail="acknowledged_in_pagerduty",
+    alert_id="guarded-live:reconciliation",
+    external_reference=incident.alert_id,
+    occurred_at=clock.current + timedelta(minutes=1),
+  )
+  synced = next(event for event in acked.incident_events if event.event_id == incident.event_id)
+  assert synced.acknowledgment_state == "acknowledged"
+  assert synced.acknowledged_by == "pagerduty:responder-1"
+  assert synced.external_provider == "pagerduty"
+  assert synced.external_reference == "guarded-live:reconciliation"
+  assert synced.external_status == "acknowledged"
+  assert synced.paging_status == "acknowledged"
+  suppressed = next(
+    record
+    for record in acked.delivery_history
+    if record.incident_event_id == incident.event_id and record.status == "retry_suppressed"
+  )
+  assert suppressed.target == "pagerduty_events"
+  assert any(event.kind == "guarded_live_incident_external_synced" for event in acked.audit_events)
+  assert any(alert.alert_id == "guarded-live:reconciliation" for alert in acked.active_alerts)
+
+  resolved = app.sync_guarded_live_incident_from_external(
+    provider="pagerduty",
+    event_kind="resolved",
+    actor="responder-1",
+    detail="resolved_in_pagerduty",
+    alert_id="guarded-live:reconciliation",
+    external_reference=incident.alert_id,
+    occurred_at=clock.current + timedelta(minutes=2),
+  )
+  resolved_incident = next(event for event in resolved.incident_events if event.event_id == incident.event_id)
+  assert resolved_incident.external_status == "resolved"
+  assert resolved_incident.paging_status == "resolved"
+  assert any(alert.alert_id == "guarded-live:reconciliation" for alert in resolved.active_alerts)
+
+
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(
   tmp_path: Path,
 ) -> None:
