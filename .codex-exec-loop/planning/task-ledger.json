@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit bacc33d still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but fuller order-book continuation after snapshot rebuild is the first numbered remainder and venue-native amend semantics still sit closer to active guarded-live supervision scope.",
+      "priority_reason": "The latest main-session reply after commit ea06cb9 still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but broader venue-native channel or session continuation is the first numbered remainder and venue-native amend semantics still sit closer to active guarded-live supervision scope.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:20:00Z",
+      "updated_at": "2026-04-17T01:17:54Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit bacc33d still explicitly calls out that live order management stops at cancel or replace and does not yet support venue-native amend semantics, but fuller order-book continuation and deeper channel restoration remain the first direct executable follow-up from the completed rebuild bridge.",
+      "priority_reason": "The latest main-session reply after commit ea06cb9 still explicitly calls out that live order management stops at cancel or replace and does not yet support venue-native amend semantics, but broader venue-native channel or session continuation remains the first direct executable follow-up from the completed Binance restore expansion.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:20:00Z",
+      "updated_at": "2026-04-17T01:17:54Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -635,18 +635,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Continue guarded-live with full venue order-book recovery and deeper channel restore",
       "description": "Build on the completed snapshot bridge and local book rebuild by restoring the next authoritative live-session layer: full venue-native order-book continuation after rebuild and the deeper market-data channels still missing from the guarded-live handoff, so recovery does not stop at reseeding a local book when the venue session should keep streaming forward.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply after commit bacc33d says snapshot bridge and local book rebuild are complete, and names full venue-native order-book continuation plus deeper market channels as the first remaining item, making it the clearest immediate executable follow-up for the next queued task.",
+      "priority_reason": "Completed in main session commit ea06cb9, which extended guarded-live resume through recovered bid or ask ladders plus channel-restore state, rebuilt the local book from full depth snapshot or persisted handoff across failover and restart, restored deeper ticker, trades, and ohlcv channels without overwriting rebuilt top-of-book state, surfaced the richer handoff in the control room, and verified with API pytest plus web typecheck and build before push.",
       "depends_on": [
         "planning-guarded-live-depth-snapshot-bridge-and-local-book-rebuild"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:20:00Z",
+      "updated_at": "2026-04-17T01:17:54Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from snapshot-based order-book recovery to continuous venue-native session restoration, closing the remaining gap where live failover can rebuild locally but still lacks fuller authoritative order-book and deeper channel continuation."
+      "direction_relation_note": "Closed the next guarded-live restore gap by carrying full order-book recovery through deeper ticker, trades, and ohlcv channel restoration, which now leaves broader venue-native channel or session continuation beyond the current Binance-focused restore, plus amend semantics and durable live-path alert delivery, as the next candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-wider-venue-native-channel-session-continuation",
+      "direction_id": "guarded-live-execution",
+      "title": "Broaden guarded-live continuation beyond the current Binance channel restore",
+      "description": "Build on the completed full order-book recovery and deeper channel restore by extending guarded-live recovery beyond the current Binance multi-stream plus exchange-backed ticker, trades, and ohlcv restore, deciding and implementing the next venue-native channel or session continuation layer so resumed live supervision does not stop at adapter-specific reseeding.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply after commit ea06cb9 explicitly says the restore now covers Binance multi-stream plus exchange-backed ticker, trades, and ohlcv recovery, but broader venue-native channel or session continuation is still the first remaining item, making it the clearest next executable queue head.",
+      "depends_on": [
+        "planning-guarded-live-full-order-book-continuation-and-deeper-channel-restore"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T01:17:54Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from a restored Binance-specific handoff toward a broader venue-native continuation model, keeping restart recovery focused on authoritative channel or session continuity before lower-priority amend and alerting follow-ups."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
