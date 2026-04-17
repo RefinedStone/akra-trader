@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After the repository-level provider-managed remediation coverage already extends through the current Better Stack-era provider set, deepen the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve richer private remediation-engine detail instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After the repository-level provider-managed remediation coverage now extends through the current All Quiet-era provider set, deepen the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve richer private remediation-engine detail instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says the current repo now has provider-authoritative sync, typed recovery schemas, direct polling, native phase graphs, and paging-provider inference wired through Better Stack, but richer provider-private remediation-engine phase graphs and native metrics still are not mirrored 1:1; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply again listed wider provider coverage first.",
+      "priority_reason": "The latest main-session reply says the current repo now has provider-authoritative sync, typed recovery schemas, direct polling, native phase graphs, and paging-provider inference wired through All Quiet, but richer provider-private remediation-engine phase graphs and native metrics still are not mirrored 1:1; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply again listed wider provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:51:20Z",
+      "updated_at": "2026-04-17T22:33:24Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through Better Stack."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through All Quiet."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1193,19 +1193,55 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-better-stack",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Better Stack",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, and Better Stack adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current nineteen providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, and Better Stack adapters to OnPage, adding the `onpage_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, OnPage typed recovery schemas, native phase-graph handling, paging-provider inference, provider-authoritative remediation sync generalization, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty providers.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 24,
-      "priority_reason": "The latest main-session reply says the first remaining executable item after commit 3b82416 on 2026-04-18 is to keep widening provider-managed remediation coverage to additional incident providers, so the next provider-breadth expansion becomes the new ready queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 142a1f5, which expanded provider-managed remediation coverage through OnPage across operator delivery, application wiring, provider pull-sync, remediation-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-ilert"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:51:20Z",
+      "updated_at": "2026-04-18T12:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Better Stack as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Better Stack to OnPage, which now leaves the next provider expansion and deeper provider-native remediation mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-onpage",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond OnPage",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, and OnPage adapters to All Quiet, adding the `allquiet_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty-one providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "Completed in main session commit 9ce0ccd, which expanded provider-managed remediation coverage through All Quiet across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-better-stack"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T22:33:24Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond OnPage to All Quiet, which now leaves the next provider expansion and deeper provider-native remediation mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-all-quiet",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond All Quiet",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, and All Quiet adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current twenty-one providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 26,
+      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage as the first remaining item after commit 9ce0ccd on 2026-04-18, so the next provider-breadth expansion beyond All Quiet becomes the new ready queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-onpage"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T22:33:24Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating All Quiet as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
