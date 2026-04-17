@@ -563,18 +563,54 @@
       "direction_id": "guarded-live-execution",
       "title": "Broaden guarded-live venue-native session transport beyond Binance user-data events",
       "description": "Extend the guarded-live venue-native supervision model beyond the current Binance user-data account and order event coverage by deciding and implementing the next authoritative transport surface, such as market-depth or broader venue-native push channels, so live supervision can track more of the venue session without falling back to polling-style gaps.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 84,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply after commit 6f735dd lists the remaining gap first: coverage now reaches Binance user-data account and order events, but market-depth and broader venue-native session transport are still missing, making this the clearest automatic next queued task.",
+      "priority_reason": "Completed in main session commit a528cd4, which broadened guarded-live venue transport from Binance user-data only to a combined multi-stream websocket carrying user-data plus trade and book-ticker events, added full-session failover, surfaced the richer handoff state in the control room, and verified with API pytest plus web typecheck and build before push.",
       "depends_on": [
         "planning-guarded-live-binance-session-failover-and-coverage"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:30:00Z",
+      "updated_at": "2026-04-17T11:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from resilient Binance user-data supervision toward fuller venue-native session coverage, which is the next explicit gap before live oversight can rely on broader authoritative transport."
+      "direction_relation_note": "Closed the next Binance venue-session transport step by folding market trade and book-ticker streams into the guarded-live handoff, which now leaves depth or order-book, kline, wider venue-native session breadth, amend semantics, and durable alert delivery as the remaining candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-depth-and-kline-session-coverage",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend guarded-live venue session coverage to depth and the next market-data channels",
+      "description": "Build on the new Binance multi-stream venue session by deciding and implementing the next coverage layer after trade and book-ticker, starting with authoritative depth or order-book transport and any immediately adjacent kline or venue-native market channels needed for guarded-live supervision, so the live session model keeps expanding without dropping back to polling-style gaps.",
+      "status": "done",
+      "base_priority": 85,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "Completed in main session commit 8d7b77b, which widened the Binance multi-stream handoff to depthUpdate and timeframe-aware kline coverage, persisted depth or kline timing in session handoff state, surfaced the new timestamps in the control room, and verified the behavior with API pytest plus web typecheck and build before push.",
+      "depends_on": [
+        "planning-guarded-live-broaden-venue-native-session-transport"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:41:42Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next Binance venue-session transport gap by extending the guarded-live handoff through depth and timeframe-aware kline coverage, which now leaves wider venue-native channel breadth and a fuller order-book lifecycle as the next explicit live-session supervision gap."
+    },
+    {
+      "id": "planning-guarded-live-full-order-book-and-wider-channel-supervision",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend guarded-live supervision to fuller order-book lifecycle and wider venue-native channels",
+      "description": "Build on the completed trade, book-ticker, depth, and timeframe-aware kline handoff by adding the next executable layer of guarded-live venue supervision: fuller order-book lifecycle coverage and the next venue-native market-data channels that close the remaining live-session blind spots without falling back to polling-style recovery.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply after commit 8d7b77b says the venue session now covers account, order, trade, book-ticker, depth, and kline, and explicitly calls out wider venue-native channels plus a full order-book lifecycle as the first remaining gap, making this the clearest automatic next queued task.",
+      "depends_on": [
+        "planning-guarded-live-depth-and-kline-session-coverage"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T00:41:42Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from partial market-session supervision toward fuller venue-native order-book and channel coverage, which remains the first explicit transport and oversight gap after depth and kline handoff landed."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
