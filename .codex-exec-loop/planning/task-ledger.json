@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit 9237149 still explicitly lists wider live-path alerting and durable operator audit or event delivery as one of the three remaining guarded-live gaps, but the direct executable queue head is still the push-native multi-venue session transport follow-up before alert-delivery expansion.",
+      "priority_reason": "The latest main-session reply after commit 69fb4be still explicitly lists wider live-path alerting and durable operator audit or event delivery as one of the three remaining guarded-live gaps, but authenticated multi-venue session transport is the clearer immediate queue head before alert-delivery expansion.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:51:26Z",
+      "updated_at": "2026-04-17T11:12:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit 9237149 still explicitly says live order management stops at cancel or replace and lacks venue-native amend flow, but the newly narrowed push-native multi-venue session transport follow-up remains the first executable guarded-live task before amend semantics.",
+      "priority_reason": "The latest main-session reply after commit 69fb4be still says live order management lacks venue-native amend flow, but authenticated multi-venue session transport remains the first executable guarded-live follow-up before amend semantics.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:51:26Z",
+      "updated_at": "2026-04-17T11:12:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -689,18 +689,72 @@
       "direction_id": "guarded-live-execution",
       "title": "Replace polling fallback with push-native multi-venue guarded-live session transport",
       "description": "Build on the completed Binance-native continuation plus generic CCXT polling fallback by adding a true push-native multi-venue session transport layer for guarded-live continuation, so wider venue support does not depend on polling-based market reconstruction when a venue can provide authoritative streaming session continuity.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply after commit 9237149 explicitly says the remaining continuation gap is wider push-native multi-venue session transport beyond the current Binance-native websocket plus generic polling fallback, making it the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 3e0200b, which removed the generic polling fallback, kept Binance on combined private plus public websocket transport, added Coinbase Advanced Trade public websocket continuation with guarded-live event normalization, removed poll-interval config, updated docs, and verified with API pytest plus web typecheck and build before push.",
       "depends_on": [
         "planning-guarded-live-wider-venue-native-session-transport-after-binance-continuation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T01:51:26Z",
+      "updated_at": "2026-04-17T04:21:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from transport-aware fallback into authoritative multi-venue streaming continuity, preserving the sequencing where push-native session transport still comes before venue-native amend semantics and durable alert-delivery expansion."
+      "direction_relation_note": "Closed the polling-fallback gap by moving guarded-live continuation onto push-native Binance and Coinbase websocket transports, which now leaves broader venue-session breadth, venue-native amend semantics, and durable live-path alert delivery as the next candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-broader-push-native-venue-session-coverage",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend guarded-live push-native session transport beyond Binance and Coinbase public coverage",
+      "description": "Build on the completed Binance combined websocket and Coinbase public websocket continuation by adding the next authoritative push-native venue session transports or coverage boundaries, so guarded-live continuation can widen beyond the current two-venue scope without falling back to polling-based market reconstruction or adapter-specific dead ends.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "Completed in main session commit 69fb4be, which added Kraken spot public websocket transport, normalized heartbeat plus ticker plus trade plus book plus ohlc events into the guarded-live handoff and sync surface, generalized the exchange resolver for venue-aware Kraken selection, expanded coverage and labeling through sync and release, and verified the change with API pytest plus web typecheck and build before push.",
+      "depends_on": [
+        "planning-guarded-live-push-native-multi-venue-session-transport"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T11:12:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next public push-native venue-session expansion step by extending guarded-live continuation through Kraken public websocket transport, which now leaves authenticated account or order session coverage beyond Binance, broader multi-venue launch or reconciliation generalization, and durable live-path alert delivery plus amend semantics as the remaining candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-multi-venue-authenticated-session-transport",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend guarded-live authenticated account and order session transport beyond Binance",
+      "description": "Build on the completed Binance, Coinbase, and Kraken public push-native continuation by adding the next authenticated venue-native account and order session transports outside the current Binance-only path, so guarded-live supervision can receive authoritative private account, balance, fill, and order lifecycle events for additional venues instead of relying on public-market transport alone.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply after commit 69fb4be explicitly says push-native continuation now reaches Binance, Coinbase, and Kraken but Binance remains the only venue with authenticated account or order session transport, making this the clearest executable next guarded-live follow-up.",
+      "depends_on": [
+        "planning-guarded-live-broader-push-native-venue-session-coverage"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T11:12:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from broader public-market continuation into true multi-venue private-session supervision, which is the next prerequisite before wider launch wiring, durable alert delivery, or venue-native amend semantics can be judged complete."
+    },
+    {
+      "id": "planning-guarded-live-multi-venue-launch-and-reconciliation-generalization",
+      "direction_id": "guarded-live-execution",
+      "title": "Generalize guarded-live launch wiring and venue-state reconciliation beyond transport adapters",
+      "description": "Broaden the guarded-live multi-venue path beyond transport-layer coverage by generalizing live launch wiring, venue-state reconciliation, and runtime attachment semantics so newly added venues can use the same guarded-live candidacy flow without venue-specific launch or recovery dead ends.",
+      "status": "proposed",
+      "base_priority": 84,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply after commit 69fb4be says broader multi-venue guarded-live support is still transport-layer heavy and has not yet generalized venue-state reconciliation or live launch wiring, but authenticated session transport is the more immediate queue head.",
+      "depends_on": [
+        "planning-guarded-live-multi-venue-authenticated-session-transport"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T11:12:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps guarded-live venue breadth honest by requiring launch, recovery, and reconciliation semantics to generalize with the transport layer instead of leaving multi-venue support stranded at adapter-specific session ingestion."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
