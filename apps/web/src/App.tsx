@@ -362,6 +362,25 @@ type OperatorVisibility = {
       reference?: string | null;
       provider_payload: Record<string, unknown>;
       provider_payload_updated_at?: string | null;
+      provider_recovery: {
+        lifecycle_state: string;
+        provider?: string | null;
+        job_id?: string | null;
+        reference?: string | null;
+        workflow_reference?: string | null;
+        summary?: string | null;
+        detail?: string | null;
+        channels: string[];
+        symbols: string[];
+        timeframe?: string | null;
+        updated_at?: string | null;
+        verification: {
+          state: string;
+          checked_at?: string | null;
+          summary?: string | null;
+          issues: string[];
+        };
+      };
     };
   }[];
   delivery_history: {
@@ -475,6 +494,25 @@ type GuardedLiveStatus = {
       reference?: string | null;
       provider_payload: Record<string, unknown>;
       provider_payload_updated_at?: string | null;
+      provider_recovery: {
+        lifecycle_state: string;
+        provider?: string | null;
+        job_id?: string | null;
+        reference?: string | null;
+        workflow_reference?: string | null;
+        summary?: string | null;
+        detail?: string | null;
+        channels: string[];
+        symbols: string[];
+        timeframe?: string | null;
+        updated_at?: string | null;
+        verification: {
+          state: string;
+          checked_at?: string | null;
+          summary?: string | null;
+          issues: string[];
+        };
+      };
     };
   }[];
   delivery_history: {
@@ -2098,6 +2136,29 @@ export default function App() {
                                       : ""}
                                   </p>
                                 ) : null}
+                                {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
+                                  <p className="run-lineage-symbol-copy">
+                                    Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
+                                    {event.remediation.provider_recovery.job_id
+                                      ? ` / job ${event.remediation.provider_recovery.job_id}`
+                                      : ""}
+                                    {event.remediation.provider_recovery.channels.length
+                                      ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
+                                      : ""}
+                                    {event.remediation.provider_recovery.symbols.length
+                                      ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
+                                      : ""}
+                                    {event.remediation.provider_recovery.timeframe
+                                      ? ` / ${event.remediation.provider_recovery.timeframe}`
+                                      : ""}
+                                    {event.remediation.provider_recovery.verification.state !== "unknown"
+                                      ? ` / verification ${event.remediation.provider_recovery.verification.state}`
+                                      : ""}
+                                    {event.remediation.provider_recovery.updated_at
+                                      ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
+                                      : ""}
+                                  </p>
+                                ) : null}
                               </>
                             ) : null}
                           </td>
@@ -3197,6 +3258,29 @@ export default function App() {
                                       Provider recovery payload: {formatParameterMap(event.remediation.provider_payload)}
                                       {event.remediation.provider_payload_updated_at
                                         ? ` at ${formatTimestamp(event.remediation.provider_payload_updated_at)}`
+                                        : ""}
+                                    </p>
+                                  ) : null}
+                                  {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
+                                    <p className="run-lineage-symbol-copy">
+                                      Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
+                                      {event.remediation.provider_recovery.job_id
+                                        ? ` / job ${event.remediation.provider_recovery.job_id}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.channels.length
+                                        ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.symbols.length
+                                        ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.timeframe
+                                        ? ` / ${event.remediation.provider_recovery.timeframe}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.verification.state !== "unknown"
+                                        ? ` / verification ${event.remediation.provider_recovery.verification.state}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.updated_at
+                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
                                         : ""}
                                     </p>
                                   ) : null}

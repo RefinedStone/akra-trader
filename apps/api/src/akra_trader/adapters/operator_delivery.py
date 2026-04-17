@@ -709,6 +709,33 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             if incident.remediation.provider_payload_updated_at is not None
             else None
           ),
+          "provider_recovery": {
+            "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
+            "provider": incident.remediation.provider_recovery.provider,
+            "job_id": incident.remediation.provider_recovery.job_id,
+            "reference": incident.remediation.provider_recovery.reference,
+            "workflow_reference": incident.remediation.provider_recovery.workflow_reference,
+            "summary": incident.remediation.provider_recovery.summary,
+            "detail": incident.remediation.provider_recovery.detail,
+            "channels": incident.remediation.provider_recovery.channels,
+            "symbols": incident.remediation.provider_recovery.symbols,
+            "timeframe": incident.remediation.provider_recovery.timeframe,
+            "updated_at": (
+              incident.remediation.provider_recovery.updated_at.isoformat()
+              if incident.remediation.provider_recovery.updated_at is not None
+              else None
+            ),
+            "verification": {
+              "state": incident.remediation.provider_recovery.verification.state,
+              "checked_at": (
+                incident.remediation.provider_recovery.verification.checked_at.isoformat()
+                if incident.remediation.provider_recovery.verification.checked_at is not None
+                else None
+              ),
+              "summary": incident.remediation.provider_recovery.verification.summary,
+              "issues": incident.remediation.provider_recovery.verification.issues,
+            },
+          },
         },
       }
     ).encode("utf-8")
@@ -763,6 +790,14 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
             "remediation_provider_payload": incident.remediation.provider_payload,
+            "remediation_provider_recovery": {
+              "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
+              "job_id": incident.remediation.provider_recovery.job_id,
+              "channels": incident.remediation.provider_recovery.channels,
+              "symbols": incident.remediation.provider_recovery.symbols,
+              "timeframe": incident.remediation.provider_recovery.timeframe,
+              "verification_state": incident.remediation.provider_recovery.verification.state,
+            },
           },
         },
       }
@@ -812,6 +847,14 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
             "remediation_provider_payload": incident.remediation.provider_payload,
+            "remediation_provider_recovery": {
+              "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
+              "job_id": incident.remediation.provider_recovery.job_id,
+              "channels": incident.remediation.provider_recovery.channels,
+              "symbols": incident.remediation.provider_recovery.symbols,
+              "timeframe": incident.remediation.provider_recovery.timeframe,
+              "verification_state": incident.remediation.provider_recovery.verification.state,
+            },
           },
           "tags": ["akra", incident.source, incident.severity.lower()],
         }

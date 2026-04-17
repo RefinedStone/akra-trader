@@ -502,6 +502,35 @@ class OperatorIncidentRemediation:
   reference: str | None = None
   provider_payload: dict[str, Any] = field(default_factory=dict)
   provider_payload_updated_at: datetime | None = None
+  provider_recovery: "OperatorIncidentProviderRecoveryState" = field(
+    default_factory=lambda: OperatorIncidentProviderRecoveryState()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentProviderRecoveryVerification:
+  state: str = "unknown"
+  checked_at: datetime | None = None
+  summary: str | None = None
+  issues: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class OperatorIncidentProviderRecoveryState:
+  lifecycle_state: str = "not_synced"
+  provider: str | None = None
+  job_id: str | None = None
+  reference: str | None = None
+  workflow_reference: str | None = None
+  summary: str | None = None
+  detail: str | None = None
+  channels: tuple[str, ...] = ()
+  symbols: tuple[str, ...] = ()
+  timeframe: str | None = None
+  verification: OperatorIncidentProviderRecoveryVerification = field(
+    default_factory=OperatorIncidentProviderRecoveryVerification
+  )
+  updated_at: datetime | None = None
 
 
 @dataclass(frozen=True)

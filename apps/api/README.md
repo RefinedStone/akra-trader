@@ -234,9 +234,11 @@ Defaults:
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, `resolved`, and
   remediation lifecycle sync events into the durable guarded-live incident history, including
   provider workflow references plus richer provider recovery payloads. Those payloads now persist
-  on incident remediation state, surface in the guarded-live incident table, and are reused when
-  local remediation closes the loop so provider-native workflow `resolve` actions are pushed back
-  out after successful verification across PagerDuty and Opsgenie
+  on incident remediation state as both raw payload and typed provider recovery state
+  (`job_id`, channels, symbols, timeframe, verification result). That typed state surfaces in the
+  guarded-live incident table and is reused when local remediation closes the loop so
+  provider-native workflow `resolve` actions are pushed back out after successful verification
+  across PagerDuty and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

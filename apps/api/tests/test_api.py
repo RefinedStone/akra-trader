@@ -1609,6 +1609,7 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
         "payload": {
           "job_id": "provider-job-901",
           "summary": "provider completed recovery verification",
+          "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
           "verification": {"state": "passed"},
         },
       },
@@ -1622,6 +1623,10 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert updated_incident["remediation"]["state"] == "executed"
     assert updated_incident["remediation"]["requested_by"] == "pagerduty:responder-1"
     assert updated_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
+    assert updated_incident["remediation"]["provider_recovery"]["job_id"] == "provider-job-901"
+    assert updated_incident["remediation"]["provider_recovery"]["symbols"] == ["ETH/USDT"]
+    assert updated_incident["remediation"]["provider_recovery"]["timeframe"] == "5m"
+    assert updated_incident["remediation"]["provider_recovery"]["verification"]["state"] == "passed"
     assert updated_incident["provider_workflow_action"] == "remediate"
     assert updated_incident["provider_workflow_state"] == "delivered"
     assert updated_incident["provider_workflow_reference"] == "PDINC-REC-901"
@@ -1633,6 +1638,7 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert resolved_incident["provider_workflow_action"] == "resolve"
     assert resolved_incident["provider_workflow_state"] in {"delivered", "not_supported"}
     assert resolved_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
+    assert resolved_incident["remediation"]["provider_recovery"]["job_id"] == "provider-job-901"
 
 
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(

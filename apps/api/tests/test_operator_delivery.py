@@ -6,6 +6,8 @@ from datetime import datetime
 
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
 from akra_trader.domain.models import OperatorIncidentRemediation
 
 
@@ -134,6 +136,15 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
       kind="recent_sync",
       summary="Refresh the live timeframe sync window and verify freshness thresholds.",
       runbook="market_data.sync_recent",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        lifecycle_state="recovering",
+        provider="pagerduty",
+        job_id="pd-job-1",
+        channels=("kline", "depth"),
+        symbols=("ETH/USDT",),
+        timeframe="5m",
+        verification=OperatorIncidentProviderRecoveryVerification(state="pending"),
+      ),
     ),
   )
 
@@ -283,6 +294,15 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
       kind="recent_sync",
       summary="Refresh the live timeframe sync window and verify freshness thresholds.",
       runbook="market_data.sync_recent",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        lifecycle_state="recovering",
+        provider="opsgenie",
+        job_id="og-job-existing",
+        channels=("kline",),
+        symbols=("ETH/USDT",),
+        timeframe="5m",
+        verification=OperatorIncidentProviderRecoveryVerification(state="pending"),
+      ),
     ),
   )
 

@@ -192,11 +192,11 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   loop instead of relying on provider workflow state alone.
   External incident-management systems can sync paging and remediation-lifecycle events back through
   a guarded API endpoint, including richer provider recovery payloads that persist on the incident
-  remediation record. Local acknowledge/remediate/escalate actions can push provider-native
-  workflow updates back out when the selected provider supports them, and locally verified
-  remediation closures now push a provider-native `resolve` action as well, so durable incidents
-  track a bidirectional paging and remediation workflow without handing local alert truth over to
-  the external system.
+  remediation record as both raw payload and typed provider recovery state. Local
+  acknowledge/remediate/escalate actions can push provider-native workflow updates back out when
+  the selected provider supports them, and locally verified remediation closures now push a
+  provider-native `resolve` action as well, so durable incidents track a bidirectional paging and
+  remediation workflow without handing local alert truth over to the external system.
 
 ## Modes
 

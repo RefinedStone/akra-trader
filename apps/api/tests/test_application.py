@@ -1720,6 +1720,7 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
       "job_id": "recovery-job-1",
       "summary": "provider verified market-data recovery",
       "channels": ["kline", "depth"],
+      "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
       "verification": {"state": "passed"},
     },
   )
@@ -1735,8 +1736,16 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
     "job_id": "recovery-job-1",
     "summary": "provider verified market-data recovery",
     "channels": ["kline", "depth"],
+    "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
     "verification": {"state": "passed"},
   }
+  assert updated_incident.remediation.provider_recovery.lifecycle_state == "verified"
+  assert updated_incident.remediation.provider_recovery.provider == "pagerduty"
+  assert updated_incident.remediation.provider_recovery.job_id == "recovery-job-1"
+  assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
+  assert updated_incident.remediation.provider_recovery.symbols == ("ETH/USDT",)
+  assert updated_incident.remediation.provider_recovery.timeframe == "5m"
+  assert updated_incident.remediation.provider_recovery.verification.state == "passed"
   assert updated_incident.provider_workflow_action == "remediate"
   assert updated_incident.provider_workflow_state == "delivered"
   assert updated_incident.provider_workflow_reference == "PDINC-REC-1"
@@ -1749,6 +1758,8 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   assert resolved_incident.provider_workflow_state == "delivered"
   assert resolved_incident.provider_workflow_reference == "PDINC-REC-1"
   assert resolved_incident.remediation.provider_payload["job_id"] == "recovery-job-1"
+  assert resolved_incident.remediation.provider_recovery.job_id == "recovery-job-1"
+  assert resolved_incident.remediation.provider_recovery.verification.state == "passed"
   assert any(
     record.phase == "provider_remediate"
     and record.external_reference == "PDINC-REC-1"
@@ -1770,6 +1781,7 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
     and action == "resolve"
     and payload is not None
     and payload.get("remediation", {}).get("provider_payload", {}).get("job_id") == "recovery-job-1"
+    and payload.get("remediation", {}).get("provider_recovery", {}).get("job_id") == "recovery-job-1"
     for workflow_event_id, provider, action, payload in delivery.workflow_payloads
   )
   assert any(

@@ -48,6 +48,8 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
 from akra_trader.domain.models import OperatorIncidentRemediation
 from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import Position
@@ -1518,6 +1520,46 @@ class TradingApplication:
         return stripped
     return None
 
+  @staticmethod
+  def _extract_payload_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, dict):
+      return value
+    return {}
+
+  @classmethod
+  def _extract_string_tuple(cls, *values: Any) -> tuple[str, ...]:
+    items: list[str] = []
+    for value in values:
+      if isinstance(value, str):
+        stripped = value.strip()
+        if stripped and stripped not in items:
+          items.append(stripped)
+        continue
+      if isinstance(value, (list, tuple, set)):
+        for item in value:
+          if not isinstance(item, str):
+            continue
+          stripped = item.strip()
+          if stripped and stripped not in items:
+            items.append(stripped)
+    return tuple(items)
+
+  @classmethod
+  def _parse_payload_datetime(cls, value: Any) -> datetime | None:
+    if isinstance(value, datetime):
+      return value
+    if not isinstance(value, str):
+      return None
+    candidate = value.strip()
+    if not candidate:
+      return None
+    if candidate.endswith("Z"):
+      candidate = f"{candidate[:-1]}+00:00"
+    try:
+      return datetime.fromisoformat(candidate)
+    except ValueError:
+      return None
+
   @classmethod
   def _normalize_incident_workflow_payload_value(cls, value: Any) -> Any:
     if value is None or isinstance(value, (str, bool)):
@@ -1580,6 +1622,127 @@ class TradingApplication:
       payload.get("recovery_id"),
     )
 
+  @staticmethod
+  def _provider_recovery_lifecycle_for_remediation_state(remediation_state: str) -> str:
+    mapping = {
+      "requested": "requested",
+      "provider_recovering": "recovering",
+      "provider_recovered": "recovered",
+      "executed": "verified",
+      "completed": "verified",
+      "partial": "partially_verified",
+      "failed": "failed",
+    }
+    return mapping.get(remediation_state, remediation_state or "not_synced")
+
+  def _build_provider_recovery_state(
+    self,
+    *,
+    remediation: OperatorIncidentRemediation,
+    next_state: str,
+    provider: str,
+    detail: str,
+    synced_at: datetime,
+    workflow_reference: str | None,
+    payload: dict[str, Any],
+  ) -> OperatorIncidentProviderRecoveryState:
+    existing = remediation.provider_recovery
+    verification_payload = self._extract_payload_mapping(payload.get("verification"))
+    target_payload = self._extract_payload_mapping(payload.get("target"))
+    targets_payload = self._extract_payload_mapping(payload.get("targets"))
+    lifecycle_state = self._first_non_empty_string(
+      payload.get("recovery_state"),
+      payload.get("recovery_phase"),
+      payload.get("job_state"),
+      payload.get("status"),
+    ) or self._provider_recovery_lifecycle_for_remediation_state(next_state)
+    verification = OperatorIncidentProviderRecoveryVerification(
+      state=self._first_non_empty_string(
+        verification_payload.get("state"),
+        payload.get("verification_state"),
+        existing.verification.state,
+      ) or "unknown",
+      checked_at=(
+        self._parse_payload_datetime(verification_payload.get("checked_at"))
+        or self._parse_payload_datetime(payload.get("verified_at"))
+        or self._parse_payload_datetime(payload.get("checked_at"))
+        or existing.verification.checked_at
+      ),
+      summary=self._first_non_empty_string(
+        verification_payload.get("summary"),
+        verification_payload.get("message"),
+        payload.get("verification_summary"),
+        existing.verification.summary,
+      ),
+      issues=self._extract_string_tuple(
+        verification_payload.get("issues"),
+        payload.get("verification_issues"),
+        existing.verification.issues,
+      ),
+    )
+    return OperatorIncidentProviderRecoveryState(
+      lifecycle_state=lifecycle_state,
+      provider=provider or existing.provider or remediation.provider,
+      job_id=self._first_non_empty_string(
+        payload.get("job_id"),
+        payload.get("recovery_id"),
+        payload.get("execution_id"),
+        existing.job_id,
+      ),
+      reference=self._first_non_empty_string(
+        payload.get("reference"),
+        payload.get("job_reference"),
+        payload.get("recovery_reference"),
+        existing.reference,
+        remediation.reference,
+      ),
+      workflow_reference=self._first_non_empty_string(
+        workflow_reference,
+        payload.get("workflow_reference"),
+        payload.get("provider_workflow_reference"),
+        existing.workflow_reference,
+      ),
+      summary=self._first_non_empty_string(
+        payload.get("summary"),
+        payload.get("remediation_summary"),
+        payload.get("message"),
+        existing.summary,
+        remediation.summary,
+      ),
+      detail=self._first_non_empty_string(
+        payload.get("detail"),
+        payload.get("remediation_detail"),
+        payload.get("status_detail"),
+        payload.get("result_detail"),
+        existing.detail,
+        detail,
+      ),
+      channels=self._extract_string_tuple(
+        payload.get("channels"),
+        payload.get("channel"),
+        target_payload.get("channels"),
+        existing.channels,
+      ),
+      symbols=self._extract_string_tuple(
+        payload.get("symbols"),
+        payload.get("symbol"),
+        targets_payload.get("symbols"),
+        target_payload.get("symbols"),
+        target_payload.get("symbol"),
+        existing.symbols,
+      ),
+      timeframe=self._first_non_empty_string(
+        payload.get("timeframe"),
+        payload.get("target_timeframe"),
+        targets_payload.get("timeframe"),
+        target_payload.get("timeframe"),
+        verification_payload.get("timeframe"),
+        existing.timeframe,
+      ),
+      verification=verification,
+      updated_at=synced_at,
+    )
+
   def _apply_external_remediation_sync(
     self,
     *,
@@ -1598,6 +1761,15 @@ class TradingApplication:
       incoming=payload,
     )
     payload_reference = self._extract_incident_payload_reference(payload)
+    provider_recovery = self._build_provider_recovery_state(
+      remediation=remediation,
+      next_state=next_state,
+      provider=provider,
+      detail=detail,
+      synced_at=synced_at,
+      workflow_reference=workflow_reference,
+      payload=merged_payload,
+    )
     next_remediation = replace(
       remediation,
       state=next_state,
@@ -1634,6 +1806,7 @@ class TradingApplication:
       provider_payload_updated_at=(
         synced_at if merged_payload != remediation.provider_payload else remediation.provider_payload_updated_at
       ),
+      provider_recovery=provider_recovery,
     )
     return replace(incident, remediation=next_remediation)
 
@@ -1685,6 +1858,7 @@ class TradingApplication:
           if remediation.provider_payload_updated_at is not None
           else None
         ),
+        "provider_recovery": asdict(remediation.provider_recovery),
       }
     if payload:
       workflow_payload["provider_context"] = self._normalize_incident_workflow_payload(payload)
@@ -6496,13 +6670,21 @@ class TradingApplication:
       return incident, ()
 
     last_attempted_at = max((result.finished_at for result in results), default=current_time)
+    local_state = self._resolve_local_remediation_state(results=results)
+    local_detail = self._summarize_local_remediation_results(results)
     updated_remediation = replace(
       remediation,
-      state=self._resolve_local_remediation_state(results=results),
+      state=local_state,
       requested_at=current_time,
       requested_by=actor,
       last_attempted_at=last_attempted_at,
-      detail=self._summarize_local_remediation_results(results),
+      detail=local_detail,
+      provider_recovery=replace(
+        remediation.provider_recovery,
+        lifecycle_state=self._provider_recovery_lifecycle_for_remediation_state(local_state),
+        detail=local_detail,
+        updated_at=last_attempted_at,
+      ),
     )
     return replace(incident, remediation=updated_remediation), results
 
