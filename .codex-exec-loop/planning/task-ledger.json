@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit 6f735dd still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but broader venue-native session transport is the first numbered remainder and venue-native amend semantics remain closer to active live supervision scope.",
+      "priority_reason": "The latest main-session reply after commit bacc33d still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but fuller order-book continuation after snapshot rebuild is the first numbered remainder and venue-native amend semantics still sit closer to active guarded-live supervision scope.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:30:00Z",
+      "updated_at": "2026-04-17T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit 6f735dd says live order management still stops at cancel or replace and does not use venue-native amend semantics; it is still an explicit follow-up, but broader venue-native session transport is the first direct remainder from the completed Binance supervision work.",
+      "priority_reason": "The latest main-session reply after commit bacc33d still explicitly calls out that live order management stops at cancel or replace and does not yet support venue-native amend semantics, but fuller order-book continuation and deeper channel restoration remain the first direct executable follow-up from the completed rebuild bridge.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T10:30:00Z",
+      "updated_at": "2026-04-17T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -617,18 +617,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Bridge guarded-live failover through full depth snapshots and local book rebuild",
       "description": "Turn the new `resync_required` order-book supervision signal into executable guarded-live recovery by fetching or bridging a full depth snapshot after failover, rebuilding the local book against update IDs, and quarantining clearly when authoritative order-book continuity cannot be restored.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply after commit b3f6ee8 says gap detection and resync-required signaling now exist, but failover still lacks a full depth snapshot bridge and true local order-book rebuild, making this the clearest immediate executable follow-up.",
+      "priority_reason": "Completed in main session commit bacc33d, which bridged guarded-live failover through venue depth snapshots and local book rebuild, persisted rebuild counters and snapshot metadata in session handoff state, surfaced the rebuild details in the control room, and verified the recovery path with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-full-order-book-and-wider-channel-supervision"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:52:26Z",
+      "updated_at": "2026-04-17T11:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from order-book gap detection to authoritative order-book recovery, so failover no longer stops at supervision warnings when venue depth continuity breaks."
+      "direction_relation_note": "Closed the guarded-live depth recovery gap by turning failover and depth-gap resync into authoritative snapshot-backed local book rebuilds, which now leaves fuller venue-native order-book continuation, deeper market-channel restoration, amend semantics, and durable live-path alert delivery as the next candidacy steps."
+    },
+    {
+      "id": "planning-guarded-live-full-order-book-continuation-and-deeper-channel-restore",
+      "direction_id": "guarded-live-execution",
+      "title": "Continue guarded-live with full venue order-book recovery and deeper channel restore",
+      "description": "Build on the completed snapshot bridge and local book rebuild by restoring the next authoritative live-session layer: full venue-native order-book continuation after rebuild and the deeper market-data channels still missing from the guarded-live handoff, so recovery does not stop at reseeding a local book when the venue session should keep streaming forward.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply after commit bacc33d says snapshot bridge and local book rebuild are complete, and names full venue-native order-book continuation plus deeper market channels as the first remaining item, making it the clearest immediate executable follow-up for the next queued task.",
+      "depends_on": [
+        "planning-guarded-live-depth-snapshot-bridge-and-local-book-rebuild"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T11:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from snapshot-based order-book recovery to continuous venue-native session restoration, closing the remaining gap where live failover can rebuild locally but still lacks fuller authoritative order-book and deeper channel continuation."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
