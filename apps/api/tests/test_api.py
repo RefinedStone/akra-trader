@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.config import Settings
 from akra_trader.domain.models import GapWindow
+from akra_trader.domain.models import GuardedLiveBookTickerChannelSnapshot
+from akra_trader.domain.models import GuardedLiveKlineChannelSnapshot
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorIncidentDelivery
@@ -1271,6 +1273,123 @@ def test_operator_visibility_endpoint_surfaces_channel_level_market_data_inciden
     )
     assert any(
       event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
+      for event in incident_events
+    )
+
+
+def test_operator_visibility_endpoint_surfaces_book_and_kline_consistency_incidents(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 19, 30, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "book_kline_consistency_visibility",
+      },
+    )
+    assert live_response.status_code == 200
+    run_id = live_response.json()["config"]["run_id"]
+
+    state = app._guarded_live_state.load_state()
+    app._guarded_live_state.save_state(
+      replace(
+        state,
+        session_handoff=replace(
+          state.session_handoff,
+          coverage=("book_ticker", "depth_updates", "kline_candles"),
+          last_sync_at=datetime(2025, 1, 3, 19, 30, tzinfo=UTC),
+          last_depth_event_at=datetime(2025, 1, 3, 19, 29, 55, tzinfo=UTC),
+          last_book_ticker_event_at=datetime(2025, 1, 3, 19, 29, 55, tzinfo=UTC),
+          last_kline_event_at=datetime(2025, 1, 3, 19, 29, 55, tzinfo=UTC),
+          order_book_state="streaming",
+          order_book_best_bid_price=2501.2,
+          order_book_best_ask_price=2500.8,
+          order_book_bid_level_count=2,
+          order_book_ask_level_count=2,
+          book_ticker_snapshot=GuardedLiveBookTickerChannelSnapshot(
+            bid_price=2501.1,
+            bid_quantity=1.0,
+            ask_price=2500.9,
+            ask_quantity=0.9,
+            event_at=datetime(2025, 1, 3, 19, 29, 55, tzinfo=UTC),
+          ),
+          kline_snapshot=GuardedLiveKlineChannelSnapshot(
+            timeframe="1m",
+            open_at=datetime(2025, 1, 3, 19, 25, tzinfo=UTC),
+            close_at=datetime(2025, 1, 3, 19, 24, tzinfo=UTC),
+            open_price=2499.5,
+            high_price=2500.0,
+            low_price=2499.0,
+            close_price=2501.0,
+            volume=4.2,
+            closed=True,
+            event_at=datetime(2025, 1, 3, 19, 29, 55, tzinfo=UTC),
+          ),
+        ),
+      )
+    )
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    alerts = visibility_response.json()["alerts"]
+    categories = {
+      alert["category"]
+      for alert in alerts
+      if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
+    }
+    assert {"market_data_book_consistency", "market_data_kline_consistency"} <= categories
+
+    book_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_book_consistency"
+    )
+    assert "binance local order book is crossed: best bid 2501.20000000 is above best ask 2500.80000000." in book_alert["detail"]
+    assert "binance book-ticker quote is crossed: bid 2501.10000000 is above ask 2500.90000000." in book_alert["detail"]
+    assert "binance local best bid 2501.20000000 is above book-ticker ask 2500.90000000." in book_alert["detail"]
+
+    kline_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_kline_consistency"
+    )
+    assert "binance kline timeframe 1m does not match the guarded-live timeframe 5m." in kline_alert["detail"]
+    assert "binance kline closes at" in kline_alert["detail"]
+    assert "binance kline close 2501.00000000 falls outside the high/low range 2499.00000000-2500.00000000." in kline_alert["detail"]
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident_events = guarded_live_response.json()["incident_events"]
+    assert any(
+      event["alert_id"] == f"guarded-live:market-data-book-consistency:{run_id}"
+      for event in incident_events
+    )
+    assert any(
+      event["alert_id"] == f"guarded-live:market-data-kline-consistency:{run_id}"
       for event in incident_events
     )
 

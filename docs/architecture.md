@@ -140,8 +140,9 @@ sync, and market-data freshness faults from stale sync, richer backfill-quality 
 windows, repeated sync failures, and venue-specific upstream fault classifications now persist as
 live-path alert history with active/resolved lifecycle state and delivery targets. Guarded-live
 venue-session coverage now also promotes channel-level depth/order-book continuity gaps, stale
-market-channel timestamps, and channel-restore failures into the same durable incident surface.
-Alert transitions now emit durable incident-opened/resolved events plus outbound delivery attempt
+market-channel timestamps, channel-restore failures, and venue-specific book/kline consistency
+faults into the same durable incident surface. Alert transitions now emit durable
+incident-opened/resolved events plus outbound delivery attempt
 history, failed deliveries now carry retry scheduling state through attempt numbers plus bounded
 exponential backoff timestamps, durable incidents now also carry
 acknowledgment, escalation, and external paging-sync state, and worker lifecycle notes plus

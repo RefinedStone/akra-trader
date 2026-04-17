@@ -4384,6 +4384,52 @@ class TradingApplication:
           delivery_targets=delivery_targets,
         )
       )
+
+    book_details, book_detected_at, book_has_critical = self._collect_guarded_live_book_consistency_findings(
+      handoff=handoff,
+      current_time=current_time,
+    )
+    if book_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-book-consistency:{run_id or 'unknown'}",
+          severity="critical" if book_has_critical else "warning",
+          category="market_data_book_consistency",
+          summary=(
+            f"Guarded-live book consistency requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(book_details),
+          detected_at=book_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    kline_details, kline_detected_at, kline_has_critical = self._collect_guarded_live_kline_consistency_findings(
+      handoff=handoff,
+      current_time=current_time,
+    )
+    if kline_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-kline-consistency:{run_id or 'unknown'}",
+          severity="critical" if kline_has_critical else "warning",
+          category="market_data_kline_consistency",
+          summary=(
+            f"Guarded-live kline consistency requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(kline_details),
+          detected_at=kline_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
     return alerts
 
   def _collect_guarded_live_channel_consistency_findings(
@@ -4503,6 +4549,161 @@ class TradingApplication:
         detected_at=restore_anchor,
         critical=True,
       )
+
+    detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  def _collect_guarded_live_book_consistency_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    snapshot = handoff.book_ticker_snapshot
+    if (
+      handoff.order_book_state in {"inactive", "released"}
+      and snapshot is None
+    ):
+      return [], current_time, False
+
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    venue = handoff.venue or "venue"
+    tolerance = self._guarded_live_balance_tolerance
+
+    def add_finding(detail: str, *, detected_at: datetime | None, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    best_bid = handoff.order_book_best_bid_price
+    best_ask = handoff.order_book_best_ask_price
+    if best_bid is not None and best_ask is not None and best_bid > (best_ask + tolerance):
+      add_finding(
+        f"{venue} local order book is crossed: best bid {best_bid:.8f} is above best ask {best_ask:.8f}.",
+        detected_at=handoff.last_depth_event_at or handoff.order_book_last_rebuilt_at or handoff.last_sync_at,
+        critical=True,
+      )
+
+    if snapshot is not None:
+      if (
+        snapshot.bid_price is not None
+        and snapshot.ask_price is not None
+        and snapshot.bid_price > (snapshot.ask_price + tolerance)
+      ):
+        add_finding(
+          f"{venue} book-ticker quote is crossed: bid {snapshot.bid_price:.8f} is above ask {snapshot.ask_price:.8f}.",
+          detected_at=snapshot.event_at or handoff.last_book_ticker_event_at or handoff.last_sync_at,
+          critical=True,
+        )
+      if (
+        best_bid is not None
+        and snapshot.ask_price is not None
+        and best_bid > (snapshot.ask_price + tolerance)
+      ):
+        add_finding(
+          f"{venue} local best bid {best_bid:.8f} is above book-ticker ask {snapshot.ask_price:.8f}.",
+          detected_at=snapshot.event_at or handoff.last_book_ticker_event_at or handoff.last_sync_at,
+          critical=True,
+        )
+      if (
+        snapshot.bid_price is not None
+        and best_ask is not None
+        and snapshot.bid_price > (best_ask + tolerance)
+      ):
+        add_finding(
+          f"{venue} book-ticker bid {snapshot.bid_price:.8f} is above local best ask {best_ask:.8f}.",
+          detected_at=snapshot.event_at or handoff.last_book_ticker_event_at or handoff.last_sync_at,
+          critical=True,
+        )
+
+    detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  def _collect_guarded_live_kline_consistency_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    snapshot = handoff.kline_snapshot
+    if snapshot is None:
+      return [], current_time, False
+
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    venue = handoff.venue or "venue"
+    tolerance = self._guarded_live_balance_tolerance
+
+    def add_finding(detail: str, *, detected_at: datetime | None, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if (
+      snapshot.timeframe is not None
+      and handoff.timeframe is not None
+      and snapshot.timeframe != handoff.timeframe
+    ):
+      add_finding(
+        f"{venue} kline timeframe {snapshot.timeframe} does not match the guarded-live timeframe {handoff.timeframe}.",
+        detected_at=snapshot.event_at or handoff.last_kline_event_at or handoff.last_sync_at,
+      )
+
+    if (
+      snapshot.open_at is not None
+      and snapshot.close_at is not None
+      and snapshot.close_at <= snapshot.open_at
+    ):
+      add_finding(
+        f"{venue} kline closes at {snapshot.close_at.isoformat()} before or at its open {snapshot.open_at.isoformat()}.",
+        detected_at=snapshot.event_at or snapshot.close_at or handoff.last_kline_event_at,
+        critical=True,
+      )
+
+    if (
+      snapshot.high_price is not None
+      and snapshot.low_price is not None
+      and snapshot.high_price + tolerance < snapshot.low_price
+    ):
+      add_finding(
+        f"{venue} kline high {snapshot.high_price:.8f} is below low {snapshot.low_price:.8f}.",
+        detected_at=snapshot.event_at or handoff.last_kline_event_at or handoff.last_sync_at,
+        critical=True,
+      )
+    elif snapshot.high_price is not None and snapshot.low_price is not None:
+      if (
+        snapshot.open_price is not None
+        and (
+          snapshot.open_price > snapshot.high_price + tolerance
+          or snapshot.open_price + tolerance < snapshot.low_price
+        )
+      ):
+        add_finding(
+          f"{venue} kline open {snapshot.open_price:.8f} falls outside the high/low range "
+          f"{snapshot.low_price:.8f}-{snapshot.high_price:.8f}.",
+          detected_at=snapshot.event_at or handoff.last_kline_event_at or handoff.last_sync_at,
+          critical=True,
+        )
+      if (
+        snapshot.close_price is not None
+        and (
+          snapshot.close_price > snapshot.high_price + tolerance
+          or snapshot.close_price + tolerance < snapshot.low_price
+        )
+      ):
+        add_finding(
+          f"{venue} kline close {snapshot.close_price:.8f} falls outside the high/low range "
+          f"{snapshot.low_price:.8f}-{snapshot.high_price:.8f}.",
+          detected_at=snapshot.event_at or handoff.last_kline_event_at or handoff.last_sync_at,
+          critical=True,
+        )
 
     detected_at = max(detected_candidates) if detected_candidates else current_time
     return list(dict.fromkeys(findings)), detected_at, has_critical
