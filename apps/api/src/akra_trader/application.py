@@ -60,6 +60,8 @@ from akra_trader.domain.models import OperatorIncidentRootlyRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentRootlyRecoveryState
 from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentBlamelessRecoveryState
+from akra_trader.domain.models import OperatorIncidentXmattersRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentXmattersRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1581,6 +1583,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "xmatters"
+          and provider_recovery.xmatters.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            xmatters=replace(
+              aligned_provider_recovery.xmatters,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2805,6 +2818,126 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_xmatters_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_xmatters_ownership_phase(assignee: str | None, existing_phase: str) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_xmatters_priority_phase(priority: str | None, existing_phase: str) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_xmatters_response_plan_phase(response_plan: str | None, existing_phase: str) -> str:
+    if response_plan:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_xmatters_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_xmatters_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    priority: str | None,
+    assignee: str | None,
+    response_plan: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentXmattersRecoveryState,
+  ) -> OperatorIncidentXmattersRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_xmatters_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_xmatters_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentXmattersRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_xmatters_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_xmatters_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      response_plan_phase=self._first_non_empty_string(
+        payload.get("response_plan_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("response_plan_phase"),
+      ) or self._resolve_xmatters_response_plan_phase(
+        response_plan,
+        existing.phase_graph.response_plan_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -2825,6 +2958,7 @@ class TradingApplication:
     OperatorIncidentFireHydrantRecoveryState,
     OperatorIncidentRootlyRecoveryState,
     OperatorIncidentBlamelessRecoveryState,
+    OperatorIncidentXmattersRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -3293,6 +3427,81 @@ class TradingApplication:
       ),
     )
 
+    xmatters_payload = self._merge_payload_mappings(
+      schema_payload.get("xmatters"),
+      schema_payload.get("x_matters"),
+      payload.get("xmatters"),
+      payload.get("xmatters_incident"),
+      payload.get("x_matters"),
+    )
+    xmatters_status = self._first_non_empty_string(
+      xmatters_payload.get("incident_status"),
+      xmatters_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.xmatters.incident_status,
+    ) or "unknown"
+    xmatters = OperatorIncidentXmattersRecoveryState(
+      incident_id=self._first_non_empty_string(
+        xmatters_payload.get("incident_id"),
+        xmatters_payload.get("id"),
+        workflow_reference,
+        existing.xmatters.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        xmatters_payload.get("external_reference"),
+        xmatters_payload.get("reference"),
+        reference,
+        existing.xmatters.external_reference,
+      ),
+      incident_status=xmatters_status,
+      priority=self._first_non_empty_string(
+        xmatters_payload.get("priority"),
+        existing.xmatters.priority,
+      ),
+      assignee=self._first_non_empty_string(
+        xmatters_payload.get("assignee"),
+        xmatters_payload.get("owner"),
+        existing.xmatters.assignee,
+      ),
+      response_plan=self._first_non_empty_string(
+        xmatters_payload.get("response_plan"),
+        xmatters_payload.get("plan"),
+        existing.xmatters.response_plan,
+      ),
+      url=self._first_non_empty_string(
+        xmatters_payload.get("url"),
+        xmatters_payload.get("html_url"),
+        existing.xmatters.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(xmatters_payload.get("updated_at"))
+        or existing.xmatters.updated_at
+      ),
+      phase_graph=self._build_xmatters_recovery_phase_graph(
+        payload=xmatters_payload,
+        incident_status=xmatters_status,
+        priority=self._first_non_empty_string(
+          xmatters_payload.get("priority"),
+          existing.xmatters.priority,
+        ),
+        assignee=self._first_non_empty_string(
+          xmatters_payload.get("assignee"),
+          xmatters_payload.get("owner"),
+          existing.xmatters.assignee,
+        ),
+        response_plan=self._first_non_empty_string(
+          xmatters_payload.get("response_plan"),
+          xmatters_payload.get("plan"),
+          existing.xmatters.response_plan,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.xmatters,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -3302,6 +3511,7 @@ class TradingApplication:
         existing.firehydrant,
         existing.rootly,
         existing.blameless,
+        existing.xmatters,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -3312,6 +3522,7 @@ class TradingApplication:
         existing.firehydrant,
         existing.rootly,
         existing.blameless,
+        existing.xmatters,
       )
     if normalized_provider == "incidentio":
       return (
@@ -3322,6 +3533,7 @@ class TradingApplication:
         existing.firehydrant,
         existing.rootly,
         existing.blameless,
+        existing.xmatters,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -3332,6 +3544,7 @@ class TradingApplication:
         firehydrant,
         existing.rootly,
         existing.blameless,
+        existing.xmatters,
       )
     if normalized_provider == "rootly":
       return (
@@ -3342,6 +3555,7 @@ class TradingApplication:
         existing.firehydrant,
         rootly,
         existing.blameless,
+        existing.xmatters,
       )
     if normalized_provider == "blameless":
       return (
@@ -3352,6 +3566,18 @@ class TradingApplication:
         existing.firehydrant,
         existing.rootly,
         blameless,
+        existing.xmatters,
+      )
+    if normalized_provider == "xmatters":
+      return (
+        "xmatters",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        xmatters,
       )
     return (
       existing.provider_schema_kind,
@@ -3361,6 +3587,7 @@ class TradingApplication:
       existing.firehydrant,
       existing.rootly,
       existing.blameless,
+      existing.xmatters,
     )
 
   def _build_provider_recovery_state(
@@ -3443,6 +3670,7 @@ class TradingApplication:
       firehydrant_schema,
       rootly_schema,
       blameless_schema,
+      xmatters_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
@@ -3524,6 +3752,7 @@ class TradingApplication:
       firehydrant=firehydrant_schema,
       rootly=rootly_schema,
       blameless=blameless_schema,
+      xmatters=xmatters_schema,
       updated_at=synced_at,
     )
 
@@ -3617,6 +3846,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.blameless,
+        ),
+      ),
+      xmatters=replace(
+        provider_recovery.xmatters,
+        phase_graph=self._build_xmatters_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.xmatters.incident_status,
+          priority=provider_recovery.xmatters.priority,
+          assignee=provider_recovery.xmatters.assignee,
+          response_plan=provider_recovery.xmatters.response_plan,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.xmatters,
         ),
       ),
     )
@@ -7960,6 +8203,8 @@ class TradingApplication:
       return "rootly"
     if normalized == "blame_less":
       return "blameless"
+    if normalized == "x_matters":
+      return "xmatters"
     return normalized or None
 
   @staticmethod
@@ -8129,6 +8374,8 @@ class TradingApplication:
       return "rootly"
     if "blameless_incidents" in combined:
       return "blameless"
+    if "xmatters_incidents" in combined:
+      return "xmatters"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

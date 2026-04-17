@@ -39,6 +39,8 @@ def _normalize_target(target: str) -> str | None:
     return "rootly_incidents"
   if normalized in {"blameless", "blameless_incidents", "operator_blameless"}:
     return "blameless_incidents"
+  if normalized in {"xmatters", "x_matters", "xmatters_incidents", "operator_xmatters"}:
+    return "xmatters_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -72,6 +74,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     blameless_api_url: str = "https://api.blameless.com",
     blameless_recovery_engine_url_template: str | None = None,
     blameless_recovery_engine_token: str | None = None,
+    xmatters_api_token: str | None = None,
+    xmatters_api_url: str = "https://api.xmatters.com",
+    xmatters_recovery_engine_url_template: str | None = None,
+    xmatters_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -109,6 +115,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._blameless_api_url = blameless_api_url.rstrip("/")
     self._blameless_recovery_engine_url_template = blameless_recovery_engine_url_template
     self._blameless_recovery_engine_token = blameless_recovery_engine_token
+    self._xmatters_api_token = xmatters_api_token
+    self._xmatters_api_url = xmatters_api_url.rstrip("/")
+    self._xmatters_recovery_engine_url_template = xmatters_recovery_engine_url_template
+    self._xmatters_recovery_engine_token = xmatters_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -132,6 +142,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("rootly")
     if self._blameless_api_token:
       providers.append("blameless")
+    if self._xmatters_api_token:
+      providers.append("xmatters")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -170,6 +182,9 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         continue
       if target == "blameless_incidents":
         records.append(self._deliver_blameless(incident=incident, attempt_number=attempt_number, phase=phase))
+        continue
+      if target == "xmatters_incidents":
+        records.append(self._deliver_xmatters(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "opsgenie_alerts":
         records.append(self._deliver_opsgenie(incident=incident, attempt_number=attempt_number, phase=phase))
@@ -243,6 +258,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "xmatters":
+      return (
+        self._sync_xmatters_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsgenie":
       return (
         self._sync_opsgenie_workflow(
@@ -293,6 +319,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_rootly_workflow_state(incident=incident)
     if normalized_provider == "blameless":
       return self._pull_blameless_workflow_state(incident=incident)
+    if normalized_provider == "xmatters":
+      return self._pull_xmatters_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -391,6 +419,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   def _build_blameless_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
     token = self._blameless_recovery_engine_token or self._blameless_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_xmatters_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    token = self._xmatters_recovery_engine_token or self._xmatters_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -560,6 +597,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_blameless_recovery_engine_request(url=url)
+    elif provider == "xmatters":
+      url = self._format_recovery_engine_url(
+        url_template=self._xmatters_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_xmatters_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -1814,6 +1862,245 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_xmatters(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._xmatters_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:xmatters_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="xmatters_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="xmatters_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_xmatters_delivery_request(incident=incident, reference=reference)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:xmatters_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="xmatters_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"xmatters_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:xmatters_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="xmatters_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"xmatters_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_xmatters_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    target = "xmatters_workflow"
+    if not self._xmatters_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="xmatters_workflow_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="xmatters_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="xmatters",
+        external_reference=None,
+        source=incident.source,
+      )
+    request = self._build_xmatters_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"xmatters_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"xmatters_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="xmatters",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_xmatters_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._xmatters_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_xmatters_pull_request(reference=reference, reference_type=reference_type)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    incident_payload = self._extract_mapping(
+      payload.get("data"),
+      payload.get("incident"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      incident_payload.get("attributes"),
+      incident_payload.get("incident"),
+      incident_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      attributes.get("metadata"),
+      attributes.get("details"),
+      attributes.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "priority": self._first_non_empty_string(
+        attributes.get("priority"),
+        self._extract_mapping(attributes.get("priority")).get("name"),
+      ),
+      "assignee": self._first_non_empty_string(
+        attributes.get("assignee"),
+        self._extract_mapping(attributes.get("assignee")).get("name"),
+        self._extract_mapping(attributes.get("owner")).get("name"),
+      ),
+      "response_plan": self._first_non_empty_string(
+        attributes.get("response_plan"),
+        self._extract_mapping(attributes.get("response_plan")).get("name"),
+      ),
+      "url": self._first_non_empty_string(
+        attributes.get("url"),
+        attributes.get("html_url"),
+      ),
+      "updated_at": attributes.get("updated_at"),
+      "external_reference": self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="xmatters",
+      workflow_reference=self._first_non_empty_string(
+        incident_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        attributes.get("status"),
+        payload.get("status"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        attributes.get("title"),
+        attributes.get("summary"),
+        attributes.get("description"),
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        attributes.get("updated_at"),
+        attributes.get("created_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -2444,6 +2731,60 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return "incident_active"
     return "idle"
 
+  @staticmethod
+  def _resolve_xmatters_incident_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_xmatters_ownership_phase(assignee: str | None) -> str:
+    return "assigned" if assignee else "unassigned"
+
+  @staticmethod
+  def _resolve_xmatters_priority_phase(priority: str | None) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    return normalized or "unknown"
+
+  @staticmethod
+  def _resolve_xmatters_response_plan_phase(response_plan: str | None) -> str:
+    return "configured" if response_plan else "unconfigured"
+
+  @staticmethod
+  def _resolve_xmatters_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
   def _build_provider_pull_sync(
     self,
     *,
@@ -2949,6 +3290,105 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           provider_telemetry.get("state"),
           provider_recovery.get("job_state"),
           blameless_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
+    elif provider == "xmatters":
+      xmatters_priority = self._first_non_empty_string(
+        provider_specific_recovery.get("priority"),
+        provider_payload.get("priority"),
+      )
+      xmatters_assignee = self._first_non_empty_string(
+        provider_specific_recovery.get("assignee"),
+        provider_payload.get("assignee"),
+        self._extract_mapping(provider_payload.get("owner")).get("name"),
+      )
+      xmatters_response_plan = self._first_non_empty_string(
+        provider_specific_recovery.get("response_plan"),
+        provider_payload.get("response_plan"),
+      )
+      xmatters_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("status"),
+      ) or "unknown"
+      xmatters_incident_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("incident_phase"),
+        self._resolve_xmatters_incident_phase(xmatters_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "xmatters",
+        "xmatters": {
+          "incident_id": workflow_reference,
+          "external_reference": external_reference,
+          "incident_status": xmatters_status,
+          "priority": xmatters_priority,
+          "assignee": xmatters_assignee,
+          "response_plan": xmatters_response_plan,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "incident_phase": xmatters_incident_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_xmatters_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=xmatters_status,
+            ),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_xmatters_ownership_phase(xmatters_assignee),
+            "priority_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("priority_phase"),
+            ) or self._resolve_xmatters_priority_phase(xmatters_priority),
+            "response_plan_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("response_plan_phase"),
+            ) or self._resolve_xmatters_response_plan_phase(xmatters_response_plan),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          xmatters_status,
         ),
         "job_url": self._first_non_empty_string(
           provider_telemetry.get("job_url"),
@@ -3496,6 +3936,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           ),
         },
       },
+      "xmatters": {
+        "incident_id": provider_recovery.xmatters.incident_id,
+        "external_reference": provider_recovery.xmatters.external_reference,
+        "incident_status": provider_recovery.xmatters.incident_status,
+        "priority": provider_recovery.xmatters.priority,
+        "assignee": provider_recovery.xmatters.assignee,
+        "response_plan": provider_recovery.xmatters.response_plan,
+        "url": provider_recovery.xmatters.url,
+        "updated_at": (
+          provider_recovery.xmatters.updated_at.isoformat()
+          if provider_recovery.xmatters.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "incident_phase": provider_recovery.xmatters.phase_graph.incident_phase,
+          "workflow_phase": provider_recovery.xmatters.phase_graph.workflow_phase,
+          "ownership_phase": provider_recovery.xmatters.phase_graph.ownership_phase,
+          "priority_phase": provider_recovery.xmatters.phase_graph.priority_phase,
+          "response_plan_phase": provider_recovery.xmatters.phase_graph.response_plan_phase,
+          "last_transition_at": (
+            provider_recovery.xmatters.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.xmatters.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
     }
 
   @staticmethod
@@ -3895,6 +4361,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       method="GET",
     )
 
+  def _build_xmatters_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}?identifier_type={reference_type}",
+      headers={
+        "Authorization": f"Bearer {self._xmatters_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
   def _build_pagerduty_workflow_request(
     self,
     *,
@@ -4256,6 +4738,137 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported blameless workflow action: {action}")
 
+  def _build_xmatters_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._xmatters_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._xmatters_api_url}/v1/incidents",
+      data=json.dumps(
+        {
+          "incident": {
+            "title": incident.summary[:255],
+            "summary": incident.detail,
+            "status": "open",
+            "priority": self._map_xmatters_priority(incident.severity),
+            "external_reference": reference,
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_xmatters_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._xmatters_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated incident to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._xmatters_api_url}/v1/incidents/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported xmatters workflow action: {action}")
+
   def _build_opsgenie_pull_request(
     self,
     *,
@@ -4560,3 +5173,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "sev3"
     return "sev4"
+
+  @staticmethod
+  def _map_xmatters_priority(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "P1"
+    if normalized in {"warning", "warn"}:
+      return "P3"
+    return "P5"

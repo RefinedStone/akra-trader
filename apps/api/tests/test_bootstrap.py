@@ -173,6 +173,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       blameless_api_url: str,
       blameless_recovery_engine_url_template: str | None,
       blameless_recovery_engine_token: str | None,
+      xmatters_api_token: str | None,
+      xmatters_api_url: str,
+      xmatters_recovery_engine_url_template: str | None,
+      xmatters_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -203,6 +207,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["blameless_api_url"] = blameless_api_url
       captured["blameless_recovery_engine_url_template"] = blameless_recovery_engine_url_template or ""
       captured["blameless_recovery_engine_token"] = blameless_recovery_engine_token or ""
+      captured["xmatters_api_token"] = xmatters_api_token or ""
+      captured["xmatters_api_url"] = xmatters_api_url
+      captured["xmatters_recovery_engine_url_template"] = xmatters_recovery_engine_url_template or ""
+      captured["xmatters_recovery_engine_token"] = xmatters_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -281,6 +289,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://blameless.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_blameless_recovery_engine_token="blameless-recovery-token",
+      operator_alert_xmatters_api_token="xmatters-token",
+      operator_alert_xmatters_api_url="https://api.xmatters.example",
+      operator_alert_xmatters_recovery_engine_url_template=(
+        "https://xmatters.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_xmatters_recovery_engine_token="xmatters-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -324,6 +338,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["blameless_api_url"] == "https://api.blameless.example"
   assert captured["blameless_recovery_engine_url_template"] == "https://blameless.example/recovery/{workflow_reference_urlencoded}"
   assert captured["blameless_recovery_engine_token"] == "blameless-recovery-token"
+  assert captured["xmatters_api_token"] == "xmatters-token"
+  assert captured["xmatters_api_url"] == "https://api.xmatters.example"
+  assert captured["xmatters_recovery_engine_url_template"] == "https://xmatters.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["xmatters_recovery_engine_token"] == "xmatters-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"

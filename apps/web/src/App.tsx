@@ -520,6 +520,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        xmatters: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assignee?: string | null;
+          response_plan?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            response_plan_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -789,6 +807,24 @@ type GuardedLiveStatus = {
             command_phase: string;
             visibility_phase: string;
             severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        xmatters: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          assignee?: string | null;
+          response_plan?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            response_plan_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8304,6 +8340,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  xmatters: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    priority?: string | null;
+    assignee?: string | null;
+    response_plan?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      response_plan_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8476,6 +8530,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Blameless schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "xmatters") {
+    const details = [
+      providerRecovery.xmatters.incident_id ? `incident ${providerRecovery.xmatters.incident_id}` : null,
+      providerRecovery.xmatters.incident_status !== "unknown"
+        ? `status ${providerRecovery.xmatters.incident_status}`
+        : null,
+      providerRecovery.xmatters.priority ? `priority ${providerRecovery.xmatters.priority}` : null,
+      providerRecovery.xmatters.assignee ? `assignee ${providerRecovery.xmatters.assignee}` : null,
+      providerRecovery.xmatters.response_plan
+        ? `response plan ${providerRecovery.xmatters.response_plan}`
+        : null,
+      providerRecovery.xmatters.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.xmatters.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.xmatters.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.xmatters.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.xmatters.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.xmatters.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.xmatters.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.xmatters.updated_at)}`
+        : null,
+      providerRecovery.xmatters.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.xmatters.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `xMatters schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

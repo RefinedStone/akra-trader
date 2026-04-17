@@ -701,6 +701,31 @@ class OperatorIncidentBlamelessRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentXmattersRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  priority: str | None = None
+  assignee: str | None = None
+  response_plan: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentXmattersRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentXmattersRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentXmattersRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  response_plan_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -739,6 +764,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   blameless: OperatorIncidentBlamelessRecoveryState = field(
     default_factory=OperatorIncidentBlamelessRecoveryState
+  )
+  xmatters: OperatorIncidentXmattersRecoveryState = field(
+    default_factory=OperatorIncidentXmattersRecoveryState
   )
   updated_at: datetime | None = None
 
