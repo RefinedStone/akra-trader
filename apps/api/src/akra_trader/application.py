@@ -76,6 +76,8 @@ from akra_trader.domain.models import OperatorIncidentSplunkOnCallRecoveryPhaseG
 from akra_trader.domain.models import OperatorIncidentSplunkOnCallRecoveryState
 from akra_trader.domain.models import OperatorIncidentJiraServiceManagementRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentJiraServiceManagementRecoveryState
+from akra_trader.domain.models import OperatorIncidentPagerTreeRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentPagerTreeRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1682,6 +1684,17 @@ class TradingApplication:
             aligned_provider_recovery,
             jira_service_management=replace(
               aligned_provider_recovery.jira_service_management,
+              incident_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "pagertree"
+          and provider_recovery.pagertree.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            pagertree=replace(
+              aligned_provider_recovery.pagertree,
               incident_status="delivered",
             ),
           )
@@ -3895,6 +3908,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_pagertree_incident_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "in_progress",
+      "investigating",
+      "monitoring",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_pagertree_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_pagertree_urgency_phase(
+    urgency: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (urgency or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_pagertree_team_phase(
+    team: str | None,
+    existing_phase: str,
+  ) -> str:
+    if team:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_pagertree_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"triggered", "open", "in_progress", "investigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_pagertree_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    urgency: str | None,
+    assignee: str | None,
+    team: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentPagerTreeRecoveryState,
+  ) -> OperatorIncidentPagerTreeRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_pagertree_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_pagertree_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentPagerTreeRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_pagertree_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      urgency_phase=self._first_non_empty_string(
+        payload.get("urgency_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("urgency_phase"),
+      ) or self._resolve_pagertree_urgency_phase(
+        urgency,
+        existing.phase_graph.urgency_phase,
+      ),
+      team_phase=self._first_non_empty_string(
+        payload.get("team_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("team_phase"),
+      ) or self._resolve_pagertree_team_phase(
+        team,
+        existing.phase_graph.team_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -3923,6 +4069,7 @@ class TradingApplication:
     OperatorIncidentZendutyRecoveryState,
     OperatorIncidentSplunkOnCallRecoveryState,
     OperatorIncidentJiraServiceManagementRecoveryState,
+    OperatorIncidentPagerTreeRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -5016,6 +5163,86 @@ class TradingApplication:
       ),
     )
 
+    pagertree_payload = self._merge_payload_mappings(
+      schema_payload.get("pagertree"),
+      schema_payload.get("pager_tree"),
+      payload.get("pagertree"),
+      payload.get("pagertree_incident"),
+      payload.get("pager_tree"),
+    )
+    pagertree_status = self._first_non_empty_string(
+      pagertree_payload.get("incident_status"),
+      pagertree_payload.get("status"),
+      pagertree_payload.get("state"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.pagertree.incident_status,
+    ) or "unknown"
+    pagertree = OperatorIncidentPagerTreeRecoveryState(
+      incident_id=self._first_non_empty_string(
+        pagertree_payload.get("incident_id"),
+        pagertree_payload.get("id"),
+        workflow_reference,
+        existing.pagertree.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        pagertree_payload.get("external_reference"),
+        pagertree_payload.get("reference"),
+        reference,
+        existing.pagertree.external_reference,
+      ),
+      incident_status=pagertree_status,
+      urgency=self._first_non_empty_string(
+        pagertree_payload.get("urgency"),
+        pagertree_payload.get("priority"),
+        pagertree_payload.get("severity"),
+        existing.pagertree.urgency,
+      ),
+      assignee=self._first_non_empty_string(
+        pagertree_payload.get("assignee"),
+        pagertree_payload.get("owner"),
+        existing.pagertree.assignee,
+      ),
+      team=self._first_non_empty_string(
+        pagertree_payload.get("team"),
+        pagertree_payload.get("service"),
+        existing.pagertree.team,
+      ),
+      url=self._first_non_empty_string(
+        pagertree_payload.get("url"),
+        pagertree_payload.get("html_url"),
+        existing.pagertree.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(pagertree_payload.get("updated_at"))
+        or existing.pagertree.updated_at
+      ),
+      phase_graph=self._build_pagertree_recovery_phase_graph(
+        payload=pagertree_payload,
+        incident_status=pagertree_status,
+        urgency=self._first_non_empty_string(
+          pagertree_payload.get("urgency"),
+          pagertree_payload.get("priority"),
+          pagertree_payload.get("severity"),
+          existing.pagertree.urgency,
+        ),
+        assignee=self._first_non_empty_string(
+          pagertree_payload.get("assignee"),
+          pagertree_payload.get("owner"),
+          existing.pagertree.assignee,
+        ),
+        team=self._first_non_empty_string(
+          pagertree_payload.get("team"),
+          pagertree_payload.get("service"),
+          existing.pagertree.team,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.pagertree,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -5033,6 +5260,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -5051,6 +5279,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "incidentio":
       return (
@@ -5069,6 +5298,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -5087,6 +5317,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "rootly":
       return (
@@ -5105,6 +5336,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "blameless":
       return (
@@ -5123,6 +5355,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "xmatters":
       return (
@@ -5141,6 +5374,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "servicenow":
       return (
@@ -5159,6 +5393,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "squadcast":
       return (
@@ -5177,6 +5412,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "bigpanda":
       return (
@@ -5195,6 +5431,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "grafana_oncall":
       return (
@@ -5213,6 +5450,7 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "zenduty":
       return (
@@ -5231,6 +5469,7 @@ class TradingApplication:
         zenduty,
         existing.splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "splunk_oncall":
       return (
@@ -5249,6 +5488,7 @@ class TradingApplication:
         existing.zenduty,
         splunk_oncall,
         existing.jira_service_management,
+        existing.pagertree,
       )
     if normalized_provider == "jira_service_management":
       return (
@@ -5267,6 +5507,26 @@ class TradingApplication:
         existing.zenduty,
         existing.splunk_oncall,
         jira_service_management,
+        existing.pagertree,
+      )
+    if normalized_provider == "pagertree":
+      return (
+        "pagertree",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        existing.xmatters,
+        existing.servicenow,
+        existing.squadcast,
+        existing.bigpanda,
+        existing.grafana_oncall,
+        existing.zenduty,
+        existing.splunk_oncall,
+        existing.jira_service_management,
+        pagertree,
       )
     return (
       existing.provider_schema_kind,
@@ -5284,6 +5544,7 @@ class TradingApplication:
       existing.zenduty,
       existing.splunk_oncall,
       existing.jira_service_management,
+      existing.pagertree,
     )
 
   def _build_provider_recovery_state(
@@ -5374,6 +5635,7 @@ class TradingApplication:
       zenduty_schema,
       splunk_oncall_schema,
       jira_service_management_schema,
+      pagertree_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
         provider=provider or existing.provider or remediation.provider or "",
@@ -5463,6 +5725,7 @@ class TradingApplication:
       zenduty=zenduty_schema,
       splunk_oncall=splunk_oncall_schema,
       jira_service_management=jira_service_management_schema,
+      pagertree=pagertree_schema,
       updated_at=synced_at,
     )
 
@@ -5668,6 +5931,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.jira_service_management,
+        ),
+      ),
+      pagertree=replace(
+        provider_recovery.pagertree,
+        phase_graph=self._build_pagertree_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.pagertree.incident_status,
+          urgency=provider_recovery.pagertree.urgency,
+          assignee=provider_recovery.pagertree.assignee,
+          team=provider_recovery.pagertree.team,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.pagertree,
         ),
       ),
     )
@@ -10025,6 +10302,8 @@ class TradingApplication:
       return "splunk_oncall"
     if normalized in {"jsm", "jira_service_desk"}:
       return "jira_service_management"
+    if normalized == "pager_tree":
+      return "pagertree"
     if normalized in {"grafana_oncall_incidents", "grafanaoncall", "operator_grafana_oncall"}:
       return "grafana_oncall"
     if normalized in {"zenduty_incidents", "operator_zenduty"}:
@@ -10038,6 +10317,8 @@ class TradingApplication:
       "jsm_incidents",
     }:
       return "jira_service_management"
+    if normalized in {"pagertree_incidents", "operator_pagertree"}:
+      return "pagertree"
     return normalized or None
 
   @staticmethod
@@ -10223,6 +10504,8 @@ class TradingApplication:
       return "splunk_oncall"
     if "jira_service_management_incidents" in combined or "jsm_incidents" in combined:
       return "jira_service_management"
+    if "pagertree_incidents" in combined:
+      return "pagertree"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

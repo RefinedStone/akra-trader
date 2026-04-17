@@ -646,6 +646,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        pagertree: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          urgency?: string | null;
+          assignee?: string | null;
+          team?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            urgency_phase: string;
+            team_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1059,6 +1077,24 @@ type GuardedLiveStatus = {
             assignment_phase: string;
             priority_phase: string;
             project_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        pagertree: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          urgency?: string | null;
+          assignee?: string | null;
+          team?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            urgency_phase: string;
+            team_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8718,6 +8754,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  pagertree: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    urgency?: string | null;
+    assignee?: string | null;
+    team?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      urgency_phase: string;
+      team_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9133,6 +9187,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Jira Service Management schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "pagertree") {
+    const details = [
+      providerRecovery.pagertree.incident_id ? `incident ${providerRecovery.pagertree.incident_id}` : null,
+      providerRecovery.pagertree.incident_status !== "unknown"
+        ? `status ${providerRecovery.pagertree.incident_status}`
+        : null,
+      providerRecovery.pagertree.urgency ? `urgency ${providerRecovery.pagertree.urgency}` : null,
+      providerRecovery.pagertree.assignee ? `assignee ${providerRecovery.pagertree.assignee}` : null,
+      providerRecovery.pagertree.team ? `team ${providerRecovery.pagertree.team}` : null,
+      providerRecovery.pagertree.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.pagertree.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.pagertree.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.pagertree.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.pagertree.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.pagertree.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.pagertree.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.pagertree.updated_at)}`
+        : null,
+      providerRecovery.pagertree.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.pagertree.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `PagerTree schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

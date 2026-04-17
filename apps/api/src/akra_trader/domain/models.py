@@ -901,6 +901,31 @@ class OperatorIncidentJiraServiceManagementRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentPagerTreeRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  urgency: str | None = None
+  assignee: str | None = None
+  team: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentPagerTreeRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentPagerTreeRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentPagerTreeRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  urgency_phase: str = "unknown"
+  team_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -963,6 +988,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   jira_service_management: OperatorIncidentJiraServiceManagementRecoveryState = field(
     default_factory=OperatorIncidentJiraServiceManagementRecoveryState
+  )
+  pagertree: OperatorIncidentPagerTreeRecoveryState = field(
+    default_factory=OperatorIncidentPagerTreeRecoveryState
   )
   updated_at: datetime | None = None
 

@@ -224,6 +224,8 @@ class FakeOperatorAlertDeliveryAdapter:
         external_provider = "splunk_oncall"
       elif target == "jira_service_management_incidents":
         external_provider = "jira_service_management"
+      elif target == "pagertree_incidents":
+        external_provider = "pagertree"
       elif target == "zenduty_incidents":
         external_provider = "zenduty"
       elif target == "opsgenie_alerts":
@@ -3356,6 +3358,136 @@ def test_external_jira_service_management_recovery_sync_populates_jira_service_m
   assert updated_incident.remediation.provider_recovery.telemetry.current_step == "repair_channel_window"
 
 
+def test_external_pagertree_recovery_sync_populates_pagertree_typed_schema(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 16, 43, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagertree_incidents",),
+    supported_workflow_providers=("pagertree",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="pagertree",
+    operator_alert_paging_policy_warning_targets=("pagertree_incidents",),
+    operator_alert_paging_policy_critical_targets=("pagertree_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="pagertree_market_data_recovery_sync",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="pagertree",
+    event_kind="remediation_started",
+    actor="pagertree",
+    detail="pagertree_market_data_recovery_started",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="PT-123",
+    occurred_at=clock.current + timedelta(minutes=1),
+    payload={
+      "job_id": "pt-job-11",
+      "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+      "pagertree": {
+        "incident_id": "PT-123",
+        "external_reference": "guarded-live:market-data:5m",
+        "incident_status": "acknowledged",
+        "urgency": "high",
+        "assignee": "market-data-oncall",
+        "team": "market-data-platform",
+        "url": "https://pagertree.example/incidents/PT-123",
+      },
+      "telemetry": {
+        "state": "running",
+        "progress_percent": 67,
+        "attempt_count": 1,
+        "current_step": "repair_channel_window",
+        "last_message": "pagertree recovery started",
+        "external_run_id": "pagertree-telemetry-1",
+      },
+    },
+  )
+
+  updated_incident = next(
+    event
+    for event in synced.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated_incident.remediation.provider_recovery.provider_schema_kind == "pagertree"
+  assert updated_incident.remediation.provider_recovery.pagertree.incident_id == "PT-123"
+  assert updated_incident.remediation.provider_recovery.pagertree.external_reference == "guarded-live:market-data:5m"
+  assert updated_incident.remediation.provider_recovery.pagertree.incident_status == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.pagertree.urgency == "high"
+  assert updated_incident.remediation.provider_recovery.pagertree.assignee == "market-data-oncall"
+  assert updated_incident.remediation.provider_recovery.pagertree.team == "market-data-platform"
+  assert updated_incident.remediation.provider_recovery.pagertree.phase_graph.incident_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.pagertree.phase_graph.workflow_phase == "provider_recovering"
+  assert updated_incident.remediation.provider_recovery.pagertree.phase_graph.ownership_phase == "assigned"
+  assert updated_incident.remediation.provider_recovery.pagertree.phase_graph.team_phase == "configured"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 67
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "repair_channel_window"
+
+
 def test_guarded_live_channel_restore_incidents_auto_run_local_session_remediation(
   tmp_path: Path,
 ) -> None:
@@ -5699,6 +5831,80 @@ def test_incident_paging_provider_can_be_inferred_for_jira_service_management_wo
   assert updated.provider_workflow_action == "acknowledge"
   assert any(
     attempt[1:] == ("jira_service_management", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
+
+
+def test_incident_paging_provider_can_be_inferred_for_pagertree_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 16, 7, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagertree_incidents",),
+    supported_workflow_providers=("pagertree",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_warning_targets=("pagertree_incidents",),
+    operator_alert_paging_policy_critical_targets=("pagertree_incidents",),
+    operator_alert_paging_policy_warning_escalation_targets=("pagertree_incidents",),
+    operator_alert_paging_policy_critical_escalation_targets=("pagertree_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="pagertree_policy")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_provider == "pagertree"
+  assert incident.delivery_targets == ("pagertree_incidents",)
+  assert incident.escalation_targets == ("pagertree_incidents",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="pagertree",
+    event_kind="triggered",
+    actor="pagertree",
+    detail="provider_incident_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="PT-123",
+    occurred_at=clock.current + timedelta(seconds=15),
+  )
+  triggered = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered.provider_workflow_reference == "PT-123"
+  assert triggered.external_provider == "pagertree"
+
+  clock.advance(timedelta(minutes=1))
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="pagertree_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert any(
+    attempt[1:] == ("pagertree", "acknowledge", 1)
     for attempt in delivery.workflow_attempts
   )
 
