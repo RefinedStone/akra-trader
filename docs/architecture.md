@@ -138,8 +138,10 @@ flows. Failed worker sessions and stale heartbeats surface as control-room alert
 control/session faults plus guarded-live risk breaches, repeated recovery loops, stale order
 sync, and market-data freshness faults from stale sync, richer backfill-quality semantics, gap
 windows, repeated sync failures, and venue-specific upstream fault classifications now persist as
-live-path alert history with active/resolved lifecycle state and delivery targets, alert
-transitions now emit durable incident-opened/resolved events plus outbound delivery attempt
+live-path alert history with active/resolved lifecycle state and delivery targets. Guarded-live
+venue-session coverage now also promotes channel-level depth/order-book continuity gaps, stale
+market-channel timestamps, and channel-restore failures into the same durable incident surface.
+Alert transitions now emit durable incident-opened/resolved events plus outbound delivery attempt
 history, failed deliveries now carry retry scheduling state through attempt numbers plus bounded
 exponential backoff timestamps, durable incidents now also carry
 acknowledgment, escalation, and external paging-sync state, and worker lifecycle notes plus

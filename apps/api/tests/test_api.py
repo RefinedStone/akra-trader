@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
@@ -1163,6 +1164,115 @@ def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_r
     assert any(event["alert_id"] == "guarded-live:market-data-quality:binance:5m" for event in incident_events)
     assert any(event["alert_id"] == "guarded-live:market-data-venue:binance:5m" for event in incident_events)
     assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
+
+
+def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 19, 0, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "channel_level_incident_visibility",
+      },
+    )
+    assert live_response.status_code == 200
+    run_id = live_response.json()["config"]["run_id"]
+
+    state = app._guarded_live_state.load_state()
+    app._guarded_live_state.save_state(
+      replace(
+        state,
+        session_handoff=replace(
+          state.session_handoff,
+          coverage=("trade_ticks", "depth_updates", "kline_candles"),
+          handed_off_at=datetime(2025, 1, 3, 18, 58, tzinfo=UTC),
+          last_sync_at=datetime(2025, 1, 3, 18, 58, tzinfo=UTC),
+          last_trade_event_at=datetime(2025, 1, 3, 18, 58, tzinfo=UTC),
+          last_depth_event_at=datetime(2025, 1, 3, 18, 58, tzinfo=UTC),
+          last_kline_event_at=None,
+          order_book_state="snapshot_rebuilt",
+          order_book_gap_count=1,
+          order_book_rebuild_count=2,
+          order_book_last_update_id=34,
+          order_book_last_rebuilt_at=datetime(2025, 1, 3, 18, 59, tzinfo=UTC),
+          channel_restore_state="unavailable",
+          channel_restore_count=2,
+          channel_last_restored_at=datetime(2025, 1, 3, 18, 59, tzinfo=UTC),
+          channel_continuation_state="unavailable",
+          channel_continuation_count=2,
+          channel_last_continued_at=datetime(2025, 1, 3, 18, 59, tzinfo=UTC),
+          issues=(
+            "binance_order_book_gap_detected:25:29",
+            "binance_market_channel_restore_failed:ticker:timeout:exchange timeout",
+          ),
+        ),
+      )
+    )
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    alerts = visibility_response.json()["alerts"]
+    categories = {
+      alert["category"]
+      for alert in alerts
+      if alert.get("run_id") == run_id and alert.get("source") == "guarded_live"
+    }
+    assert {"market_data_channel_consistency", "market_data_channel_restore"} <= categories
+
+    consistency_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_channel_consistency"
+    )
+    assert "depth/order-book continuity recorded 1 gap(s)." in consistency_alert["detail"]
+    assert "binance depth stream gap detected between update ids 25 and 29." in consistency_alert["detail"]
+    assert "trade ticks is stale" in consistency_alert["detail"]
+
+    restore_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run_id and alert["category"] == "market_data_channel_restore"
+    )
+    assert "market-channel restore is unavailable." in restore_alert["detail"]
+    assert "market-channel continuation is unavailable." in restore_alert["detail"]
+    assert "binance ticker restore failed: timeout:exchange timeout." in restore_alert["detail"]
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident_events = guarded_live_response.json()["incident_events"]
+    assert any(
+      event["alert_id"] == f"guarded-live:market-data-channel-consistency:{run_id}"
+      for event in incident_events
+    )
+    assert any(
+      event["alert_id"] == f"guarded-live:market-data-channel-restore:{run_id}"
+      for event in incident_events
+    )
 
 
 def test_live_endpoints_use_configured_supported_guarded_live_venue(tmp_path: Path) -> None:

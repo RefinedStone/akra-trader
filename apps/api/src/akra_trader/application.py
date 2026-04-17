@@ -4095,6 +4095,15 @@ class TradingApplication:
         )
       )
 
+    alerts.extend(
+      self._build_guarded_live_channel_operator_alerts(
+        state=state,
+        current_time=current_time,
+        live_context_active=live_context_active,
+        delivery_targets=delivery_targets,
+      )
+    )
+
     for run in live_runs:
       alerts.extend(self._build_live_operator_alerts_for_run(run=run, current_time=current_time))
 
@@ -4306,6 +4315,264 @@ class TradingApplication:
       if run.config.timeframe not in timeframes:
         timeframes.append(run.config.timeframe)
     return tuple(timeframes or ("5m",))
+
+  def _build_guarded_live_channel_operator_alerts(
+    self,
+    *,
+    state: GuardedLiveState,
+    current_time: datetime,
+    live_context_active: bool,
+    delivery_targets: tuple[str, ...],
+  ) -> list[OperatorAlert]:
+    if not live_context_active:
+      return []
+
+    handoff = state.session_handoff
+    if handoff.state in {"inactive", "released"}:
+      return []
+
+    run_id = state.ownership.owner_run_id or handoff.owner_run_id
+    session_id = state.ownership.owner_session_id or handoff.owner_session_id
+    alerts: list[OperatorAlert] = []
+
+    consistency_details, consistency_detected_at, consistency_has_critical = (
+      self._collect_guarded_live_channel_consistency_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if consistency_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-channel-consistency:{run_id or 'unknown'}",
+          severity="critical" if consistency_has_critical else "warning",
+          category="market_data_channel_consistency",
+          summary=(
+            f"Guarded-live market-data channel consistency is degraded for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(consistency_details),
+          detected_at=consistency_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    restore_details, restore_detected_at, restore_has_critical = (
+      self._collect_guarded_live_channel_restore_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if restore_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-channel-restore:{run_id or 'unknown'}",
+          severity="critical" if restore_has_critical else "warning",
+          category="market_data_channel_restore",
+          summary=(
+            f"Guarded-live market-data channel restore requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(restore_details),
+          detected_at=restore_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+    return alerts
+
+  def _collect_guarded_live_channel_consistency_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    threshold_seconds = max(self._guarded_live_worker_heartbeat_timeout_seconds, 1)
+    threshold = timedelta(seconds=threshold_seconds)
+    handoff_anchor = handoff.last_sync_at or handoff.handed_off_at or current_time
+    has_critical = False
+
+    def add_finding(detail: str, *, detected_at: datetime | None, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if handoff.order_book_state == "unavailable":
+      add_finding(
+        "depth/order-book supervision is unavailable.",
+        detected_at=handoff.last_sync_at or handoff.handed_off_at or current_time,
+        critical=True,
+      )
+    elif handoff.order_book_state == "resync_required":
+      add_finding(
+        "depth/order-book continuity requires a resync before the local book is trustworthy.",
+        detected_at=handoff.last_sync_at or handoff.handed_off_at or current_time,
+        critical=True,
+      )
+
+    if handoff.order_book_gap_count > 0:
+      gap_detail = f"depth/order-book continuity recorded {handoff.order_book_gap_count} gap(s)."
+      if handoff.order_book_last_update_id is not None:
+        gap_detail += f" Last update id: {handoff.order_book_last_update_id}."
+      add_finding(
+        gap_detail,
+        detected_at=handoff.order_book_last_rebuilt_at or handoff.last_sync_at or handoff.handed_off_at,
+      )
+
+    for issue_detail in self._extract_guarded_live_channel_gap_semantics(issues=handoff.issues):
+      add_finding(
+        issue_detail,
+        detected_at=handoff.order_book_last_rebuilt_at or handoff.last_sync_at or handoff.handed_off_at,
+      )
+
+    for channel_name, event_at, critical_channel in self._resolve_guarded_live_market_channel_activity(
+      handoff=handoff
+    ):
+      if event_at is None:
+        if current_time - handoff_anchor >= threshold:
+          add_finding(
+            f"{channel_name} has not produced any events within {threshold_seconds}s of the active venue handoff.",
+            detected_at=handoff_anchor,
+            critical=critical_channel,
+          )
+        continue
+      if current_time - event_at > threshold:
+        add_finding(
+          f"{channel_name} is stale; last event at {event_at.isoformat()}.",
+          detected_at=event_at,
+          critical=critical_channel,
+        )
+
+    detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  def _collect_guarded_live_channel_restore_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    restore_anchor = handoff.channel_last_restored_at or handoff.last_sync_at or handoff.handed_off_at or current_time
+    has_critical = False
+
+    def add_finding(detail: str, *, detected_at: datetime | None, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if handoff.channel_restore_state == "partial":
+      add_finding(
+        "market-channel restore completed only partially.",
+        detected_at=restore_anchor,
+      )
+    elif handoff.channel_restore_state == "unavailable":
+      add_finding(
+        "market-channel restore is unavailable.",
+        detected_at=restore_anchor,
+        critical=True,
+      )
+
+    if handoff.channel_continuation_state == "partial":
+      add_finding(
+        "market-channel continuation is only partially supervised.",
+        detected_at=handoff.channel_last_continued_at or restore_anchor,
+      )
+    elif handoff.channel_continuation_state == "unavailable":
+      add_finding(
+        "market-channel continuation is unavailable.",
+        detected_at=handoff.channel_last_continued_at or restore_anchor,
+        critical=True,
+      )
+
+    for issue_detail in self._extract_guarded_live_channel_restore_semantics(issues=handoff.issues):
+      add_finding(
+        issue_detail,
+        detected_at=restore_anchor,
+        critical=True,
+      )
+
+    detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  @staticmethod
+  def _resolve_guarded_live_market_channel_activity(
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+  ) -> tuple[tuple[str, datetime | None, bool], ...]:
+    coverage = set(handoff.coverage)
+    activity: list[tuple[str, datetime | None, bool]] = []
+    if "trade_ticks" in coverage:
+      activity.append(("trade ticks", handoff.last_trade_event_at, False))
+    if "aggregate_trade_ticks" in coverage:
+      activity.append(("aggregate-trade ticks", handoff.last_aggregate_trade_event_at, False))
+    if "book_ticker" in coverage:
+      activity.append(("book-ticker updates", handoff.last_book_ticker_event_at, False))
+    if "mini_ticker" in coverage:
+      activity.append(("mini-ticker updates", handoff.last_mini_ticker_event_at, False))
+    if "depth_updates" in coverage or "order_book_lifecycle" in coverage:
+      activity.append(("depth/order-book updates", handoff.last_depth_event_at, True))
+    if "kline_candles" in coverage:
+      activity.append(("kline candles", handoff.last_kline_event_at, False))
+    return tuple(activity)
+
+  @staticmethod
+  def _extract_guarded_live_channel_gap_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings: list[str] = []
+    for issue in issues:
+      if "_order_book_gap_detected:" not in issue:
+        continue
+      venue, payload = issue.split("_order_book_gap_detected:", 1)
+      previous_update_id, _, next_update_id = payload.partition(":")
+      if previous_update_id and next_update_id:
+        findings.append(
+          f"{venue} depth stream gap detected between update ids {previous_update_id} and {next_update_id}."
+        )
+      else:
+        findings.append(f"{venue} depth stream gap detected.")
+    return tuple(dict.fromkeys(findings))
+
+  @staticmethod
+  def _extract_guarded_live_channel_restore_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings: list[str] = []
+    for issue in issues:
+      if "_market_channel_restore_failed:" not in issue:
+        continue
+      venue, payload = issue.split("_market_channel_restore_failed:", 1)
+      channel, _, remainder = payload.partition(":")
+      reason = remainder.replace("_", " ") if remainder else "unknown"
+      channel_label = channel.replace("_", " ") if channel else "market channel"
+      findings.append(
+        f"{venue} {channel_label} restore failed: {reason}."
+      )
+    return tuple(dict.fromkeys(findings))
+
+  @staticmethod
+  def _summarize_guarded_live_issue_copy(details: list[str]) -> str:
+    unique_details = list(dict.fromkeys(details))
+    return " ".join(unique_details[:3]) + (
+      f" Additional issues: {len(unique_details) - 3}."
+      if len(unique_details) > 3
+      else ""
+    )
 
   def _build_guarded_live_incident_events(
     self,

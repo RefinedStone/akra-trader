@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
@@ -1273,6 +1274,120 @@ def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incid
   )
   assert any(
     record.alert_id == "guarded-live:market-data-quality:binance:5m"
+    for record in guarded_live_status.delivery_history
+  )
+
+
+def test_operator_visibility_promotes_channel_level_market_data_incidents(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 19, 0, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="channel_level_incident_visibility",
+  )
+
+  state = guarded_live_state.load_state()
+  degraded_handoff = replace(
+    state.session_handoff,
+    coverage=("trade_ticks", "depth_updates", "kline_candles"),
+    handed_off_at=clock.current - timedelta(minutes=2),
+    last_sync_at=clock.current - timedelta(minutes=2),
+    last_trade_event_at=clock.current - timedelta(minutes=2),
+    last_depth_event_at=clock.current - timedelta(minutes=2),
+    last_kline_event_at=None,
+    order_book_state="snapshot_rebuilt",
+    order_book_gap_count=1,
+    order_book_rebuild_count=2,
+    order_book_last_update_id=34,
+    order_book_last_rebuilt_at=clock.current - timedelta(minutes=1),
+    channel_restore_state="unavailable",
+    channel_restore_count=2,
+    channel_last_restored_at=clock.current - timedelta(minutes=1),
+    channel_continuation_state="unavailable",
+    channel_continuation_count=2,
+    channel_last_continued_at=clock.current - timedelta(minutes=1),
+    issues=(
+      "binance_order_book_gap_detected:25:29",
+      "binance_market_channel_restore_failed:ticker:timeout:exchange timeout",
+    ),
+  )
+  guarded_live_state.save_state(replace(state, session_handoff=degraded_handoff))
+
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  categories = {
+    alert.category
+    for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.source == "guarded_live"
+  }
+  assert {"market_data_channel_consistency", "market_data_channel_restore"} <= categories
+
+  consistency_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "market_data_channel_consistency"
+  )
+  assert "depth/order-book continuity recorded 1 gap(s)." in consistency_alert.detail
+  assert "binance depth stream gap detected between update ids 25 and 29." in consistency_alert.detail
+  assert "trade ticks is stale" in consistency_alert.detail
+
+  restore_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "market_data_channel_restore"
+  )
+  assert "market-channel restore is unavailable." in restore_alert.detail
+  assert "market-channel continuation is unavailable." in restore_alert.detail
+  assert "binance ticker restore failed: timeout:exchange timeout." in restore_alert.detail
+
+  assert any(
+    event.kind == "incident_opened"
+    and event.alert_id == f"guarded-live:market-data-channel-consistency:{run.config.run_id}"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    event.kind == "incident_opened"
+    and event.alert_id == f"guarded-live:market-data-channel-restore:{run.config.run_id}"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    record.alert_id == f"guarded-live:market-data-channel-consistency:{run.config.run_id}"
+    for record in guarded_live_status.delivery_history
+  )
+  assert any(
+    record.alert_id == f"guarded-live:market-data-channel-restore:{run.config.run_id}"
     for record in guarded_live_status.delivery_history
   )
 
