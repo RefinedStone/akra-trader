@@ -16,6 +16,7 @@ from urllib import request as urllib_request
 
 import ccxt
 
+from akra_trader.domain.models import GuardedLiveOrderBookLevel
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
@@ -521,6 +522,25 @@ class VenueExecutionExchange(Protocol):
     params: dict[str, Any] | None = None,
   ) -> dict[str, Any]: ...
 
+  def fetch_ticker(self, symbol: str, params: dict[str, Any] | None = None) -> dict[str, Any]: ...
+
+  def fetch_trades(
+    self,
+    symbol: str,
+    since: int | None = None,
+    limit: int | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> list[dict[str, Any]]: ...
+
+  def fetch_ohlcv(
+    self,
+    symbol: str,
+    timeframe: str = "1m",
+    since: int | None = None,
+    limit: int | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> list[list[Any]]: ...
+
   def fetch_closed_orders(
     self,
     symbol: str | None = None,
@@ -660,6 +680,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       last_sync_at=current_time,
       supervision_state="streaming",
       order_book_state="synthetic",
+      channel_restore_state="synthetic",
       coverage=("execution_reports",),
       active_order_count=self._count_active_orders(symbol=symbol),
       issues=(),
@@ -709,6 +730,11 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       order_book_best_bid_quantity=existing.order_book_best_bid_quantity or handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=existing.order_book_best_ask_price or handoff.order_book_best_ask_price,
       order_book_best_ask_quantity=existing.order_book_best_ask_quantity or handoff.order_book_best_ask_quantity,
+      order_book_bids=existing.order_book_bids or handoff.order_book_bids,
+      order_book_asks=existing.order_book_asks or handoff.order_book_asks,
+      channel_restore_state=existing.channel_restore_state or handoff.channel_restore_state or "synthetic",
+      channel_restore_count=existing.channel_restore_count or handoff.channel_restore_count,
+      channel_last_restored_at=existing.channel_last_restored_at or handoff.channel_last_restored_at,
       failover_count=existing.failover_count or handoff.failover_count,
       last_failover_at=existing.last_failover_at or handoff.last_failover_at,
       coverage=existing.coverage or handoff.coverage or ("execution_reports",),
@@ -772,6 +798,11 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=handoff.order_book_best_ask_price,
       order_book_best_ask_quantity=handoff.order_book_best_ask_quantity,
+      order_book_bids=handoff.order_book_bids,
+      order_book_asks=handoff.order_book_asks,
+      channel_restore_state=handoff.channel_restore_state,
+      channel_restore_count=handoff.channel_restore_count,
+      channel_last_restored_at=handoff.channel_last_restored_at,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
@@ -1202,6 +1233,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       rebuild_count=0,
       reason="handoff",
     )
+    channel_restore = self._restore_market_channels_from_exchange(
+      symbol=symbol,
+      timeframe=timeframe,
+      reason="handoff",
+    )
     return GuardedLiveVenueSessionHandoff(
       state="active",
       handed_off_at=current_time,
@@ -1228,9 +1264,20 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       order_book_best_bid_quantity=rebuild["best_bid_quantity"],
       order_book_best_ask_price=rebuild["best_ask_price"],
       order_book_best_ask_quantity=rebuild["best_ask_quantity"],
+      order_book_bids=rebuild["bids"],
+      order_book_asks=rebuild["asks"],
+      channel_restore_state=str(channel_restore["state"]),
+      channel_restore_count=1 if channel_restore["restored_at"] is not None else 0,
+      channel_last_restored_at=channel_restore["restored_at"],
       coverage=BINANCE_VENUE_STREAM_COVERAGE,
+      last_market_event_at=channel_restore["last_market_event_at"],
+      last_kline_event_at=channel_restore["last_kline_event_at"],
+      last_aggregate_trade_event_at=channel_restore["last_aggregate_trade_event_at"],
+      last_mini_ticker_event_at=channel_restore["last_mini_ticker_event_at"],
+      last_trade_event_at=channel_restore["last_trade_event_at"],
+      last_book_ticker_event_at=channel_restore["last_book_ticker_event_at"],
       active_order_count=len(restore.open_orders),
-      issues=tuple(dict.fromkeys((*restore.issues, *tuple(rebuild["issues"])))),
+      issues=tuple(dict.fromkeys((*restore.issues, *tuple(rebuild["issues"]), *tuple(channel_restore["issues"])))),
     )
 
   def sync_session(
@@ -1265,6 +1312,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     order_book_best_bid_quantity = handoff.order_book_best_bid_quantity
     order_book_best_ask_price = handoff.order_book_best_ask_price
     order_book_best_ask_quantity = handoff.order_book_best_ask_quantity
+    order_book_bids = handoff.order_book_bids
+    order_book_asks = handoff.order_book_asks
+    channel_restore_state = handoff.channel_restore_state or "inactive"
+    channel_restore_count = handoff.channel_restore_count
+    channel_last_restored_at = handoff.channel_last_restored_at
     last_event_at = handoff.last_event_at
     last_market_event_at = handoff.last_market_event_at
     last_depth_event_at = handoff.last_depth_event_at
@@ -1278,24 +1330,42 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     last_book_ticker_event_at = handoff.last_book_ticker_event_at
     event_count = 0
     if local_book is None and handoff.state != "released":
-      rebuild = self._rebuild_local_order_book_from_snapshot(
-        symbol=handoff.symbol or "",
+      local_book = self._restore_local_order_book_from_handoff(
+        handoff=handoff,
         order_book_key=order_book_key,
-        rebuild_count=order_book_rebuild_count,
-        reason="local_book_missing",
       )
-      local_book = rebuild["book"]
-      order_book_state = str(rebuild["state"])
-      order_book_last_update_id = rebuild["last_update_id"]
-      order_book_rebuild_count = rebuild["rebuild_count"]
-      order_book_last_rebuilt_at = rebuild["rebuilt_at"]
-      order_book_bid_level_count = rebuild["bid_level_count"]
-      order_book_ask_level_count = rebuild["ask_level_count"]
-      order_book_best_bid_price = rebuild["best_bid_price"]
-      order_book_best_bid_quantity = rebuild["best_bid_quantity"]
-      order_book_best_ask_price = rebuild["best_ask_price"]
-      order_book_best_ask_quantity = rebuild["best_ask_quantity"]
-      issues.extend(tuple(rebuild["issues"]))
+      if local_book is not None:
+        order_book_state = "persisted_recovered"
+        order_book_last_update_id = local_book.last_update_id
+        order_book_rebuild_count = local_book.rebuild_count
+        order_book_last_rebuilt_at = local_book.rebuilt_at
+        order_book_bid_level_count = local_book.bid_level_count
+        order_book_ask_level_count = local_book.ask_level_count
+        order_book_best_bid_price, order_book_best_bid_quantity = local_book.best_bid
+        order_book_best_ask_price, order_book_best_ask_quantity = local_book.best_ask
+        order_book_bids = handoff.order_book_bids
+        order_book_asks = handoff.order_book_asks
+      else:
+        rebuild = self._rebuild_local_order_book_from_snapshot(
+          symbol=handoff.symbol or "",
+          order_book_key=order_book_key,
+          rebuild_count=order_book_rebuild_count,
+          reason="local_book_missing",
+        )
+        local_book = rebuild["book"]
+        order_book_state = str(rebuild["state"])
+        order_book_last_update_id = rebuild["last_update_id"]
+        order_book_rebuild_count = rebuild["rebuild_count"]
+        order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+        order_book_bid_level_count = rebuild["bid_level_count"]
+        order_book_ask_level_count = rebuild["ask_level_count"]
+        order_book_best_bid_price = rebuild["best_bid_price"]
+        order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+        order_book_best_ask_price = rebuild["best_ask_price"]
+        order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+        order_book_bids = rebuild["bids"]
+        order_book_asks = rebuild["asks"]
+        issues.extend(tuple(rebuild["issues"]))
     if stream_session is None and handoff.state != "released":
       failover = self._failover_stream_session(
         session_id=session_id,
@@ -1314,24 +1384,60 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         failover_count += 1
         last_failover_at = current_time
         order_book_gap_count += 1
-        rebuild = self._rebuild_local_order_book_from_snapshot(
+        if local_book is None:
+          rebuild = self._rebuild_local_order_book_from_snapshot(
+            symbol=handoff.symbol or "",
+            order_book_key=order_book_key,
+            rebuild_count=order_book_rebuild_count,
+            reason="session_missing",
+          )
+          local_book = rebuild["book"]
+          order_book_state = str(rebuild["state"])
+          order_book_last_update_id = rebuild["last_update_id"]
+          order_book_rebuild_count = rebuild["rebuild_count"]
+          order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+          order_book_bid_level_count = rebuild["bid_level_count"]
+          order_book_ask_level_count = rebuild["ask_level_count"]
+          order_book_best_bid_price = rebuild["best_bid_price"]
+          order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+          order_book_best_ask_price = rebuild["best_ask_price"]
+          order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+          order_book_bids = rebuild["bids"]
+          order_book_asks = rebuild["asks"]
+          issues.extend(tuple(rebuild["issues"]))
+        channel_restore = self._restore_market_channels_from_exchange(
           symbol=handoff.symbol or "",
-          order_book_key=order_book_key,
-          rebuild_count=order_book_rebuild_count,
+          timeframe=handoff.timeframe or "5m",
           reason="session_missing",
         )
-        local_book = rebuild["book"]
-        order_book_state = str(rebuild["state"])
-        order_book_last_update_id = rebuild["last_update_id"]
-        order_book_rebuild_count = rebuild["rebuild_count"]
-        order_book_last_rebuilt_at = rebuild["rebuilt_at"]
-        order_book_bid_level_count = rebuild["bid_level_count"]
-        order_book_ask_level_count = rebuild["ask_level_count"]
-        order_book_best_bid_price = rebuild["best_bid_price"]
-        order_book_best_bid_quantity = rebuild["best_bid_quantity"]
-        order_book_best_ask_price = rebuild["best_ask_price"]
-        order_book_best_ask_quantity = rebuild["best_ask_quantity"]
-        issues.extend(tuple(rebuild["issues"]))
+        channel_restore_state = str(channel_restore["state"])
+        if channel_restore["restored_at"] is not None:
+          channel_restore_count += 1
+          channel_last_restored_at = channel_restore["restored_at"]
+        last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
+        last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
+        last_aggregate_trade_event_at = _max_datetime(
+          last_aggregate_trade_event_at,
+          channel_restore["last_aggregate_trade_event_at"],
+        )
+        last_book_ticker_event_at = _max_datetime(
+          last_book_ticker_event_at,
+          channel_restore["last_book_ticker_event_at"],
+        )
+        last_mini_ticker_event_at = _max_datetime(
+          last_mini_ticker_event_at,
+          channel_restore["last_mini_ticker_event_at"],
+        )
+        last_kline_event_at = _max_datetime(last_kline_event_at, channel_restore["last_kline_event_at"])
+        if order_book_best_bid_price is None and channel_restore["best_bid_price"] is not None:
+          order_book_best_bid_price = channel_restore["best_bid_price"]
+        if order_book_best_bid_quantity is None and channel_restore["best_bid_quantity"] is not None:
+          order_book_best_bid_quantity = channel_restore["best_bid_quantity"]
+        if order_book_best_ask_price is None and channel_restore["best_ask_price"] is not None:
+          order_book_best_ask_price = channel_restore["best_ask_price"]
+        if order_book_best_ask_quantity is None and channel_restore["best_ask_quantity"] is not None:
+          order_book_best_ask_quantity = channel_restore["best_ask_quantity"]
+        issues.extend(tuple(channel_restore["issues"]))
         event_count += 1
 
     events = stream_session.drain_events() if stream_session is not None else ()
@@ -1426,6 +1532,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
           order_book_best_bid_quantity = rebuild["best_bid_quantity"]
           order_book_best_ask_price = rebuild["best_ask_price"]
           order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+          order_book_bids = rebuild["bids"]
+          order_book_asks = rebuild["asks"]
           issues.extend(tuple(rebuild["issues"]))
         if local_book is not None and depth_last_update_id is not None and local_book.last_update_id is not None:
           if depth_last_update_id <= local_book.last_update_id:
@@ -1462,6 +1570,41 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
           order_book_best_bid_quantity = rebuild["best_bid_quantity"]
           order_book_best_ask_price = rebuild["best_ask_price"]
           order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+          order_book_bids = rebuild["bids"]
+          order_book_asks = rebuild["asks"]
+          channel_restore = self._restore_market_channels_from_exchange(
+            symbol=handoff.symbol or "",
+            timeframe=handoff.timeframe or "5m",
+            reason="depth_gap",
+          )
+          channel_restore_state = str(channel_restore["state"])
+          if channel_restore["restored_at"] is not None:
+            channel_restore_count += 1
+            channel_last_restored_at = channel_restore["restored_at"]
+          last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
+          last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
+          last_aggregate_trade_event_at = _max_datetime(
+            last_aggregate_trade_event_at,
+            channel_restore["last_aggregate_trade_event_at"],
+          )
+          last_book_ticker_event_at = _max_datetime(
+            last_book_ticker_event_at,
+            channel_restore["last_book_ticker_event_at"],
+          )
+          last_mini_ticker_event_at = _max_datetime(
+            last_mini_ticker_event_at,
+            channel_restore["last_mini_ticker_event_at"],
+          )
+          last_kline_event_at = _max_datetime(last_kline_event_at, channel_restore["last_kline_event_at"])
+          if order_book_best_bid_price is None and channel_restore["best_bid_price"] is not None:
+            order_book_best_bid_price = channel_restore["best_bid_price"]
+          if order_book_best_bid_quantity is None and channel_restore["best_bid_quantity"] is not None:
+            order_book_best_bid_quantity = channel_restore["best_bid_quantity"]
+          if order_book_best_ask_price is None and channel_restore["best_ask_price"] is not None:
+            order_book_best_ask_price = channel_restore["best_ask_price"]
+          if order_book_best_ask_quantity is None and channel_restore["best_ask_quantity"] is not None:
+            order_book_best_ask_quantity = channel_restore["best_ask_quantity"]
+          issues.extend(tuple(channel_restore["issues"]))
           issues.extend(tuple(rebuild["issues"]))
           event_count += 1
           last_event_at = event_at
@@ -1481,6 +1624,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         order_book_ask_level_count = local_book.ask_level_count
         order_book_best_bid_price, order_book_best_bid_quantity = local_book.best_bid
         order_book_best_ask_price, order_book_best_ask_quantity = local_book.best_ask
+        order_book_bids = _serialize_order_book_side(local_book.bids, reverse=True)
+        order_book_asks = _serialize_order_book_side(local_book.asks, reverse=False)
         event_count += 1
         last_event_at = event_at
         continue
@@ -1535,7 +1680,42 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         order_book_best_bid_quantity = rebuild["best_bid_quantity"]
         order_book_best_ask_price = rebuild["best_ask_price"]
         order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+        order_book_bids = rebuild["bids"]
+        order_book_asks = rebuild["asks"]
+        channel_restore = self._restore_market_channels_from_exchange(
+          symbol=handoff.symbol or "",
+          timeframe=handoff.timeframe or "5m",
+          reason=failover_reason,
+        )
+        channel_restore_state = str(channel_restore["state"])
+        if channel_restore["restored_at"] is not None:
+          channel_restore_count += 1
+          channel_last_restored_at = channel_restore["restored_at"]
+        last_market_event_at = _max_datetime(last_market_event_at, channel_restore["last_market_event_at"])
+        last_trade_event_at = _max_datetime(last_trade_event_at, channel_restore["last_trade_event_at"])
+        last_aggregate_trade_event_at = _max_datetime(
+          last_aggregate_trade_event_at,
+          channel_restore["last_aggregate_trade_event_at"],
+        )
+        last_book_ticker_event_at = _max_datetime(
+          last_book_ticker_event_at,
+          channel_restore["last_book_ticker_event_at"],
+        )
+        last_mini_ticker_event_at = _max_datetime(
+          last_mini_ticker_event_at,
+          channel_restore["last_mini_ticker_event_at"],
+        )
+        last_kline_event_at = _max_datetime(last_kline_event_at, channel_restore["last_kline_event_at"])
+        if order_book_best_bid_price is None and channel_restore["best_bid_price"] is not None:
+          order_book_best_bid_price = channel_restore["best_bid_price"]
+        if order_book_best_bid_quantity is None and channel_restore["best_bid_quantity"] is not None:
+          order_book_best_bid_quantity = channel_restore["best_bid_quantity"]
+        if order_book_best_ask_price is None and channel_restore["best_ask_price"] is not None:
+          order_book_best_ask_price = channel_restore["best_ask_price"]
+        if order_book_best_ask_quantity is None and channel_restore["best_ask_quantity"] is not None:
+          order_book_best_ask_quantity = channel_restore["best_ask_quantity"]
         issues.extend(tuple(rebuild["issues"]))
+        issues.extend(tuple(channel_restore["issues"]))
         event_count += 1
 
     synced_orders = tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids))
@@ -1579,6 +1759,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       order_book_best_bid_quantity=order_book_best_bid_quantity,
       order_book_best_ask_price=order_book_best_ask_price,
       order_book_best_ask_quantity=order_book_best_ask_quantity,
+      order_book_bids=order_book_bids,
+      order_book_asks=order_book_asks,
+      channel_restore_state=channel_restore_state,
+      channel_restore_count=channel_restore_count,
+      channel_last_restored_at=channel_last_restored_at,
       failover_count=failover_count,
       last_failover_at=last_failover_at,
       coverage=coverage,
@@ -1652,6 +1837,11 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=handoff.order_book_best_ask_price,
       order_book_best_ask_quantity=handoff.order_book_best_ask_quantity,
+      order_book_bids=handoff.order_book_bids,
+      order_book_asks=handoff.order_book_asks,
+      channel_restore_state=handoff.channel_restore_state,
+      channel_restore_count=handoff.channel_restore_count,
+      channel_last_restored_at=handoff.channel_last_restored_at,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
@@ -1883,6 +2073,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         "best_bid_quantity": None,
         "best_ask_price": None,
         "best_ask_quantity": None,
+        "bids": (),
+        "asks": (),
       }
     try:
       exchange = self._resolve_exchange()
@@ -1907,6 +2099,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         "best_bid_quantity": None,
         "best_ask_price": None,
         "best_ask_quantity": None,
+        "bids": (),
+        "asks": (),
       }
     self._local_order_books[order_book_key] = book
     best_bid_price, best_bid_quantity = book.best_bid
@@ -1920,6 +2114,134 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       "rebuilt_at": book.rebuilt_at,
       "bid_level_count": book.bid_level_count,
       "ask_level_count": book.ask_level_count,
+      "best_bid_price": best_bid_price,
+      "best_bid_quantity": best_bid_quantity,
+      "best_ask_price": best_ask_price,
+      "best_ask_quantity": best_ask_quantity,
+      "bids": _serialize_order_book_side(book.bids, reverse=True),
+      "asks": _serialize_order_book_side(book.asks, reverse=False),
+    }
+
+  def _restore_local_order_book_from_handoff(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    order_book_key: str,
+  ) -> LocalOrderBookState | None:
+    if not handoff.symbol:
+      return None
+    if not handoff.order_book_bids and not handoff.order_book_asks:
+      return None
+    bids = {level.price: level.quantity for level in handoff.order_book_bids}
+    asks = {level.price: level.quantity for level in handoff.order_book_asks}
+    book = LocalOrderBookState(
+      symbol=handoff.symbol,
+      last_update_id=handoff.order_book_last_update_id,
+      rebuilt_at=handoff.order_book_last_rebuilt_at or self._clock(),
+      rebuild_count=handoff.order_book_rebuild_count,
+      bids=bids,
+      asks=asks,
+    )
+    self._local_order_books[order_book_key] = book
+    return book
+
+  def _restore_market_channels_from_exchange(
+    self,
+    *,
+    symbol: str,
+    timeframe: str,
+    reason: str,
+  ) -> dict[str, object]:
+    current_time = self._clock()
+    if not symbol:
+      return {
+        "state": "unavailable",
+        "issues": ("binance_market_channel_restore_failed:missing_symbol",),
+        "restored_at": None,
+        "last_market_event_at": None,
+        "last_trade_event_at": None,
+        "last_aggregate_trade_event_at": None,
+        "last_book_ticker_event_at": None,
+        "last_mini_ticker_event_at": None,
+        "last_kline_event_at": None,
+        "best_bid_price": None,
+        "best_bid_quantity": None,
+        "best_ask_price": None,
+        "best_ask_quantity": None,
+      }
+    issues: list[str] = []
+    restored_any = False
+    last_market_event_at: datetime | None = None
+    last_trade_event_at: datetime | None = None
+    last_aggregate_trade_event_at: datetime | None = None
+    last_book_ticker_event_at: datetime | None = None
+    last_mini_ticker_event_at: datetime | None = None
+    last_kline_event_at: datetime | None = None
+    best_bid_price: float | None = None
+    best_bid_quantity: float | None = None
+    best_ask_price: float | None = None
+    best_ask_quantity: float | None = None
+    try:
+      exchange = self._resolve_exchange()
+    except Exception as exc:
+      return {
+        "state": "unavailable",
+        "issues": (f"binance_market_channel_restore_failed:{reason}:{exc}",),
+        "restored_at": None,
+        "last_market_event_at": None,
+        "last_trade_event_at": None,
+        "last_aggregate_trade_event_at": None,
+        "last_book_ticker_event_at": None,
+        "last_mini_ticker_event_at": None,
+        "last_kline_event_at": None,
+        "best_bid_price": None,
+        "best_bid_quantity": None,
+        "best_ask_price": None,
+        "best_ask_quantity": None,
+      }
+    try:
+      ticker = exchange.fetch_ticker(symbol, {})
+      ticker_at = _coerce_datetime(ticker.get("datetime"), ticker.get("timestamp")) or current_time
+      last_market_event_at = ticker_at
+      last_book_ticker_event_at = ticker_at
+      last_mini_ticker_event_at = ticker_at
+      best_bid_price = _coerce_float(ticker.get("bid"))
+      best_bid_quantity = _coerce_float(ticker.get("bidVolume"))
+      best_ask_price = _coerce_float(ticker.get("ask"))
+      best_ask_quantity = _coerce_float(ticker.get("askVolume"))
+      restored_any = True
+    except Exception as exc:
+      issues.append(f"binance_market_channel_restore_failed:ticker:{reason}:{exc}")
+    try:
+      trades = exchange.fetch_trades(symbol, None, 1, {})
+      if trades:
+        trade = trades[-1]
+        trade_at = _coerce_datetime(trade.get("datetime"), trade.get("timestamp")) or current_time
+        last_trade_event_at = trade_at
+        last_aggregate_trade_event_at = trade_at
+        last_market_event_at = _max_datetime(last_market_event_at, trade_at)
+        restored_any = True
+    except Exception as exc:
+      issues.append(f"binance_market_channel_restore_failed:trades:{reason}:{exc}")
+    try:
+      candles = exchange.fetch_ohlcv(symbol, timeframe, None, 1, {})
+      if candles:
+        candle_at = _coerce_ohlcv_timestamp(candles[-1][0], timeframe=timeframe) or current_time
+        last_kline_event_at = candle_at
+        last_market_event_at = _max_datetime(last_market_event_at, candle_at)
+        restored_any = True
+    except Exception as exc:
+      issues.append(f"binance_market_channel_restore_failed:ohlcv:{reason}:{exc}")
+    return {
+      "state": "restored_from_exchange" if restored_any and not issues else ("partial" if restored_any else "unavailable"),
+      "issues": tuple(issues),
+      "restored_at": current_time if restored_any else None,
+      "last_market_event_at": last_market_event_at,
+      "last_trade_event_at": last_trade_event_at,
+      "last_aggregate_trade_event_at": last_aggregate_trade_event_at,
+      "last_book_ticker_event_at": last_book_ticker_event_at,
+      "last_mini_ticker_event_at": last_mini_ticker_event_at,
+      "last_kline_event_at": last_kline_event_at,
       "best_bid_price": best_bid_price,
       "best_bid_quantity": best_bid_quantity,
       "best_ask_price": best_ask_price,
@@ -2327,3 +2649,36 @@ def _build_local_order_book_from_snapshot_row(
     bids=bids,
     asks=asks,
   )
+
+
+def _serialize_order_book_side(
+  levels: dict[float, float],
+  *,
+  reverse: bool,
+) -> tuple[GuardedLiveOrderBookLevel, ...]:
+  return tuple(
+    GuardedLiveOrderBookLevel(price=price, quantity=levels[price])
+    for price in sorted(levels, reverse=reverse)
+  )
+
+
+def _max_datetime(first: datetime | None, second: datetime | None) -> datetime | None:
+  if first is None:
+    return second
+  if second is None:
+    return first
+  return max(first, second)
+
+
+def _coerce_ohlcv_timestamp(value: Any, *, timeframe: str) -> datetime | None:
+  timestamp = _coerce_datetime(None, value)
+  if timestamp is not None:
+    return timestamp
+  if not isinstance(value, str):
+    return None
+  try:
+    if len(value) == 10:
+      return datetime.fromisoformat(f"{value}T00:00:00+00:00")
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+  except ValueError:
+    return None

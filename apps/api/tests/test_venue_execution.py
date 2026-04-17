@@ -56,9 +56,19 @@ class FakeExecutionExchange:
     *,
     fetch_rows: list[dict[str, object]],
     order_books: list[dict[str, object]] | None = None,
+    ticker: dict[str, object] | None = None,
+    trades: list[dict[str, object]] | None = None,
+    ohlcv: list[list[object]] | None = None,
   ) -> None:
     self._fetch_rows = fetch_rows
     self._order_books = list(order_books or [])
+    self._ticker = dict(ticker or {})
+    self._trades = list(trades or [])
+    self._ohlcv = [list(candle) for candle in (ohlcv or [])]
+    self.fetch_order_book_calls = 0
+    self.fetch_ticker_calls = 0
+    self.fetch_trades_calls = 0
+    self.fetch_ohlcv_calls = 0
 
   def create_order(self, symbol, type, side, amount, price=None, params=None) -> dict[str, object]:
     raise AssertionError("create_order should not be called in this test")
@@ -73,11 +83,26 @@ class FakeExecutionExchange:
     return []
 
   def fetch_order_book(self, symbol, limit=None, params=None) -> dict[str, object]:
+    self.fetch_order_book_calls += 1
     if not self._order_books:
       raise AssertionError("fetch_order_book called without a prepared snapshot")
     if len(self._order_books) == 1:
       return dict(self._order_books[0])
     return dict(self._order_books.pop(0))
+
+  def fetch_ticker(self, symbol, params=None) -> dict[str, object]:
+    self.fetch_ticker_calls += 1
+    if not self._ticker:
+      raise AssertionError("fetch_ticker called without a prepared ticker")
+    return dict(self._ticker)
+
+  def fetch_trades(self, symbol, since=None, limit=None, params=None) -> list[dict[str, object]]:
+    self.fetch_trades_calls += 1
+    return [dict(trade) for trade in self._trades]
+
+  def fetch_ohlcv(self, symbol, timeframe="1m", since=None, limit=None, params=None) -> list[list[object]]:
+    self.fetch_ohlcv_calls += 1
+    return [list(candle) for candle in self._ohlcv]
 
   def fetch_closed_orders(self, symbol=None, since=None, limit=None, params=None) -> list[dict[str, object]]:
     return []
@@ -315,6 +340,21 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
         "asks": [[2500.9, 0.80], [2501.0, 1.05]],
       },
     ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 2498.95,
+      "bidVolume": 1.2,
+      "ask": 2501.05,
+      "askVolume": 0.9,
+    },
+    trades=[
+      {
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int(current_time.timestamp() * 1000), 2499.0, 2502.0, 2497.5, 2500.0, 18.0]
+    ],
   )
   first_stream_session = FakeStreamSession("listen-key-1")
   second_stream_session = FakeStreamSession("listen-key-2")
@@ -360,6 +400,23 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert handoff.order_book_ask_level_count == 2
   assert handoff.order_book_best_bid_price == 2498.8
   assert handoff.order_book_best_ask_price == 2501.2
+  assert tuple((level.price, level.quantity) for level in handoff.order_book_bids) == (
+    (2498.8, 0.75),
+    (2498.7, 0.65),
+  )
+  assert tuple((level.price, level.quantity) for level in handoff.order_book_asks) == (
+    (2501.2, 0.85),
+    (2501.3, 0.95),
+  )
+  assert handoff.channel_restore_state == "restored_from_exchange"
+  assert handoff.channel_restore_count == 1
+  assert handoff.channel_last_restored_at == current_time
+  assert handoff.last_market_event_at == current_time
+  assert handoff.last_trade_event_at == current_time
+  assert handoff.last_aggregate_trade_event_at == current_time
+  assert handoff.last_book_ticker_event_at == current_time
+  assert handoff.last_mini_ticker_event_at == current_time
+  assert handoff.last_kline_event_at == current_time
   assert stream_client.open_count == 1
 
   clock.advance(timedelta(minutes=1))
@@ -403,6 +460,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert first_sync.handoff.order_book_state == "snapshot_rebuilt"
   assert first_sync.handoff.order_book_last_update_id == 101
   assert first_sync.handoff.order_book_rebuild_count == 2
+  assert first_sync.handoff.channel_restore_state == "restored_from_exchange"
+  assert first_sync.handoff.channel_restore_count == 2
+  assert first_sync.handoff.channel_last_restored_at == clock()
   assert first_sync.handoff.last_failover_at == clock()
   assert first_sync.handoff.last_account_event_at == clock()
   assert first_sync.synced_orders[0].status == "partially_filled"
@@ -503,6 +563,14 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert second_sync.handoff.order_book_best_bid_quantity == 1.25
   assert second_sync.handoff.order_book_best_ask_price == 2500.6
   assert second_sync.handoff.order_book_best_ask_quantity == 0.95
+  assert tuple((level.price, level.quantity) for level in second_sync.handoff.order_book_bids[:2]) == (
+    (2499.4, 1.25),
+    (2499.1, 0.9),
+  )
+  assert tuple((level.price, level.quantity) for level in second_sync.handoff.order_book_asks[:2]) == (
+    (2500.6, 0.95),
+    (2500.9, 0.8),
+  )
   assert second_sync.handoff.last_market_event_at == clock()
   assert second_sync.handoff.last_depth_event_at == clock()
   assert second_sync.handoff.last_kline_event_at == clock()
@@ -519,6 +587,8 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert released.transport == "binance_multi_stream_websocket"
   assert released.supervision_state == "released"
   assert released.order_book_state == "released"
+  assert released.channel_restore_state == second_sync.handoff.channel_restore_state
+  assert released.channel_restore_count == second_sync.handoff.channel_restore_count
   assert released.failover_count == 1
   assert second_stream_session.closed is True
 
@@ -539,6 +609,21 @@ def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap
         "bids": [[2497.3, 0.95], [2497.1, 0.55]],
         "asks": [[2498.2, 0.72], [2498.5, 0.68]],
       },
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 2498.0,
+      "bidVolume": 0.5,
+      "ask": 2498.8,
+      "askVolume": 0.45,
+    },
+    trades=[
+      {
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int(current_time.timestamp() * 1000), 2498.0, 2499.1, 2497.5, 2498.4, 11.0]
     ],
   )
   stream_session = FakeStreamSession("listen-key-gap")
@@ -597,4 +682,136 @@ def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap
   assert second_sync.handoff.order_book_ask_level_count == 2
   assert second_sync.handoff.order_book_best_bid_price == 2497.3
   assert second_sync.handoff.order_book_best_ask_price == 2498.2
+  assert tuple((level.price, level.quantity) for level in second_sync.handoff.order_book_bids) == (
+    (2497.3, 0.95),
+    (2497.1, 0.55),
+  )
+  assert tuple((level.price, level.quantity) for level in second_sync.handoff.order_book_asks) == (
+    (2498.2, 0.72),
+    (2498.5, 0.68),
+  )
+  assert second_sync.handoff.channel_restore_state == "restored_from_exchange"
+  assert second_sync.handoff.channel_restore_count == 2
+  assert second_sync.handoff.channel_last_restored_at == clock()
   assert "binance_order_book_gap_detected:25:29" in second_sync.handoff.issues
+
+
+def test_binance_adapter_restores_persisted_order_book_and_deeper_channels_after_restart() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  initial_exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 40,
+        "bids": [[2499.9, 0.55], [2499.7, 0.45]],
+        "asks": [[2500.2, 0.60], [2500.4, 0.75]],
+      }
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 2499.95,
+      "bidVolume": 0.7,
+      "ask": 2500.25,
+      "askVolume": 0.8,
+    },
+    trades=[
+      {
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int(current_time.timestamp() * 1000), 2499.5, 2500.5, 2499.1, 2500.0, 7.0]
+    ],
+  )
+  first_stream_session = FakeStreamSession("listen-key-persisted")
+  initial_adapter = BinanceVenueExecutionAdapter(
+    exchange=initial_exchange,
+    venue_stream_client=FakeStreamClient(first_stream_session),
+    clock=clock,
+  )
+
+  handoff = initial_adapter.handoff_session(
+    symbol="ETH/USDT",
+    timeframe="5m",
+    owner_run_id="run-live-persisted",
+    owner_session_id="worker-live-persisted",
+    owned_order_ids=(),
+  )
+
+  assert initial_exchange.fetch_order_book_calls == 1
+  assert handoff.order_book_last_update_id == 40
+  assert len(handoff.order_book_bids) == 2
+  assert len(handoff.order_book_asks) == 2
+
+  clock.advance(timedelta(seconds=45))
+  restart_exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    ticker={
+      "timestamp": int(clock().timestamp() * 1000),
+      "bid": 2500.0,
+      "bidVolume": 0.9,
+      "ask": 2500.3,
+      "askVolume": 0.85,
+    },
+    trades=[
+      {
+        "timestamp": int(clock().timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int(clock().timestamp() * 1000), 2499.8, 2500.8, 2499.5, 2500.1, 9.0]
+    ],
+  )
+  restart_stream_session = FakeStreamSession("listen-key-persisted-2")
+  restart_stream_session.push(
+    {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+      "U": 41,
+      "u": 42,
+      "pu": 40,
+      "b": [["2499.95", "0.80"]],
+      "a": [["2500.15", "0.65"]],
+    }
+  )
+  restarted_adapter = BinanceVenueExecutionAdapter(
+    exchange=restart_exchange,
+    venue_stream_client=FakeStreamClient(restart_stream_session),
+    clock=clock,
+  )
+
+  sync = restarted_adapter.sync_session(handoff=handoff, order_ids=())
+
+  assert restart_exchange.fetch_order_book_calls == 0
+  assert restart_exchange.fetch_ticker_calls == 1
+  assert restart_exchange.fetch_trades_calls == 1
+  assert restart_exchange.fetch_ohlcv_calls == 1
+  assert sync.state == "active"
+  assert sync.handoff.venue_session_id == "listen-key-persisted-2"
+  assert sync.handoff.failover_count == 1
+  assert sync.handoff.order_book_state == "streaming"
+  assert sync.handoff.order_book_last_update_id == 42
+  assert sync.handoff.order_book_gap_count == 1
+  assert sync.handoff.order_book_rebuild_count == 1
+  assert sync.handoff.order_book_best_bid_price == 2499.95
+  assert sync.handoff.order_book_best_ask_price == 2500.15
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_bids[:3]) == (
+    (2499.95, 0.8),
+    (2499.9, 0.55),
+    (2499.7, 0.45),
+  )
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_asks[:3]) == (
+    (2500.15, 0.65),
+    (2500.2, 0.6),
+    (2500.4, 0.75),
+  )
+  assert sync.handoff.channel_restore_state == "restored_from_exchange"
+  assert sync.handoff.channel_restore_count == 2
+  assert sync.handoff.channel_last_restored_at == clock()
+  assert sync.handoff.last_market_event_at == clock()
+  assert sync.handoff.last_trade_event_at == clock()
+  assert sync.handoff.last_aggregate_trade_event_at == clock()
+  assert sync.handoff.last_book_ticker_event_at == clock()
+  assert sync.handoff.last_mini_ticker_event_at == clock()
+  assert sync.handoff.last_kline_event_at == clock()

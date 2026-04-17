@@ -546,6 +546,12 @@ class GuardedLiveVenueOpenOrder:
 
 
 @dataclass(frozen=True)
+class GuardedLiveOrderBookLevel:
+  price: float
+  quantity: float
+
+
+@dataclass(frozen=True)
 class GuardedLiveVenueOrderRequest:
   run_id: str
   session_id: str
@@ -681,6 +687,11 @@ class GuardedLiveVenueSessionHandoff:
   order_book_best_bid_quantity: float | None = None
   order_book_best_ask_price: float | None = None
   order_book_best_ask_quantity: float | None = None
+  order_book_bids: tuple[GuardedLiveOrderBookLevel, ...] = ()
+  order_book_asks: tuple[GuardedLiveOrderBookLevel, ...] = ()
+  channel_restore_state: str = "inactive"
+  channel_restore_count: int = 0
+  channel_last_restored_at: datetime | None = None
   last_market_event_at: datetime | None = None
   last_depth_event_at: datetime | None = None
   last_kline_event_at: datetime | None = None

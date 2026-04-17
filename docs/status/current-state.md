@@ -65,7 +65,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - Binance push-session supervision now performs automatic listen-key failover and records broader
   account-position, balance-update, order-list, trade-tick, aggregate-trade, book-ticker,
   mini-ticker, depth, and kline coverage alongside execution events, full depth snapshot rebuilds,
-  order-book resync state, rebuild counts, and top-of-book levels
+  order-book resync state, rebuild counts, full recovered bid/ask levels, channel-restore
+  timing/counts, and top-of-book levels
 
 ### Control room
 
@@ -82,8 +83,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
   live-owner visibility, venue-native session-restore state, durable order-book visibility,
   venue session handoff supervision/failover coverage plus market/depth/kline event visibility,
-  order-book resync state, snapshot rebuild visibility, top-of-book visibility, guarded-live
-  resume controls, and guarded-live audit history
+  order-book resync state, snapshot rebuild visibility, recovered bid/ask ladders, deeper channel
+  restore visibility, top-of-book visibility, guarded-live resume controls, and guarded-live audit
+  history
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -95,7 +97,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   recovery/live resume currently restores tracked venue order lifecycle state before falling back to
   persisted control-plane state, but it still does not revive broader venue-native stream or market
   session coverage beyond Binance multi-stream
-  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline events
+  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline events plus exchange-backed
+  ticker/trade/ohlcv restore
 - guarded-live order sync now persists lifecycle progression, a durable open-order snapshot, and
   session ownership for resume, but it still does not restore a full exchange session lifecycle
 - custom strategy registration exists, but registration metadata is process-local rather than durable
@@ -110,7 +113,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
 - broader venue-native session continuation beyond Binance multi-stream
-  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline streaming
+  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline streaming and
+  exchange-backed ticker/trade/ohlcv restore
 - live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
 

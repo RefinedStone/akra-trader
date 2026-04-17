@@ -485,6 +485,17 @@ type GuardedLiveStatus = {
     order_book_best_bid_quantity?: number | null;
     order_book_best_ask_price?: number | null;
     order_book_best_ask_quantity?: number | null;
+    order_book_bids: {
+      price: number;
+      quantity: number;
+    }[];
+    order_book_asks: {
+      price: number;
+      quantity: number;
+    }[];
+    channel_restore_state: string;
+    channel_restore_count: number;
+    channel_last_restored_at?: string | null;
     last_market_event_at?: string | null;
     last_depth_event_at?: string | null;
     last_kline_event_at?: string | null;
@@ -2296,6 +2307,18 @@ export default function App() {
                         <td>{guardedLive.session_handoff.order_book_ask_level_count}</td>
                       </tr>
                       <tr>
+                        <th>Channel restore</th>
+                        <td>{guardedLive.session_handoff.channel_restore_state}</td>
+                      </tr>
+                      <tr>
+                        <th>Channel restore count</th>
+                        <td>{guardedLive.session_handoff.channel_restore_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Last channel restore</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.channel_last_restored_at ?? null)}</td>
+                      </tr>
+                      <tr>
                         <th>Best bid</th>
                         <td>
                           {guardedLive.session_handoff.order_book_best_bid_price != null
@@ -2379,6 +2402,52 @@ export default function App() {
                       </tr>
                     </tbody>
                   </table>
+                  <h3>Recovered venue order book</h3>
+                  {guardedLive.session_handoff.order_book_bids.length
+                    || guardedLive.session_handoff.order_book_asks.length ? (
+                      <div className="status-grid-two-column">
+                        <section>
+                          <h4>Recovered bids</h4>
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {guardedLive.session_handoff.order_book_bids.slice(0, 5).map((level) => (
+                                <tr key={`handoff-bid-${level.price}`}>
+                                  <td>{level.price.toFixed(8)}</td>
+                                  <td>{level.quantity.toFixed(8)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </section>
+                        <section>
+                          <h4>Recovered asks</h4>
+                          <table className="data-table">
+                            <thead>
+                              <tr>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {guardedLive.session_handoff.order_book_asks.slice(0, 5).map((level) => (
+                                <tr key={`handoff-ask-${level.price}`}>
+                                  <td>{level.price.toFixed(8)}</td>
+                                  <td>{level.quantity.toFixed(8)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </section>
+                      </div>
+                    ) : (
+                      <p className="empty-state">No recovered venue order-book levels recorded.</p>
+                    )}
                   <h3>Durable order book</h3>
                   <table className="data-table">
                     <tbody>
