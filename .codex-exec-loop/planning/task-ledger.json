@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After direct remediation-engine polling and the BigPanda typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After direct remediation-engine polling and the Grafana OnCall typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, and native phase graphs now reach BigPanda too, but richer provider-native private remediation-engine graphs and metrics are still not mirrored; this remains the second explicit follow-up behind broader provider breadth because the reply listed wider incident-provider coverage first.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, and native phase graphs now reach Grafana OnCall too, but richer provider-native private remediation-engine graphs and metrics are still not mirrored; this remains the second explicit follow-up behind broader provider breadth because the reply listed wider incident-provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T01:10:00Z",
+      "updated_at": "2026-04-17T19:01:55Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints are being polled directly."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints and typed recovery schemas now generalized through Grafana OnCall are being polled directly."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1013,19 +1013,37 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-bigpanda",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond BigPanda",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, and BigPanda adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current ten providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, and BigPanda adapters to Grafana OnCall, adding the `grafana_oncall_incidents` delivery target, provider workflow sync, provider pull-sync, remediation-engine direct polling, Grafana OnCall typed recovery schemas, native phase-graph handling, paging-provider inference, provider-authoritative remediation sync generalization, and aligned UI or docs or test coverage so authoritative external remediation ownership now spans eleven providers.",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says provider-managed remediation coverage now reaches PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, and Opsgenie, while wider incident-provider breadth remains the first explicitly listed unfinished item, so another provider expansion is the clearest executable queue head.",
+      "priority_reason": "Completed in main session commit 9420915, which expanded provider-managed remediation coverage through Grafana OnCall across operator delivery, application wiring, provider pull-sync, remediation-engine polling, typed recovery schemas, native phase graphs, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-squadcast"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T01:10:00Z",
+      "updated_at": "2026-04-17T19:01:55Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating BigPanda as the current milestone rather than the final provider breadth endpoint."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond BigPanda to Grafana OnCall, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-grafana-oncall",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Grafana OnCall",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, and Grafana OnCall adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current eleven providers.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply says provider-managed remediation coverage now reaches PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, and Opsgenie, while wider incident-provider breadth remains the first explicitly listed unfinished item, so another provider expansion is the clearest executable queue head.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-bigpanda"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T19:01:55Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Grafana OnCall as the current milestone rather than the final provider breadth endpoint."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
