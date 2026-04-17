@@ -1717,7 +1717,8 @@ class TradingApplication:
     run.notes.append(
       f"{current_time.isoformat()} | guarded_live_venue_session_handed_off | "
       f"source={handoff.source}; transport={handoff.transport}; state={handoff.state}; "
-      f"supervision={handoff.supervision_state}; failovers={handoff.failover_count}; reason={reason}"
+      f"supervision={handoff.supervision_state}; order_book={handoff.order_book_state}; "
+      f"failovers={handoff.failover_count}; reason={reason}"
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_venue_session_handed_off",
@@ -1726,7 +1727,8 @@ class TradingApplication:
       detail=(
         f"Reason: {reason}. Source {handoff.source} activated transport {handoff.transport} "
         f"with session {handoff.venue_session_id or 'n/a'}. Supervision "
-        f"{handoff.supervision_state} with coverage {', '.join(handoff.coverage) or 'none'}."
+        f"{handoff.supervision_state} with coverage {', '.join(handoff.coverage) or 'none'} "
+        f"and order-book state {handoff.order_book_state}."
       ),
       run_id=run.config.run_id,
       session_id=session.session_id if session is not None else None,
@@ -2966,8 +2968,21 @@ class TradingApplication:
         f"source={next_handoff.source}; transport={next_handoff.transport}; "
         f"state={next_handoff.state}; active_orders={next_handoff.active_order_count}; "
         f"cursor={next_handoff.cursor or 'n/a'}; supervision={next_handoff.supervision_state}; "
-        f"failovers={next_handoff.failover_count}; coverage={','.join(next_handoff.coverage) or 'none'}"
+        f"order_book={next_handoff.order_book_state}; failovers={next_handoff.failover_count}; "
+        f"coverage={','.join(next_handoff.coverage) or 'none'}"
       )
+      if (
+        next_handoff.order_book_best_bid_price is not None
+        or next_handoff.order_book_best_ask_price is not None
+      ):
+        detail += (
+          f"; top_of_book={next_handoff.order_book_best_bid_price or 0.0:.8f}/"
+          f"{next_handoff.order_book_best_ask_price or 0.0:.8f}"
+        )
+      if next_handoff.order_book_last_update_id is not None:
+        detail += f"; depth_update_id={next_handoff.order_book_last_update_id}"
+      if next_handoff.order_book_gap_count > 0:
+        detail += f"; depth_gaps={next_handoff.order_book_gap_count}"
       if session_sync.issues:
         detail += f"; issues={', '.join(session_sync.issues)}"
       run.notes.append(

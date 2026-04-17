@@ -300,6 +300,10 @@ class BinanceWebSocketMarketStreamSession:
           event["e"] = "bookTicker"
         elif stream_name.endswith("@trade"):
           event["e"] = "trade"
+        elif stream_name.endswith("@aggTrade"):
+          event["e"] = "aggTrade"
+        elif stream_name.endswith("@miniTicker"):
+          event["e"] = "24hrMiniTicker"
         elif "@depth" in stream_name:
           event["e"] = "depthUpdate"
         elif "@kline_" in stream_name:
@@ -336,12 +340,14 @@ class BinanceWebSocketMarketStreamClient:
     market_symbol = _normalize_binance_stream_symbol(self._symbol)
     streams = (
       f"{market_symbol}@trade/"
+      f"{market_symbol}@aggTrade/"
       f"{market_symbol}@bookTicker/"
+      f"{market_symbol}@miniTicker/"
       f"{market_symbol}@depth20@100ms/"
       f"{market_symbol}@kline_{self._timeframe}"
     )
     return BinanceWebSocketMarketStreamSession(
-      session_id=f"market:{market_symbol}:trade+bookTicker+depth+kline_{self._timeframe}",
+      session_id=f"market:{market_symbol}:trade+aggTrade+bookTicker+miniTicker+depth+kline_{self._timeframe}",
       websocket_url=f"{self._websocket_url}?streams={streams}",
       clock=self._clock,
     )
@@ -434,9 +440,12 @@ BINANCE_USER_DATA_STREAM_COVERAGE = (
 )
 BINANCE_MARKET_STREAM_COVERAGE = (
   "trade_ticks",
+  "aggregate_trade_ticks",
   "book_ticker",
+  "mini_ticker",
   "depth_updates",
   "kline_candles",
+  "order_book_lifecycle",
 )
 BINANCE_VENUE_STREAM_COVERAGE = (
   *BINANCE_USER_DATA_STREAM_COVERAGE,
@@ -610,6 +619,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=self._resolve_last_event_at(symbol=symbol),
       last_sync_at=current_time,
       supervision_state="streaming",
+      order_book_state="synthetic",
       coverage=("execution_reports",),
       active_order_count=self._count_active_orders(symbol=symbol),
       issues=(),
@@ -648,12 +658,23 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=self._resolve_last_event_at(symbol=existing.symbol or handoff.symbol or ""),
       last_sync_at=current_time,
       supervision_state="streaming",
+      order_book_state=existing.order_book_state or handoff.order_book_state or "synthetic",
+      order_book_last_update_id=existing.order_book_last_update_id or handoff.order_book_last_update_id,
+      order_book_gap_count=existing.order_book_gap_count or handoff.order_book_gap_count,
+      order_book_best_bid_price=existing.order_book_best_bid_price or handoff.order_book_best_bid_price,
+      order_book_best_bid_quantity=existing.order_book_best_bid_quantity or handoff.order_book_best_bid_quantity,
+      order_book_best_ask_price=existing.order_book_best_ask_price or handoff.order_book_best_ask_price,
+      order_book_best_ask_quantity=existing.order_book_best_ask_quantity or handoff.order_book_best_ask_quantity,
       failover_count=existing.failover_count or handoff.failover_count,
       last_failover_at=existing.last_failover_at or handoff.last_failover_at,
       coverage=existing.coverage or handoff.coverage or ("execution_reports",),
       last_market_event_at=existing.last_market_event_at or handoff.last_market_event_at,
       last_depth_event_at=existing.last_depth_event_at or handoff.last_depth_event_at,
       last_kline_event_at=existing.last_kline_event_at or handoff.last_kline_event_at,
+      last_aggregate_trade_event_at=(
+        existing.last_aggregate_trade_event_at or handoff.last_aggregate_trade_event_at
+      ),
+      last_mini_ticker_event_at=existing.last_mini_ticker_event_at or handoff.last_mini_ticker_event_at,
       last_account_event_at=existing.last_account_event_at or handoff.last_account_event_at,
       last_balance_event_at=existing.last_balance_event_at or handoff.last_balance_event_at,
       last_order_list_event_at=existing.last_order_list_event_at or handoff.last_order_list_event_at,
@@ -696,12 +717,21 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=handoff.last_event_at,
       last_sync_at=current_time,
       supervision_state="released",
+      order_book_state="released",
+      order_book_last_update_id=handoff.order_book_last_update_id,
+      order_book_gap_count=handoff.order_book_gap_count,
+      order_book_best_bid_price=handoff.order_book_best_bid_price,
+      order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
+      order_book_best_ask_price=handoff.order_book_best_ask_price,
+      order_book_best_ask_quantity=handoff.order_book_best_ask_quantity,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
       last_market_event_at=handoff.last_market_event_at,
       last_depth_event_at=handoff.last_depth_event_at,
       last_kline_event_at=handoff.last_kline_event_at,
+      last_aggregate_trade_event_at=handoff.last_aggregate_trade_event_at,
+      last_mini_ticker_event_at=handoff.last_mini_ticker_event_at,
       last_account_event_at=handoff.last_account_event_at,
       last_balance_event_at=handoff.last_balance_event_at,
       last_order_list_event_at=handoff.last_order_list_event_at,
@@ -1085,6 +1115,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         owner_session_id=owner_session_id,
         transport="binance_multi_stream_websocket",
         supervision_state="unavailable",
+        order_book_state="unavailable",
         coverage=BINANCE_VENUE_STREAM_COVERAGE,
         active_order_count=len(restore.open_orders),
         issues=tuple(dict.fromkeys((*restore.issues, "binance_venue_stream_unavailable"))),
@@ -1103,6 +1134,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         owner_session_id=owner_session_id,
         transport="binance_multi_stream_websocket",
         supervision_state="unavailable",
+        order_book_state="unavailable",
         coverage=BINANCE_VENUE_STREAM_COVERAGE,
         active_order_count=len(restore.open_orders),
         issues=tuple(dict.fromkeys((*restore.issues, f"binance_venue_stream_open_failed:{exc}"))),
@@ -1124,6 +1156,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=restore.restored_at,
       last_sync_at=current_time,
       supervision_state="streaming",
+      order_book_state="awaiting_depth",
       coverage=BINANCE_VENUE_STREAM_COVERAGE,
       active_order_count=len(restore.open_orders),
       issues=restore.issues,
@@ -1143,10 +1176,19 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     failover_count = handoff.failover_count
     last_failover_at = handoff.last_failover_at
     coverage = handoff.coverage or BINANCE_VENUE_STREAM_COVERAGE
+    order_book_state = handoff.order_book_state or "awaiting_depth"
+    order_book_last_update_id = handoff.order_book_last_update_id
+    order_book_gap_count = handoff.order_book_gap_count
+    order_book_best_bid_price = handoff.order_book_best_bid_price
+    order_book_best_bid_quantity = handoff.order_book_best_bid_quantity
+    order_book_best_ask_price = handoff.order_book_best_ask_price
+    order_book_best_ask_quantity = handoff.order_book_best_ask_quantity
     last_event_at = handoff.last_event_at
     last_market_event_at = handoff.last_market_event_at
     last_depth_event_at = handoff.last_depth_event_at
     last_kline_event_at = handoff.last_kline_event_at
+    last_aggregate_trade_event_at = handoff.last_aggregate_trade_event_at
+    last_mini_ticker_event_at = handoff.last_mini_ticker_event_at
     last_account_event_at = handoff.last_account_event_at
     last_balance_event_at = handoff.last_balance_event_at
     last_order_list_event_at = handoff.last_order_list_event_at
@@ -1165,10 +1207,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       issues = list(failover["issues"])
       if stream_session is None:
         supervision_state = "reconnect_failed"
+        order_book_state = "unavailable"
       else:
         session_id = stream_session.session_id
         failover_count += 1
         last_failover_at = current_time
+        order_book_state = "resync_required"
+        order_book_gap_count += 1
+        issues.append("binance_order_book_resync_required:session_missing")
         event_count += 1
 
     events = stream_session.drain_events() if stream_session is not None else ()
@@ -1207,15 +1253,73 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         event_count += 1
         last_event_at = event_at
         continue
+      if event_type == "aggTrade":
+        last_market_event_at = event_at
+        last_aggregate_trade_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "24hrMiniTicker":
+        last_market_event_at = event_at
+        last_mini_ticker_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
       if event_type == "bookTicker":
         last_market_event_at = event_at
         last_book_ticker_event_at = event_at
+        book_bid_price = _coerce_float(event.get("b"))
+        book_bid_quantity = _coerce_float(event.get("B"))
+        book_ask_price = _coerce_float(event.get("a"))
+        book_ask_quantity = _coerce_float(event.get("A"))
+        if book_bid_price is not None:
+          order_book_best_bid_price = book_bid_price
+        if book_bid_quantity is not None:
+          order_book_best_bid_quantity = book_bid_quantity
+        if book_ask_price is not None:
+          order_book_best_ask_price = book_ask_price
+        if book_ask_quantity is not None:
+          order_book_best_ask_quantity = book_ask_quantity
         event_count += 1
         last_event_at = event_at
         continue
       if event_type == "depthUpdate":
         last_market_event_at = event_at
         last_depth_event_at = event_at
+        depth_first_update_id = _coerce_int(event.get("U"))
+        depth_last_update_id = _coerce_int(event.get("u"))
+        depth_previous_update_id = _coerce_int(event.get("pu"))
+        depth_bid_price, depth_bid_quantity = _coerce_first_depth_level(event.get("b"))
+        depth_ask_price, depth_ask_quantity = _coerce_first_depth_level(event.get("a"))
+        if depth_bid_price is not None:
+          order_book_best_bid_price = depth_bid_price
+        if depth_bid_quantity is not None:
+          order_book_best_bid_quantity = depth_bid_quantity
+        if depth_ask_price is not None:
+          order_book_best_ask_price = depth_ask_price
+        if depth_ask_quantity is not None:
+          order_book_best_ask_quantity = depth_ask_quantity
+        gap_detected = False
+        if order_book_last_update_id is not None:
+          if depth_previous_update_id is not None and depth_previous_update_id != order_book_last_update_id:
+            gap_detected = True
+          elif (
+            depth_first_update_id is not None
+            and depth_first_update_id > (order_book_last_update_id + 1)
+          ):
+            gap_detected = True
+        if gap_detected:
+          order_book_state = "resync_required"
+          order_book_gap_count += 1
+          issues.append(
+            "binance_order_book_gap_detected:"
+            f"{order_book_last_update_id or 'none'}:"
+            f"{depth_previous_update_id or depth_first_update_id or 'none'}"
+          )
+        elif order_book_state not in {"resync_required", "released", "unavailable"}:
+          order_book_state = "streaming"
+        if depth_last_update_id is not None:
+          order_book_last_update_id = depth_last_update_id
         event_count += 1
         last_event_at = event_at
         continue
@@ -1247,10 +1351,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       issues = list(failover["issues"])
       if stream_session is None:
         supervision_state = "reconnect_failed"
+        order_book_state = "unavailable"
       else:
         session_id = stream_session.session_id
         failover_count += 1
         last_failover_at = current_time
+        order_book_state = "resync_required"
+        order_book_gap_count += 1
+        issues.append(f"binance_order_book_resync_required:{failover_reason}")
         event_count += 1
 
     synced_orders = tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids))
@@ -1279,12 +1387,25 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         if next_state == "released"
         else supervision_state
       ),
+      order_book_state=(
+        "released"
+        if next_state == "released"
+        else "unavailable" if next_state == "unavailable" else order_book_state
+      ),
+      order_book_last_update_id=order_book_last_update_id,
+      order_book_gap_count=order_book_gap_count,
+      order_book_best_bid_price=order_book_best_bid_price,
+      order_book_best_bid_quantity=order_book_best_bid_quantity,
+      order_book_best_ask_price=order_book_best_ask_price,
+      order_book_best_ask_quantity=order_book_best_ask_quantity,
       failover_count=failover_count,
       last_failover_at=last_failover_at,
       coverage=coverage,
       last_market_event_at=last_market_event_at,
       last_depth_event_at=last_depth_event_at,
       last_kline_event_at=last_kline_event_at,
+      last_aggregate_trade_event_at=last_aggregate_trade_event_at,
+      last_mini_ticker_event_at=last_mini_ticker_event_at,
       last_account_event_at=last_account_event_at,
       last_balance_event_at=last_balance_event_at,
       last_order_list_event_at=last_order_list_event_at,
@@ -1332,12 +1453,21 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=handoff.last_event_at,
       last_sync_at=current_time,
       supervision_state="released",
+      order_book_state="released",
+      order_book_last_update_id=handoff.order_book_last_update_id,
+      order_book_gap_count=handoff.order_book_gap_count,
+      order_book_best_bid_price=handoff.order_book_best_bid_price,
+      order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
+      order_book_best_ask_price=handoff.order_book_best_ask_price,
+      order_book_best_ask_quantity=handoff.order_book_best_ask_quantity,
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
       last_market_event_at=handoff.last_market_event_at,
       last_depth_event_at=handoff.last_depth_event_at,
       last_kline_event_at=handoff.last_kline_event_at,
+      last_aggregate_trade_event_at=handoff.last_aggregate_trade_event_at,
+      last_mini_ticker_event_at=handoff.last_mini_ticker_event_at,
       last_account_event_at=handoff.last_account_event_at,
       last_balance_event_at=handoff.last_balance_event_at,
       last_order_list_event_at=handoff.last_order_list_event_at,
@@ -1830,3 +1960,23 @@ def _coerce_float(value: Any) -> float | None:
     return float(value)
   except (TypeError, ValueError):
     return None
+
+
+def _coerce_int(value: Any) -> int | None:
+  if isinstance(value, bool):
+    return None
+  if isinstance(value, int):
+    return value
+  try:
+    return int(str(value))
+  except (TypeError, ValueError):
+    return None
+
+
+def _coerce_first_depth_level(value: Any) -> tuple[float | None, float | None]:
+  if not isinstance(value, list) or not value:
+    return None, None
+  first_level = value[0]
+  if not isinstance(first_level, (list, tuple)) or len(first_level) < 2:
+    return None, None
+  return _coerce_float(first_level[0]), _coerce_float(first_level[1])

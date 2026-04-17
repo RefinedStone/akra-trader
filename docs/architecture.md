@@ -152,7 +152,8 @@ venue session handoff backed by the Binance multi-stream websocket transport so 
 maintenance cycles can continue against the same venue-owned session lifecycle instead of dropping
 back to a one-shot restore. That handoff is now supervised: if the stream drops, the adapter
 rotates to a fresh listen key and keeps session metadata on failover count plus observed
-account/balance/order-list/trade/book-ticker/depth/kline coverage.
+account/balance/order-list/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline coverage,
+order-book resync state, and top-of-book levels.
 
 ## Modes
 
@@ -184,8 +185,9 @@ account/balance/order-list/trade/book-ticker/depth/kline coverage.
   metadata once a live session has been resumed or relaunched, and Binance uses a multi-stream
   websocket transport instead of the earlier restore-and-poll bridge
 - Binance push-session supervision now covers execution, account-position, balance-update, and
-  order-list events plus trade/book-ticker/depth/kline market transport, with automatic
-  listen-key failover when the websocket drops
+  order-list events plus trade/aggregate-trade/book-ticker/mini-ticker/depth/kline market
+  transport, with automatic listen-key failover when the websocket drops and order-book resync
+  state when depth continuity breaks
 
 ## Control Room
 
@@ -200,7 +202,8 @@ The web app currently surfaces:
 - guarded-live order cancel/replace controls for active venue orders
 - guarded-live live-owner visibility, durable order-book state, and explicit resume control
 - guarded-live venue session handoff state, websocket transport, cursor, failover health, and
-  last account/balance/order-list/market/depth/kline event visibility
+  last account/balance/order-list/market/depth/kline event visibility plus order-book resync and
+  top-of-book supervision
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
@@ -213,8 +216,8 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 - guarded-live worker execution exists, but it is still limited to a narrow market-entry path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
   guarded-live recovery/live resume still stop short of broader venue-native stream coverage beyond
-  Binance multi-stream account/order/trade/book-ticker/depth/kline session coverage and order
-  lifecycle supervision
+  Binance multi-stream account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline
+  session coverage and order lifecycle supervision
 - the system still lacks durable alert delivery and wider operator event coverage
 - venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
   flow and no full exchange-order restore

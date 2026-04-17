@@ -186,7 +186,7 @@ def test_binance_websocket_user_data_stream_client_opens_stream_and_refreshes_li
   assert connection.closed is True
 
 
-def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stream(
+def test_binance_websocket_market_stream_client_opens_wider_market_channels(
   monkeypatch,
 ) -> None:
   clock = MutableClock(datetime(2026, 4, 17, 12, 0, tzinfo=UTC))
@@ -224,6 +224,17 @@ def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stre
   connection.messages.put(
     json.dumps(
       {
+        "stream": "ethusdt@aggTrade",
+        "data": {
+          "a": 17,
+          "T": int(clock().timestamp() * 1000),
+        },
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
         "stream": "ethusdt@bookTicker",
         "data": {
           "u": 123,
@@ -231,17 +242,31 @@ def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stre
       }
     )
   )
+  connection.messages.put(
+    json.dumps(
+      {
+        "stream": "ethusdt@miniTicker",
+        "data": {
+          "E": int(clock().timestamp() * 1000),
+        },
+      }
+    )
+  )
 
-  events = _wait_for_events(session, expected_count=2)
+  events = _wait_for_events(session, expected_count=4)
 
   assert session.transport == "binance_market_data_websocket"
   assert request_urls == [
-    "wss://stream.binance.test/stream?streams=ethusdt@trade/ethusdt@bookTicker/ethusdt@depth20@100ms/ethusdt@kline_5m"
+    "wss://stream.binance.test/stream?streams=ethusdt@trade/ethusdt@aggTrade/ethusdt@bookTicker/ethusdt@miniTicker/ethusdt@depth20@100ms/ethusdt@kline_5m"
   ]
   assert events[0]["e"] == "trade"
   assert events[0]["stream_scope"] == "market_data"
-  assert events[1]["e"] == "bookTicker"
-  assert events[1]["stream"] == "ethusdt@bookTicker"
+  assert events[1]["e"] == "aggTrade"
+  assert events[1]["stream"] == "ethusdt@aggTrade"
+  assert events[2]["e"] == "bookTicker"
+  assert events[2]["stream"] == "ethusdt@bookTicker"
+  assert events[3]["e"] == "24hrMiniTicker"
+  assert events[3]["stream"] == "ethusdt@miniTicker"
 
   session.close()
   assert connection.closed is True
@@ -295,11 +320,15 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     "balance_updates",
     "order_list_status",
     "trade_ticks",
+    "aggregate_trade_ticks",
     "book_ticker",
+    "mini_ticker",
     "depth_updates",
     "kline_candles",
+    "order_book_lifecycle",
   )
   assert handoff.active_order_count == 1
+  assert handoff.order_book_state == "awaiting_depth"
   assert stream_client.open_count == 1
 
   clock.advance(timedelta(minutes=1))
@@ -363,14 +392,35 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   )
   second_stream_session.push(
     {
+      "e": "aggTrade",
+      "E": int(clock().timestamp() * 1000),
+      "T": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
+    {
       "e": "bookTicker",
       "_received_at_ms": int(clock().timestamp() * 1000),
+      "b": "2499.5",
+      "B": "0.80",
+      "a": "2500.5",
+      "A": "1.10",
+    }
+  )
+  second_stream_session.push(
+    {
+      "e": "24hrMiniTicker",
+      "E": int(clock().timestamp() * 1000),
     }
   )
   second_stream_session.push(
     {
       "e": "depthUpdate",
       "E": int(clock().timestamp() * 1000),
+      "U": 101,
+      "u": 102,
+      "b": [["2499.4", "1.25"]],
+      "a": [["2500.6", "0.95"]],
     }
   )
   second_stream_session.push(
@@ -408,11 +458,20 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=("order-1",))
   released = adapter.release_session(handoff=second_sync.handoff)
 
-  assert second_sync.handoff.cursor == "event-11"
+  assert second_sync.handoff.cursor == "event-13"
   assert second_sync.handoff.active_order_count == 0
+  assert second_sync.handoff.order_book_state == "resync_required"
+  assert second_sync.handoff.order_book_last_update_id == 102
+  assert second_sync.handoff.order_book_gap_count == 1
+  assert second_sync.handoff.order_book_best_bid_price == 2499.4
+  assert second_sync.handoff.order_book_best_bid_quantity == 1.25
+  assert second_sync.handoff.order_book_best_ask_price == 2500.6
+  assert second_sync.handoff.order_book_best_ask_quantity == 0.95
   assert second_sync.handoff.last_market_event_at == clock()
   assert second_sync.handoff.last_depth_event_at == clock()
   assert second_sync.handoff.last_kline_event_at == clock()
+  assert second_sync.handoff.last_aggregate_trade_event_at == clock()
+  assert second_sync.handoff.last_mini_ticker_event_at == clock()
   assert second_sync.handoff.last_balance_event_at == clock()
   assert second_sync.handoff.last_order_list_event_at == clock()
   assert second_sync.handoff.last_trade_event_at == clock()
@@ -423,5 +482,63 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert released.state == "released"
   assert released.transport == "binance_multi_stream_websocket"
   assert released.supervision_state == "released"
+  assert released.order_book_state == "released"
   assert released.failover_count == 1
   assert second_stream_session.closed is True
+
+
+def test_binance_adapter_marks_order_book_resync_required_on_depth_sequence_gap() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  exchange = FakeExecutionExchange(fetch_rows=[])
+  stream_session = FakeStreamSession("listen-key-gap")
+  stream_client = FakeStreamClient(stream_session)
+  adapter = BinanceVenueExecutionAdapter(
+    exchange=exchange,
+    venue_stream_client=stream_client,
+    clock=clock,
+  )
+
+  handoff = adapter.handoff_session(
+    symbol="ETH/USDT",
+    timeframe="5m",
+    owner_run_id="run-live-gap",
+    owner_session_id="worker-live-gap",
+    owned_order_ids=(),
+  )
+
+  clock.advance(timedelta(seconds=30))
+  stream_session.push(
+    {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+      "U": 21,
+      "u": 25,
+      "b": [["2498.0", "0.50"]],
+      "a": [["2498.8", "0.45"]],
+    }
+  )
+  first_sync = adapter.sync_session(handoff=handoff, order_ids=())
+
+  clock.advance(timedelta(seconds=30))
+  stream_session.push(
+    {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+      "U": 31,
+      "u": 34,
+      "pu": 29,
+      "b": [["2497.5", "0.80"]],
+      "a": [["2498.4", "0.70"]],
+    }
+  )
+  second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=())
+
+  assert first_sync.handoff.order_book_state == "streaming"
+  assert first_sync.handoff.order_book_last_update_id == 25
+  assert second_sync.handoff.order_book_state == "resync_required"
+  assert second_sync.handoff.order_book_gap_count == 1
+  assert second_sync.handoff.order_book_last_update_id == 34
+  assert second_sync.handoff.order_book_best_bid_price == 2497.5
+  assert second_sync.handoff.order_book_best_ask_price == 2498.4
+  assert "binance_order_book_gap_detected:25:29" in second_sync.handoff.issues

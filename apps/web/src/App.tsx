@@ -474,9 +474,18 @@ type GuardedLiveStatus = {
     failover_count: number;
     last_failover_at?: string | null;
     coverage: string[];
+    order_book_state: string;
+    order_book_last_update_id?: number | null;
+    order_book_gap_count: number;
+    order_book_best_bid_price?: number | null;
+    order_book_best_bid_quantity?: number | null;
+    order_book_best_ask_price?: number | null;
+    order_book_best_ask_quantity?: number | null;
     last_market_event_at?: string | null;
     last_depth_event_at?: string | null;
     last_kline_event_at?: string | null;
+    last_aggregate_trade_event_at?: string | null;
+    last_mini_ticker_event_at?: string | null;
     last_account_event_at?: string | null;
     last_balance_event_at?: string | null;
     last_order_list_event_at?: string | null;
@@ -2255,8 +2264,46 @@ export default function App() {
                         <td>{guardedLive.session_handoff.coverage.length ? guardedLive.session_handoff.coverage.join(", ") : "none"}</td>
                       </tr>
                       <tr>
+                        <th>Order book state</th>
+                        <td>{guardedLive.session_handoff.order_book_state}</td>
+                      </tr>
+                      <tr>
+                        <th>Last depth update ID</th>
+                        <td>{guardedLive.session_handoff.order_book_last_update_id ?? "n/a"}</td>
+                      </tr>
+                      <tr>
+                        <th>Depth gap count</th>
+                        <td>{guardedLive.session_handoff.order_book_gap_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Best bid</th>
+                        <td>
+                          {guardedLive.session_handoff.order_book_best_bid_price != null
+                            ? `${guardedLive.session_handoff.order_book_best_bid_price.toFixed(8)}`
+                              + ` @ ${guardedLive.session_handoff.order_book_best_bid_quantity?.toFixed(8) ?? "n/a"}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Best ask</th>
+                        <td>
+                          {guardedLive.session_handoff.order_book_best_ask_price != null
+                            ? `${guardedLive.session_handoff.order_book_best_ask_price.toFixed(8)}`
+                              + ` @ ${guardedLive.session_handoff.order_book_best_ask_quantity?.toFixed(8) ?? "n/a"}`
+                            : "n/a"}
+                        </td>
+                      </tr>
+                      <tr>
                         <th>Last market event</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_market_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last aggregate trade</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_aggregate_trade_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last mini ticker</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_mini_ticker_event_at ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Last depth update</th>
