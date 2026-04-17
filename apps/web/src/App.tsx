@@ -556,6 +556,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        squadcast: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          escalation_policy?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -861,6 +879,24 @@ type GuardedLiveStatus = {
             assignment_phase: string;
             priority_phase: string;
             group_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        squadcast: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          escalation_policy?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            escalation_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8412,6 +8448,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  squadcast: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    assignee?: string | null;
+    escalation_policy?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8646,6 +8700,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `ServiceNow schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "squadcast") {
+    const details = [
+      providerRecovery.squadcast.incident_id ? `incident ${providerRecovery.squadcast.incident_id}` : null,
+      providerRecovery.squadcast.incident_status !== "unknown"
+        ? `status ${providerRecovery.squadcast.incident_status}`
+        : null,
+      providerRecovery.squadcast.severity ? `severity ${providerRecovery.squadcast.severity}` : null,
+      providerRecovery.squadcast.assignee ? `assignee ${providerRecovery.squadcast.assignee}` : null,
+      providerRecovery.squadcast.escalation_policy
+        ? `policy ${providerRecovery.squadcast.escalation_policy}`
+        : null,
+      providerRecovery.squadcast.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.squadcast.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.squadcast.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.squadcast.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.squadcast.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.squadcast.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.squadcast.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.squadcast.updated_at)}`
+        : null,
+      providerRecovery.squadcast.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.squadcast.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Squadcast schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

@@ -65,6 +65,10 @@ class Settings:
   operator_alert_servicenow_api_url: str = "https://api.servicenow.com"
   operator_alert_servicenow_recovery_engine_url_template: str | None = None
   operator_alert_servicenow_recovery_engine_token: str | None = None
+  operator_alert_squadcast_api_token: str | None = None
+  operator_alert_squadcast_api_url: str = "https://api.squadcast.com"
+  operator_alert_squadcast_recovery_engine_url_template: str | None = None
+  operator_alert_squadcast_recovery_engine_token: str | None = None
   operator_alert_opsgenie_api_key: str | None = None
   operator_alert_opsgenie_api_url: str = "https://api.opsgenie.com"
   operator_alert_opsgenie_recovery_engine_url_template: str | None = None
@@ -227,6 +231,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_servicenow_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_SERVICENOW_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_squadcast_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUADCAST_API_TOKEN") or None
+    ),
+    operator_alert_squadcast_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_SQUADCAST_API_URL",
+      "https://api.squadcast.com",
+    ),
+    operator_alert_squadcast_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUADCAST_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_squadcast_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUADCAST_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsgenie_api_key=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY") or None

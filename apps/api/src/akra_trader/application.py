@@ -64,6 +64,8 @@ from akra_trader.domain.models import OperatorIncidentXmattersRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentXmattersRecoveryState
 from akra_trader.domain.models import OperatorIncidentServicenowRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServicenowRecoveryState
+from akra_trader.domain.models import OperatorIncidentSquadcastRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentSquadcastRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1607,6 +1609,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "squadcast"
+          and provider_recovery.squadcast.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            squadcast=replace(
+              aligned_provider_recovery.squadcast,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -3078,6 +3091,129 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_squadcast_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "investigating",
+      "on_hold",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_squadcast_ownership_phase(assignee: str | None, existing_phase: str) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_squadcast_severity_phase(severity: str | None, existing_phase: str) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_squadcast_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_squadcast_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"triggered", "open", "investigating", "on_hold"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_squadcast_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity: str | None,
+    assignee: str | None,
+    escalation_policy: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentSquadcastRecoveryState,
+  ) -> OperatorIncidentSquadcastRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_squadcast_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_squadcast_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentSquadcastRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_squadcast_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      severity_phase=self._first_non_empty_string(
+        payload.get("severity_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("severity_phase"),
+      ) or self._resolve_squadcast_severity_phase(
+        severity,
+        existing.phase_graph.severity_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_squadcast_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -3100,6 +3236,7 @@ class TradingApplication:
     OperatorIncidentBlamelessRecoveryState,
     OperatorIncidentXmattersRecoveryState,
     OperatorIncidentServicenowRecoveryState,
+    OperatorIncidentSquadcastRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -3719,6 +3856,86 @@ class TradingApplication:
       ),
     )
 
+    squadcast_payload = self._merge_payload_mappings(
+      schema_payload.get("squadcast"),
+      schema_payload.get("squad_cast"),
+      payload.get("squadcast"),
+      payload.get("squadcast_incident"),
+      payload.get("squad_cast"),
+    )
+    squadcast_status = self._first_non_empty_string(
+      squadcast_payload.get("incident_status"),
+      squadcast_payload.get("status"),
+      squadcast_payload.get("state"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.squadcast.incident_status,
+    ) or "unknown"
+    squadcast = OperatorIncidentSquadcastRecoveryState(
+      incident_id=self._first_non_empty_string(
+        squadcast_payload.get("incident_id"),
+        squadcast_payload.get("id"),
+        workflow_reference,
+        existing.squadcast.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        squadcast_payload.get("external_reference"),
+        squadcast_payload.get("reference"),
+        reference,
+        existing.squadcast.external_reference,
+      ),
+      incident_status=squadcast_status,
+      severity=self._first_non_empty_string(
+        squadcast_payload.get("severity"),
+        squadcast_payload.get("priority"),
+        existing.squadcast.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        squadcast_payload.get("assignee"),
+        squadcast_payload.get("owner"),
+        existing.squadcast.assignee,
+      ),
+      escalation_policy=self._first_non_empty_string(
+        squadcast_payload.get("escalation_policy"),
+        squadcast_payload.get("escalation_policy_name"),
+        squadcast_payload.get("policy"),
+        existing.squadcast.escalation_policy,
+      ),
+      url=self._first_non_empty_string(
+        squadcast_payload.get("url"),
+        squadcast_payload.get("html_url"),
+        existing.squadcast.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(squadcast_payload.get("updated_at"))
+        or existing.squadcast.updated_at
+      ),
+      phase_graph=self._build_squadcast_recovery_phase_graph(
+        payload=squadcast_payload,
+        incident_status=squadcast_status,
+        severity=self._first_non_empty_string(
+          squadcast_payload.get("severity"),
+          squadcast_payload.get("priority"),
+          existing.squadcast.severity,
+        ),
+        assignee=self._first_non_empty_string(
+          squadcast_payload.get("assignee"),
+          squadcast_payload.get("owner"),
+          existing.squadcast.assignee,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          squadcast_payload.get("escalation_policy"),
+          squadcast_payload.get("escalation_policy_name"),
+          squadcast_payload.get("policy"),
+          existing.squadcast.escalation_policy,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.squadcast,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -3730,6 +3947,7 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -3742,6 +3960,7 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "incidentio":
       return (
@@ -3754,6 +3973,7 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -3766,6 +3986,7 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "rootly":
       return (
@@ -3778,6 +3999,7 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "blameless":
       return (
@@ -3790,6 +4012,7 @@ class TradingApplication:
         blameless,
         existing.xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "xmatters":
       return (
@@ -3802,6 +4025,7 @@ class TradingApplication:
         existing.blameless,
         xmatters,
         existing.servicenow,
+        existing.squadcast,
       )
     if normalized_provider == "servicenow":
       return (
@@ -3814,6 +4038,20 @@ class TradingApplication:
         existing.blameless,
         existing.xmatters,
         servicenow,
+        existing.squadcast,
+      )
+    if normalized_provider == "squadcast":
+      return (
+        "squadcast",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        existing.xmatters,
+        existing.servicenow,
+        squadcast,
       )
     return (
       existing.provider_schema_kind,
@@ -3825,6 +4063,7 @@ class TradingApplication:
       existing.blameless,
       existing.xmatters,
       existing.servicenow,
+      existing.squadcast,
     )
 
   def _build_provider_recovery_state(
@@ -3909,6 +4148,7 @@ class TradingApplication:
       blameless_schema,
       xmatters_schema,
       servicenow_schema,
+      squadcast_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
@@ -3992,6 +4232,7 @@ class TradingApplication:
       blameless=blameless_schema,
       xmatters=xmatters_schema,
       servicenow=servicenow_schema,
+      squadcast=squadcast_schema,
       updated_at=synced_at,
     )
 
@@ -4113,6 +4354,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.servicenow,
+        ),
+      ),
+      squadcast=replace(
+        provider_recovery.squadcast,
+        phase_graph=self._build_squadcast_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.squadcast.incident_status,
+          severity=provider_recovery.squadcast.severity,
+          assignee=provider_recovery.squadcast.assignee,
+          escalation_policy=provider_recovery.squadcast.escalation_policy,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.squadcast,
         ),
       ),
     )
@@ -8460,6 +8715,8 @@ class TradingApplication:
       return "xmatters"
     if normalized == "service_now":
       return "servicenow"
+    if normalized == "squad_cast":
+      return "squadcast"
     return normalized or None
 
   @staticmethod
@@ -8633,6 +8890,8 @@ class TradingApplication:
       return "xmatters"
     if "servicenow_incidents" in combined:
       return "servicenow"
+    if "squadcast_incidents" in combined:
+      return "squadcast"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

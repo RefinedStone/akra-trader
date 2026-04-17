@@ -751,6 +751,31 @@ class OperatorIncidentServicenowRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentSquadcastRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  assignee: str | None = None
+  escalation_policy: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentSquadcastRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentSquadcastRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentSquadcastRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -795,6 +820,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   servicenow: OperatorIncidentServicenowRecoveryState = field(
     default_factory=OperatorIncidentServicenowRecoveryState
+  )
+  squadcast: OperatorIncidentSquadcastRecoveryState = field(
+    default_factory=OperatorIncidentSquadcastRecoveryState
   )
   updated_at: datetime | None = None
 
