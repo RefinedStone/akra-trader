@@ -185,6 +185,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_zenduty_recovery_engine_url_template
     ),
     zenduty_recovery_engine_token=settings.operator_alert_zenduty_recovery_engine_token,
+    splunk_oncall_api_token=settings.operator_alert_splunk_oncall_api_token,
+    splunk_oncall_api_url=settings.operator_alert_splunk_oncall_api_url,
+    splunk_oncall_recovery_engine_url_template=(
+      settings.operator_alert_splunk_oncall_recovery_engine_url_template
+    ),
+    splunk_oncall_recovery_engine_token=settings.operator_alert_splunk_oncall_recovery_engine_token,
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
     opsgenie_recovery_engine_url_template=(

@@ -610,6 +610,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        splunk_oncall: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          routing_key?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            routing_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -987,6 +1005,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        splunk_oncall: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          routing_key?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            routing_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8610,6 +8646,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  splunk_oncall: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    assignee?: string | null;
+    routing_key?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      routing_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -8953,6 +9007,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Grafana OnCall schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "splunk_oncall") {
+    const details = [
+      providerRecovery.splunk_oncall.incident_id
+        ? `incident ${providerRecovery.splunk_oncall.incident_id}`
+        : null,
+      providerRecovery.splunk_oncall.incident_status !== "unknown"
+        ? `status ${providerRecovery.splunk_oncall.incident_status}`
+        : null,
+      providerRecovery.splunk_oncall.severity
+        ? `severity ${providerRecovery.splunk_oncall.severity}`
+        : null,
+      providerRecovery.splunk_oncall.assignee
+        ? `assignee ${providerRecovery.splunk_oncall.assignee}`
+        : null,
+      providerRecovery.splunk_oncall.routing_key
+        ? `routing ${providerRecovery.splunk_oncall.routing_key}`
+        : null,
+      providerRecovery.splunk_oncall.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.splunk_oncall.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.splunk_oncall.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.splunk_oncall.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.splunk_oncall.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.splunk_oncall.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.splunk_oncall.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.splunk_oncall.updated_at)}`
+        : null,
+      providerRecovery.splunk_oncall.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.splunk_oncall.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Splunk On-Call schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

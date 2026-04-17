@@ -851,6 +851,31 @@ class OperatorIncidentZendutyRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentSplunkOnCallRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  assignee: str | None = None
+  routing_key: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentSplunkOnCallRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentSplunkOnCallRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentSplunkOnCallRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  routing_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -907,6 +932,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   zenduty: OperatorIncidentZendutyRecoveryState = field(
     default_factory=OperatorIncidentZendutyRecoveryState
+  )
+  splunk_oncall: OperatorIncidentSplunkOnCallRecoveryState = field(
+    default_factory=OperatorIncidentSplunkOnCallRecoveryState
   )
   updated_at: datetime | None = None
 

@@ -193,6 +193,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       grafana_oncall_api_url: str,
       grafana_oncall_recovery_engine_url_template: str | None,
       grafana_oncall_recovery_engine_token: str | None,
+      splunk_oncall_api_token: str | None,
+      splunk_oncall_api_url: str,
+      splunk_oncall_recovery_engine_url_template: str | None,
+      splunk_oncall_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -249,6 +253,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         grafana_oncall_recovery_engine_url_template or ""
       )
       captured["grafana_oncall_recovery_engine_token"] = grafana_oncall_recovery_engine_token or ""
+      captured["splunk_oncall_api_token"] = splunk_oncall_api_token or ""
+      captured["splunk_oncall_api_url"] = splunk_oncall_api_url
+      captured["splunk_oncall_recovery_engine_url_template"] = (
+        splunk_oncall_recovery_engine_url_template or ""
+      )
+      captured["splunk_oncall_recovery_engine_token"] = splunk_oncall_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -361,6 +371,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://grafana-oncall.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_grafana_oncall_recovery_engine_token="grafana-oncall-recovery-token",
+      operator_alert_splunk_oncall_api_token="splunk-oncall-token",
+      operator_alert_splunk_oncall_api_url="https://api.splunkoncall.example",
+      operator_alert_splunk_oncall_recovery_engine_url_template=(
+        "https://splunk-oncall.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_splunk_oncall_recovery_engine_token="splunk-oncall-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -430,6 +446,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["grafana_oncall_api_url"] == "https://oncall-api.grafana.example"
   assert captured["grafana_oncall_recovery_engine_url_template"] == "https://grafana-oncall.example/recovery/{workflow_reference_urlencoded}"
   assert captured["grafana_oncall_recovery_engine_token"] == "grafana-oncall-recovery-token"
+  assert captured["splunk_oncall_api_token"] == "splunk-oncall-token"
+  assert captured["splunk_oncall_api_url"] == "https://api.splunkoncall.example"
+  assert captured["splunk_oncall_recovery_engine_url_template"] == "https://splunk-oncall.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["splunk_oncall_recovery_engine_token"] == "splunk-oncall-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"
