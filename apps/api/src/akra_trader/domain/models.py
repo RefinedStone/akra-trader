@@ -668,9 +668,12 @@ class GuardedLiveVenueSessionHandoff:
   failover_count: int = 0
   last_failover_at: datetime | None = None
   coverage: tuple[str, ...] = ()
+  last_market_event_at: datetime | None = None
   last_account_event_at: datetime | None = None
   last_balance_event_at: datetime | None = None
   last_order_list_event_at: datetime | None = None
+  last_trade_event_at: datetime | None = None
+  last_book_ticker_event_at: datetime | None = None
   active_order_count: int = 0
   issues: tuple[str, ...] = ()
 

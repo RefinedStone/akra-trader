@@ -474,9 +474,12 @@ type GuardedLiveStatus = {
     failover_count: number;
     last_failover_at?: string | null;
     coverage: string[];
+    last_market_event_at?: string | null;
     last_account_event_at?: string | null;
     last_balance_event_at?: string | null;
     last_order_list_event_at?: string | null;
+    last_trade_event_at?: string | null;
+    last_book_ticker_event_at?: string | null;
     active_order_count: number;
     issues: string[];
   };
@@ -2250,6 +2253,10 @@ export default function App() {
                         <td>{guardedLive.session_handoff.coverage.length ? guardedLive.session_handoff.coverage.join(", ") : "none"}</td>
                       </tr>
                       <tr>
+                        <th>Last market event</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_market_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
                         <th>Last account event</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_account_event_at ?? null)}</td>
                       </tr>
@@ -2260,6 +2267,14 @@ export default function App() {
                       <tr>
                         <th>Last order-list event</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_order_list_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last trade tick</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_trade_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last book ticker</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_book_ticker_event_at ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Venue session</th>

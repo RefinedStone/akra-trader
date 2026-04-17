@@ -35,11 +35,11 @@ Implemented now:
   and guarded-live resume now restores the owned live run from venue-native order lifecycle state
   before falling back to the persisted snapshot
 - guarded-live live workers now keep an explicit venue session handoff backed by the Binance
-  user-data websocket stream so maintenance can continue through the same venue-owned lifecycle
+  multi-stream websocket session so maintenance can continue through the same venue-owned lifecycle
   after resume
 - Binance guarded-live session supervision now fails over to a fresh listen-key stream when the
-  user-data websocket drops, and the control plane tracks broader stream coverage across execution,
-  account-position, balance-update, and order-list events
+  venue session drops, and the control plane tracks broader stream coverage across execution,
+  account-position, balance-update, order-list, trade-tick, and book-ticker events
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -141,10 +141,11 @@ Defaults:
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
-  metadata so the resumed worker can continue through the Binance user-data websocket stream and
-  the same venue-owned lifecycle
+  metadata so the resumed worker can continue through the Binance multi-stream websocket transport
+  and the same venue-owned lifecycle
 - guarded-live session handoff state now tracks supervision health, failover count, and the latest
-  account-position, balance-update, and order-list event timestamps from the Binance push session
+  market, account-position, balance-update, order-list, trade-tick, and book-ticker event
+  timestamps from the Binance push session
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

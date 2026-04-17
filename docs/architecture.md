@@ -148,11 +148,11 @@ lifecycle changes back into local orders, fills, positions, and audit notes. Ope
 cancel active venue orders or replace them with repriced limit orders from persisted live run
 state, and the guarded-live resume flow now restores tracked venue order lifecycle state before it
 falls back to the persisted snapshot after restart or fault drills. The live worker also persists a
-venue session handoff backed by the Binance user-data websocket stream so subsequent maintenance
-cycles can continue against the same venue-owned session lifecycle instead of dropping back to a
-one-shot restore. That handoff is now supervised: if the stream drops, the adapter rotates to a
-fresh listen key and keeps session metadata on failover count plus observed account/balance/order
-list coverage.
+venue session handoff backed by the Binance multi-stream websocket transport so subsequent
+maintenance cycles can continue against the same venue-owned session lifecycle instead of dropping
+back to a one-shot restore. That handoff is now supervised: if the stream drops, the adapter
+rotates to a fresh listen key and keeps session metadata on failover count plus observed
+account/balance/order-list/trade/book-ticker coverage.
 
 ## Modes
 
@@ -181,10 +181,11 @@ list coverage.
   guarded-live resume action can recover the owned live session from venue-native order lifecycle
   state after restart or fault drills
 - guarded-live maintenance now follows a persisted venue session handoff with transport/session
-  metadata once a live session has been resumed or relaunched, and Binance uses a user-data
-  websocket stream instead of the earlier restore-and-poll bridge
+  metadata once a live session has been resumed or relaunched, and Binance uses a multi-stream
+  websocket transport instead of the earlier restore-and-poll bridge
 - Binance push-session supervision now covers execution, account-position, balance-update, and
-  order-list events, with automatic listen-key failover when the websocket drops
+  order-list events plus trade/book-ticker market transport, with automatic listen-key failover
+  when the websocket drops
 
 ## Control Room
 
@@ -199,7 +200,7 @@ The web app currently surfaces:
 - guarded-live order cancel/replace controls for active venue orders
 - guarded-live live-owner visibility, durable order-book state, and explicit resume control
 - guarded-live venue session handoff state, websocket transport, cursor, failover health, and
-  last account/balance/order-list event visibility
+  last account/balance/order-list/market event visibility
 - runtime alerts and audit visibility for sandbox worker failures and stale sessions
 - guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
@@ -212,7 +213,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
 - guarded-live worker execution exists, but it is still limited to a narrow market-entry path
 - runtime alerts and audit visibility exist only for sandbox worker failures and stale sessions, and
   guarded-live recovery/live resume still stop short of broader venue-native stream coverage beyond
-  Binance user-data session events and order lifecycle supervision
+  Binance multi-stream account/order/market session coverage and order lifecycle supervision
 - the system still lacks durable alert delivery and wider operator event coverage
 - venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
   flow and no full exchange-order restore

@@ -10,6 +10,7 @@ from datetime import datetime
 from datetime import timedelta
 
 from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
+from akra_trader.adapters.venue_execution import BinanceWebSocketMarketStreamClient
 from akra_trader.adapters.venue_execution import BinanceWebSocketUserDataStreamClient
 
 
@@ -70,10 +71,9 @@ class FakeExecutionExchange:
 
 
 class FakeStreamSession:
-  transport = "binance_user_data_websocket"
-
-  def __init__(self, session_id: str) -> None:
+  def __init__(self, session_id: str, *, transport: str = "binance_multi_stream_websocket") -> None:
     self.session_id = session_id
+    self.transport = transport
     self.closed = False
     self._events: list[dict[str, object]] = []
 
@@ -103,11 +103,16 @@ class FakeStreamClient:
     return self._sessions.pop(0)
 
 
-def _wait_for_events(session, *, timeout_seconds: float = 0.5) -> tuple[dict[str, object], ...]:
+def _wait_for_events(
+  session,
+  *,
+  expected_count: int = 1,
+  timeout_seconds: float = 0.5,
+) -> tuple[dict[str, object], ...]:
   deadline = time.monotonic() + timeout_seconds
   while time.monotonic() < deadline:
     events = session.drain_events()
-    if events:
+    if len(events) >= expected_count:
       return events
     time.sleep(0.01)
   return ()
@@ -181,6 +186,66 @@ def test_binance_websocket_user_data_stream_client_opens_stream_and_refreshes_li
   assert connection.closed is True
 
 
+def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stream(
+  monkeypatch,
+) -> None:
+  clock = MutableClock(datetime(2026, 4, 17, 12, 0, tzinfo=UTC))
+  request_urls: list[str] = []
+  connection = FakeWebSocketConnection()
+
+  def fake_connect(url: str):
+    request_urls.append(url)
+    return connection
+
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution.BinanceWebSocketMarketStreamSession._resolve_connect",
+    staticmethod(lambda: fake_connect),
+  )
+
+  client = BinanceWebSocketMarketStreamClient(
+    symbol="ETH/USDT",
+    websocket_url="wss://stream.binance.test/stream",
+    clock=clock,
+  )
+  session = client.open_session()
+  connection.messages.put(
+    json.dumps(
+      {
+        "stream": "ethusdt@trade",
+        "data": {
+          "e": "trade",
+          "E": int(clock().timestamp() * 1000),
+          "T": int(clock().timestamp() * 1000),
+        },
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "stream": "ethusdt@bookTicker",
+        "data": {
+          "u": 123,
+        },
+      }
+    )
+  )
+
+  events = _wait_for_events(session, expected_count=2)
+
+  assert session.transport == "binance_market_data_websocket"
+  assert request_urls == [
+    "wss://stream.binance.test/stream?streams=ethusdt@trade/ethusdt@bookTicker"
+  ]
+  assert events[0]["e"] == "trade"
+  assert events[0]["stream_scope"] == "market_data"
+  assert events[1]["e"] == "bookTicker"
+  assert events[1]["stream"] == "ethusdt@bookTicker"
+
+  session.close()
+  assert connection.closed is True
+
+
 def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
@@ -205,7 +270,7 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   stream_client = FakeStreamClient(first_stream_session, second_stream_session)
   adapter = BinanceVenueExecutionAdapter(
     exchange=exchange,
-    user_data_stream_client=stream_client,
+    venue_stream_client=stream_client,
     clock=clock,
   )
 
@@ -217,8 +282,8 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   )
 
   assert handoff.state == "active"
-  assert handoff.source == "binance_user_data_stream"
-  assert handoff.transport == "binance_user_data_websocket"
+  assert handoff.source == "binance_venue_stream"
+  assert handoff.transport == "binance_multi_stream_websocket"
   assert handoff.venue_session_id == "listen-key-1"
   assert handoff.supervision_state == "streaming"
   assert handoff.failover_count == 0
@@ -227,6 +292,8 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     "account_positions",
     "balance_updates",
     "order_list_status",
+    "trade_ticks",
+    "book_ticker",
   )
   assert handoff.active_order_count == 1
   assert stream_client.open_count == 1
@@ -263,7 +330,7 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   first_sync = adapter.sync_session(handoff=handoff, order_ids=("order-1",))
 
   assert first_sync.state == "active"
-  assert first_sync.handoff.transport == "binance_user_data_websocket"
+  assert first_sync.handoff.transport == "binance_multi_stream_websocket"
   assert first_sync.handoff.venue_session_id == "listen-key-2"
   assert first_sync.handoff.cursor == "event-4"
   assert first_sync.handoff.active_order_count == 1
@@ -281,6 +348,19 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     {
       "e": "balanceUpdate",
       "E": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
+    {
+      "e": "trade",
+      "E": int(clock().timestamp() * 1000),
+      "T": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
+    {
+      "e": "bookTicker",
+      "_received_at_ms": int(clock().timestamp() * 1000),
     }
   )
   second_stream_session.push(
@@ -307,15 +387,18 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=("order-1",))
   released = adapter.release_session(handoff=second_sync.handoff)
 
-  assert second_sync.handoff.cursor == "event-7"
+  assert second_sync.handoff.cursor == "event-9"
   assert second_sync.handoff.active_order_count == 0
+  assert second_sync.handoff.last_market_event_at == clock()
   assert second_sync.handoff.last_balance_event_at == clock()
   assert second_sync.handoff.last_order_list_event_at == clock()
+  assert second_sync.handoff.last_trade_event_at == clock()
+  assert second_sync.handoff.last_book_ticker_event_at == clock()
   assert second_sync.synced_orders[0].status == "filled"
   assert second_sync.synced_orders[0].filled_amount == 1.0
   assert second_sync.open_orders == ()
   assert released.state == "released"
-  assert released.transport == "binance_user_data_websocket"
+  assert released.transport == "binance_multi_stream_websocket"
   assert released.supervision_state == "released"
   assert released.failover_count == 1
   assert second_stream_session.closed is True
