@@ -470,6 +470,13 @@ type GuardedLiveStatus = {
     cursor?: string | null;
     last_event_at?: string | null;
     last_sync_at?: string | null;
+    supervision_state: string;
+    failover_count: number;
+    last_failover_at?: string | null;
+    coverage: string[];
+    last_account_event_at?: string | null;
+    last_balance_event_at?: string | null;
+    last_order_list_event_at?: string | null;
     active_order_count: number;
     issues: string[];
   };
@@ -2225,6 +2232,34 @@ export default function App() {
                       <tr>
                         <th>Last stream sync</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_sync_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Supervision</th>
+                        <td>{guardedLive.session_handoff.supervision_state}</td>
+                      </tr>
+                      <tr>
+                        <th>Failovers</th>
+                        <td>{guardedLive.session_handoff.failover_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Last failover</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_failover_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Coverage</th>
+                        <td>{guardedLive.session_handoff.coverage.length ? guardedLive.session_handoff.coverage.join(", ") : "none"}</td>
+                      </tr>
+                      <tr>
+                        <th>Last account event</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_account_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last balance event</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_balance_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last order-list event</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_order_list_event_at ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Venue session</th>

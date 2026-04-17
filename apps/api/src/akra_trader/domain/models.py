@@ -664,6 +664,13 @@ class GuardedLiveVenueSessionHandoff:
   cursor: str | None = None
   last_event_at: datetime | None = None
   last_sync_at: datetime | None = None
+  supervision_state: str = "inactive"
+  failover_count: int = 0
+  last_failover_at: datetime | None = None
+  coverage: tuple[str, ...] = ()
+  last_account_event_at: datetime | None = None
+  last_balance_event_at: datetime | None = None
+  last_order_list_event_at: datetime | None = None
   active_order_count: int = 0
   issues: tuple[str, ...] = ()
 

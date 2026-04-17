@@ -37,6 +37,9 @@ Implemented now:
 - guarded-live live workers now keep an explicit venue session handoff backed by the Binance
   user-data websocket stream so maintenance can continue through the same venue-owned lifecycle
   after resume
+- Binance guarded-live session supervision now fails over to a fresh listen-key stream when the
+  user-data websocket drops, and the control plane tracks broader stream coverage across execution,
+  account-position, balance-update, and order-list events
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -140,6 +143,8 @@ Defaults:
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance user-data websocket stream and
   the same venue-owned lifecycle
+- guarded-live session handoff state now tracks supervision health, failover count, and the latest
+  account-position, balance-update, and order-list event timestamps from the Binance push session
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

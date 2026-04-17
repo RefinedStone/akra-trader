@@ -90,13 +90,17 @@ class FakeStreamSession:
 
 
 class FakeStreamClient:
-  def __init__(self, session: FakeStreamSession) -> None:
-    self._session = session
+  def __init__(self, *sessions: FakeStreamSession) -> None:
+    self._sessions = list(sessions)
     self.open_count = 0
 
   def open_session(self) -> FakeStreamSession:
+    if not self._sessions:
+      raise RuntimeError("no_fake_stream_session_available")
     self.open_count += 1
-    return self._session
+    if len(self._sessions) == 1:
+      return self._sessions[0]
+    return self._sessions.pop(0)
 
 
 def _wait_for_events(session, *, timeout_seconds: float = 0.5) -> tuple[dict[str, object], ...]:
@@ -177,7 +181,7 @@ def test_binance_websocket_user_data_stream_client_opens_stream_and_refreshes_li
   assert connection.closed is True
 
 
-def test_binance_adapter_handoff_uses_user_data_websocket_stream_and_syncs_execution_reports() -> None:
+def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
   exchange = FakeExecutionExchange(
@@ -196,8 +200,9 @@ def test_binance_adapter_handoff_uses_user_data_websocket_stream_and_syncs_execu
       }
     ]
   )
-  stream_session = FakeStreamSession("listen-key-1")
-  stream_client = FakeStreamClient(stream_session)
+  first_stream_session = FakeStreamSession("listen-key-1")
+  second_stream_session = FakeStreamSession("listen-key-2")
+  stream_client = FakeStreamClient(first_stream_session, second_stream_session)
   adapter = BinanceVenueExecutionAdapter(
     exchange=exchange,
     user_data_stream_client=stream_client,
@@ -215,11 +220,25 @@ def test_binance_adapter_handoff_uses_user_data_websocket_stream_and_syncs_execu
   assert handoff.source == "binance_user_data_stream"
   assert handoff.transport == "binance_user_data_websocket"
   assert handoff.venue_session_id == "listen-key-1"
+  assert handoff.supervision_state == "streaming"
+  assert handoff.failover_count == 0
+  assert handoff.coverage == (
+    "execution_reports",
+    "account_positions",
+    "balance_updates",
+    "order_list_status",
+  )
   assert handoff.active_order_count == 1
   assert stream_client.open_count == 1
 
   clock.advance(timedelta(minutes=1))
-  stream_session.push(
+  first_stream_session.push(
+    {
+      "e": "outboundAccountPosition",
+      "E": int(clock().timestamp() * 1000),
+    }
+  )
+  first_stream_session.push(
     {
       "e": "executionReport",
       "E": int(clock().timestamp() * 1000),
@@ -234,18 +253,43 @@ def test_binance_adapter_handoff_uses_user_data_websocket_stream_and_syncs_execu
       "Z": "625.0",
     }
   )
+  first_stream_session.push(
+    {
+      "e": "streamDisconnect",
+      "E": int(clock().timestamp() * 1000),
+      "message": "socket_reset",
+    }
+  )
   first_sync = adapter.sync_session(handoff=handoff, order_ids=("order-1",))
 
   assert first_sync.state == "active"
   assert first_sync.handoff.transport == "binance_user_data_websocket"
-  assert first_sync.handoff.cursor == "event-1"
+  assert first_sync.handoff.venue_session_id == "listen-key-2"
+  assert first_sync.handoff.cursor == "event-4"
   assert first_sync.handoff.active_order_count == 1
+  assert first_sync.handoff.supervision_state == "streaming"
+  assert first_sync.handoff.failover_count == 1
+  assert first_sync.handoff.last_failover_at == clock()
+  assert first_sync.handoff.last_account_event_at == clock()
   assert first_sync.synced_orders[0].status == "partially_filled"
   assert first_sync.synced_orders[0].filled_amount == 0.25
   assert first_sync.open_orders[0].order_id == "order-1"
+  assert first_stream_session.closed is True
 
   clock.advance(timedelta(minutes=1))
-  stream_session.push(
+  second_stream_session.push(
+    {
+      "e": "balanceUpdate",
+      "E": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
+    {
+      "e": "listStatus",
+      "E": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
     {
       "e": "executionReport",
       "E": int(clock().timestamp() * 1000),
@@ -263,11 +307,15 @@ def test_binance_adapter_handoff_uses_user_data_websocket_stream_and_syncs_execu
   second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=("order-1",))
   released = adapter.release_session(handoff=second_sync.handoff)
 
-  assert second_sync.handoff.cursor == "event-2"
+  assert second_sync.handoff.cursor == "event-7"
   assert second_sync.handoff.active_order_count == 0
+  assert second_sync.handoff.last_balance_event_at == clock()
+  assert second_sync.handoff.last_order_list_event_at == clock()
   assert second_sync.synced_orders[0].status == "filled"
   assert second_sync.synced_orders[0].filled_amount == 1.0
   assert second_sync.open_orders == ()
   assert released.state == "released"
   assert released.transport == "binance_user_data_websocket"
-  assert stream_session.closed is True
+  assert released.supervision_state == "released"
+  assert released.failover_count == 1
+  assert second_stream_session.closed is True

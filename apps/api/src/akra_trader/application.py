@@ -1711,7 +1711,8 @@ class TradingApplication:
     current_time = self._clock()
     run.notes.append(
       f"{current_time.isoformat()} | guarded_live_venue_session_handed_off | "
-      f"source={handoff.source}; transport={handoff.transport}; state={handoff.state}; reason={reason}"
+      f"source={handoff.source}; transport={handoff.transport}; state={handoff.state}; "
+      f"supervision={handoff.supervision_state}; failovers={handoff.failover_count}; reason={reason}"
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_venue_session_handed_off",
@@ -1719,7 +1720,8 @@ class TradingApplication:
       summary=f"Guarded-live venue session handed off for {run.config.symbols[0]}.",
       detail=(
         f"Reason: {reason}. Source {handoff.source} activated transport {handoff.transport} "
-        f"with session {handoff.venue_session_id or 'n/a'}."
+        f"with session {handoff.venue_session_id or 'n/a'}. Supervision "
+        f"{handoff.supervision_state} with coverage {', '.join(handoff.coverage) or 'none'}."
       ),
       run_id=run.config.run_id,
       session_id=session.session_id if session is not None else None,
@@ -1739,7 +1741,8 @@ class TradingApplication:
     current_time = self._clock()
     run.notes.append(
       f"{current_time.isoformat()} | guarded_live_venue_session_released | "
-      f"source={released.source}; transport={released.transport}; state={released.state}"
+      f"source={released.source}; transport={released.transport}; state={released.state}; "
+      f"supervision={released.supervision_state}; failovers={released.failover_count}"
     )
     self._append_guarded_live_audit_event(
       kind="guarded_live_venue_session_released",
@@ -1747,7 +1750,8 @@ class TradingApplication:
       summary=f"Guarded-live venue session released for {run.config.symbols[0]}.",
       detail=(
         f"Source {released.source} released transport {released.transport} "
-        f"for session {released.venue_session_id or 'n/a'}."
+        f"for session {released.venue_session_id or 'n/a'} after "
+        f"{released.failover_count} failover(s)."
       ),
       run_id=run.config.run_id,
       session_id=run.provenance.runtime_session.session_id if run.provenance.runtime_session else None,
@@ -2956,7 +2960,8 @@ class TradingApplication:
       detail = (
         f"source={next_handoff.source}; transport={next_handoff.transport}; "
         f"state={next_handoff.state}; active_orders={next_handoff.active_order_count}; "
-        f"cursor={next_handoff.cursor or 'n/a'}"
+        f"cursor={next_handoff.cursor or 'n/a'}; supervision={next_handoff.supervision_state}; "
+        f"failovers={next_handoff.failover_count}; coverage={','.join(next_handoff.coverage) or 'none'}"
       )
       if session_sync.issues:
         detail += f"; issues={', '.join(session_sync.issues)}"

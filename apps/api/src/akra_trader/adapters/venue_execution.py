@@ -100,20 +100,29 @@ class BinanceWebSocketUserDataStreamSession:
           return
         self._events.put(
           {
-            "e": "streamError",
+            "e": "streamDisconnect",
             "message": str(exc),
             "E": int(self._clock().timestamp() * 1000),
           }
         )
         return
       if message is None:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamDisconnect",
+            "message": "connection_closed",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
         return
       try:
         payload = json.loads(message)
       except json.JSONDecodeError as exc:
         self._events.put(
           {
-            "e": "streamError",
+            "e": "streamWarning",
             "message": f"invalid_json:{exc}",
             "E": int(self._clock().timestamp() * 1000),
           }
@@ -191,6 +200,14 @@ class BinanceWebSocketUserDataStreamClient:
     if not isinstance(listen_key, str) or not listen_key:
       raise RuntimeError("binance_user_data_stream_missing_listen_key")
     return listen_key
+
+
+BINANCE_USER_DATA_STREAM_COVERAGE = (
+  "execution_reports",
+  "account_positions",
+  "balance_updates",
+  "order_list_status",
+)
 
 
 class VenueExecutionExchange(Protocol):
@@ -356,6 +373,8 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       cursor="event-0",
       last_event_at=self._resolve_last_event_at(symbol=symbol),
       last_sync_at=current_time,
+      supervision_state="streaming",
+      coverage=("execution_reports",),
       active_order_count=self._count_active_orders(symbol=symbol),
       issues=(),
     )
@@ -391,6 +410,13 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       cursor=next_cursor,
       last_event_at=self._resolve_last_event_at(symbol=existing.symbol or handoff.symbol or ""),
       last_sync_at=current_time,
+      supervision_state="streaming",
+      failover_count=existing.failover_count or handoff.failover_count,
+      last_failover_at=existing.last_failover_at or handoff.last_failover_at,
+      coverage=existing.coverage or handoff.coverage or ("execution_reports",),
+      last_account_event_at=existing.last_account_event_at or handoff.last_account_event_at,
+      last_balance_event_at=existing.last_balance_event_at or handoff.last_balance_event_at,
+      last_order_list_event_at=existing.last_order_list_event_at or handoff.last_order_list_event_at,
       active_order_count=len(open_orders),
       issues=(),
     )
@@ -426,6 +452,13 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       cursor=handoff.cursor,
       last_event_at=handoff.last_event_at,
       last_sync_at=current_time,
+      supervision_state="released",
+      failover_count=handoff.failover_count,
+      last_failover_at=handoff.last_failover_at,
+      coverage=handoff.coverage,
+      last_account_event_at=handoff.last_account_event_at,
+      last_balance_event_at=handoff.last_balance_event_at,
+      last_order_list_event_at=handoff.last_order_list_event_at,
       active_order_count=0,
       issues=handoff.issues,
     )
@@ -801,6 +834,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         owner_run_id=owner_run_id,
         owner_session_id=owner_session_id,
         transport="binance_user_data_websocket",
+        supervision_state="unavailable",
+        coverage=BINANCE_USER_DATA_STREAM_COVERAGE,
         active_order_count=len(restore.open_orders),
         issues=tuple(dict.fromkeys((*restore.issues, "binance_user_data_stream_unavailable"))),
       )
@@ -816,6 +851,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         owner_run_id=owner_run_id,
         owner_session_id=owner_session_id,
         transport="binance_user_data_websocket",
+        supervision_state="unavailable",
+        coverage=BINANCE_USER_DATA_STREAM_COVERAGE,
         active_order_count=len(restore.open_orders),
         issues=tuple(dict.fromkeys((*restore.issues, f"binance_user_data_stream_open_failed:{exc}"))),
       )
@@ -834,6 +871,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       cursor="event-0",
       last_event_at=restore.restored_at,
       last_sync_at=current_time,
+      supervision_state="streaming",
+      coverage=BINANCE_USER_DATA_STREAM_COVERAGE,
       active_order_count=len(restore.open_orders),
       issues=restore.issues,
     )
@@ -847,38 +886,62 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     current_time = self._clock()
     session_id = handoff.venue_session_id or ""
     stream_session = self._active_stream_sessions.get(session_id)
-    if stream_session is None:
-      next_handoff = GuardedLiveVenueSessionHandoff(
-        state="unavailable",
-        handed_off_at=handoff.handed_off_at,
-        released_at=handoff.released_at,
-        source=handoff.source or "binance_user_data_stream",
-        venue=handoff.venue or self._venue,
-        symbol=handoff.symbol,
-        owner_run_id=handoff.owner_run_id,
-        owner_session_id=handoff.owner_session_id,
-        venue_session_id=handoff.venue_session_id,
-        transport=handoff.transport or "binance_user_data_websocket",
-        cursor=handoff.cursor,
-        last_event_at=handoff.last_event_at,
-        last_sync_at=current_time,
-        active_order_count=handoff.active_order_count,
-        issues=tuple(dict.fromkeys((*handoff.issues, "binance_user_data_stream_session_missing"))),
-      )
-      return GuardedLiveVenueSessionSync(
-        state="unavailable",
-        synced_at=current_time,
-        handoff=next_handoff,
-        synced_orders=tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids)),
-        open_orders=self._build_open_orders_from_state(symbol=handoff.symbol or ""),
-        issues=next_handoff.issues,
-      )
-
-    events = stream_session.drain_events()
-    issues: list[str] = list(handoff.issues)
+    issues: list[str] = self._filter_stream_issues(handoff.issues)
+    supervision_state = "streaming" if handoff.state != "released" else "released"
+    failover_count = handoff.failover_count
+    last_failover_at = handoff.last_failover_at
+    coverage = handoff.coverage or BINANCE_USER_DATA_STREAM_COVERAGE
     last_event_at = handoff.last_event_at
+    last_account_event_at = handoff.last_account_event_at
+    last_balance_event_at = handoff.last_balance_event_at
+    last_order_list_event_at = handoff.last_order_list_event_at
     event_count = 0
+    if stream_session is None and handoff.state != "released":
+      failover = self._failover_stream_session(
+        session_id=session_id,
+        current_issues=tuple(issues),
+        reason="session_missing",
+      )
+      stream_session = failover["session"]
+      issues = list(failover["issues"])
+      if stream_session is None:
+        supervision_state = "reconnect_failed"
+      else:
+        session_id = stream_session.session_id
+        failover_count += 1
+        last_failover_at = current_time
+        event_count += 1
+
+    events = stream_session.drain_events() if stream_session is not None else ()
+    failover_reason: str | None = None
     for event in events:
+      event_type = str(event.get("e") or "")
+      event_at = self._coerce_stream_event_at(event) or current_time
+      if event_type == "streamDisconnect":
+        failover_reason = str(event.get("message") or "stream_disconnect")
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "streamWarning":
+        issues.append(f"binance_user_data_stream_warning:{event.get('message', 'unknown')}")
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "outboundAccountPosition":
+        last_account_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "balanceUpdate":
+        last_balance_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "listStatus":
+        last_order_list_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
       result, event_issues = self._build_order_result_from_stream_event(
         event=event,
         fallback_symbol=handoff.symbol or "",
@@ -889,11 +952,30 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         last_event_at = result.updated_at or result.submitted_at or last_event_at
       issues.extend(event_issues)
 
+    if failover_reason is not None and handoff.state != "released":
+      failover = self._failover_stream_session(
+        session_id=session_id,
+        current_issues=tuple(issues),
+        reason=failover_reason,
+      )
+      stream_session = failover["session"]
+      issues = list(failover["issues"])
+      if stream_session is None:
+        supervision_state = "reconnect_failed"
+      else:
+        session_id = stream_session.session_id
+        failover_count += 1
+        last_failover_at = current_time
+        event_count += 1
+
     synced_orders = tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids))
     open_orders = self._build_open_orders_from_state(symbol=handoff.symbol or "")
     active_order_count = len(open_orders)
+    next_state = "active" if handoff.state != "released" else "released"
+    if stream_session is None and next_state != "released":
+      next_state = "unavailable"
     next_handoff = GuardedLiveVenueSessionHandoff(
-      state="active" if handoff.state != "released" else "released",
+      state=next_state,
       handed_off_at=handoff.handed_off_at,
       released_at=handoff.released_at,
       source=handoff.source or "binance_user_data_stream",
@@ -901,11 +983,22 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       symbol=handoff.symbol,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
-      venue_session_id=handoff.venue_session_id,
+      venue_session_id=session_id or handoff.venue_session_id,
       transport=handoff.transport or "binance_user_data_websocket",
       cursor=self._advance_event_cursor(handoff.cursor, increment=event_count),
       last_event_at=last_event_at,
       last_sync_at=current_time,
+      supervision_state=(
+        "released"
+        if next_state == "released"
+        else supervision_state
+      ),
+      failover_count=failover_count,
+      last_failover_at=last_failover_at,
+      coverage=coverage,
+      last_account_event_at=last_account_event_at,
+      last_balance_event_at=last_balance_event_at,
+      last_order_list_event_at=last_order_list_event_at,
       active_order_count=active_order_count,
       issues=tuple(dict.fromkeys(issues)),
     )
@@ -946,6 +1039,13 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       cursor=handoff.cursor,
       last_event_at=handoff.last_event_at,
       last_sync_at=current_time,
+      supervision_state="released",
+      failover_count=handoff.failover_count,
+      last_failover_at=handoff.last_failover_at,
+      coverage=handoff.coverage,
+      last_account_event_at=handoff.last_account_event_at,
+      last_balance_event_at=handoff.last_balance_event_at,
+      last_order_list_event_at=handoff.last_order_list_event_at,
       active_order_count=0,
       issues=issues,
     )
@@ -1092,6 +1192,57 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         continue
       self._order_states[result.order_id] = result
 
+  def _failover_stream_session(
+    self,
+    *,
+    session_id: str,
+    current_issues: tuple[str, ...],
+    reason: str,
+  ) -> dict[str, object]:
+    issues = list(current_issues)
+    previous_session = self._active_stream_sessions.pop(session_id, None)
+    if previous_session is not None:
+      try:
+        previous_session.close()
+      except Exception as exc:
+        issues.append(f"binance_user_data_stream_close_failed:{exc}")
+    stream_client = self._resolve_stream_client()
+    if stream_client is None:
+      issues.append(f"binance_user_data_stream_failover_failed:{reason}:stream_unavailable")
+      return {
+        "session": None,
+        "issues": tuple(dict.fromkeys(issues)),
+      }
+    try:
+      replacement = stream_client.open_session()
+    except Exception as exc:
+      issues.append(f"binance_user_data_stream_failover_failed:{reason}:{exc}")
+      return {
+        "session": None,
+        "issues": tuple(dict.fromkeys(issues)),
+      }
+    self._active_stream_sessions[replacement.session_id] = replacement
+    return {
+      "session": replacement,
+      "issues": tuple(dict.fromkeys(issues)),
+    }
+
+  @staticmethod
+  def _filter_stream_issues(issues: tuple[str, ...]) -> list[str]:
+    return [
+      issue
+      for issue in issues
+      if not issue.startswith("binance_user_data_stream")
+    ]
+
+  @staticmethod
+  def _coerce_stream_event_at(event: dict[str, Any]) -> datetime | None:
+    return (
+      _coerce_datetime(None, event.get("E"))
+      or _coerce_datetime(None, event.get("u"))
+      or _coerce_datetime(None, event.get("T"))
+    )
+
   def _build_synced_orders_from_state(
     self,
     *,
@@ -1152,8 +1303,6 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     fallback_symbol: str,
   ) -> tuple[GuardedLiveVenueOrderResult | None, tuple[str, ...]]:
     event_type = str(event.get("e") or "")
-    if event_type == "streamError":
-      return None, (f"binance_user_data_stream_error:{event.get('message', 'unknown')}",)
     if event_type != "executionReport":
       return None, ()
     submitted_at = _coerce_datetime(None, event.get("O") or event.get("E")) or self._clock()
