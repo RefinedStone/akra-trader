@@ -18,6 +18,7 @@ from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
@@ -677,6 +678,14 @@ def test_incident_endpoints_surface_provider_workflow_and_paging_policy(tmp_path
         ),
       )
 
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ):
+      return None
+
   with build_client(
     tmp_path / "runs.sqlite3",
     guarded_live_execution_enabled=True,
@@ -1282,6 +1291,14 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
         ),
       )
 
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ):
+      return None
+
   with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
     app = client.app.state.container.app
     app._operator_alert_delivery = FakeProviderWorkflowDeliveryAdapter()
@@ -1650,6 +1667,222 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["state"] == "resolved"
     assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_action"] == "resolve"
     assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["job_state"] == "resolved"
+
+
+def test_guarded_live_endpoint_pull_syncs_provider_authoritative_recovery_state(
+  tmp_path: Path,
+) -> None:
+  class FakeProviderPullSyncAdapter:
+    def __init__(self) -> None:
+      self.pull_attempts: list[tuple[str, str, str | None]] = []
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("pagerduty_events",)
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = targets or self.list_targets()
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_delivery:{target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          external_provider="pagerduty",
+          external_reference=incident.external_reference or incident.alert_id,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      payload=None,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return (
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{provider}_workflow:{action}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=f"{provider}_workflow",
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_provider_workflow:{action}:{detail}",
+          attempt_number=attempt_number,
+          phase=f"provider_{action}",
+          provider_action=action,
+          external_provider=provider,
+          external_reference=incident.provider_workflow_reference or incident.external_reference or incident.alert_id,
+          source=incident.source,
+        ),
+      )
+
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ):
+      reference = incident.provider_workflow_reference or incident.external_reference
+      self.pull_attempts.append((incident.event_id, provider, reference))
+      if incident.alert_id != "guarded-live:market-data:5m":
+        return None
+      return OperatorIncidentProviderPullSync(
+        provider="pagerduty",
+        workflow_reference="PDINC-PULL-API-1",
+        external_reference="guarded-live:market-data:5m",
+        workflow_state="acknowledged",
+        remediation_state="provider_recovered",
+        detail="provider authoritatively completed recovery job",
+        payload={
+          "job_id": "pd-job-api-1",
+          "channels": ["kline", "depth"],
+          "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+          "verification": {"state": "passed"},
+          "status_machine": {
+            "state": "provider_running",
+            "workflow_state": "acknowledged",
+            "workflow_action": "remediate",
+            "job_state": "completed",
+            "sync_state": "provider_authoritative",
+          },
+        },
+        synced_at=datetime(2025, 1, 3, 18, 31, tzinfo=UTC),
+      )
+
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    pull_adapter = FakeProviderPullSyncAdapter()
+    app._operator_alert_delivery = pull_adapter
+    app._operator_alert_paging_policy_default_provider = "pagerduty"
+    app._operator_alert_paging_policy_warning_targets = ("pagerduty_events",)
+    app._operator_alert_paging_policy_critical_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "provider_pull_sync_surface"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "provider_pull_sync_surface"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "provider_pull_sync_surface",
+      },
+    )
+    assert live_response.status_code == 200
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 10, tzinfo=UTC),
+            sync_status="stale",
+            lag_seconds=1_200,
+            last_sync_at=datetime(2025, 1, 3, 18, 15, tzinfo=UTC),
+            issues=("freshness_threshold_exceeded:1200:600",),
+          ),
+        ],
+      ),
+    )
+    market_data.set_remediation_status(
+      kind="recent_sync",
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 31, tzinfo=UTC),
+            sync_status="synced",
+            lag_seconds=0,
+            last_sync_at=datetime(2025, 1, 3, 18, 31, tzinfo=UTC),
+            issues=(),
+          ),
+        ],
+      ),
+    )
+    app._market_data = market_data
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    opened_incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert opened_incident["remediation"]["state"] == "executed"
+    assert opened_incident["remediation"]["provider_recovery"]["job_id"] == "pd-job-api-1"
+    assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_state"] == "acknowledged"
+    assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["sync_state"] == "bidirectional_synced"
+    assert any(
+      event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
+      for event in guarded_live_response.json()["incident_events"]
+    )
+    assert all(
+      alert["alert_id"] != "guarded-live:market-data:5m"
+      for alert in guarded_live_response.json()["active_alerts"]
+    )
+    assert any(
+      event["kind"] == "guarded_live_incident_provider_pull_synced"
+      for event in guarded_live_response.json()["audit_events"]
+    )
+    assert any(
+      attempt[0] == opened_incident["event_id"] and attempt[1] == "pagerduty"
+      for attempt in pull_adapter.pull_attempts
+    )
 
 
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(

@@ -194,7 +194,9 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   a guarded API endpoint, including richer provider recovery payloads that persist on the incident
   remediation record as both raw payload and typed provider recovery state. That typed recovery
   state now includes a provider-side status machine covering workflow phase, job phase, sync
-  status, last provider event, and attempt count. Local
+  status, last provider event, and attempt count, and guarded-live refresh also pull-syncs the
+  current provider incident/alert body so PagerDuty/Opsgenie-held recovery metadata can reconcile
+  local state authoritatively when callbacks lag. Local
   acknowledge/remediate/escalate actions can push provider-native workflow updates back out when
   the selected provider supports them, and locally verified remediation closures now push a
   provider-native `resolve` action as well, so durable incidents track a bidirectional paging and

@@ -20,6 +20,7 @@ from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -159,6 +160,13 @@ class OperatorAlertDeliveryPort(Protocol):
     payload: dict[str, Any] | None = None,
     attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]: ...
+
+  def pull_incident_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+  ) -> OperatorIncidentProviderPullSync | None: ...
 
 
 class VenueStatePort(Protocol):

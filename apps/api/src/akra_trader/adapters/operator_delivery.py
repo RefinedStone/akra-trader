@@ -12,6 +12,7 @@ from urllib import request as urllib_request
 
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.ports import OperatorAlertDeliveryPort
 
 
@@ -162,6 +163,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         source=incident.source,
       ),
     )
+
+  def pull_incident_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+  ) -> OperatorIncidentProviderPullSync | None:
+    normalized_provider = provider.strip().lower().replace("-", "_")
+    if normalized_provider == "pagerduty":
+      return self._pull_pagerduty_workflow_state(incident=incident)
+    if normalized_provider == "opsgenie":
+      return self._pull_opsgenie_workflow_state(incident=incident)
+    return None
 
   def _deliver_console(
     self,
@@ -636,49 +650,243 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         source=incident.source,
       )
 
-    request = self._build_pagerduty_workflow_request(
-      incident=incident,
-      action=action,
-      actor=actor,
-      detail=detail,
-      workflow_reference=workflow_reference,
+  def _pull_pagerduty_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    workflow_reference = incident.provider_workflow_reference or incident.external_reference
+    if not self._pagerduty_api_token or not self._pagerduty_from_email or not workflow_reference:
+      return None
+    request = self._build_pagerduty_pull_request(workflow_reference=workflow_reference)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    incident_payload = self._extract_mapping(payload.get("incident"), payload)
+    body_payload = self._extract_mapping(
+      incident_payload.get("body"),
+      incident_payload.get("custom_details"),
+      incident_payload.get("details"),
+    )
+    custom_details = self._extract_mapping(
+      incident_payload.get("custom_details"),
+      body_payload.get("details"),
+      body_payload,
+    )
+    return self._build_provider_pull_sync(
+      provider="pagerduty",
+      workflow_reference=self._first_non_empty_string(
+        incident_payload.get("id"),
+        workflow_reference,
+      ),
+      external_reference=self._first_non_empty_string(
+        incident_payload.get("incident_key"),
+        incident.alert_id,
+        workflow_reference,
+      ),
+      workflow_state=self._first_non_empty_string(
+        incident_payload.get("status"),
+        payload.get("status"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        incident_payload.get("title"),
+        incident_payload.get("summary"),
+        incident_payload.get("description"),
+      ),
+      provider_payload=custom_details,
+      updated_at=self._parse_provider_datetime(
+        incident_payload.get("last_status_change_at"),
+        incident_payload.get("updated_at"),
+        payload.get("updated_at"),
+      ),
+    )
+
+  def _pull_opsgenie_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._opsgenie_api_key or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "alias"
+    request = self._build_opsgenie_pull_request(
+      reference=reference,
+      reference_type=reference_type,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
-        status_code = getattr(response, "status", 202)
-      return OperatorIncidentDelivery(
-        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
-        incident_event_id=incident.event_id,
-        alert_id=incident.alert_id,
-        incident_kind=incident.kind,
-        target=target,
-        status="delivered",
-        attempted_at=attempted_at,
-        detail=f"pagerduty_workflow_status:{status_code}:{action}",
-        attempt_number=attempt_number,
-        phase=f"provider_{action}",
-        provider_action=action,
-        external_provider="pagerduty",
-        external_reference=workflow_reference,
-        source=incident.source,
-      )
-    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
-      return OperatorIncidentDelivery(
-        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
-        incident_event_id=incident.event_id,
-        alert_id=incident.alert_id,
-        incident_kind=incident.kind,
-        target=target,
-        status="failed",
-        attempted_at=attempted_at,
-        detail=f"pagerduty_workflow_failed:{action}:{exc}",
-        attempt_number=attempt_number,
-        phase=f"provider_{action}",
-        provider_action=action,
-        external_provider="pagerduty",
-        external_reference=workflow_reference,
-        source=incident.source,
-      )
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    alert_payload = self._extract_mapping(payload.get("data"), payload)
+    details_payload = self._extract_mapping(
+      alert_payload.get("details"),
+      alert_payload.get("detail"),
+    )
+    workflow_state = self._first_non_empty_string(alert_payload.get("status"))
+    acknowledged = alert_payload.get("acknowledged")
+    if workflow_state is None and isinstance(acknowledged, bool):
+      workflow_state = "acknowledged" if acknowledged else "triggered"
+    return self._build_provider_pull_sync(
+      provider="opsgenie",
+      workflow_reference=self._first_non_empty_string(
+        alert_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        alert_payload.get("alias"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=workflow_state or "unknown",
+      detail=self._first_non_empty_string(
+        alert_payload.get("message"),
+        alert_payload.get("description"),
+      ),
+      provider_payload=details_payload,
+      updated_at=self._parse_provider_datetime(
+        alert_payload.get("updatedAt"),
+        alert_payload.get("updated_at"),
+        alert_payload.get("createdAt"),
+      ),
+    )
+
+  def _build_provider_pull_sync(
+    self,
+    *,
+    provider: str,
+    workflow_reference: str | None,
+    external_reference: str | None,
+    workflow_state: str,
+    detail: str | None,
+    provider_payload: dict[str, Any],
+    updated_at: datetime | None,
+  ) -> OperatorIncidentProviderPullSync:
+    remediation_payload = self._extract_mapping(
+      provider_payload.get("remediation_provider_payload"),
+      provider_payload.get("provider_payload"),
+      provider_payload.get("remediation_payload"),
+      provider_payload.get("payload"),
+    )
+    provider_recovery = self._extract_mapping(
+      provider_payload.get("remediation_provider_recovery"),
+      provider_payload.get("provider_recovery"),
+      provider_payload.get("recovery"),
+    )
+    status_machine_payload = self._extract_mapping(
+      provider_recovery.get("status_machine"),
+      provider_payload.get("status_machine"),
+    )
+    merged_payload: dict[str, Any] = dict(remediation_payload)
+    merged_payload.update({
+      "workflow_reference": workflow_reference,
+      "workflow_state": workflow_state,
+      "status": self._first_non_empty_string(
+        provider_recovery.get("job_state"),
+        provider_payload.get("remediation_state"),
+      ),
+      "recovery_state": self._first_non_empty_string(
+        provider_recovery.get("lifecycle_state"),
+        provider_payload.get("recovery_state"),
+      ),
+      "job_id": self._first_non_empty_string(
+        provider_recovery.get("job_id"),
+        provider_payload.get("job_id"),
+      ),
+      "summary": self._first_non_empty_string(
+        provider_payload.get("remediation_summary"),
+        provider_recovery.get("summary"),
+      ),
+      "detail": self._first_non_empty_string(
+        provider_payload.get("remediation_detail"),
+        provider_recovery.get("detail"),
+        detail,
+      ),
+      "channels": self._extract_string_list(
+        provider_recovery.get("channels"),
+        provider_payload.get("channels"),
+      ),
+      "targets": {
+        "symbols": self._extract_string_list(
+          provider_recovery.get("symbols"),
+          provider_payload.get("symbols"),
+        ),
+        "timeframe": self._first_non_empty_string(
+          provider_recovery.get("timeframe"),
+          provider_payload.get("timeframe"),
+        ),
+      },
+      "verification": {
+        "state": self._first_non_empty_string(
+          provider_recovery.get("verification_state"),
+          self._extract_mapping(provider_recovery.get("verification")).get("state"),
+          self._extract_mapping(provider_payload.get("verification")).get("state"),
+        ),
+      },
+      "status_machine": {
+        "state": self._first_non_empty_string(
+          provider_recovery.get("status_machine_state"),
+          status_machine_payload.get("state"),
+        ),
+        "workflow_state": self._first_non_empty_string(
+          provider_recovery.get("status_machine_workflow_state"),
+          status_machine_payload.get("workflow_state"),
+          workflow_state,
+        ),
+        "workflow_action": self._first_non_empty_string(
+          provider_recovery.get("status_machine_workflow_action"),
+          status_machine_payload.get("workflow_action"),
+        ),
+        "job_state": self._first_non_empty_string(
+          provider_recovery.get("status_machine_job_state"),
+          status_machine_payload.get("job_state"),
+          provider_recovery.get("job_state"),
+        ),
+        "sync_state": (
+          self._first_non_empty_string(
+            provider_recovery.get("status_machine_sync_state"),
+            status_machine_payload.get("sync_state"),
+          )
+          or "provider_authoritative"
+        ),
+        "last_event_kind": self._first_non_empty_string(
+          status_machine_payload.get("last_event_kind"),
+        ),
+        "last_event_at": (
+          self._parse_provider_datetime(status_machine_payload.get("last_event_at")) or updated_at
+        ),
+        "last_detail": self._first_non_empty_string(
+          provider_recovery.get("detail"),
+          status_machine_payload.get("last_detail"),
+          detail,
+        ),
+        "attempt_number": (
+          int(status_machine_payload.get("attempt_number"))
+          if isinstance(status_machine_payload.get("attempt_number"), int)
+          else 0
+        ),
+      },
+    })
+    remediation_state = self._first_non_empty_string(
+      provider_payload.get("remediation_state"),
+      provider_recovery.get("lifecycle_state"),
+      provider_recovery.get("job_state"),
+      merged_payload.get("status"),
+    )
+    return OperatorIncidentProviderPullSync(
+      provider=provider,
+      workflow_reference=workflow_reference,
+      external_reference=external_reference,
+      workflow_state=workflow_state,
+      remediation_state=remediation_state,
+      detail=detail,
+      payload=merged_payload,
+      synced_at=updated_at or self._clock(),
+    )
 
   @staticmethod
   def _build_generic_webhook_payload(*, incident: OperatorIncidentEvent) -> bytes:
@@ -886,6 +1094,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       method="POST",
     )
 
+  def _build_pagerduty_pull_request(
+    self,
+    *,
+    workflow_reference: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(workflow_reference, safe="")
+    return urllib_request.Request(
+      f"https://api.pagerduty.com/incidents/{encoded_reference}",
+      headers={
+        "Accept": "application/vnd.pagerduty+json;version=2",
+        "Authorization": f"Token token={self._pagerduty_api_token}",
+        "From": self._pagerduty_from_email or "",
+      },
+      method="GET",
+    )
+
   def _build_pagerduty_workflow_request(
     self,
     *,
@@ -967,6 +1191,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported pagerduty workflow action: {action}")
 
+  def _build_opsgenie_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      f"{self._opsgenie_api_url}/v2/alerts/{encoded_reference}?identifierType={reference_type}",
+      headers={
+        "Authorization": f"GenieKey {self._opsgenie_api_key}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
   def _build_opsgenie_workflow_request(
     self,
     *,
@@ -1044,6 +1284,73 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         method="POST",
       )
     raise ValueError(f"unsupported opsgenie workflow action: {action}")
+
+  @staticmethod
+  def _read_json_response(response: object) -> dict[str, Any]:
+    if not hasattr(response, "read"):
+      return {}
+    raw = response.read()
+    if isinstance(raw, bytes):
+      body = raw.decode("utf-8")
+    elif isinstance(raw, str):
+      body = raw
+    else:
+      body = ""
+    if not body:
+      return {}
+    parsed = json.loads(body)
+    return parsed if isinstance(parsed, dict) else {}
+
+  @staticmethod
+  def _extract_mapping(*candidates: Any) -> dict[str, Any]:
+    for candidate in candidates:
+      if isinstance(candidate, dict):
+        return candidate
+    return {}
+
+  @staticmethod
+  def _extract_string_list(*candidates: Any) -> list[str]:
+    for candidate in candidates:
+      if isinstance(candidate, str):
+        value = candidate.strip()
+        if value:
+          return [value]
+      elif isinstance(candidate, (list, tuple)):
+        values = [
+          str(item).strip()
+          for item in candidate
+          if isinstance(item, str) and item.strip()
+        ]
+        if values:
+          return values
+    return []
+
+  @staticmethod
+  def _first_non_empty_string(*candidates: Any) -> str | None:
+    for candidate in candidates:
+      if isinstance(candidate, str):
+        value = candidate.strip()
+        if value:
+          return value
+    return None
+
+  @staticmethod
+  def _parse_provider_datetime(*candidates: Any) -> datetime | None:
+    for candidate in candidates:
+      if isinstance(candidate, datetime):
+        return candidate.astimezone(UTC) if candidate.tzinfo is not None else candidate.replace(tzinfo=UTC)
+      if not isinstance(candidate, str):
+        continue
+      value = candidate.strip()
+      if not value:
+        continue
+      normalized = value.replace("Z", "+00:00")
+      try:
+        parsed = datetime.fromisoformat(normalized)
+      except ValueError:
+        continue
+      return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+    return None
 
   @staticmethod
   def _format_workflow_payload_context(payload: dict[str, Any] | None) -> str:

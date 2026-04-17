@@ -550,6 +550,18 @@ class OperatorIncidentProviderRecoveryState:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentProviderPullSync:
+  provider: str
+  workflow_reference: str | None = None
+  external_reference: str | None = None
+  workflow_state: str = "unknown"
+  remediation_state: str | None = None
+  detail: str | None = None
+  payload: dict[str, Any] = field(default_factory=dict)
+  synced_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass(frozen=True)
 class OperatorIncidentEvent:
   event_id: str
   alert_id: str

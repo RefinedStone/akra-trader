@@ -191,6 +191,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
     ):
       return ()
 
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident,
+      provider: str,
+    ):
+      return None
+
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.OperatorAlertDeliveryAdapter", FakeOperatorAlertDeliveryAdapter)

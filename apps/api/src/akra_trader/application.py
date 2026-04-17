@@ -48,6 +48,7 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
@@ -405,9 +406,18 @@ class TradingApplication:
       action: str,
       actor: str,
       detail: str,
+      payload: dict[str, Any] | None = None,
       attempt_number: int = 1,
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return ()
+
+    def pull_incident_workflow_state(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+    ) -> OperatorIncidentProviderPullSync | None:
+      return None
 
   def __init__(
     self,
@@ -773,9 +783,17 @@ class TradingApplication:
       current_time=current_time,
     )
     delivery_records = tuple((*new_delivery_records, *delivery_records))
+    provider_synced_incident_events, provider_synced_delivery_history, provider_pull_audit_events, provider_pull_executed = (
+      self._pull_sync_guarded_live_provider_recovery(
+        incident_events=tuple((*new_incident_events, *state.incident_events)),
+        delivery_history=delivery_records,
+        current_time=current_time,
+      )
+    )
+    delivery_records = provider_synced_delivery_history
     workflow_incident_events, workflow_delivery_history, workflow_audit_events = (
       self._refresh_guarded_live_incident_workflow(
-        incident_events=tuple((*new_incident_events, *state.incident_events)),
+        incident_events=provider_synced_incident_events,
         delivery_history=delivery_records,
         current_time=current_time,
       )
@@ -800,6 +818,7 @@ class TradingApplication:
       merged_history != state.alert_history
       or refreshed_incident_events != state.incident_events
       or delivery_records != state.delivery_history
+      or bool(provider_pull_audit_events)
       or bool(workflow_audit_events)
     ):
       latest_state = self._guarded_live_state.load_state()
@@ -809,10 +828,10 @@ class TradingApplication:
           alert_history=merged_history,
           incident_events=refreshed_incident_events,
           delivery_history=delivery_records,
-          audit_events=tuple((*workflow_audit_events, *latest_state.audit_events)),
+          audit_events=tuple((*provider_pull_audit_events, *workflow_audit_events, *latest_state.audit_events)),
         )
       )
-    if auto_remediation_executed and allow_post_remediation_recompute:
+    if (auto_remediation_executed or provider_pull_executed) and allow_post_remediation_recompute:
       return self._refresh_guarded_live_alert_state(
         current_time=current_time,
         allow_post_remediation_recompute=False,
@@ -1469,6 +1488,39 @@ class TradingApplication:
       )
     else:
       raise ValueError(f"unsupported external incident event kind: {event_kind}")
+
+    provider_phase = self._provider_phase_for_event_kind(normalized_kind)
+    if provider_phase is not None:
+      updated_incident = replace(
+        updated_incident,
+        provider_workflow_state="delivered",
+        provider_workflow_action=provider_phase.removeprefix("provider_"),
+        provider_workflow_reference=workflow_reference_for_delivery,
+        provider_workflow_last_attempted_at=synced_at,
+      )
+      if updated_incident.remediation.state != "not_applicable":
+        provider_recovery = updated_incident.remediation.provider_recovery
+        updated_incident = replace(
+          updated_incident,
+          remediation=replace(
+            updated_incident.remediation,
+            provider_recovery=replace(
+              provider_recovery,
+              status_machine=self._build_provider_recovery_status_machine(
+                existing=provider_recovery.status_machine,
+                remediation_state=updated_incident.remediation.state,
+                event_kind=provider_recovery.status_machine.last_event_kind,
+                workflow_state="delivered",
+                workflow_action=provider_phase.removeprefix("provider_"),
+                job_state=provider_recovery.status_machine.job_state,
+                sync_state=provider_recovery.status_machine.sync_state,
+                detail=provider_recovery.status_machine.last_detail,
+                event_at=synced_at,
+                attempt_number=provider_recovery.status_machine.attempt_number,
+              ),
+            ),
+          ),
+        )
 
     incident_events = self._replace_incident_event(
       incident_events=state.incident_events,
@@ -6591,29 +6643,52 @@ class TradingApplication:
         and key[2].startswith("provider_")
       )
       latest_provider_record = self._latest_provider_workflow_record(records=provider_records)
+      prefer_provider_authoritative = (
+        incident.external_last_synced_at is not None
+        and (
+          latest_provider_record is None
+          or latest_provider_record.attempted_at <= incident.external_last_synced_at
+        )
+      )
       refreshed.append(
         replace(
           incident,
           delivery_state=self._resolve_incident_delivery_state(records=delivery_records),
           provider_workflow_state=(
-            self._resolve_incident_delivery_state(records=provider_records)
-            if provider_records
-            else incident.provider_workflow_state
+            incident.provider_workflow_state
+            if prefer_provider_authoritative
+            else (
+              self._resolve_incident_delivery_state(records=provider_records)
+              if provider_records
+              else incident.provider_workflow_state
+            )
           ),
           provider_workflow_action=(
-            latest_provider_record.provider_action
-            if latest_provider_record is not None
-            else incident.provider_workflow_action
+            incident.provider_workflow_action
+            if prefer_provider_authoritative
+            else (
+              latest_provider_record.provider_action
+              if latest_provider_record is not None
+              else incident.provider_workflow_action
+            )
           ),
           provider_workflow_last_attempted_at=(
-            latest_provider_record.attempted_at
-            if latest_provider_record is not None
-            else incident.provider_workflow_last_attempted_at
+            incident.provider_workflow_last_attempted_at
+            if prefer_provider_authoritative
+            else (
+              latest_provider_record.attempted_at
+              if latest_provider_record is not None
+              else incident.provider_workflow_last_attempted_at
+            )
           ),
           provider_workflow_reference=(
-            latest_provider_record.external_reference
-            if latest_provider_record is not None and latest_provider_record.external_reference is not None
-            else incident.provider_workflow_reference
+            incident.provider_workflow_reference
+            if prefer_provider_authoritative
+            else (
+              latest_provider_record.external_reference
+              if latest_provider_record is not None and latest_provider_record.external_reference is not None
+              else incident.provider_workflow_reference
+            )
           ),
           remediation=self._refresh_incident_remediation_state(
             incident=incident,
@@ -6641,6 +6716,15 @@ class TradingApplication:
     if not remediation_records:
       return remediation
     latest_record = self._latest_provider_workflow_record(records=remediation_records)
+    prefer_provider_authoritative = (
+      incident.external_last_synced_at is not None
+      and (
+        latest_record is None
+        or latest_record.attempted_at <= incident.external_last_synced_at
+      )
+    )
+    if prefer_provider_authoritative:
+      return remediation
     next_state = self._resolve_remediation_delivery_state(
       records=remediation_records,
       current_state=remediation.state,
@@ -7202,6 +7286,348 @@ class TradingApplication:
     if len(detail_copy) > 2:
       summary += f" Additional jobs: {len(detail_copy) - 2}."
     return summary
+
+  def _pull_sync_guarded_live_provider_recovery(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[
+    tuple[OperatorIncidentEvent, ...],
+    tuple[OperatorIncidentDelivery, ...],
+    tuple[OperatorAuditEvent, ...],
+    bool,
+  ]:
+    updated_incidents = incident_events
+    effective_delivery_history = delivery_history
+    audit_events: list[OperatorAuditEvent] = []
+    local_remediation_executed = False
+
+    for incident in tuple(updated_incidents):
+      if incident.kind not in {"incident_opened", "incident_resolved"}:
+        continue
+      provider = self._normalize_paging_provider(
+        incident.remediation.provider or incident.paging_provider or incident.external_provider
+      )
+      if provider is None:
+        continue
+      if not any((
+        incident.provider_workflow_reference,
+        incident.external_reference,
+        incident.remediation.reference,
+      )):
+        continue
+      try:
+        pull_sync = self._operator_alert_delivery.pull_incident_workflow_state(
+          incident=incident,
+          provider=provider,
+        )
+      except Exception as exc:
+        audit_events.append(
+          OperatorAuditEvent(
+            event_id=f"guarded-live-incident-provider-pull-sync-failed:{incident.event_id}:{current_time.isoformat()}",
+            timestamp=current_time,
+            actor="system",
+            kind="guarded_live_incident_provider_pull_sync_failed",
+            summary=f"Guarded-live provider pull-sync failed for {incident.alert_id}.",
+            detail=(
+              f"Provider-authoritative pull-sync failed via {provider}. "
+              f"Reference: {incident.provider_workflow_reference or incident.external_reference or incident.alert_id}. "
+              f"Error: {exc}."
+            ),
+            run_id=incident.run_id,
+            session_id=incident.session_id,
+            source="guarded_live",
+          )
+        )
+        continue
+      if pull_sync is None:
+        continue
+      previous_incident = incident
+      previous_history = effective_delivery_history
+      updated_incident, effective_delivery_history, executed = self._apply_provider_pull_sync(
+        incident=incident,
+        pull_sync=pull_sync,
+        delivery_history=effective_delivery_history,
+        current_time=current_time,
+      )
+      if updated_incident == previous_incident and effective_delivery_history == previous_history:
+        continue
+      updated_incidents = self._replace_incident_event(
+        incident_events=updated_incidents,
+        updated_incident=updated_incident,
+      )
+      local_remediation_executed = local_remediation_executed or executed
+      audit_events.append(
+        OperatorAuditEvent(
+          event_id=f"guarded-live-incident-provider-pull-sync:{updated_incident.event_id}:{pull_sync.synced_at.isoformat()}",
+          timestamp=pull_sync.synced_at,
+          actor=f"{provider}:pull_sync",
+          kind="guarded_live_incident_provider_pull_synced",
+          summary=f"Guarded-live provider recovery reconciled for {updated_incident.alert_id}.",
+          detail=(
+            f"Provider-authoritative pull-sync via {provider}. "
+            f"Workflow state: {pull_sync.workflow_state}. "
+            f"Recovery state: {pull_sync.remediation_state or 'n/a'}. "
+            f"Reference: {pull_sync.workflow_reference or updated_incident.provider_workflow_reference or updated_incident.external_reference or updated_incident.alert_id}. "
+            f"Local remediation: {'executed' if executed else 'not_executed'}."
+          ),
+          run_id=updated_incident.run_id,
+          session_id=updated_incident.session_id,
+          source="guarded_live",
+        )
+      )
+
+    return updated_incidents, effective_delivery_history, tuple(audit_events), local_remediation_executed
+
+  def _apply_provider_pull_sync(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    pull_sync: OperatorIncidentProviderPullSync,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+  ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...], bool]:
+    provider = self._normalize_paging_provider(pull_sync.provider) or pull_sync.provider
+    synced_at = pull_sync.synced_at or current_time
+    payload = self._normalize_incident_workflow_payload(pull_sync.payload)
+    detail_copy = (
+      pull_sync.detail
+      or self._first_non_empty_string(
+        payload.get("detail"),
+        payload.get("remediation_detail"),
+        payload.get("status_detail"),
+        payload.get("summary"),
+        payload.get("message"),
+      )
+      or f"{provider}_pull_synced"
+    )
+    workflow_reference = (
+      pull_sync.workflow_reference
+      or self._first_non_empty_string(
+        payload.get("workflow_reference"),
+        payload.get("provider_workflow_reference"),
+      )
+      or incident.provider_workflow_reference
+      or incident.remediation.provider_recovery.workflow_reference
+      or incident.external_reference
+    )
+    external_reference = (
+      pull_sync.external_reference
+      or incident.external_reference
+      or incident.remediation.reference
+      or incident.alert_id
+    )
+    event_kind = self._resolve_provider_pull_sync_event_kind(
+      incident=incident,
+      pull_sync=pull_sync,
+      payload=payload,
+    )
+    provider_action = (
+      self._provider_phase_for_event_kind(event_kind).removeprefix("provider_")
+      if event_kind is not None and self._provider_phase_for_event_kind(event_kind) is not None
+      else incident.provider_workflow_action
+    )
+    updated_incident = replace(
+      incident,
+      paging_provider=provider or incident.paging_provider,
+      external_provider=provider or incident.external_provider,
+      external_reference=external_reference,
+      provider_workflow_reference=workflow_reference,
+      external_last_synced_at=synced_at,
+      provider_workflow_state=pull_sync.workflow_state or incident.provider_workflow_state,
+      provider_workflow_action=provider_action,
+      provider_workflow_last_attempted_at=synced_at,
+    )
+    effective_delivery_history = delivery_history
+    executed = False
+    incident_changed = updated_incident != incident
+
+    if event_kind == "triggered":
+      updated_incident = replace(
+        updated_incident,
+        external_status="triggered",
+        paging_status="triggered",
+      )
+      incident_changed = updated_incident != incident
+    elif event_kind == "acknowledged":
+      updated_incident = replace(
+        updated_incident,
+        acknowledgment_state="acknowledged",
+        acknowledged_at=synced_at,
+        acknowledged_by=f"{provider}:pull_sync",
+        acknowledgment_reason=detail_copy,
+        next_escalation_at=None,
+        external_status="acknowledged",
+        paging_status="acknowledged",
+      )
+      effective_delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=effective_delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"provider_pull_synced:{provider}:{event_kind}",
+      )
+      incident_changed = updated_incident != incident or effective_delivery_history != delivery_history
+    elif event_kind == "escalated":
+      updated_incident = replace(
+        updated_incident,
+        escalation_state="escalated",
+        last_escalated_at=synced_at,
+        last_escalated_by=f"{provider}:pull_sync",
+        escalation_reason=detail_copy,
+        external_status="escalated",
+        paging_status="escalated",
+      )
+      incident_changed = updated_incident != incident
+    elif event_kind == "resolved":
+      updated_incident = replace(
+        updated_incident,
+        external_status="resolved",
+        paging_status="resolved",
+        next_escalation_at=None,
+      )
+      effective_delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=effective_delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"provider_pull_synced:{provider}:{event_kind}",
+      )
+      incident_changed = updated_incident != incident or effective_delivery_history != delivery_history
+    elif event_kind in {
+      "remediation_requested",
+      "remediation_started",
+      "remediation_completed",
+      "remediation_failed",
+    }:
+      next_state = {
+        "remediation_requested": "requested",
+        "remediation_started": "provider_recovering",
+        "remediation_completed": "provider_recovered",
+        "remediation_failed": "failed",
+      }[event_kind]
+      status_machine_payload = self._extract_payload_mapping(payload.get("status_machine"))
+      provider_payload = dict(payload)
+      provider_payload["status_machine"] = {
+        **status_machine_payload,
+        "workflow_state": self._first_non_empty_string(
+          status_machine_payload.get("workflow_state"),
+          pull_sync.workflow_state,
+        ),
+        "workflow_action": self._first_non_empty_string(
+          status_machine_payload.get("workflow_action"),
+          "remediate",
+        ),
+        "sync_state": self._first_non_empty_string(
+          status_machine_payload.get("sync_state"),
+          "provider_authoritative",
+        ),
+      }
+      updated_incident = self._apply_external_remediation_sync(
+        incident=updated_incident,
+        next_state=next_state,
+        event_kind=event_kind,
+        provider=provider,
+        actor="pull_sync",
+        detail=detail_copy,
+        synced_at=synced_at,
+        workflow_reference=workflow_reference,
+        payload=provider_payload,
+      )
+      effective_delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=effective_delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"provider_pull_synced:{provider}:{event_kind}",
+        phase="provider_remediate",
+      )
+      if (
+        event_kind == "remediation_completed"
+        and incident.remediation.state not in {"executed", "completed", "partial", "failed"}
+      ):
+        updated_incident, local_results = self._execute_local_incident_remediation(
+          incident=updated_incident,
+          actor=f"{provider}:pull_sync",
+          current_time=synced_at,
+        )
+        executed = bool(local_results)
+      incident_changed = (
+        updated_incident != incident
+        or effective_delivery_history != delivery_history
+        or executed
+      )
+
+    if incident_changed and event_kind is not None:
+      effective_delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=effective_delivery_history,
+        incident=incident,
+        provider=provider,
+        event_kind=event_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or external_reference,
+      )
+
+    return updated_incident, effective_delivery_history, executed
+
+  def _resolve_provider_pull_sync_event_kind(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    pull_sync: OperatorIncidentProviderPullSync,
+    payload: dict[str, Any],
+  ) -> str | None:
+    explicit_event = self._first_non_empty_string(
+      payload.get("event_kind"),
+      payload.get("recovery_event_kind"),
+      payload.get("last_event_kind"),
+      self._extract_payload_mapping(payload.get("status_machine")).get("last_event_kind"),
+    )
+    if explicit_event is not None:
+      return self._normalize_external_incident_event_kind(explicit_event)
+
+    remediation_state = self._first_non_empty_string(
+      pull_sync.remediation_state,
+      payload.get("recovery_state"),
+      payload.get("status"),
+    )
+    if remediation_state is not None:
+      normalized_state = remediation_state.strip().lower().replace("-", "_")
+      remediation_mapping = {
+        "requested": "remediation_requested",
+        "provider_requested": "remediation_requested",
+        "recovering": "remediation_started",
+        "running": "remediation_started",
+        "in_progress": "remediation_started",
+        "provider_recovering": "remediation_started",
+        "recovered": "remediation_completed",
+        "provider_recovered": "remediation_completed",
+        "completed": "remediation_completed",
+        "verified": "remediation_completed",
+        "resolved": "resolved",
+        "failed": "remediation_failed",
+        "provider_failed": "remediation_failed",
+      }
+      if normalized_state in remediation_mapping:
+        return remediation_mapping[normalized_state]
+
+    workflow_state = self._first_non_empty_string(
+      pull_sync.workflow_state,
+      payload.get("workflow_state"),
+    )
+    if workflow_state is None:
+      return None
+    normalized_workflow_state = workflow_state.strip().lower().replace("-", "_")
+    workflow_mapping = {
+      "triggered": "triggered",
+      "open": "triggered",
+      "active": "triggered",
+      "acknowledged": "acknowledged",
+      "escalated": "escalated",
+      "resolved": "resolved",
+      "closed": "resolved",
+    }
+    resolved = workflow_mapping.get(normalized_workflow_state)
+    if resolved == "resolved" and incident.kind == "incident_opened" and incident.remediation.state != "not_applicable":
+      return None
+    return resolved
 
   def _refresh_guarded_live_incident_workflow(
     self,

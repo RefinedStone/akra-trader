@@ -237,8 +237,10 @@ Defaults:
   on incident remediation state as both raw payload and typed provider recovery state
   (`job_id`, channels, symbols, timeframe, verification result) plus a provider-side status
   machine that tracks workflow phase, job phase, sync state, last provider event, and attempt
-  count. That typed state surfaces in the guarded-live incident table and is reused when local
-  remediation closes the loop so
+  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/Opsgenie
+  incident/alert body so provider-stored workflow and recovery details become the authoritative
+  reconciliation source even when callbacks lag. That typed state surfaces in the guarded-live
+  incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
   across PagerDuty and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session

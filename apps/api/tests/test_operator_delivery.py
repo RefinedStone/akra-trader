@@ -12,14 +12,18 @@ from akra_trader.domain.models import OperatorIncidentRemediation
 
 
 class FakeResponse:
-  def __init__(self, status: int) -> None:
+  def __init__(self, status: int, body: bytes | None = None) -> None:
     self.status = status
+    self._body = body or b""
 
   def __enter__(self):
     return self
 
   def __exit__(self, exc_type, exc, tb) -> None:
     return None
+
+  def read(self) -> bytes:
+    return self._body
 
 
 def test_operator_alert_delivery_adapter_supports_slack_and_pagerduty_targets() -> None:
@@ -206,6 +210,83 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
 
 
+def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    return FakeResponse(
+      200,
+      json.dumps(
+        {
+          "incident": {
+            "id": "PDINC-123",
+            "incident_key": "guarded-live:market-data:5m",
+            "status": "acknowledged",
+            "title": "Guarded-live market-data incident",
+            "updated_at": "2025-01-03T14:05:00Z",
+            "custom_details": {
+              "remediation_state": "provider_recovered",
+              "remediation_provider_payload": {
+                "job_id": "pd-job-9",
+                "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                "verification": {"state": "passed"},
+              },
+              "remediation_provider_recovery": {
+                "lifecycle_state": "recovered",
+                "job_id": "pd-job-9",
+                "channels": ["depth", "kline"],
+                "symbols": ["ETH/USDT"],
+                "timeframe": "5m",
+                "verification_state": "passed",
+                "status_machine_state": "provider_running",
+                "status_machine_workflow_state": "acknowledged",
+                "status_machine_job_state": "completed",
+              },
+            },
+          }
+        }
+      ).encode("utf-8"),
+    )
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("pagerduty",),
+    pagerduty_api_token="pagerduty-api-token",
+    pagerduty_from_email="akra-ops@example.com",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-pagerduty-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="pagerduty",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="PDINC-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="pagerduty",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "pagerduty"
+  assert snapshot.workflow_reference == "PDINC-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "provider_recovered"
+  assert snapshot.payload["job_id"] == "pd-job-9"
+  assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert requests[0][0].endswith("/incidents/PDINC-123")
+  assert requests[0][1] == "GET"
+  assert requests[0][2]["From"] == "akra-ops@example.com"
+
+
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
   requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
 
@@ -359,3 +440,77 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
   assert '"job_id": "og-job-2"' in remediate_payload["note"]
   assert '"job_id": "og-job-1"' in resolve_payload["note"]
   assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
+
+
+def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    return FakeResponse(
+      200,
+      json.dumps(
+        {
+          "data": {
+            "id": "OG-123",
+            "alias": "guarded-live:market-data:5m",
+            "status": "acknowledged",
+            "message": "Guarded-live market-data incident",
+            "updatedAt": "2025-01-03T14:12:00Z",
+            "details": {
+              "remediation_state": "requested",
+              "remediation_provider_payload": {
+                "job_id": "og-job-7",
+                "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+              },
+              "remediation_provider_recovery": {
+                "lifecycle_state": "recovering",
+                "job_id": "og-job-7",
+                "channels": ["kline"],
+                "symbols": ["ETH/USDT"],
+                "timeframe": "5m",
+                "status_machine_state": "provider_requested",
+                "status_machine_workflow_state": "acknowledged",
+                "status_machine_job_state": "requested",
+              },
+            },
+          }
+        }
+      ).encode("utf-8"),
+    )
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("opsgenie",),
+    opsgenie_api_key="opsgenie-key",
+    opsgenie_api_url="https://api.opsgenie.example",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-opsgenie-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 14, 10, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="opsgenie",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="OG-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="opsgenie",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "opsgenie"
+  assert snapshot.workflow_reference == "OG-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "requested"
+  assert snapshot.payload["job_id"] == "og-job-7"
+  assert snapshot.payload["channels"] == ["kline"]
+  assert snapshot.payload["status_machine"]["job_state"] == "requested"
+  assert requests[0][0].endswith("/v2/alerts/OG-123?identifierType=id")
+  assert requests[0][1] == "GET"

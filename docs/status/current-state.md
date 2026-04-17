@@ -117,7 +117,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   channel-restore, and order-book rebuild jobs and then immediately re-evaluate guarded-live
   incidents so recovered market-data faults can resolve in the same control-room loop. External
   provider recovery callbacks can also sync remediation lifecycle state, richer provider recovery
-  payloads, and trigger the local verification pass before the same loop is refreshed. Those
+  payloads, and trigger the local verification pass before the same loop is refreshed. Guarded-live
+  refresh now also pull-syncs PagerDuty/Opsgenie incident bodies so provider-held workflow and
+  recovery metadata can reconcile remediation state authoritatively when callbacks lag. Those
   payloads are now promoted into typed remediation recovery state with job/reference, channels,
   symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
   phase, job phase, sync state, last event, and attempt count. When local verification closes the

@@ -34,6 +34,7 @@ from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import Order
 from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
@@ -168,10 +169,12 @@ class FakeOperatorAlertDeliveryAdapter:
     self.delivery_attempts: list[tuple[str, str, int]] = []
     self.workflow_attempts: list[tuple[str, str, str, int]] = []
     self.workflow_payloads: list[tuple[str, str, str, dict[str, Any] | None]] = []
+    self.pull_sync_attempts: list[tuple[str, str, str | None]] = []
     self._failures_before_success = dict(failures_before_success or {})
     self._workflow_failures_before_success = dict(workflow_failures_before_success or {})
     self._attempts_by_target: dict[str, int] = {}
     self._workflow_attempts_by_key: dict[tuple[str, str], int] = {}
+    self._pull_sync_by_key: dict[tuple[str, str], OperatorIncidentProviderPullSync] = {}
     self._clock = clock
 
   def list_targets(self) -> tuple[str, ...]:
@@ -275,6 +278,27 @@ class FakeOperatorAlertDeliveryAdapter:
         source=incident.source,
       ),
     )
+
+  def set_pull_sync(
+    self,
+    *,
+    provider: str,
+    reference: str,
+    snapshot: OperatorIncidentProviderPullSync,
+  ) -> None:
+    self._pull_sync_by_key[(provider, reference)] = snapshot
+
+  def pull_incident_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference
+    self.pull_sync_attempts.append((incident.event_id, provider, reference))
+    if reference is None:
+      return None
+    return self._pull_sync_by_key.get((provider, reference))
 
 
 def build_guarded_live_repository(tmp_path: Path):
@@ -1807,6 +1831,164 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
     event.kind == "guarded_live_incident_external_synced"
     and "Local remediation: recent_sync:ETH/USDT:5m:status_repaired" in event.detail
     for event in synced.audit_events
+  )
+
+
+def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_incident(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 45, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    supported_workflow_providers=("pagerduty",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="pagerduty",
+    operator_alert_paging_policy_warning_targets=("pagerduty_events",),
+    operator_alert_paging_policy_critical_targets=("pagerduty_events",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="provider_pull_sync_market_data_recovery",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert incident.remediation.provider_recovery.status_machine.state == "provider_requested"
+
+  market_data.set_remediation_status(
+    kind="recent_sync",
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current,
+          sync_status="synced",
+          lag_seconds=0,
+          last_sync_at=clock.current,
+          issues=(),
+        ),
+      ],
+    ),
+  )
+  delivery.set_pull_sync(
+    provider="pagerduty",
+    reference="guarded-live:market-data:5m",
+    snapshot=OperatorIncidentProviderPullSync(
+      provider="pagerduty",
+      workflow_reference="PDINC-PULL-1",
+      external_reference="guarded-live:market-data:5m",
+      workflow_state="acknowledged",
+      remediation_state="provider_recovered",
+      detail="provider authoritatively completed recovery job",
+      payload={
+        "job_id": "pd-job-77",
+        "channels": ["kline", "depth"],
+        "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+        "verification": {"state": "passed"},
+        "status_machine": {
+          "state": "provider_running",
+          "workflow_state": "acknowledged",
+          "workflow_action": "remediate",
+          "job_state": "completed",
+          "sync_state": "provider_authoritative",
+        },
+      },
+      synced_at=clock.current + timedelta(minutes=1),
+    ),
+  )
+
+  reconciled = app.get_guarded_live_status()
+
+  updated_incident = next(
+    event
+    for event in reconciled.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated_incident.remediation.state == "executed"
+  assert updated_incident.remediation.requested_by == "pagerduty:pull_sync"
+  assert updated_incident.remediation.provider_recovery.job_id == "pd-job-77"
+  assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
+  assert updated_incident.remediation.provider_recovery.status_machine.workflow_state == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.status_machine.sync_state == "bidirectional_synced"
+  assert any(
+    event.kind == "incident_resolved" and event.alert_id == "guarded-live:market-data:5m"
+    for event in reconciled.incident_events
+  )
+  assert all(
+    alert.alert_id != "guarded-live:market-data:5m"
+    for alert in reconciled.active_alerts
+  )
+  assert any(
+    attempt[0] == incident.event_id and attempt[1] == "pagerduty"
+    for attempt in delivery.pull_sync_attempts
+  )
+  assert any(
+    event.kind == "guarded_live_incident_provider_pull_synced"
+    and "Workflow state: acknowledged." in event.detail
+    for event in reconciled.audit_events
   )
 
 
