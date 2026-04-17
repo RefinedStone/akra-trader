@@ -131,6 +131,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_incidentio_recovery_engine_url_template
     ),
     incidentio_recovery_engine_token=settings.operator_alert_incidentio_recovery_engine_token,
+    firehydrant_api_token=settings.operator_alert_firehydrant_api_token,
+    firehydrant_api_url=settings.operator_alert_firehydrant_api_url,
+    firehydrant_recovery_engine_url_template=(
+      settings.operator_alert_firehydrant_recovery_engine_url_template
+    ),
+    firehydrant_recovery_engine_token=settings.operator_alert_firehydrant_recovery_engine_token,
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
     opsgenie_recovery_engine_url_template=(

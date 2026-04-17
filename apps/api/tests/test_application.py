@@ -204,6 +204,8 @@ class FakeOperatorAlertDeliveryAdapter:
         external_provider = "pagerduty"
       elif target == "incidentio_incidents":
         external_provider = "incidentio"
+      elif target == "firehydrant_incidents":
+        external_provider = "firehydrant"
       elif target == "opsgenie_alerts":
         external_provider = "opsgenie"
       records.append(
@@ -3695,6 +3697,80 @@ def test_incident_paging_provider_can_be_inferred_for_incidentio_workflow(
   assert updated.provider_workflow_action == "acknowledge"
   assert any(
     attempt[1:] == ("incidentio", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
+
+
+def test_incident_paging_provider_can_be_inferred_for_firehydrant_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 10, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("firehydrant_incidents",),
+    supported_workflow_providers=("firehydrant",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_warning_targets=("firehydrant_incidents",),
+    operator_alert_paging_policy_critical_targets=("firehydrant_incidents",),
+    operator_alert_paging_policy_warning_escalation_targets=("firehydrant_incidents",),
+    operator_alert_paging_policy_critical_escalation_targets=("firehydrant_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="firehydrant_policy")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_provider == "firehydrant"
+  assert incident.delivery_targets == ("firehydrant_incidents",)
+  assert incident.escalation_targets == ("firehydrant_incidents",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="firehydrant",
+    event_kind="triggered",
+    actor="firehydrant",
+    detail="provider_incident_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="FH-123",
+    occurred_at=clock.current + timedelta(seconds=15),
+  )
+  triggered = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered.provider_workflow_reference == "FH-123"
+  assert triggered.external_provider == "firehydrant"
+
+  clock.advance(timedelta(minutes=1))
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="firehydrant_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert any(
+    attempt[1:] == ("firehydrant", "acknowledge", 1)
     for attempt in delivery.workflow_attempts
   )
 

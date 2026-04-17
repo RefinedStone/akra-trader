@@ -464,6 +464,25 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        firehydrant: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          priority?: string | null;
+          team?: string | null;
+          runbook?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            priority_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -677,6 +696,25 @@ type GuardedLiveStatus = {
             assignment_phase: string;
             visibility_phase: string;
             severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        firehydrant: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          priority?: string | null;
+          team?: string | null;
+          runbook?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            priority_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8136,6 +8174,25 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  firehydrant: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    priority?: string | null;
+    team?: string | null;
+    runbook?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      priority_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8221,6 +8278,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `incident.io schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "firehydrant") {
+    const details = [
+      providerRecovery.firehydrant.incident_id
+        ? `incident ${providerRecovery.firehydrant.incident_id}`
+        : null,
+      providerRecovery.firehydrant.incident_status !== "unknown"
+        ? `status ${providerRecovery.firehydrant.incident_status}`
+        : null,
+      providerRecovery.firehydrant.severity ? `severity ${providerRecovery.firehydrant.severity}` : null,
+      providerRecovery.firehydrant.priority ? `priority ${providerRecovery.firehydrant.priority}` : null,
+      providerRecovery.firehydrant.team ? `team ${providerRecovery.firehydrant.team}` : null,
+      providerRecovery.firehydrant.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.firehydrant.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.firehydrant.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.firehydrant.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.firehydrant.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.firehydrant.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.firehydrant.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.firehydrant.updated_at)}`
+        : null,
+      providerRecovery.firehydrant.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.firehydrant.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `FireHydrant schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

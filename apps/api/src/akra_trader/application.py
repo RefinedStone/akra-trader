@@ -48,6 +48,8 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentFireHydrantRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentFireHydrantRecoveryState
 from akra_trader.domain.models import OperatorIncidentIncidentIoRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIncidentIoRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryState
@@ -1542,6 +1544,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "firehydrant"
+          and provider_recovery.firehydrant.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            firehydrant=replace(
+              aligned_provider_recovery.firehydrant,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2277,6 +2290,144 @@ class TradingApplication:
       last_transition_at=last_transition_at,
     )
 
+  @staticmethod
+  def _normalize_firehydrant_incident_phase(
+    incident_status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (incident_status or "").strip().lower().replace(" ", "_")
+    if normalized in {"open", "investigating", "mitigating", "monitoring", "resolved", "closed"}:
+      return normalized
+    return existing_phase
+
+  @staticmethod
+  def _resolve_firehydrant_ownership_phase(
+    team: str | None,
+    existing_phase: str,
+  ) -> str:
+    if team:
+      return "assigned"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "unassigned"
+
+  @staticmethod
+  def _resolve_firehydrant_severity_phase(
+    severity: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized in {"sev1", "critical"}:
+      return "critical"
+    if normalized in {"sev2", "high"}:
+      return "high"
+    if normalized in {"sev3", "medium"}:
+      return "medium"
+    if normalized in {"sev4", "low"}:
+      return "low"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_firehydrant_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized in {"p1", "critical"}:
+      return "critical"
+    if normalized in {"p2", "high"}:
+      return "high"
+    if normalized in {"p3", "medium"}:
+      return "medium"
+    if normalized in {"p4", "low"}:
+      return "low"
+    return existing_phase
+
+  @staticmethod
+  def _resolve_firehydrant_workflow_phase(
+    *,
+    lifecycle_state: str,
+    workflow_action: str | None,
+    incident_phase: str,
+    existing_phase: str,
+  ) -> str:
+    if workflow_action == "resolve" or incident_phase in {"resolved", "closed"} or lifecycle_state == "resolved":
+      return "resolved_back_synced"
+    if lifecycle_state == "verified":
+      return "verified_pending_resolve"
+    if lifecycle_state == "recovered":
+      return "awaiting_local_verification"
+    if lifecycle_state == "recovering":
+      return "provider_recovering"
+    if lifecycle_state == "requested" or workflow_action == "remediate":
+      return "remediation_requested"
+    if lifecycle_state == "failed":
+      return "recovery_failed"
+    if incident_phase in {"investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    if existing_phase != "unknown":
+      return existing_phase
+    return "idle"
+
+  def _build_firehydrant_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity: str | None,
+    priority: str | None,
+    team: str | None,
+    lifecycle_state: str,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentFireHydrantRecoveryState,
+  ) -> OperatorIncidentFireHydrantRecoveryPhaseGraph:
+    phase_payload = self._extract_payload_mapping(payload.get("phase_graph"))
+    incident_phase = self._first_non_empty_string(
+      phase_payload.get("incident_phase"),
+      self._normalize_firehydrant_incident_phase(incident_status, existing.phase_graph.incident_phase),
+      existing.phase_graph.incident_phase,
+    ) or "unknown"
+    workflow_phase = self._first_non_empty_string(
+      phase_payload.get("workflow_phase"),
+      self._resolve_firehydrant_workflow_phase(
+        lifecycle_state=lifecycle_state,
+        workflow_action=status_machine.workflow_action,
+        incident_phase=incident_phase,
+        existing_phase=existing.phase_graph.workflow_phase,
+      ),
+      existing.phase_graph.workflow_phase,
+    ) or "unknown"
+    ownership_phase = self._first_non_empty_string(
+      phase_payload.get("ownership_phase"),
+      self._resolve_firehydrant_ownership_phase(team, existing.phase_graph.ownership_phase),
+      existing.phase_graph.ownership_phase,
+    ) or "unknown"
+    severity_phase = self._first_non_empty_string(
+      phase_payload.get("severity_phase"),
+      self._resolve_firehydrant_severity_phase(severity, existing.phase_graph.severity_phase),
+      existing.phase_graph.severity_phase,
+    ) or "unknown"
+    priority_phase = self._first_non_empty_string(
+      phase_payload.get("priority_phase"),
+      self._resolve_firehydrant_priority_phase(priority, existing.phase_graph.priority_phase),
+      existing.phase_graph.priority_phase,
+    ) or "unknown"
+    last_transition_at = (
+      self._parse_payload_datetime(phase_payload.get("last_transition_at"))
+      or self._parse_payload_datetime(payload.get("updated_at"))
+      or existing.phase_graph.last_transition_at
+      or synced_at
+    )
+    return OperatorIncidentFireHydrantRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=ownership_phase,
+      severity_phase=severity_phase,
+      priority_phase=priority_phase,
+      last_transition_at=last_transition_at,
+    )
+
   def _build_provider_recovery_telemetry(
     self,
     *,
@@ -2392,6 +2543,7 @@ class TradingApplication:
     OperatorIncidentPagerDutyRecoveryState,
     OperatorIncidentOpsgenieRecoveryState,
     OperatorIncidentIncidentIoRecoveryState,
+    OperatorIncidentFireHydrantRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -2634,13 +2786,99 @@ class TradingApplication:
       ),
     )
 
+    firehydrant_payload = self._merge_payload_mappings(
+      schema_payload.get("firehydrant"),
+      schema_payload.get("fire_hydrant"),
+      payload.get("firehydrant"),
+      payload.get("firehydrant_incident"),
+      payload.get("fire_hydrant"),
+    )
+    firehydrant_status = self._first_non_empty_string(
+      firehydrant_payload.get("incident_status"),
+      firehydrant_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.firehydrant.incident_status,
+    ) or "unknown"
+    firehydrant = OperatorIncidentFireHydrantRecoveryState(
+      incident_id=self._first_non_empty_string(
+        firehydrant_payload.get("incident_id"),
+        firehydrant_payload.get("id"),
+        workflow_reference,
+        existing.firehydrant.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        firehydrant_payload.get("external_reference"),
+        firehydrant_payload.get("reference"),
+        reference,
+        existing.firehydrant.external_reference,
+      ),
+      incident_status=firehydrant_status,
+      severity=self._first_non_empty_string(
+        firehydrant_payload.get("severity"),
+        existing.firehydrant.severity,
+      ),
+      priority=self._first_non_empty_string(
+        firehydrant_payload.get("priority"),
+        existing.firehydrant.priority,
+      ),
+      team=self._first_non_empty_string(
+        firehydrant_payload.get("team"),
+        firehydrant_payload.get("owner"),
+        existing.firehydrant.team,
+      ),
+      runbook=self._first_non_empty_string(
+        firehydrant_payload.get("runbook"),
+        firehydrant_payload.get("runbook_name"),
+        existing.firehydrant.runbook,
+      ),
+      url=self._first_non_empty_string(
+        firehydrant_payload.get("url"),
+        firehydrant_payload.get("html_url"),
+        existing.firehydrant.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(firehydrant_payload.get("updated_at"))
+        or existing.firehydrant.updated_at
+      ),
+      phase_graph=self._build_firehydrant_recovery_phase_graph(
+        payload=firehydrant_payload,
+        incident_status=firehydrant_status,
+        severity=self._first_non_empty_string(
+          firehydrant_payload.get("severity"),
+          existing.firehydrant.severity,
+        ),
+        priority=self._first_non_empty_string(
+          firehydrant_payload.get("priority"),
+          existing.firehydrant.priority,
+        ),
+        team=self._first_non_empty_string(
+          firehydrant_payload.get("team"),
+          firehydrant_payload.get("owner"),
+          existing.firehydrant.team,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.firehydrant,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
-      return "pagerduty", pagerduty, existing.opsgenie, existing.incidentio
+      return "pagerduty", pagerduty, existing.opsgenie, existing.incidentio, existing.firehydrant
     if normalized_provider == "opsgenie":
-      return "opsgenie", existing.pagerduty, opsgenie, existing.incidentio
+      return "opsgenie", existing.pagerduty, opsgenie, existing.incidentio, existing.firehydrant
     if normalized_provider == "incidentio":
-      return "incidentio", existing.pagerduty, existing.opsgenie, incidentio
-    return existing.provider_schema_kind, existing.pagerduty, existing.opsgenie, existing.incidentio
+      return "incidentio", existing.pagerduty, existing.opsgenie, incidentio, existing.firehydrant
+    if normalized_provider == "firehydrant":
+      return "firehydrant", existing.pagerduty, existing.opsgenie, existing.incidentio, firehydrant
+    return (
+      existing.provider_schema_kind,
+      existing.pagerduty,
+      existing.opsgenie,
+      existing.incidentio,
+      existing.firehydrant,
+    )
 
   def _build_provider_recovery_state(
     self,
@@ -2714,7 +2952,7 @@ class TradingApplication:
       existing.reference,
       remediation.reference,
     )
-    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema = (
+    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema, firehydrant_schema = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
       payload=payload,
@@ -2792,6 +3030,7 @@ class TradingApplication:
       pagerduty=pagerduty_schema,
       opsgenie=opsgenie_schema,
       incidentio=incidentio_schema,
+      firehydrant=firehydrant_schema,
       updated_at=synced_at,
     )
 
@@ -2843,6 +3082,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.incidentio,
+        ),
+      ),
+      firehydrant=replace(
+        provider_recovery.firehydrant,
+        phase_graph=self._build_firehydrant_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.firehydrant.incident_status,
+          severity=provider_recovery.firehydrant.severity,
+          priority=provider_recovery.firehydrant.priority,
+          team=provider_recovery.firehydrant.team,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.firehydrant,
         ),
       ),
     )
@@ -7180,6 +7433,8 @@ class TradingApplication:
     normalized = provider.strip().lower().replace("-", "_").replace(".", "_")
     if normalized == "incident_io":
       return "incidentio"
+    if normalized == "fire_hydrant":
+      return "firehydrant"
     return normalized or None
 
   @staticmethod
@@ -7343,6 +7598,8 @@ class TradingApplication:
       return "pagerduty"
     if "incidentio_incidents" in combined:
       return "incidentio"
+    if "firehydrant_incidents" in combined:
+      return "firehydrant"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None
