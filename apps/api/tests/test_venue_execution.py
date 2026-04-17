@@ -1085,6 +1085,85 @@ def test_coinbase_adapter_marks_exchange_specific_ladder_rules_on_snapshot_refre
   assert "coinbase_order_book_snapshot_refresh:700:701" in sync.handoff.issues
 
 
+def test_coinbase_adapter_marks_ladder_sequence_mismatch_issues() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 700,
+        "bids": [[21931.98, 1.10], [21931.70, 0.90]],
+        "asks": [[21933.98, 1.25], [21934.20, 0.95]],
+      },
+      {
+        "nonce": 704,
+        "bids": [[21934.00, 0.95], [21933.80, 0.65]],
+        "asks": [[21934.20, 1.05], [21934.40, 0.85]],
+      },
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 21931.98,
+      "bidVolume": 1.1,
+      "ask": 21933.98,
+      "askVolume": 1.25,
+      "open": 21900.0,
+      "last": 21932.98,
+      "high": 22010.0,
+      "low": 21835.0,
+      "baseVolume": 16038.0,
+      "quoteVolume": 351749098.0,
+    },
+    trades=[
+      {
+        "id": "coinbase-trade-restore-1",
+        "price": 21932.98,
+        "amount": 0.30,
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 21920.0, 21940.0, 21910.0, 21932.5, 12.0]
+    ],
+  )
+  stream_session = FakeStreamSession(
+    "coinbase-market-sequence",
+    transport="coinbase_advanced_trade_market_websocket",
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    venue="coinbase",
+    exchange=exchange,
+    venue_stream_client=FakeStreamClient(stream_session),
+    clock=clock,
+  )
+
+  handoff = adapter.handoff_session(
+    symbol="BTC/USD",
+    timeframe="5m",
+    owner_run_id="run-live-coinbase-sequence",
+    owner_session_id="worker-live-coinbase-sequence",
+    owned_order_ids=(),
+  )
+
+  clock.advance(timedelta(seconds=30))
+  stream_session.push(
+    {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+      "U": 704,
+      "u": 704,
+      "pu": 703,
+      "b": [["21934.00", "0.95"]],
+      "a": [["21934.20", "1.05"]],
+    }
+  )
+  sync = adapter.sync_session(handoff=handoff, order_ids=())
+
+  assert "coinbase_order_book_gap_detected:700:703" in sync.handoff.issues
+  assert "coinbase_order_book_sequence_mismatch:700:703:704" in sync.handoff.issues
+
+
 def test_coinbase_adapter_extends_authenticated_account_and_order_transport(monkeypatch) -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)

@@ -22,10 +22,10 @@ Implemented now:
   live order sync, market-data freshness/quality/venue-policy breaches, channel-level
   market-data consistency/restore breaches from guarded-live venue-session coverage, venue-specific
   book/kline consistency faults, exchange-specific ladder gap/rebuild integrity faults,
-  venue-native ladder snapshot integrity faults, exchange-specific ladder bridge/sequence/
-  snapshot-refresh faults, deeper depth-ladder/candle-sequence faults, and multi-candle
-  continuity faults, persisted live-path alert history, durable incident events, outbound delivery
-  history, and merged runtime plus guarded-live audit events
+  venue-native ladder snapshot integrity faults, ladder bridge integrity faults, ladder sequence
+  integrity faults, ladder snapshot-refresh faults, deeper depth-ladder/candle-sequence faults,
+  and multi-candle continuity faults, persisted live-path alert history, durable incident events,
+  outbound delivery history, and merged runtime plus guarded-live audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
   history, durable incident events, outbound delivery history, and guarded-live audit events in the
   control plane
@@ -54,7 +54,7 @@ Implemented now:
   continuation snapshots for trade, aggregate-trade, book-ticker, mini-ticker, and kline state.
   Durable incidents now distinguish generic ladder gap/rebuild faults from venue-native ladder
   snapshot integrity faults such as crossed or non-monotonic snapshots and missing snapshot sides,
-  plus exchange-specific ladder bridge, sequence, and snapshot-refresh rule faults
+  plus separate ladder bridge, ladder sequence, and ladder snapshot-refresh rule faults
 - guarded-live session handoff can now widen beyond Binance-native continuation into push-native
   market transports: Binance falls back to its public market websocket when user-data auth is not
   available, Coinbase Advanced Trade can now supply authenticated user/account order transport plus

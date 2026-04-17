@@ -4428,24 +4428,74 @@ class TradingApplication:
         )
       )
 
-    exchange_ladder_integrity_details, exchange_ladder_integrity_detected_at, exchange_ladder_integrity_has_critical = (
-      self._collect_guarded_live_exchange_ladder_integrity_findings(
+    ladder_bridge_details, ladder_bridge_detected_at, ladder_bridge_has_critical = (
+      self._collect_guarded_live_ladder_bridge_findings(
         handoff=handoff,
         current_time=current_time,
       )
     )
-    if exchange_ladder_integrity_details:
+    if ladder_bridge_details:
       alerts.append(
         OperatorAlert(
-          alert_id=f"guarded-live:market-data-exchange-ladder-integrity:{run_id or 'unknown'}",
-          severity="critical" if exchange_ladder_integrity_has_critical else "warning",
-          category="market_data_exchange_ladder_integrity",
+          alert_id=f"guarded-live:market-data-ladder-bridge:{run_id or 'unknown'}",
+          severity="critical" if ladder_bridge_has_critical else "warning",
+          category="market_data_ladder_bridge_integrity",
           summary=(
-            f"Guarded-live exchange-specific ladder rules require review for "
+            f"Guarded-live ladder bridge rules require review for "
             f"{handoff.symbol or 'the active live session'}."
           ),
-          detail=self._summarize_guarded_live_issue_copy(exchange_ladder_integrity_details),
-          detected_at=exchange_ladder_integrity_detected_at,
+          detail=self._summarize_guarded_live_issue_copy(ladder_bridge_details),
+          detected_at=ladder_bridge_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    ladder_sequence_details, ladder_sequence_detected_at, ladder_sequence_has_critical = (
+      self._collect_guarded_live_ladder_sequence_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if ladder_sequence_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-ladder-sequence:{run_id or 'unknown'}",
+          severity="critical" if ladder_sequence_has_critical else "warning",
+          category="market_data_ladder_sequence_integrity",
+          summary=(
+            f"Guarded-live ladder sequence rules require review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(ladder_sequence_details),
+          detected_at=ladder_sequence_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    ladder_snapshot_refresh_details, ladder_snapshot_refresh_detected_at, ladder_snapshot_refresh_has_critical = (
+      self._collect_guarded_live_ladder_snapshot_refresh_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if ladder_snapshot_refresh_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-ladder-snapshot-refresh:{run_id or 'unknown'}",
+          severity="critical" if ladder_snapshot_refresh_has_critical else "warning",
+          category="market_data_ladder_snapshot_refresh",
+          summary=(
+            f"Guarded-live ladder snapshot refresh rules require review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(ladder_snapshot_refresh_details),
+          detected_at=ladder_snapshot_refresh_detected_at,
           run_id=run_id,
           session_id=session_id,
           source="guarded_live",
@@ -4695,7 +4745,7 @@ class TradingApplication:
     resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
     return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
 
-  def _collect_guarded_live_exchange_ladder_integrity_findings(
+  def _collect_guarded_live_ladder_bridge_findings(
     self,
     *,
     handoff: GuardedLiveVenueSessionHandoff,
@@ -4713,7 +4763,55 @@ class TradingApplication:
       if detected_at is not None:
         detected_candidates.append(detected_at)
 
-    for issue_detail in self._extract_guarded_live_exchange_ladder_integrity_semantics(issues=handoff.issues):
+    for issue_detail in self._extract_guarded_live_ladder_bridge_semantics(issues=handoff.issues):
+      add_finding(issue_detail, critical=True)
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
+
+  def _collect_guarded_live_ladder_sequence_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    detected_at = handoff.last_depth_event_at or handoff.order_book_last_rebuilt_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    for issue_detail in self._extract_guarded_live_ladder_sequence_semantics(issues=handoff.issues):
+      add_finding(issue_detail, critical=True)
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
+
+  def _collect_guarded_live_ladder_snapshot_refresh_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    detected_at = handoff.last_depth_event_at or handoff.order_book_last_rebuilt_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    for issue_detail in self._extract_guarded_live_ladder_snapshot_refresh_semantics(issues=handoff.issues):
       add_finding(issue_detail, critical=True)
 
     resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
@@ -5213,7 +5311,7 @@ class TradingApplication:
     return tuple(dict.fromkeys(findings))
 
   @staticmethod
-  def _extract_guarded_live_exchange_ladder_integrity_semantics(
+  def _extract_guarded_live_ladder_bridge_semantics(
     *,
     issues: tuple[str, ...],
   ) -> tuple[str, ...]:
@@ -5236,15 +5334,33 @@ class TradingApplication:
           f"does not cover expected next update id {expected_next or 'unknown'}."
         )
         continue
-      if "_order_book_sequence_mismatch:" in issue:
-        venue, payload = issue.split("_order_book_sequence_mismatch:", 1)
-        expected_previous, _, remainder = payload.partition(":")
-        actual_previous, _, current_update_id = remainder.partition(":")
-        findings.append(
-          f"{venue} ladder sequence expected previous update id {expected_previous or 'unknown'} "
-          f"but received {actual_previous or 'unknown'} before update {current_update_id or 'unknown'}."
-        )
+    return tuple(dict.fromkeys(findings))
+
+  @staticmethod
+  def _extract_guarded_live_ladder_sequence_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings: list[str] = []
+    for issue in issues:
+      if "_order_book_sequence_mismatch:" not in issue:
         continue
+      venue, payload = issue.split("_order_book_sequence_mismatch:", 1)
+      expected_previous, _, remainder = payload.partition(":")
+      actual_previous, _, current_update_id = remainder.partition(":")
+      findings.append(
+        f"{venue} ladder sequence expected previous update id {expected_previous or 'unknown'} "
+        f"but received {actual_previous or 'unknown'} before update {current_update_id or 'unknown'}."
+      )
+    return tuple(dict.fromkeys(findings))
+
+  @staticmethod
+  def _extract_guarded_live_ladder_snapshot_refresh_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings: list[str] = []
+    for issue in issues:
       if "_order_book_snapshot_refresh:" not in issue:
         continue
       venue, payload = issue.split("_order_book_snapshot_refresh:", 1)
