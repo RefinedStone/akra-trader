@@ -650,6 +650,32 @@ class OperatorIncidentFireHydrantRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentRootlyRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity_id: str | None = None
+  private: bool | None = None
+  slug: str | None = None
+  url: str | None = None
+  acknowledged_at: datetime | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentRootlyRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentRootlyRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentRootlyRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  acknowledgment_phase: str = "unknown"
+  visibility_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -682,6 +708,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   firehydrant: OperatorIncidentFireHydrantRecoveryState = field(
     default_factory=OperatorIncidentFireHydrantRecoveryState
+  )
+  rootly: OperatorIncidentRootlyRecoveryState = field(
+    default_factory=OperatorIncidentRootlyRecoveryState
   )
   updated_at: datetime | None = None
 

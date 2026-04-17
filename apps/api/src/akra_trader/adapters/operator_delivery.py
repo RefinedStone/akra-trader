@@ -35,6 +35,8 @@ def _normalize_target(target: str) -> str | None:
     return "incidentio_incidents"
   if normalized in {"firehydrant", "fire_hydrant", "firehydrant_incidents", "operator_firehydrant"}:
     return "firehydrant_incidents"
+  if normalized in {"rootly", "root_ly", "rootly_incidents", "operator_rootly"}:
+    return "rootly_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -60,6 +62,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     firehydrant_api_url: str = "https://api.firehydrant.io",
     firehydrant_recovery_engine_url_template: str | None = None,
     firehydrant_recovery_engine_token: str | None = None,
+    rootly_api_token: str | None = None,
+    rootly_api_url: str = "https://api.rootly.com",
+    rootly_recovery_engine_url_template: str | None = None,
+    rootly_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -89,6 +95,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._firehydrant_api_url = firehydrant_api_url.rstrip("/")
     self._firehydrant_recovery_engine_url_template = firehydrant_recovery_engine_url_template
     self._firehydrant_recovery_engine_token = firehydrant_recovery_engine_token
+    self._rootly_api_token = rootly_api_token
+    self._rootly_api_url = rootly_api_url.rstrip("/")
+    self._rootly_recovery_engine_url_template = rootly_recovery_engine_url_template
+    self._rootly_recovery_engine_token = rootly_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -108,6 +118,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("incidentio")
     if self._firehydrant_api_token:
       providers.append("firehydrant")
+    if self._rootly_api_token:
+      providers.append("rootly")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -140,6 +152,9 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         continue
       if target == "firehydrant_incidents":
         records.append(self._deliver_firehydrant(incident=incident, attempt_number=attempt_number, phase=phase))
+        continue
+      if target == "rootly_incidents":
+        records.append(self._deliver_rootly(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "opsgenie_alerts":
         records.append(self._deliver_opsgenie(incident=incident, attempt_number=attempt_number, phase=phase))
@@ -183,6 +198,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized_provider == "firehydrant":
       return (
         self._sync_firehydrant_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
+    if normalized_provider == "rootly":
+      return (
+        self._sync_rootly_workflow(
           incident=incident,
           action=normalized_action,
           actor=actor,
@@ -237,6 +263,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_incidentio_workflow_state(incident=incident)
     if normalized_provider == "firehydrant":
       return self._pull_firehydrant_workflow_state(incident=incident)
+    if normalized_provider == "rootly":
+      return self._pull_rootly_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -317,6 +345,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   def _build_firehydrant_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
     token = self._firehydrant_recovery_engine_token or self._firehydrant_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_rootly_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    token = self._rootly_recovery_engine_token or self._rootly_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -464,6 +501,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_firehydrant_recovery_engine_request(url=url)
+    elif provider == "rootly":
+      url = self._format_recovery_engine_url(
+        url_template=self._rootly_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_rootly_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -1243,6 +1291,242 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_rootly(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._rootly_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:rootly_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="rootly_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="rootly_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_rootly_delivery_request(incident=incident, reference=reference)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:rootly_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="rootly_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"rootly_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:rootly_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="rootly_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"rootly_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_rootly_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    target = "rootly_workflow"
+    if not self._rootly_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="rootly_workflow_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="rootly_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="rootly",
+        external_reference=None,
+        source=incident.source,
+      )
+    request = self._build_rootly_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"rootly_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"rootly_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="rootly",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_rootly_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._rootly_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_rootly_pull_request(reference=reference, reference_type=reference_type)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    incident_payload = self._extract_mapping(
+      payload.get("data"),
+      payload.get("incident"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      incident_payload.get("attributes"),
+      incident_payload.get("incident"),
+      incident_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      attributes.get("metadata"),
+      attributes.get("details"),
+      attributes.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "severity_id": self._first_non_empty_string(
+        attributes.get("severity_id"),
+        self._extract_mapping(attributes.get("severity")).get("id"),
+      ),
+      "private": attributes.get("private") if isinstance(attributes.get("private"), bool) else None,
+      "slug": self._first_non_empty_string(
+        attributes.get("slug"),
+        attributes.get("short_id"),
+      ),
+      "url": self._first_non_empty_string(
+        attributes.get("url"),
+        attributes.get("html_url"),
+      ),
+      "acknowledged_at": attributes.get("acknowledged_at"),
+      "updated_at": attributes.get("updated_at"),
+      "external_reference": self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="rootly",
+      workflow_reference=self._first_non_empty_string(
+        incident_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        attributes.get("status"),
+        payload.get("status"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        attributes.get("title"),
+        attributes.get("summary"),
+        attributes.get("description"),
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        attributes.get("updated_at"),
+        attributes.get("created_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -1746,6 +2030,76 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return "incident_active"
     return "idle"
 
+  @staticmethod
+  def _resolve_rootly_incident_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_rootly_acknowledgment_phase(
+    *,
+    incident_phase: str,
+    acknowledged_at: str | None,
+  ) -> str:
+    if incident_phase in {"resolved", "closed"}:
+      return "closed"
+    if acknowledged_at:
+      return "acknowledged"
+    if incident_phase == "acknowledged":
+      return "acknowledged"
+    if incident_phase in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "pending_acknowledgment"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_rootly_visibility_phase(private: bool | None) -> str:
+    if private is True:
+      return "private"
+    if private is False:
+      return "public"
+    return "unknown"
+
+  @staticmethod
+  def _resolve_rootly_severity_phase(severity_id: str | None) -> str:
+    normalized = (severity_id or "").strip().lower().replace(" ", "_")
+    return normalized or "unknown"
+
+  @staticmethod
+  def _resolve_rootly_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
   def _build_provider_pull_sync(
     self,
     *,
@@ -2035,6 +2389,122 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           provider_telemetry.get("state"),
           provider_recovery.get("job_state"),
           firehydrant_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
+    elif provider == "rootly":
+      rootly_severity_id = self._first_non_empty_string(
+        provider_specific_recovery.get("severity_id"),
+        provider_payload.get("severity_id"),
+        self._extract_mapping(provider_payload.get("severity")).get("id"),
+      )
+      rootly_private = (
+        provider_specific_recovery.get("private")
+        if isinstance(provider_specific_recovery.get("private"), bool)
+        else (
+          provider_payload.get("private")
+          if isinstance(provider_payload.get("private"), bool)
+          else None
+        )
+      )
+      rootly_acknowledged_at = self._first_non_empty_string(
+        provider_specific_recovery.get("acknowledged_at"),
+        provider_payload.get("acknowledged_at"),
+      )
+      rootly_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("status"),
+      ) or "unknown"
+      rootly_incident_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("incident_phase"),
+        self._resolve_rootly_incident_phase(rootly_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "rootly",
+        "rootly": {
+          "incident_id": workflow_reference,
+          "external_reference": external_reference,
+          "incident_status": rootly_status,
+          "severity_id": rootly_severity_id,
+          "private": rootly_private,
+          "slug": self._first_non_empty_string(
+            provider_specific_recovery.get("slug"),
+            provider_payload.get("slug"),
+            provider_payload.get("short_id"),
+          ),
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "acknowledged_at": (
+            self._parse_provider_datetime(rootly_acknowledged_at).isoformat()
+            if self._parse_provider_datetime(rootly_acknowledged_at) is not None
+            else None
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "incident_phase": rootly_incident_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_rootly_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=rootly_status,
+            ),
+            "acknowledgment_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("acknowledgment_phase"),
+            ) or self._resolve_rootly_acknowledgment_phase(
+              incident_phase=rootly_incident_phase,
+              acknowledged_at=rootly_acknowledged_at,
+            ),
+            "visibility_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("visibility_phase"),
+            ) or self._resolve_rootly_visibility_phase(rootly_private),
+            "severity_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("severity_phase"),
+            ) or self._resolve_rootly_severity_phase(rootly_severity_id),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          rootly_status,
         ),
         "job_url": self._first_non_empty_string(
           provider_telemetry.get("job_url"),
@@ -2525,6 +2995,37 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           ),
         },
       },
+      "rootly": {
+        "incident_id": provider_recovery.rootly.incident_id,
+        "external_reference": provider_recovery.rootly.external_reference,
+        "incident_status": provider_recovery.rootly.incident_status,
+        "severity_id": provider_recovery.rootly.severity_id,
+        "private": provider_recovery.rootly.private,
+        "slug": provider_recovery.rootly.slug,
+        "url": provider_recovery.rootly.url,
+        "acknowledged_at": (
+          provider_recovery.rootly.acknowledged_at.isoformat()
+          if provider_recovery.rootly.acknowledged_at is not None
+          else None
+        ),
+        "updated_at": (
+          provider_recovery.rootly.updated_at.isoformat()
+          if provider_recovery.rootly.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "incident_phase": provider_recovery.rootly.phase_graph.incident_phase,
+          "workflow_phase": provider_recovery.rootly.phase_graph.workflow_phase,
+          "acknowledgment_phase": provider_recovery.rootly.phase_graph.acknowledgment_phase,
+          "visibility_phase": provider_recovery.rootly.phase_graph.visibility_phase,
+          "severity_phase": provider_recovery.rootly.phase_graph.severity_phase,
+          "last_transition_at": (
+            provider_recovery.rootly.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.rootly.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
     }
 
   @staticmethod
@@ -2785,6 +3286,65 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       method="POST",
     )
 
+  def _build_rootly_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._rootly_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._rootly_api_url}/v1/incidents/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._rootly_api_url}/v1/incidents",
+      data=json.dumps(
+        {
+          "incident": {
+            "title": incident.summary[:255],
+            "summary": incident.detail,
+            "status": "open",
+            "severity_id": self._map_rootly_severity(incident.severity),
+            "private": False,
+            "slug": reference,
+            "external_reference": reference,
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
   def _build_pagerduty_pull_request(
     self,
     *,
@@ -2828,6 +3388,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       f"{self._firehydrant_api_url}/v1/incidents/{encoded_reference}?identifier_type={reference_type}",
       headers={
         "Authorization": f"Bearer {self._firehydrant_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
+  def _build_rootly_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      f"{self._rootly_api_url}/v1/incidents/{encoded_reference}?identifier_type={reference_type}",
+      headers={
+        "Authorization": f"Bearer {self._rootly_api_token}",
         "Content-Type": "application/json",
       },
       method="GET",
@@ -2987,6 +3563,80 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         method="POST",
       )
     raise ValueError(f"unsupported firehydrant workflow action: {action}")
+
+  def _build_rootly_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._rootly_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._rootly_api_url}/v1/incidents/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._rootly_api_url}/v1/incidents/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._rootly_api_url}/v1/incidents/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated incident to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._rootly_api_url}/v1/incidents/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported rootly workflow action: {action}")
 
   def _build_opsgenie_pull_request(
     self,
@@ -3272,3 +3922,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "P2"
     return "P3"
+
+  @staticmethod
+  def _map_rootly_severity(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "sev_critical"
+    if normalized in {"warning", "warn"}:
+      return "sev_warning"
+    return "sev_info"

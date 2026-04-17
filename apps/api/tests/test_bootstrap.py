@@ -165,6 +165,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       firehydrant_api_url: str,
       firehydrant_recovery_engine_url_template: str | None,
       firehydrant_recovery_engine_token: str | None,
+      rootly_api_token: str | None,
+      rootly_api_url: str,
+      rootly_recovery_engine_url_template: str | None,
+      rootly_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -187,6 +191,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["firehydrant_api_url"] = firehydrant_api_url
       captured["firehydrant_recovery_engine_url_template"] = firehydrant_recovery_engine_url_template or ""
       captured["firehydrant_recovery_engine_token"] = firehydrant_recovery_engine_token or ""
+      captured["rootly_api_token"] = rootly_api_token or ""
+      captured["rootly_api_url"] = rootly_api_url
+      captured["rootly_recovery_engine_url_template"] = rootly_recovery_engine_url_template or ""
+      captured["rootly_recovery_engine_token"] = rootly_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -253,6 +261,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://firehydrant.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_firehydrant_recovery_engine_token="firehydrant-recovery-token",
+      operator_alert_rootly_api_token="rootly-token",
+      operator_alert_rootly_api_url="https://api.rootly.example",
+      operator_alert_rootly_recovery_engine_url_template=(
+        "https://rootly.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_rootly_recovery_engine_token="rootly-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -288,6 +302,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["firehydrant_api_url"] == "https://api.firehydrant.example"
   assert captured["firehydrant_recovery_engine_url_template"] == "https://firehydrant.example/recovery/{workflow_reference_urlencoded}"
   assert captured["firehydrant_recovery_engine_token"] == "firehydrant-recovery-token"
+  assert captured["rootly_api_token"] == "rootly-token"
+  assert captured["rootly_api_url"] == "https://api.rootly.example"
+  assert captured["rootly_recovery_engine_url_template"] == "https://rootly.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["rootly_recovery_engine_token"] == "rootly-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"

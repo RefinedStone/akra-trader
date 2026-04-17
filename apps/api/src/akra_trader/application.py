@@ -56,6 +56,8 @@ from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryState
 from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentRootlyRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentRootlyRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1555,6 +1557,17 @@ class TradingApplication:
               incident_status="delivered",
             ),
           )
+        elif (
+          normalized_provider == "rootly"
+          and provider_recovery.rootly.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            rootly=replace(
+              aligned_provider_recovery.rootly,
+              incident_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
@@ -2526,6 +2539,138 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_rootly_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "open",
+      "started",
+      "acknowledged",
+      "investigating",
+      "mitigating",
+      "monitoring",
+      "resolved",
+      "closed",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_rootly_acknowledgment_phase(
+    incident_phase: str,
+    acknowledged_at: datetime | None,
+    existing_phase: str,
+  ) -> str:
+    if incident_phase in {"resolved", "closed"}:
+      return "closed"
+    if acknowledged_at is not None or incident_phase == "acknowledged":
+      return "acknowledged"
+    if incident_phase in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "pending_acknowledgment"
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_rootly_visibility_phase(private: bool | None, existing_phase: str) -> str:
+    if private is True:
+      return "private"
+    if private is False:
+      return "public"
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_rootly_severity_phase(severity_id: str | None, existing_phase: str) -> str:
+    normalized = (severity_id or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_rootly_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"open", "started", "investigating", "mitigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_rootly_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity_id: str | None,
+    private: bool | None,
+    acknowledged_at: datetime | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentRootlyRecoveryState,
+  ) -> OperatorIncidentRootlyRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_rootly_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+      status_machine.workflow_state,
+    ) or self._resolve_rootly_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentRootlyRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      acknowledgment_phase=self._first_non_empty_string(
+        payload.get("acknowledgment_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("acknowledgment_phase"),
+      ) or self._resolve_rootly_acknowledgment_phase(
+        incident_phase,
+        acknowledged_at,
+        existing.phase_graph.acknowledgment_phase,
+      ),
+      visibility_phase=self._first_non_empty_string(
+        payload.get("visibility_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("visibility_phase"),
+      ) or self._resolve_rootly_visibility_phase(
+        private,
+        existing.phase_graph.visibility_phase,
+      ),
+      severity_phase=self._first_non_empty_string(
+        payload.get("severity_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("severity_phase"),
+      ) or self._resolve_rootly_severity_phase(
+        severity_id,
+        existing.phase_graph.severity_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -2544,6 +2689,7 @@ class TradingApplication:
     OperatorIncidentOpsgenieRecoveryState,
     OperatorIncidentIncidentIoRecoveryState,
     OperatorIncidentFireHydrantRecoveryState,
+    OperatorIncidentRootlyRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -2864,20 +3010,131 @@ class TradingApplication:
       ),
     )
 
+    rootly_payload = self._merge_payload_mappings(
+      schema_payload.get("rootly"),
+      schema_payload.get("root_ly"),
+      payload.get("rootly"),
+      payload.get("rootly_incident"),
+      payload.get("root_ly"),
+    )
+    rootly_status = self._first_non_empty_string(
+      rootly_payload.get("incident_status"),
+      rootly_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.rootly.incident_status,
+    ) or "unknown"
+    rootly_private = (
+      rootly_payload.get("private")
+      if isinstance(rootly_payload.get("private"), bool)
+      else existing.rootly.private
+    )
+    rootly_acknowledged_at = (
+      self._parse_payload_datetime(rootly_payload.get("acknowledged_at"))
+      or existing.rootly.acknowledged_at
+    )
+    rootly = OperatorIncidentRootlyRecoveryState(
+      incident_id=self._first_non_empty_string(
+        rootly_payload.get("incident_id"),
+        rootly_payload.get("id"),
+        workflow_reference,
+        existing.rootly.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        rootly_payload.get("external_reference"),
+        rootly_payload.get("reference"),
+        reference,
+        existing.rootly.external_reference,
+      ),
+      incident_status=rootly_status,
+      severity_id=self._first_non_empty_string(
+        rootly_payload.get("severity_id"),
+        existing.rootly.severity_id,
+      ),
+      private=rootly_private,
+      slug=self._first_non_empty_string(
+        rootly_payload.get("slug"),
+        rootly_payload.get("short_id"),
+        existing.rootly.slug,
+      ),
+      url=self._first_non_empty_string(
+        rootly_payload.get("url"),
+        rootly_payload.get("html_url"),
+        existing.rootly.url,
+      ),
+      acknowledged_at=rootly_acknowledged_at,
+      updated_at=(
+        self._parse_payload_datetime(rootly_payload.get("updated_at"))
+        or existing.rootly.updated_at
+      ),
+      phase_graph=self._build_rootly_recovery_phase_graph(
+        payload=rootly_payload,
+        incident_status=rootly_status,
+        severity_id=self._first_non_empty_string(
+          rootly_payload.get("severity_id"),
+          existing.rootly.severity_id,
+        ),
+        private=rootly_private,
+        acknowledged_at=rootly_acknowledged_at,
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.rootly,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
-      return "pagerduty", pagerduty, existing.opsgenie, existing.incidentio, existing.firehydrant
+      return (
+        "pagerduty",
+        pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+      )
     if normalized_provider == "opsgenie":
-      return "opsgenie", existing.pagerduty, opsgenie, existing.incidentio, existing.firehydrant
+      return (
+        "opsgenie",
+        existing.pagerduty,
+        opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+      )
     if normalized_provider == "incidentio":
-      return "incidentio", existing.pagerduty, existing.opsgenie, incidentio, existing.firehydrant
+      return (
+        "incidentio",
+        existing.pagerduty,
+        existing.opsgenie,
+        incidentio,
+        existing.firehydrant,
+        existing.rootly,
+      )
     if normalized_provider == "firehydrant":
-      return "firehydrant", existing.pagerduty, existing.opsgenie, existing.incidentio, firehydrant
+      return (
+        "firehydrant",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        firehydrant,
+        existing.rootly,
+      )
+    if normalized_provider == "rootly":
+      return (
+        "rootly",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        rootly,
+      )
     return (
       existing.provider_schema_kind,
       existing.pagerduty,
       existing.opsgenie,
       existing.incidentio,
       existing.firehydrant,
+      existing.rootly,
     )
 
   def _build_provider_recovery_state(
@@ -2952,7 +3209,7 @@ class TradingApplication:
       existing.reference,
       remediation.reference,
     )
-    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema, firehydrant_schema = (
+    provider_schema_kind, pagerduty_schema, opsgenie_schema, incidentio_schema, firehydrant_schema, rootly_schema = (
       self._build_provider_recovery_provider_schema(
       provider=provider or existing.provider or remediation.provider or "",
       payload=payload,
@@ -3031,6 +3288,7 @@ class TradingApplication:
       opsgenie=opsgenie_schema,
       incidentio=incidentio_schema,
       firehydrant=firehydrant_schema,
+      rootly=rootly_schema,
       updated_at=synced_at,
     )
 
@@ -3096,6 +3354,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.firehydrant,
+        ),
+      ),
+      rootly=replace(
+        provider_recovery.rootly,
+        phase_graph=self._build_rootly_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.rootly.incident_status,
+          severity_id=provider_recovery.rootly.severity_id,
+          private=provider_recovery.rootly.private,
+          acknowledged_at=provider_recovery.rootly.acknowledged_at,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.rootly,
         ),
       ),
     )
@@ -7435,6 +7707,8 @@ class TradingApplication:
       return "incidentio"
     if normalized == "fire_hydrant":
       return "firehydrant"
+    if normalized == "root_ly":
+      return "rootly"
     return normalized or None
 
   @staticmethod
@@ -7600,6 +7874,8 @@ class TradingApplication:
       return "incidentio"
     if "firehydrant_incidents" in combined:
       return "firehydrant"
+    if "rootly_incidents" in combined:
+      return "rootly"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

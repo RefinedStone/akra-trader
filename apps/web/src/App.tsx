@@ -483,6 +483,25 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        rootly: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity_id?: string | null;
+          private?: boolean | null;
+          slug?: string | null;
+          url?: string | null;
+          acknowledged_at?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            acknowledgment_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -715,6 +734,25 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             priority_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        rootly: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity_id?: string | null;
+          private?: boolean | null;
+          slug?: string | null;
+          url?: string | null;
+          acknowledged_at?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            acknowledgment_phase: string;
+            visibility_phase: string;
+            severity_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8193,6 +8231,25 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  rootly: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity_id?: string | null;
+    private?: boolean | null;
+    slug?: string | null;
+    url?: string | null;
+    acknowledged_at?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      acknowledgment_phase: string;
+      visibility_phase: string;
+      severity_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8307,6 +8364,37 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `FireHydrant schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "rootly") {
+    const details = [
+      providerRecovery.rootly.incident_id ? `incident ${providerRecovery.rootly.incident_id}` : null,
+      providerRecovery.rootly.incident_status !== "unknown"
+        ? `status ${providerRecovery.rootly.incident_status}`
+        : null,
+      providerRecovery.rootly.severity_id ? `severity ${providerRecovery.rootly.severity_id}` : null,
+      providerRecovery.rootly.private === true
+        ? "private"
+        : providerRecovery.rootly.private === false
+          ? "public"
+          : null,
+      providerRecovery.rootly.slug ? `slug ${providerRecovery.rootly.slug}` : null,
+      providerRecovery.rootly.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.rootly.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.rootly.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.rootly.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.rootly.phase_graph.acknowledgment_phase !== "unknown"
+        ? `ack ${providerRecovery.rootly.phase_graph.acknowledgment_phase}`
+        : null,
+      providerRecovery.rootly.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.rootly.updated_at)}`
+        : null,
+      providerRecovery.rootly.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.rootly.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Rootly schema: ${details.join(" / ")}` : null;
   }
   return null;
 }
