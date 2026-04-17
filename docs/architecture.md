@@ -156,9 +156,10 @@ account/balance/order-list/trade/aggregate-trade/book-ticker/mini-ticker/depth/k
 order-book resync state, full depth snapshot rebuilds, full recovered bid/ask levels, deeper
 channel restore state from exchange ticker/trade/ohlcv snapshots, persisted market-channel
 continuation snapshots for trade/aggregate-trade/book-ticker/mini-ticker/kline state, and
-top-of-book levels. When the Binance-native stream is unavailable but venue execution is still
-reachable, the guarded-live adapter can now widen into a generic CCXT polling transport so
-depth/ticker/trade/OHLCV continuation persists with explicit transport ownership metadata.
+top-of-book levels. When Binance user-data streaming is unavailable, the guarded-live adapter can
+continue on Binance's public market websocket, and the same handoff model now supports Coinbase
+Advanced Trade public market channels so multi-venue push-native continuation persists with
+explicit transport ownership metadata.
 
 ## Modes
 
@@ -195,9 +196,10 @@ depth/ticker/trade/OHLCV continuation persists with explicit transport ownership
   rebuilds when order-book continuity breaks, persisted recovered bid/ask levels for restart
   recovery, exchange-snapshot channel restore for ticker/trade/ohlcv state, and persisted market
   channel continuation snapshots for broader restart continuity
-- guarded-live can now widen beyond the Binance-native stream into a generic CCXT polling transport
-  when native streaming is unavailable, preserving venue transport ownership plus
-  depth/ticker/trade/OHLCV continuation state across handoff and sync
+- guarded-live can now widen beyond the Binance-native stream into push-native market transports,
+  using Binance public market websockets or Coinbase Advanced Trade public heartbeats/ticker/trade/
+  level2/candles while preserving venue transport ownership and continuation state across handoff
+  and sync
 
 ## Control Room
 
@@ -229,7 +231,7 @@ The UI is already useful for research inspection, but not yet an operator-grade 
   guarded-live recovery/live resume still stop short of broader venue-native stream coverage beyond
   Binance multi-stream account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline
   session coverage plus exchange-backed ticker/trade/ohlcv restore, persisted market-channel
-  continuation, generic polling fallback, and order lifecycle supervision
+  continuation, Binance/Coinbase push-market continuation, and order lifecycle supervision
 - the system still lacks durable alert delivery and wider operator event coverage
 - venue order lifecycle management is still limited beyond cancel/replace: no venue-native amend
   flow and no full exchange-order restore

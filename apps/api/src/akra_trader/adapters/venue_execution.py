@@ -106,13 +106,7 @@ class BinanceWebSocketUserDataStreamSession:
     if self._closed:
       return ()
     self._maybe_keepalive()
-    events: list[dict[str, Any]] = []
-    while True:
-      try:
-        events.append(self._events.get_nowait())
-      except Empty:
-        break
-    return tuple(events)
+    return _drain_stream_event_queue(self._events)
 
   def close(self) -> None:
     if self._closed:
@@ -266,13 +260,7 @@ class BinanceWebSocketMarketStreamSession:
   def drain_events(self) -> tuple[dict[str, Any], ...]:
     if self._closed:
       return ()
-    events: list[dict[str, Any]] = []
-    while True:
-      try:
-        events.append(self._events.get_nowait())
-      except Empty:
-        break
-    return tuple(events)
+    return _drain_stream_event_queue(self._events)
 
   def close(self) -> None:
     if self._closed:
@@ -473,16 +461,6 @@ class BinanceCombinedWebSocketVenueStreamClient:
     )
 
 
-GENERIC_POLLING_VENUE_STREAM_COVERAGE = (
-  "order_state_snapshots",
-  "trade_ticks",
-  "aggregate_trade_ticks",
-  "book_ticker",
-  "mini_ticker",
-  "depth_updates",
-  "kline_candles",
-  "order_book_lifecycle",
-)
 BINANCE_USER_DATA_STREAM_COVERAGE = (
   "execution_reports",
   "account_positions",
@@ -498,9 +476,24 @@ BINANCE_MARKET_STREAM_COVERAGE = (
   "kline_candles",
   "order_book_lifecycle",
 )
+BINANCE_MARKET_PUSH_VENUE_STREAM_COVERAGE = (
+  "order_state_snapshots",
+  *BINANCE_MARKET_STREAM_COVERAGE,
+)
 BINANCE_VENUE_STREAM_COVERAGE = (
   *BINANCE_USER_DATA_STREAM_COVERAGE,
   *BINANCE_MARKET_STREAM_COVERAGE,
+)
+COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE = (
+  "order_state_snapshots",
+  "heartbeat_events",
+  "trade_ticks",
+  "aggregate_trade_ticks",
+  "book_ticker",
+  "mini_ticker",
+  "depth_updates",
+  "kline_candles",
+  "order_book_lifecycle",
 )
 
 
@@ -567,264 +560,375 @@ class VenueExecutionExchange(Protocol):
   ) -> list[dict[str, Any]]: ...
 
 
-class GenericPollingVenueStreamSession:
-  transport = "generic_ccxt_polling_transport"
+class CoinbaseAdvancedTradeWebSocketMarketStreamSession:
+  transport = "coinbase_advanced_trade_market_websocket"
 
   def __init__(
     self,
     *,
     session_id: str,
-    exchange: VenueExecutionExchange,
-    symbol: str,
+    websocket_url: str,
+    product_id: str,
     timeframe: str,
     clock: Callable[[], datetime],
-    poll_interval_seconds: int,
   ) -> None:
     self.session_id = session_id
-    self._exchange = exchange
-    self._symbol = symbol
+    self._websocket_url = websocket_url
+    self._product_id = product_id
     self._timeframe = timeframe
     self._clock = clock
-    self._poll_interval_seconds = max(poll_interval_seconds, 0)
+    self._events: Queue[dict[str, Any]] = Queue()
     self._closed = False
-    self._last_polled_at: datetime | None = None
-    self._last_depth_key: tuple[object, ...] | None = None
-    self._last_ticker_key: tuple[object, ...] | None = None
-    self._last_trade_key: tuple[object, ...] | None = None
-    self._last_kline_key: tuple[object, ...] | None = None
-    self._last_depth_update_id: int | None = None
+    self._reader_stop = threading.Event()
+    self._last_level2_sequence_num: int | None = None
+    self._connect = self._resolve_connect()
+    self._connection = self._connect(self._websocket_url)
+    self._subscribe()
+    self._reader = threading.Thread(
+      target=self._reader_loop,
+      name=f"coinbase-market-stream-{session_id}",
+      daemon=True,
+    )
+    self._reader.start()
 
   def drain_events(self) -> tuple[dict[str, Any], ...]:
     if self._closed:
       return ()
-    now = self._clock()
-    if (
-      self._last_polled_at is not None
-      and self._poll_interval_seconds > 0
-      and (now - self._last_polled_at).total_seconds() < self._poll_interval_seconds
-    ):
-      return ()
-    self._last_polled_at = now
-    events: list[dict[str, Any]] = []
-
-    try:
-      snapshot = self._exchange.fetch_order_book(self._symbol, 20, {})
-      if event := self._build_depth_event(snapshot=snapshot, polled_at=now):
-        events.append(event)
-    except Exception as exc:
-      events.append(self._build_warning_event(kind="order_book", message=str(exc), event_at=now))
-
-    try:
-      ticker = self._exchange.fetch_ticker(self._symbol, {})
-      next_events = self._build_ticker_events(ticker=ticker, polled_at=now)
-      events.extend(next_events)
-    except Exception as exc:
-      events.append(self._build_warning_event(kind="ticker", message=str(exc), event_at=now))
-
-    try:
-      trades = self._exchange.fetch_trades(self._symbol, None, 1, {})
-      if trades:
-        next_events = self._build_trade_events(trade=trades[-1], polled_at=now)
-        events.extend(next_events)
-    except Exception as exc:
-      events.append(self._build_warning_event(kind="trades", message=str(exc), event_at=now))
-
-    try:
-      candles = self._exchange.fetch_ohlcv(self._symbol, self._timeframe, None, 1, {})
-      if candles:
-        if event := self._build_kline_event(row=candles[-1], polled_at=now):
-          events.append(event)
-    except Exception as exc:
-      events.append(self._build_warning_event(kind="ohlcv", message=str(exc), event_at=now))
-
-    return tuple(events)
+    return _drain_stream_event_queue(self._events)
 
   def close(self) -> None:
+    if self._closed:
+      return
     self._closed = True
+    self._reader_stop.set()
+    try:
+      self._connection.close()
+    except Exception:
+      pass
+    if self._reader.is_alive():
+      self._reader.join(timeout=1.0)
 
-  def _build_depth_event(self, *, snapshot: dict[str, Any], polled_at: datetime) -> dict[str, Any] | None:
-    update_id = (
-      _coerce_int(_extract_nested_value(snapshot, ("info", "lastUpdateId")))
-      or _coerce_int(snapshot.get("nonce"))
-      or _coerce_int(snapshot.get("lastUpdateId"))
+  def _subscribe(self) -> None:
+    subscription_messages = (
+      {"type": "subscribe", "channel": "heartbeats"},
+      {"type": "subscribe", "channel": "ticker", "product_ids": [self._product_id]},
+      {"type": "subscribe", "channel": "market_trades", "product_ids": [self._product_id]},
+      {"type": "subscribe", "channel": "level2", "product_ids": [self._product_id]},
+      {"type": "subscribe", "channel": "candles", "product_ids": [self._product_id]},
     )
-    bids = _coerce_depth_levels(snapshot.get("bids"))
-    asks = _coerce_depth_levels(snapshot.get("asks"))
-    key = (
-      update_id,
-      tuple(bids),
-      tuple(asks),
-    )
-    if key == self._last_depth_key:
-      return None
-    previous_update_id = self._last_depth_update_id
-    self._last_depth_key = key
-    self._last_depth_update_id = update_id
-    event_at = _coerce_datetime(snapshot.get("datetime"), snapshot.get("timestamp")) or polled_at
-    return {
-      "e": "depthUpdate",
-      "E": int(event_at.timestamp() * 1000),
-      "U": update_id,
-      "u": update_id,
-      "pu": previous_update_id,
-      "b": [[str(price), str(quantity)] for price, quantity in bids],
-      "a": [[str(price), str(quantity)] for price, quantity in asks],
-      "stream_scope": "market_data",
-      "stream": "polling@depth",
-      "_received_at_ms": int(polled_at.timestamp() * 1000),
-    }
+    for message in subscription_messages:
+      self._connection.send(json.dumps(message))
 
-  def _build_ticker_events(self, *, ticker: dict[str, Any], polled_at: datetime) -> tuple[dict[str, Any], ...]:
-    event_at = _coerce_datetime(ticker.get("datetime"), ticker.get("timestamp")) or polled_at
-    key = (
-      _coerce_float(ticker.get("bid")),
-      _coerce_float(ticker.get("bidVolume")),
-      _coerce_float(ticker.get("ask")),
-      _coerce_float(ticker.get("askVolume")),
-      _coerce_float(ticker.get("open")),
-      _coerce_float(ticker.get("last")) or _coerce_float(ticker.get("close")),
-      _coerce_float(ticker.get("high")),
-      _coerce_float(ticker.get("low")),
-      _coerce_float(ticker.get("baseVolume")),
-      _coerce_float(ticker.get("quoteVolume")),
-      event_at,
-    )
-    if key == self._last_ticker_key:
+  def _reader_loop(self) -> None:
+    while not self._reader_stop.is_set():
+      try:
+        message = self._connection.recv()
+      except Exception as exc:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamDisconnect",
+            "stream_scope": "market_data",
+            "message": str(exc),
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        return
+      if message is None:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamDisconnect",
+            "stream_scope": "market_data",
+            "message": "connection_closed",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        return
+      try:
+        payload = json.loads(message)
+      except json.JSONDecodeError as exc:
+        self._events.put(
+          {
+            "e": "streamWarning",
+            "stream_scope": "market_data",
+            "message": f"invalid_json:{exc}",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        continue
+      for event in self._normalize_payload(payload):
+        self._events.put(event)
+
+  def _normalize_payload(self, payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    if str(payload.get("type") or "").lower() == "error":
+      return (
+        {
+          "e": "streamWarning",
+          "stream_scope": "market_data",
+          "message": str(payload.get("message") or "coinbase_stream_error"),
+          "E": int(self._clock().timestamp() * 1000),
+        },
+      )
+    channel = str(payload.get("channel") or "")
+    if channel in {"", "subscriptions"}:
       return ()
-    self._last_ticker_key = key
-    event_ms = int(event_at.timestamp() * 1000)
+    received_at = _coerce_datetime(payload.get("timestamp"), None) or self._clock()
+    events = payload.get("events")
+    if not isinstance(events, list):
+      return ()
+    sequence_num = _coerce_int(payload.get("sequence_num"))
+    normalized: list[dict[str, Any]] = []
+    for entry in events:
+      if not isinstance(entry, dict):
+        continue
+      if channel == "heartbeats":
+        normalized.append(
+          {
+            "e": "streamHeartbeat",
+            "stream_scope": "market_data",
+            "stream": "coinbase@heartbeats",
+            "E": int(received_at.timestamp() * 1000),
+            "_received_at_ms": int(received_at.timestamp() * 1000),
+          }
+        )
+        continue
+      if channel in {"ticker", "ticker_batch"}:
+        normalized.extend(
+          self._normalize_ticker_entry(
+            entry=entry,
+            channel=channel,
+            received_at=received_at,
+          )
+        )
+        continue
+      if channel == "market_trades":
+        normalized.extend(self._normalize_trade_entry(entry=entry, received_at=received_at))
+        continue
+      if channel in {"level2", "l2_data"}:
+        normalized.extend(
+          self._normalize_level2_entry(
+            entry=entry,
+            channel=channel,
+            received_at=received_at,
+            sequence_num=sequence_num,
+          )
+        )
+        continue
+      if channel == "candles":
+        normalized.extend(self._normalize_candle_entry(entry=entry, received_at=received_at))
+    if channel in {"level2", "l2_data"} and sequence_num is not None:
+      self._last_level2_sequence_num = sequence_num
+    return tuple(normalized)
+
+  def _normalize_ticker_entry(
+    self,
+    *,
+    entry: dict[str, Any],
+    channel: str,
+    received_at: datetime,
+  ) -> tuple[dict[str, Any], ...]:
+    rows = entry.get("tickers")
+    if not isinstance(rows, list):
+      return ()
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+      if not isinstance(row, dict):
+        continue
+      event_at = received_at
+      best_bid = _coerce_float(row.get("best_bid"))
+      best_bid_quantity = _coerce_float(row.get("best_bid_quantity"))
+      best_ask = _coerce_float(row.get("best_ask"))
+      best_ask_quantity = _coerce_float(row.get("best_ask_quantity"))
+      if best_bid is not None or best_ask is not None:
+        normalized.append(
+          {
+            "e": "bookTicker",
+            "E": int(event_at.timestamp() * 1000),
+            "b": str(row.get("best_bid") or ""),
+            "B": str(row.get("best_bid_quantity") or ""),
+            "a": str(row.get("best_ask") or ""),
+            "A": str(row.get("best_ask_quantity") or ""),
+            "stream_scope": "market_data",
+            "stream": f"coinbase@{channel}",
+            "_received_at_ms": int(received_at.timestamp() * 1000),
+          }
+        )
+      normalized.append(
+        {
+          "e": "24hrMiniTicker",
+          "E": int(event_at.timestamp() * 1000),
+          "c": str(row.get("price") or ""),
+          "h": str(row.get("high_24_h") or ""),
+          "l": str(row.get("low_24_h") or ""),
+          "v": str(row.get("volume_24_h") or ""),
+          "stream_scope": "market_data",
+          "stream": f"coinbase@{channel}",
+          "_received_at_ms": int(received_at.timestamp() * 1000),
+        }
+      )
+    return tuple(normalized)
+
+  def _normalize_trade_entry(
+    self,
+    *,
+    entry: dict[str, Any],
+    received_at: datetime,
+  ) -> tuple[dict[str, Any], ...]:
+    rows = entry.get("trades")
+    if not isinstance(rows, list):
+      return ()
+    normalized: list[dict[str, Any]] = []
+    for row in rows:
+      if not isinstance(row, dict):
+        continue
+      event_at = _coerce_datetime(row.get("time"), None) or received_at
+      event_id = _coerce_string(row.get("trade_id")) or str(int(event_at.timestamp() * 1000))
+      normalized.extend(
+        (
+          {
+            "e": "trade",
+            "E": int(event_at.timestamp() * 1000),
+            "T": int(event_at.timestamp() * 1000),
+            "t": event_id,
+            "p": str(row.get("price") or ""),
+            "q": str(row.get("size") or ""),
+            "stream_scope": "market_data",
+            "stream": "coinbase@market_trades",
+            "_received_at_ms": int(received_at.timestamp() * 1000),
+          },
+          {
+            "e": "aggTrade",
+            "E": int(event_at.timestamp() * 1000),
+            "T": int(event_at.timestamp() * 1000),
+            "a": event_id,
+            "p": str(row.get("price") or ""),
+            "q": str(row.get("size") or ""),
+            "stream_scope": "market_data",
+            "stream": "coinbase@market_trades",
+            "_received_at_ms": int(received_at.timestamp() * 1000),
+          },
+        )
+      )
+    return tuple(normalized)
+
+  def _normalize_level2_entry(
+    self,
+    *,
+    entry: dict[str, Any],
+    channel: str,
+    received_at: datetime,
+    sequence_num: int | None,
+  ) -> tuple[dict[str, Any], ...]:
+    updates = entry.get("updates")
+    if not isinstance(updates, list):
+      return ()
+    bids: list[list[str]] = []
+    asks: list[list[str]] = []
+    event_at = received_at
+    for update in updates:
+      if not isinstance(update, dict):
+        continue
+      update_at = _coerce_datetime(update.get("event_time"), None)
+      event_at = _max_datetime(event_at, update_at) or event_at
+      side = str(update.get("side") or "").lower()
+      level = [str(update.get("price_level") or ""), str(update.get("new_quantity") or "")]
+      if side in {"bid", "buy"}:
+        bids.append(level)
+      else:
+        asks.append(level)
+    if not bids and not asks:
+      return ()
     return (
       {
-        "e": "bookTicker",
-        "E": event_ms,
-        "b": str(ticker.get("bid") or ""),
-        "B": str(ticker.get("bidVolume") or ""),
-        "a": str(ticker.get("ask") or ""),
-        "A": str(ticker.get("askVolume") or ""),
+        "e": "depthUpdate",
+        "E": int(event_at.timestamp() * 1000),
+        "U": sequence_num,
+        "u": sequence_num,
+        "pu": self._last_level2_sequence_num,
+        "b": bids,
+        "a": asks,
+        "_snapshot_depth": str(entry.get("type") or "").lower() == "snapshot",
         "stream_scope": "market_data",
-        "stream": "polling@bookTicker",
-        "_received_at_ms": int(polled_at.timestamp() * 1000),
-      },
-      {
-        "e": "24hrMiniTicker",
-        "E": event_ms,
-        "o": str(ticker.get("open") or ""),
-        "c": str(ticker.get("last") or ticker.get("close") or ""),
-        "h": str(ticker.get("high") or ""),
-        "l": str(ticker.get("low") or ""),
-        "v": str(ticker.get("baseVolume") or ""),
-        "q": str(ticker.get("quoteVolume") or ""),
-        "stream_scope": "market_data",
-        "stream": "polling@miniTicker",
-        "_received_at_ms": int(polled_at.timestamp() * 1000),
+        "stream": f"coinbase@{channel}",
+        "_received_at_ms": int(received_at.timestamp() * 1000),
       },
     )
 
-  def _build_trade_events(self, *, trade: dict[str, Any], polled_at: datetime) -> tuple[dict[str, Any], ...]:
-    event_at = _coerce_datetime(trade.get("datetime"), trade.get("timestamp")) or polled_at
-    event_id = _coerce_string(trade.get("id")) or str(int(event_at.timestamp() * 1000))
-    key = (
-      event_id,
-      _coerce_float(trade.get("price")),
-      _coerce_float(trade.get("amount")),
-      event_at,
-    )
-    if key == self._last_trade_key:
+  def _normalize_candle_entry(
+    self,
+    *,
+    entry: dict[str, Any],
+    received_at: datetime,
+  ) -> tuple[dict[str, Any], ...]:
+    candles = entry.get("candles")
+    if not isinstance(candles, list):
       return ()
-    self._last_trade_key = key
-    event_ms = int(event_at.timestamp() * 1000)
-    return (
-      {
-        "e": "trade",
-        "E": event_ms,
-        "T": event_ms,
-        "t": event_id,
-        "p": str(trade.get("price") or ""),
-        "q": str(trade.get("amount") or ""),
-        "stream_scope": "market_data",
-        "stream": "polling@trade",
-        "_received_at_ms": int(polled_at.timestamp() * 1000),
-      },
-      {
-        "e": "aggTrade",
-        "E": event_ms,
-        "T": event_ms,
-        "a": event_id,
-        "p": str(trade.get("price") or ""),
-        "q": str(trade.get("amount") or ""),
-        "stream_scope": "market_data",
-        "stream": "polling@aggTrade",
-        "_received_at_ms": int(polled_at.timestamp() * 1000),
-      },
-    )
-
-  def _build_kline_event(self, *, row: list[Any], polled_at: datetime) -> dict[str, Any] | None:
-    key = tuple(row)
-    if key == self._last_kline_key:
-      return None
-    self._last_kline_key = key
-    open_at = _coerce_ohlcv_timestamp(row[0] if row else None, timeframe=self._timeframe) or polled_at
-    close_at = _coerce_ohlcv_close_timestamp(row[0] if row else None, timeframe=self._timeframe) or open_at
-    return {
-      "e": "kline",
-      "E": int(close_at.timestamp() * 1000),
-      "stream_scope": "market_data",
-      "stream": f"polling@kline_{self._timeframe}",
-      "_received_at_ms": int(polled_at.timestamp() * 1000),
-      "k": {
-        "i": self._timeframe,
-        "t": int(open_at.timestamp() * 1000),
-        "T": int(close_at.timestamp() * 1000),
-        "o": str(row[1] if len(row) > 1 else ""),
-        "h": str(row[2] if len(row) > 2 else ""),
-        "l": str(row[3] if len(row) > 3 else ""),
-        "c": str(row[4] if len(row) > 4 else ""),
-        "v": str(row[5] if len(row) > 5 else ""),
-        "x": True,
-      },
-    }
+    normalized: list[dict[str, Any]] = []
+    for row in candles:
+      if not isinstance(row, dict):
+        continue
+      open_at = _coerce_ohlcv_timestamp(row.get("start"), timeframe=self._timeframe) or received_at
+      close_at = _coerce_ohlcv_close_timestamp(row.get("start"), timeframe=self._timeframe) or open_at
+      normalized.append(
+        {
+          "e": "kline",
+          "E": int(close_at.timestamp() * 1000),
+          "stream_scope": "market_data",
+          "stream": f"coinbase@candles_{self._timeframe}",
+          "_received_at_ms": int(received_at.timestamp() * 1000),
+          "k": {
+            "i": self._timeframe,
+            "t": int(open_at.timestamp() * 1000),
+            "T": int(close_at.timestamp() * 1000),
+            "o": str(row.get("open") or ""),
+            "h": str(row.get("high") or ""),
+            "l": str(row.get("low") or ""),
+            "c": str(row.get("close") or ""),
+            "v": str(row.get("volume") or ""),
+            "x": close_at <= received_at,
+          },
+        }
+      )
+    return tuple(normalized)
 
   @staticmethod
-  def _build_warning_event(*, kind: str, message: str, event_at: datetime) -> dict[str, Any]:
-    return {
-      "e": "streamWarning",
-      "stream_scope": "market_data",
-      "message": f"polling_{kind}_failed:{message}",
-      "E": int(event_at.timestamp() * 1000),
-      "_received_at_ms": int(event_at.timestamp() * 1000),
-    }
+  def _resolve_connect():
+    try:
+      from websockets.sync.client import connect
+    except ImportError as exc:
+      raise RuntimeError("websockets_dependency_missing") from exc
+    return connect
 
 
-class GenericPollingVenueStreamClient:
-  transport = "generic_ccxt_polling_transport"
+class CoinbaseAdvancedTradeWebSocketMarketStreamClient:
+  transport = "coinbase_advanced_trade_market_websocket"
 
   def __init__(
     self,
     *,
-    venue: str,
-    exchange: VenueExecutionExchange,
     symbol: str,
     timeframe: str,
-    clock: Callable[[], datetime],
-    poll_interval_seconds: int,
+    websocket_url: str = "wss://advanced-trade-ws.coinbase.com",
+    clock: Callable[[], datetime] | None = None,
   ) -> None:
-    self._venue = venue
-    self._exchange = exchange
     self._symbol = symbol
     self._timeframe = timeframe
-    self._clock = clock
-    self._poll_interval_seconds = poll_interval_seconds
-    self._session_count = 0
+    self._websocket_url = websocket_url
+    self._clock = clock or (lambda: datetime.now(UTC))
 
   def open_session(self) -> BinanceVenueStreamSession:
-    self._session_count += 1
-    return GenericPollingVenueStreamSession(
-      session_id=f"{self._venue}:poll:{_normalize_binance_stream_symbol(self._symbol)}:{self._timeframe}:{self._session_count}",
-      exchange=self._exchange,
-      symbol=self._symbol,
+    return CoinbaseAdvancedTradeWebSocketMarketStreamSession(
+      session_id=(
+        f"coinbase-market:{_normalize_coinbase_product_id(self._symbol)}:"
+        f"heartbeats+ticker+market_trades+level2+candles_{self._timeframe}"
+      ),
+      websocket_url=self._websocket_url,
+      product_id=_normalize_coinbase_product_id(self._symbol),
       timeframe=self._timeframe,
       clock=self._clock,
-      poll_interval_seconds=self._poll_interval_seconds,
     )
 
 
@@ -1360,7 +1464,6 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     api_secret: str | None = None,
     exchange: VenueExecutionExchange | None = None,
     venue_stream_client: BinanceVenueStreamClient | None = None,
-    poll_interval_seconds: int = 15,
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._venue = venue
@@ -1369,7 +1472,6 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self._exchange = exchange
     self._clock = clock or (lambda: datetime.now(UTC))
     self._venue_stream_client = venue_stream_client
-    self._poll_interval_seconds = poll_interval_seconds
     self._active_stream_sessions: dict[str, BinanceVenueStreamSession] = {}
     self._order_states: dict[str, GuardedLiveVenueOrderResult] = {}
     self._local_order_books: dict[str, LocalOrderBookState] = {}
@@ -1377,9 +1479,9 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
     issues: list[str] = []
     if self._exchange is None and not (self._api_key and self._api_secret):
-      issues.append("binance_trade_credentials_missing")
-    if self._venue_stream_client is None and self._exchange is None and not self._api_key:
-      issues.append("binance_venue_stream_unavailable")
+      issues.append("venue_trade_credentials_missing")
+    if self._venue_stream_client is None and not self._has_builtin_stream_transport():
+      issues.append("venue_stream_transport_unavailable")
     return (len(issues) == 0), tuple(issues)
 
   def restore_session(
@@ -1784,6 +1886,10 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         event_count += 1
         last_event_at = event_at
         continue
+      if event_type == "streamHeartbeat":
+        event_count += 1
+        last_event_at = event_at
+        continue
       if event_type == "outboundAccountPosition":
         last_account_event_at = event_at
         event_count += 1
@@ -1879,7 +1985,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         depth_previous_update_id = _coerce_int(event.get("pu"))
         depth_bids = _coerce_depth_levels(event.get("b"))
         depth_asks = _coerce_depth_levels(event.get("a"))
-        if self._is_polling_transport(active_transport):
+        if bool(event.get("_snapshot_depth")):
           local_book = _build_local_order_book_from_snapshot_row(
             symbol=handoff.symbol or "",
             row={
@@ -2132,7 +2238,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         event_count += 1
 
     resolved_transport = stream_session.transport if stream_session is not None else handoff.transport
-    if self._is_polling_transport(resolved_transport):
+    if self._requires_order_state_sync(resolved_transport):
       synced_orders = self.sync_order_states(
         symbol=handoff.symbol or "",
         order_ids=order_ids,
@@ -2433,7 +2539,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     clients: list[BinanceVenueStreamClient] = []
     if self._venue_stream_client is not None:
       clients.append(self._venue_stream_client)
-    elif self._api_key and symbol and timeframe:
+    elif self._venue == "binance" and self._api_key and symbol and timeframe:
       try:
         clients.append(
           BinanceCombinedWebSocketVenueStreamClient(
@@ -2446,26 +2552,27 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       except Exception:
         pass
     if symbol and timeframe:
-      polling_client = self._resolve_polling_stream_client(symbol=symbol, timeframe=timeframe)
-      if polling_client is not None:
-        clients.append(polling_client)
+      push_client = self._resolve_push_stream_client(symbol=symbol, timeframe=timeframe)
+      if push_client is not None:
+        clients.append(push_client)
     return tuple(clients)
 
-  def _resolve_polling_stream_client(self, *, symbol: str, timeframe: str) -> BinanceVenueStreamClient | None:
+  def _resolve_push_stream_client(self, *, symbol: str, timeframe: str) -> BinanceVenueStreamClient | None:
     if not symbol or not timeframe:
       return None
-    try:
-      exchange = self._resolve_exchange()
-    except Exception:
-      return None
-    return GenericPollingVenueStreamClient(
-      venue=self._venue,
-      exchange=exchange,
-      symbol=symbol,
-      timeframe=timeframe,
-      clock=self._clock,
-      poll_interval_seconds=self._poll_interval_seconds,
-    )
+    if self._venue == "binance":
+      return BinanceWebSocketMarketStreamClient(
+        symbol=symbol,
+        timeframe=timeframe,
+        clock=self._clock,
+      )
+    if self._venue == "coinbase" and timeframe == "5m":
+      return CoinbaseAdvancedTradeWebSocketMarketStreamClient(
+        symbol=symbol,
+        timeframe=timeframe,
+        clock=self._clock,
+      )
+    return None
 
   def _open_stream_session(
     self,
@@ -2484,7 +2591,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         )
         continue
       self._active_stream_sessions[session.session_id] = session
-      if self._is_polling_transport(session.transport):
+      if self._is_fallback_transport(session.transport):
         issues.append(f"venue_stream_transport_fallback:{session.transport}")
       return {
         "session": session,
@@ -2539,44 +2646,54 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
 
   @staticmethod
   def _coverage_for_transport(transport: str | None) -> tuple[str, ...]:
-    if transport == "generic_ccxt_polling_transport":
-      return GENERIC_POLLING_VENUE_STREAM_COVERAGE
+    if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket"}:
+      return BINANCE_VENUE_STREAM_COVERAGE
+    if transport == "binance_market_data_websocket":
+      return BINANCE_MARKET_PUSH_VENUE_STREAM_COVERAGE
+    if transport == "coinbase_advanced_trade_market_websocket":
+      return COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
+    if transport in {None, "venue_stream_unavailable"}:
+      return ()
+    return ()
+
+  @staticmethod
+  def _supervision_state_for_transport(transport: str | None) -> str:
     if transport in {
       "binance_multi_stream_websocket",
       "binance_user_data_websocket",
       "binance_market_data_websocket",
+      "coinbase_advanced_trade_market_websocket",
     }:
-      return BINANCE_VENUE_STREAM_COVERAGE
-    if transport in {None, "venue_stream_unavailable"}:
-      return ()
-    return BINANCE_VENUE_STREAM_COVERAGE
-
-  @staticmethod
-  def _supervision_state_for_transport(transport: str | None) -> str:
-    if transport == "generic_ccxt_polling_transport":
-      return "polling"
-    if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket", "binance_market_data_websocket"}:
       return "streaming"
     return "inactive"
 
   @staticmethod
-  def _is_polling_transport(transport: str | None) -> bool:
-    return transport == "generic_ccxt_polling_transport"
+  def _requires_order_state_sync(transport: str | None) -> bool:
+    return transport in {"binance_market_data_websocket", "coinbase_advanced_trade_market_websocket"}
+
+  @staticmethod
+  def _is_fallback_transport(transport: str | None) -> bool:
+    return transport in {"binance_market_data_websocket", "coinbase_advanced_trade_market_websocket"}
+
+  def _has_builtin_stream_transport(self) -> bool:
+    return self._venue in {"binance", "coinbase"}
 
   @staticmethod
   def _source_for_transport(transport: str | None) -> str:
-    if transport == "generic_ccxt_polling_transport":
-      return "venue_polling_transport"
-    if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket", "binance_market_data_websocket"}:
+    if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket"}:
       return "binance_venue_stream"
+    if transport == "binance_market_data_websocket":
+      return "binance_market_push_transport"
+    if transport == "coinbase_advanced_trade_market_websocket":
+      return "coinbase_market_push_transport"
     return "venue_stream_transport"
 
   @staticmethod
   def _stream_issue_prefix_for_transport(transport: str | None) -> str:
-    if transport == "generic_ccxt_polling_transport":
-      return "generic_venue_stream"
     if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket", "binance_market_data_websocket"}:
       return "binance_venue_stream"
+    if transport == "coinbase_advanced_trade_market_websocket":
+      return "coinbase_venue_stream"
     return "venue_stream"
 
   @staticmethod
@@ -2867,7 +2984,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       for issue in issues
       if not issue.startswith("binance_venue_stream")
       and not issue.startswith("binance_user_data_stream")
-      and not issue.startswith("generic_venue_stream")
+      and not issue.startswith("coinbase_venue_stream")
       and not issue.startswith("venue_stream_failover_failed")
     ]
 
@@ -3131,6 +3248,10 @@ def _normalize_binance_stream_symbol(symbol: str) -> str:
   return symbol.replace("/", "").replace("-", "").lower()
 
 
+def _normalize_coinbase_product_id(symbol: str) -> str:
+  return symbol.replace("/", "-").upper()
+
+
 def _extract_nested_value(row: dict[str, Any], path: tuple[str, ...]) -> Any:
   current: Any = row
   for key in path:
@@ -3206,6 +3327,24 @@ def _coerce_depth_levels(value: Any) -> tuple[tuple[float, float], ...]:
       continue
     levels.append((price, quantity))
   return tuple(levels)
+
+
+def _drain_stream_event_queue(
+  queue: Queue[dict[str, Any]],
+  *,
+  first_event_timeout_seconds: float = 0.01,
+) -> tuple[dict[str, Any], ...]:
+  events: list[dict[str, Any]] = []
+  try:
+    events.append(queue.get(timeout=first_event_timeout_seconds))
+  except Empty:
+    return ()
+  while True:
+    try:
+      events.append(queue.get_nowait())
+    except Empty:
+      break
+  return tuple(events)
 
 
 def _depth_event_matches_local_book(

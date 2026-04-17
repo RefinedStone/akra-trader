@@ -10,9 +10,9 @@ from datetime import datetime
 from datetime import timedelta
 
 from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
+from akra_trader.adapters.venue_execution import COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
 from akra_trader.adapters.venue_execution import BinanceWebSocketMarketStreamClient
 from akra_trader.adapters.venue_execution import BinanceWebSocketUserDataStreamClient
-from akra_trader.adapters.venue_execution import GENERIC_POLLING_VENUE_STREAM_COVERAGE
 
 
 class MutableClock:
@@ -37,6 +37,7 @@ class FakeUrlOpenResponse(io.BytesIO):
 class FakeWebSocketConnection:
   def __init__(self) -> None:
     self.messages: Queue[str] = Queue()
+    self.sent_messages: list[str] = []
     self.closed = False
 
   def recv(self) -> str:
@@ -46,6 +47,9 @@ class FakeWebSocketConnection:
       except Empty:
         continue
     raise RuntimeError("closed")
+
+  def send(self, payload: str) -> None:
+    self.sent_messages.append(payload)
 
   def close(self) -> None:
     self.closed = True
@@ -687,89 +691,58 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert second_stream_session.closed is True
 
 
-def test_binance_adapter_falls_back_to_generic_polling_transport() -> None:
+def test_coinbase_adapter_uses_push_native_multi_venue_transport(monkeypatch) -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
+  request_urls: list[str] = []
+  connection = FakeWebSocketConnection()
+
+  def fake_connect(url: str):
+    request_urls.append(url)
+    return connection
+
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution.CoinbaseAdvancedTradeWebSocketMarketStreamSession._resolve_connect",
+    staticmethod(lambda: fake_connect),
+  )
+
   exchange = FakeExecutionExchange(
     fetch_rows=[],
     order_books=[
       {
-        "nonce": 500,
-        "bids": [[2498.1, 0.60], [2498.0, 0.55]],
-        "asks": [[2498.7, 0.45], [2498.8, 0.52]],
-      },
-      {
-        "nonce": 501,
-        "bids": [[2498.3, 0.75], [2498.2, 0.50]],
-        "asks": [[2498.9, 0.40], [2499.0, 0.58]],
+        "nonce": 700,
+        "bids": [[21931.98, 1.10], [21931.25, 0.65]],
+        "asks": [[21933.98, 1.25], [21934.50, 0.40]],
       },
     ],
-    ticker_sequence=[
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 21931.98,
+      "bidVolume": 1.10,
+      "ask": 21933.98,
+      "askVolume": 1.25,
+      "last": 21932.98,
+      "high": 23011.18,
+      "low": 21835.29,
+      "baseVolume": 16038.28770938,
+      "quoteVolume": 351749098.37,
+    },
+    trades=[
       {
+        "id": "coinbase-trade-restore-1",
+        "price": 21932.98,
+        "amount": 0.30,
         "timestamp": int(current_time.timestamp() * 1000),
-        "bid": 2498.2,
-        "bidVolume": 0.7,
-        "ask": 2498.8,
-        "askVolume": 0.5,
-        "open": 2496.4,
-        "last": 2498.5,
-        "high": 2499.0,
-        "low": 2496.1,
-        "baseVolume": 21.0,
-        "quoteVolume": 52468.5,
-      },
-      {
-        "timestamp": int((current_time + timedelta(seconds=20)).timestamp() * 1000),
-        "bid": 2498.45,
-        "bidVolume": 0.82,
-        "ask": 2498.95,
-        "askVolume": 0.61,
-        "open": 2496.4,
-        "last": 2498.72,
-        "high": 2499.2,
-        "low": 2496.1,
-        "baseVolume": 23.4,
-        "quoteVolume": 58469.9,
-      },
+      }
     ],
-    trades_sequence=[
-      [
-        {
-          "id": "poll-trade-1",
-          "price": 2498.45,
-          "amount": 0.16,
-          "timestamp": int(current_time.timestamp() * 1000),
-        }
-      ],
-      [
-        {
-          "id": "poll-trade-2",
-          "price": 2498.7,
-          "amount": 0.22,
-          "timestamp": int((current_time + timedelta(seconds=20)).timestamp() * 1000),
-        }
-      ],
-    ],
-    ohlcv_sequence=[
-      [
-        [int(current_time.timestamp() * 1000), 2497.8, 2498.9, 2497.5, 2498.4, 8.0]
-      ],
-      [
-        [
-          int((current_time + timedelta(minutes=5)).timestamp() * 1000),
-          2498.4,
-          2499.2,
-          2498.0,
-          2498.9,
-          9.5,
-        ]
-      ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 21920.0, 21940.0, 21910.0, 21932.5, 12.0]
     ],
   )
   adapter = BinanceVenueExecutionAdapter(
+    venue="coinbase",
     exchange=exchange,
     clock=clock,
-    poll_interval_seconds=15,
   )
 
   ready, issues = adapter.describe_capability()
@@ -778,66 +751,192 @@ def test_binance_adapter_falls_back_to_generic_polling_transport() -> None:
   assert issues == ()
 
   handoff = adapter.handoff_session(
-    symbol="ETH/USDT",
+    symbol="BTC/USD",
     timeframe="5m",
-    owner_run_id="run-live-poll",
-    owner_session_id="worker-live-poll",
+    owner_run_id="run-live-coinbase",
+    owner_session_id="worker-live-coinbase",
     owned_order_ids=(),
   )
 
+  sent_messages = [json.loads(payload) for payload in connection.sent_messages]
+
+  assert request_urls == ["wss://advanced-trade-ws.coinbase.com"]
+  assert sent_messages == [
+    {"type": "subscribe", "channel": "heartbeats"},
+    {"type": "subscribe", "channel": "ticker", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "market_trades", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "level2", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "candles", "product_ids": ["BTC-USD"]},
+  ]
   assert handoff.state == "active"
-  assert handoff.source == "venue_polling_transport"
-  assert handoff.transport == "generic_ccxt_polling_transport"
-  assert handoff.supervision_state == "polling"
-  assert handoff.coverage == GENERIC_POLLING_VENUE_STREAM_COVERAGE
-  assert "venue_stream_transport_fallback:generic_ccxt_polling_transport" in handoff.issues
+  assert handoff.source == "coinbase_market_push_transport"
+  assert handoff.transport == "coinbase_advanced_trade_market_websocket"
+  assert handoff.supervision_state == "streaming"
+  assert handoff.coverage == COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
+  assert "venue_stream_transport_fallback:coinbase_advanced_trade_market_websocket" in handoff.issues
   assert handoff.order_book_state == "snapshot_rebuilt"
-  assert handoff.order_book_last_update_id == 500
+  assert handoff.order_book_last_update_id == 700
   assert handoff.channel_restore_state == "restored_from_exchange"
   assert handoff.channel_continuation_state == "restored_from_exchange"
   assert handoff.trade_snapshot is not None
-  assert handoff.trade_snapshot.event_id == "poll-trade-1"
+  assert handoff.trade_snapshot.event_id == "coinbase-trade-restore-1"
   assert handoff.book_ticker_snapshot is not None
-  assert handoff.book_ticker_snapshot.bid_price == 2498.2
+  assert handoff.book_ticker_snapshot.bid_price == 21931.98
   assert handoff.mini_ticker_snapshot is not None
-  assert handoff.mini_ticker_snapshot.close_price == 2498.5
+  assert handoff.mini_ticker_snapshot.close_price == 21932.98
   assert handoff.kline_snapshot is not None
-  assert handoff.kline_snapshot.close_price == 2498.4
+  assert handoff.kline_snapshot.close_price == 21932.5
 
-  clock.advance(timedelta(seconds=20))
+  clock.advance(timedelta(minutes=5))
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "heartbeats",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "events": [{"current_time": clock().isoformat().replace("+00:00", "Z"), "heartbeat_counter": "1"}],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "ticker",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 701,
+        "events": [
+          {
+            "type": "snapshot",
+            "tickers": [
+              {
+                "type": "ticker",
+                "product_id": "BTC-USD",
+                "price": "21934.10",
+                "volume_24_h": "16040.10",
+                "low_24_h": "21835.29",
+                "high_24_h": "23011.18",
+                "best_bid": "21934.00",
+                "best_bid_quantity": "0.95",
+                "best_ask": "21934.20",
+                "best_ask_quantity": "1.05",
+              }
+            ],
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "market_trades",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 702,
+        "events": [
+          {
+            "type": "update",
+            "trades": [
+              {
+                "trade_id": "coinbase-trade-2",
+                "product_id": "BTC-USD",
+                "price": "21934.12",
+                "size": "0.42",
+                "side": "BUY",
+                "time": clock().isoformat().replace("+00:00", "Z"),
+              }
+            ],
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "l2_data",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 701,
+        "events": [
+          {
+            "type": "update",
+            "product_id": "BTC-USD",
+            "updates": [
+              {
+                "side": "bid",
+                "event_time": clock().isoformat().replace("+00:00", "Z"),
+                "price_level": "21934.00",
+                "new_quantity": "0.95",
+              },
+              {
+                "side": "offer",
+                "event_time": clock().isoformat().replace("+00:00", "Z"),
+                "price_level": "21934.20",
+                "new_quantity": "1.05",
+              },
+            ],
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "candles",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 703,
+        "events": [
+          {
+            "type": "snapshot",
+            "candles": [
+              {
+                "start": str(int((clock() - timedelta(minutes=5)).timestamp())),
+                "high": "21936.00",
+                "low": "21920.00",
+                "open": "21930.00",
+                "close": "21934.50",
+                "volume": "18.25",
+                "product_id": "BTC-USD",
+              }
+            ],
+          }
+        ],
+      }
+    )
+  )
   sync = adapter.sync_session(handoff=handoff, order_ids=())
+  released = adapter.release_session(handoff=sync.handoff)
 
   assert sync.state == "active"
-  assert sync.handoff.transport == "generic_ccxt_polling_transport"
-  assert sync.handoff.source == "venue_polling_transport"
-  assert sync.handoff.supervision_state == "polling"
+  assert sync.handoff.transport == "coinbase_advanced_trade_market_websocket"
+  assert sync.handoff.source == "coinbase_market_push_transport"
+  assert sync.handoff.supervision_state == "streaming"
   assert sync.handoff.failover_count == 0
-  assert sync.handoff.coverage == GENERIC_POLLING_VENUE_STREAM_COVERAGE
+  assert sync.handoff.coverage == COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
   assert sync.handoff.order_book_state == "streaming"
-  assert sync.handoff.order_book_last_update_id == 501
+  assert sync.handoff.order_book_last_update_id == 701
   assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_bids[:2]) == (
-    (2498.3, 0.75),
-    (2498.2, 0.5),
+    (21934.0, 0.95),
+    (21931.98, 1.1),
   )
   assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_asks[:2]) == (
-    (2498.9, 0.4),
-    (2499.0, 0.58),
+    (21933.98, 1.25),
+    (21934.2, 1.05),
   )
-  assert sync.handoff.order_book_best_bid_price == 2498.45
-  assert sync.handoff.order_book_best_ask_price == 2498.95
+  assert sync.handoff.order_book_best_bid_price == 21934.0
+  assert sync.handoff.order_book_best_ask_price == 21933.98
   assert sync.handoff.channel_continuation_state == "streaming"
   assert sync.handoff.channel_continuation_count == 1
   assert sync.handoff.trade_snapshot is not None
-  assert sync.handoff.trade_snapshot.event_id == "poll-trade-2"
+  assert sync.handoff.trade_snapshot.event_id == "coinbase-trade-2"
   assert sync.handoff.aggregate_trade_snapshot is not None
-  assert sync.handoff.aggregate_trade_snapshot.event_id == "poll-trade-2"
+  assert sync.handoff.aggregate_trade_snapshot.event_id == "coinbase-trade-2"
   assert sync.handoff.book_ticker_snapshot is not None
-  assert sync.handoff.book_ticker_snapshot.bid_price == 2498.45
-  assert sync.handoff.book_ticker_snapshot.ask_price == 2498.95
+  assert sync.handoff.book_ticker_snapshot.bid_price == 21934.0
+  assert sync.handoff.book_ticker_snapshot.ask_price == 21934.2
   assert sync.handoff.mini_ticker_snapshot is not None
-  assert sync.handoff.mini_ticker_snapshot.close_price == 2498.72
+  assert sync.handoff.mini_ticker_snapshot.close_price == 21934.1
   assert sync.handoff.kline_snapshot is not None
-  assert sync.handoff.kline_snapshot.close_price == 2498.9
+  assert sync.handoff.kline_snapshot.close_price == 21934.5
   assert sync.handoff.channel_last_continued_at == sync.handoff.kline_snapshot.close_at
   assert sync.handoff.last_market_event_at == sync.handoff.kline_snapshot.close_at
   assert sync.handoff.last_depth_event_at == clock()
@@ -846,6 +945,10 @@ def test_binance_adapter_falls_back_to_generic_polling_transport() -> None:
   assert sync.handoff.last_book_ticker_event_at == clock()
   assert sync.handoff.last_mini_ticker_event_at == clock()
   assert sync.handoff.last_kline_event_at == sync.handoff.kline_snapshot.close_at
+  assert released.state == "released"
+  assert released.transport == "coinbase_advanced_trade_market_websocket"
+  assert released.source == "coinbase_market_push_transport"
+  assert connection.closed is True
 
 
 def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap() -> None:

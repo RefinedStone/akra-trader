@@ -44,9 +44,10 @@ Implemented now:
   recording order-book resync state, rebuild counts, full recovered bid/ask levels, and
   deeper-channel restore state from exchange ticker/trade/ohlcv snapshots plus persisted channel
   continuation snapshots for trade, aggregate-trade, book-ticker, mini-ticker, and kline state
-- guarded-live session handoff can now widen beyond Binance-native continuation by falling back to
-  a generic CCXT polling transport when venue trading access exists but Binance-native streaming is
-  unavailable, while preserving depth/ticker/trade/ohlcv continuation state and transport metadata
+- guarded-live session handoff can now widen beyond Binance-native continuation into push-native
+  market transports: Binance falls back to its public market websocket when user-data auth is not
+  available, and Coinbase Advanced Trade can supply public heartbeat/ticker/trade/level2/candle
+  continuation through the same handoff surface
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -77,7 +78,6 @@ Useful environment variables:
 - `AKRA_TRADER_GUARDED_LIVE_EXECUTION_ENABLED`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
-- `AKRA_TRADER_GUARDED_LIVE_VENUE_POLL_INTERVAL_SECONDS`
 - `AKRA_TRADER_BINANCE_API_KEY`
 - `AKRA_TRADER_BINANCE_API_SECRET`
 
@@ -157,9 +157,9 @@ Defaults:
   with order-book state, depth sequence, snapshot rebuild timing/counts, full recovered bid/ask
   levels, channel-restore timing/counts, channel-continuation timing/counts, persisted market
   channel snapshots, and top-of-book levels
-- if Binance-native streaming is unavailable but venue execution still exists, guarded-live can
-  fall back to a generic CCXT polling transport for depth/ticker/trade/OHLCV continuation using
-  `AKRA_TRADER_GUARDED_LIVE_VENUE_POLL_INTERVAL_SECONDS`
+- if Binance-native user-data streaming is unavailable, guarded-live can now continue on the
+  Binance public market websocket, and the same handoff model also supports Coinbase Advanced
+  Trade public market channels for heartbeat/ticker/trade/level2/candle continuation
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

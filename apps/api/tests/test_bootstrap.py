@@ -6,7 +6,6 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.bootstrap import build_container
 from akra_trader.bootstrap import build_default_market_data_database_url
 from akra_trader.bootstrap import build_default_runs_database_url
-from akra_trader.bootstrap import build_venue_execution_adapter
 from akra_trader.config import Settings
 
 
@@ -231,27 +230,3 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
   assert len(container.background_jobs) == 2
-
-
-def test_build_venue_execution_adapter_passes_poll_interval(monkeypatch) -> None:
-  captured: dict[str, object] = {}
-
-  class FakeBinanceVenueExecutionAdapter:
-    def __init__(self, **kwargs) -> None:
-      captured.update(kwargs)
-
-  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
-
-  adapter = build_venue_execution_adapter(
-    Settings(
-      market_data_provider="binance",
-      binance_api_key="test-key",
-      binance_api_secret="test-secret",
-      guarded_live_venue_poll_interval_seconds=27,
-    )
-  )
-
-  assert isinstance(adapter, FakeBinanceVenueExecutionAdapter)
-  assert captured["api_key"] == "test-key"
-  assert captured["api_secret"] == "test-secret"
-  assert captured["poll_interval_seconds"] == 27

@@ -31,7 +31,6 @@ class Settings:
   guarded_live_execution_enabled: bool = False
   guarded_live_worker_heartbeat_interval_seconds: int = 15
   guarded_live_worker_heartbeat_timeout_seconds: int = 45
-  guarded_live_venue_poll_interval_seconds: int = 15
   binance_api_key: str | None = None
   binance_api_secret: str | None = None
 
@@ -72,9 +71,6 @@ def load_settings() -> Settings:
     ),
     guarded_live_worker_heartbeat_timeout_seconds=int(
       os.getenv("AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
-    ),
-    guarded_live_venue_poll_interval_seconds=int(
-      os.getenv("AKRA_TRADER_GUARDED_LIVE_VENUE_POLL_INTERVAL_SECONDS", "15")
     ),
     binance_api_key=os.getenv("AKRA_TRADER_BINANCE_API_KEY") or None,
     binance_api_secret=os.getenv("AKRA_TRADER_BINANCE_API_SECRET") or None,
