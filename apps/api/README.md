@@ -18,10 +18,11 @@ Implemented now:
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
   relaunch stored boundaries into backtest, sandbox, or paper flows
 - operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts,
-  guarded-live live-path alerts, persisted live-path alert history, and merged runtime plus
-  guarded-live audit events
+  guarded-live live-path alerts, persisted live-path alert history, durable incident events,
+  outbound delivery history, and merged runtime plus guarded-live audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
-  history, and guarded-live audit events in the control plane
+  history, durable incident events, outbound delivery history, and guarded-live audit events in the
+  control plane
 - guarded-live reconciliation records venue-state snapshots and compares them against local runtime
   exposure before live candidacy discussion
 - guarded-live runtime recovery can rebuild persisted runtime exposure and open-order state from the
@@ -84,6 +85,9 @@ Useful environment variables:
 - `AKRA_TRADER_GUARDED_LIVE_VENUE`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
+- `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_TARGETS`
+- `AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS`
 - `AKRA_TRADER_GUARDED_LIVE_API_KEY`
 - `AKRA_TRADER_GUARDED_LIVE_API_SECRET`
 - `AKRA_TRADER_BINANCE_API_KEY`
@@ -139,8 +143,8 @@ Defaults:
 - sandbox runs now start as native worker sessions, then continuously apply new candle ticks with
   persisted heartbeat and recovery state
 - operator visibility now surfaces stale sandbox heartbeats, worker failures, guarded-live
-  live-path alerts, persisted live-path alert history, and merged runtime plus guarded-live audit
-  entries directly in the control room
+  live-path alerts, persisted live-path alert history, durable incident events, outbound delivery
+  history, and merged runtime plus guarded-live audit entries directly in the control room
 - guarded-live controls now persist kill-switch state, can stop running sandbox/paper sessions, and
   record operator reconciliation drills before any live candidacy discussion
 - guarded-live reconciliation now stores internal exposure snapshots, venue balance/open-order
@@ -157,6 +161,9 @@ Defaults:
 - guarded-live control state now tracks owned live session identity plus a durable open-order
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
+- guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
+  delivery attempts through configured operator delivery targets such as console logging or webhook
+  delivery, while persisting the attempt history for operator review
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

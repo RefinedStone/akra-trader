@@ -313,6 +313,31 @@ type OperatorVisibility = {
     source: string;
     delivery_targets: string[];
   }[];
+  incident_events: {
+    event_id: string;
+    alert_id: string;
+    timestamp: string;
+    kind: string;
+    severity: string;
+    summary: string;
+    detail: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    source: string;
+    delivery_targets: string[];
+    delivery_state: string;
+  }[];
+  delivery_history: {
+    delivery_id: string;
+    incident_event_id: string;
+    alert_id: string;
+    incident_kind: string;
+    target: string;
+    status: string;
+    attempted_at: string;
+    detail: string;
+    source: string;
+  }[];
   audit_events: {
     event_id: string;
     timestamp: string;
@@ -357,6 +382,31 @@ type GuardedLiveStatus = {
     resolved_at?: string | null;
     source: string;
     delivery_targets: string[];
+  }[];
+  incident_events: {
+    event_id: string;
+    alert_id: string;
+    timestamp: string;
+    kind: string;
+    severity: string;
+    summary: string;
+    detail: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    source: string;
+    delivery_targets: string[];
+    delivery_state: string;
+  }[];
+  delivery_history: {
+    delivery_id: string;
+    incident_event_id: string;
+    alert_id: string;
+    incident_kind: string;
+    target: string;
+    status: string;
+    attempted_at: string;
+    detail: string;
+    source: string;
   }[];
   kill_switch: {
     state: string;
@@ -1209,6 +1259,8 @@ export default function App() {
       criticalCount,
       warningCount,
       historyCount: operatorVisibility.alert_history.length,
+      incidentCount: operatorVisibility.incident_events.length,
+      deliveryCount: operatorVisibility.delivery_history.length,
       latestAuditAt: operatorVisibility.audit_events[0]?.timestamp ?? null,
     };
   }, [operatorVisibility]);
@@ -1758,6 +1810,14 @@ export default function App() {
                     <span>Alert history</span>
                     <strong>{operatorSummary.historyCount}</strong>
                   </div>
+                  <div className="metric-tile">
+                    <span>Incidents</span>
+                    <strong>{operatorSummary.incidentCount}</strong>
+                  </div>
+                  <div className="metric-tile">
+                    <span>Deliveries</span>
+                    <strong>{operatorSummary.deliveryCount}</strong>
+                  </div>
                 </>
               ) : null}
               <div className="status-grid-two-column">
@@ -1828,6 +1888,40 @@ export default function App() {
                 </div>
               </div>
               <div>
+                <h3>Incident events</h3>
+                {operatorVisibility.incident_events.length ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>Kind</th>
+                        <th>Severity</th>
+                        <th>Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operatorVisibility.incident_events.slice(0, 8).map((event) => (
+                        <tr key={`incident-${event.event_id}`}>
+                          <td>{formatTimestamp(event.timestamp)}</td>
+                          <td>{event.kind}</td>
+                          <td>{event.severity}</td>
+                          <td>
+                            <strong>{event.summary}</strong>
+                            <p className="run-lineage-symbol-copy">{event.detail}</p>
+                            <p className="run-lineage-symbol-copy">
+                              Delivery: {event.delivery_state}
+                              {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
+                            </p>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="empty-state">No persisted incident events recorded.</p>
+                )}
+              </div>
+              <div>
                 <h3>Alert history</h3>
                 {operatorVisibility.alert_history.length ? (
                   <table className="data-table">
@@ -1860,6 +1954,36 @@ export default function App() {
                   </table>
                 ) : (
                   <p className="empty-state">No persisted live-path alert history recorded.</p>
+                )}
+              </div>
+              <div>
+                <h3>Delivery history</h3>
+                {operatorVisibility.delivery_history.length ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>When</th>
+                        <th>Target</th>
+                        <th>Status</th>
+                        <th>Detail</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
+                        <tr key={`delivery-${record.delivery_id}`}>
+                          <td>{formatTimestamp(record.attempted_at)}</td>
+                          <td>{record.target}</td>
+                          <td>{record.status}</td>
+                          <td>
+                            <strong>{record.incident_kind}</strong>
+                            <p className="run-lineage-symbol-copy">{record.detail}</p>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="empty-state">No outbound delivery attempts recorded.</p>
                 )}
               </div>
             </div>
@@ -2785,6 +2909,66 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">No guarded-live alert history recorded.</p>
+                  )}
+                  <h3>Guarded-live incidents</h3>
+                  {guardedLive.incident_events.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>Kind</th>
+                          <th>Severity</th>
+                          <th>Summary</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.incident_events.slice(0, 8).map((event) => (
+                          <tr key={`guarded-live-incident-${event.event_id}`}>
+                            <td>{formatTimestamp(event.timestamp)}</td>
+                            <td>{event.kind}</td>
+                            <td>{event.severity}</td>
+                            <td>
+                              <strong>{event.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{event.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {event.delivery_state}
+                                {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
+                              </p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No guarded-live incident events recorded.</p>
+                  )}
+                  <h3>Guarded-live delivery history</h3>
+                  {guardedLive.delivery_history.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>When</th>
+                          <th>Target</th>
+                          <th>Status</th>
+                          <th>Detail</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.delivery_history.slice(0, 8).map((record) => (
+                          <tr key={`guarded-live-delivery-${record.delivery_id}`}>
+                            <td>{formatTimestamp(record.attempted_at)}</td>
+                            <td>{record.target}</td>
+                            <td>{record.status}</td>
+                            <td>
+                              <strong>{record.incident_kind}</strong>
+                              <p className="run-lineage-symbol-copy">{record.detail}</p>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No guarded-live outbound delivery attempts recorded.</p>
                   )}
                   <h3>Guarded-live audit</h3>
                   {guardedLive.audit_events.length ? (

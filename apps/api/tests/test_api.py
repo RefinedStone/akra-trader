@@ -338,6 +338,10 @@ def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_pa
       if alert["alert_id"] == "guarded-live:reconciliation"
     )
     assert active_history["status"] == "active"
+    assert active_payload["incident_events"][0]["kind"] == "incident_opened"
+    assert active_payload["incident_events"][0]["alert_id"] == "guarded-live:reconciliation"
+    assert active_payload["delivery_history"][0]["target"] == "operator_console"
+    assert active_payload["delivery_history"][0]["status"] == "delivered"
     assert any(event["kind"] == "guarded_live_reconciliation_ran" for event in active_payload["audit_events"])
 
     app._venue_state = StaticVenueStateAdapter(
@@ -368,6 +372,7 @@ def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_pa
   )
   assert resolved_history["status"] == "resolved"
   assert resolved_history["resolved_at"] is not None
+  assert resolved_payload["incident_events"][0]["kind"] == "incident_resolved"
 
 
 def test_guarded_live_endpoints_manage_kill_switch_and_block_runtime_starts(tmp_path: Path) -> None:

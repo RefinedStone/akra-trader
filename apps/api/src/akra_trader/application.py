@@ -42,6 +42,8 @@ from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
+from akra_trader.domain.models import OperatorIncidentDelivery
+from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import ReferenceSource
@@ -62,6 +64,7 @@ from akra_trader.domain.services import summarize_performance
 from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import GuardedLiveStatePort
 from akra_trader.ports import MarketDataPort
+from akra_trader.ports import OperatorAlertDeliveryPort
 from akra_trader.ports import ReferenceCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
@@ -344,6 +347,17 @@ class TradingApplication:
     ) -> tuple[GuardedLiveVenueOrderResult, ...]:
       raise RuntimeError("Venue execution port is not configured.")
 
+  class _NoopOperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
+    def list_targets(self) -> tuple[str, ...]:
+      return ()
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return ()
+
   def __init__(
     self,
     *,
@@ -354,6 +368,7 @@ class TradingApplication:
     guarded_live_state: GuardedLiveStatePort | None = None,
     venue_state: VenueStatePort | None = None,
     venue_execution: VenueExecutionPort | None = None,
+    operator_alert_delivery: OperatorAlertDeliveryPort | None = None,
     freqtrade_reference: FreqtradeReferenceAdapter | None = None,
     mode_service: ExecutionModeService | None = None,
     data_engine: DataEngine | None = None,
@@ -375,6 +390,9 @@ class TradingApplication:
     self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
     self._venue_state = venue_state or self._UnavailableVenueStateAdapter(self._clock)
     self._venue_execution = venue_execution or self._UnavailableVenueExecutionAdapter()
+    self._operator_alert_delivery = (
+      operator_alert_delivery or self._NoopOperatorAlertDeliveryAdapter()
+    )
     self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
     self._data_engine = data_engine or DataEngine(market_data)
@@ -516,12 +534,24 @@ class TradingApplication:
     )
     alerts = [*sandbox_alerts, *live_alerts]
     audit_events = [*sandbox_audit_events, *guarded_live_state.audit_events]
+    incident_events = tuple(
+      sorted(guarded_live_state.incident_events, key=lambda event: event.timestamp, reverse=True)
+    )
+    delivery_history = tuple(
+      sorted(
+        guarded_live_state.delivery_history,
+        key=lambda record: record.attempted_at,
+        reverse=True,
+      )
+    )
     alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
     audit_events.sort(key=lambda event: event.timestamp, reverse=True)
     return OperatorVisibility(
       generated_at=current_time,
       alerts=tuple(alerts),
       alert_history=guarded_live_state.alert_history,
+      incident_events=incident_events,
+      delivery_history=delivery_history,
       audit_events=tuple(audit_events),
     )
 
@@ -563,12 +593,20 @@ class TradingApplication:
     audit_events = tuple(
       sorted(state.audit_events, key=lambda event: event.timestamp, reverse=True)
     )
+    incident_events = tuple(
+      sorted(state.incident_events, key=lambda event: event.timestamp, reverse=True)
+    )
+    delivery_history = tuple(
+      sorted(state.delivery_history, key=lambda record: record.attempted_at, reverse=True)
+    )
     return GuardedLiveStatus(
       generated_at=current_time,
       candidacy_status="blocked" if blockers else "candidate",
       blockers=tuple(dict.fromkeys(blockers)),
       active_alerts=tuple(live_alerts),
       alert_history=state.alert_history,
+      incident_events=incident_events,
+      delivery_history=delivery_history,
       kill_switch=state.kill_switch,
       reconciliation=state.reconciliation,
       recovery=state.recovery,
@@ -610,11 +648,25 @@ class TradingApplication:
       active_alerts=active_alerts,
       current_time=current_time,
     )
-    if merged_history != state.alert_history:
+    incident_events = self._build_guarded_live_incident_events(
+      previous_history=state.alert_history,
+      merged_history=merged_history,
+      current_time=current_time,
+    )
+    delivered_incident_events, delivery_records = self._deliver_guarded_live_incident_events(
+      incident_events=incident_events,
+    )
+    if (
+      merged_history != state.alert_history
+      or delivered_incident_events
+      or delivery_records
+    ):
       state = self._persist_guarded_live_state(
         replace(
           state,
           alert_history=merged_history,
+          incident_events=tuple((*delivered_incident_events, *state.incident_events)),
+          delivery_history=tuple((*delivery_records, *state.delivery_history)),
         )
       )
     return state, active_alerts
@@ -3457,9 +3509,13 @@ class TradingApplication:
     )
     return self._venue_execution.submit_limit_order(request)
 
-  @staticmethod
-  def _guarded_live_delivery_targets() -> tuple[str, ...]:
-    return ("operator_visibility", "guarded_live_status", "control_room")
+  def _guarded_live_delivery_targets(self) -> tuple[str, ...]:
+    return (
+      "operator_visibility",
+      "guarded_live_status",
+      "control_room",
+      *self._operator_alert_delivery.list_targets(),
+    )
 
   def _build_guarded_live_operator_alerts(
     self,
@@ -3618,6 +3674,91 @@ class TradingApplication:
 
     alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
     return alerts
+
+  def _build_guarded_live_incident_events(
+    self,
+    *,
+    previous_history: tuple[OperatorAlert, ...],
+    merged_history: tuple[OperatorAlert, ...],
+    current_time: datetime,
+  ) -> tuple[OperatorIncidentEvent, ...]:
+    previous_by_id = {alert.alert_id: alert for alert in previous_history}
+    incident_events: list[OperatorIncidentEvent] = []
+    outbound_targets = self._operator_alert_delivery.list_targets()
+
+    for alert in merged_history:
+      previous = previous_by_id.get(alert.alert_id)
+      if alert.status == "active" and (previous is None or previous.status != "active"):
+        incident_events.append(
+          OperatorIncidentEvent(
+            event_id=f"incident_opened:{alert.alert_id}:{alert.detected_at.isoformat()}",
+            alert_id=alert.alert_id,
+            timestamp=alert.detected_at,
+            kind="incident_opened",
+            severity=alert.severity,
+            summary=alert.summary,
+            detail=alert.detail,
+            run_id=alert.run_id,
+            session_id=alert.session_id,
+            source=alert.source,
+            delivery_targets=outbound_targets,
+          )
+        )
+        continue
+      if alert.status == "resolved" and previous is not None and previous.status == "active":
+        resolved_at = alert.resolved_at or current_time
+        incident_events.append(
+          OperatorIncidentEvent(
+            event_id=f"incident_resolved:{alert.alert_id}:{resolved_at.isoformat()}",
+            alert_id=alert.alert_id,
+            timestamp=resolved_at,
+            kind="incident_resolved",
+            severity=alert.severity,
+            summary=f"Resolved: {alert.summary}",
+            detail=alert.detail,
+            run_id=alert.run_id,
+            session_id=alert.session_id,
+            source=alert.source,
+            delivery_targets=outbound_targets,
+          )
+        )
+
+    incident_events.sort(key=lambda event: event.timestamp, reverse=True)
+    return tuple(incident_events)
+
+  def _deliver_guarded_live_incident_events(
+    self,
+    *,
+    incident_events: tuple[OperatorIncidentEvent, ...],
+  ) -> tuple[tuple[OperatorIncidentEvent, ...], tuple[OperatorIncidentDelivery, ...]]:
+    persisted_events: list[OperatorIncidentEvent] = []
+    delivery_records: list[OperatorIncidentDelivery] = []
+    for incident in incident_events:
+      records = self._operator_alert_delivery.deliver(incident=incident)
+      delivery_state = self._resolve_incident_delivery_state(records=records)
+      persisted_events.append(
+        replace(
+          incident,
+          delivery_state=delivery_state,
+          delivery_targets=incident.delivery_targets or self._operator_alert_delivery.list_targets(),
+        )
+      )
+      delivery_records.extend(records)
+    return tuple(persisted_events), tuple(delivery_records)
+
+  @staticmethod
+  def _resolve_incident_delivery_state(
+    *,
+    records: tuple[OperatorIncidentDelivery, ...],
+  ) -> str:
+    if not records:
+      return "not_configured"
+    statuses = {record.status for record in records}
+    if statuses == {"delivered"}:
+      return "delivered"
+    if "delivered" in statuses:
+      return "partial"
+    return "failed"
 
   def _build_live_operator_alerts_for_run(
     self,

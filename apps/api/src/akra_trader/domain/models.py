@@ -488,10 +488,41 @@ class OperatorAuditEvent:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentEvent:
+  event_id: str
+  alert_id: str
+  timestamp: datetime
+  kind: str
+  severity: str
+  summary: str
+  detail: str
+  run_id: str | None = None
+  session_id: str | None = None
+  source: str = "guarded_live"
+  delivery_targets: tuple[str, ...] = ()
+  delivery_state: str = "pending"
+
+
+@dataclass(frozen=True)
+class OperatorIncidentDelivery:
+  delivery_id: str
+  incident_event_id: str
+  alert_id: str
+  incident_kind: str
+  target: str
+  status: str
+  attempted_at: datetime
+  detail: str
+  source: str = "guarded_live"
+
+
+@dataclass(frozen=True)
 class OperatorVisibility:
   generated_at: datetime
   alerts: tuple[OperatorAlert, ...] = ()
   alert_history: tuple[OperatorAlert, ...] = ()
+  incident_events: tuple[OperatorIncidentEvent, ...] = ()
+  delivery_history: tuple[OperatorIncidentDelivery, ...] = ()
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -791,6 +822,8 @@ class GuardedLiveState:
   session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
   session_handoff: GuardedLiveVenueSessionHandoff = field(default_factory=GuardedLiveVenueSessionHandoff)
   alert_history: tuple[OperatorAlert, ...] = ()
+  incident_events: tuple[OperatorIncidentEvent, ...] = ()
+  delivery_history: tuple[OperatorIncidentDelivery, ...] = ()
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -801,6 +834,8 @@ class GuardedLiveStatus:
   blockers: tuple[str, ...] = ()
   active_alerts: tuple[OperatorAlert, ...] = ()
   alert_history: tuple[OperatorAlert, ...] = ()
+  incident_events: tuple[OperatorIncidentEvent, ...] = ()
+  delivery_history: tuple[OperatorIncidentDelivery, ...] = ()
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)

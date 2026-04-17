@@ -23,6 +23,8 @@ from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import OperatorIncidentDelivery
+from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import SignalAction
@@ -87,6 +89,36 @@ class StaticVenueStateAdapter:
 
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
     return self._snapshot
+
+
+class FakeOperatorAlertDeliveryAdapter:
+  def __init__(self, *, targets: tuple[str, ...] = ("operator_console",)) -> None:
+    self._targets = targets
+    self.delivered_incidents: list[OperatorIncidentEvent] = []
+
+  def list_targets(self) -> tuple[str, ...]:
+    return self._targets
+
+  def deliver(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    self.delivered_incidents.append(incident)
+    return tuple(
+      OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=incident.timestamp,
+        detail=f"fake_delivery:{target}",
+        source=incident.source,
+      )
+      for target in self._targets
+    )
 
 
 def build_guarded_live_repository(tmp_path: Path):
@@ -707,6 +739,7 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   runs = build_runs_repository(tmp_path)
   guarded_live_state = build_guarded_live_repository(tmp_path)
   clock = MutableClock(datetime(2025, 1, 3, 12, 30, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(targets=("operator_console", "operator_webhook"))
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
@@ -714,6 +747,7 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
     venue_state=StaticVenueStateAdapter(
       GuardedLiveVenueStateSnapshot(
         provider="seeded",
@@ -748,6 +782,14 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   )
   assert history_alert.status == "active"
   assert history_alert.resolved_at is None
+  assert visibility.incident_events[0].kind == "incident_opened"
+  assert visibility.incident_events[0].alert_id == "guarded-live:reconciliation"
+  assert visibility.incident_events[0].delivery_state == "delivered"
+  assert {record.target for record in visibility.delivery_history[:2]} == {
+    "operator_console",
+    "operator_webhook",
+  }
+  assert delivery.delivered_incidents[0].kind == "incident_opened"
 
   clock.advance(timedelta(minutes=5))
   app._venue_state = StaticVenueStateAdapter(
@@ -774,6 +816,9 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   )
   assert resolved_history_alert.status == "resolved"
   assert resolved_history_alert.resolved_at == clock()
+  assert resolved_visibility.incident_events[0].kind == "incident_resolved"
+  assert resolved_visibility.incident_events[0].alert_id == "guarded-live:reconciliation"
+  assert delivery.delivered_incidents[-1].kind == "incident_resolved"
 
   restarted = TradingApplication(
     market_data=SeededMarketDataAdapter(),
@@ -782,6 +827,7 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
     runs=runs,
     clock=clock,
     guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
     venue_state=StaticVenueStateAdapter(
       GuardedLiveVenueStateSnapshot(
         provider="seeded",
@@ -799,6 +845,7 @@ def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   )
   assert restarted_history_alert.status == "resolved"
   assert restarted_history_alert.resolved_at == clock()
+  assert restarted_visibility.incident_events[0].kind == "incident_resolved"
 
 
 def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_history(
@@ -808,12 +855,14 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
   runs = build_runs_repository(tmp_path)
   clock = MutableClock(datetime(2025, 1, 3, 12, 45, tzinfo=UTC))
   market_data = MutableSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter()
   app = TradingApplication(
     market_data=market_data,
     strategies=LocalStrategyCatalog(),
     references=build_references(),
     runs=runs,
     clock=clock,
+    operator_alert_delivery=delivery,
     venue_state=StaticVenueStateAdapter(
       GuardedLiveVenueStateSnapshot(
         provider="seeded",
@@ -865,6 +914,15 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
     if alert.alert_id == failure_alert.alert_id
   )
   assert history_alert.status == "active"
+  assert any(
+    event.kind == "incident_opened" and event.alert_id == failure_alert.alert_id
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    record.target == "operator_console" and record.alert_id == failure_alert.alert_id
+    for record in guarded_live_status.delivery_history
+  )
+  assert any(incident.alert_id == failure_alert.alert_id for incident in delivery.delivered_incidents)
 
 
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(

@@ -16,6 +16,8 @@ from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataStatus
+from akra_trader.domain.models import OperatorIncidentDelivery
+from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -120,6 +122,16 @@ class GuardedLiveStatePort(Protocol):
   def load_state(self) -> GuardedLiveState: ...
 
   def save_state(self, state: GuardedLiveState) -> GuardedLiveState: ...
+
+
+class OperatorAlertDeliveryPort(Protocol):
+  def list_targets(self) -> tuple[str, ...]: ...
+
+  def deliver(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> tuple[OperatorIncidentDelivery, ...]: ...
 
 
 class VenueStatePort(Protocol):

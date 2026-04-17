@@ -136,8 +136,9 @@ app also starts a `MarketDataSyncJob` that periodically refreshes tracked symbol
 The application also derives operator visibility from runtime state across sandbox and guarded-live
 flows. Failed worker sessions and stale heartbeats surface as control-room alerts, guarded-live
 control/session faults now persist as live-path alert history with active/resolved lifecycle state
-and delivery targets, and worker lifecycle notes plus guarded-live control events are normalized
-into recent audit events for operator review.
+and delivery targets, alert transitions now emit durable incident-opened/resolved events plus
+outbound delivery attempt history, and worker lifecycle notes plus guarded-live control events are
+normalized into recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
@@ -228,9 +229,11 @@ The web app currently surfaces:
   rebuild, recovered bid/ask ladders, channel-restore visibility, persisted market-channel
   continuation visibility, and top-of-book supervision
 - runtime alerts and audit visibility for sandbox worker failures, stale sessions, guarded-live
-  live-path alerts, and persisted live-path alert history
+  live-path alerts, persisted live-path alert history, durable incident events, and outbound
+  delivery history
 - guarded-live kill switch, candidacy blockers, guarded-live alert history, venue-state
-  verification snapshots, reconciliation findings, and guarded-live audit history
+  verification snapshots, reconciliation findings, durable incident events, outbound delivery
+  history, and guarded-live audit history
 - run history
 - run comparison and benchmark narratives
 

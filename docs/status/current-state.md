@@ -87,10 +87,11 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - separate sandbox worker sessions and paper sessions with their own filters, stop controls, and rerun-boundary actions
 - separate guarded-live run history with stop controls
 - runtime alert and audit panel for stale sandbox heartbeats, worker failures, guarded-live
-  live-path alerts, persisted live-path alert history, and recent merged runtime/guarded-live
-  events
+  live-path alerts, persisted live-path alert history, durable incident events, outbound delivery
+  history, and recent merged runtime/guarded-live events
 - guarded-live panel with persisted kill-switch state, candidacy blockers, active guarded-live
-  alerts, guarded-live alert history, reconciliation findings,
+  alerts, guarded-live alert history, durable incident events, outbound delivery history,
+  reconciliation findings,
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
   live-owner visibility, venue-native session-restore state, durable order-book visibility,
   venue session handoff supervision/failover coverage plus market/depth/kline event visibility,
@@ -102,8 +103,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ## Partial or Fragile Areas
 
 - sandbox runs are now supervised worker sessions that keep processing newly arrived candles with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
-- operator visibility now persists guarded-live live-path alert history, but it is not yet a
-  durable event store or notification channel
+- operator visibility now persists guarded-live live-path alert history, durable incident events,
+  and outbound delivery attempts, but it is not yet a full external incident-management system
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
   recovery/live resume currently restores tracked venue order lifecycle state before falling back to
   persisted control-plane state, but it still does not revive broader venue-native stream or market

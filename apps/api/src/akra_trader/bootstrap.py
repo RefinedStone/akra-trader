@@ -9,6 +9,7 @@ from akra_trader.adapters.binance import SUPPORTED_CCXT_MARKET_DATA_VENUES
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
+from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
@@ -112,6 +113,14 @@ def build_venue_execution_adapter(settings: Settings):
   raise ValueError(f"Unsupported guarded-live venue: {venue}")
 
 
+def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDeliveryAdapter:
+  return OperatorAlertDeliveryAdapter(
+    targets=settings.operator_alert_delivery_targets,
+    webhook_url=settings.operator_alert_webhook_url,
+    webhook_timeout_seconds=settings.operator_alert_webhook_timeout_seconds,
+  )
+
+
 def build_background_jobs(
   settings: Settings,
   market_data,
@@ -154,6 +163,7 @@ def build_container(settings: Settings) -> Container:
   )
   venue_state = build_venue_state_adapter(settings)
   venue_execution = build_venue_execution_adapter(settings)
+  operator_alert_delivery = build_operator_alert_delivery_adapter(settings)
   application = TradingApplication(
     market_data=market_data,
     strategies=strategies,
@@ -162,6 +172,7 @@ def build_container(settings: Settings) -> Container:
     guarded_live_state=guarded_live_state,
     venue_state=venue_state,
     venue_execution=venue_execution,
+    operator_alert_delivery=operator_alert_delivery,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
     guarded_live_venue=resolve_guarded_live_venue(settings),
     guarded_live_execution_enabled=settings.guarded_live_execution_enabled,

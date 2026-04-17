@@ -134,6 +134,53 @@ def test_build_container_adds_guarded_live_worker_job_when_enabled(monkeypatch) 
   assert captured["guarded_live_interval_seconds"] == "19"
 
 
+def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> None:
+  captured: dict[str, str] = {}
+
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeOperatorAlertDeliveryAdapter:
+    def __init__(
+      self,
+      *,
+      targets: tuple[str, ...],
+      webhook_url: str | None,
+      webhook_timeout_seconds: int,
+    ) -> None:
+      captured["targets"] = ",".join(targets)
+      captured["webhook_url"] = webhook_url or ""
+      captured["webhook_timeout_seconds"] = str(webhook_timeout_seconds)
+
+    def list_targets(self) -> tuple[str, ...]:
+      return ("operator_console",)
+
+    def deliver(self, *, incident):
+      return ()
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.OperatorAlertDeliveryAdapter", FakeOperatorAlertDeliveryAdapter)
+
+  build_container(
+    Settings(
+      market_data_provider="seeded",
+      operator_alert_delivery_targets=("console", "webhook"),
+      operator_alert_webhook_url="https://ops.example.com/alert",
+      operator_alert_webhook_timeout_seconds=7,
+    )
+  )
+
+  assert captured["targets"] == "console,webhook"
+  assert captured["webhook_url"] == "https://ops.example.com/alert"
+  assert captured["webhook_timeout_seconds"] == "7"
+
+
 def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatch) -> None:
   captured: dict[str, str] = {}
 
