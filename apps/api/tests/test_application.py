@@ -234,6 +234,8 @@ class FakeOperatorAlertDeliveryAdapter:
         external_provider = "ilert"
       elif target == "betterstack_incidents":
         external_provider = "betterstack"
+      elif target == "onpage_incidents":
+        external_provider = "onpage"
       elif target == "zenduty_incidents":
         external_provider = "zenduty"
       elif target == "opsgenie_alerts":
@@ -6729,6 +6731,210 @@ def test_incident_paging_provider_can_be_inferred_for_betterstack_workflow(
   assert updated.provider_workflow_action == "acknowledge"
   assert any(
     attempt[1:] == ("betterstack", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
+
+
+def test_external_onpage_recovery_sync_populates_onpage_typed_schema(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 17, 12, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("onpage_incidents",),
+    supported_workflow_providers=("onpage",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="onpage",
+    operator_alert_paging_policy_warning_targets=("onpage_incidents",),
+    operator_alert_paging_policy_critical_targets=("onpage_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="onpage_market_data_recovery_sync",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="onpage",
+    event_kind="remediation_started",
+    actor="onpage",
+    detail="onpage_market_data_recovery_started",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="OP-123",
+    occurred_at=clock.current + timedelta(minutes=1),
+    payload={
+      "job_id": "onpage-job-11",
+      "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+      "onpage": {
+        "alert_id": "OP-123",
+        "external_reference": "guarded-live:market-data:5m",
+        "alert_status": "acknowledged",
+        "priority": "high",
+        "escalation_policy": "market-data-primary",
+        "assignee": "market-data-oncall",
+        "url": "https://onpage.example/alerts/OP-123",
+      },
+      "telemetry": {
+        "state": "running",
+        "progress_percent": 74,
+        "attempt_count": 1,
+        "current_step": "verify_repaired_window",
+        "last_message": "onpage recovery started",
+        "external_run_id": "onpage-telemetry-1",
+      },
+    },
+  )
+
+  updated_incident = next(
+    event
+    for event in synced.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated_incident.remediation.provider_recovery.provider_schema_kind == "onpage"
+  assert updated_incident.remediation.provider_recovery.onpage.alert_id == "OP-123"
+  assert updated_incident.remediation.provider_recovery.onpage.external_reference == "guarded-live:market-data:5m"
+  assert updated_incident.remediation.provider_recovery.onpage.alert_status == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.onpage.priority == "high"
+  assert updated_incident.remediation.provider_recovery.onpage.escalation_policy == "market-data-primary"
+  assert updated_incident.remediation.provider_recovery.onpage.assignee == "market-data-oncall"
+  assert updated_incident.remediation.provider_recovery.onpage.phase_graph.alert_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.onpage.phase_graph.workflow_phase == "provider_recovering"
+  assert updated_incident.remediation.provider_recovery.onpage.phase_graph.ownership_phase == "assigned"
+  assert updated_incident.remediation.provider_recovery.onpage.phase_graph.escalation_phase == "configured"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 74
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verify_repaired_window"
+
+
+def test_incident_paging_provider_can_be_inferred_for_onpage_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 16, 32, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("onpage_incidents",),
+    supported_workflow_providers=("onpage",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_warning_targets=("onpage_incidents",),
+    operator_alert_paging_policy_critical_targets=("onpage_incidents",),
+    operator_alert_paging_policy_warning_escalation_targets=("onpage_incidents",),
+    operator_alert_paging_policy_critical_escalation_targets=("onpage_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="onpage_policy")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_provider == "onpage"
+  assert incident.delivery_targets == ("onpage_incidents",)
+  assert incident.escalation_targets == ("onpage_incidents",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="onpage",
+    event_kind="triggered",
+    actor="onpage",
+    detail="provider_alert_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="OP-123",
+    occurred_at=clock.current + timedelta(seconds=15),
+  )
+  triggered = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered.provider_workflow_reference == "OP-123"
+  assert triggered.external_provider == "onpage"
+
+  clock.advance(timedelta(minutes=1))
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="onpage_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert any(
+    attempt[1:] == ("onpage", "acknowledge", 1)
     for attempt in delivery.workflow_attempts
   )
 

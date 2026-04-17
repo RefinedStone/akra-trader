@@ -86,6 +86,8 @@ from akra_trader.domain.models import OperatorIncidentIlertRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIlertRecoveryState
 from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryState
+from akra_trader.domain.models import OperatorIncidentOnpageRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentOnpageRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1747,6 +1749,17 @@ class TradingApplication:
             aligned_provider_recovery,
             betterstack=replace(
               aligned_provider_recovery.betterstack,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "onpage"
+          and provider_recovery.onpage.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            onpage=replace(
+              aligned_provider_recovery.onpage,
               alert_status="delivered",
             ),
           )
@@ -4627,6 +4640,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_onpage_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_onpage_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_onpage_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_onpage_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_onpage_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_onpage_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentOnpageRecoveryState,
+  ) -> OperatorIncidentOnpageRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_onpage_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_onpage_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentOnpageRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_onpage_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_onpage_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_onpage_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -6706,6 +6852,101 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "betterstack"
+    onpage_schema = existing.onpage
+    onpage_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("onpage"),
+      self._extract_payload_mapping(payload.get("provider_schema")).get("on_page"),
+      payload.get("onpage"),
+      payload.get("onpage_alert"),
+      payload.get("on_page"),
+    )
+    if normalized_provider == "onpage" or onpage_payload:
+      onpage_status = self._first_non_empty_string(
+        onpage_payload.get("alert_status"),
+        onpage_payload.get("status"),
+        onpage_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.onpage.alert_status,
+      ) or "unknown"
+      onpage_schema = OperatorIncidentOnpageRecoveryState(
+        alert_id=self._first_non_empty_string(
+          onpage_payload.get("alert_id"),
+          onpage_payload.get("id"),
+          onpage_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.onpage.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          onpage_payload.get("external_reference"),
+          onpage_payload.get("reference"),
+          reference,
+          existing.onpage.external_reference,
+        ),
+        alert_status=onpage_status,
+        priority=self._first_non_empty_string(
+          onpage_payload.get("priority"),
+          onpage_payload.get("severity"),
+          onpage_payload.get("urgency"),
+          existing.onpage.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          onpage_payload.get("escalation_policy"),
+          onpage_payload.get("escalationPolicy"),
+          onpage_payload.get("policy"),
+          onpage_payload.get("source"),
+          existing.onpage.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          onpage_payload.get("assignee"),
+          onpage_payload.get("owner"),
+          onpage_payload.get("assigned_to"),
+          existing.onpage.assignee,
+        ),
+        url=self._first_non_empty_string(
+          onpage_payload.get("url"),
+          onpage_payload.get("html_url"),
+          onpage_payload.get("link"),
+          existing.onpage.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(onpage_payload.get("updated_at"))
+          or existing.onpage.updated_at
+        ),
+        phase_graph=self._build_onpage_recovery_phase_graph(
+          payload=onpage_payload,
+          alert_status=onpage_status,
+          priority=self._first_non_empty_string(
+            onpage_payload.get("priority"),
+            onpage_payload.get("severity"),
+            onpage_payload.get("urgency"),
+            existing.onpage.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            onpage_payload.get("escalation_policy"),
+            onpage_payload.get("escalationPolicy"),
+            onpage_payload.get("policy"),
+            onpage_payload.get("source"),
+            existing.onpage.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            onpage_payload.get("assignee"),
+            onpage_payload.get("owner"),
+            onpage_payload.get("assigned_to"),
+            existing.onpage.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.onpage,
+        ),
+      )
+      provider_schema_kind = "onpage"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -6782,6 +7023,7 @@ class TradingApplication:
       signl4=signl4_schema,
       ilert=ilert_schema,
       betterstack=betterstack_schema,
+      onpage=onpage_schema,
       updated_at=synced_at,
     )
 
@@ -7057,6 +7299,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.betterstack,
+        ),
+      ),
+      onpage=replace(
+        provider_recovery.onpage,
+        phase_graph=self._build_onpage_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.onpage.alert_status,
+          priority=provider_recovery.onpage.priority,
+          escalation_policy=provider_recovery.onpage.escalation_policy,
+          assignee=provider_recovery.onpage.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.onpage,
         ),
       ),
     )
@@ -11447,6 +11703,10 @@ class TradingApplication:
       return "ilert"
     if normalized in {"betterstack_incidents", "betterstack_alerts", "operator_betterstack"}:
       return "betterstack"
+    if normalized in {"on_page", "onpage_alerts", "operator_onpage"}:
+      return "onpage"
+    if normalized in {"onpage_incidents", "operator_onpage"}:
+      return "onpage"
     return normalized or None
 
   @staticmethod
@@ -11642,6 +11902,8 @@ class TradingApplication:
       return "ilert"
     if "betterstack_incidents" in combined or "betterstack_alerts" in combined:
       return "betterstack"
+    if "onpage_incidents" in combined or "onpage_alerts" in combined:
+      return "onpage"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

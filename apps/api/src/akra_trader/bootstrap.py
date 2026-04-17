@@ -229,6 +229,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_betterstack_recovery_engine_url_template
     ),
     betterstack_recovery_engine_token=settings.operator_alert_betterstack_recovery_engine_token,
+    onpage_api_token=settings.operator_alert_onpage_api_token,
+    onpage_api_url=settings.operator_alert_onpage_api_url,
+    onpage_recovery_engine_url_template=(
+      settings.operator_alert_onpage_recovery_engine_url_template
+    ),
+    onpage_recovery_engine_token=settings.operator_alert_onpage_recovery_engine_token,
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
     opsgenie_recovery_engine_url_template=(
