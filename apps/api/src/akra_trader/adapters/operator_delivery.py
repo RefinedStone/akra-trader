@@ -78,6 +78,8 @@ def _normalize_target(target: str) -> str | None:
     return "pagertree_incidents"
   if normalized in {"alertops", "alert_ops", "alertops_incidents", "operator_alertops"}:
     return "alertops_incidents"
+  if normalized in {"signl4", "signl_4", "signl4_incidents", "operator_signl4"}:
+    return "signl4_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -151,6 +153,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     alertops_api_url: str = "https://api.alertops.com",
     alertops_recovery_engine_url_template: str | None = None,
     alertops_recovery_engine_token: str | None = None,
+    signl4_api_token: str | None = None,
+    signl4_api_url: str = "https://connect.signl4.com",
+    signl4_recovery_engine_url_template: str | None = None,
+    signl4_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -232,6 +238,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._alertops_api_url = alertops_api_url.rstrip("/")
     self._alertops_recovery_engine_url_template = alertops_recovery_engine_url_template
     self._alertops_recovery_engine_token = alertops_recovery_engine_token
+    self._signl4_api_token = signl4_api_token
+    self._signl4_api_url = signl4_api_url.rstrip("/")
+    self._signl4_recovery_engine_url_template = signl4_recovery_engine_url_template
+    self._signl4_recovery_engine_token = signl4_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -275,6 +285,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("pagertree")
     if self._alertops_api_token:
       providers.append("alertops")
+    if self._signl4_api_token:
+      providers.append("signl4")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -362,6 +374,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if target == "alertops_incidents":
         records.append(
           self._deliver_alertops(
+            incident=incident,
+            attempt_number=attempt_number,
+            phase=phase,
+          )
+        )
+        continue
+      if target == "signl4_incidents":
+        records.append(
+          self._deliver_signl4(
             incident=incident,
             attempt_number=attempt_number,
             phase=phase,
@@ -550,6 +571,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "signl4":
+      return (
+        self._sync_signl4_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsgenie":
       return (
         self._sync_opsgenie_workflow(
@@ -620,6 +652,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_pagertree_workflow_state(incident=incident)
     if normalized_provider == "alertops":
       return self._pull_alertops_workflow_state(incident=incident)
+    if normalized_provider == "signl4":
+      return self._pull_signl4_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -823,6 +857,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     url: str,
   ) -> urllib_request.Request:
     token = self._alertops_recovery_engine_token or self._alertops_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_signl4_recovery_engine_request(
+    self,
+    *,
+    url: str,
+  ) -> urllib_request.Request:
+    token = self._signl4_recovery_engine_token or self._signl4_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -1102,6 +1149,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_alertops_recovery_engine_request(url=url)
+    elif provider == "signl4":
+      url = self._format_recovery_engine_url(
+        url_template=self._signl4_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_signl4_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -4914,6 +4972,269 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_signl4(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._signl4_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:signl4_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="signl4_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="signl4_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_signl4_delivery_request(
+      incident=incident,
+      reference=reference,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:signl4_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="signl4_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"signl4_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:signl4_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="signl4_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"signl4_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_signl4_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    target = "signl4_workflow"
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._signl4_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="signl4_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="signl4_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="signl4",
+        external_reference=None,
+        source=incident.source,
+      )
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_signl4_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"signl4_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"signl4_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="signl4",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_signl4_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._signl4_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_signl4_pull_request(
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    alert_payload = self._extract_mapping(
+      payload.get("result"),
+      payload.get("data"),
+      payload.get("alert"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      alert_payload.get("attributes"),
+      alert_payload.get("alert"),
+      alert_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      alert_payload.get("metadata"),
+      attributes.get("metadata"),
+      attributes.get("details"),
+      alert_payload.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "priority": self._first_non_empty_string(
+        alert_payload.get("priority"),
+        alert_payload.get("severity"),
+        attributes.get("priority"),
+      ),
+      "team": self._first_non_empty_string(
+        alert_payload.get("team"),
+        alert_payload.get("service"),
+        attributes.get("team"),
+      ),
+      "assignee": self._first_non_empty_string(
+        alert_payload.get("assignee"),
+        alert_payload.get("owner"),
+        attributes.get("assignee"),
+        self._extract_mapping(alert_payload.get("owner")).get("display_name"),
+        self._extract_mapping(alert_payload.get("owner")).get("name"),
+      ),
+      "url": self._first_non_empty_string(
+        alert_payload.get("url"),
+        attributes.get("url"),
+        alert_payload.get("html_url"),
+      ),
+      "updated_at": self._first_non_empty_string(
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+      "external_reference": self._first_non_empty_string(
+        alert_payload.get("external_reference"),
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="signl4",
+      workflow_reference=self._first_non_empty_string(
+        alert_payload.get("alert_id"),
+        alert_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        provider_payload.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        alert_payload.get("alert_status"),
+        alert_payload.get("status"),
+        alert_payload.get("state"),
+        attributes.get("alert_status"),
+        attributes.get("status"),
+        attributes.get("state"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        alert_payload.get("summary"),
+        alert_payload.get("subject"),
+        attributes.get("summary"),
+        incident.summary,
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        provider_payload.get("updated_at"),
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -6136,6 +6457,68 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return "incident_acknowledged"
     if workflow_state in {"triggered", "open", "in_progress", "investigating", "monitoring", "escalated"}:
       return "incident_active"
+    return "idle"
+
+  @staticmethod
+  def _resolve_signl4_alert_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "in_progress",
+      "investigating",
+      "monitoring",
+      "escalated",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_signl4_ownership_phase(assignee: str | None) -> str:
+    if assignee:
+      return "assigned"
+    return "unassigned"
+
+  @staticmethod
+  def _resolve_signl4_priority_phase(priority: str | None) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_signl4_team_phase(team: str | None) -> str:
+    if team:
+      return "configured"
+    return "unconfigured"
+
+  @staticmethod
+  def _resolve_signl4_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "in_progress", "investigating", "monitoring", "escalated"}:
+      return "alert_active"
     return "idle"
 
   def _build_provider_pull_sync(
@@ -7749,6 +8132,116 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           updated_at,
         ),
       }
+    elif provider == "signl4":
+      signl4_priority = self._first_non_empty_string(
+        provider_specific_recovery.get("priority"),
+        provider_payload.get("priority"),
+        provider_payload.get("severity"),
+        provider_payload.get("urgency"),
+      )
+      signl4_team = self._first_non_empty_string(
+        provider_specific_recovery.get("team"),
+        provider_payload.get("team"),
+        provider_payload.get("service"),
+      )
+      signl4_assignee = self._first_non_empty_string(
+        provider_specific_recovery.get("assignee"),
+        provider_payload.get("assignee"),
+        provider_payload.get("owner"),
+        self._extract_mapping(provider_payload.get("owner")).get("display_name"),
+      )
+      signl4_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("alert_status"),
+        provider_payload.get("status"),
+        provider_payload.get("state"),
+      ) or "unknown"
+      signl4_alert_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("alert_phase"),
+        self._resolve_signl4_alert_phase(signl4_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "signl4",
+        "signl4": {
+          "alert_id": self._first_non_empty_string(
+            provider_specific_recovery.get("alert_id"),
+            provider_payload.get("alert_id"),
+            provider_payload.get("id"),
+            workflow_reference,
+          ),
+          "external_reference": external_reference,
+          "alert_status": signl4_status,
+          "priority": signl4_priority,
+          "team": signl4_team,
+          "assignee": signl4_assignee,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "alert_phase": signl4_alert_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_signl4_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=signl4_status,
+            ),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_signl4_ownership_phase(signl4_assignee),
+            "priority_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("priority_phase"),
+            ) or self._resolve_signl4_priority_phase(signl4_priority),
+            "team_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("team_phase"),
+            ) or self._resolve_signl4_team_phase(signl4_team),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          signl4_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
     elif provider == "opsgenie":
       opsgenie_owner = self._first_non_empty_string(
         provider_specific_recovery.get("owner"),
@@ -8541,6 +9034,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           "last_transition_at": (
             provider_recovery.alertops.phase_graph.last_transition_at.isoformat()
             if provider_recovery.alertops.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
+      "signl4": {
+        "alert_id": provider_recovery.signl4.alert_id,
+        "external_reference": provider_recovery.signl4.external_reference,
+        "alert_status": provider_recovery.signl4.alert_status,
+        "priority": provider_recovery.signl4.priority,
+        "team": provider_recovery.signl4.team,
+        "assignee": provider_recovery.signl4.assignee,
+        "url": provider_recovery.signl4.url,
+        "updated_at": (
+          provider_recovery.signl4.updated_at.isoformat()
+          if provider_recovery.signl4.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "alert_phase": provider_recovery.signl4.phase_graph.alert_phase,
+          "workflow_phase": provider_recovery.signl4.phase_graph.workflow_phase,
+          "ownership_phase": provider_recovery.signl4.phase_graph.ownership_phase,
+          "priority_phase": provider_recovery.signl4.phase_graph.priority_phase,
+          "team_phase": provider_recovery.signl4.phase_graph.team_phase,
+          "last_transition_at": (
+            provider_recovery.signl4.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.signl4.phase_graph.last_transition_at is not None
             else None
           ),
         },
@@ -10784,6 +11303,156 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported alertops workflow action: {action}")
 
+  def _build_signl4_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      (
+        f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}"
+        f"?identifier_type={reference_type}"
+      ),
+      headers={
+        "Authorization": f"Bearer {self._signl4_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
+  def _build_signl4_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._signl4_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._signl4_api_url}/api/v1/alerts",
+      data=json.dumps(
+        {
+          "alert": {
+            "summary": incident.summary[:255],
+            "description": incident.detail,
+            "status": "triggered",
+            "priority": self._map_signl4_priority(incident.severity),
+            "external_reference": reference,
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_signl4_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._signl4_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated alert to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._signl4_api_url}/api/v1/alerts/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported signl4 workflow action: {action}")
+
   def _build_opsgenie_pull_request(
     self,
     *,
@@ -11169,6 +11838,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "p2"
     return "p3"
+
+  @staticmethod
+  def _map_signl4_priority(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "critical"
+    if normalized in {"warning", "warn"}:
+      return "high"
+    return "medium"
 
   @staticmethod
   def _map_servicenow_priority(severity: str) -> str:

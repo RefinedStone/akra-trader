@@ -61,7 +61,7 @@ Implemented now:
   public heartbeat/ticker/trade/level2/candle continuation, and Kraken spot can supply public
   heartbeat/ticker/trade/book/ohlc continuation through the same handoff surface
 - guarded-live incident delivery now supports console, generic webhook, Slack webhook, PagerDuty
-  Events API, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, Zenduty, and Opsgenie Alert API targets with persisted attempt history, operator
+  Events API, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, Zenduty, and Opsgenie Alert API targets with persisted attempt history, operator
   acknowledgment, manual/automatic escalation, and retry/backoff scheduling
 - durable incidents now persist paging policy selection, provider workflow state/reference, and
   can sync provider callbacks plus local provider-native workflow actions bidirectionally through
@@ -75,7 +75,7 @@ Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
 - full external incident-management workflow such as provider-managed incident ownership beyond the
-  current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
+  current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
   paging policy management
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -163,6 +163,10 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_ALERTOPS_API_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_ALERTOPS_RECOVERY_ENGINE_URL_TEMPLATE`
 - `AKRA_TRADER_OPERATOR_ALERT_ALERTOPS_RECOVERY_ENGINE_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_SIGNL4_API_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_SIGNL4_API_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_SIGNL4_RECOVERY_ENGINE_URL_TEMPLATE`
+- `AKRA_TRADER_OPERATOR_ALERT_SIGNL4_RECOVERY_ENGINE_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_ZENDUTY_API_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_ZENDUTY_API_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_ZENDUTY_RECOVERY_ENGINE_URL_TEMPLATE`
@@ -298,10 +302,10 @@ Defaults:
   on incident remediation state as both raw payload and typed provider recovery state
   (`job_id`, channels, symbols, timeframe, verification result) plus a provider-side status
   machine that tracks workflow phase, job phase, sync state, last provider event, and attempt
-  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/Zenduty/Opsgenie
+  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/Zenduty/Opsgenie
   incident/alert body so provider-stored workflow and recovery details become the authoritative
   reconciliation source even when callbacks lag. The typed recovery state now also preserves
-  provider-specific schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, Zenduty incidents, and Opsgenie alerts instead of
+  provider-specific schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, Zenduty incidents, and Opsgenie alerts instead of
   flattening every provider into one generic shape, and each provider schema now carries its own
   native recovery phase graph instead of relying only on the shared recovery machine. Provider
   pull-sync now also lifts remediation telemetry such as progress, current step, attempt count,
@@ -310,7 +314,7 @@ Defaults:
   are configured, pull-sync also polls those endpoints and lets engine telemetry override stale
   incident-body copies. That typed state surfaces in the guarded-live incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
-  across PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, Zenduty, and Opsgenie
+  across PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, Zenduty, and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

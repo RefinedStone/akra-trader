@@ -97,6 +97,10 @@ class Settings:
   operator_alert_alertops_api_url: str = "https://api.alertops.com"
   operator_alert_alertops_recovery_engine_url_template: str | None = None
   operator_alert_alertops_recovery_engine_token: str | None = None
+  operator_alert_signl4_api_token: str | None = None
+  operator_alert_signl4_api_url: str = "https://connect.signl4.com"
+  operator_alert_signl4_recovery_engine_url_template: str | None = None
+  operator_alert_signl4_recovery_engine_token: str | None = None
   operator_alert_opsgenie_api_key: str | None = None
   operator_alert_opsgenie_api_url: str = "https://api.opsgenie.com"
   operator_alert_opsgenie_recovery_engine_url_template: str | None = None
@@ -364,6 +368,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_alertops_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_ALERTOPS_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_signl4_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SIGNL4_API_TOKEN") or None
+    ),
+    operator_alert_signl4_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_SIGNL4_API_URL",
+      "https://connect.signl4.com",
+    ),
+    operator_alert_signl4_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SIGNL4_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_signl4_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SIGNL4_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsgenie_api_key=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY") or None

@@ -80,6 +80,8 @@ from akra_trader.domain.models import OperatorIncidentPagerTreeRecoveryPhaseGrap
 from akra_trader.domain.models import OperatorIncidentPagerTreeRecoveryState
 from akra_trader.domain.models import OperatorIncidentAlertOpsRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentAlertOpsRecoveryState
+from akra_trader.domain.models import OperatorIncidentSignl4RecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentSignl4RecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1709,6 +1711,17 @@ class TradingApplication:
             alertops=replace(
               aligned_provider_recovery.alertops,
               incident_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "signl4"
+          and provider_recovery.signl4.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            signl4=replace(
+              aligned_provider_recovery.signl4,
+              alert_status="delivered",
             ),
           )
         updated_incident = replace(
@@ -4188,6 +4201,140 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_signl4_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "in_progress",
+      "investigating",
+      "monitoring",
+      "resolved",
+      "closed",
+      "canceled",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_signl4_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_signl4_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_signl4_team_phase(
+    team: str | None,
+    existing_phase: str,
+  ) -> str:
+    if team:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_signl4_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "in_progress", "investigating", "monitoring", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_signl4_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    team: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentSignl4RecoveryState,
+  ) -> OperatorIncidentSignl4RecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_signl4_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_signl4_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentSignl4RecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_signl4_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_signl4_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      team_phase=self._first_non_empty_string(
+        payload.get("team_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("team_phase"),
+      ) or self._resolve_signl4_team_phase(
+        team,
+        existing.phase_graph.team_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -4218,6 +4365,7 @@ class TradingApplication:
     OperatorIncidentJiraServiceManagementRecoveryState,
     OperatorIncidentPagerTreeRecoveryState,
     OperatorIncidentAlertOpsRecoveryState,
+    OperatorIncidentSignl4RecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -5471,6 +5619,86 @@ class TradingApplication:
       ),
     )
 
+    signl4_payload = self._merge_payload_mappings(
+      schema_payload.get("signl4"),
+      schema_payload.get("signl_4"),
+      payload.get("signl4"),
+      payload.get("signl4_alert"),
+      payload.get("signl_4"),
+    )
+    signl4_status = self._first_non_empty_string(
+      signl4_payload.get("alert_status"),
+      signl4_payload.get("status"),
+      signl4_payload.get("state"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.signl4.alert_status,
+    ) or "unknown"
+    signl4 = OperatorIncidentSignl4RecoveryState(
+      alert_id=self._first_non_empty_string(
+        signl4_payload.get("alert_id"),
+        signl4_payload.get("id"),
+        workflow_reference,
+        existing.signl4.alert_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        signl4_payload.get("external_reference"),
+        signl4_payload.get("reference"),
+        reference,
+        existing.signl4.external_reference,
+      ),
+      alert_status=signl4_status,
+      priority=self._first_non_empty_string(
+        signl4_payload.get("priority"),
+        signl4_payload.get("severity"),
+        signl4_payload.get("urgency"),
+        existing.signl4.priority,
+      ),
+      team=self._first_non_empty_string(
+        signl4_payload.get("team"),
+        signl4_payload.get("service"),
+        existing.signl4.team,
+      ),
+      assignee=self._first_non_empty_string(
+        signl4_payload.get("assignee"),
+        signl4_payload.get("owner"),
+        existing.signl4.assignee,
+      ),
+      url=self._first_non_empty_string(
+        signl4_payload.get("url"),
+        signl4_payload.get("html_url"),
+        existing.signl4.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(signl4_payload.get("updated_at"))
+        or existing.signl4.updated_at
+      ),
+      phase_graph=self._build_signl4_recovery_phase_graph(
+        payload=signl4_payload,
+        alert_status=signl4_status,
+        priority=self._first_non_empty_string(
+          signl4_payload.get("priority"),
+          signl4_payload.get("severity"),
+          signl4_payload.get("urgency"),
+          existing.signl4.priority,
+        ),
+        team=self._first_non_empty_string(
+          signl4_payload.get("team"),
+          signl4_payload.get("service"),
+          existing.signl4.team,
+        ),
+        assignee=self._first_non_empty_string(
+          signl4_payload.get("assignee"),
+          signl4_payload.get("owner"),
+          existing.signl4.assignee,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.signl4,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -5490,6 +5718,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -5510,6 +5739,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "incidentio":
       return (
@@ -5530,6 +5760,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -5550,6 +5781,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "rootly":
       return (
@@ -5570,6 +5802,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "blameless":
       return (
@@ -5590,6 +5823,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "xmatters":
       return (
@@ -5610,6 +5844,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "servicenow":
       return (
@@ -5630,6 +5865,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "squadcast":
       return (
@@ -5650,6 +5886,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "bigpanda":
       return (
@@ -5670,6 +5907,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "grafana_oncall":
       return (
@@ -5690,6 +5928,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "zenduty":
       return (
@@ -5710,6 +5949,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "splunk_oncall":
       return (
@@ -5730,6 +5970,7 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "jira_service_management":
       return (
@@ -5750,6 +5991,7 @@ class TradingApplication:
         jira_service_management,
         existing.pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "pagertree":
       return (
@@ -5770,6 +6012,7 @@ class TradingApplication:
         existing.jira_service_management,
         pagertree,
         existing.alertops,
+        existing.signl4,
       )
     if normalized_provider == "alertops":
       return (
@@ -5790,6 +6033,28 @@ class TradingApplication:
         existing.jira_service_management,
         existing.pagertree,
         alertops,
+        existing.signl4,
+      )
+    if normalized_provider == "signl4":
+      return (
+        "signl4",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        existing.xmatters,
+        existing.servicenow,
+        existing.squadcast,
+        existing.bigpanda,
+        existing.grafana_oncall,
+        existing.zenduty,
+        existing.splunk_oncall,
+        existing.jira_service_management,
+        existing.pagertree,
+        existing.alertops,
+        signl4,
       )
     return (
       existing.provider_schema_kind,
@@ -5809,6 +6074,7 @@ class TradingApplication:
       existing.jira_service_management,
       existing.pagertree,
       existing.alertops,
+      existing.signl4,
     )
 
   def _build_provider_recovery_state(
@@ -5901,6 +6167,7 @@ class TradingApplication:
       jira_service_management_schema,
       pagertree_schema,
       alertops_schema,
+      signl4_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
         provider=provider or existing.provider or remediation.provider or "",
@@ -5992,6 +6259,7 @@ class TradingApplication:
       jira_service_management=jira_service_management_schema,
       pagertree=pagertree_schema,
       alertops=alertops_schema,
+      signl4=signl4_schema,
       updated_at=synced_at,
     )
 
@@ -6225,6 +6493,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.alertops,
+        ),
+      ),
+      signl4=replace(
+        provider_recovery.signl4,
+        phase_graph=self._build_signl4_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.signl4.alert_status,
+          priority=provider_recovery.signl4.priority,
+          team=provider_recovery.signl4.team,
+          assignee=provider_recovery.signl4.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.signl4,
         ),
       ),
     )
@@ -10586,6 +10868,8 @@ class TradingApplication:
       return "pagertree"
     if normalized == "alert_ops":
       return "alertops"
+    if normalized == "signl_4":
+      return "signl4"
     if normalized in {"grafana_oncall_incidents", "grafanaoncall", "operator_grafana_oncall"}:
       return "grafana_oncall"
     if normalized in {"zenduty_incidents", "operator_zenduty"}:
@@ -10603,6 +10887,8 @@ class TradingApplication:
       return "pagertree"
     if normalized in {"alertops_incidents", "operator_alertops"}:
       return "alertops"
+    if normalized in {"signl4_incidents", "operator_signl4"}:
+      return "signl4"
     return normalized or None
 
   @staticmethod
@@ -10792,6 +11078,8 @@ class TradingApplication:
       return "pagertree"
     if "alertops_incidents" in combined:
       return "alertops"
+    if "signl4_incidents" in combined:
+      return "signl4"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

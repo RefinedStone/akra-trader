@@ -682,6 +682,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        signl4: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          team?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            team_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1131,6 +1149,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             priority_phase: string;
             service_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        signl4: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          team?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            team_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8826,6 +8862,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  signl4: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    team?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      team_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9295,6 +9349,36 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `AlertOps schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "signl4") {
+    const details = [
+      providerRecovery.signl4.alert_id ? `alert ${providerRecovery.signl4.alert_id}` : null,
+      providerRecovery.signl4.alert_status !== "unknown"
+        ? `status ${providerRecovery.signl4.alert_status}`
+        : null,
+      providerRecovery.signl4.priority ? `priority ${providerRecovery.signl4.priority}` : null,
+      providerRecovery.signl4.team ? `team ${providerRecovery.signl4.team}` : null,
+      providerRecovery.signl4.assignee ? `assignee ${providerRecovery.signl4.assignee}` : null,
+      providerRecovery.signl4.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.signl4.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.signl4.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.signl4.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.signl4.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.signl4.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.signl4.phase_graph.priority_phase !== "unknown"
+        ? `priority phase ${providerRecovery.signl4.phase_graph.priority_phase}`
+        : null,
+      providerRecovery.signl4.phase_graph.team_phase !== "unknown"
+        ? `team phase ${providerRecovery.signl4.phase_graph.team_phase}`
+        : null,
+      providerRecovery.signl4.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.signl4.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `SIGNL4 schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [
