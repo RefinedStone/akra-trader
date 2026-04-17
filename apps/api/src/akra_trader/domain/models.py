@@ -1176,6 +1176,31 @@ class OperatorIncidentIncidentHubRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentOpsRampRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentOpsRampRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentOpsRampRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentOpsRampRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -1271,6 +1296,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   incidenthub: OperatorIncidentIncidentHubRecoveryState = field(
     default_factory=OperatorIncidentIncidentHubRecoveryState
+  )
+  opsramp: OperatorIncidentOpsRampRecoveryState = field(
+    default_factory=OperatorIncidentOpsRampRecoveryState
   )
   updated_at: datetime | None = None
 

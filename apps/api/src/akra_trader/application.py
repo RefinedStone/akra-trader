@@ -98,6 +98,8 @@ from akra_trader.domain.models import OperatorIncidentDutyCallsRecoveryPhaseGrap
 from akra_trader.domain.models import OperatorIncidentDutyCallsRecoveryState
 from akra_trader.domain.models import OperatorIncidentIncidentHubRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIncidentHubRecoveryState
+from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1825,6 +1827,17 @@ class TradingApplication:
             aligned_provider_recovery,
             incidenthub=replace(
               aligned_provider_recovery.incidenthub,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "opsramp"
+          and provider_recovery.opsramp.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            opsramp=replace(
+              aligned_provider_recovery.opsramp,
               alert_status="delivered",
             ),
           )
@@ -5503,6 +5516,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_opsramp_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_opsramp_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_opsramp_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_opsramp_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_opsramp_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_opsramp_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentOpsRampRecoveryState,
+  ) -> OperatorIncidentOpsRampRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_opsramp_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_opsramp_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentOpsRampRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_opsramp_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_opsramp_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_opsramp_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -8144,6 +8290,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "incidenthub"
+    opsramp_schema = existing.opsramp
+    opsramp_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("opsramp"),
+      payload.get("opsramp"),
+      payload.get("opsramp_alert"),
+    )
+    if normalized_provider == "opsramp" or opsramp_payload:
+      opsramp_status = self._first_non_empty_string(
+        opsramp_payload.get("alert_status"),
+        opsramp_payload.get("status"),
+        opsramp_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.opsramp.alert_status,
+      ) or "unknown"
+      opsramp_schema = OperatorIncidentOpsRampRecoveryState(
+        alert_id=self._first_non_empty_string(
+          opsramp_payload.get("alert_id"),
+          opsramp_payload.get("id"),
+          opsramp_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.opsramp.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          opsramp_payload.get("external_reference"),
+          opsramp_payload.get("reference"),
+          reference,
+          existing.opsramp.external_reference,
+        ),
+        alert_status=opsramp_status,
+        priority=self._first_non_empty_string(
+          opsramp_payload.get("priority"),
+          opsramp_payload.get("severity"),
+          opsramp_payload.get("urgency"),
+          existing.opsramp.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          opsramp_payload.get("escalation_policy"),
+          opsramp_payload.get("escalationPolicy"),
+          opsramp_payload.get("policy"),
+          opsramp_payload.get("source"),
+          existing.opsramp.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          opsramp_payload.get("assignee"),
+          opsramp_payload.get("owner"),
+          opsramp_payload.get("assigned_to"),
+          existing.opsramp.assignee,
+        ),
+        url=self._first_non_empty_string(
+          opsramp_payload.get("url"),
+          opsramp_payload.get("html_url"),
+          opsramp_payload.get("link"),
+          existing.opsramp.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(opsramp_payload.get("updated_at"))
+          or existing.opsramp.updated_at
+        ),
+        phase_graph=self._build_opsramp_recovery_phase_graph(
+          payload=opsramp_payload,
+          alert_status=opsramp_status,
+          priority=self._first_non_empty_string(
+            opsramp_payload.get("priority"),
+            opsramp_payload.get("severity"),
+            opsramp_payload.get("urgency"),
+            existing.opsramp.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            opsramp_payload.get("escalation_policy"),
+            opsramp_payload.get("escalationPolicy"),
+            opsramp_payload.get("policy"),
+            opsramp_payload.get("source"),
+            existing.opsramp.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            opsramp_payload.get("assignee"),
+            opsramp_payload.get("owner"),
+            opsramp_payload.get("assigned_to"),
+            existing.opsramp.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.opsramp,
+        ),
+      )
+      provider_schema_kind = "opsramp"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -8226,6 +8465,7 @@ class TradingApplication:
       spikesh=spikesh_schema,
       dutycalls=dutycalls_schema,
       incidenthub=incidenthub_schema,
+      opsramp=opsramp_schema,
       updated_at=synced_at,
     )
 
@@ -8585,6 +8825,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.incidenthub,
+        ),
+      ),
+      opsramp=replace(
+        provider_recovery.opsramp,
+        phase_graph=self._build_opsramp_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.opsramp.alert_status,
+          priority=provider_recovery.opsramp.priority,
+          escalation_policy=provider_recovery.opsramp.escalation_policy,
+          assignee=provider_recovery.opsramp.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.opsramp,
         ),
       ),
     )
@@ -12999,6 +13253,10 @@ class TradingApplication:
       return "incidenthub"
     if normalized in {"incidenthub_incidents", "operator_incidenthub"}:
       return "incidenthub"
+    if normalized in {"opsramp_alerts", "ops_ramp", "operator_opsramp"}:
+      return "opsramp"
+    if normalized in {"opsramp_incidents", "operator_opsramp"}:
+      return "opsramp"
     return normalized or None
 
   @staticmethod
@@ -13206,6 +13464,8 @@ class TradingApplication:
       return "dutycalls"
     if "incidenthub_incidents" in combined or "incidenthub_alerts" in combined:
       return "incidenthub"
+    if "opsramp_incidents" in combined or "opsramp_alerts" in combined:
+      return "opsramp"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None
