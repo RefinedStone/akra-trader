@@ -37,11 +37,18 @@ class Settings:
   operator_alert_webhook_url: str | None = None
   operator_alert_slack_webhook_url: str | None = None
   operator_alert_pagerduty_integration_key: str | None = None
+  operator_alert_pagerduty_api_token: str | None = None
+  operator_alert_pagerduty_from_email: str | None = None
   operator_alert_webhook_timeout_seconds: int = 5
   operator_alert_delivery_max_attempts: int = 4
   operator_alert_delivery_initial_backoff_seconds: int = 15
   operator_alert_delivery_max_backoff_seconds: int = 300
   operator_alert_delivery_backoff_multiplier: float = 2.0
+  operator_alert_paging_policy_default_provider: str | None = None
+  operator_alert_paging_policy_warning_targets: tuple[str, ...] = ()
+  operator_alert_paging_policy_critical_targets: tuple[str, ...] = ()
+  operator_alert_paging_policy_warning_escalation_targets: tuple[str, ...] = ()
+  operator_alert_paging_policy_critical_escalation_targets: tuple[str, ...] = ()
   operator_alert_external_sync_token: str | None = None
   operator_alert_incident_ack_timeout_seconds: int = 300
   operator_alert_incident_max_escalations: int = 2
@@ -101,6 +108,12 @@ def load_settings() -> Settings:
     operator_alert_pagerduty_integration_key=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_INTEGRATION_KEY") or None
     ),
+    operator_alert_pagerduty_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_API_TOKEN") or None
+    ),
+    operator_alert_pagerduty_from_email=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_FROM_EMAIL") or None
+    ),
     operator_alert_webhook_timeout_seconds=int(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS", "5")
     ),
@@ -115,6 +128,21 @@ def load_settings() -> Settings:
     ),
     operator_alert_delivery_backoff_multiplier=float(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER", "2.0")
+    ),
+    operator_alert_paging_policy_default_provider=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_DEFAULT_PROVIDER") or None
+    ),
+    operator_alert_paging_policy_warning_targets=_parse_csv_env(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_WARNING_TARGETS", "")
+    ),
+    operator_alert_paging_policy_critical_targets=_parse_csv_env(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_CRITICAL_TARGETS", "")
+    ),
+    operator_alert_paging_policy_warning_escalation_targets=_parse_csv_env(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_WARNING_ESCALATION_TARGETS", "")
+    ),
+    operator_alert_paging_policy_critical_escalation_targets=_parse_csv_env(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_CRITICAL_ESCALATION_TARGETS", "")
     ),
     operator_alert_external_sync_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_EXTERNAL_SYNC_TOKEN") or None

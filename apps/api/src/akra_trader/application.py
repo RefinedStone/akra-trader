@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import asdict
+from dataclasses import dataclass
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
@@ -123,6 +124,15 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "reference_floor": 0.5,
   },
 }
+
+
+@dataclass(frozen=True)
+class _IncidentPagingPolicy:
+  policy_id: str
+  provider: str | None
+  initial_targets: tuple[str, ...]
+  escalation_targets: tuple[str, ...]
+  resolution_targets: tuple[str, ...]
 
 COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
   "benchmark_validation": {
@@ -352,6 +362,9 @@ class TradingApplication:
     def list_targets(self) -> tuple[str, ...]:
       return ()
 
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ()
+
     def deliver(
       self,
       *,
@@ -359,6 +372,18 @@ class TradingApplication:
       targets: tuple[str, ...] | None = None,
       attempt_number: int = 1,
       phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return ()
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      attempt_number: int = 1,
     ) -> tuple[OperatorIncidentDelivery, ...]:
       return ()
 
@@ -388,6 +413,11 @@ class TradingApplication:
     operator_alert_delivery_initial_backoff_seconds: int = 15,
     operator_alert_delivery_max_backoff_seconds: int = 300,
     operator_alert_delivery_backoff_multiplier: float = 2.0,
+    operator_alert_paging_policy_default_provider: str | None = None,
+    operator_alert_paging_policy_warning_targets: tuple[str, ...] = (),
+    operator_alert_paging_policy_critical_targets: tuple[str, ...] = (),
+    operator_alert_paging_policy_warning_escalation_targets: tuple[str, ...] = (),
+    operator_alert_paging_policy_critical_escalation_targets: tuple[str, ...] = (),
     operator_alert_external_sync_token: str | None = None,
     operator_alert_escalation_targets: tuple[str, ...] = (),
     operator_alert_incident_ack_timeout_seconds: int = 300,
@@ -433,6 +463,21 @@ class TradingApplication:
     self._operator_alert_delivery_backoff_multiplier = max(
       operator_alert_delivery_backoff_multiplier,
       1.0,
+    )
+    self._operator_alert_paging_policy_default_provider = self._normalize_paging_provider(
+      operator_alert_paging_policy_default_provider
+    )
+    self._operator_alert_paging_policy_warning_targets = self._normalize_targets(
+      operator_alert_paging_policy_warning_targets
+    )
+    self._operator_alert_paging_policy_critical_targets = self._normalize_targets(
+      operator_alert_paging_policy_critical_targets
+    )
+    self._operator_alert_paging_policy_warning_escalation_targets = self._normalize_targets(
+      operator_alert_paging_policy_warning_escalation_targets
+    )
+    self._operator_alert_paging_policy_critical_escalation_targets = self._normalize_targets(
+      operator_alert_paging_policy_critical_escalation_targets
     )
     self._operator_alert_external_sync_token = operator_alert_external_sync_token
     self._operator_alert_escalation_targets = tuple(
@@ -953,6 +998,18 @@ class TradingApplication:
       incident_event_id=event_id,
       reason="acknowledged_by_operator",
     )
+    updated_incident, delivery_history = self._sync_incident_provider_workflow(
+      incident=updated_incident,
+      delivery_history=delivery_history,
+      current_time=current_time,
+      action="acknowledge",
+      actor=actor,
+      detail=reason,
+    )
+    incident_events = self._replace_incident_event(
+      incident_events=incident_events,
+      updated_incident=updated_incident,
+    )
     incident_events = self._apply_incident_delivery_state(
       incident_events=incident_events,
       delivery_history=delivery_history,
@@ -963,7 +1020,10 @@ class TradingApplication:
       actor=actor,
       kind="guarded_live_incident_acknowledged",
       summary=f"Guarded-live incident acknowledged for {incident.alert_id}.",
-      detail=f"Reason: {reason}. Incident {event_id} acknowledged and pending retries suppressed.",
+      detail=(
+        f"Reason: {reason}. Incident {event_id} acknowledged and pending retries suppressed. "
+        f"Provider workflow: {updated_incident.provider_workflow_state}."
+      ),
       run_id=incident.run_id,
       session_id=incident.session_id,
       source="guarded_live",
@@ -1036,6 +1096,7 @@ class TradingApplication:
     detail: str,
     alert_id: str | None = None,
     external_reference: str | None = None,
+    workflow_reference: str | None = None,
     occurred_at: datetime | None = None,
     escalation_level: int | None = None,
   ) -> GuardedLiveStatus:
@@ -1053,8 +1114,10 @@ class TradingApplication:
     detail_copy = detail.strip() or f"{normalized_provider}_{normalized_kind}"
     updated_incident = replace(
       incident,
+      paging_provider=normalized_provider or incident.paging_provider,
       external_provider=normalized_provider,
       external_reference=effective_reference,
+      provider_workflow_reference=workflow_reference or incident.provider_workflow_reference,
       external_last_synced_at=synced_at,
     )
     delivery_history = state.delivery_history
@@ -1064,6 +1127,15 @@ class TradingApplication:
         updated_incident,
         external_status="triggered",
         paging_status="triggered",
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or effective_reference,
       )
     elif normalized_kind == "acknowledged":
       if updated_incident.acknowledgment_state != "acknowledged":
@@ -1084,6 +1156,15 @@ class TradingApplication:
         delivery_history=delivery_history,
         incident_event_id=incident.event_id,
         reason=f"external_acknowledged:{normalized_provider}",
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
       )
     elif normalized_kind == "escalated":
       next_level = max(updated_incident.escalation_level + 1, escalation_level or 1)
@@ -1107,6 +1188,15 @@ class TradingApplication:
         external_status="escalated",
         paging_status="escalated",
       )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
+      )
     elif normalized_kind == "resolved":
       if updated_incident.acknowledgment_state != "acknowledged":
         updated_incident = replace(
@@ -1126,6 +1216,15 @@ class TradingApplication:
         delivery_history=delivery_history,
         incident_event_id=incident.event_id,
         reason=f"external_resolved:{normalized_provider}",
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
       )
     else:
       raise ValueError(f"unsupported external incident event kind: {event_kind}")
@@ -3993,9 +4092,9 @@ class TradingApplication:
   ) -> tuple[OperatorIncidentEvent, ...]:
     previous_by_id = {alert.alert_id: alert for alert in previous_history}
     incident_events: list[OperatorIncidentEvent] = []
-    outbound_targets = self._operator_alert_delivery.list_targets()
 
     for alert in merged_history:
+      policy = self._resolve_incident_paging_policy(alert=alert)
       previous = previous_by_id.get(alert.alert_id)
       if alert.status == "active" and (previous is None or previous.status != "active"):
         incident_events.append(
@@ -4010,17 +4109,21 @@ class TradingApplication:
             run_id=alert.run_id,
             session_id=alert.session_id,
             source=alert.source,
-            delivery_targets=outbound_targets,
-            escalation_targets=self._operator_alert_escalation_targets,
+            paging_policy_id=policy.policy_id,
+            paging_provider=policy.provider,
+            delivery_targets=policy.initial_targets,
+            escalation_targets=policy.escalation_targets,
             acknowledgment_state="unacknowledged",
             escalation_state=(
-              "pending" if self._operator_alert_escalation_targets else "not_configured"
+              "pending" if policy.escalation_targets else "not_configured"
             ),
             next_escalation_at=(
               alert.detected_at + timedelta(seconds=self._operator_alert_incident_ack_timeout_seconds)
-              if self._operator_alert_escalation_targets
+              if policy.escalation_targets
               else None
             ),
+            paging_status="pending" if policy.provider else "not_configured",
+            provider_workflow_state="idle" if policy.provider else "not_configured",
           )
         )
         continue
@@ -4038,14 +4141,72 @@ class TradingApplication:
             run_id=alert.run_id,
             session_id=alert.session_id,
             source=alert.source,
-            delivery_targets=outbound_targets,
+            paging_policy_id=policy.policy_id,
+            paging_provider=policy.provider,
+            delivery_targets=policy.resolution_targets,
             acknowledgment_state="not_applicable",
             escalation_state="not_applicable",
+            paging_status="pending" if policy.provider else "not_configured",
           )
         )
 
     incident_events.sort(key=lambda event: event.timestamp, reverse=True)
     return tuple(incident_events)
+
+  @staticmethod
+  def _normalize_targets(targets: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(targets))
+
+  @staticmethod
+  def _normalize_paging_provider(provider: str | None) -> str | None:
+    if provider is None:
+      return None
+    normalized = provider.strip().lower().replace("-", "_")
+    return normalized or None
+
+  def _resolve_incident_paging_policy(self, *, alert: OperatorAlert) -> _IncidentPagingPolicy:
+    severity = alert.severity.strip().lower()
+    policy_id = "default"
+    initial_targets = self._operator_alert_delivery.list_targets()
+    escalation_targets = self._operator_alert_escalation_targets or initial_targets
+    if severity in {"critical", "error"}:
+      policy_id = "severity:critical"
+      if self._operator_alert_paging_policy_critical_targets:
+        initial_targets = self._operator_alert_paging_policy_critical_targets
+      if self._operator_alert_paging_policy_critical_escalation_targets:
+        escalation_targets = self._operator_alert_paging_policy_critical_escalation_targets
+    elif severity in {"warning", "warn"}:
+      policy_id = "severity:warning"
+      if self._operator_alert_paging_policy_warning_targets:
+        initial_targets = self._operator_alert_paging_policy_warning_targets
+      if self._operator_alert_paging_policy_warning_escalation_targets:
+        escalation_targets = self._operator_alert_paging_policy_warning_escalation_targets
+
+    initial_targets = self._normalize_targets(initial_targets)
+    escalation_targets = self._normalize_targets(escalation_targets)
+    resolution_targets = self._normalize_targets((*initial_targets, *escalation_targets))
+    provider = self._operator_alert_paging_policy_default_provider or self._infer_paging_provider(
+      initial_targets=initial_targets,
+      escalation_targets=escalation_targets,
+    )
+    return _IncidentPagingPolicy(
+      policy_id=policy_id,
+      provider=provider,
+      initial_targets=initial_targets,
+      escalation_targets=escalation_targets,
+      resolution_targets=resolution_targets,
+    )
+
+  @staticmethod
+  def _infer_paging_provider(
+    *,
+    initial_targets: tuple[str, ...],
+    escalation_targets: tuple[str, ...],
+  ) -> str | None:
+    combined = {target.strip().lower().replace("-", "_") for target in (*initial_targets, *escalation_targets)}
+    if "pagerduty_events" in combined:
+      return "pagerduty"
+    return None
 
   def _deliver_guarded_live_incident_events(
     self,
@@ -4068,17 +4229,31 @@ class TradingApplication:
       )
       delivery_state = self._resolve_incident_delivery_state(records=records)
       external_record = next((record for record in records if record.external_provider is not None), None)
+      paging_status = incident.paging_status
+      external_status = incident.external_status
+      if external_record is not None and delivery_state in {"delivered", "partial"}:
+        if incident.kind == "incident_opened":
+          paging_status = "triggered"
+          external_status = "triggered"
+        elif incident.kind == "incident_resolved":
+          paging_status = "resolved"
+          external_status = "resolved"
       persisted_events.append(
         replace(
           incident,
           delivery_state=delivery_state,
           delivery_targets=incident.delivery_targets or self._operator_alert_delivery.list_targets(),
+          paging_provider=(
+            external_record.external_provider if external_record is not None else incident.paging_provider
+          ),
           external_provider=(
             external_record.external_provider if external_record is not None else incident.external_provider
           ),
           external_reference=(
             external_record.external_reference if external_record is not None else incident.external_reference
           ),
+          external_status=external_status,
+          paging_status=paging_status,
         )
       )
       delivery_records.extend(records)
@@ -4108,12 +4283,26 @@ class TradingApplication:
       )
       if latest is None:
         continue
-      records = self._operator_alert_delivery.deliver(
-        incident=incident,
-        targets=(target,),
-        attempt_number=attempt_number,
-        phase=latest.phase,
-      )
+      if latest.phase.startswith("provider_"):
+        provider = latest.external_provider or incident.paging_provider or incident.external_provider
+        action = latest.provider_action or latest.phase.removeprefix("provider_")
+        if provider is None:
+          continue
+        records = self._operator_alert_delivery.sync_incident_workflow(
+          incident=incident,
+          provider=provider,
+          action=action,
+          actor="system",
+          detail=f"retry:{latest.phase}",
+          attempt_number=attempt_number,
+        )
+      else:
+        records = self._operator_alert_delivery.deliver(
+          incident=incident,
+          targets=(target,),
+          attempt_number=attempt_number,
+          phase=latest.phase,
+        )
       retries.extend(
         self._apply_delivery_retry_policy(
           records=records,
@@ -4137,7 +4326,11 @@ class TradingApplication:
       incident = incidents_by_id.get(latest.incident_event_id)
       if incident is None:
         continue
-      if incident.kind == "incident_opened" and incident.acknowledgment_state == "acknowledged":
+      if (
+        incident.kind == "incident_opened"
+        and incident.acknowledgment_state == "acknowledged"
+        and not latest.phase.startswith("provider_")
+      ):
         continue
       if latest.status != "retry_scheduled" or latest.next_retry_at is None:
         continue
@@ -4159,15 +4352,43 @@ class TradingApplication:
 
     refreshed: list[OperatorIncidentEvent] = []
     for incident in incident_events:
-      records = tuple(
+      delivery_records = tuple(
         record
         for key, record in latest_by_key.items()
         if key[0] == incident.event_id
+        and not key[2].startswith("provider_")
       )
+      provider_records = tuple(
+        record
+        for key, record in latest_by_key.items()
+        if key[0] == incident.event_id
+        and key[2].startswith("provider_")
+      )
+      latest_provider_record = self._latest_provider_workflow_record(records=provider_records)
       refreshed.append(
         replace(
           incident,
-          delivery_state=self._resolve_incident_delivery_state(records=records),
+          delivery_state=self._resolve_incident_delivery_state(records=delivery_records),
+          provider_workflow_state=(
+            self._resolve_incident_delivery_state(records=provider_records)
+            if provider_records
+            else incident.provider_workflow_state
+          ),
+          provider_workflow_action=(
+            latest_provider_record.provider_action
+            if latest_provider_record is not None
+            else incident.provider_workflow_action
+          ),
+          provider_workflow_last_attempted_at=(
+            latest_provider_record.attempted_at
+            if latest_provider_record is not None
+            else incident.provider_workflow_last_attempted_at
+          ),
+          provider_workflow_reference=(
+            latest_provider_record.external_reference
+            if latest_provider_record is not None and latest_provider_record.external_reference is not None
+            else incident.provider_workflow_reference
+          ),
         )
       )
     refreshed.sort(key=lambda event: event.timestamp, reverse=True)
@@ -4311,6 +4532,21 @@ class TradingApplication:
     return candidates[0]
 
   @staticmethod
+  def _latest_provider_workflow_record(
+    *,
+    records: tuple[OperatorIncidentDelivery, ...],
+  ) -> OperatorIncidentDelivery | None:
+    if not records:
+      return None
+    return max(
+      records,
+      key=lambda record: (
+        record.attempted_at,
+        record.attempt_number,
+      ),
+    )
+
+  @staticmethod
   def _replace_incident_event(
     *,
     incident_events: tuple[OperatorIncidentEvent, ...],
@@ -4370,6 +4606,7 @@ class TradingApplication:
           external_reference is not None
           and (
             incident.external_reference == external_reference
+            or incident.provider_workflow_reference == external_reference
             or incident.alert_id == external_reference
           )
         )
@@ -4414,6 +4651,120 @@ class TradingApplication:
         )
       )
     return tuple(updated)
+
+  def _sync_incident_provider_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    current_time: datetime,
+    action: str,
+    actor: str,
+    detail: str,
+  ) -> tuple[OperatorIncidentEvent, tuple[OperatorIncidentDelivery, ...]]:
+    provider = incident.paging_provider or incident.external_provider
+    if provider is None:
+      return (
+        replace(
+          incident,
+          provider_workflow_state="not_configured",
+          provider_workflow_action=action,
+        ),
+        delivery_history,
+      )
+    normalized_provider = self._normalize_paging_provider(provider)
+    supported_providers = {
+      self._normalize_paging_provider(candidate)
+      for candidate in self._operator_alert_delivery.list_supported_workflow_providers()
+    }
+    if normalized_provider not in supported_providers:
+      return (
+        replace(
+          incident,
+          paging_provider=normalized_provider,
+          provider_workflow_state="not_supported",
+          provider_workflow_action=action,
+          provider_workflow_last_attempted_at=current_time,
+        ),
+        delivery_history,
+      )
+
+    records = self._operator_alert_delivery.sync_incident_workflow(
+      incident=incident,
+      provider=normalized_provider or provider,
+      action=action,
+      actor=actor,
+      detail=detail,
+      attempt_number=1,
+    )
+    records = self._apply_delivery_retry_policy(
+      records=records,
+      current_time=current_time,
+    )
+    latest = self._latest_provider_workflow_record(records=records)
+    updated_incident = replace(
+      incident,
+      paging_provider=normalized_provider,
+      external_provider=normalized_provider or incident.external_provider,
+      provider_workflow_action=action,
+      provider_workflow_last_attempted_at=(
+        latest.attempted_at if latest is not None else current_time
+      ),
+      provider_workflow_reference=(
+        latest.external_reference
+        if latest is not None and latest.external_reference is not None
+        else incident.provider_workflow_reference
+      ),
+    )
+    return updated_incident, tuple((*records, *delivery_history))
+
+  def _confirm_external_provider_workflow(
+    self,
+    *,
+    delivery_history: tuple[OperatorIncidentDelivery, ...],
+    incident: OperatorIncidentEvent,
+    provider: str,
+    event_kind: str,
+    detail: str,
+    occurred_at: datetime,
+    external_reference: str | None,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    phase = self._provider_phase_for_event_kind(event_kind)
+    if phase is None:
+      return delivery_history
+    provider_prefix = self._normalize_paging_provider(provider) or provider
+    updated_history = self._suppress_pending_incident_retries(
+      delivery_history=delivery_history,
+      incident_event_id=incident.event_id,
+      reason=f"external_confirmed:{provider_prefix}:{event_kind}",
+      phase=phase,
+    )
+    confirmation = OperatorIncidentDelivery(
+      delivery_id=f"{incident.event_id}:{provider_prefix}_external:{event_kind}:{occurred_at.isoformat()}",
+      incident_event_id=incident.event_id,
+      alert_id=incident.alert_id,
+      incident_kind=incident.kind,
+      target=f"{provider_prefix}_external_sync",
+      status="delivered",
+      attempted_at=occurred_at,
+      detail=f"external_provider_confirmed:{event_kind}:{detail}",
+      phase=phase,
+      provider_action=phase.removeprefix("provider_"),
+      external_provider=provider_prefix,
+      external_reference=external_reference,
+      source=incident.source,
+    )
+    return (confirmation, *updated_history)
+
+  @staticmethod
+  def _provider_phase_for_event_kind(event_kind: str) -> str | None:
+    mapping = {
+      "triggered": "provider_trigger",
+      "acknowledged": "provider_acknowledge",
+      "escalated": "provider_escalate",
+      "resolved": "provider_resolve",
+    }
+    return mapping.get(event_kind)
 
   def _incident_has_exhausted_initial_delivery(
     self,
@@ -4478,6 +4829,15 @@ class TradingApplication:
       records=escalation_deliveries,
       current_time=current_time,
     )
+    updated_delivery_history = tuple((*escalation_deliveries, *updated_delivery_history))
+    updated_incident, updated_delivery_history = self._sync_incident_provider_workflow(
+      incident=updated_incident,
+      delivery_history=updated_delivery_history,
+      current_time=current_time,
+      action="escalate",
+      actor=actor,
+      detail=reason,
+    )
     audit_event = OperatorAuditEvent(
       event_id=f"guarded-live-incident-escalated:{incident.event_id}:{current_time.isoformat()}",
       timestamp=current_time,
@@ -4486,13 +4846,14 @@ class TradingApplication:
       summary=f"Guarded-live incident escalated for {incident.alert_id}.",
       detail=(
         f"Trigger: {trigger}. Reason: {reason}. Escalation level {next_level} "
-        f"sent via {', '.join(escalation_targets)}."
+        f"sent via {', '.join(escalation_targets)}. "
+        f"Provider workflow: {updated_incident.provider_workflow_state}."
       ),
       run_id=incident.run_id,
       session_id=incident.session_id,
       source="guarded_live",
     )
-    return updated_incident, tuple((*escalation_deliveries, *updated_delivery_history)), audit_event
+    return updated_incident, updated_delivery_history, audit_event
 
   def _resolve_incident_escalation_backoff_seconds(self, escalation_level: int) -> int:
     multiplier = self._operator_alert_incident_escalation_backoff_multiplier ** max(escalation_level - 1, 0)

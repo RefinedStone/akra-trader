@@ -6,6 +6,7 @@ from datetime import UTC
 from datetime import datetime
 from typing import Callable
 from urllib import error as urllib_error
+from urllib import parse as urllib_parse
 from urllib import request as urllib_request
 
 from akra_trader.domain.models import OperatorIncidentDelivery
@@ -39,6 +40,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     webhook_url: str | None = None,
     slack_webhook_url: str | None = None,
     pagerduty_integration_key: str | None = None,
+    pagerduty_api_token: str | None = None,
+    pagerduty_from_email: str | None = None,
     webhook_timeout_seconds: int = 5,
     clock: Callable[[], datetime] | None = None,
     urlopen: Callable[..., object] | None = None,
@@ -52,12 +55,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._webhook_url = webhook_url
     self._slack_webhook_url = slack_webhook_url
     self._pagerduty_integration_key = pagerduty_integration_key
+    self._pagerduty_api_token = pagerduty_api_token
+    self._pagerduty_from_email = pagerduty_from_email
     self._webhook_timeout_seconds = webhook_timeout_seconds
     self._clock = clock or (lambda: datetime.now(UTC))
     self._urlopen = urlopen or urllib_request.urlopen
 
   def list_targets(self) -> tuple[str, ...]:
     return self._targets
+
+  def list_supported_workflow_providers(self) -> tuple[str, ...]:
+    if self._pagerduty_api_token and self._pagerduty_from_email:
+      return ("pagerduty",)
+    return ()
 
   def deliver(
     self,
@@ -82,6 +92,50 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if target == "pagerduty_events":
         records.append(self._deliver_pagerduty(incident=incident, attempt_number=attempt_number, phase=phase))
     return tuple(records)
+
+  def sync_incident_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+    action: str,
+    actor: str,
+    detail: str,
+    attempt_number: int = 1,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    normalized_provider = provider.strip().lower().replace("-", "_")
+    normalized_action = action.strip().lower().replace("-", "_")
+    if normalized_provider == "pagerduty":
+      return (
+        self._sync_pagerduty_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          attempt_number=attempt_number,
+        ),
+      )
+    attempted_at = self._clock()
+    return (
+      OperatorIncidentDelivery(
+        delivery_id=(
+          f"{incident.event_id}:{normalized_provider}_workflow:{normalized_action}:attempt-{attempt_number}"
+        ),
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=f"{normalized_provider}_workflow",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"provider_workflow_unsupported:{normalized_provider}:{normalized_action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{normalized_action}",
+        provider_action=normalized_action,
+        external_provider=normalized_provider,
+        external_reference=incident.provider_workflow_reference or incident.external_reference,
+        source=incident.source,
+      ),
+    )
 
   def _deliver_console(
     self,
@@ -308,6 +362,97 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         source=incident.source,
       )
 
+  def _sync_pagerduty_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    workflow_reference = incident.provider_workflow_reference or incident.external_reference
+    target = "pagerduty_workflow"
+    if not self._pagerduty_api_token or not self._pagerduty_from_email:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="pagerduty_workflow_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=workflow_reference,
+        source=incident.source,
+      )
+    if not workflow_reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="pagerduty_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=None,
+        source=incident.source,
+      )
+
+    request = self._build_pagerduty_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      workflow_reference=workflow_reference,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"pagerduty_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=workflow_reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"pagerduty_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=workflow_reference,
+        source=incident.source,
+      )
+
   @staticmethod
   def _build_generic_webhook_payload(*, incident: OperatorIncidentEvent) -> bytes:
     return json.dumps(
@@ -368,6 +513,68 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         },
       }
     ).encode("utf-8")
+
+  def _build_pagerduty_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    workflow_reference: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(workflow_reference, safe="")
+    headers = {
+      "Accept": "application/vnd.pagerduty+json;version=2",
+      "Authorization": f"Token token={self._pagerduty_api_token}",
+      "Content-Type": "application/json",
+      "From": self._pagerduty_from_email or "",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"https://api.pagerduty.com/incidents/{encoded_reference}",
+        data=json.dumps(
+          {
+            "incident": {
+              "type": "incident_reference",
+              "status": "acknowledged",
+            }
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"https://api.pagerduty.com/incidents/{encoded_reference}",
+        data=json.dumps(
+          {
+            "incident": {
+              "type": "incident_reference",
+              "status": "resolved",
+            }
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"https://api.pagerduty.com/incidents/{encoded_reference}/notes",
+        data=json.dumps(
+          {
+            "note": {
+              "content": (
+                f"Akra escalated incident to level {incident.escalation_level}. "
+                f"Actor: {actor}. Detail: {detail}."
+              ),
+            }
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported pagerduty workflow action: {action}")
 
   @staticmethod
   def _map_pagerduty_severity(severity: str) -> str:

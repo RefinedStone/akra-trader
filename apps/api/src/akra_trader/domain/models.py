@@ -499,6 +499,8 @@ class OperatorIncidentEvent:
   run_id: str | None = None
   session_id: str | None = None
   source: str = "guarded_live"
+  paging_policy_id: str = "default"
+  paging_provider: str | None = None
   delivery_targets: tuple[str, ...] = ()
   escalation_targets: tuple[str, ...] = ()
   delivery_state: str = "pending"
@@ -514,9 +516,13 @@ class OperatorIncidentEvent:
   next_escalation_at: datetime | None = None
   external_provider: str | None = None
   external_reference: str | None = None
+  provider_workflow_reference: str | None = None
   external_status: str = "not_synced"
   external_last_synced_at: datetime | None = None
   paging_status: str = "not_configured"
+  provider_workflow_state: str = "not_configured"
+  provider_workflow_action: str | None = None
+  provider_workflow_last_attempted_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -532,6 +538,7 @@ class OperatorIncidentDelivery:
   attempt_number: int = 1
   next_retry_at: datetime | None = None
   phase: str = "initial"
+  provider_action: str | None = None
   external_provider: str | None = None
   external_reference: str | None = None
   source: str = "guarded_live"

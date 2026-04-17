@@ -99,3 +99,69 @@ def test_operator_alert_delivery_adapter_resolves_pagerduty_incident_resolution(
   payload = json.loads(requests[0].decode("utf-8"))
   assert payload["event_action"] == "resolve"
   assert payload["payload"]["severity"] == "warning"
+
+
+def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("pagerduty",),
+    pagerduty_integration_key="pagerduty-key",
+    pagerduty_api_token="pagerduty-api-token",
+    pagerduty_from_email="akra-ops@example.com",
+    webhook_timeout_seconds=9,
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-2",
+    alert_id="guarded-live:reconciliation",
+    timestamp=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live reconciliation has unresolved findings.",
+    detail="reconciliation drift",
+    external_provider="pagerduty",
+    external_reference="guarded-live:reconciliation",
+    provider_workflow_reference="PDINC-123",
+    escalation_level=2,
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="pagerduty",
+    action="acknowledge",
+    actor="operator",
+    detail="triaged_by_on_call",
+    attempt_number=2,
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="pagerduty",
+    action="escalate",
+    actor="operator",
+    detail="handoff_to_manager",
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("pagerduty",)
+  assert acknowledge[0].target == "pagerduty_workflow"
+  assert acknowledge[0].provider_action == "acknowledge"
+  assert acknowledge[0].external_reference == "PDINC-123"
+  assert acknowledge[0].attempt_number == 2
+  assert escalate[0].provider_action == "escalate"
+
+  acknowledge_request = requests[0]
+  escalate_request = requests[1]
+  assert acknowledge_request[0].endswith("/incidents/PDINC-123")
+  assert acknowledge_request[1] == "PUT"
+  assert acknowledge_request[3]["From"] == "akra-ops@example.com"
+  acknowledge_payload = json.loads(acknowledge_request[2].decode("utf-8"))
+  assert acknowledge_payload["incident"]["status"] == "acknowledged"
+
+  assert escalate_request[0].endswith("/incidents/PDINC-123/notes")
+  assert escalate_request[1] == "POST"
+  escalate_payload = json.loads(escalate_request[2].decode("utf-8"))
+  assert "level 2" in escalate_payload["note"]["content"]

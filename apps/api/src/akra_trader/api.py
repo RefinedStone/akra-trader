@@ -78,6 +78,7 @@ class ExternalIncidentSyncRequest(BaseModel):
   detail: str = "external_incident_sync"
   alert_id: str | None = None
   external_reference: str | None = None
+  workflow_reference: str | None = None
   occurred_at: datetime | None = None
   escalation_level: int | None = Field(default=None, ge=1)
 
@@ -387,6 +388,7 @@ def create_router(container: Container) -> APIRouter:
         detail=request.detail,
         alert_id=request.alert_id,
         external_reference=request.external_reference,
+        workflow_reference=request.workflow_reference,
         occurred_at=request.occurred_at,
         escalation_level=request.escalation_level,
       )

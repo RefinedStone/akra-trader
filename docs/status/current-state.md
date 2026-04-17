@@ -101,9 +101,11 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - outbound incident delivery can now fan out to console, generic webhook, Slack webhook, and
   PagerDuty targets with persisted delivery-attempt history, attempt counts, and retry timing
 - durable guarded-live incidents now persist acknowledgment state, escalation state, next
-  escalation timing, and operator actions for acknowledge/escalate workflows
-- durable guarded-live incidents now also persist external provider/reference state, external
-  sync timestamps, and paging status from external incident-management callbacks
+  escalation timing, operator actions for acknowledge/escalate workflows, and paging policy
+  identity/provider selection
+- durable guarded-live incidents now also persist external provider/reference state, provider
+  workflow state/reference, external sync timestamps, and paging status from external callbacks
+  plus local provider-native workflow actions
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -113,11 +115,13 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   and outbound delivery attempts with bounded retry/backoff state, but it is not yet a full
   external incident-management system
 - incident workflow now includes operator acknowledgment, retry suppression, manual escalation, and
-  auto escalation after ack-timeout or retry exhaustion, but escalation policy is still
-  control-plane local rather than provider-native policy managed
+  auto escalation after ack-timeout or retry exhaustion, and incidents now carry a persisted paging
+  policy id/provider plus provider-workflow state, but provider-managed policy ownership is still
+  limited
 - external paging workflows can now sync `triggered`, `acknowledged`, `escalated`, and `resolved`
-  events back into local incident state, but the integration is still callback-driven and not yet a
-  full bidirectional provider-managed workflow
+  events back into local incident state, and local acknowledge/escalate actions can now push
+  provider-native workflow updates back out, but the integration is still not a full
+  provider-managed ownership workflow
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
   recovery/live resume currently restores tracked venue order lifecycle state before falling back to
   persisted control-plane state, but it still does not revive broader venue-native stream or market
@@ -135,8 +139,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ## Not Implemented Yet
 
-- full external incident-management workflow such as richer provider-native state sync, richer
-  escalation ladders, richer destinations, and more advanced retry policies
+- full external incident-management workflow such as provider-managed ownership beyond the current
+  PagerDuty-native bidirectional path, richer escalation ladders, richer destinations, and more
+  advanced retry policies
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
 - broader venue-native session continuation beyond Binance multi-stream
@@ -149,6 +154,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Expand operator delivery from the current console/webhook/Slack/PagerDuty plus callback-driven external sync into richer provider-native incident-management and wider audit coverage.
+3. Expand operator delivery from the current console/webhook/Slack/PagerDuty plus bidirectional PagerDuty workflow sync into richer multi-provider incident-management and wider audit coverage.
 4. Expand guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

@@ -173,9 +173,12 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   Incident delivery is handled behind a dedicated delivery port that can currently fan out to
   console logging, generic webhooks, Slack incoming webhooks, and PagerDuty Events API targets,
   while the application layer owns acknowledgment, escalation timing, retry suppression, and
-  phase-aware retry/backoff rules. External incident-management systems can also sync paging events
-  back through a guarded API endpoint, so durable incidents track external provider/reference state
-  and paging workflow without handing local alert truth over to the external system.
+  phase-aware retry/backoff rules. Durable incidents now also persist paging policy identity plus
+  provider workflow state/action/reference. External incident-management systems can sync paging
+  events back through a guarded API endpoint, and local acknowledge/escalate actions can push
+  provider-native workflow updates back out when the selected provider supports them, so durable
+  incidents track a bidirectional paging workflow without handing local alert truth over to the
+  external system.
 
 ## Modes
 

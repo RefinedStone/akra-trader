@@ -127,6 +127,8 @@ class GuardedLiveStatePort(Protocol):
 class OperatorAlertDeliveryPort(Protocol):
   def list_targets(self) -> tuple[str, ...]: ...
 
+  def list_supported_workflow_providers(self) -> tuple[str, ...]: ...
+
   def deliver(
     self,
     *,
@@ -134,6 +136,17 @@ class OperatorAlertDeliveryPort(Protocol):
     targets: tuple[str, ...] | None = None,
     attempt_number: int = 1,
     phase: str = "initial",
+  ) -> tuple[OperatorIncidentDelivery, ...]: ...
+
+  def sync_incident_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+    action: str,
+    actor: str,
+    detail: str,
+    attempt_number: int = 1,
   ) -> tuple[OperatorIncidentDelivery, ...]: ...
 
 

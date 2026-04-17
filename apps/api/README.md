@@ -54,8 +54,9 @@ Implemented now:
 - guarded-live incident delivery now supports console, generic webhook, Slack webhook, and
   PagerDuty Events API targets with persisted attempt history, operator acknowledgment,
   manual/automatic escalation, and retry/backoff scheduling
-- durable incidents can now sync external acknowledgment, escalation, and resolution events back
-  into local incident state through the operator incident sync endpoint and shared-token gating
+- durable incidents now persist paging policy selection, provider workflow state/reference, and
+  can sync provider callbacks plus local provider-native workflow actions bidirectionally through
+  the operator incident sync endpoint and guarded-live acknowledge/escalate actions
 - guarded-live launch wiring and venue-state reconciliation can now target a configured supported
   venue independently from the market-data provider, while seeded fixture flows still default to a
   Binance-shaped live venue in tests
@@ -64,7 +65,9 @@ Implemented now:
 Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
-- full external incident-management workflow such as richer provider-native acknowledgment sync, richer escalation ladders, and paging policy management
+- full external incident-management workflow such as provider-managed incident ownership beyond the
+  current PagerDuty-native bidirectional path, richer escalation ladders, and broader paging policy
+  management
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
 
@@ -95,10 +98,17 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_SLACK_WEBHOOK_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_INTEGRATION_KEY`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_API_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_FROM_EMAIL`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_ATTEMPTS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_INITIAL_BACKOFF_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_BACKOFF_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_BACKOFF_MULTIPLIER`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_DEFAULT_PROVIDER`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_WARNING_TARGETS`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_CRITICAL_TARGETS`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_WARNING_ESCALATION_TARGETS`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGING_POLICY_CRITICAL_ESCALATION_TARGETS`
 - `AKRA_TRADER_OPERATOR_ALERT_EXTERNAL_SYNC_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_ESCALATION_TARGETS`
 - `AKRA_TRADER_OPERATOR_ALERT_INCIDENT_ACK_TIMEOUT_SECONDS`
@@ -190,10 +200,13 @@ Defaults:
 - guarded-live incident records now persist acknowledgment and escalation state, support operator
   `acknowledge` and `escalate` actions, suppress pending retries after acknowledgment, and can
   auto-escalate to configured escalation targets after retry exhaustion or ack-timeout windows
+- severity-aware paging policy orchestration can now choose initial and escalation targets plus a
+  native paging provider, and guarded-live incident records persist the selected policy id,
+  provider workflow state/action, and provider workflow reference
 - external paging systems can now push `triggered`, `acknowledged`, `escalated`, or `resolved`
-  incident sync events into the durable guarded-live incident history, which updates external
-  provider/reference state, paging status, audit history, and retry suppression without overriding
-  local alert truth
+  incident sync events into the durable guarded-live incident history, including provider workflow
+  references, while local acknowledge/escalate actions can also push provider-native workflow
+  actions back out when the provider supports them
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

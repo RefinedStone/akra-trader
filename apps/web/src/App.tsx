@@ -324,6 +324,8 @@ type OperatorVisibility = {
     run_id?: string | null;
     session_id?: string | null;
     source: string;
+    paging_policy_id: string;
+    paging_provider?: string | null;
     delivery_targets: string[];
     escalation_targets: string[];
     delivery_state: string;
@@ -339,9 +341,13 @@ type OperatorVisibility = {
     next_escalation_at?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;
+    provider_workflow_reference?: string | null;
     external_status: string;
     external_last_synced_at?: string | null;
     paging_status: string;
+    provider_workflow_state: string;
+    provider_workflow_action?: string | null;
+    provider_workflow_last_attempted_at?: string | null;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -355,6 +361,7 @@ type OperatorVisibility = {
     attempt_number: number;
     next_retry_at?: string | null;
     phase: string;
+    provider_action?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;
     source: string;
@@ -415,6 +422,8 @@ type GuardedLiveStatus = {
     run_id?: string | null;
     session_id?: string | null;
     source: string;
+    paging_policy_id: string;
+    paging_provider?: string | null;
     delivery_targets: string[];
     escalation_targets: string[];
     delivery_state: string;
@@ -430,9 +439,13 @@ type GuardedLiveStatus = {
     next_escalation_at?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;
+    provider_workflow_reference?: string | null;
     external_status: string;
     external_last_synced_at?: string | null;
     paging_status: string;
+    provider_workflow_state: string;
+    provider_workflow_action?: string | null;
+    provider_workflow_last_attempted_at?: string | null;
   }[];
   delivery_history: {
     delivery_id: string;
@@ -446,6 +459,7 @@ type GuardedLiveStatus = {
     attempt_number: number;
     next_retry_at?: string | null;
     phase: string;
+    provider_action?: string | null;
     external_provider?: string | null;
     external_reference?: string | null;
     source: string;
@@ -2009,6 +2023,16 @@ export default function App() {
                             </p>
                             <p className="run-lineage-symbol-copy">
                               Paging: {event.paging_status}
+                              {event.paging_policy_id ? ` via ${event.paging_policy_id}` : ""}
+                              {event.paging_provider ? ` (${event.paging_provider})` : ""}
+                            </p>
+                            <p className="run-lineage-symbol-copy">
+                              Provider workflow: {event.provider_workflow_state}
+                              {event.provider_workflow_action ? ` / ${event.provider_workflow_action}` : ""}
+                              {event.provider_workflow_reference ? ` (${event.provider_workflow_reference})` : ""}
+                              {event.provider_workflow_last_attempted_at
+                                ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
+                                : ""}
                             </p>
                           </td>
                         </tr>
@@ -2079,6 +2103,11 @@ export default function App() {
                             <td>
                               <strong>{record.incident_kind}</strong>
                               <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                              {record.provider_action ? (
+                                <p className="run-lineage-symbol-copy">
+                                  Provider action: {record.provider_action}
+                                </p>
+                              ) : null}
                               <p className="run-lineage-symbol-copy">
                                 External: {record.external_provider ?? "n/a"}
                                 {record.external_reference ? ` (${record.external_reference})` : ""}
@@ -3066,6 +3095,18 @@ export default function App() {
                               </p>
                               <p className="run-lineage-symbol-copy">
                                 Paging: {event.paging_status}
+                                {event.paging_policy_id ? ` via ${event.paging_policy_id}` : ""}
+                                {event.paging_provider ? ` (${event.paging_provider})` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Provider workflow: {event.provider_workflow_state}
+                                {event.provider_workflow_action ? ` / ${event.provider_workflow_action}` : ""}
+                                {event.provider_workflow_reference
+                                  ? ` (${event.provider_workflow_reference})`
+                                  : ""}
+                                {event.provider_workflow_last_attempted_at
+                                  ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
+                                  : ""}
                               </p>
                               {event.acknowledgment_reason ? (
                                 <p className="run-lineage-symbol-copy">
@@ -3132,6 +3173,11 @@ export default function App() {
                             <td>
                               <strong>{record.incident_kind}</strong>
                               <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                              {record.provider_action ? (
+                                <p className="run-lineage-symbol-copy">
+                                  Provider action: {record.provider_action}
+                                </p>
+                              ) : null}
                               <p className="run-lineage-symbol-copy">
                                 External: {record.external_provider ?? "n/a"}
                                 {record.external_reference ? ` (${record.external_reference})` : ""}

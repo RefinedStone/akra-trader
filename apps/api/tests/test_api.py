@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from akra_trader.config import Settings
+from akra_trader.domain.models import OperatorIncidentDelivery
+from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
@@ -542,6 +544,143 @@ def test_external_incident_sync_endpoint_updates_paging_state_and_requires_token
     assert incident["external_provider"] == "pagerduty"
     assert incident["external_status"] == "acknowledged"
     assert incident["paging_status"] == "acknowledged"
+
+
+def test_incident_endpoints_surface_provider_workflow_and_paging_policy(tmp_path: Path) -> None:
+  class FakeProviderWorkflowDeliveryAdapter:
+    def list_targets(self) -> tuple[str, ...]:
+      return ("operator_console",)
+
+    def list_supported_workflow_providers(self) -> tuple[str, ...]:
+      return ("pagerduty",)
+
+    def deliver(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      targets: tuple[str, ...] | None = None,
+      attempt_number: int = 1,
+      phase: str = "initial",
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      resolved_targets = targets or self.list_targets()
+      return tuple(
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{target}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=target,
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_delivery:{target}",
+          attempt_number=attempt_number,
+          phase=phase,
+          external_provider="pagerduty" if target == "pagerduty_events" else None,
+          external_reference=incident.external_reference or incident.alert_id,
+          source=incident.source,
+        )
+        for target in resolved_targets
+      )
+
+    def sync_incident_workflow(
+      self,
+      *,
+      incident: OperatorIncidentEvent,
+      provider: str,
+      action: str,
+      actor: str,
+      detail: str,
+      attempt_number: int = 1,
+    ) -> tuple[OperatorIncidentDelivery, ...]:
+      return (
+        OperatorIncidentDelivery(
+          delivery_id=f"{incident.event_id}:{provider}_workflow:{action}:attempt-{attempt_number}",
+          incident_event_id=incident.event_id,
+          alert_id=incident.alert_id,
+          incident_kind=incident.kind,
+          target=f"{provider}_workflow",
+          status="delivered",
+          attempted_at=incident.timestamp,
+          detail=f"fake_provider_workflow:{action}:{detail}",
+          attempt_number=attempt_number,
+          phase=f"provider_{action}",
+          provider_action=action,
+          external_provider=provider,
+          external_reference=incident.provider_workflow_reference,
+          source=incident.source,
+        ),
+      )
+
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    guarded_live_execution_enabled=True,
+    operator_alert_external_sync_token="shared-token",
+  ) as client:
+    app = client.app.state.container.app
+    app._operator_alert_delivery = FakeProviderWorkflowDeliveryAdapter()
+    app._operator_alert_paging_policy_default_provider = "pagerduty"
+    app._operator_alert_paging_policy_warning_targets = ("slack_webhook", "pagerduty_events")
+    app._operator_alert_paging_policy_critical_targets = ("slack_webhook", "pagerduty_events")
+    app._operator_alert_paging_policy_warning_escalation_targets = ("pagerduty_events",)
+    app._operator_alert_paging_policy_critical_escalation_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 14, 0, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.4, free=0.4, used=0.0),),
+      )
+    )
+
+    reconcile = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "provider_workflow_surface"},
+    )
+    assert reconcile.status_code == 200
+    incident = next(
+      event
+      for event in reconcile.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:reconciliation"
+    )
+    assert incident["paging_provider"] == "pagerduty"
+    assert incident["paging_policy_id"] in {"severity:warning", "severity:critical"}
+
+    synced = client.post(
+      "/api/operator/incidents/external-sync",
+      headers={"X-Akra-Incident-Sync-Token": "shared-token"},
+      json={
+        "provider": "pagerduty",
+        "event_kind": "triggered",
+        "actor": "responder-1",
+        "detail": "provider_triggered",
+        "alert_id": "guarded-live:reconciliation",
+        "external_reference": "guarded-live:reconciliation",
+        "workflow_reference": "PDINC-901",
+        "occurred_at": "2025-01-03T14:01:00Z",
+      },
+    )
+    assert synced.status_code == 200
+
+    acknowledged = client.post(
+      f"/api/guarded-live/incidents/{incident['event_id']}/acknowledge",
+      json={"actor": "operator", "reason": "provider_ack"},
+    )
+    assert acknowledged.status_code == 200
+    acknowledged_incident = next(
+      event
+      for event in acknowledged.json()["incident_events"]
+      if event["event_id"] == incident["event_id"]
+    )
+    assert acknowledged_incident["provider_workflow_reference"] == "PDINC-901"
+    assert acknowledged_incident["provider_workflow_state"] == "delivered"
+    assert acknowledged_incident["provider_workflow_action"] == "acknowledge"
+    provider_delivery = next(
+      record
+      for record in acknowledged.json()["delivery_history"]
+      if record["incident_event_id"] == incident["event_id"] and record["phase"] == "provider_acknowledge"
+    )
+    assert provider_delivery["target"] == "pagerduty_workflow"
 
 
 def test_guarded_live_status_survives_app_restart(tmp_path: Path) -> None:

@@ -97,17 +97,26 @@ class FakeOperatorAlertDeliveryAdapter:
     *,
     targets: tuple[str, ...] = ("operator_console",),
     failures_before_success: dict[str, int] | None = None,
+    workflow_failures_before_success: dict[str, int] | None = None,
+    supported_workflow_providers: tuple[str, ...] = ("pagerduty",),
     clock=None,
   ) -> None:
     self._targets = targets
+    self._supported_workflow_providers = supported_workflow_providers
     self.delivered_incidents: list[OperatorIncidentEvent] = []
     self.delivery_attempts: list[tuple[str, str, int]] = []
+    self.workflow_attempts: list[tuple[str, str, str, int]] = []
     self._failures_before_success = dict(failures_before_success or {})
+    self._workflow_failures_before_success = dict(workflow_failures_before_success or {})
     self._attempts_by_target: dict[str, int] = {}
+    self._workflow_attempts_by_key: dict[tuple[str, str], int] = {}
     self._clock = clock
 
   def list_targets(self) -> tuple[str, ...]:
     return self._targets
+
+  def list_supported_workflow_providers(self) -> tuple[str, ...]:
+    return self._supported_workflow_providers
 
   def deliver(
     self,
@@ -145,6 +154,52 @@ class FakeOperatorAlertDeliveryAdapter:
         )
       )
     return tuple(records)
+
+  def sync_incident_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    provider: str,
+    action: str,
+    actor: str,
+    detail: str,
+    attempt_number: int = 1,
+  ) -> tuple[OperatorIncidentDelivery, ...]:
+    self.workflow_attempts.append((incident.event_id, provider, action, attempt_number))
+    target = f"{provider}_workflow"
+    key = (provider, action)
+    delivered_attempts = self._workflow_attempts_by_key.get(key, 0) + 1
+    self._workflow_attempts_by_key[key] = delivered_attempts
+    should_fail = delivered_attempts <= self._workflow_failures_before_success.get(action, 0)
+    workflow_reference = incident.provider_workflow_reference or incident.external_reference
+    if workflow_reference is None:
+      should_fail = True
+    return (
+      OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed" if should_fail else "delivered",
+        attempted_at=self._clock() if callable(self._clock) else incident.timestamp,
+        detail=(
+          f"fake_provider_workflow_reference_unavailable:{action}"
+          if workflow_reference is None
+          else (
+            f"fake_provider_workflow_failed:{action}:attempt-{attempt_number}"
+            if should_fail
+            else f"fake_provider_workflow_delivered:{action}:attempt-{attempt_number}"
+          )
+        ),
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider=provider,
+        external_reference=workflow_reference,
+        source=incident.source,
+      ),
+    )
 
 
 def build_guarded_live_repository(tmp_path: Path):
@@ -1253,6 +1308,160 @@ def test_external_incident_sync_acknowledges_and_preserves_local_alert_truth(
   assert resolved_incident.external_status == "resolved"
   assert resolved_incident.paging_status == "resolved"
   assert any(alert.alert_id == "guarded-live:reconciliation" for alert in resolved.active_alerts)
+
+
+def test_guarded_live_incident_uses_paging_policy_and_syncs_provider_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 0, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("operator_console",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="pagerduty",
+    operator_alert_paging_policy_warning_targets=("slack_webhook", "pagerduty_events"),
+    operator_alert_paging_policy_critical_targets=("slack_webhook", "pagerduty_events"),
+    operator_alert_paging_policy_warning_escalation_targets=("pagerduty_events",),
+    operator_alert_paging_policy_critical_escalation_targets=("pagerduty_events",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="policy_sync")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_policy_id in {"severity:warning", "severity:critical"}
+  assert incident.paging_provider == "pagerduty"
+  assert incident.delivery_targets == ("slack_webhook", "pagerduty_events")
+  assert incident.escalation_targets == ("pagerduty_events",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="pagerduty",
+    event_kind="triggered",
+    actor="pagerduty",
+    detail="provider_incident_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="PDINC-123",
+    occurred_at=clock.current + timedelta(seconds=30),
+  )
+  triggered_incident = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered_incident.provider_workflow_reference == "PDINC-123"
+  assert triggered_incident.external_status == "triggered"
+
+  clock.advance(timedelta(minutes=1))
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="provider_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert updated.provider_workflow_reference == "PDINC-123"
+  assert any(
+    attempt[1:] == ("pagerduty", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
+
+
+def test_provider_workflow_retry_recovers_after_external_reference_sync(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 30, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_delivery_initial_backoff_seconds=30,
+    operator_alert_paging_policy_default_provider="pagerduty",
+    operator_alert_paging_policy_warning_targets=("pagerduty_events",),
+    operator_alert_paging_policy_critical_targets=("pagerduty_events",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="workflow_retry")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="missing_reference",
+  )
+  first_pass = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert first_pass.provider_workflow_state == "retrying"
+  failed_record = next(
+    record
+    for record in acknowledged.delivery_history
+    if record.incident_event_id == incident.event_id and record.phase == "provider_acknowledge"
+  )
+  assert failed_record.status == "retry_scheduled"
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="pagerduty",
+    event_kind="triggered",
+    actor="pagerduty",
+    detail="provider_incident_reference",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="PDINC-456",
+    occurred_at=clock.current + timedelta(seconds=5),
+  )
+  synced_incident = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert synced_incident.provider_workflow_reference == "PDINC-456"
+
+  clock.advance(timedelta(seconds=30))
+  retried = app.get_guarded_live_status()
+  retried_incident = next(event for event in retried.incident_events if event.event_id == incident.event_id)
+  assert retried_incident.provider_workflow_state == "delivered"
+  assert any(
+    attempt[1:] == ("pagerduty", "acknowledge", 2)
+    for attempt in delivery.workflow_attempts
+  )
 
 
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(

@@ -119,6 +119,8 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
     webhook_url=settings.operator_alert_webhook_url,
     slack_webhook_url=settings.operator_alert_slack_webhook_url,
     pagerduty_integration_key=settings.operator_alert_pagerduty_integration_key,
+    pagerduty_api_token=settings.operator_alert_pagerduty_api_token,
+    pagerduty_from_email=settings.operator_alert_pagerduty_from_email,
     webhook_timeout_seconds=settings.operator_alert_webhook_timeout_seconds,
   )
 
@@ -186,6 +188,15 @@ def build_container(settings: Settings) -> Container:
     operator_alert_delivery_initial_backoff_seconds=settings.operator_alert_delivery_initial_backoff_seconds,
     operator_alert_delivery_max_backoff_seconds=settings.operator_alert_delivery_max_backoff_seconds,
     operator_alert_delivery_backoff_multiplier=settings.operator_alert_delivery_backoff_multiplier,
+    operator_alert_paging_policy_default_provider=settings.operator_alert_paging_policy_default_provider,
+    operator_alert_paging_policy_warning_targets=settings.operator_alert_paging_policy_warning_targets,
+    operator_alert_paging_policy_critical_targets=settings.operator_alert_paging_policy_critical_targets,
+    operator_alert_paging_policy_warning_escalation_targets=(
+      settings.operator_alert_paging_policy_warning_escalation_targets
+    ),
+    operator_alert_paging_policy_critical_escalation_targets=(
+      settings.operator_alert_paging_policy_critical_escalation_targets
+    ),
     operator_alert_external_sync_token=settings.operator_alert_external_sync_token,
     operator_alert_escalation_targets=settings.operator_alert_escalation_targets,
     operator_alert_incident_ack_timeout_seconds=settings.operator_alert_incident_ack_timeout_seconds,
