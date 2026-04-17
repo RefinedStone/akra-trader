@@ -88,6 +88,8 @@ from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryPhaseGr
 from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryState
 from akra_trader.domain.models import OperatorIncidentOnpageRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentOnpageRecoveryState
+from akra_trader.domain.models import OperatorIncidentAllquietRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentAllquietRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1760,6 +1762,17 @@ class TradingApplication:
             aligned_provider_recovery,
             onpage=replace(
               aligned_provider_recovery.onpage,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "allquiet"
+          and provider_recovery.allquiet.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            allquiet=replace(
+              aligned_provider_recovery.allquiet,
               alert_status="delivered",
             ),
           )
@@ -4773,6 +4786,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_allquiet_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_allquiet_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_allquiet_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_allquiet_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_allquiet_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_allquiet_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentAllquietRecoveryState,
+  ) -> OperatorIncidentAllquietRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_allquiet_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_allquiet_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentAllquietRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_allquiet_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_allquiet_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_allquiet_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -6947,6 +7093,101 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "onpage"
+    allquiet_schema = existing.allquiet
+    allquiet_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("allquiet"),
+      self._extract_payload_mapping(payload.get("provider_schema")).get("all_quiet"),
+      payload.get("allquiet"),
+      payload.get("allquiet_alert"),
+      payload.get("all_quiet"),
+    )
+    if normalized_provider == "allquiet" or allquiet_payload:
+      allquiet_status = self._first_non_empty_string(
+        allquiet_payload.get("alert_status"),
+        allquiet_payload.get("status"),
+        allquiet_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.allquiet.alert_status,
+      ) or "unknown"
+      allquiet_schema = OperatorIncidentAllquietRecoveryState(
+        alert_id=self._first_non_empty_string(
+          allquiet_payload.get("alert_id"),
+          allquiet_payload.get("id"),
+          allquiet_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.allquiet.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          allquiet_payload.get("external_reference"),
+          allquiet_payload.get("reference"),
+          reference,
+          existing.allquiet.external_reference,
+        ),
+        alert_status=allquiet_status,
+        priority=self._first_non_empty_string(
+          allquiet_payload.get("priority"),
+          allquiet_payload.get("severity"),
+          allquiet_payload.get("urgency"),
+          existing.allquiet.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          allquiet_payload.get("escalation_policy"),
+          allquiet_payload.get("escalationPolicy"),
+          allquiet_payload.get("policy"),
+          allquiet_payload.get("source"),
+          existing.allquiet.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          allquiet_payload.get("assignee"),
+          allquiet_payload.get("owner"),
+          allquiet_payload.get("assigned_to"),
+          existing.allquiet.assignee,
+        ),
+        url=self._first_non_empty_string(
+          allquiet_payload.get("url"),
+          allquiet_payload.get("html_url"),
+          allquiet_payload.get("link"),
+          existing.allquiet.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(allquiet_payload.get("updated_at"))
+          or existing.allquiet.updated_at
+        ),
+        phase_graph=self._build_allquiet_recovery_phase_graph(
+          payload=allquiet_payload,
+          alert_status=allquiet_status,
+          priority=self._first_non_empty_string(
+            allquiet_payload.get("priority"),
+            allquiet_payload.get("severity"),
+            allquiet_payload.get("urgency"),
+            existing.allquiet.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            allquiet_payload.get("escalation_policy"),
+            allquiet_payload.get("escalationPolicy"),
+            allquiet_payload.get("policy"),
+            allquiet_payload.get("source"),
+            existing.allquiet.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            allquiet_payload.get("assignee"),
+            allquiet_payload.get("owner"),
+            allquiet_payload.get("assigned_to"),
+            existing.allquiet.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.allquiet,
+        ),
+      )
+      provider_schema_kind = "allquiet"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -7024,6 +7265,7 @@ class TradingApplication:
       ilert=ilert_schema,
       betterstack=betterstack_schema,
       onpage=onpage_schema,
+      allquiet=allquiet_schema,
       updated_at=synced_at,
     )
 
@@ -7313,6 +7555,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.onpage,
+        ),
+      ),
+      allquiet=replace(
+        provider_recovery.allquiet,
+        phase_graph=self._build_allquiet_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.allquiet.alert_status,
+          priority=provider_recovery.allquiet.priority,
+          escalation_policy=provider_recovery.allquiet.escalation_policy,
+          assignee=provider_recovery.allquiet.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.allquiet,
         ),
       ),
     )
@@ -11707,6 +11963,10 @@ class TradingApplication:
       return "onpage"
     if normalized in {"onpage_incidents", "operator_onpage"}:
       return "onpage"
+    if normalized in {"all_quiet", "allquiet_alerts", "operator_allquiet"}:
+      return "allquiet"
+    if normalized in {"allquiet_incidents", "operator_allquiet"}:
+      return "allquiet"
     return normalized or None
 
   @staticmethod
@@ -11904,6 +12164,8 @@ class TradingApplication:
       return "betterstack"
     if "onpage_incidents" in combined or "onpage_alerts" in combined:
       return "onpage"
+    if "allquiet_incidents" in combined or "allquiet_alerts" in combined:
+      return "allquiet"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

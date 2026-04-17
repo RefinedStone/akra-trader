@@ -225,6 +225,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       onpage_api_url: str,
       onpage_recovery_engine_url_template: str | None,
       onpage_recovery_engine_token: str | None,
+      allquiet_api_token: str | None,
+      allquiet_api_url: str,
+      allquiet_recovery_engine_url_template: str | None,
+      allquiet_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -331,6 +335,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         onpage_recovery_engine_url_template or ""
       )
       captured["onpage_recovery_engine_token"] = onpage_recovery_engine_token or ""
+      captured["allquiet_api_token"] = allquiet_api_token or ""
+      captured["allquiet_api_url"] = allquiet_api_url
+      captured["allquiet_recovery_engine_url_template"] = (
+        allquiet_recovery_engine_url_template or ""
+      )
+      captured["allquiet_recovery_engine_token"] = allquiet_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -491,6 +501,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://onpage.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_onpage_recovery_engine_token="onpage-recovery-token",
+      operator_alert_allquiet_api_token="allquiet-token",
+      operator_alert_allquiet_api_url="https://api.allquiet.example",
+      operator_alert_allquiet_recovery_engine_url_template=(
+        "https://allquiet.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_allquiet_recovery_engine_token="allquiet-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -592,6 +608,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["onpage_api_url"] == "https://api.onpage.example"
   assert captured["onpage_recovery_engine_url_template"] == "https://onpage.example/recovery/{workflow_reference_urlencoded}"
   assert captured["onpage_recovery_engine_token"] == "onpage-recovery-token"
+  assert captured["allquiet_api_token"] == "allquiet-token"
+  assert captured["allquiet_api_url"] == "https://api.allquiet.example"
+  assert captured["allquiet_recovery_engine_url_template"] == "https://allquiet.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["allquiet_recovery_engine_token"] == "allquiet-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"
