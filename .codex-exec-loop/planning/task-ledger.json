@@ -779,17 +779,17 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After direct remediation-engine polling exists, decide how far to mirror provider-specific remediation metrics, transition graphs, and engine-owned state machines into local typed recovery models so operator surfaces can preserve provider-native richness without collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After direct remediation-engine polling and the incident.io typed-schema expansion exist, decide how far to mirror provider-specific remediation metrics, transition graphs, and engine-owned state machines into local typed recovery models so operator surfaces can preserve provider-native richness without collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says engine telemetry is now authoritative but still normalized into the shared recovery model instead of preserving richer provider-native remediation metrics or full engine transition graphs, but broader provider coverage is the first executable queue head because it was listed ahead of schema-depth work.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync and typed recovery schema now reach incident.io too, but richer private remediation-engine phase graphs and native metrics are still not mirrored; this remains an executable follow-up behind the newly re-raised provider breadth work because the reply listed broader provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T22:30:15Z",
+      "updated_at": "2026-04-17T22:45:05Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints are being polled directly."
     },
@@ -869,19 +869,37 @@
       "id": "planning-operator-trust-expand-provider-native-escalation-coverage",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond PagerDuty and Opsgenie",
-      "description": "Extend the newly completed direct remediation-engine polling and provider-owned incident workflow beyond the current PagerDuty and Opsgenie coverage by adding additional providers or provider-specific adapters where the external remediation engine should remain the authoritative owner of downstream recovery state, telemetry fetch, and lifecycle synchronization.",
-      "status": "ready",
+      "description": "Completed by extending the newly completed direct remediation-engine polling and provider-owned incident workflow beyond PagerDuty and Opsgenie to incident.io, adding incident.io delivery targets, provider workflow sync, provider pull-sync, direct recovery-engine polling, typed recovery schemas, and native phase-graph handling so authoritative external remediation ownership now spans a third provider.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says direct authoritative polling now works for configured PagerDuty and Opsgenie recovery-engine endpoints but broader provider coverage is still missing, making this the clearest executable next task after commit 9740b7f.",
+      "priority_reason": "Completed in main session commit 09f2f47, which expanded provider-managed remediation coverage through incident.io across operator delivery, bootstrap wiring, provider pull-sync, typed recovery schemas, native phase graphs, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-generalize-provider-native-incident-orchestration"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T22:30:30Z",
+      "updated_at": "2026-04-17T22:45:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating PagerDuty and Opsgenie as the first direct remediation-engine integrations rather than the final provider set."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond PagerDuty and Opsgenie to incident.io, which now leaves wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-incidentio",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond incident.io",
+      "description": "Build on the completed PagerDuty, Opsgenie, and incident.io adapters by adding at least one more provider-managed remediation integration or a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current three providers.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply says provider-managed remediation coverage now reaches incident.io but broader provider breadth is still the first explicitly listed remaining task, making another provider expansion the clearest executable queue head.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-native-escalation-coverage"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T22:45:15Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating incident.io as the next milestone rather than the final provider breadth endpoint."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
