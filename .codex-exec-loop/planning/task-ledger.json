@@ -386,13 +386,13 @@
       "status": "proposed",
       "base_priority": 79,
       "dynamic_priority_delta": 7,
-      "priority_reason": "Commit 212b1c8 added external incident sync and paging-state persistence for the current durable incident workflow, but the latest main-session reply explicitly says risk breaches and broader live-path faults still are not modeled through the same durable incident path, so this remains the next scope expansion after the provider-native paging workflow follow-up.",
+      "priority_reason": "Commit 75b3f77 strengthened the provider-native workflow and paging-policy substrate, but the latest main-session reply still explicitly says risk breaches and broader live-path faults are not yet raised through the same durable incident path, so this remains the next scope-expansion follow-up after provider breadth.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:25:00Z",
+      "updated_at": "2026-04-17T12:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending the same durable incident and delivery-history discipline from guarded-live incidents into risk breaches and adjacent live-path faults."
     },
@@ -437,18 +437,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add provider-native bidirectional incident workflow and paging-policy orchestration",
       "description": "Build on the completed callback-driven external incident sync by adding provider-native bidirectional workflow semantics, richer escalation ladders, and explicit paging-policy orchestration, so durable incidents do not stop at inbound status callbacks and can drive or reconcile the full downstream response lifecycle.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly lists provider-native bidirectional workflow, richer escalation ladders, and paging-policy orchestration as the first remaining follow-up after commit 212b1c8, so this is the clearest next executable queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 75b3f77, which added severity-aware paging-policy selection, provider workflow state and action persistence, bidirectional local and external workflow synchronization, PagerDuty workflow orchestration, control-room visibility, and API plus web verification coverage.",
       "depends_on": [
         "planning-operator-trust-external-incident-management-sync-and-paging"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:25:00Z",
+      "updated_at": "2026-04-17T12:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust from inbound external-state mirroring to a fuller downstream response contract where paging providers and incident systems participate in a durable bidirectional workflow."
+      "direction_relation_note": "Closed the provider-native workflow and paging-policy orchestration gap for operator trust by making durable incidents drive and reconcile a full downstream workflow, which now leaves non-PagerDuty provider breadth and broader durable incident coverage as the main follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-generalize-provider-native-incident-orchestration",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Generalize provider-native incident orchestration beyond PagerDuty",
+      "description": "Extend the newly completed provider-native incident workflow so native acknowledge, escalation, resolution, and callback reconciliation semantics are not PagerDuty-specific, giving other supported incident providers the same durable paging-policy and workflow-state contract.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply explicitly says provider-native bidirectional workflow is still PagerDuty-centered and other incident providers do not yet have native ack or escalation orchestration, so this is the clearest next executable queue head after commit 75b3f77.",
+      "depends_on": [
+        "planning-operator-trust-provider-native-bidirectional-incident-workflow"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by keeping durable incident workflows provider-agnostic instead of leaving the native downstream response contract effectively tied to one paging vendor."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
