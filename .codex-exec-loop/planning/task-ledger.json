@@ -401,18 +401,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Extend durable incident coverage to market-data freshness policy and wider risk surface",
       "description": "Build on the newly broadened durable incident workflow by promoting wider market-data freshness policy breaches and the next broader risk-surface faults into the same persisted incident, delivery-history, and operator-visible lifecycle model, so important runtime hazards do not stop at status text or narrow guarded-live categories.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly says durable incident scope now covers worker failure or staleness, risk breach, recovery loop, and stale order sync, leaving wider market-data freshness policy and broader risk surface as the clearest immediate executable follow-up.",
+      "priority_reason": "Completed in main session commit 073e0bb, which expanded durable incidents to market-data freshness policy breaches including stale, empty, error, gap, and repeated sync-failure coverage plus wider live-run risk faults such as deep total-return loss and gross open-risk-over-equity, while preserving seeded-fixture exclusions and existing delivery or paging workflow.",
       "depends_on": [
         "planning-operator-trust-sandbox-durable-alert-history"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T13:10:00Z",
+      "updated_at": "2026-04-17T13:25:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with runtime reality by extending the same durable incident discipline from newly covered live-path faults into the next operator-actionable freshness and risk hazards."
+      "direction_relation_note": "Closed the next durable incident-scope gap for operator trust by lifting configured market-data freshness policy and wider risk-surface breaches into the same persisted incident lifecycle, which now leaves richer freshness semantics and broader provider-owned or venue-native operating coverage as the main follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-richer-market-data-freshness-semantics",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Promote richer freshness policy and venue-specific data-quality semantics into durable incidents",
+      "description": "Build on the new market_data_freshness incident coverage by defining the next richer freshness-policy and venue-specific data-quality semantics, then surface those deeper hazards through the same durable incident, delivery, and paging workflow instead of stopping at stale, empty, error, gap, and repeated sync-failure checks.",
+      "status": "done",
+      "base_priority": 82,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "Completed in main session commit dfb6388, which split generic market-data alerting into explicit freshness-threshold, backfill-target, contiguous-gap, repeated-failure, and venue-fault semantics, then promoted them into separate durable incident categories for freshness, quality, and venue faults with API, application, UI-facing docs, and test coverage.",
+      "depends_on": [
+        "planning-operator-trust-expand-durable-incident-coverage-to-market-data-and-risk-surface"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T13:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the richer freshness-semantics gap for operator trust by promoting threshold, backfill-quality, repeated-failure, and venue-fault market-data hazards into distinct durable incidents, which now leaves deeper channel-level quality semantics and remediation ownership as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-channel-level-market-data-quality-incidents",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Promote channel-level market-data consistency semantics into durable incidents",
+      "description": "Extend the new market_data_quality and market_data_venue incident model beyond freshness and backfill quality by incidentizing exchange-specific deeper channel consistency hazards such as book-stream divergence, kline-level integrity faults, or other per-channel quality degradations, so operator-visible market-data incidents reflect the next real venue failure modes instead of stopping at sync freshness semantics.",
+      "status": "ready",
+      "base_priority": 83,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply explicitly says the just-completed richer market-data incident work still does not cover deeper channel consistency or book/kline-level quality semantics, making this the clearest immediate executable follow-up after commit dfb6388.",
+      "depends_on": [
+        "planning-operator-trust-richer-market-data-freshness-semantics"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T13:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with venue reality by extending durable market-data incidents from sync freshness and backfill health into deeper per-channel quality failures that operators need to distinguish and respond to."
+    },
+    {
+      "id": "planning-operator-trust-market-data-incident-remediation-workflows",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Connect market-data incidents to remediation and provider-owned workflows",
+      "description": "Build on the richer market-data incident categories by wiring those incidents into explicit automatic remediation hooks, operator runbook actions, or provider-owned workflow semantics, so freshness, quality, and venue incidents can trigger durable recovery ownership instead of remaining classification-only records.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply explicitly says the new market-data incidents are not yet connected to automatic remediation or provider-owned workflows, but deeper channel-level quality incidentization is the more direct next step from the just-completed semantics expansion.",
+      "depends_on": [
+        "planning-operator-trust-richer-market-data-freshness-semantics"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T13:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust from better classification into actionable incident response ownership by tying durable market-data incidents to remediation paths rather than leaving them as passive alerts."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -494,13 +548,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says external incident-management integration exists already, but provider-managed ownership as a broader operating path still remains beyond the current PagerDuty and Opsgenie-native workflow after commit 2474ba5.",
+      "priority_reason": "The latest main-session reply explicitly keeps provider-managed incident ownership across the broader live or operator path on the remaining-work list after commit 073e0bb, but the richer market-data freshness-policy incident semantics are the more direct next step from the just-completed incident-coverage expansion.",
       "depends_on": [
         "planning-operator-trust-generalize-provider-native-incident-orchestration"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T13:10:00Z",
+      "updated_at": "2026-04-17T13:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps operator trust moving toward provider-agnostic incident handling by treating PagerDuty and Opsgenie as the first provider-managed ownership set rather than the final scope."
     },
@@ -620,13 +674,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply still explicitly calls out venue-native amend flow as unfinished wider live-path coverage, but the operator-side acknowledgment and escalation workflow is the clearer immediate queue head after commit c56b00c.",
+      "priority_reason": "The latest main-session reply still explicitly calls out venue-native amend flow as unfinished wider live-path coverage after commit 073e0bb, but the richer market-data freshness-policy incident semantics are the clearer immediate queue head because they continue the just-finished durable-incident work directly.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:45:00Z",
+      "updated_at": "2026-04-17T13:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
