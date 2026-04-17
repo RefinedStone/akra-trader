@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
-from akra_trader.adapters.binance import BinanceMarketDataAdapter
+from akra_trader.adapters.binance import CcxtMarketDataAdapter
+from akra_trader.adapters.binance import SUPPORTED_CCXT_MARKET_DATA_VENUES
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateRepository
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
@@ -67,13 +68,14 @@ def build_default_market_data_database_url(repo_root: Path) -> str:
 def build_market_data_adapter(settings: Settings, repo_root: Path):
   if settings.market_data_provider == "seeded":
     return SeededMarketDataAdapter()
-  if settings.market_data_provider == "binance":
-    return BinanceMarketDataAdapter(
+  if settings.market_data_provider in SUPPORTED_CCXT_MARKET_DATA_VENUES:
+    return CcxtMarketDataAdapter(
       database_url=(
         settings.market_data_database_url
         or settings.runs_database_url
         or build_default_market_data_database_url(repo_root)
       ),
+      venue=settings.market_data_provider,
       tracked_symbols=settings.market_data_symbols,
       default_candle_limit=settings.market_data_default_candle_limit,
       historical_candle_limit=settings.market_data_historical_candle_limit,
@@ -128,7 +130,7 @@ def build_background_jobs(
         interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
       )
     )
-  if settings.market_data_provider == "binance":
+  if settings.market_data_provider in SUPPORTED_CCXT_MARKET_DATA_VENUES:
     jobs.append(
       MarketDataSyncJob(
         market_data=market_data,

@@ -144,17 +144,28 @@ class BackfillSnapshot:
   gap_windows: tuple[GapWindow, ...]
 
 
+SUPPORTED_CCXT_MARKET_DATA_VENUES = ("binance", "coinbase", "kraken")
+
+
+def build_ccxt_exchange(*, venue: str = "binance") -> OhlcvExchange:
+  exchange_factory = getattr(ccxt, venue, None)
+  if not callable(exchange_factory):
+    raise ValueError(f"Unsupported market data provider: {venue}")
+  return exchange_factory({"enableRateLimit": True})
+
+
 def build_binance_exchange() -> OhlcvExchange:
-  return ccxt.binance({"enableRateLimit": True})
+  return build_ccxt_exchange(venue="binance")
 
 
-class BinanceMarketDataAdapter(MarketDataPort):
+class CcxtMarketDataAdapter(MarketDataPort):
   def __init__(
     self,
     *,
     database_url: str,
     tracked_symbols: tuple[str, ...] = ("BTC/USDT", "ETH/USDT", "SOL/USDT"),
     venue: str = "binance",
+    provider: str | None = None,
     default_candle_limit: int = 500,
     historical_candle_limit: int | None = None,
     exchange_batch_limit: int = 500,
@@ -164,13 +175,14 @@ class BinanceMarketDataAdapter(MarketDataPort):
     self._database_url = database_url
     self._tracked_symbols = tracked_symbols
     self._venue = venue
+    self._provider = provider or venue
     self._default_candle_limit = default_candle_limit
     self._historical_candle_limit = max(
       historical_candle_limit or default_candle_limit,
       default_candle_limit,
     )
     self._exchange_batch_limit = exchange_batch_limit
-    self._exchange = exchange or build_binance_exchange()
+    self._exchange = exchange or build_ccxt_exchange(venue=venue)
     self._clock = clock or (lambda: datetime.now(UTC))
     self._engine = self._build_engine(database_url)
     metadata.create_all(self._engine)
@@ -260,7 +272,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
           issues=quality.issues,
         )
       )
-    return MarketDataStatus(provider="binance", venue=self._venue, instruments=instruments)
+    return MarketDataStatus(provider=self._provider, venue=self._venue, instruments=instruments)
 
   def sync_tracked(self, timeframe: str) -> None:
     for symbol in self._tracked_symbols:
@@ -297,7 +309,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     reproducibility_state = "range_only"
     if candles:
       dataset_identity = build_candle_dataset_identity(
-        provider="binance",
+        provider=self._provider,
         venue=self._venue,
         symbol=symbol,
         timeframe=timeframe,
@@ -305,7 +317,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
       )
       reproducibility_state = "pinned"
     return MarketDataLineage(
-      provider="binance",
+      provider=self._provider,
       venue=self._venue,
       symbols=(symbol,),
       timeframe=timeframe,
@@ -730,7 +742,7 @@ class BinanceMarketDataAdapter(MarketDataPort):
     )
     return SyncCheckpoint(
       checkpoint_id=build_sync_checkpoint_identity(
-        provider="binance",
+        provider=self._provider,
         venue=self._venue,
         symbol=symbol,
         timeframe=timeframe,
@@ -984,3 +996,6 @@ class BinanceMarketDataAdapter(MarketDataPort):
         **engine_kwargs,
       )
     return create_engine(database_url, **engine_kwargs)
+
+
+BinanceMarketDataAdapter = CcxtMarketDataAdapter

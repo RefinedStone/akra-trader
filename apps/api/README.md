@@ -13,8 +13,8 @@ Implemented now:
 - supervised sandbox worker sessions and paper-session priming for native strategies
 - native vs reference run comparison API
 - dataset identity and reproducibility state recorded in run market-data provenance
-- Binance-backed market data with sync, backfill, gap detection, sync checkpoints, failure history,
-  and status reporting
+- ccxt-backed market data for Binance, Coinbase, and Kraken with sync, backfill, gap detection,
+  sync checkpoints, failure history, and status reporting
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
   relaunch stored boundaries into backtest, sandbox, or paper flows
 - operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts, and
@@ -175,8 +175,8 @@ Defaults:
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only
-- the app lifespan starts sandbox worker maintenance jobs, and adds market-data sync jobs when the
-  Binance provider is active
+- the app lifespan starts sandbox worker maintenance jobs, and adds market-data sync jobs when a
+  supported ccxt market-data provider is active
 
 ## Test
 

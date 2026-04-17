@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from akra_trader.adapters.binance import BinanceMarketDataAdapter
+from akra_trader.adapters.binance import CcxtMarketDataAdapter
 
 
 class FakeExchange:
@@ -313,3 +314,41 @@ def test_binance_adapter_request_path_reads_persisted_state_only(tmp_path: Path)
   assert lineage.reproducibility_state == "range_only"
   assert lineage.sync_status == "empty"
   assert "insufficient_candle_coverage" in lineage.issues
+
+
+def test_ccxt_adapter_supports_supported_non_binance_provider(tmp_path: Path) -> None:
+  now = datetime(2025, 1, 2, 0, 0, tzinfo=UTC)
+  rows = build_ohlcv_rows(
+    start_at=now - timedelta(minutes=25),
+    count=6,
+  )
+  exchange = FakeExchange({("BTC/USDT", "5m"): rows})
+  adapter = CcxtMarketDataAdapter(
+    database_url=f"sqlite:///{tmp_path / 'market-data.sqlite3'}",
+    venue="coinbase",
+    tracked_symbols=("BTC/USDT",),
+    exchange=exchange,
+    default_candle_limit=6,
+    historical_candle_limit=6,
+    clock=lambda: now,
+  )
+
+  adapter.sync_tracked("5m")
+  status = adapter.get_status("5m")
+  candles = adapter.get_candles(symbol="BTC/USDT", timeframe="5m", limit=4)
+  lineage = adapter.describe_lineage(
+    symbol="BTC/USDT",
+    timeframe="5m",
+    candles=candles,
+    limit=4,
+  )
+
+  assert status.provider == "coinbase"
+  assert status.venue == "coinbase"
+  assert status.instruments[0].instrument_id == "coinbase:BTC/USDT"
+  assert status.instruments[0].sync_checkpoint is not None
+  assert status.instruments[0].sync_checkpoint.checkpoint_id.startswith("checkpoint-v1:")
+  assert lineage.provider == "coinbase"
+  assert lineage.venue == "coinbase"
+  assert lineage.dataset_identity is not None
+  assert lineage.sync_checkpoint_id == status.instruments[0].sync_checkpoint.checkpoint_id

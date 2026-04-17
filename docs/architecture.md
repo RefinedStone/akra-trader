@@ -124,14 +124,14 @@ Two adapters exist today:
 
 - `SeededMarketDataAdapter`
   - used for tests and deterministic fixture flows
-- `BinanceMarketDataAdapter`
+- `CcxtMarketDataAdapter` for Binance, Coinbase, and Kraken
   - backed by ccxt and local SQL storage
   - tracks sync status, lag, backfill progress, gap windows, last successful sync checkpoint,
     and recent sync failure history
 
 The API app lifespan always starts a sandbox worker maintenance job that heartbeats running worker
-sessions and applies restart recovery. When Binance is enabled, the app also starts a
-`MarketDataSyncJob` that periodically refreshes tracked symbols.
+sessions and applies restart recovery. When a supported ccxt market-data provider is enabled, the
+app also starts a `MarketDataSyncJob` that periodically refreshes tracked symbols.
 
 The application also derives operator visibility from sandbox runtime state. Failed worker sessions
 and stale heartbeats surface as control-room alerts, and worker lifecycle notes are normalized into

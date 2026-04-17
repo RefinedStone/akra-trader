@@ -171,16 +171,18 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       captured["venue_execution_api_key"] = api_key or ""
       captured["venue_execution_api_secret"] = api_secret or ""
 
-  class FakeBinanceMarketDataAdapter:
+  class FakeCcxtMarketDataAdapter:
     def __init__(
       self,
       *,
       database_url: str,
+      venue: str,
       tracked_symbols: tuple[str, ...],
       default_candle_limit: int,
       historical_candle_limit: int,
     ) -> None:
       captured["database_url"] = database_url
+      captured["market_data_venue"] = venue
       captured["tracked_symbols"] = ",".join(tracked_symbols)
       captured["default_candle_limit"] = str(default_candle_limit)
       captured["historical_candle_limit"] = str(historical_candle_limit)
@@ -210,7 +212,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
 
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
-  monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.CcxtMarketDataAdapter", FakeCcxtMarketDataAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.CcxtVenueStateAdapter", FakeCcxtVenueStateAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
@@ -233,6 +235,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
 
   assert captured["database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
   assert captured["guarded_live_database_url"] == "postgresql+psycopg://akra:akra@postgres:5432/akra_trader"
+  assert captured["market_data_venue"] == "binance"
   assert captured["tracked_symbols"] == "BTC/USDT"
   assert captured["venue_state_symbols"] == "BTC/USDT"
   assert captured["venue_state_api_key"] == "test-key"
@@ -245,6 +248,106 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["sandbox_interval_seconds"] == "11"
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
+  assert len(container.background_jobs) == 2
+
+
+def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypatch) -> None:
+  captured: dict[str, str] = {}
+
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeCcxtMarketDataAdapter:
+    def __init__(
+      self,
+      *,
+      database_url: str,
+      venue: str,
+      tracked_symbols: tuple[str, ...],
+      default_candle_limit: int,
+      historical_candle_limit: int,
+    ) -> None:
+      captured["database_url"] = database_url
+      captured["market_data_venue"] = venue
+      captured["tracked_symbols"] = ",".join(tracked_symbols)
+      captured["default_candle_limit"] = str(default_candle_limit)
+      captured["historical_candle_limit"] = str(historical_candle_limit)
+
+  class FakeCcxtVenueStateAdapter:
+    def __init__(
+      self,
+      *,
+      tracked_symbols: tuple[str, ...],
+      venue: str = "binance",
+      api_key: str | None,
+      api_secret: str | None,
+    ) -> None:
+      captured["venue_state_venue"] = venue
+
+  class FakeBinanceVenueExecutionAdapter:
+    def __init__(
+      self,
+      *,
+      venue: str = "binance",
+      api_key: str | None,
+      api_secret: str | None,
+    ) -> None:
+      captured["venue_execution_venue"] = venue
+
+  class FakeMarketDataSyncJob:
+    def __init__(self, market_data, *, timeframes: tuple[str, ...], interval_seconds: int) -> None:
+      captured["sync_timeframes"] = ",".join(timeframes)
+      captured["sync_interval_seconds"] = str(interval_seconds)
+      self._market_data = market_data
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
+  class FakeSandboxWorkerSessionsJob:
+    def __init__(self, application, *, interval_seconds: int) -> None:
+      self._application = application
+
+    async def start(self) -> None:
+      return None
+
+    async def stop(self) -> None:
+      return None
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.CcxtMarketDataAdapter", FakeCcxtMarketDataAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.CcxtVenueStateAdapter", FakeCcxtVenueStateAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
+  monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
+
+  container = build_container(
+    Settings(
+      market_data_provider="coinbase",
+      market_data_symbols=("ETH/USDT",),
+      market_data_sync_timeframes=("5m", "1h"),
+      market_data_sync_interval_seconds=90,
+      market_data_default_candle_limit=128,
+      market_data_historical_candle_limit=512,
+    )
+  )
+
+  assert captured["market_data_venue"] == "coinbase"
+  assert captured["tracked_symbols"] == "ETH/USDT"
+  assert captured["default_candle_limit"] == "128"
+  assert captured["historical_candle_limit"] == "512"
+  assert captured["sync_timeframes"] == "5m,1h"
+  assert captured["sync_interval_seconds"] == "90"
+  assert captured["venue_state_venue"] == "coinbase"
+  assert captured["venue_execution_venue"] == "coinbase"
   assert len(container.background_jobs) == 2
 
 

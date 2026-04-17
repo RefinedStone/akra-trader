@@ -26,10 +26,10 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 ### Market data
 
-- Binance-backed `MarketDataPort` adapter
+- ccxt-backed `MarketDataPort` adapter for Binance, Coinbase, and Kraken
 - tracked-symbol sync and historical backfill
 - duplicate avoidance, lag tracking, and gap reporting
-- background sync job started from the app lifespan when Binance is active
+- background sync job started from the app lifespan when a supported ccxt provider is active
 - seeded market-data adapter still available for tests and fixture-driven flows
 
 ### Strategy and execution
