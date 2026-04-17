@@ -282,6 +282,9 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.payload["job_id"] == "pd-job-9"
   assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
   assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert snapshot.payload["provider_schema"]["kind"] == "pagerduty"
+  assert snapshot.payload["provider_schema"]["pagerduty"]["incident_id"] == "PDINC-123"
+  assert snapshot.payload["provider_schema"]["pagerduty"]["incident_status"] == "acknowledged"
   assert requests[0][0].endswith("/incidents/PDINC-123")
   assert requests[0][1] == "GET"
   assert requests[0][2]["From"] == "akra-ops@example.com"
@@ -512,5 +515,8 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.payload["job_id"] == "og-job-7"
   assert snapshot.payload["channels"] == ["kline"]
   assert snapshot.payload["status_machine"]["job_state"] == "requested"
+  assert snapshot.payload["provider_schema"]["kind"] == "opsgenie"
+  assert snapshot.payload["provider_schema"]["opsgenie"]["alert_id"] == "OG-123"
+  assert snapshot.payload["provider_schema"]["opsgenie"]["alert_status"] == "acknowledged"
   assert requests[0][0].endswith("/v2/alerts/OG-123?identifierType=id")
   assert requests[0][1] == "GET"

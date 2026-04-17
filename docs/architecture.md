@@ -196,7 +196,9 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   state now includes a provider-side status machine covering workflow phase, job phase, sync
   status, last provider event, and attempt count, and guarded-live refresh also pull-syncs the
   current provider incident/alert body so PagerDuty/Opsgenie-held recovery metadata can reconcile
-  local state authoritatively when callbacks lag. Local
+  local state authoritatively when callbacks lag. The same remediation state now keeps
+  provider-specific typed branches for PagerDuty incident fields and Opsgenie alert fields so the
+  control plane does not collapse provider-owned recovery metadata into one generic schema. Local
   acknowledge/remediate/escalate actions can push provider-native workflow updates back out when
   the selected provider supports them, and locally verified remediation closures now push a
   provider-native `resolve` action as well, so durable incidents track a bidirectional paging and

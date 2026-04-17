@@ -675,6 +675,14 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       body_payload.get("details"),
       body_payload,
     )
+    provider_payload = dict(custom_details)
+    provider_payload.update({
+      "urgency": incident_payload.get("urgency"),
+      "html_url": incident_payload.get("html_url"),
+      "last_status_change_at": incident_payload.get("last_status_change_at"),
+      "service": self._extract_mapping(incident_payload.get("service")),
+      "escalation_policy": self._extract_mapping(incident_payload.get("escalation_policy")),
+    })
     return self._build_provider_pull_sync(
       provider="pagerduty",
       workflow_reference=self._first_non_empty_string(
@@ -695,7 +703,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         incident_payload.get("summary"),
         incident_payload.get("description"),
       ),
-      provider_payload=custom_details,
+      provider_payload=provider_payload,
       updated_at=self._parse_provider_datetime(
         incident_payload.get("last_status_change_at"),
         incident_payload.get("updated_at"),
@@ -726,6 +734,20 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       alert_payload.get("details"),
       alert_payload.get("detail"),
     )
+    provider_payload = dict(details_payload)
+    provider_payload.update({
+      "priority": alert_payload.get("priority"),
+      "owner": self._extract_mapping(alert_payload.get("owner")),
+      "acknowledged": alert_payload.get("acknowledged"),
+      "seen": alert_payload.get("isSeen"),
+      "tinyId": alert_payload.get("tinyId"),
+      "teams": [
+        team.get("name")
+        for team in alert_payload.get("teams", [])
+        if isinstance(team, dict) and isinstance(team.get("name"), str)
+      ] if isinstance(alert_payload.get("teams"), list) else details_payload.get("teams"),
+      "updatedAt": alert_payload.get("updatedAt"),
+    })
     workflow_state = self._first_non_empty_string(alert_payload.get("status"))
     acknowledged = alert_payload.get("acknowledged")
     if workflow_state is None and isinstance(acknowledged, bool):
@@ -747,7 +769,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         alert_payload.get("message"),
         alert_payload.get("description"),
       ),
-      provider_payload=details_payload,
+      provider_payload=provider_payload,
       updated_at=self._parse_provider_datetime(
         alert_payload.get("updatedAt"),
         alert_payload.get("updated_at"),
@@ -781,6 +803,91 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       provider_recovery.get("status_machine"),
       provider_payload.get("status_machine"),
     )
+    provider_schema_payload: dict[str, Any] = {}
+    if provider == "pagerduty":
+      provider_schema_payload = {
+        "kind": "pagerduty",
+        "pagerduty": {
+          "incident_id": workflow_reference,
+          "incident_key": external_reference,
+          "incident_status": workflow_state,
+          "urgency": self._first_non_empty_string(
+            provider_payload.get("urgency"),
+            self._extract_mapping(provider_payload.get("incident")).get("urgency"),
+          ),
+          "service_id": self._first_non_empty_string(
+            provider_payload.get("service_id"),
+            self._extract_mapping(provider_payload.get("service")).get("id"),
+          ),
+          "service_summary": self._first_non_empty_string(
+            provider_payload.get("service_summary"),
+            self._extract_mapping(provider_payload.get("service")).get("summary"),
+            self._extract_mapping(provider_payload.get("service")).get("name"),
+          ),
+          "escalation_policy_id": self._first_non_empty_string(
+            provider_payload.get("escalation_policy_id"),
+            self._extract_mapping(provider_payload.get("escalation_policy")).get("id"),
+          ),
+          "escalation_policy_summary": self._first_non_empty_string(
+            provider_payload.get("escalation_policy_summary"),
+            self._extract_mapping(provider_payload.get("escalation_policy")).get("summary"),
+            self._extract_mapping(provider_payload.get("escalation_policy")).get("name"),
+          ),
+          "html_url": self._first_non_empty_string(
+            provider_payload.get("html_url"),
+          ),
+          "last_status_change_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("last_status_change_at"),
+            ).isoformat()
+            if self._parse_provider_datetime(provider_payload.get("last_status_change_at")) is not None
+            else None
+          ),
+        },
+      }
+    elif provider == "opsgenie":
+      provider_schema_payload = {
+        "kind": "opsgenie",
+        "opsgenie": {
+          "alert_id": workflow_reference,
+          "alias": external_reference,
+          "alert_status": workflow_state,
+          "priority": self._first_non_empty_string(provider_payload.get("priority")),
+          "owner": self._first_non_empty_string(
+            provider_payload.get("owner"),
+            self._extract_mapping(provider_payload.get("owner_user")).get("username"),
+          ),
+          "acknowledged": (
+            provider_payload.get("acknowledged")
+            if isinstance(provider_payload.get("acknowledged"), bool)
+            else None
+          ),
+          "seen": (
+            provider_payload.get("seen")
+            if isinstance(provider_payload.get("seen"), bool)
+            else None
+          ),
+          "tiny_id": self._first_non_empty_string(
+            provider_payload.get("tiny_id"),
+            provider_payload.get("tinyId"),
+          ),
+          "teams": self._extract_string_list(
+            provider_payload.get("teams"),
+            provider_payload.get("team"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              provider_payload.get("updatedAt"),
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              provider_payload.get("updatedAt"),
+            ) is not None
+            else None
+          ),
+        },
+      }
     merged_payload: dict[str, Any] = dict(remediation_payload)
     merged_payload.update({
       "workflow_reference": workflow_reference,
@@ -870,6 +977,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           else 0
         ),
       },
+      "provider_schema": provider_schema_payload,
     })
     remediation_state = self._first_non_empty_string(
       provider_payload.get("remediation_state"),
@@ -887,6 +995,85 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       payload=merged_payload,
       synced_at=updated_at or self._clock(),
     )
+
+  @staticmethod
+  def _build_provider_recovery_payload(incident: OperatorIncidentEvent) -> dict[str, Any]:
+    provider_recovery = incident.remediation.provider_recovery
+    return {
+      "lifecycle_state": provider_recovery.lifecycle_state,
+      "provider": provider_recovery.provider,
+      "job_id": provider_recovery.job_id,
+      "reference": provider_recovery.reference,
+      "workflow_reference": provider_recovery.workflow_reference,
+      "summary": provider_recovery.summary,
+      "detail": provider_recovery.detail,
+      "channels": provider_recovery.channels,
+      "symbols": provider_recovery.symbols,
+      "timeframe": provider_recovery.timeframe,
+      "updated_at": (
+        provider_recovery.updated_at.isoformat()
+        if provider_recovery.updated_at is not None
+        else None
+      ),
+      "verification": {
+        "state": provider_recovery.verification.state,
+        "checked_at": (
+          provider_recovery.verification.checked_at.isoformat()
+          if provider_recovery.verification.checked_at is not None
+          else None
+        ),
+        "summary": provider_recovery.verification.summary,
+        "issues": provider_recovery.verification.issues,
+      },
+      "status_machine": {
+        "state": provider_recovery.status_machine.state,
+        "workflow_state": provider_recovery.status_machine.workflow_state,
+        "workflow_action": provider_recovery.status_machine.workflow_action,
+        "job_state": provider_recovery.status_machine.job_state,
+        "sync_state": provider_recovery.status_machine.sync_state,
+        "last_event_kind": provider_recovery.status_machine.last_event_kind,
+        "last_event_at": (
+          provider_recovery.status_machine.last_event_at.isoformat()
+          if provider_recovery.status_machine.last_event_at is not None
+          else None
+        ),
+        "last_detail": provider_recovery.status_machine.last_detail,
+        "attempt_number": provider_recovery.status_machine.attempt_number,
+      },
+      "provider_schema_kind": provider_recovery.provider_schema_kind,
+      "pagerduty": {
+        "incident_id": provider_recovery.pagerduty.incident_id,
+        "incident_key": provider_recovery.pagerduty.incident_key,
+        "incident_status": provider_recovery.pagerduty.incident_status,
+        "urgency": provider_recovery.pagerduty.urgency,
+        "service_id": provider_recovery.pagerduty.service_id,
+        "service_summary": provider_recovery.pagerduty.service_summary,
+        "escalation_policy_id": provider_recovery.pagerduty.escalation_policy_id,
+        "escalation_policy_summary": provider_recovery.pagerduty.escalation_policy_summary,
+        "html_url": provider_recovery.pagerduty.html_url,
+        "last_status_change_at": (
+          provider_recovery.pagerduty.last_status_change_at.isoformat()
+          if provider_recovery.pagerduty.last_status_change_at is not None
+          else None
+        ),
+      },
+      "opsgenie": {
+        "alert_id": provider_recovery.opsgenie.alert_id,
+        "alias": provider_recovery.opsgenie.alias,
+        "alert_status": provider_recovery.opsgenie.alert_status,
+        "priority": provider_recovery.opsgenie.priority,
+        "owner": provider_recovery.opsgenie.owner,
+        "acknowledged": provider_recovery.opsgenie.acknowledged,
+        "seen": provider_recovery.opsgenie.seen,
+        "tiny_id": provider_recovery.opsgenie.tiny_id,
+        "teams": provider_recovery.opsgenie.teams,
+        "updated_at": (
+          provider_recovery.opsgenie.updated_at.isoformat()
+          if provider_recovery.opsgenie.updated_at is not None
+          else None
+        ),
+      },
+    }
 
   @staticmethod
   def _build_generic_webhook_payload(*, incident: OperatorIncidentEvent) -> bytes:
@@ -917,48 +1104,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             if incident.remediation.provider_payload_updated_at is not None
             else None
           ),
-          "provider_recovery": {
-            "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
-            "provider": incident.remediation.provider_recovery.provider,
-            "job_id": incident.remediation.provider_recovery.job_id,
-            "reference": incident.remediation.provider_recovery.reference,
-            "workflow_reference": incident.remediation.provider_recovery.workflow_reference,
-            "summary": incident.remediation.provider_recovery.summary,
-            "detail": incident.remediation.provider_recovery.detail,
-            "channels": incident.remediation.provider_recovery.channels,
-            "symbols": incident.remediation.provider_recovery.symbols,
-            "timeframe": incident.remediation.provider_recovery.timeframe,
-            "updated_at": (
-              incident.remediation.provider_recovery.updated_at.isoformat()
-              if incident.remediation.provider_recovery.updated_at is not None
-              else None
-            ),
-            "verification": {
-              "state": incident.remediation.provider_recovery.verification.state,
-              "checked_at": (
-                incident.remediation.provider_recovery.verification.checked_at.isoformat()
-                if incident.remediation.provider_recovery.verification.checked_at is not None
-                else None
-              ),
-              "summary": incident.remediation.provider_recovery.verification.summary,
-              "issues": incident.remediation.provider_recovery.verification.issues,
-            },
-            "status_machine": {
-              "state": incident.remediation.provider_recovery.status_machine.state,
-              "workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
-              "workflow_action": incident.remediation.provider_recovery.status_machine.workflow_action,
-              "job_state": incident.remediation.provider_recovery.status_machine.job_state,
-              "sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
-              "last_event_kind": incident.remediation.provider_recovery.status_machine.last_event_kind,
-              "last_event_at": (
-                incident.remediation.provider_recovery.status_machine.last_event_at.isoformat()
-                if incident.remediation.provider_recovery.status_machine.last_event_at is not None
-                else None
-              ),
-              "last_detail": incident.remediation.provider_recovery.status_machine.last_detail,
-              "attempt_number": incident.remediation.provider_recovery.status_machine.attempt_number,
-            },
-          },
+          "provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
         },
       }
     ).encode("utf-8")
@@ -1013,18 +1159,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
             "remediation_provider_payload": incident.remediation.provider_payload,
-            "remediation_provider_recovery": {
-              "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
-              "job_id": incident.remediation.provider_recovery.job_id,
-              "channels": incident.remediation.provider_recovery.channels,
-              "symbols": incident.remediation.provider_recovery.symbols,
-              "timeframe": incident.remediation.provider_recovery.timeframe,
-              "verification_state": incident.remediation.provider_recovery.verification.state,
-              "status_machine_state": incident.remediation.provider_recovery.status_machine.state,
-              "status_machine_workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
-              "status_machine_job_state": incident.remediation.provider_recovery.status_machine.job_state,
-              "status_machine_sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
-            },
+            "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
           },
         },
       }
@@ -1074,18 +1209,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "remediation_runbook": incident.remediation.runbook,
             "remediation_summary": incident.remediation.summary,
             "remediation_provider_payload": incident.remediation.provider_payload,
-            "remediation_provider_recovery": {
-              "lifecycle_state": incident.remediation.provider_recovery.lifecycle_state,
-              "job_id": incident.remediation.provider_recovery.job_id,
-              "channels": incident.remediation.provider_recovery.channels,
-              "symbols": incident.remediation.provider_recovery.symbols,
-              "timeframe": incident.remediation.provider_recovery.timeframe,
-              "verification_state": incident.remediation.provider_recovery.verification.state,
-              "status_machine_state": incident.remediation.provider_recovery.status_machine.state,
-              "status_machine_workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
-              "status_machine_job_state": incident.remediation.provider_recovery.status_machine.job_state,
-              "status_machine_sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
-            },
+            "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
           },
           "tags": ["akra", incident.source, incident.severity.lower()],
         }

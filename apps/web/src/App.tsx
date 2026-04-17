@@ -391,6 +391,31 @@ type OperatorVisibility = {
           last_detail?: string | null;
           attempt_number: number;
         };
+        provider_schema_kind?: string | null;
+        pagerduty: {
+          incident_id?: string | null;
+          incident_key?: string | null;
+          incident_status: string;
+          urgency?: string | null;
+          service_id?: string | null;
+          service_summary?: string | null;
+          escalation_policy_id?: string | null;
+          escalation_policy_summary?: string | null;
+          html_url?: string | null;
+          last_status_change_at?: string | null;
+        };
+        opsgenie: {
+          alert_id?: string | null;
+          alias?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          owner?: string | null;
+          acknowledged?: boolean | null;
+          seen?: boolean | null;
+          tiny_id?: string | null;
+          teams: string[];
+          updated_at?: string | null;
+        };
       };
     };
   }[];
@@ -533,6 +558,31 @@ type GuardedLiveStatus = {
           last_event_at?: string | null;
           last_detail?: string | null;
           attempt_number: number;
+        };
+        provider_schema_kind?: string | null;
+        pagerduty: {
+          incident_id?: string | null;
+          incident_key?: string | null;
+          incident_status: string;
+          urgency?: string | null;
+          service_id?: string | null;
+          service_summary?: string | null;
+          escalation_policy_id?: string | null;
+          escalation_policy_summary?: string | null;
+          html_url?: string | null;
+          last_status_change_at?: string | null;
+        };
+        opsgenie: {
+          alert_id?: string | null;
+          alias?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          owner?: string | null;
+          acknowledged?: boolean | null;
+          seen?: boolean | null;
+          tiny_id?: string | null;
+          teams: string[];
+          updated_at?: string | null;
         };
       };
     };
@@ -2199,6 +2249,11 @@ export default function App() {
                                         ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
                                         : ""}
                                     </p>
+                                    {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
+                                      <p className="run-lineage-symbol-copy">
+                                        {formatProviderRecoverySchema(event.remediation.provider_recovery)}
+                                      </p>
+                                    ) : null}
                                   </>
                                 ) : null}
                               </>
@@ -3344,6 +3399,11 @@ export default function App() {
                                           ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
                                           : ""}
                                       </p>
+                                      {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          {formatProviderRecoverySchema(event.remediation.provider_recovery)}
+                                        </p>
+                                      ) : null}
                                     </>
                                   ) : null}
                                 </>
@@ -7914,6 +7974,64 @@ function formatTimestamp(value?: string | null) {
     return "n/a";
   }
   return value;
+}
+
+function formatProviderRecoverySchema(providerRecovery: {
+  provider_schema_kind?: string | null;
+  pagerduty: {
+    incident_id?: string | null;
+    incident_key?: string | null;
+    incident_status: string;
+    urgency?: string | null;
+    service_summary?: string | null;
+    escalation_policy_summary?: string | null;
+    last_status_change_at?: string | null;
+  };
+  opsgenie: {
+    alert_id?: string | null;
+    alias?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    owner?: string | null;
+    teams: string[];
+    updated_at?: string | null;
+  };
+}) {
+  if (providerRecovery.provider_schema_kind === "pagerduty") {
+    const details = [
+      providerRecovery.pagerduty.incident_id ? `incident ${providerRecovery.pagerduty.incident_id}` : null,
+      providerRecovery.pagerduty.incident_status !== "unknown"
+        ? `status ${providerRecovery.pagerduty.incident_status}`
+        : null,
+      providerRecovery.pagerduty.urgency ? `urgency ${providerRecovery.pagerduty.urgency}` : null,
+      providerRecovery.pagerduty.service_summary ? `service ${providerRecovery.pagerduty.service_summary}` : null,
+      providerRecovery.pagerduty.escalation_policy_summary
+        ? `policy ${providerRecovery.pagerduty.escalation_policy_summary}`
+        : null,
+      providerRecovery.pagerduty.last_status_change_at
+        ? `changed ${formatTimestamp(providerRecovery.pagerduty.last_status_change_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `PagerDuty schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "opsgenie") {
+    const details = [
+      providerRecovery.opsgenie.alert_id ? `alert ${providerRecovery.opsgenie.alert_id}` : null,
+      providerRecovery.opsgenie.alert_status !== "unknown"
+        ? `status ${providerRecovery.opsgenie.alert_status}`
+        : null,
+      providerRecovery.opsgenie.priority ? `priority ${providerRecovery.opsgenie.priority}` : null,
+      providerRecovery.opsgenie.owner ? `owner ${providerRecovery.opsgenie.owner}` : null,
+      providerRecovery.opsgenie.teams.length
+        ? `teams ${providerRecovery.opsgenie.teams.join(", ")}`
+        : null,
+      providerRecovery.opsgenie.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.opsgenie.updated_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Opsgenie schema: ${details.join(" / ")}` : null;
+  }
+  return null;
 }
 
 function shortenIdentifier(value: string, maxLength = 18) {

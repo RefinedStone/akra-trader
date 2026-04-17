@@ -48,6 +48,8 @@ from akra_trader.domain.models import OperatorAlert
 from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import OperatorIncidentOpsgenieRecoveryState
+from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1500,23 +1502,47 @@ class TradingApplication:
       )
       if updated_incident.remediation.state != "not_applicable":
         provider_recovery = updated_incident.remediation.provider_recovery
+        generic_workflow_states = {"unknown", "idle", "not_supported", "retrying"}
+        aligned_provider_recovery = provider_recovery
+        if (
+          normalized_provider == "pagerduty"
+          and provider_recovery.pagerduty.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            pagerduty=replace(
+              aligned_provider_recovery.pagerduty,
+              incident_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "opsgenie"
+          and provider_recovery.opsgenie.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            opsgenie=replace(
+              aligned_provider_recovery.opsgenie,
+              alert_status="delivered",
+            ),
+          )
         updated_incident = replace(
           updated_incident,
           remediation=replace(
             updated_incident.remediation,
             provider_recovery=replace(
-              provider_recovery,
+              aligned_provider_recovery,
               status_machine=self._build_provider_recovery_status_machine(
-                existing=provider_recovery.status_machine,
+                existing=aligned_provider_recovery.status_machine,
                 remediation_state=updated_incident.remediation.state,
-                event_kind=provider_recovery.status_machine.last_event_kind,
+                event_kind=aligned_provider_recovery.status_machine.last_event_kind,
                 workflow_state="delivered",
                 workflow_action=provider_phase.removeprefix("provider_"),
-                job_state=provider_recovery.status_machine.job_state,
-                sync_state=provider_recovery.status_machine.sync_state,
-                detail=provider_recovery.status_machine.last_detail,
+                job_state=aligned_provider_recovery.status_machine.job_state,
+                sync_state=aligned_provider_recovery.status_machine.sync_state,
+                detail=aligned_provider_recovery.status_machine.last_detail,
                 event_at=synced_at,
-                attempt_number=provider_recovery.status_machine.attempt_number,
+                attempt_number=aligned_provider_recovery.status_machine.attempt_number,
               ),
             ),
           ),
@@ -1582,6 +1608,14 @@ class TradingApplication:
     if isinstance(value, dict):
       return value
     return {}
+
+  @classmethod
+  def _merge_payload_mappings(cls, *values: Any) -> dict[str, Any]:
+    merged: dict[str, Any] = {}
+    for value in values:
+      if isinstance(value, dict):
+        merged.update(cls._extract_payload_mapping(value))
+    return merged
 
   @classmethod
   def _extract_string_tuple(cls, *values: Any) -> tuple[str, ...]:
@@ -1835,6 +1869,143 @@ class TradingApplication:
       ),
     )
 
+  def _build_provider_recovery_provider_schema(
+    self,
+    *,
+    provider: str,
+    payload: dict[str, Any],
+    workflow_state: str | None,
+    workflow_reference: str | None,
+    reference: str | None,
+    existing: OperatorIncidentProviderRecoveryState,
+  ) -> tuple[str | None, OperatorIncidentPagerDutyRecoveryState, OperatorIncidentOpsgenieRecoveryState]:
+    normalized_provider = self._normalize_paging_provider(provider)
+    schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
+
+    pagerduty_payload = self._merge_payload_mappings(
+      schema_payload.get("pagerduty"),
+      payload.get("pagerduty"),
+      payload.get("pagerduty_incident"),
+    )
+    pagerduty_status = self._first_non_empty_string(
+      pagerduty_payload.get("incident_status"),
+      pagerduty_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.pagerduty.incident_status,
+    ) or "unknown"
+    pagerduty = OperatorIncidentPagerDutyRecoveryState(
+      incident_id=self._first_non_empty_string(
+        pagerduty_payload.get("incident_id"),
+        pagerduty_payload.get("id"),
+        workflow_reference,
+        existing.pagerduty.incident_id,
+      ),
+      incident_key=self._first_non_empty_string(
+        pagerduty_payload.get("incident_key"),
+        pagerduty_payload.get("dedup_key"),
+        reference,
+        existing.pagerduty.incident_key,
+      ),
+      incident_status=pagerduty_status,
+      urgency=self._first_non_empty_string(
+        pagerduty_payload.get("urgency"),
+        existing.pagerduty.urgency,
+      ),
+      service_id=self._first_non_empty_string(
+        pagerduty_payload.get("service_id"),
+        existing.pagerduty.service_id,
+      ),
+      service_summary=self._first_non_empty_string(
+        pagerduty_payload.get("service_summary"),
+        pagerduty_payload.get("service_name"),
+        existing.pagerduty.service_summary,
+      ),
+      escalation_policy_id=self._first_non_empty_string(
+        pagerduty_payload.get("escalation_policy_id"),
+        existing.pagerduty.escalation_policy_id,
+      ),
+      escalation_policy_summary=self._first_non_empty_string(
+        pagerduty_payload.get("escalation_policy_summary"),
+        pagerduty_payload.get("escalation_policy_name"),
+        existing.pagerduty.escalation_policy_summary,
+      ),
+      html_url=self._first_non_empty_string(
+        pagerduty_payload.get("html_url"),
+        existing.pagerduty.html_url,
+      ),
+      last_status_change_at=(
+        self._parse_payload_datetime(pagerduty_payload.get("last_status_change_at"))
+        or existing.pagerduty.last_status_change_at
+      ),
+    )
+
+    opsgenie_payload = self._merge_payload_mappings(
+      schema_payload.get("opsgenie"),
+      payload.get("opsgenie"),
+      payload.get("opsgenie_alert"),
+    )
+    opsgenie_status = self._first_non_empty_string(
+      opsgenie_payload.get("alert_status"),
+      opsgenie_payload.get("status"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.opsgenie.alert_status,
+    ) or "unknown"
+    opsgenie = OperatorIncidentOpsgenieRecoveryState(
+      alert_id=self._first_non_empty_string(
+        opsgenie_payload.get("alert_id"),
+        opsgenie_payload.get("id"),
+        workflow_reference,
+        existing.opsgenie.alert_id,
+      ),
+      alias=self._first_non_empty_string(
+        opsgenie_payload.get("alias"),
+        reference,
+        existing.opsgenie.alias,
+      ),
+      alert_status=opsgenie_status,
+      priority=self._first_non_empty_string(
+        opsgenie_payload.get("priority"),
+        existing.opsgenie.priority,
+      ),
+      owner=self._first_non_empty_string(
+        opsgenie_payload.get("owner"),
+        existing.opsgenie.owner,
+      ),
+      acknowledged=(
+        opsgenie_payload.get("acknowledged")
+        if isinstance(opsgenie_payload.get("acknowledged"), bool)
+        else existing.opsgenie.acknowledged
+      ),
+      seen=(
+        opsgenie_payload.get("seen")
+        if isinstance(opsgenie_payload.get("seen"), bool)
+        else existing.opsgenie.seen
+      ),
+      tiny_id=self._first_non_empty_string(
+        opsgenie_payload.get("tiny_id"),
+        opsgenie_payload.get("tinyId"),
+        existing.opsgenie.tiny_id,
+      ),
+      teams=self._extract_string_tuple(
+        opsgenie_payload.get("teams"),
+        opsgenie_payload.get("team"),
+        existing.opsgenie.teams,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(opsgenie_payload.get("updated_at"))
+        or self._parse_payload_datetime(opsgenie_payload.get("updatedAt"))
+        or existing.opsgenie.updated_at
+      ),
+    )
+
+    if normalized_provider == "pagerduty":
+      return "pagerduty", pagerduty, existing.opsgenie
+    if normalized_provider == "opsgenie":
+      return "opsgenie", existing.pagerduty, opsgenie
+    return existing.provider_schema_kind, existing.pagerduty, existing.opsgenie
+
   def _build_provider_recovery_state(
     self,
     *,
@@ -1894,6 +2065,26 @@ class TradingApplication:
       event_at=synced_at,
       payload=payload,
     )
+    reference = self._first_non_empty_string(
+      payload.get("reference"),
+      payload.get("job_reference"),
+      payload.get("recovery_reference"),
+      existing.reference,
+      remediation.reference,
+    )
+    provider_schema_kind, pagerduty_schema, opsgenie_schema = self._build_provider_recovery_provider_schema(
+      provider=provider or existing.provider or remediation.provider or "",
+      payload=payload,
+      workflow_state=status_machine.workflow_state,
+      workflow_reference=self._first_non_empty_string(
+        workflow_reference,
+        payload.get("workflow_reference"),
+        payload.get("provider_workflow_reference"),
+        existing.workflow_reference,
+      ),
+      reference=reference,
+      existing=existing,
+    )
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -1903,13 +2094,7 @@ class TradingApplication:
         payload.get("execution_id"),
         existing.job_id,
       ),
-      reference=self._first_non_empty_string(
-        payload.get("reference"),
-        payload.get("job_reference"),
-        payload.get("recovery_reference"),
-        existing.reference,
-        remediation.reference,
-      ),
+      reference=reference,
       workflow_reference=self._first_non_empty_string(
         workflow_reference,
         payload.get("workflow_reference"),
@@ -1955,6 +2140,9 @@ class TradingApplication:
       ),
       verification=verification,
       status_machine=status_machine,
+      provider_schema_kind=provider_schema_kind,
+      pagerduty=pagerduty_schema,
+      opsgenie=opsgenie_schema,
       updated_at=synced_at,
     )
 

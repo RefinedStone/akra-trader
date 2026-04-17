@@ -529,6 +529,34 @@ class OperatorIncidentProviderRecoveryStatusMachine:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentPagerDutyRecoveryState:
+  incident_id: str | None = None
+  incident_key: str | None = None
+  incident_status: str = "unknown"
+  urgency: str | None = None
+  service_id: str | None = None
+  service_summary: str | None = None
+  escalation_policy_id: str | None = None
+  escalation_policy_summary: str | None = None
+  html_url: str | None = None
+  last_status_change_at: datetime | None = None
+
+
+@dataclass(frozen=True)
+class OperatorIncidentOpsgenieRecoveryState:
+  alert_id: str | None = None
+  alias: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  owner: str | None = None
+  acknowledged: bool | None = None
+  seen: bool | None = None
+  tiny_id: str | None = None
+  teams: tuple[str, ...] = ()
+  updated_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -545,6 +573,13 @@ class OperatorIncidentProviderRecoveryState:
   )
   status_machine: OperatorIncidentProviderRecoveryStatusMachine = field(
     default_factory=OperatorIncidentProviderRecoveryStatusMachine
+  )
+  provider_schema_kind: str | None = None
+  pagerduty: OperatorIncidentPagerDutyRecoveryState = field(
+    default_factory=OperatorIncidentPagerDutyRecoveryState
+  )
+  opsgenie: OperatorIncidentOpsgenieRecoveryState = field(
+    default_factory=OperatorIncidentOpsgenieRecoveryState
   )
   updated_at: datetime | None = None
 

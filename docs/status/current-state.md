@@ -122,7 +122,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   recovery metadata can reconcile remediation state authoritatively when callbacks lag. Those
   payloads are now promoted into typed remediation recovery state with job/reference, channels,
   symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
-  phase, job phase, sync state, last event, and attempt count. When local verification closes the
+  phase, job phase, sync state, last event, and attempt count. That recovery state now also keeps
+  provider-specific typed schemas for PagerDuty incidents and Opsgenie alerts instead of only a
+  flattened generic payload. When local verification closes the
   incident, the provider-native remediation workflow is resolved back out through the same
   bidirectional incident channel
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,

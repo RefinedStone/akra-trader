@@ -1644,6 +1644,9 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert updated_incident["remediation"]["requested_by"] == "pagerduty:responder-1"
     assert updated_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
     assert updated_incident["remediation"]["provider_recovery"]["job_id"] == "provider-job-901"
+    assert updated_incident["remediation"]["provider_recovery"]["provider_schema_kind"] == "pagerduty"
+    assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_id"] == "PDINC-REC-901"
+    assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_status"] == "delivered"
     assert updated_incident["remediation"]["provider_recovery"]["symbols"] == ["ETH/USDT"]
     assert updated_incident["remediation"]["provider_recovery"]["timeframe"] == "5m"
     assert updated_incident["remediation"]["provider_recovery"]["verification"]["state"] == "passed"
@@ -1865,6 +1868,9 @@ def test_guarded_live_endpoint_pull_syncs_provider_authoritative_recovery_state(
     )
     assert opened_incident["remediation"]["state"] == "executed"
     assert opened_incident["remediation"]["provider_recovery"]["job_id"] == "pd-job-api-1"
+    assert opened_incident["remediation"]["provider_recovery"]["provider_schema_kind"] == "pagerduty"
+    assert opened_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_id"] == "PDINC-PULL-API-1"
+    assert opened_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_status"] == "acknowledged"
     assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_state"] == "acknowledged"
     assert opened_incident["remediation"]["provider_recovery"]["status_machine"]["sync_state"] == "bidirectional_synced"
     assert any(
