@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After direct remediation-engine polling and the Jira Service Management typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After direct remediation-engine polling and the provider-managed remediation breadth now extends through AlertOps, deepen the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve richer private remediation-engine detail instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, direct polling, and native phase graphs now include PagerTree too, but richer provider-native private remediation-engine graphs and metrics are still not mirrored; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply still listed broader provider coverage first.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, direct polling, and native phase graphs now include AlertOps too, but richer provider-native private remediation-engine phase graphs and metrics are still not mirrored; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply still listed broader provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T05:20:00Z",
+      "updated_at": "2026-04-18T05:55:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints and typed recovery schemas now generalized through Jira Service Management are being polled directly."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints and typed recovery schemas now generalized through AlertOps are being polled directly."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1103,19 +1103,37 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-pagertree",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond PagerTree",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, and PagerTree adapters by adding at least one more provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current fifteen providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, and PagerTree adapters to AlertOps, adding the `alertops_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, AlertOps typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans sixteen providers.",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 23,
-      "priority_reason": "The latest main-session reply explicitly lists broader provider-managed remediation coverage as the first remaining item after PagerTree landed, so another provider expansion is the clearest executable queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 8a2e573, which expanded provider-managed remediation coverage through AlertOps across operator delivery, application wiring, provider pull-sync, remediation-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI schema display, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-jira-service-management"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T05:20:00Z",
+      "updated_at": "2026-04-18T05:55:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating PagerTree as the current milestone rather than the final provider breadth endpoint."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond PagerTree to AlertOps, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-alertops",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond AlertOps",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, and AlertOps adapters by adding at least one more provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current sixteen providers.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply explicitly lists broader provider-managed remediation coverage as the first remaining item after AlertOps landed, so another provider expansion is the clearest executable queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-pagertree"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T05:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating AlertOps as the current milestone rather than the final provider breadth endpoint."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
