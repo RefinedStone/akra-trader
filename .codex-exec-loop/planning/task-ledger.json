@@ -707,18 +707,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Split provider recovery state into venue-specific typed schemas",
       "description": "Build on the completed generic typed provider recovery model by separating venue-specific recovery payloads into deeper typed schemas for exchange- or provider-owned recovery flows, so remediation logic and operator surfaces can reason about venue-native recovery semantics without collapsing distinct provider contracts into one generic job or target shape.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply explicitly says PagerDuty- and Opsgenie-specific recovery phase schemas are still normalized into one shared recovery machine after commit ab8d0d0, making provider-native typed schema depth the clearest executable next task now that provider-authoritative pull-sync is complete.",
+      "priority_reason": "Completed in main session commit 105a8de, which split provider recovery state into PagerDuty- and Opsgenie-specific typed schemas across remediation storage, operator delivery, UI rendering, tests, and docs.",
       "depends_on": [
         "planning-operator-trust-typed-provider-recovery-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:30:00Z",
+      "updated_at": "2026-04-17T21:45:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by keeping typed remediation state honest about provider- and venue-native recovery semantics instead of flattening all external recovery engines into one generic contract."
+      "direction_relation_note": "Closed the first provider-specific typed-schema split for operator trust by giving PagerDuty and Opsgenie distinct remediation-state branches, which now leaves deeper provider-native phase-graph fidelity and deeper provider-owned remediation-engine synchronization as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-provider-native-recovery-phase-graph-depth",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Deepen provider-native recovery phase graphs beyond the first typed schemas",
+      "description": "Build on the completed PagerDuty and Opsgenie typed schema split by modeling provider-specific recovery phase enums and any materially distinct provider-native internal phase graph edges more faithfully, so remediation state and operator surfaces do not stop at a shallow typed branch when the provider exposes richer execution, verification, or escalation phases.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply explicitly says the new PagerDuty and Opsgenie typed schemas still do not mirror deeper provider-specific recovery phase enums or full provider-native internal phase graphs, making this the clearest immediate executable follow-up after commit 105a8de.",
+      "depends_on": [
+        "planning-operator-trust-venue-specific-provider-recovery-typed-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T21:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by tightening the provider-specific remediation contract from shallow typed branches toward provider-native recovery semantics that operators can interpret without hidden flattening."
     },
     {
       "id": "planning-operator-trust-deeper-provider-remediation-engine-sync",
@@ -728,13 +746,13 @@
       "status": "proposed",
       "base_priority": 79,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says recovery orchestration still depends on the provider incident or alert surface and does not yet poll a deeper provider-owned remediation engine, but the provider-native typed schema split is the clearer immediate executable queue head because it refines the just-shipped pull-sync contract without introducing a new provider-engine scope.",
+      "priority_reason": "The latest main-session reply explicitly says provider-authoritative sync now closes only the incident or alert surface and does not yet poll a deeper provider-owned remediation engine, but the provider-native phase-graph depth task is the clearer immediate queue head because it continues the just-shipped typed-schema split before expanding into a broader provider-engine scope.",
       "depends_on": [
         "planning-operator-trust-provider-recovery-authoritative-pull-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:30:00Z",
+      "updated_at": "2026-04-17T21:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps operator trust aligned with provider-owned recovery truth by distinguishing incident-surface reconciliation from any richer provider remediation engine that may own deeper execution states."
     },
