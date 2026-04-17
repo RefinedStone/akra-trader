@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import dataclass
 import json
 from queue import Empty
@@ -14,6 +15,7 @@ from typing import Protocol
 from urllib import error as urllib_error
 from urllib import parse as urllib_parse
 from urllib import request as urllib_request
+from uuid import uuid4
 
 import ccxt
 
@@ -495,6 +497,19 @@ COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE = (
   "kline_candles",
   "order_book_lifecycle",
 )
+COINBASE_ADVANCED_TRADE_USER_STREAM_COVERAGE = (
+  "execution_reports",
+  "account_positions",
+  "heartbeat_events",
+)
+COINBASE_ADVANCED_TRADE_VENUE_STREAM_COVERAGE = tuple(
+  dict.fromkeys(
+    (
+      *COINBASE_ADVANCED_TRADE_USER_STREAM_COVERAGE,
+      *COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE,
+    )
+  )
+)
 
 
 class VenueExecutionExchange(Protocol):
@@ -929,6 +944,342 @@ class CoinbaseAdvancedTradeWebSocketMarketStreamClient:
       product_id=_normalize_coinbase_product_id(self._symbol),
       timeframe=self._timeframe,
       clock=self._clock,
+    )
+
+
+class CoinbaseAdvancedTradeUserStreamSession:
+  transport = "coinbase_advanced_trade_user_websocket"
+
+  def __init__(
+    self,
+    *,
+    session_id: str,
+    websocket_url: str,
+    api_key: str,
+    signing_key: str,
+    product_id: str | None,
+    clock: Callable[[], datetime],
+  ) -> None:
+    self.session_id = session_id
+    self._websocket_url = websocket_url
+    self._api_key = api_key
+    self._signing_key = signing_key
+    self._product_id = product_id
+    self._clock = clock
+    self._events: Queue[dict[str, Any]] = Queue()
+    self._closed = False
+    self._reader_stop = threading.Event()
+    self._connect = self._resolve_connect()
+    self._connection = self._connect(self._websocket_url)
+    self._subscribe()
+    self._reader = threading.Thread(
+      target=self._reader_loop,
+      name=f"coinbase-user-stream-{session_id}",
+      daemon=True,
+    )
+    self._reader.start()
+
+  def drain_events(self) -> tuple[dict[str, Any], ...]:
+    if self._closed:
+      return ()
+    return _drain_stream_event_queue(self._events)
+
+  def close(self) -> None:
+    if self._closed:
+      return
+    self._closed = True
+    self._reader_stop.set()
+    try:
+      self._connection.close()
+    except Exception:
+      pass
+    if self._reader.is_alive():
+      self._reader.join(timeout=1.0)
+
+  def _subscribe(self) -> None:
+    heartbeat_message = {
+      "type": "subscribe",
+      "channel": "heartbeats",
+      "jwt": _build_coinbase_websocket_jwt(
+        api_key=self._api_key,
+        signing_key=self._signing_key,
+        current_time=self._clock(),
+      ),
+    }
+    user_message: dict[str, Any] = {
+      "type": "subscribe",
+      "channel": "user",
+      "jwt": _build_coinbase_websocket_jwt(
+        api_key=self._api_key,
+        signing_key=self._signing_key,
+        current_time=self._clock(),
+      ),
+    }
+    if self._product_id is not None:
+      user_message["product_ids"] = [self._product_id]
+    for message in (heartbeat_message, user_message):
+      self._connection.send(json.dumps(message))
+
+  def _reader_loop(self) -> None:
+    while not self._reader_stop.is_set():
+      try:
+        message = self._connection.recv()
+      except Exception as exc:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamDisconnect",
+            "stream_scope": "user_data",
+            "message": str(exc),
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        return
+      if message is None:
+        if self._reader_stop.is_set():
+          return
+        self._events.put(
+          {
+            "e": "streamDisconnect",
+            "stream_scope": "user_data",
+            "message": "connection_closed",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        return
+      try:
+        payload = json.loads(message)
+      except json.JSONDecodeError as exc:
+        self._events.put(
+          {
+            "e": "streamWarning",
+            "stream_scope": "user_data",
+            "message": f"invalid_json:{exc}",
+            "E": int(self._clock().timestamp() * 1000),
+          }
+        )
+        continue
+      for event in self._normalize_payload(payload):
+        self._events.put(event)
+
+  def _normalize_payload(self, payload: dict[str, Any]) -> tuple[dict[str, Any], ...]:
+    channel = str(payload.get("channel") or "")
+    if str(payload.get("type") or "").lower() == "error":
+      return (
+        {
+          "e": "streamWarning",
+          "stream_scope": "user_data",
+          "message": str(payload.get("message") or "coinbase_user_stream_error"),
+          "E": int(self._clock().timestamp() * 1000),
+        },
+      )
+    if channel in {"", "subscriptions"}:
+      return ()
+    if channel == "heartbeats":
+      received_at = _coerce_datetime(payload.get("timestamp"), None) or self._clock()
+      return (
+        {
+          "e": "streamHeartbeat",
+          "stream_scope": "user_data",
+          "stream": "coinbase@user_heartbeats",
+          "E": int(received_at.timestamp() * 1000),
+          "_received_at_ms": int(received_at.timestamp() * 1000),
+        },
+      )
+    if channel != "user":
+      return ()
+    received_at = _coerce_datetime(payload.get("timestamp"), None) or self._clock()
+    events = payload.get("events")
+    if not isinstance(events, list):
+      return ()
+    normalized: list[dict[str, Any]] = []
+    for entry in events:
+      if not isinstance(entry, dict):
+        continue
+      normalized.extend(self._normalize_user_event(entry=entry, received_at=received_at))
+    return tuple(normalized)
+
+  def _normalize_user_event(
+    self,
+    *,
+    entry: dict[str, Any],
+    received_at: datetime,
+  ) -> tuple[dict[str, Any], ...]:
+    normalized: list[dict[str, Any]] = []
+    orders = entry.get("orders")
+    if isinstance(orders, list):
+      for row in orders:
+        if not isinstance(row, dict):
+          continue
+        created_at = (
+          _coerce_datetime(_sanitize_coinbase_zero_time(row.get("creation_time")), None)
+          or received_at
+        )
+        updated_at = (
+          _coerce_datetime(_sanitize_coinbase_zero_time(row.get("end_time")), None)
+          or received_at
+        )
+        filled_amount = _coerce_float(row.get("cumulative_quantity")) or 0.0
+        remaining_amount = _coerce_float(row.get("leaves_quantity"))
+        requested_amount = (
+          filled_amount + remaining_amount
+          if remaining_amount is not None
+          else _coerce_float(row.get("base_size"))
+          or filled_amount
+        )
+        normalized.append(
+          {
+            "e": "executionReport",
+            "E": int(received_at.timestamp() * 1000),
+            "O": int(created_at.timestamp() * 1000),
+            "T": int(updated_at.timestamp() * 1000),
+            "i": str(row.get("order_id") or row.get("client_order_id") or ""),
+            "c": str(row.get("client_order_id") or ""),
+            "S": str(row.get("order_side") or "unknown").upper(),
+            "q": str(requested_amount),
+            "z": str(filled_amount),
+            "p": str(row.get("limit_price") or row.get("avg_price") or ""),
+            "L": str(row.get("avg_price") or ""),
+            "X": str(row.get("status") or ""),
+            "Z": str(row.get("filled_value") or ""),
+            "n": str(row.get("total_fees") or ""),
+            "stream_scope": "user_data",
+            "stream": "coinbase@user",
+            "_received_at_ms": int(received_at.timestamp() * 1000),
+          }
+        )
+    positions = entry.get("positions")
+    if positions not in (None, {}, [], ()):
+      normalized.append(
+        {
+          "e": "outboundAccountPosition",
+          "E": int(received_at.timestamp() * 1000),
+          "stream_scope": "user_data",
+          "stream": "coinbase@user",
+          "_received_at_ms": int(received_at.timestamp() * 1000),
+        }
+      )
+    return tuple(normalized)
+
+  @staticmethod
+  def _resolve_connect():
+    try:
+      from websockets.sync.client import connect
+    except ImportError as exc:
+      raise RuntimeError("websockets_dependency_missing") from exc
+    return connect
+
+
+class CoinbaseAdvancedTradeUserStreamClient:
+  transport = "coinbase_advanced_trade_user_websocket"
+
+  def __init__(
+    self,
+    *,
+    api_key: str,
+    signing_key: str,
+    symbol: str | None = None,
+    websocket_url: str = "wss://advanced-trade-ws-user.coinbase.com",
+    clock: Callable[[], datetime] | None = None,
+  ) -> None:
+    self._api_key = api_key
+    self._signing_key = signing_key
+    self._symbol = symbol
+    self._websocket_url = websocket_url
+    self._clock = clock or (lambda: datetime.now(UTC))
+
+  def open_session(self) -> BinanceVenueStreamSession:
+    product_id = _normalize_coinbase_product_id(self._symbol) if self._symbol else None
+    return CoinbaseAdvancedTradeUserStreamSession(
+      session_id=f"coinbase-user:{product_id or 'all'}:heartbeats+user",
+      websocket_url=self._websocket_url,
+      api_key=self._api_key,
+      signing_key=self._signing_key,
+      product_id=product_id,
+      clock=self._clock,
+    )
+
+
+class CoinbaseCombinedWebSocketVenueSession:
+  transport = "coinbase_advanced_trade_combined_websocket"
+
+  def __init__(
+    self,
+    *,
+    user_data_session: BinanceVenueStreamSession,
+    market_stream_session: BinanceVenueStreamSession,
+  ) -> None:
+    self.session_id = f"{user_data_session.session_id}|{market_stream_session.session_id}"
+    self._user_data_session = user_data_session
+    self._market_stream_session = market_stream_session
+
+  def drain_events(self) -> tuple[dict[str, Any], ...]:
+    events: list[dict[str, Any]] = []
+    for event in self._user_data_session.drain_events():
+      next_event = dict(event)
+      next_event.setdefault("stream_scope", "user_data")
+      events.append(next_event)
+    for event in self._market_stream_session.drain_events():
+      next_event = dict(event)
+      next_event.setdefault("stream_scope", "market_data")
+      events.append(next_event)
+    return tuple(events)
+
+  def close(self) -> None:
+    user_error: Exception | None = None
+    try:
+      self._user_data_session.close()
+    except Exception as exc:  # pragma: no cover - defensive aggregation
+      user_error = exc
+    try:
+      self._market_stream_session.close()
+    except Exception as exc:  # pragma: no cover - defensive aggregation
+      if user_error is not None:
+        raise RuntimeError(f"{user_error}; {exc}") from exc
+      raise
+    if user_error is not None:
+      raise user_error
+
+
+class CoinbaseCombinedWebSocketVenueStreamClient:
+  transport = "coinbase_advanced_trade_combined_websocket"
+
+  def __init__(
+    self,
+    *,
+    api_key: str,
+    signing_key: str,
+    symbol: str,
+    timeframe: str,
+    user_websocket_url: str = "wss://advanced-trade-ws-user.coinbase.com",
+    market_websocket_url: str = "wss://advanced-trade-ws.coinbase.com",
+    clock: Callable[[], datetime] | None = None,
+  ) -> None:
+    self._user_stream_client = CoinbaseAdvancedTradeUserStreamClient(
+      api_key=api_key,
+      signing_key=signing_key,
+      symbol=symbol,
+      websocket_url=user_websocket_url,
+      clock=clock,
+    )
+    self._market_stream_client = CoinbaseAdvancedTradeWebSocketMarketStreamClient(
+      symbol=symbol,
+      timeframe=timeframe,
+      websocket_url=market_websocket_url,
+      clock=clock,
+    )
+
+  def open_session(self) -> BinanceVenueStreamSession:
+    user_data_session = self._user_stream_client.open_session()
+    try:
+      market_stream_session = self._market_stream_client.open_session()
+    except Exception:
+      user_data_session.close()
+      raise
+    return CoinbaseCombinedWebSocketVenueSession(
+      user_data_session=user_data_session,
+      market_stream_session=market_stream_session,
     )
 
 
@@ -2943,6 +3294,19 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         )
       except Exception:
         pass
+    elif self._venue == "coinbase" and self._api_key and self._api_secret and symbol and timeframe:
+      try:
+        clients.append(
+          CoinbaseCombinedWebSocketVenueStreamClient(
+            api_key=self._api_key,
+            signing_key=self._api_secret,
+            symbol=symbol,
+            timeframe=timeframe,
+            clock=self._clock,
+          )
+        )
+      except Exception:
+        pass
     if symbol and timeframe:
       push_client = self._resolve_push_stream_client(symbol=symbol, timeframe=timeframe)
       if push_client is not None:
@@ -3048,6 +3412,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       return BINANCE_VENUE_STREAM_COVERAGE
     if transport == "binance_market_data_websocket":
       return BINANCE_MARKET_PUSH_VENUE_STREAM_COVERAGE
+    if transport in {"coinbase_advanced_trade_combined_websocket", "coinbase_advanced_trade_user_websocket"}:
+      return COINBASE_ADVANCED_TRADE_VENUE_STREAM_COVERAGE
     if transport == "coinbase_advanced_trade_market_websocket":
       return COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
     if transport == "kraken_spot_market_websocket":
@@ -3062,6 +3428,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       "binance_multi_stream_websocket",
       "binance_user_data_websocket",
       "binance_market_data_websocket",
+      "coinbase_advanced_trade_combined_websocket",
+      "coinbase_advanced_trade_user_websocket",
       "coinbase_advanced_trade_market_websocket",
       "kraken_spot_market_websocket",
     }:
@@ -3093,6 +3461,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       return "binance_venue_stream"
     if transport == "binance_market_data_websocket":
       return "binance_market_push_transport"
+    if transport in {"coinbase_advanced_trade_combined_websocket", "coinbase_advanced_trade_user_websocket"}:
+      return "coinbase_venue_stream"
     if transport == "coinbase_advanced_trade_market_websocket":
       return "coinbase_market_push_transport"
     if transport == "kraken_spot_market_websocket":
@@ -3103,6 +3473,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   def _stream_issue_prefix_for_transport(transport: str | None) -> str:
     if transport in {"binance_multi_stream_websocket", "binance_user_data_websocket", "binance_market_data_websocket"}:
       return "binance_venue_stream"
+    if transport in {"coinbase_advanced_trade_combined_websocket", "coinbase_advanced_trade_user_websocket"}:
+      return "coinbase_venue_stream"
     if transport == "coinbase_advanced_trade_market_websocket":
       return "coinbase_venue_stream"
     if transport == "kraken_spot_market_websocket":
@@ -3667,6 +4039,12 @@ def _normalize_coinbase_product_id(symbol: str) -> str:
   return symbol.replace("/", "-").upper()
 
 
+def _sanitize_coinbase_zero_time(value: Any) -> Any:
+  if isinstance(value, str) and value.startswith("0001-01-01T00:00:00"):
+    return None
+  return value
+
+
 def _extract_nested_value(row: dict[str, Any], path: tuple[str, ...]) -> Any:
   current: Any = row
   for key in path:
@@ -3718,6 +4096,49 @@ def _coerce_string(value: Any) -> str | None:
     return None
   text = str(value)
   return text if text else None
+
+
+def _base64url_encode_json(value: dict[str, Any]) -> bytes:
+  payload = json.dumps(value, separators=(",", ":"), sort_keys=True).encode()
+  return base64.urlsafe_b64encode(payload).rstrip(b"=")
+
+
+def _base64url_encode_bytes(value: bytes) -> str:
+  return base64.urlsafe_b64encode(value).rstrip(b"=").decode()
+
+
+def _build_coinbase_websocket_jwt(
+  *,
+  api_key: str,
+  signing_key: str,
+  current_time: datetime,
+) -> str:
+  from cryptography.hazmat.primitives import hashes
+  from cryptography.hazmat.primitives import serialization
+  from cryptography.hazmat.primitives.asymmetric import ec
+  from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+  issued_at = int(current_time.timestamp())
+  header = {
+    "alg": "ES256",
+    "kid": api_key,
+    "nonce": uuid4().hex,
+    "typ": "JWT",
+  }
+  payload = {
+    "iss": "cdp",
+    "nbf": issued_at,
+    "exp": issued_at + 120,
+    "sub": api_key,
+  }
+  signing_input = b".".join((_base64url_encode_json(header), _base64url_encode_json(payload)))
+  private_key = serialization.load_pem_private_key(signing_key.encode(), password=None)
+  if not isinstance(private_key, ec.EllipticCurvePrivateKey):
+    raise RuntimeError("coinbase_websocket_signing_key_invalid")
+  der_signature = private_key.sign(signing_input, ec.ECDSA(hashes.SHA256()))
+  r, s = decode_dss_signature(der_signature)
+  raw_signature = r.to_bytes(32, "big") + s.to_bytes(32, "big")
+  return f"{signing_input.decode()}.{_base64url_encode_bytes(raw_signature)}"
 
 
 def _coerce_first_depth_level(value: Any) -> tuple[float | None, float | None]:

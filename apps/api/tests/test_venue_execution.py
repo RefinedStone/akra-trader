@@ -952,6 +952,244 @@ def test_coinbase_adapter_uses_push_native_multi_venue_transport(monkeypatch) ->
   assert connection.closed is True
 
 
+def test_coinbase_adapter_extends_authenticated_account_and_order_transport(monkeypatch) -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  request_urls: list[str] = []
+  user_connection = FakeWebSocketConnection()
+  market_connection = FakeWebSocketConnection()
+
+  def fake_user_connect(url: str):
+    request_urls.append(url)
+    return user_connection
+
+  def fake_market_connect(url: str):
+    request_urls.append(url)
+    return market_connection
+
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution.CoinbaseAdvancedTradeUserStreamSession._resolve_connect",
+    staticmethod(lambda: fake_user_connect),
+  )
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution.CoinbaseAdvancedTradeWebSocketMarketStreamSession._resolve_connect",
+    staticmethod(lambda: fake_market_connect),
+  )
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution._build_coinbase_websocket_jwt",
+    lambda *, api_key, signing_key, current_time: "test-jwt",
+  )
+
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 700,
+        "bids": [[21931.98, 1.10], [21931.25, 0.65]],
+        "asks": [[21933.98, 1.25], [21934.50, 0.40]],
+      },
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 21931.98,
+      "bidVolume": 1.10,
+      "ask": 21933.98,
+      "askVolume": 1.25,
+      "last": 21932.98,
+      "high": 23011.18,
+      "low": 21835.29,
+      "baseVolume": 16038.28770938,
+      "quoteVolume": 351749098.37,
+    },
+    trades=[
+      {
+        "id": "coinbase-trade-restore-1",
+        "price": 21932.98,
+        "amount": 0.30,
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 21920.0, 21940.0, 21910.0, 21932.5, 12.0]
+    ],
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    venue="coinbase",
+    api_key="organizations/test/apiKeys/key-1",
+    api_secret="-----BEGIN PRIVATE KEY-----\nTEST\n-----END PRIVATE KEY-----\n",
+    exchange=exchange,
+    clock=clock,
+  )
+
+  handoff = adapter.handoff_session(
+    symbol="BTC/USD",
+    timeframe="5m",
+    owner_run_id="run-live-coinbase-auth",
+    owner_session_id="worker-live-coinbase-auth",
+    owned_order_ids=(),
+  )
+
+  user_messages = [json.loads(payload) for payload in user_connection.sent_messages]
+  market_messages = [json.loads(payload) for payload in market_connection.sent_messages]
+
+  assert request_urls == [
+    "wss://advanced-trade-ws-user.coinbase.com",
+    "wss://advanced-trade-ws.coinbase.com",
+  ]
+  assert user_messages == [
+    {
+      "type": "subscribe",
+      "channel": "heartbeats",
+      "jwt": "test-jwt",
+    },
+    {
+      "type": "subscribe",
+      "channel": "user",
+      "product_ids": ["BTC-USD"],
+      "jwt": "test-jwt",
+    },
+  ]
+  assert market_messages == [
+    {"type": "subscribe", "channel": "heartbeats"},
+    {"type": "subscribe", "channel": "ticker", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "market_trades", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "level2", "product_ids": ["BTC-USD"]},
+    {"type": "subscribe", "channel": "candles", "product_ids": ["BTC-USD"]},
+  ]
+  assert handoff.source == "coinbase_venue_stream"
+  assert handoff.transport == "coinbase_advanced_trade_combined_websocket"
+  assert "venue_stream_transport_fallback:coinbase_advanced_trade_combined_websocket" not in handoff.issues
+
+  clock.advance(timedelta(minutes=5))
+  user_connection.messages.put(
+    json.dumps(
+      {
+        "channel": "heartbeats",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "events": [{"current_time": clock().isoformat().replace("+00:00", "Z"), "heartbeat_counter": "1"}],
+      }
+    )
+  )
+  user_connection.messages.put(
+    json.dumps(
+      {
+        "channel": "user",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 11,
+        "events": [
+          {
+            "type": "snapshot",
+            "orders": [
+              {
+                "avg_price": "2500",
+                "client_order_id": "client-order-1",
+                "cumulative_quantity": "0.25",
+                "filled_value": "625",
+                "leaves_quantity": "0.75",
+                "limit_price": "2500",
+                "order_id": "coinbase-order-1",
+                "order_side": "BUY",
+                "order_type": "Limit",
+                "product_id": "BTC-USD",
+                "status": "OPEN",
+                "total_fees": "2",
+                "creation_time": clock().isoformat().replace("+00:00", "Z"),
+                "end_time": "0001-01-01T00:00:00Z",
+              }
+            ],
+            "positions": {
+              "perpetual_futures_positions": [],
+            },
+          }
+        ],
+      }
+    )
+  )
+  market_connection.messages.put(
+    json.dumps(
+      {
+        "channel": "ticker",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 701,
+        "events": [
+          {
+            "type": "snapshot",
+            "tickers": [
+              {
+                "type": "ticker",
+                "product_id": "BTC-USD",
+                "price": "21934.10",
+                "volume_24_h": "16040.10",
+                "low_24_h": "21835.29",
+                "high_24_h": "23011.18",
+                "best_bid": "21934.00",
+                "best_bid_quantity": "0.95",
+                "best_ask": "21934.20",
+                "best_ask_quantity": "1.05",
+              }
+            ],
+          }
+        ],
+      }
+    )
+  )
+  market_connection.messages.put(
+    json.dumps(
+      {
+        "channel": "market_trades",
+        "timestamp": clock().isoformat().replace("+00:00", "Z"),
+        "sequence_num": 702,
+        "events": [
+          {
+            "type": "update",
+            "trades": [
+              {
+                "trade_id": "coinbase-trade-2",
+                "product_id": "BTC-USD",
+                "price": "21934.12",
+                "size": "0.42",
+                "side": "BUY",
+                "time": clock().isoformat().replace("+00:00", "Z"),
+              }
+            ],
+          }
+        ],
+      }
+    )
+  )
+
+  sync = adapter.sync_session(handoff=handoff, order_ids=("coinbase-order-1",))
+  released = adapter.release_session(handoff=sync.handoff)
+
+  assert sync.handoff.transport == "coinbase_advanced_trade_combined_websocket"
+  assert sync.handoff.source == "coinbase_venue_stream"
+  assert sync.handoff.coverage == (
+    "execution_reports",
+    "account_positions",
+    "heartbeat_events",
+    "order_state_snapshots",
+    "trade_ticks",
+    "aggregate_trade_ticks",
+    "book_ticker",
+    "mini_ticker",
+    "depth_updates",
+    "kline_candles",
+    "order_book_lifecycle",
+  )
+  assert sync.handoff.last_account_event_at == clock()
+  assert sync.handoff.last_market_event_at == clock()
+  assert sync.synced_orders[0].order_id == "coinbase-order-1"
+  assert sync.synced_orders[0].status == "partially_filled"
+  assert sync.synced_orders[0].filled_amount == 0.25
+  assert sync.open_orders[0].order_id == "coinbase-order-1"
+  assert sync.open_orders[0].amount == 0.75
+  assert sync.handoff.active_order_count == 1
+  assert released.transport == "coinbase_advanced_trade_combined_websocket"
+  assert released.source == "coinbase_venue_stream"
+  assert user_connection.closed is True
+  assert market_connection.closed is True
+
+
 def test_kraken_adapter_extends_push_native_multi_venue_transport(monkeypatch) -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
