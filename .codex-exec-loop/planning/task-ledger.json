@@ -381,20 +381,20 @@
     {
       "id": "planning-operator-trust-sandbox-durable-alert-history",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Broaden operator alert surface and durable history beyond guarded-live incidents",
-      "description": "Expand operator-facing alert coverage beyond the current guarded-live incident set by persisting sandbox and adjacent runtime alert lifecycle state, surfacing wider operator-visible alert categories, and making those alerts inspectable without relying only on current in-memory status or narrow live-path incidents.",
+      "title": "Extend durable incident workflow to risk breaches and broader live-path faults",
+      "description": "Expand the new durable incident workflow beyond the current guarded-live incident set by persisting risk-breach and adjacent live-path fault lifecycle state, surfacing those wider operator-visible incident categories, and making them inspectable through the same incident and delivery history instead of only current in-memory status or narrow guarded-live alerts.",
       "status": "proposed",
       "base_priority": 79,
       "dynamic_priority_delta": 7,
-      "priority_reason": "Commit faaa129 closed guarded-live incident acknowledgment, escalation, and phase-aware retry, but the latest main-session reply says broader risk-breach and adjacent live-path faults still are not covered by the same durable incident workflow, so this remains the next operator-trust expansion after the external incident-management follow-up.",
+      "priority_reason": "Commit 212b1c8 added external incident sync and paging-state persistence for the current durable incident workflow, but the latest main-session reply explicitly says risk breaches and broader live-path faults still are not modeled through the same durable incident path, so this remains the next scope expansion after the provider-native paging workflow follow-up.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:10:00Z",
+      "updated_at": "2026-04-17T12:25:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending durable alert lifecycle records and operator-visible alert categories beyond the current guarded-live incident subset."
+      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending the same durable incident and delivery-history discipline from guarded-live incidents into risk breaches and adjacent live-path faults."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -419,18 +419,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Sync durable incidents with external incident-management and paging workflow",
       "description": "Extend the newly completed local acknowledgment and escalation workflow beyond the control plane by adding external incident-management synchronization, richer escalation ladders, and paging-policy orchestration semantics, so durable incidents stay aligned with downstream response systems instead of ending at local operator actions.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply lists external incident-management acknowledgment sync, richer escalation ladders, and paging-policy orchestration as the first remaining gap after commit faaa129, so this is the clearest next executable queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 212b1c8, which added durable external provider and paging-state fields, a token-protected external incident-sync callback endpoint, audit-trail updates for triggered through resolved events, UI visibility for external sync state, and API pytest plus web typecheck and build coverage.",
       "depends_on": [
         "planning-operator-trust-external-incident-workflow-and-escalation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:10:00Z",
+      "updated_at": "2026-04-17T12:25:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust from local incident handling to durable downstream coordination by making acknowledgment and escalation state interoperable with external paging and incident-response systems."
+      "direction_relation_note": "Closed the first downstream incident-sync gap for operator trust by making durable incidents interoperable with callback-driven external paging state, which now leaves provider-native bidirectional workflows, richer escalation ladders, and broader durable incident coverage as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-provider-native-bidirectional-incident-workflow",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add provider-native bidirectional incident workflow and paging-policy orchestration",
+      "description": "Build on the completed callback-driven external incident sync by adding provider-native bidirectional workflow semantics, richer escalation ladders, and explicit paging-policy orchestration, so durable incidents do not stop at inbound status callbacks and can drive or reconcile the full downstream response lifecycle.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly lists provider-native bidirectional workflow, richer escalation ladders, and paging-policy orchestration as the first remaining follow-up after commit 212b1c8, so this is the clearest next executable queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-operator-trust-external-incident-management-sync-and-paging"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust from inbound external-state mirroring to a fuller downstream response contract where paging providers and incident systems participate in a durable bidirectional workflow."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
