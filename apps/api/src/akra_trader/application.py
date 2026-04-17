@@ -4206,6 +4206,8 @@ class TradingApplication:
     combined = {target.strip().lower().replace("-", "_") for target in (*initial_targets, *escalation_targets)}
     if "pagerduty_events" in combined:
       return "pagerduty"
+    if "opsgenie_alerts" in combined:
+      return "opsgenie"
     return None
 
   def _deliver_guarded_live_incident_events(

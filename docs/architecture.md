@@ -171,8 +171,8 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   order-session adapters run against Binance, Coinbase, or Kraken while candle reads stay on a
   separate market-data source.
   Incident delivery is handled behind a dedicated delivery port that can currently fan out to
-  console logging, generic webhooks, Slack incoming webhooks, and PagerDuty Events API targets,
-  while the application layer owns acknowledgment, escalation timing, retry suppression, and
+  console logging, generic webhooks, Slack incoming webhooks, PagerDuty Events API targets, and
+  Opsgenie Alert API targets, while the application layer owns acknowledgment, escalation timing, retry suppression, and
   phase-aware retry/backoff rules. Durable incidents now also persist paging policy identity plus
   provider workflow state/action/reference. External incident-management systems can sync paging
   events back through a guarded API endpoint, and local acknowledge/escalate actions can push

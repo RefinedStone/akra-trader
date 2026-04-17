@@ -29,6 +29,8 @@ def _normalize_target(target: str) -> str | None:
     return "slack_webhook"
   if normalized in {"pagerduty", "pagerduty_events", "operator_pagerduty"}:
     return "pagerduty_events"
+  if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
+    return "opsgenie_alerts"
   return None
 
 
@@ -42,6 +44,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     pagerduty_integration_key: str | None = None,
     pagerduty_api_token: str | None = None,
     pagerduty_from_email: str | None = None,
+    opsgenie_api_key: str | None = None,
+    opsgenie_api_url: str = "https://api.opsgenie.com",
     webhook_timeout_seconds: int = 5,
     clock: Callable[[], datetime] | None = None,
     urlopen: Callable[..., object] | None = None,
@@ -57,6 +61,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._pagerduty_integration_key = pagerduty_integration_key
     self._pagerduty_api_token = pagerduty_api_token
     self._pagerduty_from_email = pagerduty_from_email
+    self._opsgenie_api_key = opsgenie_api_key
+    self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._webhook_timeout_seconds = webhook_timeout_seconds
     self._clock = clock or (lambda: datetime.now(UTC))
     self._urlopen = urlopen or urllib_request.urlopen
@@ -65,9 +71,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     return self._targets
 
   def list_supported_workflow_providers(self) -> tuple[str, ...]:
+    providers: list[str] = []
     if self._pagerduty_api_token and self._pagerduty_from_email:
-      return ("pagerduty",)
-    return ()
+      providers.append("pagerduty")
+    if self._opsgenie_api_key:
+      providers.append("opsgenie")
+    return tuple(providers)
 
   def deliver(
     self,
@@ -91,6 +100,9 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         continue
       if target == "pagerduty_events":
         records.append(self._deliver_pagerduty(incident=incident, attempt_number=attempt_number, phase=phase))
+        continue
+      if target == "opsgenie_alerts":
+        records.append(self._deliver_opsgenie(incident=incident, attempt_number=attempt_number, phase=phase))
     return tuple(records)
 
   def sync_incident_workflow(
@@ -108,6 +120,16 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized_provider == "pagerduty":
       return (
         self._sync_pagerduty_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          attempt_number=attempt_number,
+        ),
+      )
+    if normalized_provider == "opsgenie":
+      return (
+        self._sync_opsgenie_workflow(
           incident=incident,
           action=normalized_action,
           actor=actor,
@@ -453,6 +475,203 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         source=incident.source,
       )
 
+  def _deliver_opsgenie(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    alias = incident.external_reference or incident.alert_id
+    if not self._opsgenie_api_key:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:opsgenie_alerts:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="opsgenie_alerts",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="opsgenie_api_key_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="opsgenie",
+        external_reference=alias,
+        source=incident.source,
+      )
+    request = self._build_opsgenie_delivery_request(incident=incident, alias=alias)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:opsgenie_alerts:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="opsgenie_alerts",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"opsgenie_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="opsgenie",
+        external_reference=alias,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:opsgenie_alerts:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="opsgenie_alerts",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"opsgenie_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="opsgenie",
+        external_reference=alias,
+        source=incident.source,
+      )
+
+  def _sync_opsgenie_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    reference_type = "id" if incident.provider_workflow_reference else "alias"
+    target = "opsgenie_workflow"
+    if not self._opsgenie_api_key:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="opsgenie_workflow_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="opsgenie",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="opsgenie_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="opsgenie",
+        external_reference=None,
+        source=incident.source,
+      )
+    request = self._build_opsgenie_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"opsgenie_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="opsgenie",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"opsgenie_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="opsgenie",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+    request = self._build_pagerduty_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      workflow_reference=workflow_reference,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"pagerduty_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=workflow_reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"pagerduty_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="pagerduty",
+        external_reference=workflow_reference,
+        source=incident.source,
+      )
+
   @staticmethod
   def _build_generic_webhook_payload(*, incident: OperatorIncidentEvent) -> bytes:
     return json.dumps(
@@ -513,6 +732,53 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         },
       }
     ).encode("utf-8")
+
+  def _build_opsgenie_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    alias: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"GenieKey {self._opsgenie_api_key}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_alias = urllib_parse.quote(alias, safe="")
+      return urllib_request.Request(
+        f"{self._opsgenie_api_url}/v2/alerts/{encoded_alias}/close?identifierType=alias",
+        data=json.dumps(
+          {
+            "user": "Akra Trader",
+            "source": incident.source,
+            "note": incident.detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._opsgenie_api_url}/v2/alerts",
+      data=json.dumps(
+        {
+          "message": incident.summary[:130],
+          "alias": alias,
+          "description": incident.detail,
+          "source": incident.source,
+          "priority": self._map_opsgenie_priority(incident.severity),
+          "details": {
+            "alert_id": incident.alert_id,
+            "event_id": incident.event_id,
+            "incident_kind": incident.kind,
+            "run_id": incident.run_id,
+            "session_id": incident.session_id,
+          },
+          "tags": ["akra", incident.source, incident.severity.lower()],
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
 
   def _build_pagerduty_workflow_request(
     self,
@@ -576,6 +842,66 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported pagerduty workflow action: {action}")
 
+  def _build_opsgenie_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifierType={reference_type}"
+    headers = {
+      "Authorization": f"GenieKey {self._opsgenie_api_key}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._opsgenie_api_url}/v2/alerts/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "user": actor,
+            "source": incident.source,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._opsgenie_api_url}/v2/alerts/{encoded_reference}/close{suffix}",
+        data=json.dumps(
+          {
+            "user": actor,
+            "source": incident.source,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._opsgenie_api_url}/v2/alerts/{encoded_reference}/notes{suffix}",
+        data=json.dumps(
+          {
+            "user": actor,
+            "source": incident.source,
+            "note": (
+              f"Akra escalated incident to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported opsgenie workflow action: {action}")
+
   @staticmethod
   def _map_pagerduty_severity(severity: str) -> str:
     normalized = severity.lower()
@@ -584,3 +910,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "warning"
     return "info"
+
+  @staticmethod
+  def _map_opsgenie_priority(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "P1"
+    if normalized in {"warning", "warn"}:
+      return "P3"
+    return "P5"

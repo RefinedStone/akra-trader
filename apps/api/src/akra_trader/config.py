@@ -39,6 +39,8 @@ class Settings:
   operator_alert_pagerduty_integration_key: str | None = None
   operator_alert_pagerduty_api_token: str | None = None
   operator_alert_pagerduty_from_email: str | None = None
+  operator_alert_opsgenie_api_key: str | None = None
+  operator_alert_opsgenie_api_url: str = "https://api.opsgenie.com"
   operator_alert_webhook_timeout_seconds: int = 5
   operator_alert_delivery_max_attempts: int = 4
   operator_alert_delivery_initial_backoff_seconds: int = 15
@@ -113,6 +115,13 @@ def load_settings() -> Settings:
     ),
     operator_alert_pagerduty_from_email=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_FROM_EMAIL") or None
+    ),
+    operator_alert_opsgenie_api_key=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY") or None
+    ),
+    operator_alert_opsgenie_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_URL",
+      "https://api.opsgenie.com",
     ),
     operator_alert_webhook_timeout_seconds=int(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_WEBHOOK_TIMEOUT_SECONDS", "5")

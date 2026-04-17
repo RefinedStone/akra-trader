@@ -165,3 +165,125 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   assert escalate_request[1] == "POST"
   escalate_payload = json.loads(escalate_request[2].decode("utf-8"))
   assert "level 2" in escalate_payload["note"]["content"]
+
+
+def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("opsgenie",),
+    opsgenie_api_key="opsgenie-key",
+    opsgenie_api_url="https://api.opsgenie.example",
+    webhook_timeout_seconds=6,
+    urlopen=fake_urlopen,
+  )
+  opened = OperatorIncidentEvent(
+    event_id="incident-opened-opsgenie-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 14, 5, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live worker failed for ETH/USDT.",
+    detail="live worker crash",
+  )
+  resolved = OperatorIncidentEvent(
+    event_id="incident-resolved-opsgenie-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 14, 6, tzinfo=UTC),
+    kind="incident_resolved",
+    severity="warning",
+    summary="Resolved: Guarded-live worker failed for ETH/USDT.",
+    detail="live worker recovered",
+    external_reference="guarded-live:worker-failed:run-1",
+  )
+
+  opened_records = adapter.deliver(incident=opened)
+  resolved_records = adapter.deliver(incident=resolved)
+
+  assert adapter.list_targets() == ("opsgenie_alerts",)
+  assert opened_records[0].target == "opsgenie_alerts"
+  assert opened_records[0].external_provider == "opsgenie"
+  assert resolved_records[0].external_reference == "guarded-live:worker-failed:run-1"
+
+  create_request = requests[0]
+  resolve_request = requests[1]
+  assert create_request[0] == "https://api.opsgenie.example/v2/alerts"
+  assert create_request[1] == "POST"
+  assert create_request[3]["Authorization"] == "GenieKey opsgenie-key"
+  create_payload = json.loads(create_request[2].decode("utf-8"))
+  assert create_payload["alias"] == "guarded-live:worker-failed:run-1"
+  assert create_payload["priority"] == "P1"
+
+  assert resolve_request[0].endswith(
+    "/v2/alerts/guarded-live%3Aworker-failed%3Arun-1/close?identifierType=alias"
+  )
+  assert resolve_request[1] == "POST"
+  resolve_payload = json.loads(resolve_request[2].decode("utf-8"))
+  assert resolve_payload["note"] == "live worker recovered"
+
+
+def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("opsgenie",),
+    opsgenie_api_key="opsgenie-key",
+    opsgenie_api_url="https://api.opsgenie.example",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-opsgenie-2",
+    alert_id="guarded-live:reconciliation",
+    timestamp=datetime(2025, 1, 3, 14, 10, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live reconciliation has unresolved findings.",
+    detail="reconciliation drift",
+    external_provider="opsgenie",
+    external_reference="guarded-live:reconciliation",
+    provider_workflow_reference="OG-123",
+    escalation_level=3,
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="opsgenie",
+    action="acknowledge",
+    actor="operator",
+    detail="triaged",
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="opsgenie",
+    action="escalate",
+    actor="operator",
+    detail="handoff",
+  )
+  resolve = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="opsgenie",
+    action="resolve",
+    actor="operator",
+    detail="fixed",
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("opsgenie",)
+  assert acknowledge[0].target == "opsgenie_workflow"
+  assert acknowledge[0].external_reference == "OG-123"
+  assert escalate[0].provider_action == "escalate"
+  assert resolve[0].provider_action == "resolve"
+
+  assert requests[0][0].endswith("/v2/alerts/OG-123/acknowledge?identifierType=id")
+  assert requests[0][1] == "POST"
+  assert requests[1][0].endswith("/v2/alerts/OG-123/notes?identifierType=id")
+  assert requests[2][0].endswith("/v2/alerts/OG-123/close?identifierType=id")
+  escalate_payload = json.loads(requests[1][2].decode("utf-8"))
+  assert "level 3" in escalate_payload["note"]

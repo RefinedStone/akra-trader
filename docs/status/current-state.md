@@ -98,8 +98,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   order-book resync state, snapshot rebuild visibility, recovered bid/ask ladders, deeper channel
   restore visibility, persisted market-channel continuation visibility, top-of-book visibility,
   guarded-live resume controls, and guarded-live audit history
-- outbound incident delivery can now fan out to console, generic webhook, Slack webhook, and
-  PagerDuty targets with persisted delivery-attempt history, attempt counts, and retry timing
+- outbound incident delivery can now fan out to console, generic webhook, Slack webhook,
+  PagerDuty, and Opsgenie targets with persisted delivery-attempt history, attempt counts, and
+  retry timing
 - durable guarded-live incidents now persist acknowledgment state, escalation state, next
   escalation timing, operator actions for acknowledge/escalate workflows, and paging policy
   identity/provider selection
@@ -140,8 +141,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 ## Not Implemented Yet
 
 - full external incident-management workflow such as provider-managed ownership beyond the current
-  PagerDuty-native bidirectional path, richer escalation ladders, richer destinations, and more
-  advanced retry policies
+  PagerDuty/Opsgenie-native bidirectional paths, richer escalation ladders, richer destinations,
+  and more advanced retry policies
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
 - broader venue-native session continuation beyond Binance multi-stream
@@ -154,6 +155,6 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Expand operator delivery from the current console/webhook/Slack/PagerDuty plus bidirectional PagerDuty workflow sync into richer multi-provider incident-management and wider audit coverage.
+3. Expand operator delivery from the current console/webhook/Slack/PagerDuty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
 4. Expand guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

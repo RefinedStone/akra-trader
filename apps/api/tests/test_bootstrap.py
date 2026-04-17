@@ -155,6 +155,8 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       pagerduty_integration_key: str | None,
       pagerduty_api_token: str | None,
       pagerduty_from_email: str | None,
+      opsgenie_api_key: str | None,
+      opsgenie_api_url: str,
       webhook_timeout_seconds: int,
     ) -> None:
       captured["targets"] = ",".join(targets)
@@ -163,13 +165,15 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["pagerduty_integration_key"] = pagerduty_integration_key or ""
       captured["pagerduty_api_token"] = pagerduty_api_token or ""
       captured["pagerduty_from_email"] = pagerduty_from_email or ""
+      captured["opsgenie_api_key"] = opsgenie_api_key or ""
+      captured["opsgenie_api_url"] = opsgenie_api_url
       captured["webhook_timeout_seconds"] = str(webhook_timeout_seconds)
 
     def list_targets(self) -> tuple[str, ...]:
       return ("operator_console",)
 
     def list_supported_workflow_providers(self) -> tuple[str, ...]:
-      return ("pagerduty",)
+      return ("pagerduty", "opsgenie")
 
     def deliver(self, *, incident, targets=None, attempt_number: int = 1, phase: str = "initial"):
       return ()
@@ -200,6 +204,8 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       operator_alert_pagerduty_integration_key="pagerduty-key",
       operator_alert_pagerduty_api_token="pagerduty-api-token",
       operator_alert_pagerduty_from_email="akra-ops@example.com",
+      operator_alert_opsgenie_api_key="opsgenie-key",
+      operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_webhook_timeout_seconds=7,
       operator_alert_paging_policy_default_provider="pagerduty",
       operator_alert_paging_policy_warning_targets=("slack", "pagerduty"),
@@ -219,6 +225,8 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["pagerduty_integration_key"] == "pagerduty-key"
   assert captured["pagerduty_api_token"] == "pagerduty-api-token"
   assert captured["pagerduty_from_email"] == "akra-ops@example.com"
+  assert captured["opsgenie_api_key"] == "opsgenie-key"
+  assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["webhook_timeout_seconds"] == "7"
   assert container.app._operator_alert_paging_policy_default_provider == "pagerduty"
   assert container.app._operator_alert_paging_policy_warning_targets == (
