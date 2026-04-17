@@ -18,8 +18,9 @@ Implemented now:
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
   relaunch stored boundaries into backtest, sandbox, or paper flows
 - operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts,
-  guarded-live live-path alerts, persisted live-path alert history, durable incident events,
-  outbound delivery history, and merged runtime plus guarded-live audit events
+  guarded-live live-path alerts including risk breaches, repeated runtime recovery loops, stale
+  live order sync, persisted live-path alert history, durable incident events, outbound delivery
+  history, and merged runtime plus guarded-live audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
   history, durable incident events, outbound delivery history, and guarded-live audit events in the
   control plane
@@ -192,6 +193,9 @@ Defaults:
 - guarded-live control state now tracks owned live session identity plus a durable open-order
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
+- guarded-live live-path alerting now covers worker failure/staleness, risk guardrail breaches,
+  repeated live-session recovery loops, and stale active-order sync so those faults flow into the
+  same durable incident and delivery history
 - guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
   delivery attempts through configured operator delivery targets such as console logging, generic
   webhook delivery, Slack webhook delivery, PagerDuty Events API delivery, or Opsgenie Alert API

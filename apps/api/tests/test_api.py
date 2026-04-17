@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -12,6 +13,10 @@ from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import Order
+from akra_trader.domain.models import OrderSide
+from akra_trader.domain.models import OrderStatus
+from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import Position
 from akra_trader.main import create_app
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -918,6 +923,86 @@ def test_live_endpoints_launch_and_stop_guarded_live_worker_after_gates_clear(tm
   stopped_payload = stop_response.json()
   assert stopped_payload["status"] == "stopped"
   assert stopped_payload["provenance"]["runtime_session"]["lifecycle_state"] == "stopped"
+
+
+def test_operator_visibility_endpoint_surfaces_risk_breach_and_live_fault_incidents(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 0, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "risk_fault_visibility",
+      },
+    )
+    assert live_response.status_code == 200
+    payload = live_response.json()
+    run = app.get_run(payload["config"]["run_id"])
+    assert run is not None
+    assert run.provenance.runtime_session is not None
+    run.provenance.runtime_session.recovery_count = 2
+    run.provenance.runtime_session.last_recovered_at = datetime(2025, 1, 3, 18, 1, tzinfo=UTC)
+    run.provenance.runtime_session.last_recovery_reason = "heartbeat_timeout"
+    run.metrics["max_drawdown_pct"] = 41.0
+    run.orders.append(
+      Order(
+        run_id=run.config.run_id,
+        instrument_id="binance:ETH/USDT",
+        side=OrderSide.BUY,
+        quantity=0.2,
+        requested_price=3_150.0,
+        order_type=OrderType.LIMIT,
+        status=OrderStatus.OPEN,
+        order_id="stale-api-live-order-1",
+        created_at=datetime(2025, 1, 3, 17, 50, tzinfo=UTC),
+        updated_at=datetime(2025, 1, 3, 17, 51, tzinfo=UTC),
+        last_synced_at=datetime(2025, 1, 3, 17, 52, tzinfo=UTC),
+        remaining_quantity=0.2,
+      )
+    )
+    app._runs.save_run(run)
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    alerts = visibility_response.json()["alerts"]
+    categories = {
+      alert["category"]
+      for alert in alerts
+      if alert.get("run_id") == run.config.run_id and alert.get("source") == "guarded_live"
+    }
+    assert {"risk_breach", "runtime_recovery", "order_sync"} <= categories
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident_events = guarded_live_response.json()["incident_events"]
+    assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
+    assert any(event["alert_id"].startswith("guarded-live:order-sync:") for event in incident_events)
 
 
 def test_live_endpoints_use_configured_supported_guarded_live_venue(tmp_path: Path) -> None:

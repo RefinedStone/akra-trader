@@ -267,6 +267,8 @@ class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
   _guarded_live_worker_kind = "guarded_live_native_worker"
   _guarded_live_balance_tolerance = 1e-9
+  _guarded_live_drawdown_breach_pct = 35.0
+  _guarded_live_recovery_alert_threshold = 2
 
   class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
     def __init__(self) -> None:
@@ -4925,6 +4927,95 @@ class TradingApplication:
           delivery_targets=delivery_targets,
         )
       )
+
+    risk_issues: list[str] = []
+    latest_equity = run.equity_curve[-1] if run.equity_curve else None
+    max_drawdown_pct = run.metrics.get("max_drawdown_pct")
+    if isinstance(max_drawdown_pct, Number) and float(max_drawdown_pct) >= self._guarded_live_drawdown_breach_pct:
+      risk_issues.append(
+        f"max drawdown {float(max_drawdown_pct):.2f}% breached the "
+        f"{self._guarded_live_drawdown_breach_pct:.2f}% guardrail"
+      )
+    if latest_equity is not None and latest_equity.cash < -self._guarded_live_balance_tolerance:
+      risk_issues.append(
+        f"cash balance fell below zero to {latest_equity.cash:.2f}"
+      )
+    if risk_issues:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:risk-breach:{run.config.run_id}:{session.session_id}",
+          severity="critical",
+          category="risk_breach",
+          summary=f"Guarded-live risk guardrail breached for {symbol}.",
+          detail=(
+            "; ".join(risk_issues)
+            + (
+              f". Latest equity {latest_equity.equity:.2f}."
+              if latest_equity is not None
+              else ""
+            )
+          ),
+          detected_at=(
+            latest_equity.timestamp
+            if latest_equity is not None
+            else heartbeat_at
+          ),
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if run.status == RunStatus.RUNNING and session.recovery_count >= self._guarded_live_recovery_alert_threshold:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:recovery-loop:{run.config.run_id}:{session.session_id}",
+          severity="critical" if session.recovery_count >= self._guarded_live_recovery_alert_threshold + 1 else "warning",
+          category="runtime_recovery",
+          summary=f"Guarded-live worker recovery loop detected for {symbol}.",
+          detail=(
+            f"Runtime session recovered {session.recovery_count} times. "
+            f"Last recovery: {session.last_recovery_reason or 'unknown'} at "
+            f"{session.last_recovered_at.isoformat() if session.last_recovered_at is not None else 'n/a'}."
+          ),
+          detected_at=session.last_recovered_at or heartbeat_at,
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if run.status == RunStatus.RUNNING:
+      stale_orders = []
+      for order in run.orders:
+        if order.status not in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
+          continue
+        synced_at = order.last_synced_at or order.updated_at or order.created_at
+        if (current_time - synced_at).total_seconds() <= session.heartbeat_timeout_seconds:
+          continue
+        stale_orders.append((order, synced_at))
+      if stale_orders:
+        stale_order_ids = ", ".join(order.order_id for order, _ in stale_orders[:3])
+        oldest_sync_at = min(synced_at for _, synced_at in stale_orders)
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:order-sync:{run.config.run_id}:{session.session_id}",
+            severity="warning",
+            category="order_sync",
+            summary=f"Guarded-live venue order sync is stale for {symbol}.",
+            detail=(
+              f"{len(stale_orders)} active order(s) have not synced within "
+              f"{session.heartbeat_timeout_seconds}s. Orders: {stale_order_ids}."
+            ),
+            detected_at=oldest_sync_at,
+            run_id=run.config.run_id,
+            session_id=session.session_id,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
     return alerts
 
   @staticmethod

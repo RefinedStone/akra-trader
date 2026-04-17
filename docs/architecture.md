@@ -135,10 +135,11 @@ app also starts a `MarketDataSyncJob` that periodically refreshes tracked symbol
 
 The application also derives operator visibility from runtime state across sandbox and guarded-live
 flows. Failed worker sessions and stale heartbeats surface as control-room alerts, guarded-live
-control/session faults now persist as live-path alert history with active/resolved lifecycle state
-and delivery targets, alert transitions now emit durable incident-opened/resolved events plus
-outbound delivery attempt history, failed deliveries now carry retry scheduling state through
-attempt numbers plus bounded exponential backoff timestamps, durable incidents now also carry
+control/session faults plus guarded-live risk breaches, repeated recovery loops, and stale order
+sync now persist as live-path alert history with active/resolved lifecycle state and delivery
+targets, alert transitions now emit durable incident-opened/resolved events plus outbound delivery
+attempt history, failed deliveries now carry retry scheduling state through attempt numbers plus
+bounded exponential backoff timestamps, durable incidents now also carry
 acknowledgment, escalation, and external paging-sync state, and worker lifecycle notes plus
 guarded-live control events are normalized into recent audit events for operator review.
 

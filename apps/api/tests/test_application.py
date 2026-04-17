@@ -25,6 +25,8 @@ from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
+from akra_trader.domain.models import Order
+from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import SignalAction
@@ -1004,6 +1006,90 @@ def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_h
     for record in guarded_live_status.delivery_history
   )
   assert any(incident.alert_id == failure_alert.alert_id for incident in delivery.delivered_incidents)
+
+
+def test_operator_visibility_persists_risk_breach_and_live_fault_incidents(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 13, 5, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter()
+  app = TradingApplication(
+    market_data=MutableSeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="operator_visibility_risk_faults",
+  )
+  assert run.provenance.runtime_session is not None
+  run.provenance.runtime_session.recovery_count = 2
+  run.provenance.runtime_session.last_recovered_at = clock.current - timedelta(minutes=1)
+  run.provenance.runtime_session.last_recovery_reason = "heartbeat_timeout"
+  run.metrics["max_drawdown_pct"] = 42.0
+  run.orders.append(
+    Order(
+      run_id=run.config.run_id,
+      instrument_id="binance:ETH/USDT",
+      side=OrderSide.BUY,
+      quantity=0.15,
+      requested_price=3_200.0,
+      order_type=OrderType.LIMIT,
+      status=OrderStatus.OPEN,
+      order_id="stale-live-order-1",
+      created_at=clock.current - timedelta(minutes=10),
+      updated_at=clock.current - timedelta(minutes=9),
+      last_synced_at=clock.current - timedelta(minutes=8),
+      remaining_quantity=0.15,
+    )
+  )
+  runs.save_run(run)
+
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  categories = {
+    alert.category
+    for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.source == "guarded_live"
+  }
+  assert {"risk_breach", "runtime_recovery", "order_sync"} <= categories
+  assert any(
+    event.kind == "incident_opened" and event.alert_id.startswith("guarded-live:risk-breach:")
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    record.alert_id.startswith("guarded-live:order-sync:")
+    for record in guarded_live_status.delivery_history
+  )
+  assert any(
+    incident.alert_id.startswith("guarded-live:recovery-loop:")
+    for incident in delivery.delivered_incidents
+  )
 
 
 def test_guarded_live_delivery_retries_failed_outbound_target_with_backoff(
