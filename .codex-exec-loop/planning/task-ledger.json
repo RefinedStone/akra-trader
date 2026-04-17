@@ -725,36 +725,73 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Deepen provider-native recovery phase graphs beyond the first typed schemas",
       "description": "Build on the completed PagerDuty and Opsgenie typed schema split by modeling provider-specific recovery phase enums and any materially distinct provider-native internal phase graph edges more faithfully, so remediation state and operator surfaces do not stop at a shallow typed branch when the provider exposes richer execution, verification, or escalation phases.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says the new PagerDuty and Opsgenie typed schemas still do not mirror deeper provider-specific recovery phase enums or full provider-native internal phase graphs, making this the clearest immediate executable follow-up after commit 105a8de.",
+      "priority_reason": "Completed in main session commit 39f493c, which added PagerDuty- and Opsgenie-specific phase_graph typed schemas, recalculated provider-native phase graphs through external sync and local verification, exposed the richer graph summaries in operator delivery and the control room, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-operator-trust-venue-specific-provider-recovery-typed-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:45:00Z",
+      "updated_at": "2026-04-17T22:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by tightening the provider-specific remediation contract from shallow typed branches toward provider-native recovery semantics that operators can interpret without hidden flattening."
+      "direction_relation_note": "Closed the next provider-native recovery modeling gap for operator trust by extending PagerDuty and Opsgenie remediation state into deeper native phase graphs, which now leaves provider-owned remediation telemetry polling as the clearest follow-up for full provider-authoritative phase parity."
     },
     {
       "id": "planning-operator-trust-deeper-provider-remediation-engine-sync",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Extend recovery reconciliation beyond incident surfaces into deeper provider remediation engines",
-      "description": "Build on the completed provider-authoritative incident or alert pull-sync by polling or reconciling any deeper provider-owned remediation engine transition graph where recovery execution state outlives or diverges from the provider incident body itself, so local guarded-live closure does not assume the incident surface is the full source of truth when the provider exposes a richer internal recovery workflow.",
-      "status": "proposed",
+      "title": "Pull provider remediation telemetry into authoritative recovery sync",
+      "description": "Completed by wiring provider remediation telemetry from provider incident or alert payloads and embedded recovery payloads into authoritative recovery sync, preserving typed progress, step, attempt, run, message, and job-link fields through external sync, outbound delivery, operator UI, tests, and docs so provider-authoritative recovery state no longer stops at coarse incident status alone.",
+      "status": "done",
       "base_priority": 79,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says provider-authoritative sync now closes only the incident or alert surface and does not yet poll a deeper provider-owned remediation engine, but the provider-native phase-graph depth task is the clearer immediate queue head because it continues the just-shipped typed-schema split before expanding into a broader provider-engine scope.",
+      "dynamic_priority_delta": 18,
+      "priority_reason": "Completed in main session commit f82bc10, which added typed provider recovery telemetry to remediation state, synchronized telemetry through authoritative pull-sync and outbound payloads, surfaced it in the control-room incident table, updated docs, and verified with API pytest plus web typecheck and build.",
       "depends_on": [
-        "planning-operator-trust-provider-recovery-authoritative-pull-sync"
+        "planning-operator-trust-provider-recovery-authoritative-pull-sync",
+        "planning-operator-trust-provider-native-recovery-phase-graph-depth"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T21:45:00Z",
+      "updated_at": "2026-04-17T22:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with provider-owned recovery truth by distinguishing incident-surface reconciliation from any richer provider remediation engine that may own deeper execution states."
+      "direction_relation_note": "Closed the next provider-authoritative recovery gap for operator trust by carrying provider remediation telemetry through the authoritative sync path, which now leaves direct remediation-engine endpoint polling and richer provider-native telemetry mirroring as the remaining follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-direct-provider-remediation-endpoint-polling",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Poll provider remediation-engine endpoints directly for authoritative sync",
+      "description": "Completed by wiring authoritative recovery sync to poll configured PagerDuty and Opsgenie remediation-engine endpoints directly, including direct URL or URL-template resolution, dedicated recovery-engine credentials, normalized engine payload ingestion, telemetry-source visibility, and engine-telemetry override of stale incident-body telemetry across API, UI, tests, and docs.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "Completed in main session commit 9740b7f, which added direct remediation-engine endpoint polling for configured PagerDuty and Opsgenie recovery engines, surfaced telemetry_source through the stack, updated docs, and verified with API pytest plus web typecheck and build.",
+      "depends_on": [
+        "planning-operator-trust-deeper-provider-remediation-engine-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T22:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the direct endpoint-polling gap for operator trust by letting configured PagerDuty and Opsgenie remediation engines override stale incident-body telemetry during authoritative sync, which now leaves broader provider coverage and richer provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Mirror richer provider-native remediation metrics and transition graphs",
+      "description": "After direct remediation-engine polling exists, decide how far to mirror provider-specific remediation metrics, transition graphs, and engine-owned state machines into local typed recovery models so operator surfaces can preserve provider-native richness without collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "status": "proposed",
+      "base_priority": 78,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply explicitly says engine telemetry is now authoritative but still normalized into the shared recovery model instead of preserving richer provider-native remediation metrics or full engine transition graphs, but broader provider coverage is the first executable queue head because it was listed ahead of schema-depth work.",
+      "depends_on": [
+        "planning-operator-trust-direct-provider-remediation-endpoint-polling"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T22:30:15Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints are being polled directly."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -831,20 +868,20 @@
     {
       "id": "planning-operator-trust-expand-provider-native-escalation-coverage",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Expand provider-managed incident ownership beyond PagerDuty and Opsgenie",
-      "description": "Build on the generalized provider-native incident workflow by adding additional incident providers and fuller provider-managed ownership semantics, so durable paging-policy orchestration does not stop at the current PagerDuty and Opsgenie feature set or remain partially local when the provider should own the downstream lifecycle.",
-      "status": "proposed",
+      "title": "Expand provider-managed remediation coverage beyond PagerDuty and Opsgenie",
+      "description": "Extend the newly completed direct remediation-engine polling and provider-owned incident workflow beyond the current PagerDuty and Opsgenie coverage by adding additional providers or provider-specific adapters where the external remediation engine should remain the authoritative owner of downstream recovery state, telemetry fetch, and lifecycle synchronization.",
+      "status": "ready",
       "base_priority": 80,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply explicitly keeps provider-managed incident ownership across the broader live or operator path on the remaining-work list after commit 073e0bb, but the richer market-data freshness-policy incident semantics are the more direct next step from the just-completed incident-coverage expansion.",
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says direct authoritative polling now works for configured PagerDuty and Opsgenie recovery-engine endpoints but broader provider coverage is still missing, making this the clearest executable next task after commit 9740b7f.",
       "depends_on": [
         "planning-operator-trust-generalize-provider-native-incident-orchestration"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T13:25:00Z",
+      "updated_at": "2026-04-17T22:30:30Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic incident handling by treating PagerDuty and Opsgenie as the first provider-managed ownership set rather than the final scope."
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating PagerDuty and Opsgenie as the first direct remediation-engine integrations rather than the final provider set."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
