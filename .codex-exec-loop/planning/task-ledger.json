@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After direct remediation-engine polling and the Zenduty typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After direct remediation-engine polling and the Jira Service Management typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, and native phase graphs now reach Zenduty too, but richer provider-native private remediation-engine graphs and metrics are still not mirrored; this remains the second explicit follow-up behind broader provider breadth because the reply listed wider incident-provider coverage first.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, direct polling, and native phase graphs now include PagerTree too, but richer provider-native private remediation-engine graphs and metrics are still not mirrored; this remains the clearest secondary follow-up behind the next provider-breadth expansion because the reply still listed broader provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:18:13Z",
+      "updated_at": "2026-04-18T05:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints and typed recovery schemas now generalized through Zenduty are being polled directly."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints and typed recovery schemas now generalized through Jira Service Management are being polled directly."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1050,18 +1050,72 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Zenduty",
       "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, and Zenduty adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current twelve providers.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply explicitly says wider incident-provider breadth remains the first unfinished item after Zenduty landed, so another provider expansion is the clearest executable queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit f040e9b, which extended provider-managed remediation coverage through Splunk On-Call across backend delivery and orchestration, typed recovery state, provider-state assembly, UI schema display, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-grafana-oncall"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:18:13Z",
+      "updated_at": "2026-04-17T19:43:55Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Zenduty as the current milestone rather than the final provider breadth endpoint."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Zenduty to Splunk On-Call, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-splunk-oncall",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Splunk On-Call",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, and Splunk On-Call adapters to Jira Service Management, adding the `jira_service_management_incidents` delivery target, workflow sync, provider pull-sync, recovery-engine direct polling, JSM typed recovery schemas, native phase-graph handling, paging-provider inference, provider-authoritative remediation sync generalization, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans fourteen providers.",
+      "status": "done",
+      "base_priority": 79,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "Completed in main session commit ecc7ae5, which expanded provider-managed remediation coverage through Jira Service Management across operator delivery, application wiring, provider pull-sync, recovery-engine polling, typed recovery schemas, native phase graphs, UI schema display, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-zenduty"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T04:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Splunk On-Call to Jira Service Management, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-jira-service-management",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Jira Service Management",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, and Jira Service Management adapters to PagerTree, adding the `pagertree_incidents` delivery target, backend delivery and orchestration support, provider pull-sync, remediation-engine direct polling, PagerTree typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans fifteen providers.",
+      "status": "done",
+      "base_priority": 79,
+      "dynamic_priority_delta": 22,
+      "priority_reason": "Completed in main session commit fbd10aa, which expanded provider-managed remediation coverage through PagerTree across operator delivery, application wiring, provider pull-sync, remediation-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI schema display, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-splunk-oncall"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T05:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Jira Service Management to PagerTree, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-pagertree",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond PagerTree",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, and PagerTree adapters by adding at least one more provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current fifteen providers.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 23,
+      "priority_reason": "The latest main-session reply explicitly lists broader provider-managed remediation coverage as the first remaining item after PagerTree landed, so another provider expansion is the clearest executable queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-jira-service-management"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T05:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating PagerTree as the current milestone rather than the final provider breadth endpoint."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
