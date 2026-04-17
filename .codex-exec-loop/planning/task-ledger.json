@@ -329,16 +329,16 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Persist live-path alert history and broaden operator delivery coverage",
       "description": "Move runtime-derived alerts and guarded-live audit events beyond local control-state visibility by adding durable alert history, broader live-path operator event coverage, and a clear delivery boundary for notifications or downstream incident handling, so guarded-live safety visibility survives restarts and expands beyond the control room audit trail alone.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 80,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply after commit f143ed5 still explicitly lists wider live-path alerting and durable operator audit or event delivery as a remaining guarded-live gap, but the newly exposed market-data provider generalization work is the clearer immediate queue head before alert-delivery expansion.",
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply after commit 724e8e7 says guarded-live provider generalization is complete and explicitly leaves wider live-path alerting plus durable operator audit or event delivery as the clearest remaining executable gap, so this should now lead the automatic queue.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:47:17Z",
+      "updated_at": "2026-04-17T06:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -761,18 +761,36 @@
       "direction_id": "guarded-live-execution",
       "title": "Generalize guarded-live market-data provider assumptions beyond seeded and Binance",
       "description": "Finish the newly generalized multi-venue guarded-live path by removing the remaining seeded- and Binance-centric assumptions from the market-data provider layer, so supported live venues can reuse one runtime market-data boundary instead of depending on provider-specific shortcuts that reintroduce venue dead ends after launch and reconciliation were generalized.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 85,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply after commit f143ed5 says guarded-live launch wiring and venue-state reconciliation are now generalized, and explicitly identifies the remaining market-data provider layer as still seeded or Binance-centric, making this the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 724e8e7, which generalized the ccxt market-data adapter and bootstrap wiring across Binance, Coinbase, and Kraken, recorded provider lineage and checkpoints by venue, kept the compatibility alias in place, updated docs, and verified with API pytest plus web typecheck and build before push.",
       "depends_on": [
         "planning-guarded-live-multi-venue-launch-and-reconciliation-generalization"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T02:47:17Z",
+      "updated_at": "2026-04-17T06:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends guarded-live venue breadth past launch and reconciliation by aligning the runtime market-data boundary with the same supported-venue contract, preventing multi-venue live candidacy from staying partially Binance-shaped in provider code."
+    },
+    {
+      "id": "planning-data-trust-venue-specific-market-data-normalization",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Deepen venue-specific market-data normalization beyond the shared ccxt OHLCV path",
+      "description": "Build on the new multi-venue ccxt market-data wiring by defining the next venue-specific normalization and deeper channel coverage boundaries, so Binance, Coinbase, and Kraken do not all appear equally supported when the current live and sync path is still centered on the shallow shared OHLCV contract.",
+      "status": "proposed",
+      "base_priority": 84,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly says the newly generalized provider layer still relies on a shallow ccxt OHLCV path and lacks deeper venue-specific channels or normalization, but the broader guarded-live alerting and durable delivery gap is the clearer immediate executable queue head.",
+      "depends_on": [
+        "planning-guarded-live-market-data-provider-generalization"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T06:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps the data-trust direction honest about venue breadth by separating shared ccxt wiring progress from the still-missing exchange-specific normalization and richer ingestion guarantees."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
