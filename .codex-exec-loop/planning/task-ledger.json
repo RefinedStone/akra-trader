@@ -779,17 +779,17 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror richer provider-native remediation metrics and transition graphs",
-      "description": "After direct remediation-engine polling and the FireHydrant typed-schema expansion exist, decide how far to mirror provider-specific remediation metrics, transition graphs, and engine-owned state machines into local typed recovery models so operator surfaces can preserve provider-native richness without collapsing everything into the current progress or step or attempt or run or message summary shape.",
+      "description": "After direct remediation-engine polling and the Rootly typed-schema expansion exist, extend the local typed recovery model so provider-specific remediation metrics, transition graphs, and engine-owned state machines can preserve deeper private remediation-engine richness instead of collapsing everything into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync and typed recovery schema now reach FireHydrant too, but richer private remediation-engine phase graphs and native metrics are still not mirrored; this remains the second explicit follow-up behind broader provider breadth because the reply listed wider provider coverage first.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync and typed recovery schema now reach Rootly too, but richer private remediation-engine phase graphs and native metrics are still not mirrored; this remains the second explicit follow-up behind broader provider breadth because the reply listed wider provider coverage first.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T23:00:00Z",
+      "updated_at": "2026-04-17T23:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints are being polled directly."
     },
@@ -905,19 +905,37 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-firehydrant",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond FireHydrant",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, and FireHydrant adapters by adding at least one more provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current four providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, and FireHydrant adapters to Rootly, adding the `rootly_incidents` delivery target, Rootly workflow sync, provider pull-sync, recovery-engine direct polling, Rootly typed recovery schemas, native phase-graph handling, paging-provider inference, provider-authoritative remediation sync generalization, and UI or docs or test coverage so authoritative external remediation ownership now spans five providers.",
+      "status": "done",
       "base_priority": 79,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply says provider-managed remediation coverage now reaches PagerDuty, incident.io, FireHydrant, and Opsgenie, but wider incident-provider breadth is still the first explicitly listed remaining task, making another provider expansion the clearest executable queue head.",
+      "priority_reason": "Completed in main session commit 0d6581a, which expanded provider-managed remediation coverage through Rootly across operator delivery, application wiring, provider pull-sync, typed recovery schemas, native phase graphs, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-incidentio"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T23:00:00Z",
+      "updated_at": "2026-04-17T23:15:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating FireHydrant as the current milestone rather than the final provider breadth endpoint."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond FireHydrant to Rootly, which now leaves still-wider provider coverage and deeper provider-native telemetry mirroring as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-rootly",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Rootly",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, and Rootly adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, and lifecycle synchronization do not stop at the current five providers.",
+      "status": "ready",
+      "base_priority": 79,
+      "dynamic_priority_delta": 19,
+      "priority_reason": "The latest main-session reply says provider-managed remediation coverage now reaches PagerDuty, incident.io, FireHydrant, Rootly, and Opsgenie, but wider incident-provider breadth is still the first explicitly listed remaining task, making another provider expansion the clearest executable queue head.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-firehydrant"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T23:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Rootly as the current milestone rather than the final provider breadth endpoint."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
