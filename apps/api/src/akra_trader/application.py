@@ -4430,6 +4430,56 @@ class TradingApplication:
           delivery_targets=delivery_targets,
         )
       )
+
+    depth_ladder_details, depth_ladder_detected_at, depth_ladder_has_critical = (
+      self._collect_guarded_live_depth_ladder_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if depth_ladder_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-depth-ladder:{run_id or 'unknown'}",
+          severity="critical" if depth_ladder_has_critical else "warning",
+          category="market_data_depth_ladder",
+          summary=(
+            f"Guarded-live depth ladder semantics require review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(depth_ladder_details),
+          detected_at=depth_ladder_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    candle_sequence_details, candle_sequence_detected_at, candle_sequence_has_critical = (
+      self._collect_guarded_live_candle_sequence_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if candle_sequence_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-candle-sequence:{run_id or 'unknown'}",
+          severity="critical" if candle_sequence_has_critical else "warning",
+          category="market_data_candle_sequence",
+          summary=(
+            f"Guarded-live candle sequencing requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(candle_sequence_details),
+          detected_at=candle_sequence_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
     return alerts
 
   def _collect_guarded_live_channel_consistency_findings(
@@ -4707,6 +4757,185 @@ class TradingApplication:
 
     detected_at = max(detected_candidates) if detected_candidates else current_time
     return list(dict.fromkeys(findings)), detected_at, has_critical
+
+  def _collect_guarded_live_depth_ladder_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    if not handoff.order_book_bids and not handoff.order_book_asks:
+      return [], current_time, False
+
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    venue = handoff.venue or "venue"
+    tolerance = self._guarded_live_balance_tolerance
+    detected_at = handoff.last_depth_event_at or handoff.order_book_last_rebuilt_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if handoff.order_book_bid_level_count and handoff.order_book_bid_level_count != len(handoff.order_book_bids):
+      add_finding(
+        f"{venue} bid ladder count {len(handoff.order_book_bids)} does not match stored bid level count "
+        f"{handoff.order_book_bid_level_count}.",
+        critical=True,
+      )
+    if handoff.order_book_ask_level_count and handoff.order_book_ask_level_count != len(handoff.order_book_asks):
+      add_finding(
+        f"{venue} ask ladder count {len(handoff.order_book_asks)} does not match stored ask level count "
+        f"{handoff.order_book_ask_level_count}.",
+        critical=True,
+      )
+
+    if handoff.order_book_bids and (
+      handoff.order_book_best_bid_price is not None or handoff.order_book_best_bid_quantity is not None
+    ):
+      head = handoff.order_book_bids[0]
+      if (
+        (handoff.order_book_best_bid_price is not None and abs(head.price - handoff.order_book_best_bid_price) > tolerance)
+        or (
+          handoff.order_book_best_bid_quantity is not None
+          and abs(head.quantity - handoff.order_book_best_bid_quantity) > tolerance
+        )
+      ):
+        add_finding(
+          f"{venue} best bid ladder head {head.price:.8f}/{head.quantity:.8f} does not match stored "
+          f"best bid {handoff.order_book_best_bid_price or 0.0:.8f}/"
+          f"{handoff.order_book_best_bid_quantity or 0.0:.8f}.",
+          critical=True,
+        )
+    if handoff.order_book_asks and (
+      handoff.order_book_best_ask_price is not None or handoff.order_book_best_ask_quantity is not None
+    ):
+      head = handoff.order_book_asks[0]
+      if (
+        (handoff.order_book_best_ask_price is not None and abs(head.price - handoff.order_book_best_ask_price) > tolerance)
+        or (
+          handoff.order_book_best_ask_quantity is not None
+          and abs(head.quantity - handoff.order_book_best_ask_quantity) > tolerance
+        )
+      ):
+        add_finding(
+          f"{venue} best ask ladder head {head.price:.8f}/{head.quantity:.8f} does not match stored "
+          f"best ask {handoff.order_book_best_ask_price or 0.0:.8f}/"
+          f"{handoff.order_book_best_ask_quantity or 0.0:.8f}.",
+          critical=True,
+        )
+
+    previous_price: float | None = None
+    for index, level in enumerate(handoff.order_book_bids, start=1):
+      if level.quantity <= tolerance:
+        add_finding(
+          f"{venue} bid ladder level {index} has non-positive quantity {level.quantity:.8f}.",
+          critical=True,
+        )
+      if previous_price is not None and level.price >= (previous_price - tolerance):
+        add_finding(
+          f"{venue} bid ladder is not strictly descending at level {index} "
+          f"({level.price:.8f} after {previous_price:.8f}).",
+          critical=True,
+        )
+      previous_price = level.price
+
+    previous_price = None
+    for index, level in enumerate(handoff.order_book_asks, start=1):
+      if level.quantity <= tolerance:
+        add_finding(
+          f"{venue} ask ladder level {index} has non-positive quantity {level.quantity:.8f}.",
+          critical=True,
+        )
+      if previous_price is not None and level.price <= (previous_price + tolerance):
+        add_finding(
+          f"{venue} ask ladder is not strictly ascending at level {index} "
+          f"({level.price:.8f} after {previous_price:.8f}).",
+          critical=True,
+        )
+      previous_price = level.price
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
+
+  def _collect_guarded_live_candle_sequence_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    snapshot = handoff.kline_snapshot
+    if snapshot is None:
+      return [], current_time, False
+
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    venue = handoff.venue or "venue"
+    timeframe = snapshot.timeframe or handoff.timeframe
+    timeframe_delta = self._guarded_live_timeframe_to_timedelta(timeframe)
+    detected_at = snapshot.event_at or handoff.last_kline_event_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if timeframe_delta is not None and snapshot.open_at is not None:
+      if not self._datetime_is_aligned_to_interval(snapshot.open_at, timeframe_delta):
+        add_finding(
+          f"{venue} kline open {snapshot.open_at.isoformat()} is not aligned to the {timeframe} timeframe boundary."
+        )
+
+    if timeframe_delta is not None and snapshot.open_at is not None and snapshot.close_at is not None:
+      expected_close_at = snapshot.open_at + timeframe_delta
+      if snapshot.close_at != expected_close_at:
+        add_finding(
+          f"{venue} kline close {snapshot.close_at.isoformat()} does not match the expected {timeframe} boundary close "
+          f"{expected_close_at.isoformat()}.",
+          critical=True,
+        )
+
+    if snapshot.closed and snapshot.event_at is not None and snapshot.close_at is not None and snapshot.event_at < snapshot.close_at:
+      add_finding(
+        f"{venue} closed kline event arrived at {snapshot.event_at.isoformat()} before the candle close "
+        f"{snapshot.close_at.isoformat()}.",
+        critical=True,
+      )
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
+
+  @staticmethod
+  def _guarded_live_timeframe_to_timedelta(timeframe: str | None) -> timedelta | None:
+    if not timeframe or len(timeframe) < 2:
+      return None
+    unit = timeframe[-1]
+    try:
+      amount = int(timeframe[:-1])
+    except ValueError:
+      return None
+    if amount <= 0:
+      return None
+    return {
+      "m": timedelta(minutes=amount),
+      "h": timedelta(hours=amount),
+      "d": timedelta(days=amount),
+      "w": timedelta(weeks=amount),
+    }.get(unit)
+
+  @staticmethod
+  def _datetime_is_aligned_to_interval(value: datetime, interval: timedelta) -> bool:
+    if interval.total_seconds() <= 0:
+      return False
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    return ((value - epoch).total_seconds() % interval.total_seconds()) == 0
 
   @staticmethod
   def _resolve_guarded_live_market_channel_activity(

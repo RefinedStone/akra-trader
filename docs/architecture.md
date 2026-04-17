@@ -141,7 +141,7 @@ windows, repeated sync failures, and venue-specific upstream fault classificatio
 live-path alert history with active/resolved lifecycle state and delivery targets. Guarded-live
 venue-session coverage now also promotes channel-level depth/order-book continuity gaps, stale
 market-channel timestamps, channel-restore failures, and venue-specific book/kline consistency
-faults into the same durable incident surface. Alert transitions now emit durable
+faults, plus deeper depth-ladder and candle-sequence semantics, into the same durable incident surface. Alert transitions now emit durable
 incident-opened/resolved events plus outbound delivery attempt
 history, failed deliveries now carry retry scheduling state through attempt numbers plus bounded
 exponential backoff timestamps, durable incidents now also carry
