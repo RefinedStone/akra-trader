@@ -718,6 +718,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        betterstack: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1189,6 +1207,24 @@ type GuardedLiveStatus = {
           };
         };
         ilert: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        betterstack: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -8934,6 +8970,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  betterstack: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9462,6 +9516,39 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `iLert schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "betterstack") {
+    const details = [
+      providerRecovery.betterstack.alert_id ? `alert ${providerRecovery.betterstack.alert_id}` : null,
+      providerRecovery.betterstack.alert_status !== "unknown"
+        ? `status ${providerRecovery.betterstack.alert_status}`
+        : null,
+      providerRecovery.betterstack.priority
+        ? `priority ${providerRecovery.betterstack.priority}`
+        : null,
+      providerRecovery.betterstack.escalation_policy
+        ? `policy ${providerRecovery.betterstack.escalation_policy}`
+        : null,
+      providerRecovery.betterstack.assignee
+        ? `assignee ${providerRecovery.betterstack.assignee}`
+        : null,
+      providerRecovery.betterstack.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.betterstack.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.betterstack.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.betterstack.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.betterstack.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.betterstack.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.betterstack.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.betterstack.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.betterstack.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.betterstack.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Better Stack schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

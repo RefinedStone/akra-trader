@@ -1001,6 +1001,31 @@ class OperatorIncidentIlertRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentBetterstackRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentBetterstackRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentBetterstackRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentBetterstackRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -1075,6 +1100,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   ilert: OperatorIncidentIlertRecoveryState = field(
     default_factory=OperatorIncidentIlertRecoveryState
+  )
+  betterstack: OperatorIncidentBetterstackRecoveryState = field(
+    default_factory=OperatorIncidentBetterstackRecoveryState
   )
   updated_at: datetime | None = None
 

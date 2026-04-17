@@ -84,6 +84,8 @@ from akra_trader.domain.models import OperatorIncidentSignl4RecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentSignl4RecoveryState
 from akra_trader.domain.models import OperatorIncidentIlertRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIlertRecoveryState
+from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentBetterstackRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1734,6 +1736,17 @@ class TradingApplication:
             aligned_provider_recovery,
             ilert=replace(
               aligned_provider_recovery.ilert,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "betterstack"
+          and provider_recovery.betterstack.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            betterstack=replace(
+              aligned_provider_recovery.betterstack,
               alert_status="delivered",
             ),
           )
@@ -4481,6 +4494,139 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_betterstack_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_betterstack_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_betterstack_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_betterstack_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_betterstack_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_betterstack_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentBetterstackRecoveryState,
+  ) -> OperatorIncidentBetterstackRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_betterstack_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_betterstack_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentBetterstackRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_betterstack_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_betterstack_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_betterstack_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -6462,6 +6608,104 @@ class TradingApplication:
         existing=existing,
       )
     )
+    betterstack_schema = existing.betterstack
+    normalized_provider = self._normalize_paging_provider(
+      provider or existing.provider or remediation.provider or ""
+    )
+    betterstack_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("betterstack"),
+      self._extract_payload_mapping(payload.get("provider_schema")).get("better_stack"),
+      payload.get("betterstack"),
+      payload.get("betterstack_alert"),
+      payload.get("better_stack"),
+    )
+    if normalized_provider == "betterstack" or betterstack_payload:
+      betterstack_status = self._first_non_empty_string(
+        betterstack_payload.get("alert_status"),
+        betterstack_payload.get("status"),
+        betterstack_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.betterstack.alert_status,
+      ) or "unknown"
+      betterstack_schema = OperatorIncidentBetterstackRecoveryState(
+        alert_id=self._first_non_empty_string(
+          betterstack_payload.get("alert_id"),
+          betterstack_payload.get("id"),
+          betterstack_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.betterstack.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          betterstack_payload.get("external_reference"),
+          betterstack_payload.get("reference"),
+          reference,
+          existing.betterstack.external_reference,
+        ),
+        alert_status=betterstack_status,
+        priority=self._first_non_empty_string(
+          betterstack_payload.get("priority"),
+          betterstack_payload.get("severity"),
+          betterstack_payload.get("urgency"),
+          existing.betterstack.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          betterstack_payload.get("escalation_policy"),
+          betterstack_payload.get("escalationPolicy"),
+          betterstack_payload.get("policy"),
+          betterstack_payload.get("source"),
+          existing.betterstack.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          betterstack_payload.get("assignee"),
+          betterstack_payload.get("owner"),
+          betterstack_payload.get("assigned_to"),
+          existing.betterstack.assignee,
+        ),
+        url=self._first_non_empty_string(
+          betterstack_payload.get("url"),
+          betterstack_payload.get("html_url"),
+          betterstack_payload.get("link"),
+          existing.betterstack.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(betterstack_payload.get("updated_at"))
+          or existing.betterstack.updated_at
+        ),
+        phase_graph=self._build_betterstack_recovery_phase_graph(
+          payload=betterstack_payload,
+          alert_status=betterstack_status,
+          priority=self._first_non_empty_string(
+            betterstack_payload.get("priority"),
+            betterstack_payload.get("severity"),
+            betterstack_payload.get("urgency"),
+            existing.betterstack.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            betterstack_payload.get("escalation_policy"),
+            betterstack_payload.get("escalationPolicy"),
+            betterstack_payload.get("policy"),
+            betterstack_payload.get("source"),
+            existing.betterstack.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            betterstack_payload.get("assignee"),
+            betterstack_payload.get("owner"),
+            betterstack_payload.get("assigned_to"),
+            existing.betterstack.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.betterstack,
+        ),
+      )
+      provider_schema_kind = "betterstack"
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
       provider=provider or existing.provider or remediation.provider,
@@ -6537,6 +6781,7 @@ class TradingApplication:
       alertops=alertops_schema,
       signl4=signl4_schema,
       ilert=ilert_schema,
+      betterstack=betterstack_schema,
       updated_at=synced_at,
     )
 
@@ -6798,6 +7043,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.ilert,
+        ),
+      ),
+      betterstack=replace(
+        provider_recovery.betterstack,
+        phase_graph=self._build_betterstack_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.betterstack.alert_status,
+          priority=provider_recovery.betterstack.priority,
+          escalation_policy=provider_recovery.betterstack.escalation_policy,
+          assignee=provider_recovery.betterstack.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.betterstack,
         ),
       ),
     )
@@ -11163,6 +11422,8 @@ class TradingApplication:
       return "signl4"
     if normalized in {"i_lert", "ilert_alerts", "operator_ilert"}:
       return "ilert"
+    if normalized in {"better_stack", "betterstack_alerts", "operator_betterstack"}:
+      return "betterstack"
     if normalized in {"grafana_oncall_incidents", "grafanaoncall", "operator_grafana_oncall"}:
       return "grafana_oncall"
     if normalized in {"zenduty_incidents", "operator_zenduty"}:
@@ -11184,6 +11445,8 @@ class TradingApplication:
       return "signl4"
     if normalized in {"ilert_incidents", "ilert_alerts", "operator_ilert"}:
       return "ilert"
+    if normalized in {"betterstack_incidents", "betterstack_alerts", "operator_betterstack"}:
+      return "betterstack"
     return normalized or None
 
   @staticmethod
@@ -11377,6 +11640,8 @@ class TradingApplication:
       return "signl4"
     if "ilert_incidents" in combined or "ilert_alerts" in combined:
       return "ilert"
+    if "betterstack_incidents" in combined or "betterstack_alerts" in combined:
+      return "betterstack"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

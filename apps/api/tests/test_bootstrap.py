@@ -217,6 +217,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       ilert_api_url: str,
       ilert_recovery_engine_url_template: str | None,
       ilert_recovery_engine_token: str | None,
+      betterstack_api_token: str | None,
+      betterstack_api_url: str,
+      betterstack_recovery_engine_url_template: str | None,
+      betterstack_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -311,6 +315,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         ilert_recovery_engine_url_template or ""
       )
       captured["ilert_recovery_engine_token"] = ilert_recovery_engine_token or ""
+      captured["betterstack_api_token"] = betterstack_api_token or ""
+      captured["betterstack_api_url"] = betterstack_api_url
+      captured["betterstack_recovery_engine_url_template"] = (
+        betterstack_recovery_engine_url_template or ""
+      )
+      captured["betterstack_recovery_engine_token"] = betterstack_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -459,6 +469,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://ilert.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_ilert_recovery_engine_token="ilert-recovery-token",
+      operator_alert_betterstack_api_token="betterstack-token",
+      operator_alert_betterstack_api_url="https://api.betterstack.example",
+      operator_alert_betterstack_recovery_engine_url_template=(
+        "https://betterstack.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_betterstack_recovery_engine_token="betterstack-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -552,6 +568,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["ilert_api_url"] == "https://api.ilert.example"
   assert captured["ilert_recovery_engine_url_template"] == "https://ilert.example/recovery/{workflow_reference_urlencoded}"
   assert captured["ilert_recovery_engine_token"] == "ilert-recovery-token"
+  assert captured["betterstack_api_token"] == "betterstack-token"
+  assert captured["betterstack_api_url"] == "https://api.betterstack.example"
+  assert captured["betterstack_recovery_engine_url_template"] == "https://betterstack.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["betterstack_recovery_engine_token"] == "betterstack-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"
