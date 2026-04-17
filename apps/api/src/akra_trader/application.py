@@ -49,6 +49,7 @@ from akra_trader.domain.models import OperatorAuditEvent
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
 from akra_trader.domain.models import OperatorIncidentRemediation
 from akra_trader.domain.models import OperatorVisibility
@@ -1366,6 +1367,7 @@ class TradingApplication:
       updated_incident = self._apply_external_remediation_sync(
         incident=updated_incident,
         next_state="requested",
+        event_kind=normalized_kind,
         provider=normalized_provider,
         actor=actor,
         detail=detail_copy,
@@ -1391,6 +1393,7 @@ class TradingApplication:
       updated_incident = self._apply_external_remediation_sync(
         incident=updated_incident,
         next_state="provider_recovering",
+        event_kind=normalized_kind,
         provider=normalized_provider,
         actor=actor,
         detail=detail_copy,
@@ -1416,6 +1419,7 @@ class TradingApplication:
       updated_incident = self._apply_external_remediation_sync(
         incident=updated_incident,
         next_state="provider_recovered",
+        event_kind=normalized_kind,
         provider=normalized_provider,
         actor=actor,
         detail=detail_copy,
@@ -1446,6 +1450,7 @@ class TradingApplication:
       updated_incident = self._apply_external_remediation_sync(
         incident=updated_incident,
         next_state="failed",
+        event_kind=normalized_kind,
         provider=normalized_provider,
         actor=actor,
         detail=detail_copy,
@@ -1635,6 +1640,149 @@ class TradingApplication:
     }
     return mapping.get(remediation_state, remediation_state or "not_synced")
 
+  @staticmethod
+  def _provider_recovery_lifecycle_for_event(
+    *,
+    remediation_state: str,
+    event_kind: str | None,
+  ) -> str:
+    event_mapping = {
+      "remediation_requested": "requested",
+      "remediation_started": "recovering",
+      "remediation_completed": "recovered",
+      "remediation_failed": "failed",
+      "local_remediation_requested": "requested",
+      "local_verification_executed": "verified",
+      "local_verification_failed": "failed",
+      "provider_resolve_requested": "resolved",
+      "provider_resolve_confirmed": "resolved",
+    }
+    if event_kind is not None and event_kind in event_mapping:
+      return event_mapping[event_kind]
+    return TradingApplication._provider_recovery_lifecycle_for_remediation_state(remediation_state)
+
+  @staticmethod
+  def _provider_recovery_machine_defaults_for_event(
+    *,
+    remediation_state: str,
+    event_kind: str | None = None,
+  ) -> tuple[str, str, str]:
+    event_mapping = {
+      "remediation_requested": ("provider_requested", "requested", "provider_confirmed"),
+      "remediation_started": ("provider_running", "running", "provider_confirmed"),
+      "remediation_completed": ("local_verification_pending", "completed", "provider_confirmed"),
+      "remediation_failed": ("provider_failed", "failed", "provider_confirmed"),
+      "local_remediation_requested": ("provider_requested", "requested", "local_dispatched"),
+      "local_verification_executed": ("verified", "verified", "bidirectional_synced"),
+      "local_verification_failed": ("verification_failed", "failed", "local_failed"),
+      "provider_resolve_requested": ("resolved", "resolved", "bidirectional_synced"),
+      "provider_resolve_confirmed": ("resolved", "resolved", "provider_confirmed"),
+    }
+    if event_kind is not None and event_kind in event_mapping:
+      return event_mapping[event_kind]
+    remediation_mapping = {
+      "requested": ("provider_requested", "requested", "local_dispatched"),
+      "provider_recovering": ("provider_running", "running", "provider_confirmed"),
+      "provider_recovered": ("local_verification_pending", "completed", "provider_confirmed"),
+      "executed": ("verified", "verified", "bidirectional_synced"),
+      "completed": ("verified", "verified", "bidirectional_synced"),
+      "partial": ("partially_verified", "partial", "partially_synced"),
+      "failed": ("provider_failed", "failed", "provider_failed"),
+      "skipped": ("verification_skipped", "skipped", "local_only"),
+      "retrying": ("provider_requested", "requested", "local_retrying"),
+      "suppressed": ("provider_requested", "requested", "suppressed"),
+      "not_supported": ("provider_unavailable", "not_supported", "not_supported"),
+      "not_configured": ("provider_unavailable", "not_configured", "not_configured"),
+      "suggested": ("not_requested", "not_started", "not_synced"),
+      "operator_review": ("not_requested", "not_started", "not_synced"),
+      "not_applicable": ("not_requested", "not_started", "not_synced"),
+    }
+    return remediation_mapping.get(remediation_state, ("not_requested", "not_started", "not_synced"))
+
+  def _build_provider_recovery_status_machine(
+    self,
+    *,
+    existing: OperatorIncidentProviderRecoveryStatusMachine,
+    remediation_state: str,
+    event_kind: str | None,
+    workflow_state: str | None = None,
+    workflow_action: str | None = None,
+    job_state: str | None = None,
+    sync_state: str | None = None,
+    detail: str | None = None,
+    event_at: datetime | None = None,
+    attempt_number: int | None = None,
+    payload: dict[str, Any] | None = None,
+  ) -> OperatorIncidentProviderRecoveryStatusMachine:
+    payload = payload or {}
+    status_payload = self._extract_payload_mapping(payload.get("status_machine"))
+    default_state, default_job_state, default_sync_state = self._provider_recovery_machine_defaults_for_event(
+      remediation_state=remediation_state,
+      event_kind=event_kind,
+    )
+    return OperatorIncidentProviderRecoveryStatusMachine(
+      state=self._first_non_empty_string(
+        status_payload.get("state"),
+        payload.get("recovery_machine_state"),
+        payload.get("machine_state"),
+      ) or default_state,
+      workflow_state=self._first_non_empty_string(
+        status_payload.get("workflow_state"),
+        payload.get("workflow_state"),
+        workflow_state,
+        existing.workflow_state,
+      ) or "idle",
+      workflow_action=self._first_non_empty_string(
+        status_payload.get("workflow_action"),
+        payload.get("workflow_action"),
+        workflow_action,
+        existing.workflow_action,
+      ),
+      job_state=self._first_non_empty_string(
+        status_payload.get("job_state"),
+        payload.get("job_state"),
+        payload.get("status"),
+        job_state,
+      ) or default_job_state,
+      sync_state=self._first_non_empty_string(
+        status_payload.get("sync_state"),
+        payload.get("sync_state"),
+        sync_state,
+      ) or default_sync_state,
+      last_event_kind=self._first_non_empty_string(
+        status_payload.get("last_event_kind"),
+        payload.get("last_event_kind"),
+        event_kind,
+        existing.last_event_kind,
+      ),
+      last_event_at=(
+        self._parse_payload_datetime(status_payload.get("last_event_at"))
+        or self._parse_payload_datetime(payload.get("last_event_at"))
+        or event_at
+        or existing.last_event_at
+      ),
+      last_detail=self._first_non_empty_string(
+        status_payload.get("last_detail"),
+        payload.get("last_detail"),
+        payload.get("status_detail"),
+        detail,
+        existing.last_detail,
+      ),
+      attempt_number=(
+        int(status_payload.get("attempt_number"))
+        if isinstance(status_payload.get("attempt_number"), int)
+        else (
+          int(payload.get("attempt_number"))
+          if isinstance(payload.get("attempt_number"), int)
+          else (
+            attempt_number
+            if attempt_number is not None
+            else existing.attempt_number
+          )
+        )
+      ),
+    )
+
   def _build_provider_recovery_state(
     self,
     *,
@@ -1645,6 +1793,7 @@ class TradingApplication:
     synced_at: datetime,
     workflow_reference: str | None,
     payload: dict[str, Any],
+    event_kind: str | None = None,
   ) -> OperatorIncidentProviderRecoveryState:
     existing = remediation.provider_recovery
     verification_payload = self._extract_payload_mapping(payload.get("verification"))
@@ -1655,7 +1804,10 @@ class TradingApplication:
       payload.get("recovery_phase"),
       payload.get("job_state"),
       payload.get("status"),
-    ) or self._provider_recovery_lifecycle_for_remediation_state(next_state)
+    ) or self._provider_recovery_lifecycle_for_event(
+      remediation_state=next_state,
+      event_kind=event_kind,
+    )
     verification = OperatorIncidentProviderRecoveryVerification(
       state=self._first_non_empty_string(
         verification_payload.get("state"),
@@ -1679,6 +1831,16 @@ class TradingApplication:
         payload.get("verification_issues"),
         existing.verification.issues,
       ),
+    )
+    status_machine = self._build_provider_recovery_status_machine(
+      existing=existing.status_machine,
+      remediation_state=next_state,
+      event_kind=event_kind,
+      workflow_state=existing.status_machine.workflow_state,
+      workflow_action=existing.status_machine.workflow_action,
+      detail=detail,
+      event_at=synced_at,
+      payload=payload,
     )
     return OperatorIncidentProviderRecoveryState(
       lifecycle_state=lifecycle_state,
@@ -1740,6 +1902,7 @@ class TradingApplication:
         existing.timeframe,
       ),
       verification=verification,
+      status_machine=status_machine,
       updated_at=synced_at,
     )
 
@@ -1748,6 +1911,7 @@ class TradingApplication:
     *,
     incident: OperatorIncidentEvent,
     next_state: str,
+    event_kind: str,
     provider: str,
     actor: str,
     detail: str,
@@ -1769,6 +1933,7 @@ class TradingApplication:
       synced_at=synced_at,
       workflow_reference=workflow_reference,
       payload=merged_payload,
+      event_kind=event_kind,
     )
     next_remediation = replace(
       remediation,
@@ -6496,6 +6661,21 @@ class TradingApplication:
         if latest_record is not None and latest_record.external_reference is not None
         else remediation.reference
       ),
+      provider_recovery=replace(
+        remediation.provider_recovery,
+        status_machine=self._build_provider_recovery_status_machine(
+          existing=remediation.provider_recovery.status_machine,
+          remediation_state=next_state,
+          event_kind=remediation.provider_recovery.status_machine.last_event_kind,
+          workflow_state=self._resolve_incident_delivery_state(records=remediation_records),
+          workflow_action=(
+            latest_record.provider_action if latest_record is not None else remediation.provider_recovery.status_machine.workflow_action
+          ),
+          attempt_number=latest_record.attempt_number if latest_record is not None else remediation.provider_recovery.status_machine.attempt_number,
+          detail=latest_record.detail if latest_record is not None else remediation.provider_recovery.status_machine.last_detail,
+          event_at=latest_record.attempted_at if latest_record is not None else remediation.provider_recovery.status_machine.last_event_at,
+        ),
+      ),
     )
 
   def _request_incident_remediation(
@@ -6571,6 +6751,37 @@ class TradingApplication:
       current_time=current_time,
     )
     latest = self._latest_provider_workflow_record(records=records)
+    requested_provider_recovery = self._build_provider_recovery_state(
+      remediation=requested_remediation,
+      next_state=requested_remediation.state,
+      provider=normalized_provider or provider,
+      detail=detail_copy,
+      synced_at=current_time,
+      workflow_reference=(
+        latest.external_reference
+        if latest is not None and latest.external_reference is not None
+        else requested_remediation.reference
+      ),
+      payload={},
+      event_kind="local_remediation_requested",
+    )
+    requested_provider_recovery = replace(
+      requested_provider_recovery,
+      status_machine=self._build_provider_recovery_status_machine(
+        existing=requested_provider_recovery.status_machine,
+        remediation_state=requested_remediation.state,
+        event_kind="local_remediation_requested",
+        workflow_state=(
+          self._resolve_incident_delivery_state(records=records)
+          if records
+          else requested_provider_recovery.status_machine.workflow_state
+        ),
+        workflow_action="remediate",
+        attempt_number=latest.attempt_number if latest is not None else 1,
+        detail=detail_copy,
+        event_at=latest.attempted_at if latest is not None else current_time,
+      ),
+    )
     updated_incident = replace(
       incident,
       remediation=replace(
@@ -6585,6 +6796,7 @@ class TradingApplication:
           if latest is not None and latest.external_reference is not None
           else requested_remediation.reference
         ),
+        provider_recovery=requested_provider_recovery,
       ),
     )
     return updated_incident, records
@@ -6683,6 +6895,31 @@ class TradingApplication:
         remediation.provider_recovery,
         lifecycle_state=self._provider_recovery_lifecycle_for_remediation_state(local_state),
         detail=local_detail,
+        status_machine=self._build_provider_recovery_status_machine(
+          existing=remediation.provider_recovery.status_machine,
+          remediation_state=local_state,
+          event_kind=(
+            "local_verification_executed"
+            if local_state in {"executed", "completed", "partial", "skipped"}
+            else "local_verification_failed"
+          ),
+          workflow_state=remediation.provider_recovery.status_machine.workflow_state,
+          workflow_action=remediation.provider_recovery.status_machine.workflow_action,
+          job_state=(
+            "verified"
+            if local_state in {"executed", "completed"}
+            else ("partial" if local_state == "partial" else ("skipped" if local_state == "skipped" else "failed"))
+          ),
+          sync_state=(
+            "bidirectional_synced"
+            if remediation.provider_recovery.provider is not None
+            and local_state in {"executed", "completed", "partial", "skipped"}
+            else ("local_failed" if local_state == "failed" else "local_only")
+          ),
+          detail=local_detail,
+          event_at=last_attempted_at,
+          attempt_number=remediation.provider_recovery.status_machine.attempt_number,
+        ),
         updated_at=last_attempted_at,
       ),
     )
@@ -7081,6 +7318,29 @@ class TradingApplication:
         actor="system",
         detail=resolve_detail,
         payload=resolved_incident.remediation.provider_payload,
+      )
+      resolved_incident = replace(
+        resolved_incident,
+        remediation=replace(
+          resolved_incident.remediation,
+          provider_recovery=replace(
+            resolved_incident.remediation.provider_recovery,
+            lifecycle_state="resolved",
+            status_machine=self._build_provider_recovery_status_machine(
+              existing=resolved_incident.remediation.provider_recovery.status_machine,
+              remediation_state="completed",
+              event_kind="provider_resolve_requested",
+              workflow_state=resolved_incident.provider_workflow_state,
+              workflow_action="resolve",
+              job_state="resolved",
+              sync_state="bidirectional_synced",
+              detail=resolve_detail,
+              event_at=current_time,
+              attempt_number=resolved_incident.remediation.provider_recovery.status_machine.attempt_number,
+            ),
+            updated_at=current_time,
+          ),
+        ),
       )
       updated_incidents = self._replace_incident_event(
         incident_events=updated_incidents,

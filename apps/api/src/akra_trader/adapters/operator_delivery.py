@@ -735,6 +735,21 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
               "summary": incident.remediation.provider_recovery.verification.summary,
               "issues": incident.remediation.provider_recovery.verification.issues,
             },
+            "status_machine": {
+              "state": incident.remediation.provider_recovery.status_machine.state,
+              "workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
+              "workflow_action": incident.remediation.provider_recovery.status_machine.workflow_action,
+              "job_state": incident.remediation.provider_recovery.status_machine.job_state,
+              "sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
+              "last_event_kind": incident.remediation.provider_recovery.status_machine.last_event_kind,
+              "last_event_at": (
+                incident.remediation.provider_recovery.status_machine.last_event_at.isoformat()
+                if incident.remediation.provider_recovery.status_machine.last_event_at is not None
+                else None
+              ),
+              "last_detail": incident.remediation.provider_recovery.status_machine.last_detail,
+              "attempt_number": incident.remediation.provider_recovery.status_machine.attempt_number,
+            },
           },
         },
       }
@@ -797,6 +812,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
               "symbols": incident.remediation.provider_recovery.symbols,
               "timeframe": incident.remediation.provider_recovery.timeframe,
               "verification_state": incident.remediation.provider_recovery.verification.state,
+              "status_machine_state": incident.remediation.provider_recovery.status_machine.state,
+              "status_machine_workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
+              "status_machine_job_state": incident.remediation.provider_recovery.status_machine.job_state,
+              "status_machine_sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
             },
           },
         },
@@ -854,6 +873,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
               "symbols": incident.remediation.provider_recovery.symbols,
               "timeframe": incident.remediation.provider_recovery.timeframe,
               "verification_state": incident.remediation.provider_recovery.verification.state,
+              "status_machine_state": incident.remediation.provider_recovery.status_machine.state,
+              "status_machine_workflow_state": incident.remediation.provider_recovery.status_machine.workflow_state,
+              "status_machine_job_state": incident.remediation.provider_recovery.status_machine.job_state,
+              "status_machine_sync_state": incident.remediation.provider_recovery.status_machine.sync_state,
             },
           },
           "tags": ["akra", incident.source, incident.severity.lower()],

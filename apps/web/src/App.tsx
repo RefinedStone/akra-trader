@@ -380,6 +380,17 @@ type OperatorVisibility = {
           summary?: string | null;
           issues: string[];
         };
+        status_machine: {
+          state: string;
+          workflow_state: string;
+          workflow_action?: string | null;
+          job_state: string;
+          sync_state: string;
+          last_event_kind?: string | null;
+          last_event_at?: string | null;
+          last_detail?: string | null;
+          attempt_number: number;
+        };
       };
     };
   }[];
@@ -511,6 +522,17 @@ type GuardedLiveStatus = {
           checked_at?: string | null;
           summary?: string | null;
           issues: string[];
+        };
+        status_machine: {
+          state: string;
+          workflow_state: string;
+          workflow_action?: string | null;
+          job_state: string;
+          sync_state: string;
+          last_event_kind?: string | null;
+          last_event_at?: string | null;
+          last_detail?: string | null;
+          attempt_number: number;
         };
       };
     };
@@ -2137,27 +2159,47 @@ export default function App() {
                                   </p>
                                 ) : null}
                                 {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
-                                  <p className="run-lineage-symbol-copy">
-                                    Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
-                                    {event.remediation.provider_recovery.job_id
-                                      ? ` / job ${event.remediation.provider_recovery.job_id}`
-                                      : ""}
-                                    {event.remediation.provider_recovery.channels.length
-                                      ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
-                                      : ""}
-                                    {event.remediation.provider_recovery.symbols.length
-                                      ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
-                                      : ""}
-                                    {event.remediation.provider_recovery.timeframe
-                                      ? ` / ${event.remediation.provider_recovery.timeframe}`
-                                      : ""}
-                                    {event.remediation.provider_recovery.verification.state !== "unknown"
-                                      ? ` / verification ${event.remediation.provider_recovery.verification.state}`
-                                      : ""}
-                                    {event.remediation.provider_recovery.updated_at
-                                      ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
-                                      : ""}
-                                  </p>
+                                  <>
+                                    <p className="run-lineage-symbol-copy">
+                                      Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
+                                      {event.remediation.provider_recovery.job_id
+                                        ? ` / job ${event.remediation.provider_recovery.job_id}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.channels.length
+                                        ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.symbols.length
+                                        ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.timeframe
+                                        ? ` / ${event.remediation.provider_recovery.timeframe}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.verification.state !== "unknown"
+                                        ? ` / verification ${event.remediation.provider_recovery.verification.state}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.updated_at
+                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
+                                        : ""}
+                                    </p>
+                                    <p className="run-lineage-symbol-copy">
+                                      Recovery machine: {event.remediation.provider_recovery.status_machine.state}
+                                      {` / workflow ${event.remediation.provider_recovery.status_machine.workflow_state}`}
+                                      {event.remediation.provider_recovery.status_machine.workflow_action
+                                        ? ` (${event.remediation.provider_recovery.status_machine.workflow_action})`
+                                        : ""}
+                                      {` / job ${event.remediation.provider_recovery.status_machine.job_state}`}
+                                      {` / sync ${event.remediation.provider_recovery.status_machine.sync_state}`}
+                                      {event.remediation.provider_recovery.status_machine.attempt_number
+                                        ? ` / attempt ${event.remediation.provider_recovery.status_machine.attempt_number}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.status_machine.last_event_kind
+                                        ? ` / event ${event.remediation.provider_recovery.status_machine.last_event_kind}`
+                                        : ""}
+                                      {event.remediation.provider_recovery.status_machine.last_event_at
+                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
+                                        : ""}
+                                    </p>
+                                  </>
                                 ) : null}
                               </>
                             ) : null}
@@ -3262,27 +3304,47 @@ export default function App() {
                                     </p>
                                   ) : null}
                                   {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
-                                    <p className="run-lineage-symbol-copy">
-                                      Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
-                                      {event.remediation.provider_recovery.job_id
-                                        ? ` / job ${event.remediation.provider_recovery.job_id}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.channels.length
-                                        ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.symbols.length
-                                        ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.timeframe
-                                        ? ` / ${event.remediation.provider_recovery.timeframe}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.verification.state !== "unknown"
-                                        ? ` / verification ${event.remediation.provider_recovery.verification.state}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.updated_at
-                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
-                                        : ""}
-                                    </p>
+                                    <>
+                                      <p className="run-lineage-symbol-copy">
+                                        Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
+                                        {event.remediation.provider_recovery.job_id
+                                          ? ` / job ${event.remediation.provider_recovery.job_id}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.channels.length
+                                          ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.symbols.length
+                                          ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.timeframe
+                                          ? ` / ${event.remediation.provider_recovery.timeframe}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.verification.state !== "unknown"
+                                          ? ` / verification ${event.remediation.provider_recovery.verification.state}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.updated_at
+                                          ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
+                                          : ""}
+                                      </p>
+                                      <p className="run-lineage-symbol-copy">
+                                        Recovery machine: {event.remediation.provider_recovery.status_machine.state}
+                                        {` / workflow ${event.remediation.provider_recovery.status_machine.workflow_state}`}
+                                        {event.remediation.provider_recovery.status_machine.workflow_action
+                                          ? ` (${event.remediation.provider_recovery.status_machine.workflow_action})`
+                                          : ""}
+                                        {` / job ${event.remediation.provider_recovery.status_machine.job_state}`}
+                                        {` / sync ${event.remediation.provider_recovery.status_machine.sync_state}`}
+                                        {event.remediation.provider_recovery.status_machine.attempt_number
+                                          ? ` / attempt ${event.remediation.provider_recovery.status_machine.attempt_number}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.status_machine.last_event_kind
+                                          ? ` / event ${event.remediation.provider_recovery.status_machine.last_event_kind}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.status_machine.last_event_at
+                                          ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
+                                          : ""}
+                                      </p>
+                                    </>
                                   ) : null}
                                 </>
                               ) : null}

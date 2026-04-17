@@ -516,6 +516,19 @@ class OperatorIncidentProviderRecoveryVerification:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentProviderRecoveryStatusMachine:
+  state: str = "not_requested"
+  workflow_state: str = "idle"
+  workflow_action: str | None = None
+  job_state: str = "not_started"
+  sync_state: str = "not_synced"
+  last_event_kind: str | None = None
+  last_event_at: datetime | None = None
+  last_detail: str | None = None
+  attempt_number: int = 0
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -529,6 +542,9 @@ class OperatorIncidentProviderRecoveryState:
   timeframe: str | None = None
   verification: OperatorIncidentProviderRecoveryVerification = field(
     default_factory=OperatorIncidentProviderRecoveryVerification
+  )
+  status_machine: OperatorIncidentProviderRecoveryStatusMachine = field(
+    default_factory=OperatorIncidentProviderRecoveryStatusMachine
   )
   updated_at: datetime | None = None
 

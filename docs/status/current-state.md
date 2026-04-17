@@ -119,9 +119,10 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   provider recovery callbacks can also sync remediation lifecycle state, richer provider recovery
   payloads, and trigger the local verification pass before the same loop is refreshed. Those
   payloads are now promoted into typed remediation recovery state with job/reference, channels,
-  symbols, timeframe, and verification fields. When local verification closes the incident, the
-  provider-native remediation workflow is resolved back out through the same bidirectional incident
-  channel
+  symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
+  phase, job phase, sync state, last event, and attempt count. When local verification closes the
+  incident, the provider-native remediation workflow is resolved back out through the same
+  bidirectional incident channel
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
   repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
   breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and

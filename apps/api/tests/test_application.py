@@ -1429,6 +1429,12 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
   assert incident.remediation.reference == "guarded-live:market-data:5m"
   assert incident.remediation.requested_by == "system"
   assert "seeded_market_data_provider_has_no_live_remediation_jobs" in incident.remediation.detail
+  assert incident.remediation.provider_recovery.lifecycle_state == "requested"
+  assert incident.remediation.provider_recovery.status_machine.state == "provider_requested"
+  assert incident.remediation.provider_recovery.status_machine.workflow_state == "delivered"
+  assert incident.remediation.provider_recovery.status_machine.workflow_action == "remediate"
+  assert incident.remediation.provider_recovery.status_machine.job_state == "requested"
+  assert incident.remediation.provider_recovery.status_machine.sync_state == "local_dispatched"
   assert market_data.remediation_calls[-1] == ("recent_sync", "ETH/USDT", "5m")
   assert any(
     workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
@@ -1746,6 +1752,13 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   assert updated_incident.remediation.provider_recovery.symbols == ("ETH/USDT",)
   assert updated_incident.remediation.provider_recovery.timeframe == "5m"
   assert updated_incident.remediation.provider_recovery.verification.state == "passed"
+  assert updated_incident.remediation.provider_recovery.status_machine.state == "verified"
+  assert updated_incident.remediation.provider_recovery.status_machine.workflow_state == "delivered"
+  assert updated_incident.remediation.provider_recovery.status_machine.workflow_action == "remediate"
+  assert updated_incident.remediation.provider_recovery.status_machine.job_state == "verified"
+  assert updated_incident.remediation.provider_recovery.status_machine.sync_state == "bidirectional_synced"
+  assert updated_incident.remediation.provider_recovery.status_machine.last_event_kind == "local_verification_executed"
+  assert updated_incident.remediation.provider_recovery.status_machine.attempt_number == 1
   assert updated_incident.provider_workflow_action == "remediate"
   assert updated_incident.provider_workflow_state == "delivered"
   assert updated_incident.provider_workflow_reference == "PDINC-REC-1"
@@ -1760,6 +1773,12 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   assert resolved_incident.remediation.provider_payload["job_id"] == "recovery-job-1"
   assert resolved_incident.remediation.provider_recovery.job_id == "recovery-job-1"
   assert resolved_incident.remediation.provider_recovery.verification.state == "passed"
+  assert resolved_incident.remediation.provider_recovery.lifecycle_state == "resolved"
+  assert resolved_incident.remediation.provider_recovery.status_machine.state == "resolved"
+  assert resolved_incident.remediation.provider_recovery.status_machine.workflow_action == "resolve"
+  assert resolved_incident.remediation.provider_recovery.status_machine.job_state == "resolved"
+  assert resolved_incident.remediation.provider_recovery.status_machine.sync_state == "bidirectional_synced"
+  assert resolved_incident.remediation.provider_recovery.status_machine.last_event_kind == "provider_resolve_requested"
   assert any(
     record.phase == "provider_remediate"
     and record.external_reference == "PDINC-REC-1"

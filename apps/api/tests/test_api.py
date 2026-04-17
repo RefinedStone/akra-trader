@@ -1354,6 +1354,9 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
     assert incident["remediation"]["state"] == "skipped"
     assert incident["remediation"]["runbook"] == "market_data.sync_recent"
     assert incident["remediation"]["provider"] == "pagerduty"
+    assert incident["remediation"]["provider_recovery"]["lifecycle_state"] == "requested"
+    assert incident["remediation"]["provider_recovery"]["status_machine"]["state"] == "provider_requested"
+    assert incident["remediation"]["provider_recovery"]["status_machine"]["workflow_action"] == "remediate"
     assert "seeded_market_data_provider_has_no_live_remediation_jobs" in incident["remediation"]["detail"]
     assert any(
       record["incident_event_id"] == incident["event_id"] and record["phase"] == "provider_remediate"
@@ -1627,6 +1630,11 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert updated_incident["remediation"]["provider_recovery"]["symbols"] == ["ETH/USDT"]
     assert updated_incident["remediation"]["provider_recovery"]["timeframe"] == "5m"
     assert updated_incident["remediation"]["provider_recovery"]["verification"]["state"] == "passed"
+    assert updated_incident["remediation"]["provider_recovery"]["status_machine"]["state"] == "verified"
+    assert updated_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_state"] == "delivered"
+    assert updated_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_action"] == "remediate"
+    assert updated_incident["remediation"]["provider_recovery"]["status_machine"]["job_state"] == "verified"
+    assert updated_incident["remediation"]["provider_recovery"]["status_machine"]["sync_state"] == "bidirectional_synced"
     assert updated_incident["provider_workflow_action"] == "remediate"
     assert updated_incident["provider_workflow_state"] == "delivered"
     assert updated_incident["provider_workflow_reference"] == "PDINC-REC-901"
@@ -1639,6 +1647,9 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert resolved_incident["provider_workflow_state"] in {"delivered", "not_supported"}
     assert resolved_incident["remediation"]["provider_payload"]["job_id"] == "provider-job-901"
     assert resolved_incident["remediation"]["provider_recovery"]["job_id"] == "provider-job-901"
+    assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["state"] == "resolved"
+    assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["workflow_action"] == "resolve"
+    assert resolved_incident["remediation"]["provider_recovery"]["status_machine"]["job_state"] == "resolved"
 
 
 def test_operator_visibility_endpoint_surfaces_channel_level_market_data_incidents(

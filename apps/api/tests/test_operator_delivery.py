@@ -203,6 +203,7 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   assert "market_data.sync_recent" in remediate_payload["note"]["content"]
   assert '"job_id": "pd-job-1"' in remediate_payload["note"]["content"]
   assert '"channels": ["kline", "depth"]' in remediate_payload["note"]["content"]
+  assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
 
 
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
@@ -357,3 +358,4 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
   assert "market_data.sync_recent" in remediate_payload["note"]
   assert '"job_id": "og-job-2"' in remediate_payload["note"]
   assert '"job_id": "og-job-1"' in resolve_payload["note"]
+  assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
