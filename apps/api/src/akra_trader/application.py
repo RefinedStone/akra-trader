@@ -359,6 +359,7 @@ class TradingApplication:
     data_engine: DataEngine | None = None,
     execution_engine: ExecutionEngine | None = None,
     run_supervisor: RunSupervisor | None = None,
+    guarded_live_venue: str = "binance",
     guarded_live_execution_enabled: bool = False,
     sandbox_worker_heartbeat_interval_seconds: int = 15,
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
@@ -379,6 +380,7 @@ class TradingApplication:
     self._data_engine = data_engine or DataEngine(market_data)
     self._execution_engine = execution_engine or ExecutionEngine()
     self._run_supervisor = run_supervisor or RunSupervisor()
+    self._guarded_live_venue = guarded_live_venue
     self._guarded_live_execution_enabled = guarded_live_execution_enabled
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
@@ -978,7 +980,7 @@ class TradingApplication:
       mode=RunMode.LIVE,
       strategy_id=metadata.strategy_id,
       strategy_version=metadata.version,
-      venue="binance",
+      venue=self._guarded_live_venue,
       symbols=(symbol,),
       timeframe=timeframe,
       parameters=parameters,
@@ -2066,7 +2068,11 @@ class TradingApplication:
     state: GuardedLiveState,
   ) -> GuardedLiveVenueStateSnapshot:
     snapshot = state.reconciliation.venue_snapshot
-    if snapshot is not None and snapshot.verification_state != "unavailable":
+    if (
+      snapshot is not None
+      and snapshot.verification_state != "unavailable"
+      and snapshot.venue == self._guarded_live_venue
+    ):
       return snapshot
     return self._venue_state.capture_snapshot()
 
@@ -2090,7 +2096,7 @@ class TradingApplication:
         issues.append(f"unmapped_recovery_asset:{balance.asset}")
         recovered.append(
           GuardedLiveRecoveredExposure(
-            instrument_id=f"{snapshot.venue}:{balance.asset}",
+            instrument_id=f"{self._guarded_live_venue}:{balance.asset}",
             symbol=balance.asset,
             asset=balance.asset,
             quantity=balance.total,
@@ -2099,7 +2105,7 @@ class TradingApplication:
         continue
       recovered.append(
         GuardedLiveRecoveredExposure(
-          instrument_id=instrument.instrument_id,
+          instrument_id=f"{self._guarded_live_venue}:{instrument.symbol}",
           symbol=instrument.symbol,
           asset=balance.asset,
           quantity=balance.total,
@@ -2356,6 +2362,19 @@ class TradingApplication:
     effective_state = state or self._guarded_live_state.load_state()
     internal_snapshot = self._build_guarded_live_internal_snapshot(state=effective_state)
     venue_snapshot = self._venue_state.capture_snapshot()
+
+    if venue_snapshot.venue != self._guarded_live_venue:
+      findings.append(
+        GuardedLiveReconciliationFinding(
+          kind="guarded_live_venue_mismatch",
+          severity="critical",
+          summary="Venue-state snapshot does not match the configured guarded-live venue.",
+          detail=(
+            f"Guarded-live is configured for {self._guarded_live_venue}, "
+            f"but venue-state reconciliation captured {venue_snapshot.venue}."
+          ),
+        )
+      )
 
     runtime_visibility = self.get_operator_visibility()
     if runtime_visibility.alerts:

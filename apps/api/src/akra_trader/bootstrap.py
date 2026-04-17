@@ -13,7 +13,7 @@ from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
-from akra_trader.adapters.venue_state import BinanceVenueStateAdapter
+from akra_trader.adapters.venue_state import CcxtVenueStateAdapter
 from akra_trader.adapters.venue_state import SeededVenueStateAdapter
 from akra_trader.application import TradingApplication
 from akra_trader.config import Settings
@@ -32,6 +32,26 @@ class AppLifecycle(Protocol):
 class Container:
   app: TradingApplication
   background_jobs: tuple[AppLifecycle, ...] = ()
+
+
+def resolve_guarded_live_venue(settings: Settings) -> str:
+  if settings.guarded_live_venue:
+    return settings.guarded_live_venue
+  if settings.market_data_provider == "seeded":
+    return "binance"
+  return settings.market_data_provider
+
+
+def _use_seeded_guarded_live_adapters(settings: Settings) -> bool:
+  return settings.market_data_provider == "seeded" and settings.guarded_live_venue is None
+
+
+def _resolve_guarded_live_credentials(settings: Settings, *, venue: str) -> tuple[str | None, str | None]:
+  if settings.guarded_live_api_key or settings.guarded_live_api_secret:
+    return settings.guarded_live_api_key, settings.guarded_live_api_secret
+  if venue == "binance":
+    return settings.binance_api_key, settings.binance_api_secret
+  return None, None
 
 
 def build_default_runs_database_url(repo_root: Path) -> str:
@@ -62,26 +82,32 @@ def build_market_data_adapter(settings: Settings, repo_root: Path):
 
 
 def build_venue_state_adapter(settings: Settings):
-  if settings.market_data_provider == "seeded":
-    return SeededVenueStateAdapter()
-  if settings.market_data_provider == "binance":
-    return BinanceVenueStateAdapter(
+  venue = resolve_guarded_live_venue(settings)
+  if _use_seeded_guarded_live_adapters(settings):
+    return SeededVenueStateAdapter(venue=venue)
+  if venue in {"binance", "coinbase", "kraken"}:
+    api_key, api_secret = _resolve_guarded_live_credentials(settings, venue=venue)
+    return CcxtVenueStateAdapter(
       tracked_symbols=settings.market_data_symbols,
-      api_key=settings.binance_api_key,
-      api_secret=settings.binance_api_secret,
+      venue=venue,
+      api_key=api_key,
+      api_secret=api_secret,
     )
-  raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
+  raise ValueError(f"Unsupported guarded-live venue: {venue}")
 
 
 def build_venue_execution_adapter(settings: Settings):
-  if settings.market_data_provider == "seeded":
-    return SeededVenueExecutionAdapter()
-  if settings.market_data_provider == "binance":
+  venue = resolve_guarded_live_venue(settings)
+  if _use_seeded_guarded_live_adapters(settings):
+    return SeededVenueExecutionAdapter(venue=venue)
+  if venue in {"binance", "coinbase", "kraken"}:
+    api_key, api_secret = _resolve_guarded_live_credentials(settings, venue=venue)
     return BinanceVenueExecutionAdapter(
-      api_key=settings.binance_api_key,
-      api_secret=settings.binance_api_secret,
+      venue=venue,
+      api_key=api_key,
+      api_secret=api_secret,
     )
-  raise ValueError(f"Unsupported market data provider: {settings.market_data_provider}")
+  raise ValueError(f"Unsupported guarded-live venue: {venue}")
 
 
 def build_background_jobs(
@@ -135,6 +161,7 @@ def build_container(settings: Settings) -> Container:
     venue_state=venue_state,
     venue_execution=venue_execution,
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+    guarded_live_venue=resolve_guarded_live_venue(settings),
     guarded_live_execution_enabled=settings.guarded_live_execution_enabled,
     sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,

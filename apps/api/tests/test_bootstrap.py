@@ -145,7 +145,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
     def __init__(self, database_url: str) -> None:
       captured["guarded_live_database_url"] = database_url
 
-  class FakeBinanceVenueStateAdapter:
+  class FakeCcxtVenueStateAdapter:
     def __init__(
       self,
       *,
@@ -158,6 +158,18 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
       captured["venue_state_api_key"] = api_key or ""
       captured["venue_state_api_secret"] = api_secret or ""
       captured["venue_state_venue"] = venue
+
+  class FakeBinanceVenueExecutionAdapter:
+    def __init__(
+      self,
+      *,
+      venue: str = "binance",
+      api_key: str | None,
+      api_secret: str | None,
+    ) -> None:
+      captured["venue_execution_venue"] = venue
+      captured["venue_execution_api_key"] = api_key or ""
+      captured["venue_execution_api_secret"] = api_secret or ""
 
   class FakeBinanceMarketDataAdapter:
     def __init__(
@@ -199,7 +211,8 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
   monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
   monkeypatch.setattr("akra_trader.bootstrap.BinanceMarketDataAdapter", FakeBinanceMarketDataAdapter)
-  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueStateAdapter", FakeBinanceVenueStateAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.CcxtVenueStateAdapter", FakeCcxtVenueStateAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
   monkeypatch.setattr("akra_trader.bootstrap.MarketDataSyncJob", FakeMarketDataSyncJob)
   monkeypatch.setattr("akra_trader.bootstrap.SandboxWorkerSessionsJob", FakeSandboxWorkerSessionsJob)
 
@@ -224,9 +237,75 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["venue_state_symbols"] == "BTC/USDT"
   assert captured["venue_state_api_key"] == "test-key"
   assert captured["venue_state_api_secret"] == "test-secret"
+  assert captured["venue_execution_venue"] == "binance"
+  assert captured["venue_execution_api_key"] == "test-key"
+  assert captured["venue_execution_api_secret"] == "test-secret"
   assert captured["sync_timeframes"] == "5m,1h"
   assert captured["sync_interval_seconds"] == "120"
   assert captured["sandbox_interval_seconds"] == "11"
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
   assert len(container.background_jobs) == 2
+
+
+def test_build_container_can_target_guarded_live_venue_separately_from_market_data(monkeypatch) -> None:
+  captured: dict[str, str] = {}
+
+  class FakeRunRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeGuardedLiveRepository:
+    def __init__(self, database_url: str) -> None:
+      self.database_url = database_url
+
+  class FakeCcxtVenueStateAdapter:
+    def __init__(
+      self,
+      *,
+      tracked_symbols: tuple[str, ...],
+      venue: str = "binance",
+      api_key: str | None,
+      api_secret: str | None,
+    ) -> None:
+      captured["venue_state_symbols"] = ",".join(tracked_symbols)
+      captured["venue_state_venue"] = venue
+      captured["venue_state_api_key"] = api_key or ""
+      captured["venue_state_api_secret"] = api_secret or ""
+
+  class FakeBinanceVenueExecutionAdapter:
+    def __init__(
+      self,
+      *,
+      venue: str = "binance",
+      api_key: str | None,
+      api_secret: str | None,
+    ) -> None:
+      captured["venue_execution_venue"] = venue
+      captured["venue_execution_api_key"] = api_key or ""
+      captured["venue_execution_api_secret"] = api_secret or ""
+
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyRunRepository", FakeRunRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.SqlAlchemyGuardedLiveStateRepository", FakeGuardedLiveRepository)
+  monkeypatch.setattr("akra_trader.bootstrap.CcxtVenueStateAdapter", FakeCcxtVenueStateAdapter)
+  monkeypatch.setattr("akra_trader.bootstrap.BinanceVenueExecutionAdapter", FakeBinanceVenueExecutionAdapter)
+
+  container = build_container(
+    Settings(
+      market_data_provider="seeded",
+      guarded_live_venue="coinbase",
+      guarded_live_api_key="coinbase-key",
+      guarded_live_api_secret="coinbase-secret",
+      market_data_symbols=("BTC/USDT", "ETH/USDT"),
+    )
+  )
+
+  assert isinstance(container.app._market_data, SeededMarketDataAdapter)
+  assert container.app._guarded_live_venue == "coinbase"
+  assert captured["venue_state_symbols"] == "BTC/USDT,ETH/USDT"
+  assert captured["venue_state_venue"] == "coinbase"
+  assert captured["venue_state_api_key"] == "coinbase-key"
+  assert captured["venue_state_api_secret"] == "coinbase-secret"
+  assert captured["venue_execution_venue"] == "coinbase"
+  assert captured["venue_execution_api_key"] == "coinbase-key"
+  assert captured["venue_execution_api_secret"] == "coinbase-secret"

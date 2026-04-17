@@ -1009,6 +1009,60 @@ def test_guarded_live_launch_requires_clear_reconciliation_and_recovery(tmp_path
   assert run.notes[0].startswith("Guarded live worker primed from recovered venue state")
 
 
+def test_guarded_live_reconciliation_and_launch_use_configured_supported_venue(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 18, 30, tzinfo=UTC))
+  venue_state = StaticVenueStateAdapter(
+    GuardedLiveVenueStateSnapshot(
+      provider="seeded",
+      venue="coinbase",
+      verification_state="verified",
+      captured_at=clock(),
+      balances=(
+        GuardedLiveVenueBalance(asset="ETH", total=0.4, free=0.4, used=0.0),
+        GuardedLiveVenueBalance(asset="USDT", total=9_200.0, free=9_200.0, used=0.0),
+      ),
+    )
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=venue_state,
+    venue_execution=SeededVenueExecutionAdapter(venue="coinbase"),
+    guarded_live_venue="coinbase",
+    guarded_live_execution_enabled=True,
+  )
+
+  reconciliation = app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="coinbase_pre_live_check",
+  )
+  recovery = app.recover_guarded_live_runtime_state(
+    actor="operator",
+    reason="coinbase_pre_live_recovery",
+  )
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="coinbase_guarded_live_launch",
+  )
+
+  assert reconciliation.reconciliation.venue_snapshot is not None
+  assert reconciliation.reconciliation.venue_snapshot.venue == "coinbase"
+  assert recovery.reconciliation.state == "clear"
+  assert recovery.recovery.exposures[0].instrument_id == "coinbase:ETH/USDT"
+  assert run.config.venue == "coinbase"
+  assert "coinbase:ETH/USDT" in run.positions
+
+
 def test_guarded_live_worker_submits_venue_order_on_new_candle(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   clock = MutableClock(datetime(2025, 1, 3, 19, 0, tzinfo=UTC))

@@ -49,6 +49,9 @@ Implemented now:
   available, Coinbase Advanced Trade can now supply authenticated user/account order transport plus
   public heartbeat/ticker/trade/level2/candle continuation, and Kraken spot can supply public
   heartbeat/ticker/trade/book/ohlc continuation through the same handoff surface
+- guarded-live launch wiring and venue-state reconciliation can now target a configured supported
+  venue independently from the market-data provider, while seeded fixture flows still default to a
+  Binance-shaped live venue in tests
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -77,8 +80,11 @@ Useful environment variables:
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_SANDBOX_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
 - `AKRA_TRADER_GUARDED_LIVE_EXECUTION_ENABLED`
+- `AKRA_TRADER_GUARDED_LIVE_VENUE`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_INTERVAL_SECONDS`
 - `AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS`
+- `AKRA_TRADER_GUARDED_LIVE_API_KEY`
+- `AKRA_TRADER_GUARDED_LIVE_API_SECRET`
 - `AKRA_TRADER_BINANCE_API_KEY`
 - `AKRA_TRADER_BINANCE_API_SECRET`
 
@@ -152,6 +158,9 @@ Defaults:
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle
+- guarded-live reconciliation, recovery, and live launch now use the configured guarded-live venue
+  instead of inheriting market-data provider wiring, so supported live venues can diverge from the
+  candle source when operators need that split
 - guarded-live session handoff state now tracks supervision health, failover count, and the latest
   market, depth, kline, aggregate-trade, mini-ticker, account-position, balance-update,
   order-list, trade-tick, and book-ticker event timestamps from the Binance push session, along

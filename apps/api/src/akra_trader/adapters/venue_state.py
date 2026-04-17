@@ -20,8 +20,9 @@ class VenueStateExchange(Protocol):
   def fetch_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]: ...
 
 
-def build_binance_account_exchange(
+def build_account_exchange(
   *,
+  venue: str = "binance",
   api_key: str | None = None,
   api_secret: str | None = None,
 ) -> VenueStateExchange:
@@ -30,7 +31,22 @@ def build_binance_account_exchange(
     options["apiKey"] = api_key
   if api_secret:
     options["secret"] = api_secret
-  return ccxt.binance(options)
+  exchange_factory = getattr(ccxt, venue, None)
+  if not callable(exchange_factory):
+    raise ValueError(f"Unsupported venue-state venue: {venue}")
+  return exchange_factory(options)
+
+
+def build_binance_account_exchange(
+  *,
+  api_key: str | None = None,
+  api_secret: str | None = None,
+) -> VenueStateExchange:
+  return build_account_exchange(
+    venue="binance",
+    api_key=api_key,
+    api_secret=api_secret,
+  )
 
 
 class SeededVenueStateAdapter(VenueStatePort):
@@ -60,7 +76,7 @@ class SeededVenueStateAdapter(VenueStatePort):
     )
 
 
-class BinanceVenueStateAdapter(VenueStatePort):
+class CcxtVenueStateAdapter(VenueStatePort):
   def __init__(
     self,
     *,
@@ -76,6 +92,7 @@ class BinanceVenueStateAdapter(VenueStatePort):
     self._api_key = api_key
     self._api_secret = api_secret
     self._exchange = exchange
+    self._provider = "ccxt"
     self._clock = clock or (lambda: datetime.now(UTC))
 
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
@@ -83,14 +100,15 @@ class BinanceVenueStateAdapter(VenueStatePort):
     exchange = self._exchange
     if exchange is None and not (self._api_key and self._api_secret):
       return GuardedLiveVenueStateSnapshot(
-        provider="binance",
+        provider=self._provider,
         venue=self._venue,
         verification_state="unavailable",
         captured_at=current_time,
-        issues=("binance_api_credentials_missing",),
+        issues=(f"{self._venue}_api_credentials_missing",),
       )
     if exchange is None:
-      exchange = build_binance_account_exchange(
+      exchange = build_account_exchange(
+        venue=self._venue,
         api_key=self._api_key,
         api_secret=self._api_secret,
       )
@@ -114,7 +132,7 @@ class BinanceVenueStateAdapter(VenueStatePort):
       verification_state = "partial" if balances or open_orders else "unavailable"
 
     return GuardedLiveVenueStateSnapshot(
-      provider="binance",
+      provider=self._provider,
       venue=self._venue,
       verification_state=verification_state,
       captured_at=current_time,
@@ -191,3 +209,6 @@ def _coerce_float(value: Any) -> float | None:
     return float(value)
   except (TypeError, ValueError):
     return None
+
+
+BinanceVenueStateAdapter = CcxtVenueStateAdapter

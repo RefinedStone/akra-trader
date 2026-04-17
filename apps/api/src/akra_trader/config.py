@@ -18,6 +18,7 @@ class Settings:
   api_prefix: str = "/api"
   cors_origin: str = "http://localhost:5173"
   market_data_provider: str = "binance"
+  guarded_live_venue: str | None = None
   default_quote_currency: str = "USDT"
   runs_database_url: str | None = None
   market_data_database_url: str | None = None
@@ -31,6 +32,8 @@ class Settings:
   guarded_live_execution_enabled: bool = False
   guarded_live_worker_heartbeat_interval_seconds: int = 15
   guarded_live_worker_heartbeat_timeout_seconds: int = 45
+  guarded_live_api_key: str | None = None
+  guarded_live_api_secret: str | None = None
   binance_api_key: str | None = None
   binance_api_secret: str | None = None
 
@@ -39,6 +42,7 @@ def load_settings() -> Settings:
   return Settings(
     cors_origin=os.getenv("AKRA_TRADER_CORS_ORIGIN", "http://localhost:5173"),
     market_data_provider=os.getenv("AKRA_TRADER_MARKET_DATA_PROVIDER", "binance"),
+    guarded_live_venue=os.getenv("AKRA_TRADER_GUARDED_LIVE_VENUE") or None,
     default_quote_currency=os.getenv("AKRA_TRADER_DEFAULT_QUOTE", "USDT"),
     runs_database_url=os.getenv("AKRA_TRADER_RUNS_DATABASE_URL") or None,
     market_data_database_url=os.getenv("AKRA_TRADER_MARKET_DATA_DATABASE_URL") or None,
@@ -72,6 +76,8 @@ def load_settings() -> Settings:
     guarded_live_worker_heartbeat_timeout_seconds=int(
       os.getenv("AKRA_TRADER_GUARDED_LIVE_WORKER_HEARTBEAT_TIMEOUT_SECONDS", "45")
     ),
+    guarded_live_api_key=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_KEY") or None,
+    guarded_live_api_secret=os.getenv("AKRA_TRADER_GUARDED_LIVE_API_SECRET") or None,
     binance_api_key=os.getenv("AKRA_TRADER_BINANCE_API_KEY") or None,
     binance_api_secret=os.getenv("AKRA_TRADER_BINANCE_API_SECRET") or None,
   )

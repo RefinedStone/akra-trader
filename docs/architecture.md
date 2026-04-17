@@ -161,6 +161,10 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   Advanced Trade authenticated user/account order transport plus public market channels, alongside
   Kraken spot public market channels, so multi-venue push-native continuation persists with
   explicit transport ownership metadata.
+  Guarded-live reconciliation, recovery, and launch wiring also now resolve a dedicated configured
+  live venue instead of inheriting the market-data provider, which lets supported venue-state and
+  order-session adapters run against Binance, Coinbase, or Kraken while candle reads stay on a
+  separate market-data source.
 
 ## Modes
 
@@ -202,6 +206,8 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   websockets plus public heartbeats/ticker/trade/level2/candles, or Kraken spot public
   heartbeat/ticker/trade/book/ohlc streams while preserving venue transport ownership and
   continuation state across handoff and sync
+- guarded-live reconciliation and live launch now follow a dedicated configured venue so supported
+  venue-state/account session transport no longer has to match the market-data provider
 
 ## Control Room
 

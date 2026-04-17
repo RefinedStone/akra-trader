@@ -73,6 +73,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   user/account order transport plus public heartbeats/ticker/trade/level2/candle channels, and
   Kraken spot public heartbeat/ticker/trade/book/ohlc channels while preserving continuation state
   and transport ownership metadata
+- guarded-live reconciliation, recovery, and live launch now use a dedicated configured live venue
+  instead of assuming the market-data provider, so supported venue-state and order-session wiring
+  can target Binance, Coinbase, or Kraken independently of candle sourcing
 
 ### Control room
 
