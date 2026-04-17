@@ -54,6 +54,8 @@ def _normalize_target(target: str) -> str | None:
     "operator_grafana_oncall",
   }:
     return "grafana_oncall_incidents"
+  if normalized in {"zenduty", "zen_duty", "zenduty_incidents", "operator_zenduty"}:
+    return "zenduty_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
     return "opsgenie_alerts"
   return None
@@ -107,6 +109,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     grafana_oncall_api_url: str = "https://oncall-api.grafana.com",
     grafana_oncall_recovery_engine_url_template: str | None = None,
     grafana_oncall_recovery_engine_token: str | None = None,
+    zenduty_api_token: str | None = None,
+    zenduty_api_url: str = "https://api.zenduty.com",
+    zenduty_recovery_engine_url_template: str | None = None,
+    zenduty_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
     opsgenie_recovery_engine_url_template: str | None = None,
@@ -164,6 +170,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._grafana_oncall_api_url = grafana_oncall_api_url.rstrip("/")
     self._grafana_oncall_recovery_engine_url_template = grafana_oncall_recovery_engine_url_template
     self._grafana_oncall_recovery_engine_token = grafana_oncall_recovery_engine_token
+    self._zenduty_api_token = zenduty_api_token
+    self._zenduty_api_url = zenduty_api_url.rstrip("/")
+    self._zenduty_recovery_engine_url_template = zenduty_recovery_engine_url_template
+    self._zenduty_recovery_engine_token = zenduty_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
     self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
@@ -197,6 +207,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("bigpanda")
     if self._grafana_oncall_api_token:
       providers.append("grafana_oncall")
+    if self._zenduty_api_token:
+      providers.append("zenduty")
     if self._opsgenie_api_key:
       providers.append("opsgenie")
     return tuple(providers)
@@ -250,6 +262,9 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         continue
       if target == "grafana_oncall_incidents":
         records.append(self._deliver_grafana_oncall(incident=incident, attempt_number=attempt_number, phase=phase))
+        continue
+      if target == "zenduty_incidents":
+        records.append(self._deliver_zenduty(incident=incident, attempt_number=attempt_number, phase=phase))
         continue
       if target == "opsgenie_alerts":
         records.append(self._deliver_opsgenie(incident=incident, attempt_number=attempt_number, phase=phase))
@@ -378,6 +393,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "zenduty":
+      return (
+        self._sync_zenduty_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsgenie":
       return (
         self._sync_opsgenie_workflow(
@@ -438,6 +464,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_bigpanda_workflow_state(incident=incident)
     if normalized_provider == "grafana_oncall":
       return self._pull_grafana_oncall_workflow_state(incident=incident)
+    if normalized_provider == "zenduty":
+      return self._pull_zenduty_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
@@ -581,6 +609,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   def _build_grafana_oncall_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
     token = self._grafana_oncall_recovery_engine_token or self._grafana_oncall_api_token
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_zenduty_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    token = self._zenduty_recovery_engine_token or self._zenduty_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -805,6 +842,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_grafana_oncall_recovery_engine_request(url=url)
+    elif provider == "zenduty":
+      url = self._format_recovery_engine_url(
+        url_template=self._zenduty_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_zenduty_recovery_engine_request(url=url)
     elif provider == "opsgenie":
       url = self._format_recovery_engine_url(
         url_template=self._opsgenie_recovery_engine_url_template,
@@ -3317,6 +3365,261 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_zenduty(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._zenduty_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:zenduty_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="zenduty_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="zenduty_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_zenduty_delivery_request(incident=incident, reference=reference)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:zenduty_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="zenduty_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"zenduty_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:zenduty_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="zenduty_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"zenduty_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_zenduty_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    target = "zenduty_workflow"
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._zenduty_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="zenduty_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="zenduty_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="zenduty",
+        external_reference=None,
+        source=incident.source,
+      )
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_zenduty_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"zenduty_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"zenduty_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="zenduty",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_zenduty_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._zenduty_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_zenduty_pull_request(reference=reference, reference_type=reference_type)
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    incident_payload = self._extract_mapping(
+      payload.get("result"),
+      payload.get("data"),
+      payload.get("incident"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      incident_payload.get("attributes"),
+      incident_payload.get("incident"),
+      incident_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      incident_payload.get("metadata"),
+      attributes.get("metadata"),
+      attributes.get("details"),
+      incident_payload.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "severity": self._first_non_empty_string(
+        incident_payload.get("severity"),
+        incident_payload.get("priority"),
+        attributes.get("severity"),
+      ),
+      "assignee": self._first_non_empty_string(
+        incident_payload.get("assignee"),
+        attributes.get("assignee"),
+        self._extract_mapping(incident_payload.get("assignee")).get("name"),
+      ),
+      "service": self._first_non_empty_string(
+        incident_payload.get("service"),
+        incident_payload.get("service_name"),
+        attributes.get("service"),
+      ),
+      "url": self._first_non_empty_string(
+        incident_payload.get("url"),
+        attributes.get("url"),
+        incident_payload.get("html_url"),
+      ),
+      "updated_at": self._first_non_empty_string(
+        incident_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+      "external_reference": self._first_non_empty_string(
+        incident_payload.get("external_reference"),
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="zenduty",
+      workflow_reference=self._first_non_empty_string(
+        incident_payload.get("incident_id"),
+        incident_payload.get("id"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        provider_payload.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        incident_payload.get("incident_status"),
+        incident_payload.get("status"),
+        incident_payload.get("state"),
+        attributes.get("incident_status"),
+        attributes.get("status"),
+        attributes.get("state"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        incident_payload.get("summary"),
+        incident_payload.get("subject"),
+        attributes.get("summary"),
+        incident.summary,
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        provider_payload.get("updated_at"),
+        incident_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+    )
+
   def _deliver_opsgenie(
     self,
     *,
@@ -4214,6 +4517,66 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   @staticmethod
   def _resolve_grafana_oncall_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"triggered", "open", "investigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  @staticmethod
+  def _resolve_zenduty_incident_phase(status: str | None) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "investigating",
+      "monitoring",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_zenduty_ownership_phase(assignee: str | None) -> str:
+    if assignee:
+      return "assigned"
+    return "unassigned"
+
+  @staticmethod
+  def _resolve_zenduty_severity_phase(severity: str | None) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return "unknown"
+
+  @staticmethod
+  def _resolve_zenduty_service_phase(service: str | None) -> str:
+    if service:
+      return "configured"
+    return "unconfigured"
+
+  @staticmethod
+  def _resolve_zenduty_workflow_phase(
     *,
     lifecycle_state: str | None,
     workflow_state: str,
@@ -5286,6 +5649,114 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           updated_at,
         ),
       }
+    elif provider == "zenduty":
+      zenduty_severity = self._first_non_empty_string(
+        provider_specific_recovery.get("severity"),
+        provider_payload.get("severity"),
+        provider_payload.get("priority"),
+      )
+      zenduty_assignee = self._first_non_empty_string(
+        provider_specific_recovery.get("assignee"),
+        provider_payload.get("assignee"),
+        self._extract_mapping(provider_payload.get("assignee")).get("name"),
+      )
+      zenduty_service = self._first_non_empty_string(
+        provider_specific_recovery.get("service"),
+        provider_payload.get("service"),
+        provider_payload.get("service_name"),
+      )
+      zenduty_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("incident_status"),
+        provider_payload.get("status"),
+        provider_payload.get("state"),
+      ) or "unknown"
+      zenduty_incident_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("incident_phase"),
+        self._resolve_zenduty_incident_phase(zenduty_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "zenduty",
+        "zenduty": {
+          "incident_id": self._first_non_empty_string(
+            provider_specific_recovery.get("incident_id"),
+            provider_payload.get("incident_id"),
+            provider_payload.get("id"),
+            workflow_reference,
+          ),
+          "external_reference": external_reference,
+          "incident_status": zenduty_status,
+          "severity": zenduty_severity,
+          "assignee": zenduty_assignee,
+          "service": zenduty_service,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "incident_phase": zenduty_incident_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_zenduty_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=zenduty_status,
+            ),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_zenduty_ownership_phase(zenduty_assignee),
+            "severity_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("severity_phase"),
+            ) or self._resolve_zenduty_severity_phase(zenduty_severity),
+            "service_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("service_phase"),
+            ) or self._resolve_zenduty_service_phase(zenduty_service),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          zenduty_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
     elif provider == "opsgenie":
       opsgenie_owner = self._first_non_empty_string(
         provider_specific_recovery.get("owner"),
@@ -5948,6 +6419,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           "last_transition_at": (
             provider_recovery.grafana_oncall.phase_graph.last_transition_at.isoformat()
             if provider_recovery.grafana_oncall.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
+      "zenduty": {
+        "incident_id": provider_recovery.zenduty.incident_id,
+        "external_reference": provider_recovery.zenduty.external_reference,
+        "incident_status": provider_recovery.zenduty.incident_status,
+        "severity": provider_recovery.zenduty.severity,
+        "assignee": provider_recovery.zenduty.assignee,
+        "service": provider_recovery.zenduty.service,
+        "url": provider_recovery.zenduty.url,
+        "updated_at": (
+          provider_recovery.zenduty.updated_at.isoformat()
+          if provider_recovery.zenduty.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "incident_phase": provider_recovery.zenduty.phase_graph.incident_phase,
+          "workflow_phase": provider_recovery.zenduty.phase_graph.workflow_phase,
+          "ownership_phase": provider_recovery.zenduty.phase_graph.ownership_phase,
+          "severity_phase": provider_recovery.zenduty.phase_graph.severity_phase,
+          "service_phase": provider_recovery.zenduty.phase_graph.service_phase,
+          "last_transition_at": (
+            provider_recovery.zenduty.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.zenduty.phase_graph.last_transition_at is not None
             else None
           ),
         },
@@ -7447,6 +7944,153 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported grafana_oncall workflow action: {action}")
 
+  def _build_zenduty_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}?identifier_type={reference_type}",
+      headers={
+        "Authorization": f"Bearer {self._zenduty_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
+  def _build_zenduty_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._zenduty_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    return urllib_request.Request(
+      f"{self._zenduty_api_url}/api/v1/incidents",
+      data=json.dumps(
+        {
+          "incident": {
+            "summary": incident.summary[:255],
+            "description": incident.detail,
+            "status": "triggered",
+            "severity": self._map_zenduty_severity(incident.severity),
+            "external_reference": reference,
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_zenduty_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._zenduty_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": detail,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": f"{detail}{self._format_workflow_payload_context(payload)}",
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated incident to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._zenduty_api_url}/api/v1/incidents/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="POST",
+      )
+    raise ValueError(f"unsupported zenduty workflow action: {action}")
+
   def _build_opsgenie_pull_request(
     self,
     *,
@@ -7787,6 +8431,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized in {"warning", "warn"}:
       return "warning"
     return "info"
+
+  @staticmethod
+  def _map_zenduty_severity(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "critical"
+    if normalized in {"warning", "warn"}:
+      return "high"
+    return "medium"
 
   @staticmethod
   def _map_servicenow_priority(severity: str) -> str:

@@ -826,6 +826,31 @@ class OperatorIncidentGrafanaOnCallRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentZendutyRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  assignee: str | None = None
+  service: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentZendutyRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentZendutyRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentZendutyRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  service_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -879,6 +904,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   grafana_oncall: OperatorIncidentGrafanaOnCallRecoveryState = field(
     default_factory=OperatorIncidentGrafanaOnCallRecoveryState
+  )
+  zenduty: OperatorIncidentZendutyRecoveryState = field(
+    default_factory=OperatorIncidentZendutyRecoveryState
   )
   updated_at: datetime | None = None
 

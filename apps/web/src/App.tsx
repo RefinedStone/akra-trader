@@ -610,6 +610,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        zenduty: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          service?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            service_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -969,6 +987,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        zenduty: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          service?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            service_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8574,6 +8610,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  zenduty: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    assignee?: string | null;
+    service?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      service_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8899,6 +8953,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Grafana OnCall schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "zenduty") {
+    const details = [
+      providerRecovery.zenduty.incident_id ? `incident ${providerRecovery.zenduty.incident_id}` : null,
+      providerRecovery.zenduty.incident_status !== "unknown"
+        ? `status ${providerRecovery.zenduty.incident_status}`
+        : null,
+      providerRecovery.zenduty.severity ? `severity ${providerRecovery.zenduty.severity}` : null,
+      providerRecovery.zenduty.assignee ? `assignee ${providerRecovery.zenduty.assignee}` : null,
+      providerRecovery.zenduty.service ? `service ${providerRecovery.zenduty.service}` : null,
+      providerRecovery.zenduty.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.zenduty.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.zenduty.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.zenduty.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.zenduty.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.zenduty.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.zenduty.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.zenduty.updated_at)}`
+        : null,
+      providerRecovery.zenduty.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.zenduty.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Zenduty schema: ${details.join(" / ")}` : null;
   }
   return null;
 }
