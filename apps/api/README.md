@@ -19,8 +19,9 @@ Implemented now:
   relaunch stored boundaries into backtest, sandbox, or paper flows
 - operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts,
   guarded-live live-path alerts including risk breaches, repeated runtime recovery loops, stale
-  live order sync, persisted live-path alert history, durable incident events, outbound delivery
-  history, and merged runtime plus guarded-live audit events
+  live order sync, market-data freshness policy breaches, persisted live-path alert history,
+  durable incident events, outbound delivery history, and merged runtime plus guarded-live audit
+  events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
   history, durable incident events, outbound delivery history, and guarded-live audit events in the
   control plane
@@ -194,8 +195,9 @@ Defaults:
   snapshot, and the explicit resume action now restores tracked venue order lifecycle state before
   falling back to the persisted snapshot after restart or fault drills
 - guarded-live live-path alerting now covers worker failure/staleness, risk guardrail breaches,
-  repeated live-session recovery loops, and stale active-order sync so those faults flow into the
-  same durable incident and delivery history
+  repeated live-session recovery loops, stale active-order sync, and market-data freshness faults
+  such as stale sync, gap windows, and repeated sync failures so those faults flow into the same
+  durable incident and delivery history
 - guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
   delivery attempts through configured operator delivery targets such as console logging, generic
   webhook delivery, Slack webhook delivery, PagerDuty Events API delivery, or Opsgenie Alert API

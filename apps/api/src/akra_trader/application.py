@@ -268,6 +268,8 @@ class TradingApplication:
   _guarded_live_worker_kind = "guarded_live_native_worker"
   _guarded_live_balance_tolerance = 1e-9
   _guarded_live_drawdown_breach_pct = 35.0
+  _guarded_live_loss_breach_pct = 20.0
+  _guarded_live_gross_open_risk_ratio = 1.1
   _guarded_live_recovery_alert_threshold = 2
 
   class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
@@ -407,6 +409,7 @@ class TradingApplication:
     run_supervisor: RunSupervisor | None = None,
     guarded_live_venue: str = "binance",
     guarded_live_execution_enabled: bool = False,
+    market_data_sync_timeframes: tuple[str, ...] = ("5m",),
     sandbox_worker_heartbeat_interval_seconds: int = 15,
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
     guarded_live_worker_heartbeat_interval_seconds: int = 15,
@@ -445,6 +448,9 @@ class TradingApplication:
     self._run_supervisor = run_supervisor or RunSupervisor()
     self._guarded_live_venue = guarded_live_venue
     self._guarded_live_execution_enabled = guarded_live_execution_enabled
+    self._guarded_live_market_data_timeframes = tuple(
+      dict.fromkeys(market_data_sync_timeframes or ("5m",))
+    )
     self._sandbox_worker_heartbeat_interval_seconds = sandbox_worker_heartbeat_interval_seconds
     self._sandbox_worker_heartbeat_timeout_seconds = sandbox_worker_heartbeat_timeout_seconds
     self._guarded_live_worker_heartbeat_interval_seconds = (
@@ -3938,6 +3944,13 @@ class TradingApplication:
     live_runs = self._runs.list_runs(mode=RunMode.LIVE.value)
     live_context_active = bool(live_runs) or state.ownership.state in {"owned", "orphaned"}
 
+    alerts.extend(
+      self._build_guarded_live_market_data_alerts(
+        live_runs=live_runs,
+        current_time=current_time,
+      )
+    )
+
     if state.kill_switch.state == "engaged":
       detected_at = state.kill_switch.last_engaged_at or state.kill_switch.updated_at
       alerts.append(
@@ -4084,6 +4097,136 @@ class TradingApplication:
 
     alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
     return alerts
+
+  def _build_guarded_live_market_data_alerts(
+    self,
+    *,
+    live_runs: list[RunRecord],
+    current_time: datetime,
+  ) -> list[OperatorAlert]:
+    alerts: list[OperatorAlert] = []
+    delivery_targets = self._guarded_live_delivery_targets()
+    live_symbols = {
+      symbol
+      for run in live_runs
+      for symbol in run.config.symbols
+    }
+    for timeframe in self._resolve_guarded_live_market_data_timeframes(live_runs=live_runs):
+      try:
+        status = self._market_data.get_status(timeframe)
+      except Exception as exc:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data:{timeframe}",
+            severity="critical",
+            category="market_data_freshness",
+            summary=f"Guarded-live market-data freshness policy could not be evaluated for {timeframe}.",
+            detail=f"Market-data status query failed: {exc}.",
+            detected_at=current_time,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
+        continue
+      if status.provider == "seeded":
+        continue
+
+      relevant_instruments = [
+        instrument
+        for instrument in status.instruments
+        if not live_symbols or self._symbol_from_instrument_id(instrument.instrument_id) in live_symbols
+      ]
+      if live_symbols and not relevant_instruments:
+        alerts.append(
+          OperatorAlert(
+            alert_id=f"guarded-live:market-data:{timeframe}",
+            severity="critical",
+            category="market_data_freshness",
+            summary=f"Guarded-live market-data freshness policy is uncovered for {timeframe}.",
+            detail=(
+              "No tracked market-data status covered the active live symbol set: "
+              f"{', '.join(sorted(live_symbols))}."
+            ),
+            detected_at=current_time,
+            source="guarded_live",
+            delivery_targets=delivery_targets,
+          )
+        )
+        continue
+
+      critical_details: list[str] = []
+      warning_details: list[str] = []
+      detected_candidates: list[datetime] = []
+      for instrument in relevant_instruments:
+        symbol = self._symbol_from_instrument_id(instrument.instrument_id)
+        if instrument.last_sync_at is not None:
+          detected_candidates.append(instrument.last_sync_at)
+        if instrument.last_timestamp is not None:
+          detected_candidates.append(instrument.last_timestamp)
+        if instrument.recent_failures:
+          detected_candidates.extend(failure.failed_at for failure in instrument.recent_failures)
+
+        if instrument.sync_status == "error":
+          critical_details.append(f"{symbol} last sync failed.")
+        elif instrument.sync_status == "empty":
+          critical_details.append(f"{symbol} has no persisted candles for {timeframe}.")
+        elif instrument.sync_status == "stale":
+          lag_detail = (
+            f" lagged {instrument.lag_seconds}s"
+            if instrument.lag_seconds is not None
+            else " breached the freshness window"
+          )
+          critical_details.append(f"{symbol}{lag_detail}.")
+
+        missing_candles = instrument.backfill_contiguous_missing_candles
+        if missing_candles is None and instrument.backfill_gap_windows:
+          missing_candles = sum(window.missing_candles for window in instrument.backfill_gap_windows)
+        if missing_candles and missing_candles > 0:
+          warning_details.append(
+            f"{symbol} has {missing_candles} missing candle(s) across "
+            f"{len(instrument.backfill_gap_windows)} gap window(s)."
+          )
+        if instrument.failure_count_24h > 0:
+          warning_details.append(
+            f"{symbol} recorded {instrument.failure_count_24h} sync failure(s) in the last 24h."
+          )
+        elif instrument.recent_failures:
+          latest_failure = instrument.recent_failures[0]
+          warning_details.append(
+            f"{symbol} last failure was {latest_failure.operation}: {latest_failure.error}."
+          )
+
+      detail_copy = list(dict.fromkeys((*critical_details, *warning_details)))
+      if not detail_copy:
+        continue
+      detected_at = max(detected_candidates) if detected_candidates else current_time
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data:{timeframe}",
+          severity="critical" if critical_details else "warning",
+          category="market_data_freshness",
+          summary=f"Guarded-live market-data freshness policy is degraded for {timeframe}.",
+          detail=(
+            " ".join(detail_copy[:3])
+            + (f" Additional issues: {len(detail_copy) - 3}." if len(detail_copy) > 3 else "")
+          ),
+          detected_at=detected_at,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+    return alerts
+
+  def _resolve_guarded_live_market_data_timeframes(
+    self,
+    *,
+    live_runs: list[RunRecord],
+  ) -> tuple[str, ...]:
+    timeframes = list(self._guarded_live_market_data_timeframes)
+    for run in live_runs:
+      if run.config.timeframe not in timeframes:
+        timeframes.append(run.config.timeframe)
+    return tuple(timeframes or ("5m",))
 
   def _build_guarded_live_incident_events(
     self,
@@ -4936,10 +5079,25 @@ class TradingApplication:
         f"max drawdown {float(max_drawdown_pct):.2f}% breached the "
         f"{self._guarded_live_drawdown_breach_pct:.2f}% guardrail"
       )
+    total_return_pct = run.metrics.get("total_return_pct")
+    if isinstance(total_return_pct, Number) and float(total_return_pct) <= -self._guarded_live_loss_breach_pct:
+      risk_issues.append(
+        f"total return {float(total_return_pct):.2f}% breached the "
+        f"-{self._guarded_live_loss_breach_pct:.2f}% loss guardrail"
+      )
     if latest_equity is not None and latest_equity.cash < -self._guarded_live_balance_tolerance:
       risk_issues.append(
         f"cash balance fell below zero to {latest_equity.cash:.2f}"
       )
+    if latest_equity is not None and latest_equity.equity > self._guarded_live_balance_tolerance:
+      pending_buy_notional = self._estimate_guarded_live_open_buy_notional(run)
+      gross_open_risk = max(latest_equity.exposure, 0.0) + pending_buy_notional
+      gross_open_risk_ratio = gross_open_risk / latest_equity.equity
+      if gross_open_risk_ratio > self._guarded_live_gross_open_risk_ratio:
+        risk_issues.append(
+          f"gross open risk reached {gross_open_risk_ratio:.2f}x equity "
+          f"({gross_open_risk:.2f} notional including {pending_buy_notional:.2f} pending buy notional)"
+        )
     if risk_issues:
       alerts.append(
         OperatorAlert(
@@ -5017,6 +5175,26 @@ class TradingApplication:
           )
         )
     return alerts
+
+  def _estimate_guarded_live_open_buy_notional(self, run: RunRecord) -> float:
+    pending_buy_notional = 0.0
+    for order in run.orders:
+      if order.side != OrderSide.BUY:
+        continue
+      if order.status not in {OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED}:
+        continue
+      remaining_quantity = self._resolve_guarded_live_order_remaining_quantity(order)
+      if remaining_quantity <= self._guarded_live_balance_tolerance:
+        continue
+      reference_price = order.requested_price or order.average_fill_price or 0.0
+      if reference_price <= self._guarded_live_balance_tolerance:
+        continue
+      pending_buy_notional += remaining_quantity * reference_price
+    return pending_buy_notional
+
+  @staticmethod
+  def _symbol_from_instrument_id(instrument_id: str) -> str:
+    return instrument_id.split(":", 1)[1] if ":" in instrument_id else instrument_id
 
   @staticmethod
   def _merge_operator_alert_history(

@@ -6,7 +6,11 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.config import Settings
+from akra_trader.domain.models import GapWindow
+from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import GuardedLiveVenueBalance
@@ -18,6 +22,7 @@ from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import Position
+from akra_trader.domain.models import SyncFailure
 from akra_trader.main import create_app
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 
@@ -45,6 +50,21 @@ class StaticVenueStateAdapter:
 
   def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
     return self._snapshot
+
+
+class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
+  def __init__(self) -> None:
+    super().__init__()
+    self._status_by_timeframe: dict[str, MarketDataStatus] = {}
+
+  def set_status(self, *, timeframe: str, status: MarketDataStatus) -> None:
+    self._status_by_timeframe[timeframe] = status
+
+  def get_status(self, timeframe: str) -> MarketDataStatus:
+    status = self._status_by_timeframe.get(timeframe)
+    if status is not None:
+      return status
+    return super().get_status(timeframe)
 
 
 def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
@@ -1003,6 +1023,124 @@ def test_operator_visibility_endpoint_surfaces_risk_breach_and_live_fault_incide
     incident_events = guarded_live_response.json()["incident_events"]
     assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
     assert any(event["alert_id"].startswith("guarded-live:order-sync:") for event in incident_events)
+
+
+def test_operator_visibility_endpoint_surfaces_market_data_freshness_and_wider_risk_incidents(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    app._market_data = market_data
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 0, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_check"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "pre_live_recovery"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "market_data_risk_visibility",
+      },
+    )
+    assert live_response.status_code == 200
+    run = app.get_run(live_response.json()["config"]["run_id"])
+    assert run is not None
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 0, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 17, 40, tzinfo=UTC),
+            sync_status="stale",
+            lag_seconds=1_200,
+            last_sync_at=datetime(2025, 1, 3, 17, 45, tzinfo=UTC),
+            recent_failures=(
+              SyncFailure(
+                failed_at=datetime(2025, 1, 3, 17, 51, tzinfo=UTC),
+                operation="sync_recent",
+                error="exchange timeout",
+              ),
+            ),
+            failure_count_24h=2,
+            backfill_contiguous_missing_candles=3,
+            backfill_gap_windows=(
+              GapWindow(
+                start_at=datetime(2025, 1, 3, 16, 0, tzinfo=UTC),
+                end_at=datetime(2025, 1, 3, 16, 10, tzinfo=UTC),
+                missing_candles=3,
+              ),
+            ),
+            issues=("lagging", "missing_candles:3"),
+          ),
+        ],
+      ),
+    )
+    run.metrics["total_return_pct"] = -24.0
+    run.orders.append(
+      Order(
+        run_id=run.config.run_id,
+        instrument_id="binance:ETH/USDT",
+        side=OrderSide.BUY,
+        quantity=4.0,
+        requested_price=3_200.0,
+        order_type=OrderType.LIMIT,
+        status=OrderStatus.OPEN,
+        order_id="api-pending-risk-order-1",
+        created_at=datetime(2025, 1, 3, 17, 54, tzinfo=UTC),
+        updated_at=datetime(2025, 1, 3, 17, 54, tzinfo=UTC),
+        last_synced_at=datetime(2025, 1, 3, 17, 59, 30, tzinfo=UTC),
+        remaining_quantity=4.0,
+      )
+    )
+    app._runs.save_run(run)
+
+    visibility_response = client.get("/api/operator/visibility")
+    assert visibility_response.status_code == 200
+    alerts = visibility_response.json()["alerts"]
+    categories = {alert["category"] for alert in alerts if alert.get("source") == "guarded_live"}
+    assert {"market_data_freshness", "risk_breach"} <= categories
+    market_data_alert = next(alert for alert in alerts if alert["category"] == "market_data_freshness")
+    assert "ETH/USDT lagged 1200s." in market_data_alert["detail"]
+    assert "missing candle" in market_data_alert["detail"]
+    risk_alert = next(
+      alert for alert in alerts
+      if alert.get("run_id") == run.config.run_id and alert["category"] == "risk_breach"
+    )
+    assert "total return -24.00%" in risk_alert["detail"]
+    assert "gross open risk reached" in risk_alert["detail"]
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident_events = guarded_live_response.json()["incident_events"]
+    assert any(event["alert_id"] == "guarded-live:market-data:5m" for event in incident_events)
+    assert any(event["alert_id"].startswith("guarded-live:risk-breach:") for event in incident_events)
 
 
 def test_live_endpoints_use_configured_supported_guarded_live_venue(tmp_path: Path) -> None:

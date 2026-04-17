@@ -182,6 +182,7 @@ def build_container(settings: Settings) -> Container:
     freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
     guarded_live_venue=resolve_guarded_live_venue(settings),
     guarded_live_execution_enabled=settings.guarded_live_execution_enabled,
+    market_data_sync_timeframes=settings.market_data_sync_timeframes,
     sandbox_worker_heartbeat_interval_seconds=settings.sandbox_worker_heartbeat_interval_seconds,
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,
     guarded_live_worker_heartbeat_interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,

@@ -355,6 +355,7 @@ def test_build_container_reuses_runs_database_for_binance_market_data(monkeypatc
   assert captured["sandbox_interval_seconds"] == "11"
   assert captured["default_candle_limit"] == "144"
   assert captured["historical_candle_limit"] == "720"
+  assert container.app._guarded_live_market_data_timeframes == ("5m", "1h")
   assert len(container.background_jobs) == 2
 
 
@@ -455,6 +456,7 @@ def test_build_container_supports_non_binance_ccxt_market_data_provider(monkeypa
   assert captured["sync_interval_seconds"] == "90"
   assert captured["venue_state_venue"] == "coinbase"
   assert captured["venue_execution_venue"] == "coinbase"
+  assert container.app._guarded_live_market_data_timeframes == ("5m", "1h")
   assert len(container.background_jobs) == 2
 
 

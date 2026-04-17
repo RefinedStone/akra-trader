@@ -108,8 +108,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   workflow state/reference, external sync timestamps, and paging status from external callbacks
   plus local provider-native workflow actions
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
-  repeated live recovery loops, and stale active-order sync faults instead of only generic runtime
-  control faults
+  repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
+  breaches such as stale sync, gap windows, and repeated sync failures instead of only generic
+  runtime control faults
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -147,8 +148,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   PagerDuty/Opsgenie-native bidirectional paths, richer escalation ladders, richer destinations,
   and more advanced retry policies
 - operator alerts for wider market-data freshness policies and broader risk surfaces beyond the
-  current guarded-live worker-failure, stale-runtime, risk-breach, recovery-loop, and stale
-  order-sync coverage
+  current guarded-live worker-failure, stale-runtime, market-data-freshness, risk-breach,
+  recovery-loop, and stale order-sync coverage
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
 - broader venue-native session continuation beyond Binance multi-stream
   account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline streaming and

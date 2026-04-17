@@ -19,10 +19,13 @@ from akra_trader.application import TradingApplication
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import GapWindow
 from akra_trader.domain.models import GuardedLiveVenueBalance
 from akra_trader.domain.models import GuardedLiveVenueOpenOrder
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
 from akra_trader.domain.models import GuardedLiveVenueStateSnapshot
+from akra_trader.domain.models import InstrumentStatus
+from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import Order
@@ -37,6 +40,7 @@ from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyMetadata
+from akra_trader.domain.models import SyncFailure
 from akra_trader.domain.models import WarmupSpec
 from akra_trader.strategies.base import Strategy
 
@@ -83,6 +87,21 @@ class MutableClock:
 class MutableSeededMarketDataAdapter(SeededMarketDataAdapter):
   def append_candle(self, *, symbol: str, candle: Candle) -> None:
     self._candles[symbol].append(candle)
+
+
+class StatusOverrideSeededMarketDataAdapter(MutableSeededMarketDataAdapter):
+  def __init__(self) -> None:
+    super().__init__()
+    self._status_by_timeframe: dict[str, MarketDataStatus] = {}
+
+  def set_status(self, *, timeframe: str, status: MarketDataStatus) -> None:
+    self._status_by_timeframe[timeframe] = status
+
+  def get_status(self, timeframe: str) -> MarketDataStatus:
+    status = self._status_by_timeframe.get(timeframe)
+    if status is not None:
+      return status
+    return super().get_status(timeframe)
 
 
 class StaticVenueStateAdapter:
@@ -1089,6 +1108,132 @@ def test_operator_visibility_persists_risk_breach_and_live_fault_incidents(
   assert any(
     incident.alert_id.startswith("guarded-live:recovery-loop:")
     for incident in delivery.delivered_incidents
+  )
+
+
+def test_operator_visibility_persists_market_data_freshness_and_wider_risk_incidents(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 14, 0, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter()
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="operator_visibility_market_data_risk",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          recent_failures=(
+            SyncFailure(
+              failed_at=clock.current - timedelta(minutes=9),
+              operation="sync_recent",
+              error="exchange timeout",
+            ),
+          ),
+          failure_count_24h=2,
+          backfill_contiguous_missing_candles=3,
+          backfill_gap_windows=(
+            GapWindow(
+              start_at=clock.current - timedelta(hours=2),
+              end_at=clock.current - timedelta(hours=2) + timedelta(minutes=10),
+              missing_candles=3,
+            ),
+          ),
+          issues=("lagging", "missing_candles:3"),
+        ),
+      ],
+    ),
+  )
+  run.metrics["total_return_pct"] = -24.0
+  run.orders.append(
+    Order(
+      run_id=run.config.run_id,
+      instrument_id="binance:ETH/USDT",
+      side=OrderSide.BUY,
+      quantity=4.0,
+      requested_price=3_200.0,
+      order_type=OrderType.LIMIT,
+      status=OrderStatus.OPEN,
+      order_id="pending-risk-order-1",
+      created_at=clock.current - timedelta(minutes=6),
+      updated_at=clock.current - timedelta(minutes=6),
+      last_synced_at=clock.current - timedelta(seconds=30),
+      remaining_quantity=4.0,
+    )
+  )
+  runs.save_run(run)
+
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  active_categories = {alert.category for alert in visibility.alerts if alert.source == "guarded_live"}
+  assert {"market_data_freshness", "risk_breach"} <= active_categories
+  market_data_alert = next(
+    alert for alert in visibility.alerts
+    if alert.category == "market_data_freshness"
+  )
+  assert "ETH/USDT lagged 1200s." in market_data_alert.detail
+  assert "missing candle" in market_data_alert.detail
+  risk_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "risk_breach"
+  )
+  assert "total return -24.00%" in risk_alert.detail
+  assert "gross open risk reached" in risk_alert.detail
+  assert any(
+    event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    event.kind == "incident_opened" and event.alert_id.startswith("guarded-live:risk-breach:")
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    record.alert_id == "guarded-live:market-data:5m"
+    for record in guarded_live_status.delivery_history
   )
 
 
