@@ -673,6 +673,10 @@ class GuardedLiveVenueSessionHandoff:
   order_book_state: str = "inactive"
   order_book_last_update_id: int | None = None
   order_book_gap_count: int = 0
+  order_book_rebuild_count: int = 0
+  order_book_last_rebuilt_at: datetime | None = None
+  order_book_bid_level_count: int = 0
+  order_book_ask_level_count: int = 0
   order_book_best_bid_price: float | None = None
   order_book_best_bid_quantity: float | None = None
   order_book_best_ask_price: float | None = None

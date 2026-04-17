@@ -477,6 +477,10 @@ type GuardedLiveStatus = {
     order_book_state: string;
     order_book_last_update_id?: number | null;
     order_book_gap_count: number;
+    order_book_rebuild_count: number;
+    order_book_last_rebuilt_at?: string | null;
+    order_book_bid_level_count: number;
+    order_book_ask_level_count: number;
     order_book_best_bid_price?: number | null;
     order_book_best_bid_quantity?: number | null;
     order_book_best_ask_price?: number | null;
@@ -2274,6 +2278,22 @@ export default function App() {
                       <tr>
                         <th>Depth gap count</th>
                         <td>{guardedLive.session_handoff.order_book_gap_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Rebuild count</th>
+                        <td>{guardedLive.session_handoff.order_book_rebuild_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Last rebuilt at</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.order_book_last_rebuilt_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Bid levels</th>
+                        <td>{guardedLive.session_handoff.order_book_bid_level_count}</td>
+                      </tr>
+                      <tr>
+                        <th>Ask levels</th>
+                        <td>{guardedLive.session_handoff.order_book_ask_level_count}</td>
                       </tr>
                       <tr>
                         <th>Best bid</th>

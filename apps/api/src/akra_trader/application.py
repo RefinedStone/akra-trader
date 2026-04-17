@@ -2983,6 +2983,10 @@ class TradingApplication:
         detail += f"; depth_update_id={next_handoff.order_book_last_update_id}"
       if next_handoff.order_book_gap_count > 0:
         detail += f"; depth_gaps={next_handoff.order_book_gap_count}"
+      if next_handoff.order_book_rebuild_count > 0:
+        detail += f"; depth_rebuilds={next_handoff.order_book_rebuild_count}"
+      if next_handoff.order_book_last_rebuilt_at is not None:
+        detail += f"; last_depth_rebuild={next_handoff.order_book_last_rebuilt_at.isoformat()}"
       if session_sync.issues:
         detail += f"; issues={', '.join(session_sync.issues)}"
       run.notes.append(

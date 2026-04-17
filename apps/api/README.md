@@ -40,8 +40,8 @@ Implemented now:
 - Binance guarded-live session supervision now fails over to a fresh listen-key stream when the
   venue session drops, and the control plane tracks broader stream coverage across execution,
   account-position, balance-update, order-list, trade-tick, aggregate-trade, book-ticker,
-  mini-ticker, depth, and kline events while recording order-book resync state and top-of-book
-  levels
+  mini-ticker, depth, and kline events while rebuilding a local book from full depth snapshots and
+  recording order-book resync state, rebuild counts, and top-of-book levels
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -148,7 +148,8 @@ Defaults:
 - guarded-live session handoff state now tracks supervision health, failover count, and the latest
   market, depth, kline, aggregate-trade, mini-ticker, account-position, balance-update,
   order-list, trade-tick, and book-ticker event timestamps from the Binance push session, along
-  with order-book state, depth sequence, and top-of-book levels
+  with order-book state, depth sequence, snapshot rebuild timing/counts, level counts, and
+  top-of-book levels
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

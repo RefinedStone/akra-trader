@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import json
 from queue import Empty
 from queue import Queue
@@ -35,6 +36,38 @@ class BinanceVenueStreamSession(Protocol):
 
 class BinanceVenueStreamClient(Protocol):
   def open_session(self) -> BinanceVenueStreamSession: ...
+
+
+@dataclass
+class LocalOrderBookState:
+  symbol: str
+  last_update_id: int | None
+  rebuilt_at: datetime
+  rebuild_count: int
+  bids: dict[float, float]
+  asks: dict[float, float]
+
+  @property
+  def bid_level_count(self) -> int:
+    return len(self.bids)
+
+  @property
+  def ask_level_count(self) -> int:
+    return len(self.asks)
+
+  @property
+  def best_bid(self) -> tuple[float | None, float | None]:
+    if not self.bids:
+      return None, None
+    price = max(self.bids)
+    return price, self.bids[price]
+
+  @property
+  def best_ask(self) -> tuple[float | None, float | None]:
+    if not self.asks:
+      return None, None
+    price = min(self.asks)
+    return price, self.asks[price]
 
 
 class BinanceWebSocketUserDataStreamSession:
@@ -481,6 +514,13 @@ class VenueExecutionExchange(Protocol):
 
   def fetch_open_orders(self, symbol: str | None = None) -> list[dict[str, Any]]: ...
 
+  def fetch_order_book(
+    self,
+    symbol: str,
+    limit: int | None = None,
+    params: dict[str, Any] | None = None,
+  ) -> dict[str, Any]: ...
+
   def fetch_closed_orders(
     self,
     symbol: str | None = None,
@@ -661,6 +701,10 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       order_book_state=existing.order_book_state or handoff.order_book_state or "synthetic",
       order_book_last_update_id=existing.order_book_last_update_id or handoff.order_book_last_update_id,
       order_book_gap_count=existing.order_book_gap_count or handoff.order_book_gap_count,
+      order_book_rebuild_count=existing.order_book_rebuild_count or handoff.order_book_rebuild_count,
+      order_book_last_rebuilt_at=existing.order_book_last_rebuilt_at or handoff.order_book_last_rebuilt_at,
+      order_book_bid_level_count=existing.order_book_bid_level_count or handoff.order_book_bid_level_count,
+      order_book_ask_level_count=existing.order_book_ask_level_count or handoff.order_book_ask_level_count,
       order_book_best_bid_price=existing.order_book_best_bid_price or handoff.order_book_best_bid_price,
       order_book_best_bid_quantity=existing.order_book_best_bid_quantity or handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=existing.order_book_best_ask_price or handoff.order_book_best_ask_price,
@@ -720,6 +764,10 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       order_book_state="released",
       order_book_last_update_id=handoff.order_book_last_update_id,
       order_book_gap_count=handoff.order_book_gap_count,
+      order_book_rebuild_count=handoff.order_book_rebuild_count,
+      order_book_last_rebuilt_at=handoff.order_book_last_rebuilt_at,
+      order_book_bid_level_count=handoff.order_book_bid_level_count,
+      order_book_ask_level_count=handoff.order_book_ask_level_count,
       order_book_best_bid_price=handoff.order_book_best_bid_price,
       order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=handoff.order_book_best_ask_price,
@@ -992,6 +1040,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self._venue_stream_client = venue_stream_client
     self._active_stream_sessions: dict[str, BinanceVenueStreamSession] = {}
     self._order_states: dict[str, GuardedLiveVenueOrderResult] = {}
+    self._local_order_books: dict[str, LocalOrderBookState] = {}
 
   def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
     issues: list[str] = []
@@ -1141,6 +1190,18 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       )
     session_id = stream_session.session_id
     self._active_stream_sessions[session_id] = stream_session
+    order_book_key = self._resolve_order_book_key(
+      owner_run_id=owner_run_id,
+      owner_session_id=owner_session_id,
+      session_id=session_id,
+      symbol=symbol,
+    )
+    rebuild = self._rebuild_local_order_book_from_snapshot(
+      symbol=symbol,
+      order_book_key=order_book_key,
+      rebuild_count=0,
+      reason="handoff",
+    )
     return GuardedLiveVenueSessionHandoff(
       state="active",
       handed_off_at=current_time,
@@ -1156,10 +1217,20 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       last_event_at=restore.restored_at,
       last_sync_at=current_time,
       supervision_state="streaming",
-      order_book_state="awaiting_depth",
+      order_book_state=str(rebuild["state"]),
+      order_book_last_update_id=rebuild["last_update_id"],
+      order_book_gap_count=0,
+      order_book_rebuild_count=rebuild["rebuild_count"],
+      order_book_last_rebuilt_at=rebuild["rebuilt_at"],
+      order_book_bid_level_count=rebuild["bid_level_count"],
+      order_book_ask_level_count=rebuild["ask_level_count"],
+      order_book_best_bid_price=rebuild["best_bid_price"],
+      order_book_best_bid_quantity=rebuild["best_bid_quantity"],
+      order_book_best_ask_price=rebuild["best_ask_price"],
+      order_book_best_ask_quantity=rebuild["best_ask_quantity"],
       coverage=BINANCE_VENUE_STREAM_COVERAGE,
       active_order_count=len(restore.open_orders),
-      issues=restore.issues,
+      issues=tuple(dict.fromkeys((*restore.issues, *tuple(rebuild["issues"])))),
     )
 
   def sync_session(
@@ -1170,7 +1241,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> GuardedLiveVenueSessionSync:
     current_time = self._clock()
     session_id = handoff.venue_session_id or ""
+    order_book_key = self._resolve_order_book_key(
+      owner_run_id=handoff.owner_run_id,
+      owner_session_id=handoff.owner_session_id,
+      session_id=session_id,
+      symbol=handoff.symbol,
+    )
     stream_session = self._active_stream_sessions.get(session_id)
+    local_book = self._local_order_books.get(order_book_key)
     issues: list[str] = self._filter_venue_stream_issues(handoff.issues)
     supervision_state = "streaming" if handoff.state != "released" else "released"
     failover_count = handoff.failover_count
@@ -1179,6 +1257,10 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     order_book_state = handoff.order_book_state or "awaiting_depth"
     order_book_last_update_id = handoff.order_book_last_update_id
     order_book_gap_count = handoff.order_book_gap_count
+    order_book_rebuild_count = handoff.order_book_rebuild_count
+    order_book_last_rebuilt_at = handoff.order_book_last_rebuilt_at
+    order_book_bid_level_count = handoff.order_book_bid_level_count
+    order_book_ask_level_count = handoff.order_book_ask_level_count
     order_book_best_bid_price = handoff.order_book_best_bid_price
     order_book_best_bid_quantity = handoff.order_book_best_bid_quantity
     order_book_best_ask_price = handoff.order_book_best_ask_price
@@ -1195,6 +1277,25 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     last_trade_event_at = handoff.last_trade_event_at
     last_book_ticker_event_at = handoff.last_book_ticker_event_at
     event_count = 0
+    if local_book is None and handoff.state != "released":
+      rebuild = self._rebuild_local_order_book_from_snapshot(
+        symbol=handoff.symbol or "",
+        order_book_key=order_book_key,
+        rebuild_count=order_book_rebuild_count,
+        reason="local_book_missing",
+      )
+      local_book = rebuild["book"]
+      order_book_state = str(rebuild["state"])
+      order_book_last_update_id = rebuild["last_update_id"]
+      order_book_rebuild_count = rebuild["rebuild_count"]
+      order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+      order_book_bid_level_count = rebuild["bid_level_count"]
+      order_book_ask_level_count = rebuild["ask_level_count"]
+      order_book_best_bid_price = rebuild["best_bid_price"]
+      order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+      order_book_best_ask_price = rebuild["best_ask_price"]
+      order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+      issues.extend(tuple(rebuild["issues"]))
     if stream_session is None and handoff.state != "released":
       failover = self._failover_stream_session(
         session_id=session_id,
@@ -1212,9 +1313,25 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         session_id = stream_session.session_id
         failover_count += 1
         last_failover_at = current_time
-        order_book_state = "resync_required"
         order_book_gap_count += 1
-        issues.append("binance_order_book_resync_required:session_missing")
+        rebuild = self._rebuild_local_order_book_from_snapshot(
+          symbol=handoff.symbol or "",
+          order_book_key=order_book_key,
+          rebuild_count=order_book_rebuild_count,
+          reason="session_missing",
+        )
+        local_book = rebuild["book"]
+        order_book_state = str(rebuild["state"])
+        order_book_last_update_id = rebuild["last_update_id"]
+        order_book_rebuild_count = rebuild["rebuild_count"]
+        order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+        order_book_bid_level_count = rebuild["bid_level_count"]
+        order_book_ask_level_count = rebuild["ask_level_count"]
+        order_book_best_bid_price = rebuild["best_bid_price"]
+        order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+        order_book_best_ask_price = rebuild["best_ask_price"]
+        order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+        issues.extend(tuple(rebuild["issues"]))
         event_count += 1
 
     events = stream_session.drain_events() if stream_session is not None else ()
@@ -1289,37 +1406,81 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         depth_first_update_id = _coerce_int(event.get("U"))
         depth_last_update_id = _coerce_int(event.get("u"))
         depth_previous_update_id = _coerce_int(event.get("pu"))
-        depth_bid_price, depth_bid_quantity = _coerce_first_depth_level(event.get("b"))
-        depth_ask_price, depth_ask_quantity = _coerce_first_depth_level(event.get("a"))
-        if depth_bid_price is not None:
-          order_book_best_bid_price = depth_bid_price
-        if depth_bid_quantity is not None:
-          order_book_best_bid_quantity = depth_bid_quantity
-        if depth_ask_price is not None:
-          order_book_best_ask_price = depth_ask_price
-        if depth_ask_quantity is not None:
-          order_book_best_ask_quantity = depth_ask_quantity
-        gap_detected = False
-        if order_book_last_update_id is not None:
-          if depth_previous_update_id is not None and depth_previous_update_id != order_book_last_update_id:
-            gap_detected = True
-          elif (
-            depth_first_update_id is not None
-            and depth_first_update_id > (order_book_last_update_id + 1)
-          ):
-            gap_detected = True
-        if gap_detected:
-          order_book_state = "resync_required"
+        depth_bids = _coerce_depth_levels(event.get("b"))
+        depth_asks = _coerce_depth_levels(event.get("a"))
+        if local_book is None:
+          rebuild = self._rebuild_local_order_book_from_snapshot(
+            symbol=handoff.symbol or "",
+            order_book_key=order_book_key,
+            rebuild_count=order_book_rebuild_count,
+            reason="depth_without_local_book",
+          )
+          local_book = rebuild["book"]
+          order_book_state = str(rebuild["state"])
+          order_book_last_update_id = rebuild["last_update_id"]
+          order_book_rebuild_count = rebuild["rebuild_count"]
+          order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+          order_book_bid_level_count = rebuild["bid_level_count"]
+          order_book_ask_level_count = rebuild["ask_level_count"]
+          order_book_best_bid_price = rebuild["best_bid_price"]
+          order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+          order_book_best_ask_price = rebuild["best_ask_price"]
+          order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+          issues.extend(tuple(rebuild["issues"]))
+        if local_book is not None and depth_last_update_id is not None and local_book.last_update_id is not None:
+          if depth_last_update_id <= local_book.last_update_id:
+            event_count += 1
+            last_event_at = event_at
+            continue
+        continuity_ok = _depth_event_matches_local_book(
+          book=local_book,
+          first_update_id=depth_first_update_id,
+          last_update_id=depth_last_update_id,
+          previous_update_id=depth_previous_update_id,
+        )
+        if local_book is None or not continuity_ok:
           order_book_gap_count += 1
           issues.append(
             "binance_order_book_gap_detected:"
             f"{order_book_last_update_id or 'none'}:"
             f"{depth_previous_update_id or depth_first_update_id or 'none'}"
           )
-        elif order_book_state not in {"resync_required", "released", "unavailable"}:
-          order_book_state = "streaming"
-        if depth_last_update_id is not None:
-          order_book_last_update_id = depth_last_update_id
+          rebuild = self._rebuild_local_order_book_from_snapshot(
+            symbol=handoff.symbol or "",
+            order_book_key=order_book_key,
+            rebuild_count=order_book_rebuild_count,
+            reason="depth_gap",
+          )
+          local_book = rebuild["book"]
+          order_book_state = str(rebuild["state"])
+          order_book_last_update_id = rebuild["last_update_id"]
+          order_book_rebuild_count = rebuild["rebuild_count"]
+          order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+          order_book_bid_level_count = rebuild["bid_level_count"]
+          order_book_ask_level_count = rebuild["ask_level_count"]
+          order_book_best_bid_price = rebuild["best_bid_price"]
+          order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+          order_book_best_ask_price = rebuild["best_ask_price"]
+          order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+          issues.extend(tuple(rebuild["issues"]))
+          event_count += 1
+          last_event_at = event_at
+          continue
+        local_book = self._apply_depth_update_to_local_book(
+          book=local_book,
+          last_update_id=depth_last_update_id,
+          bids=depth_bids,
+          asks=depth_asks,
+        )
+        self._local_order_books[order_book_key] = local_book
+        order_book_state = "streaming"
+        order_book_last_update_id = local_book.last_update_id
+        order_book_rebuild_count = local_book.rebuild_count
+        order_book_last_rebuilt_at = local_book.rebuilt_at
+        order_book_bid_level_count = local_book.bid_level_count
+        order_book_ask_level_count = local_book.ask_level_count
+        order_book_best_bid_price, order_book_best_bid_quantity = local_book.best_bid
+        order_book_best_ask_price, order_book_best_ask_quantity = local_book.best_ask
         event_count += 1
         last_event_at = event_at
         continue
@@ -1356,9 +1517,25 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         session_id = stream_session.session_id
         failover_count += 1
         last_failover_at = current_time
-        order_book_state = "resync_required"
         order_book_gap_count += 1
-        issues.append(f"binance_order_book_resync_required:{failover_reason}")
+        rebuild = self._rebuild_local_order_book_from_snapshot(
+          symbol=handoff.symbol or "",
+          order_book_key=order_book_key,
+          rebuild_count=order_book_rebuild_count,
+          reason=failover_reason,
+        )
+        local_book = rebuild["book"]
+        order_book_state = str(rebuild["state"])
+        order_book_last_update_id = rebuild["last_update_id"]
+        order_book_rebuild_count = rebuild["rebuild_count"]
+        order_book_last_rebuilt_at = rebuild["rebuilt_at"]
+        order_book_bid_level_count = rebuild["bid_level_count"]
+        order_book_ask_level_count = rebuild["ask_level_count"]
+        order_book_best_bid_price = rebuild["best_bid_price"]
+        order_book_best_bid_quantity = rebuild["best_bid_quantity"]
+        order_book_best_ask_price = rebuild["best_ask_price"]
+        order_book_best_ask_quantity = rebuild["best_ask_quantity"]
+        issues.extend(tuple(rebuild["issues"]))
         event_count += 1
 
     synced_orders = tuple(self._build_synced_orders_from_state(symbol=handoff.symbol or "", order_ids=order_ids))
@@ -1394,6 +1571,10 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       ),
       order_book_last_update_id=order_book_last_update_id,
       order_book_gap_count=order_book_gap_count,
+      order_book_rebuild_count=order_book_rebuild_count,
+      order_book_last_rebuilt_at=order_book_last_rebuilt_at,
+      order_book_bid_level_count=order_book_bid_level_count,
+      order_book_ask_level_count=order_book_ask_level_count,
       order_book_best_bid_price=order_book_best_bid_price,
       order_book_best_bid_quantity=order_book_best_bid_quantity,
       order_book_best_ask_price=order_book_best_ask_price,
@@ -1430,7 +1611,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> GuardedLiveVenueSessionHandoff:
     current_time = self._clock()
     session_id = handoff.venue_session_id or ""
+    order_book_key = self._resolve_order_book_key(
+      owner_run_id=handoff.owner_run_id,
+      owner_session_id=handoff.owner_session_id,
+      session_id=session_id,
+      symbol=handoff.symbol,
+    )
     stream_session = self._active_stream_sessions.pop(session_id, None)
+    self._local_order_books.pop(order_book_key, None)
     issues: tuple[str, ...] = handoff.issues
     if stream_session is not None:
       try:
@@ -1456,6 +1644,10 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       order_book_state="released",
       order_book_last_update_id=handoff.order_book_last_update_id,
       order_book_gap_count=handoff.order_book_gap_count,
+      order_book_rebuild_count=handoff.order_book_rebuild_count,
+      order_book_last_rebuilt_at=handoff.order_book_last_rebuilt_at,
+      order_book_bid_level_count=handoff.order_book_bid_level_count,
+      order_book_ask_level_count=handoff.order_book_ask_level_count,
       order_book_best_bid_price=handoff.order_book_best_bid_price,
       order_book_best_bid_quantity=handoff.order_book_best_bid_quantity,
       order_book_best_ask_price=handoff.order_book_best_ask_price,
@@ -1657,6 +1849,104 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       "session": replacement,
       "issues": tuple(dict.fromkeys(issues)),
     }
+
+  @staticmethod
+  def _resolve_order_book_key(
+    *,
+    owner_run_id: str | None,
+    owner_session_id: str | None,
+    session_id: str | None,
+    symbol: str | None,
+  ) -> str:
+    return owner_run_id or owner_session_id or session_id or symbol or "guarded-live-order-book"
+
+  def _rebuild_local_order_book_from_snapshot(
+    self,
+    *,
+    symbol: str,
+    order_book_key: str,
+    rebuild_count: int,
+    reason: str,
+  ) -> dict[str, object]:
+    current_time = self._clock()
+    if not symbol:
+      return {
+        "book": None,
+        "state": "rebuild_failed",
+        "issues": ("binance_order_book_snapshot_failed:missing_symbol",),
+        "last_update_id": None,
+        "rebuild_count": rebuild_count,
+        "rebuilt_at": None,
+        "bid_level_count": 0,
+        "ask_level_count": 0,
+        "best_bid_price": None,
+        "best_bid_quantity": None,
+        "best_ask_price": None,
+        "best_ask_quantity": None,
+      }
+    try:
+      exchange = self._resolve_exchange()
+      snapshot = exchange.fetch_order_book(symbol, 20, {})
+      book = _build_local_order_book_from_snapshot_row(
+        symbol=symbol,
+        row=snapshot,
+        rebuilt_at=current_time,
+        rebuild_count=rebuild_count + 1,
+      )
+    except Exception as exc:
+      return {
+        "book": None,
+        "state": "rebuild_failed",
+        "issues": (f"binance_order_book_snapshot_failed:{reason}:{exc}",),
+        "last_update_id": None,
+        "rebuild_count": rebuild_count,
+        "rebuilt_at": None,
+        "bid_level_count": 0,
+        "ask_level_count": 0,
+        "best_bid_price": None,
+        "best_bid_quantity": None,
+        "best_ask_price": None,
+        "best_ask_quantity": None,
+      }
+    self._local_order_books[order_book_key] = book
+    best_bid_price, best_bid_quantity = book.best_bid
+    best_ask_price, best_ask_quantity = book.best_ask
+    return {
+      "book": book,
+      "state": "snapshot_rebuilt",
+      "issues": (),
+      "last_update_id": book.last_update_id,
+      "rebuild_count": book.rebuild_count,
+      "rebuilt_at": book.rebuilt_at,
+      "bid_level_count": book.bid_level_count,
+      "ask_level_count": book.ask_level_count,
+      "best_bid_price": best_bid_price,
+      "best_bid_quantity": best_bid_quantity,
+      "best_ask_price": best_ask_price,
+      "best_ask_quantity": best_ask_quantity,
+    }
+
+  @staticmethod
+  def _apply_depth_update_to_local_book(
+    *,
+    book: LocalOrderBookState,
+    last_update_id: int | None,
+    bids: tuple[tuple[float, float], ...],
+    asks: tuple[tuple[float, float], ...],
+  ) -> LocalOrderBookState:
+    for price, quantity in bids:
+      if quantity <= 0:
+        book.bids.pop(price, None)
+      else:
+        book.bids[price] = quantity
+    for price, quantity in asks:
+      if quantity <= 0:
+        book.asks.pop(price, None)
+      else:
+        book.asks[price] = quantity
+    if last_update_id is not None:
+      book.last_update_id = last_update_id
+    return book
 
   @staticmethod
   def _filter_venue_stream_issues(issues: tuple[str, ...]) -> list[str]:
@@ -1980,3 +2270,60 @@ def _coerce_first_depth_level(value: Any) -> tuple[float | None, float | None]:
   if not isinstance(first_level, (list, tuple)) or len(first_level) < 2:
     return None, None
   return _coerce_float(first_level[0]), _coerce_float(first_level[1])
+
+
+def _coerce_depth_levels(value: Any) -> tuple[tuple[float, float], ...]:
+  if not isinstance(value, list):
+    return ()
+  levels: list[tuple[float, float]] = []
+  for item in value:
+    if not isinstance(item, (list, tuple)) or len(item) < 2:
+      continue
+    price = _coerce_float(item[0])
+    quantity = _coerce_float(item[1])
+    if price is None or quantity is None:
+      continue
+    levels.append((price, quantity))
+  return tuple(levels)
+
+
+def _depth_event_matches_local_book(
+  *,
+  book: LocalOrderBookState | None,
+  first_update_id: int | None,
+  last_update_id: int | None,
+  previous_update_id: int | None,
+) -> bool:
+  if book is None or book.last_update_id is None:
+    return False
+  if last_update_id is not None and last_update_id <= book.last_update_id:
+    return True
+  if previous_update_id is not None:
+    return previous_update_id == book.last_update_id
+  if first_update_id is None or last_update_id is None:
+    return False
+  return first_update_id <= (book.last_update_id + 1) <= last_update_id
+
+
+def _build_local_order_book_from_snapshot_row(
+  *,
+  symbol: str,
+  row: dict[str, Any],
+  rebuilt_at: datetime,
+  rebuild_count: int,
+) -> LocalOrderBookState:
+  bids = {price: quantity for price, quantity in _coerce_depth_levels(row.get("bids")) if quantity > 0}
+  asks = {price: quantity for price, quantity in _coerce_depth_levels(row.get("asks")) if quantity > 0}
+  last_update_id = (
+    _coerce_int(_extract_nested_value(row, ("info", "lastUpdateId")))
+    or _coerce_int(row.get("nonce"))
+    or _coerce_int(row.get("lastUpdateId"))
+  )
+  return LocalOrderBookState(
+    symbol=symbol,
+    last_update_id=last_update_id,
+    rebuilt_at=rebuilt_at,
+    rebuild_count=rebuild_count,
+    bids=bids,
+    asks=asks,
+  )

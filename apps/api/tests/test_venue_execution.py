@@ -51,8 +51,14 @@ class FakeWebSocketConnection:
 
 
 class FakeExecutionExchange:
-  def __init__(self, *, fetch_rows: list[dict[str, object]]) -> None:
+  def __init__(
+    self,
+    *,
+    fetch_rows: list[dict[str, object]],
+    order_books: list[dict[str, object]] | None = None,
+  ) -> None:
     self._fetch_rows = fetch_rows
+    self._order_books = list(order_books or [])
 
   def create_order(self, symbol, type, side, amount, price=None, params=None) -> dict[str, object]:
     raise AssertionError("create_order should not be called in this test")
@@ -65,6 +71,13 @@ class FakeExecutionExchange:
 
   def fetch_open_orders(self, symbol=None) -> list[dict[str, object]]:
     return []
+
+  def fetch_order_book(self, symbol, limit=None, params=None) -> dict[str, object]:
+    if not self._order_books:
+      raise AssertionError("fetch_order_book called without a prepared snapshot")
+    if len(self._order_books) == 1:
+      return dict(self._order_books[0])
+    return dict(self._order_books.pop(0))
 
   def fetch_closed_orders(self, symbol=None, since=None, limit=None, params=None) -> list[dict[str, object]]:
     return []
@@ -289,7 +302,19 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
         "timestamp": int(current_time.timestamp() * 1000),
         "lastTradeTimestamp": int(current_time.timestamp() * 1000),
       }
-    ]
+    ],
+    order_books=[
+      {
+        "nonce": 100,
+        "bids": [[2498.8, 0.75], [2498.7, 0.65]],
+        "asks": [[2501.2, 0.85], [2501.3, 0.95]],
+      },
+      {
+        "nonce": 101,
+        "bids": [[2499.1, 0.90], [2499.0, 0.70]],
+        "asks": [[2500.9, 0.80], [2501.0, 1.05]],
+      },
+    ],
   )
   first_stream_session = FakeStreamSession("listen-key-1")
   second_stream_session = FakeStreamSession("listen-key-2")
@@ -328,7 +353,13 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     "order_book_lifecycle",
   )
   assert handoff.active_order_count == 1
-  assert handoff.order_book_state == "awaiting_depth"
+  assert handoff.order_book_state == "snapshot_rebuilt"
+  assert handoff.order_book_last_update_id == 100
+  assert handoff.order_book_rebuild_count == 1
+  assert handoff.order_book_bid_level_count == 2
+  assert handoff.order_book_ask_level_count == 2
+  assert handoff.order_book_best_bid_price == 2498.8
+  assert handoff.order_book_best_ask_price == 2501.2
   assert stream_client.open_count == 1
 
   clock.advance(timedelta(minutes=1))
@@ -369,6 +400,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert first_sync.handoff.active_order_count == 1
   assert first_sync.handoff.supervision_state == "streaming"
   assert first_sync.handoff.failover_count == 1
+  assert first_sync.handoff.order_book_state == "snapshot_rebuilt"
+  assert first_sync.handoff.order_book_last_update_id == 101
+  assert first_sync.handoff.order_book_rebuild_count == 2
   assert first_sync.handoff.last_failover_at == clock()
   assert first_sync.handoff.last_account_event_at == clock()
   assert first_sync.synced_orders[0].status == "partially_filled"
@@ -417,8 +451,9 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     {
       "e": "depthUpdate",
       "E": int(clock().timestamp() * 1000),
-      "U": 101,
-      "u": 102,
+      "U": 102,
+      "u": 103,
+      "pu": 101,
       "b": [["2499.4", "1.25"]],
       "a": [["2500.6", "0.95"]],
     }
@@ -460,9 +495,10 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
 
   assert second_sync.handoff.cursor == "event-13"
   assert second_sync.handoff.active_order_count == 0
-  assert second_sync.handoff.order_book_state == "resync_required"
-  assert second_sync.handoff.order_book_last_update_id == 102
+  assert second_sync.handoff.order_book_state == "streaming"
+  assert second_sync.handoff.order_book_last_update_id == 103
   assert second_sync.handoff.order_book_gap_count == 1
+  assert second_sync.handoff.order_book_rebuild_count == 2
   assert second_sync.handoff.order_book_best_bid_price == 2499.4
   assert second_sync.handoff.order_book_best_bid_quantity == 1.25
   assert second_sync.handoff.order_book_best_ask_price == 2500.6
@@ -487,10 +523,24 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   assert second_stream_session.closed is True
 
 
-def test_binance_adapter_marks_order_book_resync_required_on_depth_sequence_gap() -> None:
+def test_binance_adapter_rebuilds_local_book_from_snapshot_on_depth_sequence_gap() -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)
-  exchange = FakeExecutionExchange(fetch_rows=[])
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 20,
+        "bids": [[2498.0, 0.50], [2497.9, 0.40]],
+        "asks": [[2498.8, 0.45], [2498.9, 0.60]],
+      },
+      {
+        "nonce": 34,
+        "bids": [[2497.3, 0.95], [2497.1, 0.55]],
+        "asks": [[2498.2, 0.72], [2498.5, 0.68]],
+      },
+    ],
+  )
   stream_session = FakeStreamSession("listen-key-gap")
   stream_client = FakeStreamClient(stream_session)
   adapter = BinanceVenueExecutionAdapter(
@@ -534,11 +584,17 @@ def test_binance_adapter_marks_order_book_resync_required_on_depth_sequence_gap(
   )
   second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=())
 
+  assert handoff.order_book_state == "snapshot_rebuilt"
+  assert handoff.order_book_last_update_id == 20
+  assert handoff.order_book_rebuild_count == 1
   assert first_sync.handoff.order_book_state == "streaming"
   assert first_sync.handoff.order_book_last_update_id == 25
-  assert second_sync.handoff.order_book_state == "resync_required"
+  assert second_sync.handoff.order_book_state == "snapshot_rebuilt"
   assert second_sync.handoff.order_book_gap_count == 1
   assert second_sync.handoff.order_book_last_update_id == 34
-  assert second_sync.handoff.order_book_best_bid_price == 2497.5
-  assert second_sync.handoff.order_book_best_ask_price == 2498.4
+  assert second_sync.handoff.order_book_rebuild_count == 2
+  assert second_sync.handoff.order_book_bid_level_count == 2
+  assert second_sync.handoff.order_book_ask_level_count == 2
+  assert second_sync.handoff.order_book_best_bid_price == 2497.3
+  assert second_sync.handoff.order_book_best_ask_price == 2498.2
   assert "binance_order_book_gap_detected:25:29" in second_sync.handoff.issues

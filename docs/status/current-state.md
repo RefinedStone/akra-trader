@@ -64,8 +64,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   venue-push multi-stream websocket transport for that handoff
 - Binance push-session supervision now performs automatic listen-key failover and records broader
   account-position, balance-update, order-list, trade-tick, aggregate-trade, book-ticker,
-  mini-ticker, depth, and kline coverage alongside execution events, order-book resync state, and
-  top-of-book levels
+  mini-ticker, depth, and kline coverage alongside execution events, full depth snapshot rebuilds,
+  order-book resync state, rebuild counts, and top-of-book levels
 
 ### Control room
 
@@ -82,8 +82,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
   live-owner visibility, venue-native session-restore state, durable order-book visibility,
   venue session handoff supervision/failover coverage plus market/depth/kline event visibility,
-  order-book resync state, top-of-book visibility, guarded-live resume controls, and guarded-live
-  audit history
+  order-book resync state, snapshot rebuild visibility, top-of-book visibility, guarded-live
+  resume controls, and guarded-live audit history
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
