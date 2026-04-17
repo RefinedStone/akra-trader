@@ -46,8 +46,9 @@ Implemented now:
   continuation snapshots for trade, aggregate-trade, book-ticker, mini-ticker, and kline state
 - guarded-live session handoff can now widen beyond Binance-native continuation into push-native
   market transports: Binance falls back to its public market websocket when user-data auth is not
-  available, and Coinbase Advanced Trade can supply public heartbeat/ticker/trade/level2/candle
-  continuation through the same handoff surface
+  available, Coinbase Advanced Trade can supply public heartbeat/ticker/trade/level2/candle
+  continuation, and Kraken spot can supply public heartbeat/ticker/trade/book/ohlc continuation
+  through the same handoff surface
 - reference catalog and Freqtrade-backed NFI backtest delegation
 
 Not implemented yet:
@@ -159,7 +160,8 @@ Defaults:
   channel snapshots, and top-of-book levels
 - if Binance-native user-data streaming is unavailable, guarded-live can now continue on the
   Binance public market websocket, and the same handoff model also supports Coinbase Advanced
-  Trade public market channels for heartbeat/ticker/trade/level2/candle continuation
+  Trade and Kraken spot public market channels for heartbeat/ticker/trade plus level2/book and
+  candle/ohlc continuation
 - paper runs now start from the latest simulated market snapshot instead of sharing the sandbox
   worker-session path
 - reference strategies are supported for backtest delegation only

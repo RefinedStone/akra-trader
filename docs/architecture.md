@@ -157,9 +157,9 @@ order-book resync state, full depth snapshot rebuilds, full recovered bid/ask le
 channel restore state from exchange ticker/trade/ohlcv snapshots, persisted market-channel
 continuation snapshots for trade/aggregate-trade/book-ticker/mini-ticker/kline state, and
 top-of-book levels. When Binance user-data streaming is unavailable, the guarded-live adapter can
-continue on Binance's public market websocket, and the same handoff model now supports Coinbase
-Advanced Trade public market channels so multi-venue push-native continuation persists with
-explicit transport ownership metadata.
+  continue on Binance's public market websocket, and the same handoff model now supports Coinbase
+  Advanced Trade plus Kraken spot public market channels so multi-venue push-native continuation
+  persists with explicit transport ownership metadata.
 
 ## Modes
 
@@ -197,9 +197,9 @@ explicit transport ownership metadata.
   recovery, exchange-snapshot channel restore for ticker/trade/ohlcv state, and persisted market
   channel continuation snapshots for broader restart continuity
 - guarded-live can now widen beyond the Binance-native stream into push-native market transports,
-  using Binance public market websockets or Coinbase Advanced Trade public heartbeats/ticker/trade/
-  level2/candles while preserving venue transport ownership and continuation state across handoff
-  and sync
+  using Binance public market websockets, Coinbase Advanced Trade public heartbeats/ticker/trade/
+  level2/candles, or Kraken spot public heartbeat/ticker/trade/book/ohlc streams while preserving
+  venue transport ownership and continuation state across handoff and sync
 
 ## Control Room
 

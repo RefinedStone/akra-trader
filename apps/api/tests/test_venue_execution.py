@@ -13,6 +13,7 @@ from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
 from akra_trader.adapters.venue_execution import COINBASE_ADVANCED_TRADE_MARKET_STREAM_COVERAGE
 from akra_trader.adapters.venue_execution import BinanceWebSocketMarketStreamClient
 from akra_trader.adapters.venue_execution import BinanceWebSocketUserDataStreamClient
+from akra_trader.adapters.venue_execution import KRAKEN_SPOT_MARKET_STREAM_COVERAGE
 
 
 class MutableClock:
@@ -948,6 +949,271 @@ def test_coinbase_adapter_uses_push_native_multi_venue_transport(monkeypatch) ->
   assert released.state == "released"
   assert released.transport == "coinbase_advanced_trade_market_websocket"
   assert released.source == "coinbase_market_push_transport"
+  assert connection.closed is True
+
+
+def test_kraken_adapter_extends_push_native_multi_venue_transport(monkeypatch) -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  request_urls: list[str] = []
+  connection = FakeWebSocketConnection()
+
+  def fake_connect(url: str):
+    request_urls.append(url)
+    return connection
+
+  monkeypatch.setattr(
+    "akra_trader.adapters.venue_execution.KrakenWebSocketMarketStreamSession._resolve_connect",
+    staticmethod(lambda: fake_connect),
+  )
+
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 900,
+        "bids": [[21931.98, 1.10], [21931.25, 0.65]],
+        "asks": [[21933.98, 1.25], [21934.50, 0.40]],
+      },
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 21931.98,
+      "bidVolume": 1.10,
+      "ask": 21933.98,
+      "askVolume": 1.25,
+      "last": 21932.98,
+      "high": 23011.18,
+      "low": 21835.29,
+      "baseVolume": 16038.28770938,
+      "quoteVolume": 351749098.37,
+    },
+    trades=[
+      {
+        "id": "kraken-trade-restore-1",
+        "price": 21932.98,
+        "amount": 0.30,
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 21920.0, 21940.0, 21910.0, 21932.5, 12.0]
+    ],
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    venue="kraken",
+    exchange=exchange,
+    clock=clock,
+  )
+
+  ready, issues = adapter.describe_capability()
+
+  assert ready is True
+  assert issues == ()
+
+  handoff = adapter.handoff_session(
+    symbol="BTC/USD",
+    timeframe="5m",
+    owner_run_id="run-live-kraken",
+    owner_session_id="worker-live-kraken",
+    owned_order_ids=(),
+  )
+
+  sent_messages = [json.loads(payload) for payload in connection.sent_messages]
+
+  assert request_urls == ["wss://ws.kraken.com/v2"]
+  assert sent_messages == [
+    {
+      "method": "subscribe",
+      "params": {
+        "channel": "ticker",
+        "symbol": ["BTC/USD"],
+        "event_trigger": "trades",
+        "snapshot": True,
+      },
+    },
+    {
+      "method": "subscribe",
+      "params": {
+        "channel": "trade",
+        "symbol": ["BTC/USD"],
+        "snapshot": True,
+      },
+    },
+    {
+      "method": "subscribe",
+      "params": {
+        "channel": "book",
+        "symbol": ["BTC/USD"],
+        "depth": 10,
+        "snapshot": True,
+      },
+    },
+    {
+      "method": "subscribe",
+      "params": {
+        "channel": "ohlc",
+        "symbol": ["BTC/USD"],
+        "interval": 5,
+        "snapshot": True,
+      },
+    },
+  ]
+  assert handoff.state == "active"
+  assert handoff.source == "kraken_market_push_transport"
+  assert handoff.transport == "kraken_spot_market_websocket"
+  assert handoff.supervision_state == "streaming"
+  assert handoff.coverage == KRAKEN_SPOT_MARKET_STREAM_COVERAGE
+  assert "venue_stream_transport_fallback:kraken_spot_market_websocket" in handoff.issues
+  assert handoff.order_book_state == "snapshot_rebuilt"
+  assert handoff.order_book_last_update_id == 900
+  assert handoff.channel_restore_state == "restored_from_exchange"
+  assert handoff.channel_continuation_state == "restored_from_exchange"
+  assert handoff.trade_snapshot is not None
+  assert handoff.trade_snapshot.event_id == "kraken-trade-restore-1"
+  assert handoff.book_ticker_snapshot is not None
+  assert handoff.book_ticker_snapshot.bid_price == 21931.98
+  assert handoff.mini_ticker_snapshot is not None
+  assert handoff.mini_ticker_snapshot.close_price == 21932.98
+  assert handoff.kline_snapshot is not None
+  assert handoff.kline_snapshot.close_price == 21932.5
+
+  clock.advance(timedelta(minutes=5))
+  connection.messages.put(json.dumps({"channel": "heartbeat"}))
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "ticker",
+        "type": "update",
+        "data": [
+          {
+            "symbol": "BTC/USD",
+            "bid": 21934.00,
+            "bid_qty": 0.95,
+            "ask": 21934.20,
+            "ask_qty": 1.05,
+            "last": 21934.10,
+            "volume": 16040.10,
+            "vwap": 21920.50,
+            "low": 21835.29,
+            "high": 23011.18,
+            "change": 1.12,
+            "change_pct": 0.01,
+            "timestamp": clock().isoformat().replace("+00:00", "Z"),
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "trade",
+        "type": "update",
+        "data": [
+          {
+            "symbol": "BTC/USD",
+            "side": "buy",
+            "price": 21934.12,
+            "qty": 0.42,
+            "ord_type": "market",
+            "trade_id": 701,
+            "timestamp": clock().isoformat().replace("+00:00", "Z"),
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "book",
+        "type": "snapshot",
+        "data": [
+          {
+            "symbol": "BTC/USD",
+            "bids": [
+              {"price": 21934.00, "qty": 0.95},
+              {"price": 21931.98, "qty": 1.10},
+            ],
+            "asks": [
+              {"price": 21934.20, "qty": 1.05},
+              {"price": 21934.50, "qty": 0.40},
+            ],
+            "timestamp": clock().isoformat().replace("+00:00", "Z"),
+          }
+        ],
+      }
+    )
+  )
+  connection.messages.put(
+    json.dumps(
+      {
+        "channel": "ohlc",
+        "type": "update",
+        "data": [
+          {
+            "symbol": "BTC/USD",
+            "open": 21930.00,
+            "high": 21936.00,
+            "low": 21920.00,
+            "close": 21934.50,
+            "vwap": 21932.20,
+            "trades": 12,
+            "volume": 18.25,
+            "interval_begin": (clock() - timedelta(minutes=5)).isoformat().replace("+00:00", "Z"),
+            "interval": 5,
+            "timestamp": clock().isoformat().replace("+00:00", "Z"),
+          }
+        ],
+      }
+    )
+  )
+
+  sync = adapter.sync_session(handoff=handoff, order_ids=())
+  released = adapter.release_session(handoff=sync.handoff)
+
+  assert sync.state == "active"
+  assert sync.handoff.transport == "kraken_spot_market_websocket"
+  assert sync.handoff.source == "kraken_market_push_transport"
+  assert sync.handoff.supervision_state == "streaming"
+  assert sync.handoff.failover_count == 0
+  assert sync.handoff.coverage == KRAKEN_SPOT_MARKET_STREAM_COVERAGE
+  assert sync.handoff.order_book_state == "streaming"
+  assert sync.handoff.order_book_last_update_id == 1
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_bids[:2]) == (
+    (21934.0, 0.95),
+    (21931.98, 1.1),
+  )
+  assert tuple((level.price, level.quantity) for level in sync.handoff.order_book_asks[:2]) == (
+    (21934.2, 1.05),
+    (21934.5, 0.4),
+  )
+  assert sync.handoff.order_book_best_bid_price == 21934.0
+  assert sync.handoff.order_book_best_ask_price == 21934.2
+  assert sync.handoff.channel_continuation_state == "streaming"
+  assert sync.handoff.channel_continuation_count == 1
+  assert sync.handoff.trade_snapshot is not None
+  assert sync.handoff.trade_snapshot.event_id == "701"
+  assert sync.handoff.aggregate_trade_snapshot is not None
+  assert sync.handoff.aggregate_trade_snapshot.event_id == "701"
+  assert sync.handoff.book_ticker_snapshot is not None
+  assert sync.handoff.book_ticker_snapshot.bid_price == 21934.0
+  assert sync.handoff.book_ticker_snapshot.ask_price == 21934.2
+  assert sync.handoff.mini_ticker_snapshot is not None
+  assert sync.handoff.mini_ticker_snapshot.close_price == 21934.1
+  assert sync.handoff.kline_snapshot is not None
+  assert sync.handoff.kline_snapshot.close_price == 21934.5
+  assert sync.handoff.last_market_event_at == clock()
+  assert sync.handoff.last_depth_event_at == clock()
+  assert sync.handoff.last_trade_event_at == clock()
+  assert sync.handoff.last_aggregate_trade_event_at == clock()
+  assert sync.handoff.last_book_ticker_event_at == clock()
+  assert sync.handoff.last_mini_ticker_event_at == clock()
+  assert sync.handoff.last_kline_event_at == clock()
+  assert released.state == "released"
+  assert released.transport == "kraken_spot_market_websocket"
+  assert released.source == "kraken_market_push_transport"
   assert connection.closed is True
 
 
