@@ -332,13 +332,13 @@
       "status": "proposed",
       "base_priority": 80,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply for commit 044a40e confirms wider live-path alerting and audit coverage are still missing beyond the current guarded-live control trail, but full venue-native stream/session lifecycle handoff remains the more direct executable follow-up from the completed restore work.",
+      "priority_reason": "The latest main-session reply after commit 6f735dd still explicitly calls out wider live-path alerting and durable operator audit or event delivery as remaining work, but broader venue-native session transport is the first numbered remainder and venue-native amend semantics remain closer to active live supervision scope.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T09:30:00Z",
+      "updated_at": "2026-04-17T10:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
     },
@@ -458,13 +458,13 @@
       "status": "proposed",
       "base_priority": 76,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply after commit 044a40e still notes replace is implemented as cancel plus new submit instead of venue-native amend, but that remains behind the more immediate full venue-native stream/session lifecycle handoff and still needs guarded-live product and venue-contract judgment.",
+      "priority_reason": "The latest main-session reply after commit 6f735dd says live order management still stops at cancel or replace and does not use venue-native amend semantics; it is still an explicit follow-up, but broader venue-native session transport is the first direct remainder from the completed Binance supervision work.",
       "depends_on": [
         "planning-guarded-live-active-order-management-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T09:30:00Z",
+      "updated_at": "2026-04-17T10:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
     },
@@ -509,18 +509,72 @@
       "direction_id": "guarded-live-execution",
       "title": "Hand off a full venue-native stream/session lifecycle after guarded-live resume",
       "description": "Extend guarded-live resume beyond restoring tracked order lifecycle so the resumed owner reattaches to the venue-native stream or session lifecycle itself, keeps receiving authoritative venue events after restart, and quarantines clearly when continuous venue-native handoff cannot be re-established.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply for commit 044a40e says resume now restores tracked venue order lifecycle, but it still does not hand off a full venue-native stream/session lifecycle, making this the clearest automatic next queued task from the numbered remaining-work list.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 21ff422, which persisted guarded-live session handoff state, added venue session handoff, sync, and release contracts, kept the live worker attached to the owned venue session lifecycle after resume, surfaced handoff details in the control room, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-guarded-live-venue-native-session-lifecycle-restore"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T09:30:00Z",
+      "updated_at": "2026-04-17T09:45:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances guarded-live candidacy from one-time venue-native restore toward continuous authoritative venue-session ownership, so restart recovery resumes the live supervision stream instead of only reconstructing local order state."
+      "direction_relation_note": "Closed the guarded-live venue-session handoff gap by persisting session ownership across resume and live maintenance, which now leaves venue-push session transport, amend semantics, and broader live-path alert coverage as the remaining candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-binance-venue-push-session-stream",
+      "direction_id": "guarded-live-execution",
+      "title": "Replace the Binance handoff bridge with a venue-push websocket session stream",
+      "description": "Advance the new persisted guarded-live session handoff beyond sync-based bridging so Binance live supervision owns a venue-push websocket session or equivalent push transport, keeps order lifecycle updates authoritative without polling-style maintenance, and quarantines clearly when push delivery drops or cannot be resumed.",
+      "status": "done",
+      "base_priority": 83,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "Completed in main session commit ebd91e4, which replaced the Binance handoff bridge with a websocket-backed user-data session stream, drained pushed executionReport events into local order state, added stream lifecycle tests, and verified the change with API pytest plus web typecheck and build before push.",
+      "depends_on": [
+        "planning-guarded-live-full-venue-native-session-handoff"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from persisted session ownership to authoritative venue-push supervision, reducing reliance on sync loops and making live session continuity match the venue transport model more directly."
+    },
+    {
+      "id": "planning-guarded-live-binance-session-failover-and-coverage",
+      "direction_id": "guarded-live-execution",
+      "title": "Extend Binance push-session supervision to failover and broader venue-native coverage",
+      "description": "Build the next guarded-live step after the new Binance websocket user-data stream by adding explicit session failover or reattach behavior and widening venue-native push coverage beyond the current order-lifecycle-only transport, so live supervision degrades or quarantines cleanly when the push stream drops and can grow toward fuller venue session scope without returning to polling bridges.",
+      "status": "done",
+      "base_priority": 84,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "Completed in main session commit 6f735dd, which added Binance user-data session failover with listen-key reattachment, expanded supervision coverage to outboundAccountPosition, balanceUpdate, and listStatus alongside executionReport, surfaced the richer session state in the control room, and verified with API pytest plus web typecheck and build before push.",
+      "depends_on": [
+        "planning-guarded-live-binance-venue-push-session-stream"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the first Binance push-session resilience step by adding failover and wider user-data event coverage, which now leaves market-depth or broader venue-native session transport, amend semantics, and wider live-path alert delivery as the remaining candidacy gaps."
+    },
+    {
+      "id": "planning-guarded-live-broaden-venue-native-session-transport",
+      "direction_id": "guarded-live-execution",
+      "title": "Broaden guarded-live venue-native session transport beyond Binance user-data events",
+      "description": "Extend the guarded-live venue-native supervision model beyond the current Binance user-data account and order event coverage by deciding and implementing the next authoritative transport surface, such as market-depth or broader venue-native push channels, so live supervision can track more of the venue session without falling back to polling-style gaps.",
+      "status": "ready",
+      "base_priority": 84,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply after commit 6f735dd lists the remaining gap first: coverage now reaches Binance user-data account and order events, but market-depth and broader venue-native session transport are still missing, making this the clearest automatic next queued task.",
+      "depends_on": [
+        "planning-guarded-live-binance-session-failover-and-coverage"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances guarded-live candidacy from resilient Binance user-data supervision toward fuller venue-native session coverage, which is the next explicit gap before live oversight can rely on broader authoritative transport."
     },
     {
       "id": "planning-intelligence-research-trace-replay-fallback",
