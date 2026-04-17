@@ -664,6 +664,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        alertops: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          owner?: string | null;
+          service?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            service_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1095,6 +1113,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             urgency_phase: string;
             team_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        alertops: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          priority?: string | null;
+          owner?: string | null;
+          service?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            service_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8772,6 +8808,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  alertops: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    priority?: string | null;
+    owner?: string | null;
+    service?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      service_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9214,6 +9268,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `PagerTree schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "alertops") {
+    const details = [
+      providerRecovery.alertops.incident_id ? `incident ${providerRecovery.alertops.incident_id}` : null,
+      providerRecovery.alertops.incident_status !== "unknown"
+        ? `status ${providerRecovery.alertops.incident_status}`
+        : null,
+      providerRecovery.alertops.priority ? `priority ${providerRecovery.alertops.priority}` : null,
+      providerRecovery.alertops.owner ? `owner ${providerRecovery.alertops.owner}` : null,
+      providerRecovery.alertops.service ? `service ${providerRecovery.alertops.service}` : null,
+      providerRecovery.alertops.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.alertops.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.alertops.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.alertops.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.alertops.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.alertops.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.alertops.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.alertops.updated_at)}`
+        : null,
+      providerRecovery.alertops.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.alertops.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `AlertOps schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

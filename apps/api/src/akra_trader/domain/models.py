@@ -926,6 +926,31 @@ class OperatorIncidentPagerTreeRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentAlertOpsRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  priority: str | None = None
+  owner: str | None = None
+  service: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentAlertOpsRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentAlertOpsRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentAlertOpsRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  service_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -991,6 +1016,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   pagertree: OperatorIncidentPagerTreeRecoveryState = field(
     default_factory=OperatorIncidentPagerTreeRecoveryState
+  )
+  alertops: OperatorIncidentAlertOpsRecoveryState = field(
+    default_factory=OperatorIncidentAlertOpsRecoveryState
   )
   updated_at: datetime | None = None
 

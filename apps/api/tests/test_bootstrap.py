@@ -205,6 +205,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       pagertree_api_url: str,
       pagertree_recovery_engine_url_template: str | None,
       pagertree_recovery_engine_token: str | None,
+      alertops_api_token: str | None,
+      alertops_api_url: str,
+      alertops_recovery_engine_url_template: str | None,
+      alertops_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -281,6 +285,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         pagertree_recovery_engine_url_template or ""
       )
       captured["pagertree_recovery_engine_token"] = pagertree_recovery_engine_token or ""
+      captured["alertops_api_token"] = alertops_api_token or ""
+      captured["alertops_api_url"] = alertops_api_url
+      captured["alertops_recovery_engine_url_template"] = (
+        alertops_recovery_engine_url_template or ""
+      )
+      captured["alertops_recovery_engine_token"] = alertops_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -411,6 +421,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://pagertree.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_pagertree_recovery_engine_token="pagertree-recovery-token",
+      operator_alert_alertops_api_token="alertops-token",
+      operator_alert_alertops_api_url="https://api.alertops.example",
+      operator_alert_alertops_recovery_engine_url_template=(
+        "https://alertops.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_alertops_recovery_engine_token="alertops-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -492,6 +508,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["pagertree_api_url"] == "https://api.pagertree.example"
   assert captured["pagertree_recovery_engine_url_template"] == "https://pagertree.example/recovery/{workflow_reference_urlencoded}"
   assert captured["pagertree_recovery_engine_token"] == "pagertree-recovery-token"
+  assert captured["alertops_api_token"] == "alertops-token"
+  assert captured["alertops_api_url"] == "https://api.alertops.example"
+  assert captured["alertops_recovery_engine_url_template"] == "https://alertops.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["alertops_recovery_engine_token"] == "alertops-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"
