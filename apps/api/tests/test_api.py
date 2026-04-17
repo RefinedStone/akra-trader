@@ -1626,14 +1626,21 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
         "external_reference": "guarded-live:market-data:5m",
         "workflow_reference": "PDINC-REC-901",
         "occurred_at": "2025-01-03T18:31:00Z",
-        "payload": {
-          "job_id": "provider-job-901",
-          "summary": "provider completed recovery verification",
-          "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
-          "verification": {"state": "passed"},
+          "payload": {
+            "job_id": "provider-job-901",
+            "summary": "provider completed recovery verification",
+            "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+            "verification": {"state": "passed"},
+            "telemetry": {
+              "state": "completed",
+              "progress_percent": 100,
+              "attempt_count": 2,
+              "current_step": "verification",
+              "external_run_id": "pd-api-telemetry-901",
+            },
+          },
         },
-      },
-    )
+      )
     assert synced.status_code == 200
     updated_incident = next(
       event
@@ -1648,6 +1655,9 @@ def test_external_market_data_recovery_sync_endpoint_resolves_incident(
     assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_id"] == "PDINC-REC-901"
     assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["incident_status"] == "delivered"
     assert updated_incident["remediation"]["provider_recovery"]["pagerduty"]["phase_graph"]["workflow_phase"] == "verified_pending_resolve"
+    assert updated_incident["remediation"]["provider_recovery"]["telemetry"]["state"] == "completed"
+    assert updated_incident["remediation"]["provider_recovery"]["telemetry"]["progress_percent"] == 100
+    assert updated_incident["remediation"]["provider_recovery"]["telemetry"]["current_step"] == "verification"
     assert updated_incident["remediation"]["provider_recovery"]["symbols"] == ["ETH/USDT"]
     assert updated_incident["remediation"]["provider_recovery"]["timeframe"] == "5m"
     assert updated_incident["remediation"]["provider_recovery"]["verification"]["state"] == "passed"

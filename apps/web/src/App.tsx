@@ -380,6 +380,19 @@ type OperatorVisibility = {
           summary?: string | null;
           issues: string[];
         };
+        telemetry: {
+          state: string;
+          progress_percent?: number | null;
+          attempt_count: number;
+          current_step?: string | null;
+          last_message?: string | null;
+          last_error?: string | null;
+          external_run_id?: string | null;
+          job_url?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+          updated_at?: string | null;
+        };
         status_machine: {
           state: string;
           workflow_state: string;
@@ -562,6 +575,19 @@ type GuardedLiveStatus = {
           checked_at?: string | null;
           summary?: string | null;
           issues: string[];
+        };
+        telemetry: {
+          state: string;
+          progress_percent?: number | null;
+          attempt_count: number;
+          current_step?: string | null;
+          last_message?: string | null;
+          last_error?: string | null;
+          external_run_id?: string | null;
+          job_url?: string | null;
+          started_at?: string | null;
+          finished_at?: string | null;
+          updated_at?: string | null;
         };
         status_machine: {
           state: string;
@@ -2279,6 +2305,11 @@ export default function App() {
                                         ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
                                         : ""}
                                     </p>
+                                    {formatProviderRecoveryTelemetry(event.remediation.provider_recovery) ? (
+                                      <p className="run-lineage-symbol-copy">
+                                        {formatProviderRecoveryTelemetry(event.remediation.provider_recovery)}
+                                      </p>
+                                    ) : null}
                                     {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
                                       <p className="run-lineage-symbol-copy">
                                         {formatProviderRecoverySchema(event.remediation.provider_recovery)}
@@ -3429,6 +3460,11 @@ export default function App() {
                                           ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
                                           : ""}
                                       </p>
+                                      {formatProviderRecoveryTelemetry(event.remediation.provider_recovery) ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          {formatProviderRecoveryTelemetry(event.remediation.provider_recovery)}
+                                        </p>
+                                      ) : null}
                                       {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
                                         <p className="run-lineage-symbol-copy">
                                           {formatProviderRecoverySchema(event.remediation.provider_recovery)}
@@ -8101,6 +8137,46 @@ function formatProviderRecoverySchema(providerRecovery: {
     return details.length ? `Opsgenie schema: ${details.join(" / ")}` : null;
   }
   return null;
+}
+
+function formatProviderRecoveryTelemetry(providerRecovery: {
+  telemetry: {
+    state: string;
+    progress_percent?: number | null;
+    attempt_count: number;
+    current_step?: string | null;
+    last_message?: string | null;
+    last_error?: string | null;
+    external_run_id?: string | null;
+    updated_at?: string | null;
+  };
+}) {
+  const details = [
+    providerRecovery.telemetry.state !== "unknown"
+      ? `state ${providerRecovery.telemetry.state}`
+      : null,
+    providerRecovery.telemetry.progress_percent != null
+      ? `progress ${providerRecovery.telemetry.progress_percent}%`
+      : null,
+    providerRecovery.telemetry.attempt_count
+      ? `attempts ${providerRecovery.telemetry.attempt_count}`
+      : null,
+    providerRecovery.telemetry.current_step
+      ? `step ${providerRecovery.telemetry.current_step}`
+      : null,
+    providerRecovery.telemetry.external_run_id
+      ? `run ${providerRecovery.telemetry.external_run_id}`
+      : null,
+    providerRecovery.telemetry.updated_at
+      ? `updated ${formatTimestamp(providerRecovery.telemetry.updated_at)}`
+      : null,
+    providerRecovery.telemetry.last_error
+      ? `error ${providerRecovery.telemetry.last_error}`
+      : providerRecovery.telemetry.last_message
+        ? `message ${providerRecovery.telemetry.last_message}`
+        : null,
+  ].filter(Boolean);
+  return details.length ? `Recovery telemetry: ${details.join(" / ")}` : null;
 }
 
 function shortenIdentifier(value: string, maxLength = 18) {

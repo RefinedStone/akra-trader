@@ -906,6 +906,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       provider_payload.get("provider_recovery"),
       provider_payload.get("recovery"),
     )
+    provider_telemetry = self._extract_mapping(
+      provider_payload.get("remediation_provider_telemetry"),
+      provider_payload.get("provider_telemetry"),
+      provider_payload.get("telemetry"),
+      provider_recovery.get("telemetry"),
+    )
     provider_specific_recovery = self._extract_mapping(provider_recovery.get(provider))
     status_machine_payload = self._extract_mapping(
       provider_recovery.get("status_machine"),
@@ -990,6 +996,22 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             ),
           },
         },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          provider_payload.get("remediation_state"),
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("html_url"),
+        ),
+        "updated_at": self._first_non_empty_string(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("last_status_change_at"),
+        ),
       }
     elif provider == "opsgenie":
       opsgenie_owner = self._first_non_empty_string(
@@ -1100,6 +1122,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           },
         },
       }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          provider_payload.get("remediation_state"),
+        ),
+        "updated_at": self._first_non_empty_string(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          provider_payload.get("updatedAt"),
+        ),
+      }
     merged_payload: dict[str, Any] = dict(remediation_payload)
     merged_payload.update({
       "workflow_reference": workflow_reference,
@@ -1144,6 +1179,67 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           provider_recovery.get("verification_state"),
           self._extract_mapping(provider_recovery.get("verification")).get("state"),
           self._extract_mapping(provider_payload.get("verification")).get("state"),
+        ),
+      },
+      "telemetry": {
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          provider_payload.get("remediation_state"),
+        ),
+        "progress_percent": (
+          provider_telemetry.get("progress_percent")
+          if isinstance(provider_telemetry.get("progress_percent"), int)
+          else provider_telemetry.get("progressPercent")
+        ),
+        "attempt_count": (
+          provider_telemetry.get("attempt_count")
+          if isinstance(provider_telemetry.get("attempt_count"), int)
+          else (
+            provider_telemetry.get("attempts")
+            if isinstance(provider_telemetry.get("attempts"), int)
+            else status_machine_payload.get("attempt_number")
+          )
+        ),
+        "current_step": self._first_non_empty_string(
+          provider_telemetry.get("current_step"),
+          provider_telemetry.get("step"),
+          provider_telemetry.get("phase"),
+        ),
+        "last_message": self._first_non_empty_string(
+          provider_telemetry.get("last_message"),
+          provider_telemetry.get("message"),
+          provider_telemetry.get("summary"),
+          provider_recovery.get("detail"),
+          detail,
+        ),
+        "last_error": self._first_non_empty_string(
+          provider_telemetry.get("last_error"),
+          provider_telemetry.get("error"),
+        ),
+        "external_run_id": self._first_non_empty_string(
+          provider_telemetry.get("external_run_id"),
+          provider_telemetry.get("run_id"),
+          provider_telemetry.get("execution_id"),
+          provider_recovery.get("job_id"),
+          provider_payload.get("job_id"),
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_telemetry.get("url"),
+        ),
+        "started_at": self._parse_provider_datetime(
+          provider_telemetry.get("started_at"),
+          provider_telemetry.get("created_at"),
+        ),
+        "finished_at": self._parse_provider_datetime(
+          provider_telemetry.get("finished_at"),
+          provider_telemetry.get("completed_at"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_telemetry.get("last_update_at"),
+          updated_at,
         ),
       },
       "status_machine": {
@@ -1236,6 +1332,31 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         ),
         "summary": provider_recovery.verification.summary,
         "issues": provider_recovery.verification.issues,
+      },
+      "telemetry": {
+        "state": provider_recovery.telemetry.state,
+        "progress_percent": provider_recovery.telemetry.progress_percent,
+        "attempt_count": provider_recovery.telemetry.attempt_count,
+        "current_step": provider_recovery.telemetry.current_step,
+        "last_message": provider_recovery.telemetry.last_message,
+        "last_error": provider_recovery.telemetry.last_error,
+        "external_run_id": provider_recovery.telemetry.external_run_id,
+        "job_url": provider_recovery.telemetry.job_url,
+        "started_at": (
+          provider_recovery.telemetry.started_at.isoformat()
+          if provider_recovery.telemetry.started_at is not None
+          else None
+        ),
+        "finished_at": (
+          provider_recovery.telemetry.finished_at.isoformat()
+          if provider_recovery.telemetry.finished_at is not None
+          else None
+        ),
+        "updated_at": (
+          provider_recovery.telemetry.updated_at.isoformat()
+          if provider_recovery.telemetry.updated_at is not None
+          else None
+        ),
       },
       "status_machine": {
         "state": provider_recovery.status_machine.state,

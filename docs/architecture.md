@@ -200,7 +200,9 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   provider-specific typed branches for PagerDuty incident fields and Opsgenie alert fields so the
   control plane does not collapse provider-owned recovery metadata into one generic schema, and
   those branches now carry provider-native recovery phase graphs alongside the shared status
-  machine. Local
+  machine. Authoritative pull-sync also lifts provider remediation telemetry into typed recovery
+  state so progress, step, attempt, and provider-run details survive callback lag and local state
+  refreshes. Local
   acknowledge/remediate/escalate actions can push provider-native workflow updates back out when
   the selected provider supports them, and locally verified remediation closures now push a
   provider-native `resolve` action as well, so durable incidents track a bidirectional paging and

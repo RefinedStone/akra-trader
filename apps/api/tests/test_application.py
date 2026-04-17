@@ -1752,6 +1752,14 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
       "channels": ["kline", "depth"],
       "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
       "verification": {"state": "passed"},
+      "telemetry": {
+        "state": "completed",
+        "progress_percent": 100,
+        "attempt_count": 3,
+        "current_step": "verification",
+        "last_message": "provider repair verified",
+        "external_run_id": "pd-telemetry-1",
+      },
     },
   )
 
@@ -1768,6 +1776,14 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
     "channels": ["kline", "depth"],
     "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
     "verification": {"state": "passed"},
+    "telemetry": {
+      "state": "completed",
+      "progress_percent": 100,
+      "attempt_count": 3,
+      "current_step": "verification",
+      "last_message": "provider repair verified",
+      "external_run_id": "pd-telemetry-1",
+    },
   }
   assert updated_incident.remediation.provider_recovery.lifecycle_state == "verified"
   assert updated_incident.remediation.provider_recovery.provider == "pagerduty"
@@ -1781,6 +1797,11 @@ def test_external_market_data_recovery_sync_executes_local_verification_and_reso
   assert updated_incident.remediation.provider_recovery.symbols == ("ETH/USDT",)
   assert updated_incident.remediation.provider_recovery.timeframe == "5m"
   assert updated_incident.remediation.provider_recovery.verification.state == "passed"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "completed"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 100
+  assert updated_incident.remediation.provider_recovery.telemetry.attempt_count == 3
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verification"
+  assert updated_incident.remediation.provider_recovery.telemetry.external_run_id == "pd-telemetry-1"
   assert updated_incident.remediation.provider_recovery.status_machine.state == "verified"
   assert updated_incident.remediation.provider_recovery.status_machine.workflow_state == "delivered"
   assert updated_incident.remediation.provider_recovery.status_machine.workflow_action == "remediate"
@@ -1953,6 +1974,14 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
         "channels": ["kline", "depth"],
         "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
         "verification": {"state": "passed"},
+        "telemetry": {
+          "state": "completed",
+          "progress_percent": 100,
+          "attempt_count": 2,
+          "current_step": "verification",
+          "last_message": "provider authoritative repair complete",
+          "external_run_id": "pd-run-77",
+        },
         "status_machine": {
           "state": "provider_running",
           "workflow_state": "acknowledged",
@@ -1981,6 +2010,10 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
   assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.incident_phase == "acknowledged"
   assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.workflow_phase == "verified_pending_resolve"
   assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "completed"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 100
+  assert updated_incident.remediation.provider_recovery.telemetry.attempt_count == 2
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verification"
   assert updated_incident.remediation.provider_recovery.status_machine.workflow_state == "acknowledged"
   assert updated_incident.remediation.provider_recovery.status_machine.sync_state == "bidirectional_synced"
   assert any(
@@ -2100,6 +2133,14 @@ def test_external_opsgenie_recovery_sync_populates_opsgenie_typed_schema(
         "teams": ["market-data"],
         "tiny_id": "42",
       },
+      "telemetry": {
+        "state": "running",
+        "progress_percent": 45,
+        "attempt_count": 1,
+        "current_step": "backfill",
+        "last_message": "opsgenie recovery started",
+        "external_run_id": "og-telemetry-1",
+      },
     },
   )
 
@@ -2118,6 +2159,9 @@ def test_external_opsgenie_recovery_sync_populates_opsgenie_typed_schema(
   assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.alert_phase == "acknowledged"
   assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.workflow_phase == "provider_recovering"
   assert updated_incident.remediation.provider_recovery.opsgenie.phase_graph.ownership_phase == "assigned"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 45
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "backfill"
 
 
 def test_guarded_live_channel_restore_incidents_auto_run_local_session_remediation(

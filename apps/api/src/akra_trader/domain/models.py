@@ -529,6 +529,21 @@ class OperatorIncidentProviderRecoveryStatusMachine:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentProviderRecoveryTelemetry:
+  state: str = "unknown"
+  progress_percent: int | None = None
+  attempt_count: int = 0
+  current_step: str | None = None
+  last_message: str | None = None
+  last_error: str | None = None
+  external_run_id: str | None = None
+  job_url: str | None = None
+  started_at: datetime | None = None
+  finished_at: datetime | None = None
+  updated_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentPagerDutyRecoveryState:
   incident_id: str | None = None
   incident_key: str | None = None
@@ -595,6 +610,9 @@ class OperatorIncidentProviderRecoveryState:
   timeframe: str | None = None
   verification: OperatorIncidentProviderRecoveryVerification = field(
     default_factory=OperatorIncidentProviderRecoveryVerification
+  )
+  telemetry: OperatorIncidentProviderRecoveryTelemetry = field(
+    default_factory=OperatorIncidentProviderRecoveryTelemetry
   )
   status_machine: OperatorIncidentProviderRecoveryStatusMachine = field(
     default_factory=OperatorIncidentProviderRecoveryStatusMachine

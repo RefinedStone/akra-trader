@@ -55,6 +55,7 @@ from akra_trader.domain.models import OperatorIncidentPagerDutyRecoveryPhaseGrap
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
+from akra_trader.domain.models import OperatorIncidentProviderRecoveryTelemetry
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryVerification
 from akra_trader.domain.models import OperatorIncidentRemediation
 from akra_trader.domain.models import OperatorVisibility
@@ -1656,6 +1657,26 @@ class TradingApplication:
     except ValueError:
       return None
 
+  @staticmethod
+  def _parse_payload_int(*values: Any) -> int | None:
+    for value in values:
+      if isinstance(value, bool):
+        continue
+      if isinstance(value, int):
+        return value
+      if isinstance(value, float) and value.is_integer():
+        return int(value)
+      if not isinstance(value, str):
+        continue
+      candidate = value.strip()
+      if not candidate:
+        continue
+      try:
+        return int(candidate)
+      except ValueError:
+        continue
+    return None
+
   @classmethod
   def _normalize_incident_workflow_payload_value(cls, value: Any) -> Any:
     if value is None or isinstance(value, (str, bool)):
@@ -2113,6 +2134,99 @@ class TradingApplication:
       last_transition_at=last_transition_at,
     )
 
+  def _build_provider_recovery_telemetry(
+    self,
+    *,
+    payload: dict[str, Any],
+    synced_at: datetime,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    existing: OperatorIncidentProviderRecoveryTelemetry,
+  ) -> OperatorIncidentProviderRecoveryTelemetry:
+    telemetry_payload = self._merge_payload_mappings(
+      payload.get("telemetry"),
+      payload.get("provider_telemetry"),
+      payload.get("remediation_telemetry"),
+      payload.get("job_telemetry"),
+    )
+    return OperatorIncidentProviderRecoveryTelemetry(
+      state=self._first_non_empty_string(
+        telemetry_payload.get("state"),
+        telemetry_payload.get("job_state"),
+        payload.get("telemetry_state"),
+        payload.get("job_state"),
+        existing.state,
+        status_machine.job_state,
+      ) or "unknown",
+      progress_percent=self._parse_payload_int(
+        telemetry_payload.get("progress_percent"),
+        telemetry_payload.get("progressPercent"),
+        telemetry_payload.get("percent_complete"),
+        telemetry_payload.get("completion_percent"),
+        telemetry_payload.get("completionPercent"),
+        existing.progress_percent,
+      ),
+      attempt_count=(
+        self._parse_payload_int(
+          telemetry_payload.get("attempt_count"),
+          telemetry_payload.get("attempts"),
+          telemetry_payload.get("retry_count"),
+          payload.get("attempt_number"),
+          existing.attempt_count,
+          status_machine.attempt_number,
+        )
+        or 0
+      ),
+      current_step=self._first_non_empty_string(
+        telemetry_payload.get("current_step"),
+        telemetry_payload.get("step"),
+        telemetry_payload.get("phase"),
+        payload.get("telemetry_step"),
+        existing.current_step,
+      ),
+      last_message=self._first_non_empty_string(
+        telemetry_payload.get("last_message"),
+        telemetry_payload.get("message"),
+        telemetry_payload.get("summary"),
+        existing.last_message,
+      ),
+      last_error=self._first_non_empty_string(
+        telemetry_payload.get("last_error"),
+        telemetry_payload.get("error"),
+        payload.get("telemetry_error"),
+        existing.last_error,
+      ),
+      external_run_id=self._first_non_empty_string(
+        telemetry_payload.get("external_run_id"),
+        telemetry_payload.get("run_id"),
+        telemetry_payload.get("execution_id"),
+        telemetry_payload.get("job_id"),
+        payload.get("job_id"),
+        existing.external_run_id,
+      ),
+      job_url=self._first_non_empty_string(
+        telemetry_payload.get("job_url"),
+        telemetry_payload.get("url"),
+        payload.get("job_url"),
+        existing.job_url,
+      ),
+      started_at=(
+        self._parse_payload_datetime(telemetry_payload.get("started_at"))
+        or self._parse_payload_datetime(telemetry_payload.get("created_at"))
+        or existing.started_at
+      ),
+      finished_at=(
+        self._parse_payload_datetime(telemetry_payload.get("finished_at"))
+        or self._parse_payload_datetime(telemetry_payload.get("completed_at"))
+        or existing.finished_at
+      ),
+      updated_at=(
+        self._parse_payload_datetime(telemetry_payload.get("updated_at"))
+        or self._parse_payload_datetime(telemetry_payload.get("last_update_at"))
+        or existing.updated_at
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -2351,6 +2465,12 @@ class TradingApplication:
       event_at=synced_at,
       payload=payload,
     )
+    telemetry = self._build_provider_recovery_telemetry(
+      payload=payload,
+      synced_at=synced_at,
+      status_machine=status_machine,
+      existing=existing.telemetry,
+    )
     reference = self._first_non_empty_string(
       payload.get("reference"),
       payload.get("job_reference"),
@@ -2428,6 +2548,7 @@ class TradingApplication:
         existing.timeframe,
       ),
       verification=verification,
+      telemetry=telemetry,
       status_machine=status_machine,
       provider_schema_kind=provider_schema_kind,
       pagerduty=pagerduty_schema,

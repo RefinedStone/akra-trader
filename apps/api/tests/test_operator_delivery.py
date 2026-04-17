@@ -243,6 +243,14 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
                 "status_machine_workflow_state": "acknowledged",
                 "status_machine_job_state": "completed",
               },
+              "remediation_provider_telemetry": {
+                "state": "completed",
+                "progress_percent": 100,
+                "attempt_count": 2,
+                "current_step": "verification",
+                "last_message": "provider confirmed repair",
+                "external_run_id": "pd-rem-9",
+              },
             },
           }
         }
@@ -288,6 +296,10 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["incident_phase"] == "acknowledged"
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["workflow_phase"] == "awaiting_local_verification"
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["responder_phase"] == "engaged"
+  assert snapshot.payload["telemetry"]["state"] == "completed"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 100
+  assert snapshot.payload["telemetry"]["attempt_count"] == 2
+  assert snapshot.payload["telemetry"]["current_step"] == "verification"
   assert requests[0][0].endswith("/incidents/PDINC-123")
   assert requests[0][1] == "GET"
   assert requests[0][2]["From"] == "akra-ops@example.com"
@@ -479,6 +491,14 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
                 "status_machine_workflow_state": "acknowledged",
                 "status_machine_job_state": "requested",
               },
+              "remediation_provider_telemetry": {
+                "state": "running",
+                "progress_percent": 45,
+                "attempt_count": 1,
+                "current_step": "backfill",
+                "last_message": "repair job started",
+                "external_run_id": "og-rem-7",
+              },
             },
           }
         }
@@ -524,5 +544,9 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["alert_phase"] == "acknowledged"
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["workflow_phase"] == "provider_recovering"
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["acknowledgment_phase"] == "acknowledged"
+  assert snapshot.payload["telemetry"]["state"] == "running"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 45
+  assert snapshot.payload["telemetry"]["attempt_count"] == 1
+  assert snapshot.payload["telemetry"]["current_step"] == "backfill"
   assert requests[0][0].endswith("/v2/alerts/OG-123?identifierType=id")
   assert requests[0][1] == "GET"
