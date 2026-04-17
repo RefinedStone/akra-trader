@@ -701,6 +701,172 @@ def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
   assert any(event.kind == "sandbox_worker_stopped" for event in stopped_visibility.audit_events)
 
 
+def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 30, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),
+        ),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  status = app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="pre_live_balance_check",
+  )
+  visibility = app.get_operator_visibility()
+
+  reconciliation_alert = next(
+    alert for alert in visibility.alerts
+    if alert.alert_id == "guarded-live:reconciliation"
+  )
+
+  assert status.active_alerts[0].alert_id == "guarded-live:reconciliation"
+  assert reconciliation_alert.source == "guarded_live"
+  assert "control_room" in reconciliation_alert.delivery_targets
+  history_alert = next(
+    alert for alert in visibility.alert_history
+    if alert.alert_id == "guarded-live:reconciliation"
+  )
+  assert history_alert.status == "active"
+  assert history_alert.resolved_at is None
+
+  clock.advance(timedelta(minutes=5))
+  app._venue_state = StaticVenueStateAdapter(
+    GuardedLiveVenueStateSnapshot(
+      provider="seeded",
+      venue="binance",
+      verification_state="verified",
+      captured_at=clock(),
+    )
+  )
+  app.run_guarded_live_reconciliation(
+    actor="operator",
+    reason="post_fix_balance_check",
+  )
+  resolved_visibility = app.get_operator_visibility()
+
+  assert all(
+    alert.alert_id != "guarded-live:reconciliation"
+    for alert in resolved_visibility.alerts
+  )
+  resolved_history_alert = next(
+    alert for alert in resolved_visibility.alert_history
+    if alert.alert_id == "guarded-live:reconciliation"
+  )
+  assert resolved_history_alert.status == "resolved"
+  assert resolved_history_alert.resolved_at == clock()
+
+  restarted = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+  restarted_visibility = restarted.get_operator_visibility()
+  restarted_history_alert = next(
+    alert for alert in restarted_visibility.alert_history
+    if alert.alert_id == "guarded-live:reconciliation"
+  )
+  assert restarted_history_alert.status == "resolved"
+  assert restarted_history_alert.resolved_at == clock()
+
+
+def test_operator_visibility_surfaces_guarded_live_worker_failure_and_persists_history(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 45, tzinfo=UTC))
+  market_data = MutableSeededMarketDataAdapter()
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),
+        ),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="operator_visibility_live_failure",
+  )
+
+  def fail_advance(_run: RunRecord) -> dict[str, int]:
+    raise RuntimeError("live worker crash")
+
+  monkeypatch.setattr(app, "_advance_guarded_live_worker_run", fail_advance)
+  app.maintain_guarded_live_worker_sessions()
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  failure_alert = next(
+    alert
+    for alert in visibility.alerts
+    if alert.category == "worker_failure" and alert.run_id == run.config.run_id
+  )
+  assert failure_alert.source == "guarded_live"
+  assert "operator_visibility" in failure_alert.delivery_targets
+  assert any(event.kind == "guarded_live_worker_failed" for event in visibility.audit_events)
+  assert any(alert.alert_id == failure_alert.alert_id for alert in guarded_live_status.active_alerts)
+  history_alert = next(
+    alert
+    for alert in visibility.alert_history
+    if alert.alert_id == failure_alert.alert_id
+  )
+  assert history_alert.status == "active"
+
+
 def test_guarded_live_kill_switch_stops_operator_control_sessions_and_blocks_restarts(
   tmp_path: Path,
 ) -> None:

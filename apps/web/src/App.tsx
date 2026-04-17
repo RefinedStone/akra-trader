@@ -295,7 +295,23 @@ type OperatorVisibility = {
     run_id?: string | null;
     session_id?: string | null;
     status: string;
+    resolved_at?: string | null;
     source: string;
+    delivery_targets: string[];
+  }[];
+  alert_history: {
+    alert_id: string;
+    severity: string;
+    category: string;
+    summary: string;
+    detail: string;
+    detected_at: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    status: string;
+    resolved_at?: string | null;
+    source: string;
+    delivery_targets: string[];
   }[];
   audit_events: {
     event_id: string;
@@ -314,6 +330,34 @@ type GuardedLiveStatus = {
   generated_at: string;
   candidacy_status: string;
   blockers: string[];
+  active_alerts: {
+    alert_id: string;
+    severity: string;
+    category: string;
+    summary: string;
+    detail: string;
+    detected_at: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    status: string;
+    resolved_at?: string | null;
+    source: string;
+    delivery_targets: string[];
+  }[];
+  alert_history: {
+    alert_id: string;
+    severity: string;
+    category: string;
+    summary: string;
+    detail: string;
+    detected_at: string;
+    run_id?: string | null;
+    session_id?: string | null;
+    status: string;
+    resolved_at?: string | null;
+    source: string;
+    delivery_targets: string[];
+  }[];
   kill_switch: {
     state: string;
     reason: string;
@@ -1164,6 +1208,7 @@ export default function App() {
       alertCount: operatorVisibility.alerts.length,
       criticalCount,
       warningCount,
+      historyCount: operatorVisibility.alert_history.length,
       latestAuditAt: operatorVisibility.audit_events[0]?.timestamp ?? null,
     };
   }, [operatorVisibility]);
@@ -1709,6 +1754,10 @@ export default function App() {
                     <span>Latest audit</span>
                     <strong>{formatTimestamp(operatorSummary.latestAuditAt)}</strong>
                   </div>
+                  <div className="metric-tile">
+                    <span>Alert history</span>
+                    <strong>{operatorSummary.historyCount}</strong>
+                  </div>
                 </>
               ) : null}
               <div className="status-grid-two-column">
@@ -1733,6 +1782,9 @@ export default function App() {
                             <td>
                               <strong>{alert.summary}</strong>
                               <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                              </p>
                             </td>
                             <td>{formatTimestamp(alert.detected_at)}</td>
                             <td>{alert.run_id ?? "n/a"}</td>
@@ -1774,6 +1826,41 @@ export default function App() {
                     <p className="empty-state">No runtime audit events recorded.</p>
                   )}
                 </div>
+              </div>
+              <div>
+                <h3>Alert history</h3>
+                {operatorVisibility.alert_history.length ? (
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Status</th>
+                        <th>Severity</th>
+                        <th>Summary</th>
+                        <th>Detected</th>
+                        <th>Resolved</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {operatorVisibility.alert_history.slice(0, 8).map((alert) => (
+                        <tr key={`history-${alert.alert_id}`}>
+                          <td>{alert.status}</td>
+                          <td>{alert.severity}</td>
+                          <td>
+                            <strong>{alert.summary}</strong>
+                            <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                            <p className="run-lineage-symbol-copy">
+                              Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                            </p>
+                          </td>
+                          <td>{formatTimestamp(alert.detected_at)}</td>
+                          <td>{formatTimestamp(alert.resolved_at ?? null)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <p className="empty-state">No persisted live-path alert history recorded.</p>
+                )}
               </div>
             </div>
           ) : (
@@ -2634,6 +2721,70 @@ export default function App() {
                     </table>
                   ) : (
                     <p className="empty-state">No durable guarded-live open orders recorded.</p>
+                  )}
+                  <h3>Guarded-live alerts</h3>
+                  {guardedLive.active_alerts.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Severity</th>
+                          <th>Category</th>
+                          <th>Summary</th>
+                          <th>Detected</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.active_alerts.map((alert) => (
+                          <tr key={`guarded-live-alert-${alert.alert_id}`}>
+                            <td>{alert.severity}</td>
+                            <td>{alert.category}</td>
+                            <td>
+                              <strong>{alert.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                              </p>
+                            </td>
+                            <td>{formatTimestamp(alert.detected_at)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No active guarded-live alerts.</p>
+                  )}
+                  <h3>Guarded-live alert history</h3>
+                  {guardedLive.alert_history.length ? (
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Status</th>
+                          <th>Severity</th>
+                          <th>Summary</th>
+                          <th>Detected</th>
+                          <th>Resolved</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {guardedLive.alert_history.slice(0, 8).map((alert) => (
+                          <tr key={`guarded-live-alert-history-${alert.alert_id}`}>
+                            <td>{alert.status}</td>
+                            <td>{alert.severity}</td>
+                            <td>
+                              <strong>{alert.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                              </p>
+                            </td>
+                            <td>{formatTimestamp(alert.detected_at)}</td>
+                            <td>{formatTimestamp(alert.resolved_at ?? null)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  ) : (
+                    <p className="empty-state">No guarded-live alert history recorded.</p>
                   )}
                   <h3>Guarded-live audit</h3>
                   {guardedLive.audit_events.length ? (

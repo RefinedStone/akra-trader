@@ -508,23 +508,28 @@ class TradingApplication:
 
   def get_operator_visibility(self) -> OperatorVisibility:
     current_time = self._clock()
-    alerts: list[OperatorAlert] = []
-    audit_events: list[OperatorAuditEvent] = []
-    for run in self._runs.list_runs(mode=RunMode.SANDBOX.value):
-      alerts.extend(self._build_operator_alerts_for_run(run=run, current_time=current_time))
-      audit_events.extend(self._build_operator_audit_events_for_run(run=run, current_time=current_time))
+    sandbox_alerts, sandbox_audit_events = self._collect_sandbox_operator_visibility(
+      current_time=current_time
+    )
+    guarded_live_state, live_alerts = self._refresh_guarded_live_alert_state(
+      current_time=current_time
+    )
+    alerts = [*sandbox_alerts, *live_alerts]
+    audit_events = [*sandbox_audit_events, *guarded_live_state.audit_events]
     alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
     audit_events.sort(key=lambda event: event.timestamp, reverse=True)
     return OperatorVisibility(
       generated_at=current_time,
       alerts=tuple(alerts),
+      alert_history=guarded_live_state.alert_history,
       audit_events=tuple(audit_events),
     )
 
   def get_guarded_live_status(self) -> GuardedLiveStatus:
     current_time = self._clock()
-    state = self._guarded_live_state.load_state()
-    runtime_visibility = self.get_operator_visibility()
+    sandbox_alerts, _ = self._collect_sandbox_operator_visibility(current_time=current_time)
+    state, live_alerts = self._refresh_guarded_live_alert_state(current_time=current_time)
+    runtime_alerts = [*sandbox_alerts, *live_alerts]
     running_sandbox_count = self._count_running_runs(RunMode.SANDBOX)
     running_paper_count = self._count_running_runs(RunMode.PAPER)
     running_live_count = self._count_running_runs(RunMode.LIVE)
@@ -552,8 +557,8 @@ class TradingApplication:
         "Guarded-live session ownership is still held by "
         f"{state.ownership.owner_run_id}. Resume or release it before launching a new live worker."
       )
-    if runtime_visibility.alerts:
-      blockers.append("Unresolved runtime alerts remain in sandbox operations.")
+    if runtime_alerts:
+      blockers.append("Unresolved operator alerts remain in runtime operations.")
 
     audit_events = tuple(
       sorted(state.audit_events, key=lambda event: event.timestamp, reverse=True)
@@ -562,6 +567,8 @@ class TradingApplication:
       generated_at=current_time,
       candidacy_status="blocked" if blockers else "candidate",
       blockers=tuple(dict.fromkeys(blockers)),
+      active_alerts=tuple(live_alerts),
+      alert_history=state.alert_history,
       kill_switch=state.kill_switch,
       reconciliation=state.reconciliation,
       recovery=state.recovery,
@@ -570,11 +577,47 @@ class TradingApplication:
       session_restore=state.session_restore,
       session_handoff=state.session_handoff,
       audit_events=audit_events,
-      active_runtime_alert_count=len(runtime_visibility.alerts),
+      active_runtime_alert_count=len(runtime_alerts),
       running_sandbox_count=running_sandbox_count,
       running_paper_count=running_paper_count,
       running_live_count=running_live_count,
     )
+
+  def _collect_sandbox_operator_visibility(
+    self,
+    *,
+    current_time: datetime,
+  ) -> tuple[list[OperatorAlert], list[OperatorAuditEvent]]:
+    alerts: list[OperatorAlert] = []
+    audit_events: list[OperatorAuditEvent] = []
+    for run in self._runs.list_runs(mode=RunMode.SANDBOX.value):
+      alerts.extend(self._build_operator_alerts_for_run(run=run, current_time=current_time))
+      audit_events.extend(self._build_operator_audit_events_for_run(run=run, current_time=current_time))
+    return alerts, audit_events
+
+  def _refresh_guarded_live_alert_state(
+    self,
+    *,
+    current_time: datetime,
+  ) -> tuple[GuardedLiveState, list[OperatorAlert]]:
+    state = self._guarded_live_state.load_state()
+    active_alerts = self._build_guarded_live_operator_alerts(
+      state=state,
+      current_time=current_time,
+    )
+    merged_history = self._merge_operator_alert_history(
+      existing=state.alert_history,
+      active_alerts=active_alerts,
+      current_time=current_time,
+    )
+    if merged_history != state.alert_history:
+      state = self._persist_guarded_live_state(
+        replace(
+          state,
+          alert_history=merged_history,
+        )
+      )
+    return state, active_alerts
 
   def engage_guarded_live_kill_switch(
     self,
@@ -2376,13 +2419,13 @@ class TradingApplication:
         )
       )
 
-    runtime_visibility = self.get_operator_visibility()
-    if runtime_visibility.alerts:
+    sandbox_alerts, _ = self._collect_sandbox_operator_visibility(current_time=self._clock())
+    if sandbox_alerts:
       findings.append(
         GuardedLiveReconciliationFinding(
           kind="runtime_alerts_present",
           severity="warning",
-          summary=f"{len(runtime_visibility.alerts)} unresolved runtime alert(s) remain active.",
+          summary=f"{len(sandbox_alerts)} unresolved runtime alert(s) remain active.",
           detail="Guarded-live candidacy stays blocked while sandbox runtime alerts remain unresolved.",
         )
       )
@@ -3414,6 +3457,274 @@ class TradingApplication:
     )
     return self._venue_execution.submit_limit_order(request)
 
+  @staticmethod
+  def _guarded_live_delivery_targets() -> tuple[str, ...]:
+    return ("operator_visibility", "guarded_live_status", "control_room")
+
+  def _build_guarded_live_operator_alerts(
+    self,
+    *,
+    state: GuardedLiveState,
+    current_time: datetime,
+  ) -> list[OperatorAlert]:
+    alerts: list[OperatorAlert] = []
+    delivery_targets = self._guarded_live_delivery_targets()
+    live_runs = self._runs.list_runs(mode=RunMode.LIVE.value)
+    live_context_active = bool(live_runs) or state.ownership.state in {"owned", "orphaned"}
+
+    if state.kill_switch.state == "engaged":
+      detected_at = state.kill_switch.last_engaged_at or state.kill_switch.updated_at
+      alerts.append(
+        OperatorAlert(
+          alert_id="guarded-live:kill-switch",
+          severity="warning",
+          category="kill_switch",
+          summary="Guarded-live kill switch is engaged.",
+          detail=(
+            f"{state.kill_switch.reason} Updated by {state.kill_switch.updated_by} at "
+            f"{state.kill_switch.updated_at.isoformat()}."
+          ),
+          detected_at=detected_at,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if state.reconciliation.state == "issues_detected":
+      finding_copy = "; ".join(finding.summary for finding in state.reconciliation.findings[:3])
+      alerts.append(
+        OperatorAlert(
+          alert_id="guarded-live:reconciliation",
+          severity=(
+            "critical"
+            if any(finding.severity == "critical" for finding in state.reconciliation.findings)
+            else "warning"
+          ),
+          category="reconciliation",
+          summary="Guarded-live reconciliation has unresolved findings.",
+          detail=(
+            f"{state.reconciliation.summary} "
+            f"{finding_copy if finding_copy else 'Review the guarded-live venue snapshot and internal exposure state.'}"
+          ),
+          detected_at=state.reconciliation.checked_at or current_time,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if state.recovery.state == "failed":
+      alerts.append(
+        OperatorAlert(
+          alert_id="guarded-live:recovery-failed",
+          severity="critical",
+          category="runtime_recovery",
+          summary="Guarded-live runtime recovery failed.",
+          detail=(
+            f"{state.recovery.summary} Issues: "
+            f"{', '.join(state.recovery.issues) if state.recovery.issues else 'none'}."
+          ),
+          detected_at=state.recovery.recovered_at or current_time,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if state.ownership.state == "orphaned":
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:ownership:{state.ownership.owner_run_id or 'unknown'}",
+          severity="critical",
+          category="session_ownership",
+          summary="Guarded-live session ownership is orphaned.",
+          detail=(
+            f"Run {state.ownership.owner_run_id or 'n/a'} still owns the guarded-live session, "
+            f"but the live worker is not healthy. Last reason: {state.ownership.last_reason or 'n/a'}."
+          ),
+          detected_at=(
+            state.ownership.last_heartbeat_at
+            or state.ownership.last_resumed_at
+            or state.ownership.claimed_at
+            or current_time
+          ),
+          run_id=state.ownership.owner_run_id,
+          session_id=state.ownership.owner_session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    if live_context_active and state.session_handoff.state == "unavailable":
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:session-transport:{state.ownership.owner_run_id or 'unknown'}",
+          severity="critical",
+          category="session_transport",
+          summary="Guarded-live venue session transport is unavailable.",
+          detail=(
+            "Venue-native session supervision could not be maintained. Issues: "
+            f"{', '.join(state.session_handoff.issues) if state.session_handoff.issues else 'none'}."
+          ),
+          detected_at=state.session_handoff.last_sync_at or state.session_handoff.handed_off_at or current_time,
+          run_id=state.ownership.owner_run_id,
+          session_id=state.ownership.owner_session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+    elif live_context_active and state.session_handoff.issues:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:session-issues:{state.ownership.owner_run_id or 'unknown'}",
+          severity="warning",
+          category="session_transport",
+          summary="Guarded-live venue session requires operator review.",
+          detail=", ".join(state.session_handoff.issues),
+          detected_at=state.session_handoff.last_sync_at or state.session_handoff.handed_off_at or current_time,
+          run_id=state.ownership.owner_run_id,
+          session_id=state.ownership.owner_session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    order_book_issue_copy: list[str] = []
+    if state.session_handoff.order_book_state == "unavailable":
+      order_book_issue_copy.append("venue order-book supervision is unavailable")
+    if state.order_book.issues:
+      order_book_issue_copy.extend(state.order_book.issues)
+    if live_context_active and order_book_issue_copy:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:order-book:{state.ownership.owner_run_id or 'unknown'}",
+          severity="warning",
+          category="order_book",
+          summary="Guarded-live order-book supervision requires review.",
+          detail="; ".join(order_book_issue_copy),
+          detected_at=(
+            state.order_book.synced_at
+            or state.session_handoff.last_sync_at
+            or state.session_handoff.handed_off_at
+            or current_time
+          ),
+          run_id=state.ownership.owner_run_id,
+          session_id=state.ownership.owner_session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    for run in live_runs:
+      alerts.extend(self._build_live_operator_alerts_for_run(run=run, current_time=current_time))
+
+    alerts.sort(key=lambda alert: alert.detected_at, reverse=True)
+    return alerts
+
+  def _build_live_operator_alerts_for_run(
+    self,
+    *,
+    run: RunRecord,
+    current_time: datetime,
+  ) -> list[OperatorAlert]:
+    session = run.provenance.runtime_session
+    if session is None:
+      return []
+
+    alerts: list[OperatorAlert] = []
+    symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
+    delivery_targets = self._guarded_live_delivery_targets()
+    failed_event = self._latest_runtime_note_event(run=run, kind="guarded_live_worker_failed")
+    if failed_event is not None or session.lifecycle_state == "failed" or run.status == RunStatus.FAILED:
+      detected_at = (
+        failed_event["timestamp"]
+        or run.ended_at
+        or session.last_heartbeat_at
+        or run.started_at
+      )
+      detail = failed_event["detail"] if failed_event is not None else (
+        run.notes[-1] if run.notes else "Guarded-live worker entered a failed runtime state."
+      )
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:worker-failed:{run.config.run_id}:{session.session_id}",
+          severity="critical",
+          category="worker_failure",
+          summary=f"Guarded-live worker failed for {symbol}.",
+          detail=detail,
+          detected_at=detected_at,
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
+    heartbeat_at = session.last_heartbeat_at or session.started_at
+    heartbeat_age_seconds = (current_time - heartbeat_at).total_seconds()
+    if (
+      run.status == RunStatus.RUNNING
+      and session.lifecycle_state == "active"
+      and heartbeat_age_seconds > session.heartbeat_timeout_seconds
+    ):
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:worker-stale:{run.config.run_id}:{session.session_id}",
+          severity="warning",
+          category="stale_runtime",
+          summary=f"Guarded-live worker heartbeat is stale for {symbol}.",
+          detail=(
+            f"Last heartbeat at {heartbeat_at.isoformat()} exceeded the "
+            f"{session.heartbeat_timeout_seconds}s timeout while the live run remains active."
+          ),
+          detected_at=heartbeat_at,
+          run_id=run.config.run_id,
+          session_id=session.session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+    return alerts
+
+  @staticmethod
+  def _merge_operator_alert_history(
+    *,
+    existing: tuple[OperatorAlert, ...],
+    active_alerts: list[OperatorAlert],
+    current_time: datetime,
+  ) -> tuple[OperatorAlert, ...]:
+    history_by_id = {alert.alert_id: alert for alert in existing}
+    active_ids = {alert.alert_id for alert in active_alerts}
+
+    for alert in active_alerts:
+      previous = history_by_id.get(alert.alert_id)
+      detected_at = (
+        previous.detected_at
+        if previous is not None and previous.status == "active"
+        else alert.detected_at
+      )
+      history_by_id[alert.alert_id] = replace(
+        alert,
+        detected_at=detected_at,
+        status="active",
+        resolved_at=None,
+        delivery_targets=alert.delivery_targets or (previous.delivery_targets if previous is not None else ()),
+      )
+
+    for alert_id, previous in tuple(history_by_id.items()):
+      if alert_id in active_ids or previous.status != "active":
+        continue
+      history_by_id[alert_id] = replace(
+        previous,
+        status="resolved",
+        resolved_at=current_time,
+      )
+
+    merged = sorted(
+      history_by_id.values(),
+      key=lambda alert: (alert.resolved_at or alert.detected_at, alert.detected_at),
+      reverse=True,
+    )
+    return tuple(merged)
+
   def _build_operator_alerts_for_run(
     self,
     *,
@@ -3568,7 +3879,7 @@ class TradingApplication:
     parts = note.split(" | ", 2)
     if len(parts) == 3:
       timestamp_raw, kind, detail = parts
-      if kind.startswith("sandbox_worker_"):
+      if kind.startswith("sandbox_worker_") or kind.startswith("guarded_live_worker_"):
         return {
           "timestamp": datetime.fromisoformat(timestamp_raw),
           "kind": kind,
@@ -3580,6 +3891,8 @@ class TradingApplication:
   def _build_runtime_audit_summary(*, run: RunRecord, kind: str) -> str:
     symbol = run.config.symbols[0] if run.config.symbols else run.config.run_id
     summary_by_kind = {
+      "guarded_live_worker_failed": f"Guarded-live worker failed for {symbol}.",
+      "guarded_live_worker_recovered": f"Guarded-live worker recovered for {symbol}.",
       "sandbox_worker_recovered": f"Sandbox worker recovered for {symbol}.",
       "sandbox_worker_failed": f"Sandbox worker failed for {symbol}.",
       "sandbox_worker_stopped": f"Sandbox worker stopped by operator for {symbol}.",

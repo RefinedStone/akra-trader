@@ -303,6 +303,73 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
   assert any(event["kind"] == "sandbox_worker_failed" for event in payload["audit_events"])
 
 
+def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 13, 15, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="ETH", total=0.4, free=0.4, used=0.0),
+        ),
+      )
+    )
+
+    first_reconcile = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "pre_live_balance_check"},
+    )
+    assert first_reconcile.status_code == 200
+
+    active_visibility = client.get("/api/operator/visibility")
+    assert active_visibility.status_code == 200
+    active_payload = active_visibility.json()
+    active_alert = next(
+      alert for alert in active_payload["alerts"]
+      if alert["alert_id"] == "guarded-live:reconciliation"
+    )
+    assert active_alert["source"] == "guarded_live"
+    assert "guarded_live_status" in active_alert["delivery_targets"]
+    active_history = next(
+      alert for alert in active_payload["alert_history"]
+      if alert["alert_id"] == "guarded-live:reconciliation"
+    )
+    assert active_history["status"] == "active"
+    assert any(event["kind"] == "guarded_live_reconciliation_ran" for event in active_payload["audit_events"])
+
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 13, 20, tzinfo=UTC),
+      )
+    )
+    second_reconcile = client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "post_fix_balance_check"},
+    )
+    assert second_reconcile.status_code == 200
+
+    resolved_visibility = client.get("/api/operator/visibility")
+
+  assert resolved_visibility.status_code == 200
+  resolved_payload = resolved_visibility.json()
+  assert all(
+    alert["alert_id"] != "guarded-live:reconciliation"
+    for alert in resolved_payload["alerts"]
+  )
+  resolved_history = next(
+    alert for alert in resolved_payload["alert_history"]
+    if alert["alert_id"] == "guarded-live:reconciliation"
+  )
+  assert resolved_history["status"] == "resolved"
+  assert resolved_history["resolved_at"] is not None
+
+
 def test_guarded_live_endpoints_manage_kill_switch_and_block_runtime_starts(tmp_path: Path) -> None:
   with build_client(tmp_path / "runs.sqlite3") as client:
     initial = client.get("/api/guarded-live")

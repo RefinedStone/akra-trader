@@ -133,9 +133,11 @@ The API app lifespan always starts a sandbox worker maintenance job that heartbe
 sessions and applies restart recovery. When a supported ccxt market-data provider is enabled, the
 app also starts a `MarketDataSyncJob` that periodically refreshes tracked symbols.
 
-The application also derives operator visibility from sandbox runtime state. Failed worker sessions
-and stale heartbeats surface as control-room alerts, and worker lifecycle notes are normalized into
-recent audit events for operator review.
+The application also derives operator visibility from runtime state across sandbox and guarded-live
+flows. Failed worker sessions and stale heartbeats surface as control-room alerts, guarded-live
+control/session faults now persist as live-path alert history with active/resolved lifecycle state
+and delivery targets, and worker lifecycle notes plus guarded-live control events are normalized
+into recent audit events for operator review.
 
 Guarded-live control state is persisted separately from run history. That state currently tracks a
 kill switch for operator-controlled runtime sessions, reconciliation results that now include
@@ -225,8 +227,10 @@ The web app currently surfaces:
   last account/balance/order-list/market/depth/kline event visibility plus order-book resync,
   rebuild, recovered bid/ask ladders, channel-restore visibility, persisted market-channel
   continuation visibility, and top-of-book supervision
-- runtime alerts and audit visibility for sandbox worker failures and stale sessions
-- guarded-live kill switch, candidacy blockers, venue-state verification snapshots, reconciliation findings, and guarded-live audit history
+- runtime alerts and audit visibility for sandbox worker failures, stale sessions, guarded-live
+  live-path alerts, and persisted live-path alert history
+- guarded-live kill switch, candidacy blockers, guarded-live alert history, venue-state
+  verification snapshots, reconciliation findings, and guarded-live audit history
 - run history
 - run comparison and benchmark narratives
 

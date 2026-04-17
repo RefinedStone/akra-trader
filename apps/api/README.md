@@ -17,10 +17,11 @@ Implemented now:
   sync checkpoints, failure history, and status reporting
 - run provenance exposes rerun boundary identities, supports rerun-boundary filtering, and can
   relaunch stored boundaries into backtest, sandbox, or paper flows
-- operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts, and
-  runtime audit events
-- guarded-live state endpoints persist kill-switch state, reconciliation status, and guarded-live
-  audit events in the control plane
+- operator visibility endpoint exposes sandbox worker failure alerts, stale runtime alerts,
+  guarded-live live-path alerts, persisted live-path alert history, and merged runtime plus
+  guarded-live audit events
+- guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
+  history, and guarded-live audit events in the control plane
 - guarded-live reconciliation records venue-state snapshots and compares them against local runtime
   exposure before live candidacy discussion
 - guarded-live runtime recovery can rebuild persisted runtime exposure and open-order state from the
@@ -137,7 +138,8 @@ Defaults:
   longer share the same storage bucket
 - sandbox runs now start as native worker sessions, then continuously apply new candle ticks with
   persisted heartbeat and recovery state
-- operator visibility now surfaces stale sandbox heartbeats, worker failures, and runtime audit
+- operator visibility now surfaces stale sandbox heartbeats, worker failures, guarded-live
+  live-path alerts, persisted live-path alert history, and merged runtime plus guarded-live audit
   entries directly in the control room
 - guarded-live controls now persist kill-switch state, can stop running sandbox/paper sessions, and
   record operator reconciliation drills before any live candidacy discussion

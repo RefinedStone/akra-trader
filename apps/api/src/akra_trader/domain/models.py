@@ -469,7 +469,9 @@ class OperatorAlert:
   run_id: str | None = None
   session_id: str | None = None
   status: str = "active"
+  resolved_at: datetime | None = None
   source: str = "runtime"
+  delivery_targets: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -489,6 +491,7 @@ class OperatorAuditEvent:
 class OperatorVisibility:
   generated_at: datetime
   alerts: tuple[OperatorAlert, ...] = ()
+  alert_history: tuple[OperatorAlert, ...] = ()
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -787,6 +790,7 @@ class GuardedLiveState:
   order_book: GuardedLiveOrderBookSync = field(default_factory=GuardedLiveOrderBookSync)
   session_restore: GuardedLiveVenueSessionRestore = field(default_factory=GuardedLiveVenueSessionRestore)
   session_handoff: GuardedLiveVenueSessionHandoff = field(default_factory=GuardedLiveVenueSessionHandoff)
+  alert_history: tuple[OperatorAlert, ...] = ()
   audit_events: tuple[OperatorAuditEvent, ...] = ()
 
 
@@ -795,6 +799,8 @@ class GuardedLiveStatus:
   generated_at: datetime
   candidacy_status: str
   blockers: tuple[str, ...] = ()
+  active_alerts: tuple[OperatorAlert, ...] = ()
+  alert_history: tuple[OperatorAlert, ...] = ()
   kill_switch: GuardedLiveKillSwitch = field(default_factory=GuardedLiveKillSwitch)
   reconciliation: GuardedLiveReconciliation = field(default_factory=GuardedLiveReconciliation)
   recovery: GuardedLiveRuntimeRecovery = field(default_factory=GuardedLiveRuntimeRecovery)
