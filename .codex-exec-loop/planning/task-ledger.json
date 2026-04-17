@@ -652,37 +652,55 @@
       "id": "planning-operator-trust-typed-provider-recovery-state",
       "direction_id": "operator-trust-and-discipline",
       "title": "Promote provider recovery payloads into typed remediation state",
-      "description": "Build on the completed structured provider payload persistence by interpreting provider-specific recovery schemas into typed remediation-state fields for channel restore, order-book rebuild, and adjacent provider-managed recovery flows, so operator surfaces and orchestration logic do not depend on opaque payload blobs when tracking verification, ownership, and recovery progress.",
-      "status": "ready",
+      "description": "Build on the completed structured provider payload persistence by interpreting provider-specific recovery schemas into typed remediation-state fields for channel restore, order-book rebuild, and adjacent provider-managed recovery flows, so operator surfaces and orchestration logic do not depend on opaque payload blobs when tracking verification, ownership, and recovery progress. This was completed by normalizing provider recovery payloads into typed lifecycle, job, channel, symbol, timeframe, and verification state across remediation storage, outbound delivery, operator surfaces, tests, and docs.",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply explicitly says the remaining immediate gap after commit 6ea20d7 is interpreting stored provider recovery payloads into deeper typed remediation state, making this the clearest next executable follow-up now that payload storage, exposure, and outbound context wiring are complete.",
+      "priority_reason": "Completed in main session commit 10b9693, which promoted provider recovery payloads into typed remediation state, carried the normalized recovery model through application storage and outbound delivery, surfaced lifecycle and verification fields in the control room, and verified the change with API pytest plus web typecheck and build.",
       "depends_on": [
         "planning-operator-trust-provider-remediation-orchestration-depth"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:08:17Z",
+      "updated_at": "2026-04-17T21:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by turning newly durable provider recovery payloads into first-class remediation semantics that product surfaces and downstream orchestration can reason about without provider-blob inspection."
+      "direction_relation_note": "Closed the opaque-provider-payload gap for operator trust by making provider recovery lifecycle and verification state first-class remediation data, which now leaves venue-specific typed schema depth and full provider-side recovery status-machine synchronization as the direct follow-ups."
     },
     {
       "id": "planning-operator-trust-provider-recovery-status-machine-sync",
       "direction_id": "operator-trust-and-discipline",
       "title": "Synchronize provider-owned recovery jobs with a full provider-side status machine",
       "description": "Extend the completed bidirectional remediation loop beyond resolve handoff by modeling and reconciling the full provider-owned recovery job lifecycle against provider-side status-machine states, so local remediation does not stop at verification plus resolve while the provider continues to own richer recovery execution progress or terminal outcomes.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 81,
-      "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply explicitly keeps full provider-side recovery-job synchronization on the remaining-work list after commit 6ea20d7, but typed remediation-state promotion is the more direct queue head because it gives the status-machine work structured state to synchronize against.",
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply explicitly says remediation now closes at typed state plus local verify or resolve, while the remaining direct implementation gap is mirroring the provider-owned recovery engine's internal phase machine as a full bidirectional state machine, making this the clearest next executable queue head after commit 10b9693.",
       "depends_on": [
         "planning-operator-trust-typed-provider-recovery-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:08:17Z",
+      "updated_at": "2026-04-17T21:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps operator trust moving toward true provider-owned remediation by making local incident state reconcile the complete external recovery-job lifecycle rather than only callback snapshots and final resolve handoff."
+    },
+    {
+      "id": "planning-operator-trust-venue-specific-provider-recovery-typed-state",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Split provider recovery state into venue-specific typed schemas",
+      "description": "Build on the completed generic typed provider recovery model by separating venue-specific recovery payloads into deeper typed schemas for exchange- or provider-owned recovery flows, so remediation logic and operator surfaces can reason about venue-native recovery semantics without collapsing distinct provider contracts into one generic job or target shape.",
+      "status": "proposed",
+      "base_priority": 80,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply explicitly calls out venue-specific typed recovery-state branching as remaining work after commit 10b9693, but the provider-side phase-machine mirror is the more direct next executable task because it closes lifecycle synchronization on top of the newly typed generic model.",
+      "depends_on": [
+        "planning-operator-trust-typed-provider-recovery-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T21:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by keeping typed remediation state honest about provider- and venue-native recovery semantics instead of flattening all external recovery engines into one generic contract."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
