@@ -801,6 +801,31 @@ class OperatorIncidentBigPandaRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentGrafanaOnCallRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  assignee: str | None = None
+  escalation_chain: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentGrafanaOnCallRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentGrafanaOnCallRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentGrafanaOnCallRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -851,6 +876,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   bigpanda: OperatorIncidentBigPandaRecoveryState = field(
     default_factory=OperatorIncidentBigPandaRecoveryState
+  )
+  grafana_oncall: OperatorIncidentGrafanaOnCallRecoveryState = field(
+    default_factory=OperatorIncidentGrafanaOnCallRecoveryState
   )
   updated_at: datetime | None = None
 

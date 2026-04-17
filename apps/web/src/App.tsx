@@ -592,6 +592,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        grafana_oncall: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          escalation_chain?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -933,6 +951,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             team_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        grafana_oncall: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          escalation_chain?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            escalation_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8520,6 +8556,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  grafana_oncall: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    assignee?: string | null;
+    escalation_chain?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8810,6 +8864,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `BigPanda schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "grafana_oncall") {
+    const details = [
+      providerRecovery.grafana_oncall.incident_id
+        ? `incident ${providerRecovery.grafana_oncall.incident_id}`
+        : null,
+      providerRecovery.grafana_oncall.incident_status !== "unknown"
+        ? `status ${providerRecovery.grafana_oncall.incident_status}`
+        : null,
+      providerRecovery.grafana_oncall.severity
+        ? `severity ${providerRecovery.grafana_oncall.severity}`
+        : null,
+      providerRecovery.grafana_oncall.assignee
+        ? `assignee ${providerRecovery.grafana_oncall.assignee}`
+        : null,
+      providerRecovery.grafana_oncall.escalation_chain
+        ? `chain ${providerRecovery.grafana_oncall.escalation_chain}`
+        : null,
+      providerRecovery.grafana_oncall.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.grafana_oncall.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.grafana_oncall.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.grafana_oncall.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.grafana_oncall.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.grafana_oncall.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.grafana_oncall.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.grafana_oncall.updated_at)}`
+        : null,
+      providerRecovery.grafana_oncall.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.grafana_oncall.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Grafana OnCall schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

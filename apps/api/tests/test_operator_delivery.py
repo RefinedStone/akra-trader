@@ -2037,6 +2037,289 @@ def test_operator_alert_delivery_adapter_pulls_bigpanda_provider_state() -> None
   assert requests[1][2]["Authorization"] == "Bearer bigpanda-recovery-token"
 
 
+def test_operator_alert_delivery_adapter_supports_grafana_oncall_target_and_resolution() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("grafana_oncall",),
+    grafana_oncall_api_token="grafana-oncall-token",
+    grafana_oncall_api_url="https://oncall-api.grafana.example",
+    webhook_timeout_seconds=6,
+    urlopen=fake_urlopen,
+  )
+  opened = OperatorIncidentEvent(
+    event_id="incident-opened-grafana-oncall-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 15, 10, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live worker failed for ETH/USDT.",
+    detail="live worker crash",
+  )
+  resolved = OperatorIncidentEvent(
+    event_id="incident-resolved-grafana-oncall-1",
+    alert_id="guarded-live:worker-failed:run-1",
+    timestamp=datetime(2025, 1, 3, 15, 11, tzinfo=UTC),
+    kind="incident_resolved",
+    severity="warning",
+    summary="Resolved: Guarded-live worker failed for ETH/USDT.",
+    detail="live worker recovered",
+    external_reference="guarded-live:worker-failed:run-1",
+  )
+
+  opened_records = adapter.deliver(incident=opened)
+  resolved_records = adapter.deliver(incident=resolved)
+
+  assert adapter.list_targets() == ("grafana_oncall_incidents",)
+  assert opened_records[0].target == "grafana_oncall_incidents"
+  assert opened_records[0].external_provider == "grafana_oncall"
+  assert resolved_records[0].external_reference == "guarded-live:worker-failed:run-1"
+
+  create_request = requests[0]
+  resolve_request = requests[1]
+  assert create_request[0] == "https://oncall-api.grafana.example/api/v1/incidents"
+  assert create_request[1] == "POST"
+  assert create_request[3]["Authorization"] == "Bearer grafana-oncall-token"
+  create_payload = json.loads(create_request[2].decode("utf-8"))
+  assert create_payload["incident"]["external_reference"] == "guarded-live:worker-failed:run-1"
+  assert create_payload["incident"]["severity"] == "critical"
+  assert create_payload["incident"]["status"] == "triggered"
+
+  assert resolve_request[0].endswith(
+    "/api/v1/incidents/guarded-live%3Aworker-failed%3Arun-1/resolve?identifier_type=external_reference"
+  )
+  assert resolve_request[1] == "POST"
+  resolve_payload = json.loads(resolve_request[2].decode("utf-8"))
+  assert resolve_payload["note"] == "live worker recovered"
+
+
+def test_operator_alert_delivery_adapter_syncs_grafana_oncall_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("grafana_oncall",),
+    grafana_oncall_api_token="grafana-oncall-token",
+    grafana_oncall_api_url="https://oncall-api.grafana.example",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-grafana-oncall-2",
+    alert_id="guarded-live:reconciliation",
+    timestamp=datetime(2025, 1, 3, 15, 12, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live reconciliation has unresolved findings.",
+    detail="reconciliation drift",
+    external_provider="grafana_oncall",
+    external_reference="guarded-live:reconciliation",
+    provider_workflow_reference="GO-123",
+    escalation_level=2,
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="recent_sync",
+      summary="Refresh the live timeframe sync window and verify freshness thresholds.",
+      runbook="market_data.sync_recent",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        lifecycle_state="recovering",
+        provider="grafana_oncall",
+        job_id="go-job-existing",
+        channels=("kline",),
+        symbols=("ETH/USDT",),
+        timeframe="5m",
+        verification=OperatorIncidentProviderRecoveryVerification(state="pending"),
+      ),
+    ),
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="grafana_oncall",
+    action="acknowledge",
+    actor="operator",
+    detail="triaged",
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="grafana_oncall",
+    action="escalate",
+    actor="operator",
+    detail="handoff",
+  )
+  resolve = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="grafana_oncall",
+    action="resolve",
+    actor="operator",
+    detail="fixed",
+    payload={"job_id": "go-job-1", "verification": {"state": "passed"}},
+  )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="grafana_oncall",
+    action="remediate",
+    actor="operator",
+    detail="restart_sync_and_verify_checkpoint",
+    payload={"job_id": "go-job-2", "channels": ["kline", "depth"]},
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("grafana_oncall",)
+  assert acknowledge[0].target == "grafana_oncall_workflow"
+  assert acknowledge[0].external_reference == "GO-123"
+  assert escalate[0].provider_action == "escalate"
+  assert resolve[0].provider_action == "resolve"
+  assert remediate[0].provider_action == "remediate"
+
+  assert requests[0][0].endswith("/api/v1/incidents/GO-123/acknowledge?identifier_type=id")
+  assert requests[1][0].endswith("/api/v1/incidents/GO-123/escalate?identifier_type=id")
+  assert requests[2][0].endswith("/api/v1/incidents/GO-123/resolve?identifier_type=id")
+  assert requests[3][0].endswith("/api/v1/incidents/GO-123/remediate?identifier_type=id")
+  escalate_payload = json.loads(requests[1][2].decode("utf-8"))
+  resolve_payload = json.loads(requests[2][2].decode("utf-8"))
+  remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  assert "level 2" in escalate_payload["note"]
+  assert '"job_id": "go-job-1"' in resolve_payload["note"]
+  assert "requested remediation" in remediate_payload["note"]
+  assert "market_data.sync_recent" in remediate_payload["note"]
+  assert '"job_id": "go-job-2"' in remediate_payload["note"]
+
+
+def test_operator_alert_delivery_adapter_pulls_grafana_oncall_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    if request.full_url == "https://oncall-api.grafana.example/api/v1/incidents/GO-123?identifier_type=id":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "result": {
+              "incident_id": "GO-123",
+              "external_reference": "guarded-live:market-data:5m",
+              "incident_status": "acknowledged",
+              "summary": "Guarded-live market-data incident",
+              "updated_at": "2025-01-03T15:13:00Z",
+              "severity": "high",
+              "assignee": "market-data-oncall",
+              "escalation_chain": "market-data-primary",
+              "url": "https://grafana-oncall.example/incidents/GO-123",
+              "metadata": {
+                "remediation_state": "recovering",
+                "remediation_provider_payload": {
+                  "job_id": "go-job-9",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                  "verification": {"state": "pending"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovering",
+                  "job_id": "go-job-9",
+                  "channels": ["depth", "kline"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "status_machine_state": "provider_running",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "running",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "running",
+                  "progress_percent": 52,
+                  "attempt_count": 1,
+                  "current_step": "incident_body",
+                  "last_message": "incident body telemetry is lagging",
+                  "external_run_id": "go-body-9",
+                },
+                "remediation_provider_telemetry_url": "https://grafana-oncall-engine.example/recovery/go-job-9",
+              },
+            }
+          }
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://grafana-oncall-engine.example/recovery/go-job-9":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "job": {
+              "state": "running",
+              "progress_percent": 92,
+              "attempt_count": 2,
+              "current_step": "verify_restored_channels",
+              "last_message": "Grafana OnCall engine is verifying restored channels",
+              "external_run_id": "go-engine-9",
+              "updated_at": "2025-01-03T15:14:00Z",
+              "url": "https://grafana-oncall-engine.example/jobs/go-job-9",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    return FakeResponse(404)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("grafana_oncall",),
+    grafana_oncall_api_token="grafana-oncall-token",
+    grafana_oncall_api_url="https://oncall-api.grafana.example",
+    grafana_oncall_recovery_engine_url_template="https://grafana-oncall-engine.example/recovery/{job_id_urlencoded}",
+    grafana_oncall_recovery_engine_token="grafana-oncall-recovery-token",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-grafana-oncall-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 15, 12, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="grafana_oncall",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="GO-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="grafana_oncall",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "grafana_oncall"
+  assert snapshot.workflow_reference == "GO-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "recovering"
+  assert snapshot.payload["job_id"] == "go-job-9"
+  assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert snapshot.payload["provider_schema"]["kind"] == "grafana_oncall"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["incident_id"] == "GO-123"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["incident_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["phase_graph"]["incident_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["phase_graph"]["workflow_phase"] == "provider_recovering"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["phase_graph"]["ownership_phase"] == "assigned"
+  assert snapshot.payload["provider_schema"]["grafana_oncall"]["phase_graph"]["escalation_phase"] == "configured"
+  assert snapshot.payload["telemetry"]["source"] == "provider_engine"
+  assert snapshot.payload["telemetry"]["state"] == "running"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 92
+  assert snapshot.payload["telemetry"]["attempt_count"] == 2
+  assert snapshot.payload["telemetry"]["current_step"] == "verify_restored_channels"
+  assert snapshot.payload["telemetry"]["last_message"] == "Grafana OnCall engine is verifying restored channels"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "go-engine-9"
+  assert requests[0][0].endswith("/api/v1/incidents/GO-123?identifier_type=id")
+  assert requests[0][1] == "GET"
+  assert requests[0][2]["Authorization"] == "Bearer grafana-oncall-token"
+  assert requests[1][0] == "https://grafana-oncall-engine.example/recovery/go-job-9"
+  assert requests[1][1] == "GET"
+  assert requests[1][2]["Authorization"] == "Bearer grafana-oncall-recovery-token"
+
+
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
   requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
 

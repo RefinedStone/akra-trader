@@ -68,6 +68,8 @@ from akra_trader.domain.models import OperatorIncidentSquadcastRecoveryPhaseGrap
 from akra_trader.domain.models import OperatorIncidentSquadcastRecoveryState
 from akra_trader.domain.models import OperatorIncidentBigPandaRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentBigPandaRecoveryState
+from akra_trader.domain.models import OperatorIncidentGrafanaOnCallRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentGrafanaOnCallRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderRecoveryStatusMachine
@@ -1630,6 +1632,17 @@ class TradingApplication:
             aligned_provider_recovery,
             bigpanda=replace(
               aligned_provider_recovery.bigpanda,
+              incident_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "grafana_oncall"
+          and provider_recovery.grafana_oncall.incident_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            grafana_oncall=replace(
+              aligned_provider_recovery.grafana_oncall,
               incident_status="delivered",
             ),
           )
@@ -3347,6 +3360,129 @@ class TradingApplication:
       ),
     )
 
+  @staticmethod
+  def _normalize_grafana_oncall_incident_phase(status: str | None, existing_phase: str) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "acknowledged",
+      "investigating",
+      "monitoring",
+      "resolved",
+      "closed",
+      "canceled",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_grafana_oncall_ownership_phase(assignee: str | None, existing_phase: str) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_grafana_oncall_severity_phase(severity: str | None, existing_phase: str) -> str:
+    normalized = (severity or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_grafana_oncall_escalation_phase(
+    escalation_chain: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_chain:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_grafana_oncall_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state == "acknowledged":
+      return "incident_acknowledged"
+    if workflow_state in {"triggered", "open", "investigating", "monitoring"}:
+      return "incident_active"
+    return "idle"
+
+  def _build_grafana_oncall_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    incident_status: str,
+    severity: str | None,
+    assignee: str | None,
+    escalation_chain: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentGrafanaOnCallRecoveryState,
+  ) -> OperatorIncidentGrafanaOnCallRecoveryPhaseGraph:
+    incident_phase = self._first_non_empty_string(
+      payload.get("incident_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("incident_phase"),
+    ) or self._normalize_grafana_oncall_incident_phase(
+      incident_status,
+      existing.phase_graph.incident_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_grafana_oncall_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=incident_status,
+    )
+    return OperatorIncidentGrafanaOnCallRecoveryPhaseGraph(
+      incident_phase=incident_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_grafana_oncall_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      severity_phase=self._first_non_empty_string(
+        payload.get("severity_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("severity_phase"),
+      ) or self._resolve_grafana_oncall_severity_phase(
+        severity,
+        existing.phase_graph.severity_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_grafana_oncall_escalation_phase(
+        escalation_chain,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
   def _build_provider_recovery_provider_schema(
     self,
     *,
@@ -3371,6 +3507,7 @@ class TradingApplication:
     OperatorIncidentServicenowRecoveryState,
     OperatorIncidentSquadcastRecoveryState,
     OperatorIncidentBigPandaRecoveryState,
+    OperatorIncidentGrafanaOnCallRecoveryState,
   ]:
     normalized_provider = self._normalize_paging_provider(provider)
     schema_payload = self._extract_payload_mapping(payload.get("provider_schema"))
@@ -4148,6 +4285,84 @@ class TradingApplication:
       ),
     )
 
+    grafana_oncall_payload = self._merge_payload_mappings(
+      schema_payload.get("grafana_oncall"),
+      schema_payload.get("grafanaoncall"),
+      payload.get("grafana_oncall"),
+      payload.get("grafana_oncall_incident"),
+      payload.get("grafanaoncall"),
+    )
+    grafana_oncall_status = self._first_non_empty_string(
+      grafana_oncall_payload.get("incident_status"),
+      grafana_oncall_payload.get("status"),
+      grafana_oncall_payload.get("state"),
+      workflow_state,
+      payload.get("workflow_state"),
+      existing.grafana_oncall.incident_status,
+    ) or "unknown"
+    grafana_oncall = OperatorIncidentGrafanaOnCallRecoveryState(
+      incident_id=self._first_non_empty_string(
+        grafana_oncall_payload.get("incident_id"),
+        grafana_oncall_payload.get("id"),
+        workflow_reference,
+        existing.grafana_oncall.incident_id,
+      ),
+      external_reference=self._first_non_empty_string(
+        grafana_oncall_payload.get("external_reference"),
+        grafana_oncall_payload.get("reference"),
+        reference,
+        existing.grafana_oncall.external_reference,
+      ),
+      incident_status=grafana_oncall_status,
+      severity=self._first_non_empty_string(
+        grafana_oncall_payload.get("severity"),
+        grafana_oncall_payload.get("priority"),
+        existing.grafana_oncall.severity,
+      ),
+      assignee=self._first_non_empty_string(
+        grafana_oncall_payload.get("assignee"),
+        grafana_oncall_payload.get("owner"),
+        existing.grafana_oncall.assignee,
+      ),
+      escalation_chain=self._first_non_empty_string(
+        grafana_oncall_payload.get("escalation_chain"),
+        grafana_oncall_payload.get("escalation_chain_name"),
+        existing.grafana_oncall.escalation_chain,
+      ),
+      url=self._first_non_empty_string(
+        grafana_oncall_payload.get("url"),
+        grafana_oncall_payload.get("html_url"),
+        existing.grafana_oncall.url,
+      ),
+      updated_at=(
+        self._parse_payload_datetime(grafana_oncall_payload.get("updated_at"))
+        or existing.grafana_oncall.updated_at
+      ),
+      phase_graph=self._build_grafana_oncall_recovery_phase_graph(
+        payload=grafana_oncall_payload,
+        incident_status=grafana_oncall_status,
+        severity=self._first_non_empty_string(
+          grafana_oncall_payload.get("severity"),
+          grafana_oncall_payload.get("priority"),
+          existing.grafana_oncall.severity,
+        ),
+        assignee=self._first_non_empty_string(
+          grafana_oncall_payload.get("assignee"),
+          grafana_oncall_payload.get("owner"),
+          existing.grafana_oncall.assignee,
+        ),
+        escalation_chain=self._first_non_empty_string(
+          grafana_oncall_payload.get("escalation_chain"),
+          grafana_oncall_payload.get("escalation_chain_name"),
+          existing.grafana_oncall.escalation_chain,
+        ),
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        existing=existing.grafana_oncall,
+      ),
+    )
+
     if normalized_provider == "pagerduty":
       return (
         "pagerduty",
@@ -4161,6 +4376,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "opsgenie":
       return (
@@ -4175,6 +4391,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "incidentio":
       return (
@@ -4189,6 +4406,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "firehydrant":
       return (
@@ -4203,6 +4421,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "rootly":
       return (
@@ -4217,6 +4436,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "blameless":
       return (
@@ -4231,6 +4451,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "xmatters":
       return (
@@ -4245,6 +4466,7 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "servicenow":
       return (
@@ -4259,6 +4481,7 @@ class TradingApplication:
         servicenow,
         existing.squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "squadcast":
       return (
@@ -4273,6 +4496,7 @@ class TradingApplication:
         existing.servicenow,
         squadcast,
         existing.bigpanda,
+        existing.grafana_oncall,
       )
     if normalized_provider == "bigpanda":
       return (
@@ -4287,6 +4511,22 @@ class TradingApplication:
         existing.servicenow,
         existing.squadcast,
         bigpanda,
+        existing.grafana_oncall,
+      )
+    if normalized_provider == "grafana_oncall":
+      return (
+        "grafana_oncall",
+        existing.pagerduty,
+        existing.opsgenie,
+        existing.incidentio,
+        existing.firehydrant,
+        existing.rootly,
+        existing.blameless,
+        existing.xmatters,
+        existing.servicenow,
+        existing.squadcast,
+        existing.bigpanda,
+        grafana_oncall,
       )
     return (
       existing.provider_schema_kind,
@@ -4300,6 +4540,7 @@ class TradingApplication:
       existing.servicenow,
       existing.squadcast,
       existing.bigpanda,
+      existing.grafana_oncall,
     )
 
   def _build_provider_recovery_state(
@@ -4386,22 +4627,23 @@ class TradingApplication:
       servicenow_schema,
       squadcast_schema,
       bigpanda_schema,
+      grafana_oncall_schema,
     ) = (
       self._build_provider_recovery_provider_schema(
-      provider=provider or existing.provider or remediation.provider or "",
-      payload=payload,
-      lifecycle_state=lifecycle_state,
-      status_machine=status_machine,
-      synced_at=synced_at,
-      workflow_state=status_machine.workflow_state,
-      workflow_reference=self._first_non_empty_string(
-        workflow_reference,
-        payload.get("workflow_reference"),
-        payload.get("provider_workflow_reference"),
-        existing.workflow_reference,
-      ),
-      reference=reference,
-      existing=existing,
+        provider=provider or existing.provider or remediation.provider or "",
+        payload=payload,
+        lifecycle_state=lifecycle_state,
+        status_machine=status_machine,
+        synced_at=synced_at,
+        workflow_state=status_machine.workflow_state,
+        workflow_reference=self._first_non_empty_string(
+          workflow_reference,
+          payload.get("workflow_reference"),
+          payload.get("provider_workflow_reference"),
+          existing.workflow_reference,
+        ),
+        reference=reference,
+        existing=existing,
       )
     )
     return OperatorIncidentProviderRecoveryState(
@@ -4471,6 +4713,7 @@ class TradingApplication:
       servicenow=servicenow_schema,
       squadcast=squadcast_schema,
       bigpanda=bigpanda_schema,
+      grafana_oncall=grafana_oncall_schema,
       updated_at=synced_at,
     )
 
@@ -4620,6 +4863,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.bigpanda,
+        ),
+      ),
+      grafana_oncall=replace(
+        provider_recovery.grafana_oncall,
+        phase_graph=self._build_grafana_oncall_recovery_phase_graph(
+          payload={},
+          incident_status=provider_recovery.grafana_oncall.incident_status,
+          severity=provider_recovery.grafana_oncall.severity,
+          assignee=provider_recovery.grafana_oncall.assignee,
+          escalation_chain=provider_recovery.grafana_oncall.escalation_chain,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.grafana_oncall,
         ),
       ),
     )
@@ -8971,6 +9228,8 @@ class TradingApplication:
       return "squadcast"
     if normalized == "big_panda":
       return "bigpanda"
+    if normalized in {"grafana_oncall_incidents", "grafanaoncall", "operator_grafana_oncall"}:
+      return "grafana_oncall"
     return normalized or None
 
   @staticmethod
@@ -9148,6 +9407,8 @@ class TradingApplication:
       return "squadcast"
     if "bigpanda_incidents" in combined:
       return "bigpanda"
+    if "grafana_oncall_incidents" in combined:
+      return "grafana_oncall"
     if "opsgenie_alerts" in combined:
       return "opsgenie"
     return None

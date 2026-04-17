@@ -73,6 +73,10 @@ class Settings:
   operator_alert_bigpanda_api_url: str = "https://api.bigpanda.io"
   operator_alert_bigpanda_recovery_engine_url_template: str | None = None
   operator_alert_bigpanda_recovery_engine_token: str | None = None
+  operator_alert_grafana_oncall_api_token: str | None = None
+  operator_alert_grafana_oncall_api_url: str = "https://oncall-api.grafana.com"
+  operator_alert_grafana_oncall_recovery_engine_url_template: str | None = None
+  operator_alert_grafana_oncall_recovery_engine_token: str | None = None
   operator_alert_opsgenie_api_key: str | None = None
   operator_alert_opsgenie_api_url: str = "https://api.opsgenie.com"
   operator_alert_opsgenie_recovery_engine_url_template: str | None = None
@@ -261,6 +265,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_bigpanda_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_BIGPANDA_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_grafana_oncall_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_GRAFANA_ONCALL_API_TOKEN") or None
+    ),
+    operator_alert_grafana_oncall_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_GRAFANA_ONCALL_API_URL",
+      "https://oncall-api.grafana.com",
+    ),
+    operator_alert_grafana_oncall_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_GRAFANA_ONCALL_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_grafana_oncall_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_GRAFANA_ONCALL_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsgenie_api_key=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY") or None

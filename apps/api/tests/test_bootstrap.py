@@ -189,6 +189,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       bigpanda_api_url: str,
       bigpanda_recovery_engine_url_template: str | None,
       bigpanda_recovery_engine_token: str | None,
+      grafana_oncall_api_token: str | None,
+      grafana_oncall_api_url: str,
+      grafana_oncall_recovery_engine_url_template: str | None,
+      grafana_oncall_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -235,6 +239,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["bigpanda_api_url"] = bigpanda_api_url
       captured["bigpanda_recovery_engine_url_template"] = bigpanda_recovery_engine_url_template or ""
       captured["bigpanda_recovery_engine_token"] = bigpanda_recovery_engine_token or ""
+      captured["grafana_oncall_api_token"] = grafana_oncall_api_token or ""
+      captured["grafana_oncall_api_url"] = grafana_oncall_api_url
+      captured["grafana_oncall_recovery_engine_url_template"] = (
+        grafana_oncall_recovery_engine_url_template or ""
+      )
+      captured["grafana_oncall_recovery_engine_token"] = grafana_oncall_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -337,6 +347,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://bigpanda.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_bigpanda_recovery_engine_token="bigpanda-recovery-token",
+      operator_alert_grafana_oncall_api_token="grafana-oncall-token",
+      operator_alert_grafana_oncall_api_url="https://oncall-api.grafana.example",
+      operator_alert_grafana_oncall_recovery_engine_url_template=(
+        "https://grafana-oncall.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_grafana_oncall_recovery_engine_token="grafana-oncall-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -396,6 +412,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["bigpanda_api_url"] == "https://api.bigpanda.example"
   assert captured["bigpanda_recovery_engine_url_template"] == "https://bigpanda.example/recovery/{workflow_reference_urlencoded}"
   assert captured["bigpanda_recovery_engine_token"] == "bigpanda-recovery-token"
+  assert captured["grafana_oncall_api_token"] == "grafana-oncall-token"
+  assert captured["grafana_oncall_api_url"] == "https://oncall-api.grafana.example"
+  assert captured["grafana_oncall_recovery_engine_url_template"] == "https://grafana-oncall.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["grafana_oncall_recovery_engine_token"] == "grafana-oncall-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"
