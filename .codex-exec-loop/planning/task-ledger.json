@@ -329,18 +329,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Persist live-path alert history and broaden operator delivery coverage",
       "description": "Move runtime-derived alerts and guarded-live audit events beyond local control-state visibility by adding durable alert history, broader live-path operator event coverage, and a clear delivery boundary for notifications or downstream incident handling, so guarded-live safety visibility survives restarts and expands beyond the control room audit trail alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply after commit 724e8e7 says guarded-live provider generalization is complete and explicitly leaves wider live-path alerting plus durable operator audit or event delivery as the clearest remaining executable gap, so this should now lead the automatic queue.",
+      "priority_reason": "Completed in main session commit 823da11, which persisted guarded-live alert history with active/resolved lifecycle state, expanded operator visibility and guarded-live APIs to include live-path alert history plus delivery targets, updated the control room, and locked the behavior with API, typecheck, and build verification.",
       "depends_on": [
         "planning-operator-trust-alerts-and-event-log"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:20:00Z",
+      "updated_at": "2026-04-17T10:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by extending guarded-live audit and alert surfaces into durable history and notification-ready delivery boundaries, covering the broader live path instead of leaving safety visibility confined to the current guarded-live audit trail."
+      "direction_relation_note": "Closed the first durable live-path alert-history gap for operator trust by persisting guarded-live alert lifecycle state and surfacing it in operator APIs and the control room, which now leaves outbound alert delivery wiring and sandbox-side durable history as the next trust follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-outbound-alert-delivery-integration",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Connect persisted live-path alerts to outbound delivery and durable incident events",
+      "description": "Use the new persisted guarded-live alert history as the source of truth for notification-ready delivery by wiring active or resolved live-path alerts into explicit outbound channels or durable incident-event records, so operator safety signals can leave the control room and survive downstream handling workflows.",
+      "status": "ready",
+      "base_priority": 81,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply explicitly says persisted alert history still is not connected to external alert channels or durable event delivery, making this the clearest executable follow-up and the next automatic queue head after commit 823da11.",
+      "depends_on": [
+        "planning-operator-trust-durable-alert-history-and-delivery"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by turning persisted live-path alerts from control-room state into delivery-capable incident signals that can drive operator response outside the immediate UI session."
+    },
+    {
+      "id": "planning-operator-trust-sandbox-durable-alert-history",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Extend durable alert history from guarded-live into sandbox runtime visibility",
+      "description": "Bring sandbox runtime alerts up to the same durable-history standard as guarded-live by persisting active and resolved sandbox alert lifecycle state and surfacing that history through operator visibility, rather than relying only on current in-memory runtime status.",
+      "status": "proposed",
+      "base_priority": 79,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply explicitly calls out that durable alert history is still live-path centric and sandbox remains mostly runtime-state visibility, but outbound delivery from the newly persisted live-path alerts is the more immediate next task.",
+      "depends_on": [
+        "planning-operator-trust-durable-alert-history-and-delivery"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T10:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending durable alert lifecycle records beyond guarded-live so sandbox incidents remain inspectable across restarts and operator sessions."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
