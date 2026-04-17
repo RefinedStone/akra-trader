@@ -790,6 +790,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        spikesh: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         zenduty: {
           incident_id?: string | null;
           external_reference?: string | null;
@@ -1333,6 +1351,24 @@ type GuardedLiveStatus = {
           };
         };
         moogsoft: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        spikesh: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9150,6 +9186,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  spikesh: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   zenduty: {
     incident_id?: string | null;
     external_reference?: string | null;
@@ -9798,6 +9852,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Moogsoft schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "spikesh") {
+    const details = [
+      providerRecovery.spikesh.alert_id ? `alert ${providerRecovery.spikesh.alert_id}` : null,
+      providerRecovery.spikesh.alert_status !== "unknown"
+        ? `status ${providerRecovery.spikesh.alert_status}`
+        : null,
+      providerRecovery.spikesh.priority ? `priority ${providerRecovery.spikesh.priority}` : null,
+      providerRecovery.spikesh.escalation_policy
+        ? `policy ${providerRecovery.spikesh.escalation_policy}`
+        : null,
+      providerRecovery.spikesh.assignee ? `assignee ${providerRecovery.spikesh.assignee}` : null,
+      providerRecovery.spikesh.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.spikesh.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.spikesh.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.spikesh.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.spikesh.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.spikesh.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.spikesh.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.spikesh.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.spikesh.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.spikesh.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Spike.sh schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "zenduty") {
     const details = [

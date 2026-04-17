@@ -233,6 +233,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       moogsoft_api_url: str,
       moogsoft_recovery_engine_url_template: str | None,
       moogsoft_recovery_engine_token: str | None,
+      spikesh_api_token: str | None,
+      spikesh_api_url: str,
+      spikesh_recovery_engine_url_template: str | None,
+      spikesh_recovery_engine_token: str | None,
       zenduty_api_token: str | None,
       zenduty_api_url: str,
       zenduty_recovery_engine_url_template: str | None,
@@ -351,6 +355,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         moogsoft_recovery_engine_url_template or ""
       )
       captured["moogsoft_recovery_engine_token"] = moogsoft_recovery_engine_token or ""
+      captured["spikesh_api_token"] = spikesh_api_token or ""
+      captured["spikesh_api_url"] = spikesh_api_url
+      captured["spikesh_recovery_engine_url_template"] = (
+        spikesh_recovery_engine_url_template or ""
+      )
+      captured["spikesh_recovery_engine_token"] = spikesh_recovery_engine_token or ""
       captured["zenduty_api_token"] = zenduty_api_token or ""
       captured["zenduty_api_url"] = zenduty_api_url
       captured["zenduty_recovery_engine_url_template"] = zenduty_recovery_engine_url_template or ""
@@ -523,6 +533,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://moogsoft.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_moogsoft_recovery_engine_token="moogsoft-recovery-token",
+      operator_alert_spikesh_api_token="spikesh-token",
+      operator_alert_spikesh_api_url="https://api.spikesh.example",
+      operator_alert_spikesh_recovery_engine_url_template=(
+        "https://spikesh.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_spikesh_recovery_engine_token="spikesh-recovery-token",
       operator_alert_zenduty_api_token="zenduty-token",
       operator_alert_zenduty_api_url="https://api.zenduty.example",
       operator_alert_zenduty_recovery_engine_url_template=(
@@ -632,6 +648,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["moogsoft_api_url"] == "https://api.moogsoft.example"
   assert captured["moogsoft_recovery_engine_url_template"] == "https://moogsoft.example/recovery/{workflow_reference_urlencoded}"
   assert captured["moogsoft_recovery_engine_token"] == "moogsoft-recovery-token"
+  assert captured["spikesh_api_token"] == "spikesh-token"
+  assert captured["spikesh_api_url"] == "https://api.spikesh.example"
+  assert captured["spikesh_recovery_engine_url_template"] == "https://spikesh.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["spikesh_recovery_engine_token"] == "spikesh-recovery-token"
   assert captured["zenduty_api_token"] == "zenduty-token"
   assert captured["zenduty_api_url"] == "https://api.zenduty.example"
   assert captured["zenduty_recovery_engine_url_template"] == "https://zenduty.example/recovery/{workflow_reference_urlencoded}"
