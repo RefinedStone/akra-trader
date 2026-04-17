@@ -527,18 +527,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Separate exchange-specific deeper ladder integrity rules beyond current venue-native snapshot faults",
       "description": "Build on the new market_data_venue_ladder_integrity split by promoting the next exchange-specific deeper ladder integrity rules into their own durable incident semantics, so venue-owned depth-contract violations beyond snapshot rebuild failure, crossed snapshot, and non-monotonic ladder checks do not remain bundled under the current venue-native pass.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply explicitly says snapshot failure, crossed snapshot, and non-monotonic ladder semantics are now separated, but deeper exchange-specific ladder integrity rules still are not, making this the clearest immediate executable follow-up before remediation wiring.",
+      "priority_reason": "Completed in main session commit 54a993b, which split exchange-specific ladder rule faults such as Binance depth bridge mismatch, Coinbase sequence mismatch, and Coinbase or Kraken snapshot refresh into durable market_data_exchange_ladder_integrity coverage, then aligned operator APIs, tests, and docs.",
       "depends_on": [
         "planning-operator-trust-venue-native-ladder-integrity-semantics"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:40:00Z",
+      "updated_at": "2026-04-17T19:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with real venue behavior by continuing the ladder-incident decomposition from generic and venue-native snapshot faults into the remaining exchange-owned depth integrity rules."
+      "direction_relation_note": "Closed the next exchange-specific ladder split for operator trust by separating bridge, sequence, and snapshot-refresh rule faults from venue-native snapshot-shape incidents, which now leaves deeper venue-owned ladder semantics and remediation ownership as the direct follow-up work."
+    },
+    {
+      "id": "planning-operator-trust-deeper-venue-owned-ladder-integrity-semantics",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Separate deeper venue-owned ladder integrity semantics beyond current exchange-specific rule incidents",
+      "description": "Build on the new market_data_exchange_ladder_integrity split by promoting the next deeper venue-owned ladder integrity semantics into their own durable incident coverage, so ladder-contract violations that remain beyond the current bridge, sequence, and snapshot-refresh rule set do not stay bundled under the first exchange-specific pass.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply explicitly lists deeper venue-owned ladder integrity semantics as the first remaining gap after commit 54a993b, making it the clearest immediate executable follow-up before remediation or provider-owned recovery wiring.",
+      "depends_on": [
+        "planning-operator-trust-exchange-specific-deeper-ladder-rules"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T19:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with real venue behavior by continuing the ladder-incident decomposition past the first exchange-specific rule layer into the remaining venue-owned depth integrity semantics."
     },
     {
       "id": "planning-operator-trust-market-data-incident-remediation-workflows",
@@ -548,13 +566,13 @@
       "status": "proposed",
       "base_priority": 81,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply still explicitly says the durable market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the newly exposed deeper exchange-specific ladder rules are the more direct next queue head before response ownership wiring.",
+      "priority_reason": "The latest main-session reply still explicitly says the durable market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but it also lists deeper venue-owned ladder semantics ahead of recovery wiring, so remediation remains the next follow-up after the new ladder split.",
       "depends_on": [
-        "planning-operator-trust-exchange-specific-deeper-ladder-rules"
+        "planning-operator-trust-deeper-venue-owned-ladder-integrity-semantics"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T19:40:00Z",
+      "updated_at": "2026-04-17T19:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust from better classification into actionable incident response ownership by tying durable market-data incidents to remediation paths rather than leaving them as passive alerts."
     },
