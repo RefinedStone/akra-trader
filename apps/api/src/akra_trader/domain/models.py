@@ -776,6 +776,31 @@ class OperatorIncidentSquadcastRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentBigPandaRecoveryState:
+  incident_id: str | None = None
+  external_reference: str | None = None
+  incident_status: str = "unknown"
+  severity: str | None = None
+  assignee: str | None = None
+  team: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentBigPandaRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentBigPandaRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentBigPandaRecoveryPhaseGraph:
+  incident_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  severity_phase: str = "unknown"
+  team_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryState:
   lifecycle_state: str = "not_synced"
   provider: str | None = None
@@ -823,6 +848,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   squadcast: OperatorIncidentSquadcastRecoveryState = field(
     default_factory=OperatorIncidentSquadcastRecoveryState
+  )
+  bigpanda: OperatorIncidentBigPandaRecoveryState = field(
+    default_factory=OperatorIncidentBigPandaRecoveryState
   )
   updated_at: datetime | None = None
 

@@ -574,6 +574,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        bigpanda: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          team?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            team_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
       };
     };
   }[];
@@ -897,6 +915,24 @@ type GuardedLiveStatus = {
             ownership_phase: string;
             severity_phase: string;
             escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        bigpanda: {
+          incident_id?: string | null;
+          external_reference?: string | null;
+          incident_status: string;
+          severity?: string | null;
+          assignee?: string | null;
+          team?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            incident_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            severity_phase: string;
+            team_phase: string;
             last_transition_at?: string | null;
           };
         };
@@ -8466,6 +8502,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  bigpanda: {
+    incident_id?: string | null;
+    external_reference?: string | null;
+    incident_status: string;
+    severity?: string | null;
+    assignee?: string | null;
+    team?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      incident_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      severity_phase: string;
+      team_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
 }) {
   if (providerRecovery.provider_schema_kind === "pagerduty") {
     const details = [
@@ -8729,6 +8783,33 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Squadcast schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "bigpanda") {
+    const details = [
+      providerRecovery.bigpanda.incident_id ? `incident ${providerRecovery.bigpanda.incident_id}` : null,
+      providerRecovery.bigpanda.incident_status !== "unknown"
+        ? `status ${providerRecovery.bigpanda.incident_status}`
+        : null,
+      providerRecovery.bigpanda.severity ? `severity ${providerRecovery.bigpanda.severity}` : null,
+      providerRecovery.bigpanda.assignee ? `assignee ${providerRecovery.bigpanda.assignee}` : null,
+      providerRecovery.bigpanda.team ? `team ${providerRecovery.bigpanda.team}` : null,
+      providerRecovery.bigpanda.phase_graph.incident_phase !== "unknown"
+        ? `incident phase ${providerRecovery.bigpanda.phase_graph.incident_phase}`
+        : null,
+      providerRecovery.bigpanda.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.bigpanda.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.bigpanda.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.bigpanda.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.bigpanda.updated_at
+        ? `updated ${formatTimestamp(providerRecovery.bigpanda.updated_at)}`
+        : null,
+      providerRecovery.bigpanda.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.bigpanda.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `BigPanda schema: ${details.join(" / ")}` : null;
   }
   return null;
 }

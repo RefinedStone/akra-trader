@@ -185,6 +185,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       squadcast_api_url: str,
       squadcast_recovery_engine_url_template: str | None,
       squadcast_recovery_engine_token: str | None,
+      bigpanda_api_token: str | None,
+      bigpanda_api_url: str,
+      bigpanda_recovery_engine_url_template: str | None,
+      bigpanda_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
       opsgenie_recovery_engine_url_template: str | None,
@@ -227,6 +231,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["squadcast_api_url"] = squadcast_api_url
       captured["squadcast_recovery_engine_url_template"] = squadcast_recovery_engine_url_template or ""
       captured["squadcast_recovery_engine_token"] = squadcast_recovery_engine_token or ""
+      captured["bigpanda_api_token"] = bigpanda_api_token or ""
+      captured["bigpanda_api_url"] = bigpanda_api_url
+      captured["bigpanda_recovery_engine_url_template"] = bigpanda_recovery_engine_url_template or ""
+      captured["bigpanda_recovery_engine_token"] = bigpanda_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
       captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
@@ -323,6 +331,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://squadcast.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_squadcast_recovery_engine_token="squadcast-recovery-token",
+      operator_alert_bigpanda_api_token="bigpanda-token",
+      operator_alert_bigpanda_api_url="https://api.bigpanda.example",
+      operator_alert_bigpanda_recovery_engine_url_template=(
+        "https://bigpanda.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_bigpanda_recovery_engine_token="bigpanda-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
       operator_alert_opsgenie_recovery_engine_url_template=(
@@ -378,6 +392,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["squadcast_api_url"] == "https://api.squadcast.example"
   assert captured["squadcast_recovery_engine_url_template"] == "https://squadcast.example/recovery/{workflow_reference_urlencoded}"
   assert captured["squadcast_recovery_engine_token"] == "squadcast-recovery-token"
+  assert captured["bigpanda_api_token"] == "bigpanda-token"
+  assert captured["bigpanda_api_url"] == "https://api.bigpanda.example"
+  assert captured["bigpanda_recovery_engine_url_template"] == "https://bigpanda.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["bigpanda_recovery_engine_token"] == "bigpanda-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
   assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"
