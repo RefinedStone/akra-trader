@@ -472,19 +472,37 @@
       "id": "planning-operator-trust-deeper-book-ladder-and-candle-sequence-incidents",
       "direction_id": "operator-trust-and-discipline",
       "title": "Split deeper depth-ladder and candle-sequence semantics into durable incidents",
-      "description": "Extend the new venue-specific market_data_book_consistency and market_data_kline_consistency coverage beyond crossed quotes and invalid OHLC shape by incidentizing deeper depth-ladder divergence and candle-sequence semantics, so per-venue book corruption or malformed candle progression is tracked explicitly instead of remaining implicit under the first-pass consistency checks.",
-      "status": "ready",
+      "description": "Extend the new venue-specific market_data_book_consistency and market_data_kline_consistency coverage beyond crossed quotes and invalid OHLC shape by incidentizing deeper depth-ladder divergence and candle-sequence semantics, so per-venue book corruption or malformed candle progression is tracked explicitly instead of remaining implicit under the first-pass consistency checks. This now includes ladder count and head mismatch, bid or ask ordering faults, candle boundary alignment faults, expected close boundary mismatches, and closed-candle event ordering faults.",
+      "status": "done",
       "base_priority": 83,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly says the new venue-specific book and kline incidentization still stops at crossed quotes and invalid OHLC shape, while deeper depth-ladder and candle-sequence semantics are not yet separated into incidents, making this the clearest immediate executable follow-up after commit 8b9b8d3.",
+      "priority_reason": "Completed in main session commit 578581a, which split guarded-live session_handoff into dedicated market_data_depth_ladder and market_data_candle_sequence incidents covering ladder count and head mismatch, bid or ask ordering faults, candle boundary alignment faults, expected close boundary mismatches, and closed-candle event ordering through durable incident, delivery-history, paging, docs, and test updates.",
       "depends_on": [
         "planning-operator-trust-venue-specific-book-kline-quality-incidents"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T18:50:00Z",
+      "updated_at": "2026-04-17T19:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust aligned with venue-specific data quality by extending the new book and kline incident categories from first-pass consistency faults into deeper ladder and candle-progression semantics that operators still need to distinguish."
+      "direction_relation_note": "Closed the next venue-specific integrity gap for operator trust by promoting deeper ladder and candle-progression faults into distinct durable incidents, which now leaves even more exchange-specific ladder integrity and multi-candle continuity semantics plus remediation ownership as the follow-up work."
+    },
+    {
+      "id": "planning-operator-trust-venue-specific-ladder-integrity-and-multi-candle-continuity-incidents",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Separate exchange-specific ladder integrity and multi-candle continuity incidents",
+      "description": "Build on the new market_data_depth_ladder and market_data_candle_sequence incidents by splitting any remaining exchange-specific ladder integrity semantics and deeper multi-candle continuity faults into their own durable incident categories, so venue-specific order-book corruption or candle-progression breaks do not remain bundled under the current first deep-semantics pass.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly says venue-specific deeper multi-candle continuity and exchange-specific ladder integrity semantics are still not separated into incidents after commit 578581a, making this the clearest immediate executable follow-up before moving on to remediation ownership wiring.",
+      "depends_on": [
+        "planning-operator-trust-deeper-book-ladder-and-candle-sequence-incidents"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T19:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust aligned with venue-native data quality by extending the new deep ladder and candle incidents into the remaining exchange-specific integrity and multi-candle continuity semantics that operators still need to distinguish."
     },
     {
       "id": "planning-operator-trust-market-data-incident-remediation-workflows",
@@ -494,13 +512,13 @@
       "status": "proposed",
       "base_priority": 81,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the remaining deeper depth-ladder and candle-sequence incident split is the more direct next step before response ownership wiring.",
+      "priority_reason": "The latest main-session reply still explicitly says the widened market-data incident path is not yet connected to automatic remediation or provider-owned recovery workflow, but the remaining exchange-specific ladder integrity and multi-candle continuity incident split is the more direct next step before response ownership wiring.",
       "depends_on": [
-        "planning-operator-trust-venue-specific-book-kline-quality-incidents"
+        "planning-operator-trust-venue-specific-ladder-integrity-and-multi-candle-continuity-incidents"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T18:50:00Z",
+      "updated_at": "2026-04-17T19:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances operator trust from better classification into actionable incident response ownership by tying durable market-data incidents to remediation paths rather than leaving them as passive alerts."
     },
