@@ -2785,7 +2785,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         if local_book is None or not continuity_ok:
           order_book_gap_count += 1
           issues.append(
-            "binance_order_book_gap_detected:"
+            f"{self._order_book_issue_prefix()}_gap_detected:"
             f"{order_book_last_update_id or 'none'}:"
             f"{depth_previous_update_id or depth_first_update_id or 'none'}"
           )
@@ -3491,6 +3491,41 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
   ) -> str:
     return owner_run_id or owner_session_id or session_id or symbol or "guarded-live-order-book"
 
+  def _order_book_issue_prefix(self) -> str:
+    return f"{self._venue or 'venue'}_order_book"
+
+  def _inspect_order_book_snapshot(
+    self,
+    *,
+    snapshot: dict[str, Any],
+  ) -> tuple[str, ...]:
+    prefix = self._order_book_issue_prefix()
+    bids = _coerce_depth_levels(snapshot.get("bids"))
+    asks = _coerce_depth_levels(snapshot.get("asks"))
+    issues: list[str] = []
+
+    if not bids:
+      issues.append(f"{prefix}_snapshot_missing_side:bids")
+    if not asks:
+      issues.append(f"{prefix}_snapshot_missing_side:asks")
+
+    if bids and asks and bids[0][0] >= asks[0][0]:
+      issues.append(f"{prefix}_snapshot_crossed:{bids[0][0]}:{asks[0][0]}")
+
+    previous_price: float | None = None
+    for index, (price, _quantity) in enumerate(bids, start=1):
+      if previous_price is not None and price >= previous_price:
+        issues.append(f"{prefix}_snapshot_non_monotonic:bids:{index}:{price}:{previous_price}")
+      previous_price = price
+
+    previous_price = None
+    for index, (price, _quantity) in enumerate(asks, start=1):
+      if previous_price is not None and price <= previous_price:
+        issues.append(f"{prefix}_snapshot_non_monotonic:asks:{index}:{price}:{previous_price}")
+      previous_price = price
+
+    return tuple(dict.fromkeys(issues))
+
   def _rebuild_local_order_book_from_snapshot(
     self,
     *,
@@ -3500,11 +3535,12 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     reason: str,
   ) -> dict[str, object]:
     current_time = self._clock()
+    issue_prefix = self._order_book_issue_prefix()
     if not symbol:
       return {
         "book": None,
         "state": "rebuild_failed",
-        "issues": ("binance_order_book_snapshot_failed:missing_symbol",),
+        "issues": (f"{issue_prefix}_snapshot_failed:missing_symbol",),
         "last_update_id": None,
         "rebuild_count": rebuild_count,
         "rebuilt_at": None,
@@ -3520,6 +3556,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     try:
       exchange = self._resolve_exchange()
       snapshot = exchange.fetch_order_book(symbol, 20, {})
+      snapshot_issues = self._inspect_order_book_snapshot(snapshot=snapshot)
       book = _build_local_order_book_from_snapshot_row(
         symbol=symbol,
         row=snapshot,
@@ -3530,7 +3567,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       return {
         "book": None,
         "state": "rebuild_failed",
-        "issues": (f"binance_order_book_snapshot_failed:{reason}:{exc}",),
+        "issues": (f"{issue_prefix}_snapshot_failed:{reason}:{exc}",),
         "last_update_id": None,
         "rebuild_count": rebuild_count,
         "rebuilt_at": None,
@@ -3549,7 +3586,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     return {
       "book": book,
       "state": "snapshot_rebuilt",
-      "issues": (),
+      "issues": snapshot_issues,
       "last_update_id": book.last_update_id,
       "rebuild_count": book.rebuild_count,
       "rebuilt_at": book.rebuilt_at,

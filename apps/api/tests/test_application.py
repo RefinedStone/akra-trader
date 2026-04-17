@@ -1431,6 +1431,126 @@ def test_operator_visibility_promotes_channel_level_market_data_incidents(
   )
 
 
+def test_operator_visibility_separates_venue_native_ladder_integrity_incidents(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 19, 0, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  run = app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USD",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="venue_native_ladder_integrity_visibility",
+  )
+
+  state = guarded_live_state.load_state()
+  owner_session_id = (
+    state.ownership.owner_session_id
+    or state.session_handoff.owner_session_id
+    or "worker-live-coinbase-market"
+  )
+  degraded_handoff = replace(
+    state.session_handoff,
+    state="active",
+    venue="coinbase",
+    owner_run_id=run.config.run_id,
+    owner_session_id=owner_session_id,
+    coverage=("depth_updates",),
+    handed_off_at=clock.current - timedelta(minutes=1),
+    last_sync_at=clock.current - timedelta(seconds=20),
+    last_depth_event_at=clock.current - timedelta(seconds=10),
+    order_book_state="snapshot_rebuilt",
+    order_book_gap_count=1,
+    order_book_rebuild_count=1,
+    order_book_last_update_id=34,
+    order_book_last_rebuilt_at=clock.current - timedelta(seconds=15),
+    issues=(
+      "coinbase_order_book_gap_detected:25:29",
+      "coinbase_order_book_snapshot_failed:session_missing:stream timeout",
+      "coinbase_order_book_snapshot_crossed:2501.5:2501.2",
+      "coinbase_order_book_snapshot_non_monotonic:bids:2:2501.3:2501.0",
+    ),
+  )
+  guarded_live_state.save_state(
+    replace(
+      state,
+      ownership=replace(
+        state.ownership,
+        state="owned",
+        owner_run_id=run.config.run_id,
+        owner_session_id=owner_session_id,
+      ),
+      session_handoff=degraded_handoff,
+    )
+  )
+
+  visibility = app.get_operator_visibility()
+  guarded_live_status = app.get_guarded_live_status()
+
+  categories = {
+    alert.category
+    for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.source == "guarded_live"
+  }
+  assert {"market_data_ladder_integrity", "market_data_venue_ladder_integrity"} <= categories
+
+  ladder_integrity_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "market_data_ladder_integrity"
+  )
+  assert "coinbase ladder integrity recorded 1 depth gap(s)." in ladder_integrity_alert.detail
+  assert "coinbase ladder integrity required 1 snapshot rebuild(s)." in ladder_integrity_alert.detail
+  assert "coinbase depth stream gap detected between update ids 25 and 29." in ladder_integrity_alert.detail
+  assert "snapshot rebuild failed" not in ladder_integrity_alert.detail
+
+  venue_ladder_alert = next(
+    alert for alert in visibility.alerts
+    if alert.run_id == run.config.run_id and alert.category == "market_data_venue_ladder_integrity"
+  )
+  assert "coinbase ladder snapshot rebuild failed during session missing: stream timeout." in venue_ladder_alert.detail
+  assert "coinbase ladder snapshot is crossed: best bid 2501.50000000 is above best ask 2501.20000000." in venue_ladder_alert.detail
+  assert "coinbase bid ladder snapshot is not strictly descending at level 2 (2501.30000000 after 2501.00000000)." in venue_ladder_alert.detail
+
+  assert any(
+    event.kind == "incident_opened"
+    and event.alert_id == f"guarded-live:market-data-venue-ladder-integrity:{run.config.run_id}"
+    for event in guarded_live_status.incident_events
+  )
+  assert any(
+    record.alert_id == f"guarded-live:market-data-venue-ladder-integrity:{run.config.run_id}"
+    for record in guarded_live_status.delivery_history
+  )
+
+
 def test_operator_visibility_promotes_book_and_kline_consistency_incidents(
   tmp_path: Path,
 ) -> None:

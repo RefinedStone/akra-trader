@@ -67,7 +67,9 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   mini-ticker, depth, and kline coverage alongside execution events, full depth snapshot rebuilds,
   order-book resync state, rebuild counts, full recovered bid/ask levels, channel-restore
   timing/counts, channel-continuation timing/counts, persisted trade/aggregate-trade/book-ticker/
-  mini-ticker/kline snapshots, and top-of-book levels
+  mini-ticker/kline snapshots, and top-of-book levels. Durable incidents now split generic ladder
+  gap/rebuild faults from venue-native ladder snapshot integrity faults such as crossed snapshots,
+  missing sides, and non-monotonic snapshot ladders
 - guarded-live handoff can now widen beyond Binance-native continuation into push-native multi-venue
   market transports, using Binance public market websockets, Coinbase Advanced Trade authenticated
   user/account order transport plus public heartbeats/ticker/trade/level2/candle channels, and

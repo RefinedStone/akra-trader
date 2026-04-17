@@ -4403,6 +4403,31 @@ class TradingApplication:
         )
       )
 
+    venue_ladder_integrity_details, venue_ladder_integrity_detected_at, venue_ladder_integrity_has_critical = (
+      self._collect_guarded_live_venue_ladder_integrity_findings(
+        handoff=handoff,
+        current_time=current_time,
+      )
+    )
+    if venue_ladder_integrity_details:
+      alerts.append(
+        OperatorAlert(
+          alert_id=f"guarded-live:market-data-venue-ladder-integrity:{run_id or 'unknown'}",
+          severity="critical" if venue_ladder_integrity_has_critical else "warning",
+          category="market_data_venue_ladder_integrity",
+          summary=(
+            f"Guarded-live venue-native ladder integrity requires review for "
+            f"{handoff.symbol or 'the active live session'}."
+          ),
+          detail=self._summarize_guarded_live_issue_copy(venue_ladder_integrity_details),
+          detected_at=venue_ladder_integrity_detected_at,
+          run_id=run_id,
+          session_id=session_id,
+          source="guarded_live",
+          delivery_targets=delivery_targets,
+        )
+      )
+
     restore_details, restore_detected_at, restore_has_critical = (
       self._collect_guarded_live_channel_restore_findings(
         handoff=handoff,
@@ -4610,6 +4635,36 @@ class TradingApplication:
       )
 
     for issue_detail in self._extract_guarded_live_ladder_integrity_semantics(issues=handoff.issues):
+      add_finding(issue_detail, critical=True)
+
+    resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
+    return list(dict.fromkeys(findings)), resolved_detected_at, has_critical
+
+  def _collect_guarded_live_venue_ladder_integrity_findings(
+    self,
+    *,
+    handoff: GuardedLiveVenueSessionHandoff,
+    current_time: datetime,
+  ) -> tuple[list[str], datetime, bool]:
+    findings: list[str] = []
+    detected_candidates: list[datetime] = []
+    has_critical = False
+    detected_at = handoff.order_book_last_rebuilt_at or handoff.last_depth_event_at or handoff.last_sync_at
+
+    def add_finding(detail: str, *, critical: bool = False) -> None:
+      nonlocal has_critical
+      findings.append(detail)
+      has_critical = has_critical or critical
+      if detected_at is not None:
+        detected_candidates.append(detected_at)
+
+    if handoff.order_book_state == "rebuild_failed":
+      add_finding(
+        f"{handoff.venue or 'venue'} ladder snapshot rebuild is currently failing.",
+        critical=True,
+      )
+
+    for issue_detail in self._extract_guarded_live_venue_ladder_integrity_semantics(issues=handoff.issues):
       add_finding(issue_detail, critical=True)
 
     resolved_detected_at = max(detected_candidates) if detected_candidates else current_time
@@ -5046,13 +5101,66 @@ class TradingApplication:
     *,
     issues: tuple[str, ...],
   ) -> tuple[str, ...]:
-    findings = list(TradingApplication._extract_guarded_live_channel_gap_semantics(issues=issues))
+    return TradingApplication._extract_guarded_live_channel_gap_semantics(issues=issues)
+
+  @staticmethod
+  def _extract_guarded_live_venue_ladder_integrity_semantics(
+    *,
+    issues: tuple[str, ...],
+  ) -> tuple[str, ...]:
+    findings: list[str] = []
     for issue in issues:
-      if "_order_book_snapshot_failed:" not in issue:
+      if "_order_book_snapshot_failed:" in issue:
+        venue, payload = issue.split("_order_book_snapshot_failed:", 1)
+        reason, _, detail = payload.partition(":")
+        reason_label = reason.replace("_", " ") if reason else "unknown"
+        if detail:
+          findings.append(f"{venue} ladder snapshot rebuild failed during {reason_label}: {detail}.")
+        else:
+          findings.append(f"{venue} ladder snapshot rebuild failed during {reason_label}.")
         continue
-      venue, payload = issue.split("_order_book_snapshot_failed:", 1)
-      reason = payload.replace("_", " ") if payload else "unknown"
-      findings.append(f"{venue} ladder snapshot rebuild failed: {reason}.")
+      if "_order_book_snapshot_missing_side:" in issue:
+        venue, payload = issue.split("_order_book_snapshot_missing_side:", 1)
+        side = payload.replace("_", " ") if payload else "unknown side"
+        findings.append(f"{venue} ladder snapshot returned no {side} levels.")
+        continue
+      if "_order_book_snapshot_crossed:" in issue:
+        venue, payload = issue.split("_order_book_snapshot_crossed:", 1)
+        bid, _, ask = payload.partition(":")
+        if bid and ask:
+          try:
+            bid_value = f"{float(bid):.8f}"
+            ask_value = f"{float(ask):.8f}"
+          except ValueError:
+            bid_value = bid
+            ask_value = ask
+          findings.append(
+            f"{venue} ladder snapshot is crossed: best bid {bid_value} is above best ask {ask_value}."
+          )
+        else:
+          findings.append(f"{venue} ladder snapshot is crossed.")
+        continue
+      if "_order_book_snapshot_non_monotonic:" not in issue:
+        continue
+      venue, payload = issue.split("_order_book_snapshot_non_monotonic:", 1)
+      side, _, remainder = payload.partition(":")
+      index, _, price_payload = remainder.partition(":")
+      price, _, previous_price = price_payload.partition(":")
+      side_label = side[:-1] if side.endswith("s") else side
+      ordering = "descending" if side == "bids" else "ascending"
+      if index and price and previous_price:
+        try:
+          price_value = f"{float(price):.8f}"
+          previous_price_value = f"{float(previous_price):.8f}"
+        except ValueError:
+          price_value = price
+          previous_price_value = previous_price
+        findings.append(
+          f"{venue} {side_label} ladder snapshot is not strictly {ordering} at level {index} "
+          f"({price_value} after {previous_price_value})."
+        )
+      else:
+        findings.append(f"{venue} {side_label} ladder snapshot is not strictly {ordering}.")
     return tuple(dict.fromkeys(findings))
 
   @staticmethod

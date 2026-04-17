@@ -952,6 +952,65 @@ def test_coinbase_adapter_uses_push_native_multi_venue_transport(monkeypatch) ->
   assert connection.closed is True
 
 
+def test_coinbase_adapter_marks_venue_specific_ladder_snapshot_issues() -> None:
+  current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
+  clock = MutableClock(current_time)
+  exchange = FakeExecutionExchange(
+    fetch_rows=[],
+    order_books=[
+      {
+        "nonce": 40,
+        "bids": [[2501.5, 1.0], [2501.7, 0.8]],
+        "asks": [[2501.2, 1.1], [2501.1, 0.5]],
+      }
+    ],
+    ticker={
+      "timestamp": int(current_time.timestamp() * 1000),
+      "bid": 2501.4,
+      "bidVolume": 0.7,
+      "ask": 2501.6,
+      "askVolume": 0.9,
+      "open": 2498.0,
+      "last": 2501.5,
+      "high": 2503.0,
+      "low": 2497.5,
+      "baseVolume": 120.0,
+      "quoteVolume": 300000.0,
+    },
+    trades=[
+      {
+        "id": "coinbase-trade-1",
+        "price": 2501.4,
+        "amount": 0.3,
+        "timestamp": int(current_time.timestamp() * 1000),
+      }
+    ],
+    ohlcv=[
+      [int((current_time - timedelta(minutes=5)).timestamp() * 1000), 2499.0, 2503.0, 2498.0, 2501.5, 12.0]
+    ],
+  )
+  adapter = BinanceVenueExecutionAdapter(
+    venue="coinbase",
+    exchange=exchange,
+    venue_stream_client=FakeStreamClient(
+      FakeStreamSession("coinbase-market-1", transport="coinbase_advanced_trade_market_websocket")
+    ),
+    clock=clock,
+  )
+
+  handoff = adapter.handoff_session(
+    symbol="BTC/USD",
+    timeframe="5m",
+    owner_run_id="run-live-coinbase-market",
+    owner_session_id="worker-live-coinbase-market",
+    owned_order_ids=(),
+  )
+
+  assert "coinbase_order_book_snapshot_crossed:2501.5:2501.2" in handoff.issues
+  assert "coinbase_order_book_snapshot_non_monotonic:bids:2:2501.7:2501.5" in handoff.issues
+  assert "coinbase_order_book_snapshot_non_monotonic:asks:2:2501.1:2501.2" in handoff.issues
+
+
 def test_coinbase_adapter_extends_authenticated_account_and_order_transport(monkeypatch) -> None:
   current_time = datetime(2026, 4, 17, 12, 0, tzinfo=UTC)
   clock = MutableClock(current_time)

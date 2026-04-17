@@ -21,10 +21,10 @@ Implemented now:
   guarded-live live-path alerts including risk breaches, repeated runtime recovery loops, stale
   live order sync, market-data freshness/quality/venue-policy breaches, channel-level
   market-data consistency/restore breaches from guarded-live venue-session coverage, venue-specific
-  book/kline consistency faults, exchange-specific ladder integrity faults, deeper
-  depth-ladder/candle-sequence faults, and multi-candle continuity faults, persisted live-path
-  alert history, durable incident events, outbound delivery history, and merged runtime plus
-  guarded-live audit events
+  book/kline consistency faults, exchange-specific ladder gap/rebuild integrity faults,
+  venue-native ladder snapshot integrity faults, deeper depth-ladder/candle-sequence faults, and
+  multi-candle continuity faults, persisted live-path alert history, durable incident events,
+  outbound delivery history, and merged runtime plus guarded-live audit events
 - guarded-live state endpoints persist kill-switch state, reconciliation status, live-path alert
   history, durable incident events, outbound delivery history, and guarded-live audit events in the
   control plane
@@ -50,7 +50,9 @@ Implemented now:
   mini-ticker, depth, and kline events while rebuilding a local book from full depth snapshots and
   recording order-book resync state, rebuild counts, full recovered bid/ask levels, and
   deeper-channel restore state from exchange ticker/trade/ohlcv snapshots plus persisted channel
-  continuation snapshots for trade, aggregate-trade, book-ticker, mini-ticker, and kline state
+  continuation snapshots for trade, aggregate-trade, book-ticker, mini-ticker, and kline state.
+  Durable incidents now distinguish generic ladder gap/rebuild faults from venue-native ladder
+  snapshot integrity faults such as crossed or non-monotonic snapshots and missing snapshot sides
 - guarded-live session handoff can now widen beyond Binance-native continuation into push-native
   market transports: Binance falls back to its public market websocket when user-data auth is not
   available, Coinbase Advanced Trade can now supply authenticated user/account order transport plus
