@@ -634,19 +634,55 @@
       "id": "planning-operator-trust-provider-remediation-orchestration-depth",
       "direction_id": "operator-trust-and-discipline",
       "title": "Consume richer provider recovery payloads and complete bidirectional remediation orchestration",
-      "description": "Build on the completed local guarded-live remediation loop by consuming richer provider-specific recovery payloads for channel restore, order-book rebuild, and adjacent provider-managed stream faults, then extend provider-owned remediation beyond coarse lifecycle mirroring into a true bidirectional contract where local incident state and external recovery execution can exchange detailed execution, verification, and ownership state end to end.",
-      "status": "ready",
+      "description": "Build on the completed local guarded-live remediation loop by consuming richer provider-specific recovery payloads for channel restore, order-book rebuild, and adjacent provider-managed stream faults, then extend provider-owned remediation beyond coarse lifecycle mirroring into a true bidirectional contract where local incident state and external recovery execution can exchange detailed execution, verification, and ownership state end to end. This was completed by persisting structured provider payloads and wiring local-to-provider resolve handoff through the remediation loop.",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply explicitly says what remains after commit ecd4e87 is richer provider-specific recovery payload handling plus deeper bidirectional provider-managed recovery orchestration, making this the clearest next executable follow-up now that local channel_restore and order_book_rebuild remediation closes in the same loop.",
+      "priority_reason": "Completed in main session commit 6ea20d7, which persisted structured provider recovery payloads into remediation state, surfaced recovery payload details in operator views, carried provider recovery context through local verification and workflow notes, and pushed provider-native resolve back out when local remediation closes the incident.",
       "depends_on": [
         "planning-operator-trust-stream-fault-remediation-job-coverage"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T11:49:38Z",
+      "updated_at": "2026-04-17T12:08:17Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust past coarse callback synchronization by making provider-managed remediation exchange richer recovery semantics with the now-completed local stream-fault repair loop, so external systems and local incident closure stay aligned end to end."
+      "direction_relation_note": "Closed the richer provider-payload and bidirectional resolve-handoff gap for operator trust by making remediation state carry structured provider recovery context all the way through local verification and provider-native closure, which now leaves typed provider recovery-state modeling and full provider-side recovery-job synchronization as the next follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-typed-provider-recovery-state",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Promote provider recovery payloads into typed remediation state",
+      "description": "Build on the completed structured provider payload persistence by interpreting provider-specific recovery schemas into typed remediation-state fields for channel restore, order-book rebuild, and adjacent provider-managed recovery flows, so operator surfaces and orchestration logic do not depend on opaque payload blobs when tracking verification, ownership, and recovery progress.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply explicitly says the remaining immediate gap after commit 6ea20d7 is interpreting stored provider recovery payloads into deeper typed remediation state, making this the clearest next executable follow-up now that payload storage, exposure, and outbound context wiring are complete.",
+      "depends_on": [
+        "planning-operator-trust-provider-remediation-orchestration-depth"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:08:17Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances operator trust by turning newly durable provider recovery payloads into first-class remediation semantics that product surfaces and downstream orchestration can reason about without provider-blob inspection."
+    },
+    {
+      "id": "planning-operator-trust-provider-recovery-status-machine-sync",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Synchronize provider-owned recovery jobs with a full provider-side status machine",
+      "description": "Extend the completed bidirectional remediation loop beyond resolve handoff by modeling and reconciling the full provider-owned recovery job lifecycle against provider-side status-machine states, so local remediation does not stop at verification plus resolve while the provider continues to own richer recovery execution progress or terminal outcomes.",
+      "status": "proposed",
+      "base_priority": 81,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply explicitly keeps full provider-side recovery-job synchronization on the remaining-work list after commit 6ea20d7, but typed remediation-state promotion is the more direct queue head because it gives the status-machine work structured state to synchronize against.",
+      "depends_on": [
+        "planning-operator-trust-typed-provider-recovery-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:08:17Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward true provider-owned remediation by making local incident state reconcile the complete external recovery-job lifecycle rather than only callback snapshots and final resolve handoff."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
