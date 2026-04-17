@@ -225,12 +225,13 @@ Defaults:
   provider workflow state/action, and provider workflow reference
 - market-data incidents now also persist remediation state/kind/runbook, auto-request
   provider-owned `remediate` workflow actions for supported paging providers, and expose the same
-  remediation state through delivery history plus the guarded-live operator surface. Explicit
-  remediation requests now execute real recent-sync, backfill, and candle-repair jobs against the
-  active market-data provider before the guarded-live incident state is refreshed again.
-- external paging systems can now push `triggered`, `acknowledged`, `escalated`, or `resolved`
-  incident sync events into the durable guarded-live incident history, including provider workflow
-  references, while local acknowledge/escalate actions can also push provider-native workflow
+  remediation state through delivery history plus the guarded-live operator surface. Incident-open
+  auto-remediation can now run the same real recent-sync, backfill, and candle-repair jobs when a
+  supported market-data incident first appears, and explicit remediation requests still run those
+  jobs before the guarded-live incident state is refreshed again.
+- external paging systems can now push `triggered`, `acknowledged`, `escalated`, `resolved`, and
+  remediation lifecycle sync events into the durable guarded-live incident history, including
+  provider workflow references, while local acknowledge/escalate actions can also push provider-native workflow
   actions back out when the provider supports them across PagerDuty and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport

@@ -112,9 +112,11 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   plus local provider-native workflow actions
 - market-data guarded-live incidents now also persist remediation state/kind/runbook metadata and
   can auto-request provider-owned `remediate` workflows, with the same remediation state exposed
-  through delivery history and operator controls. Manual remediation requests now execute real
-  recent-sync, backfill, and candle-repair jobs and then immediately re-evaluate guarded-live
-  incidents so recovered market-data faults can resolve in the same control-room loop
+  through delivery history and operator controls. Incident-open auto remediation and manual
+  remediation requests now execute real recent-sync, backfill, and candle-repair jobs and then
+  immediately re-evaluate guarded-live incidents so recovered market-data faults can resolve in the
+  same control-room loop. External provider recovery callbacks can also sync remediation lifecycle
+  state and trigger the local verification pass before the same loop is refreshed
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
   repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
   breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and

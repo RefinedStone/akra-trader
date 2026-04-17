@@ -184,10 +184,11 @@ top-of-book levels. When Binance user-data streaming is unavailable, the guarded
   phase-aware retry/backoff rules. Durable incidents now also persist paging policy identity plus
   provider workflow state/action/reference. Market-data incident categories also persist a
   remediation plan with runbook metadata and can auto-request provider-owned `remediate`
-  workflow actions when the selected provider supports them. Explicit remediation requests can now
-  also execute real provider market-data jobs such as recent sync, historical backfill, and candle
-  repair before the guarded-live alert state is recomputed. External incident-management systems
-  can sync paging events back through a guarded API endpoint, and local acknowledge/remediate/
+  workflow actions when the selected provider supports them. Incident-open auto remediation and
+  explicit remediation requests can now both execute real provider market-data jobs such as recent
+  sync, historical backfill, and candle repair before the guarded-live alert state is recomputed.
+  External incident-management systems can sync paging and remediation-lifecycle events back through
+  a guarded API endpoint, and local acknowledge/remediate/
   escalate actions can push provider-native workflow updates back out when the selected provider
   supports them, so durable incidents track a bidirectional paging workflow without handing local
   alert truth over to the external system.

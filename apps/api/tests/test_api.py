@@ -1336,6 +1336,25 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
         ],
       ),
     )
+    app._market_data = market_data
+
+    guarded_live_response = client.get("/api/guarded-live")
+    assert guarded_live_response.status_code == 200
+    incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert incident["remediation"]["kind"] == "recent_sync"
+    assert incident["remediation"]["state"] == "skipped"
+    assert incident["remediation"]["runbook"] == "market_data.sync_recent"
+    assert incident["remediation"]["provider"] == "pagerduty"
+    assert "seeded_market_data_provider_has_no_live_remediation_jobs" in incident["remediation"]["detail"]
+    assert any(
+      record["incident_event_id"] == incident["event_id"] and record["phase"] == "provider_remediate"
+      for record in guarded_live_response.json()["delivery_history"]
+    )
+
     market_data.set_remediation_status(
       kind="recent_sync",
       timeframe="5m",
@@ -1356,23 +1375,6 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
           ),
         ],
       ),
-    )
-    app._market_data = market_data
-
-    guarded_live_response = client.get("/api/guarded-live")
-    assert guarded_live_response.status_code == 200
-    incident = next(
-      event
-      for event in guarded_live_response.json()["incident_events"]
-      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
-    )
-    assert incident["remediation"]["kind"] == "recent_sync"
-    assert incident["remediation"]["state"] == "requested"
-    assert incident["remediation"]["runbook"] == "market_data.sync_recent"
-    assert incident["remediation"]["provider"] == "pagerduty"
-    assert any(
-      record["incident_event_id"] == incident["event_id"] and record["phase"] == "provider_remediate"
-      for record in guarded_live_response.json()["delivery_history"]
     )
 
     remediated = client.post(
@@ -1395,6 +1397,134 @@ def test_market_data_incident_endpoint_surfaces_remediation_and_provider_workflo
     assert all(
       alert["alert_id"] != "guarded-live:market-data:5m"
       for alert in remediated.json()["active_alerts"]
+    )
+
+
+def test_external_market_data_recovery_sync_endpoint_resolves_incident(
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    guarded_live_execution_enabled=True,
+    operator_alert_external_sync_token="shared-token",
+  ) as client:
+    app = client.app.state.container.app
+    app._operator_alert_paging_policy_default_provider = "pagerduty"
+    app._operator_alert_paging_policy_warning_targets = ("pagerduty_events",)
+    app._operator_alert_paging_policy_critical_targets = ("pagerduty_events",)
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    )
+    client.post(
+      "/api/guarded-live/reconciliation",
+      json={"actor": "operator", "reason": "provider_market_data_recovery_surface"},
+    )
+    client.post(
+      "/api/guarded-live/recovery",
+      json={"actor": "operator", "reason": "provider_market_data_recovery_surface"},
+    )
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "provider_market_data_recovery_surface",
+      },
+    )
+    assert live_response.status_code == 200
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 10, tzinfo=UTC),
+            sync_status="stale",
+            lag_seconds=1_200,
+            last_sync_at=datetime(2025, 1, 3, 18, 15, tzinfo=UTC),
+            issues=("freshness_threshold_exceeded:1200:600",),
+          ),
+        ],
+      ),
+    )
+    app._market_data = market_data
+
+    guarded_live_response = client.get("/api/guarded-live")
+    incident = next(
+      event
+      for event in guarded_live_response.json()["incident_events"]
+      if event["kind"] == "incident_opened" and event["alert_id"] == "guarded-live:market-data:5m"
+    )
+    assert incident["remediation"]["state"] == "not_supported"
+
+    market_data.set_remediation_status(
+      kind="recent_sync",
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=288,
+            first_timestamp=datetime(2025, 1, 2, 18, 30, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+            sync_status="synced",
+            lag_seconds=0,
+            last_sync_at=datetime(2025, 1, 3, 18, 30, tzinfo=UTC),
+            issues=(),
+          ),
+        ],
+      ),
+    )
+
+    synced = client.post(
+      "/api/operator/incidents/external-sync",
+      headers={"X-Akra-Incident-Sync-Token": "shared-token"},
+      json={
+        "provider": "pagerduty",
+        "event_kind": "remediation_completed",
+        "actor": "responder-1",
+        "detail": "provider_market_data_recovered",
+        "alert_id": "guarded-live:market-data:5m",
+        "external_reference": "guarded-live:market-data:5m",
+        "workflow_reference": "PDINC-REC-901",
+        "occurred_at": "2025-01-03T18:31:00Z",
+      },
+    )
+    assert synced.status_code == 200
+    updated_incident = next(
+      event
+      for event in synced.json()["incident_events"]
+      if event["event_id"] == incident["event_id"]
+    )
+    assert updated_incident["remediation"]["state"] == "executed"
+    assert updated_incident["remediation"]["requested_by"] == "pagerduty:responder-1"
+    assert updated_incident["provider_workflow_action"] == "remediate"
+    assert updated_incident["provider_workflow_state"] == "delivered"
+    assert updated_incident["provider_workflow_reference"] == "PDINC-REC-901"
+    assert any(
+      event["kind"] == "incident_resolved" and event["alert_id"] == "guarded-live:market-data:5m"
+      for event in synced.json()["incident_events"]
     )
 
 

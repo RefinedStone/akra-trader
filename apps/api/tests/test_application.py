@@ -1410,6 +1410,33 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
       ],
     ),
   )
+
+  guarded_live_status = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert incident.remediation.kind == "recent_sync"
+  assert incident.remediation.state == "skipped"
+  assert incident.remediation.summary == "Refresh the live timeframe sync window and verify freshness thresholds."
+  assert incident.remediation.runbook == "market_data.sync_recent"
+  assert incident.remediation.provider == "pagerduty"
+  assert incident.remediation.reference == "guarded-live:market-data:5m"
+  assert incident.remediation.requested_by == "system"
+  assert "seeded_market_data_provider_has_no_live_remediation_jobs" in incident.remediation.detail
+  assert market_data.remediation_calls[-1] == ("recent_sync", "ETH/USDT", "5m")
+  assert any(
+    workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
+    for workflow_event_id, provider, action, _ in delivery.workflow_attempts
+  )
+  remediation_delivery = next(
+    record
+    for record in guarded_live_status.delivery_history
+    if record.incident_event_id == incident.event_id and record.phase == "provider_remediate"
+  )
+  assert remediation_delivery.external_provider == "pagerduty"
+
   market_data.set_remediation_status(
     kind="recent_sync",
     timeframe="5m",
@@ -1431,30 +1458,6 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
       ],
     ),
   )
-
-  guarded_live_status = app.get_guarded_live_status()
-  incident = next(
-    event
-    for event in guarded_live_status.incident_events
-    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
-  )
-  assert incident.remediation.kind == "recent_sync"
-  assert incident.remediation.state == "requested"
-  assert incident.remediation.summary == "Refresh the live timeframe sync window and verify freshness thresholds."
-  assert incident.remediation.runbook == "market_data.sync_recent"
-  assert incident.remediation.provider == "pagerduty"
-  assert incident.remediation.reference == "guarded-live:market-data:5m"
-  assert incident.remediation.requested_by == "system"
-  assert any(
-    workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
-    for workflow_event_id, provider, action, _ in delivery.workflow_attempts
-  )
-  remediation_delivery = next(
-    record
-    for record in guarded_live_status.delivery_history
-    if record.incident_event_id == incident.event_id and record.phase == "provider_remediate"
-  )
-  assert remediation_delivery.external_provider == "pagerduty"
 
   updated_status = app.remediate_guarded_live_incident(
     event_id=incident.event_id,
@@ -1485,6 +1488,255 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
   assert any(
     event.kind == "guarded_live_incident_remediation_requested"
     for event in updated_status.audit_events
+  )
+
+
+def test_market_data_incidents_auto_remediate_on_incident_open(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 0, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    supported_workflow_providers=("pagerduty",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="auto_market_data_remediation",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+  market_data.set_remediation_status(
+    kind="recent_sync",
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current,
+          sync_status="synced",
+          lag_seconds=0,
+          last_sync_at=clock.current,
+          issues=(),
+        ),
+      ],
+    ),
+  )
+
+  guarded_live_status = app.get_guarded_live_status()
+
+  incident = next(
+    event
+    for event in guarded_live_status.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert incident.remediation.state == "executed"
+  assert incident.remediation.requested_by == "system"
+  assert market_data.remediation_calls[-1] == ("recent_sync", "ETH/USDT", "5m")
+  assert any(
+    event.kind == "incident_resolved" and event.alert_id == "guarded-live:market-data:5m"
+    for event in guarded_live_status.incident_events
+  )
+  assert all(
+    alert.alert_id != "guarded-live:market-data:5m"
+    for alert in guarded_live_status.active_alerts
+  )
+  assert any(
+    workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
+    for workflow_event_id, provider, action, _ in delivery.workflow_attempts
+  )
+
+
+def test_external_market_data_recovery_sync_executes_local_verification_and_resolves_incident(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 15, 30, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("pagerduty_events",),
+    supported_workflow_providers=("pagerduty",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="pagerduty",
+    operator_alert_paging_policy_warning_targets=("pagerduty_events",),
+    operator_alert_paging_policy_critical_targets=("pagerduty_events",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="provider_market_data_recovery_sync",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+  assert incident.remediation.state == "skipped"
+
+  market_data.set_remediation_status(
+    kind="recent_sync",
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current,
+          sync_status="synced",
+          lag_seconds=0,
+          last_sync_at=clock.current,
+          issues=(),
+        ),
+      ],
+    ),
+  )
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="pagerduty",
+    event_kind="remediation_completed",
+    actor="pagerduty",
+    detail="provider_market_data_recovered",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="PDINC-REC-1",
+    occurred_at=clock.current + timedelta(minutes=1),
+  )
+
+  updated_incident = next(
+    event
+    for event in synced.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated_incident.remediation.state == "executed"
+  assert updated_incident.remediation.requested_by == "pagerduty:pagerduty"
+  assert updated_incident.provider_workflow_action == "remediate"
+  assert updated_incident.provider_workflow_state == "delivered"
+  assert updated_incident.provider_workflow_reference == "PDINC-REC-1"
+  assert any(
+    event.kind == "incident_resolved" and event.alert_id == incident.alert_id
+    for event in synced.incident_events
+  )
+  assert any(
+    record.phase == "provider_remediate"
+    and record.external_reference == "PDINC-REC-1"
+    for record in synced.delivery_history
+  )
+  assert any(
+    event.kind == "guarded_live_incident_external_synced"
+    and "Local remediation: recent_sync:ETH/USDT:5m:status_repaired" in event.detail
+    for event in synced.audit_events
   )
 
 

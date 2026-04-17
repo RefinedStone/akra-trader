@@ -746,6 +746,7 @@ class TradingApplication:
     self,
     *,
     current_time: datetime,
+    allow_post_remediation_recompute: bool = True,
   ) -> tuple[GuardedLiveState, list[OperatorAlert]]:
     state = self._guarded_live_state.load_state()
     active_alerts = self._build_guarded_live_operator_alerts(
@@ -763,7 +764,7 @@ class TradingApplication:
       current_time=current_time,
     )
     delivery_records = state.delivery_history
-    new_incident_events, new_delivery_records = self._deliver_guarded_live_incident_events(
+    new_incident_events, new_delivery_records, auto_remediation_executed = self._deliver_guarded_live_incident_events(
       incident_events=incident_events,
       current_time=current_time,
     )
@@ -805,6 +806,11 @@ class TradingApplication:
           delivery_history=delivery_records,
           audit_events=tuple((*workflow_audit_events, *state.audit_events)),
         )
+      )
+    if auto_remediation_executed and allow_post_remediation_recompute:
+      return self._refresh_guarded_live_alert_state(
+        current_time=current_time,
+        allow_post_remediation_recompute=False,
       )
     return state, active_alerts
 
@@ -1192,7 +1198,7 @@ class TradingApplication:
     state, _ = self._refresh_guarded_live_alert_state(current_time=current_time)
     synced_at = occurred_at or current_time
     normalized_provider = provider.strip().lower().replace(" ", "_")
-    normalized_kind = event_kind.strip().lower().replace("-", "_")
+    normalized_kind = self._normalize_external_incident_event_kind(event_kind)
     incident = self._find_guarded_live_incident_for_external_sync(
       state=state,
       alert_id=alert_id,
@@ -1209,6 +1215,7 @@ class TradingApplication:
       external_last_synced_at=synced_at,
     )
     delivery_history = state.delivery_history
+    local_results: tuple[MarketDataRemediationResult, ...] = ()
 
     if normalized_kind == "triggered":
       updated_incident = replace(
@@ -1314,6 +1321,123 @@ class TradingApplication:
         occurred_at=synced_at,
         external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
       )
+    elif normalized_kind == "remediation_requested":
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_remediation_synced:{normalized_provider}:{normalized_kind}",
+      )
+      updated_incident = replace(
+        updated_incident,
+        remediation=replace(
+          updated_incident.remediation,
+          state="requested",
+          requested_at=updated_incident.remediation.requested_at or synced_at,
+          requested_by=f"{normalized_provider}:{actor}",
+          last_attempted_at=synced_at,
+          provider=normalized_provider or updated_incident.remediation.provider,
+          reference=workflow_reference or effective_reference,
+          detail=detail_copy,
+        ),
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
+      )
+    elif normalized_kind == "remediation_started":
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_remediation_synced:{normalized_provider}:{normalized_kind}",
+      )
+      updated_incident = replace(
+        updated_incident,
+        remediation=replace(
+          updated_incident.remediation,
+          state="provider_recovering",
+          requested_at=updated_incident.remediation.requested_at or synced_at,
+          requested_by=f"{normalized_provider}:{actor}",
+          last_attempted_at=synced_at,
+          provider=normalized_provider or updated_incident.remediation.provider,
+          reference=workflow_reference or effective_reference,
+          detail=detail_copy,
+        ),
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
+      )
+    elif normalized_kind == "remediation_completed":
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_remediation_synced:{normalized_provider}:{normalized_kind}",
+      )
+      updated_incident = replace(
+        updated_incident,
+        remediation=replace(
+          updated_incident.remediation,
+          state="provider_recovered",
+          requested_at=updated_incident.remediation.requested_at or synced_at,
+          requested_by=f"{normalized_provider}:{actor}",
+          last_attempted_at=synced_at,
+          provider=normalized_provider or updated_incident.remediation.provider,
+          reference=workflow_reference or effective_reference,
+          detail=detail_copy,
+        ),
+      )
+      updated_incident, local_results = self._execute_local_incident_remediation(
+        incident=updated_incident,
+        actor=f"{normalized_provider}:{actor}",
+        current_time=synced_at,
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
+      )
+    elif normalized_kind == "remediation_failed":
+      delivery_history = self._suppress_pending_incident_retries(
+        delivery_history=delivery_history,
+        incident_event_id=incident.event_id,
+        reason=f"external_remediation_synced:{normalized_provider}:{normalized_kind}",
+      )
+      updated_incident = replace(
+        updated_incident,
+        remediation=replace(
+          updated_incident.remediation,
+          state="failed",
+          requested_at=updated_incident.remediation.requested_at or synced_at,
+          requested_by=f"{normalized_provider}:{actor}",
+          last_attempted_at=synced_at,
+          provider=normalized_provider or updated_incident.remediation.provider,
+          reference=workflow_reference or effective_reference,
+          detail=detail_copy,
+        ),
+      )
+      delivery_history = self._confirm_external_provider_workflow(
+        delivery_history=delivery_history,
+        incident=incident,
+        provider=normalized_provider,
+        event_kind=normalized_kind,
+        detail=detail_copy,
+        occurred_at=synced_at,
+        external_reference=workflow_reference or incident.provider_workflow_reference or effective_reference,
+      )
     else:
       raise ValueError(f"unsupported external incident event kind: {event_kind}")
 
@@ -1333,7 +1457,8 @@ class TradingApplication:
       summary=f"Guarded-live incident synced from external paging workflow for {incident.alert_id}.",
       detail=(
         f"External event {normalized_kind} synced from {normalized_provider}. "
-        f"Reference: {effective_reference}. Detail: {detail_copy}."
+        f"Reference: {effective_reference}. Detail: {detail_copy}. "
+        f"Local remediation: {self._summarize_local_remediation_results(local_results)}."
       ),
       run_id=incident.run_id,
       session_id=incident.session_id,
@@ -1348,6 +1473,18 @@ class TradingApplication:
       )
     )
     return self.get_guarded_live_status()
+
+  @staticmethod
+  def _normalize_external_incident_event_kind(event_kind: str) -> str:
+    normalized = event_kind.strip().lower().replace("-", "_")
+    mapping = {
+      "recovery_requested": "remediation_requested",
+      "recovery_started": "remediation_started",
+      "recovered": "remediation_completed",
+      "recovery_completed": "remediation_completed",
+      "recovery_failed": "remediation_failed",
+    }
+    return mapping.get(normalized, normalized)
 
   def run_backtest(
     self,
@@ -5727,9 +5864,14 @@ class TradingApplication:
     *,
     incident_events: tuple[OperatorIncidentEvent, ...],
     current_time: datetime,
-  ) -> tuple[tuple[OperatorIncidentEvent, ...], tuple[OperatorIncidentDelivery, ...]]:
+  ) -> tuple[
+    tuple[OperatorIncidentEvent, ...],
+    tuple[OperatorIncidentDelivery, ...],
+    bool,
+  ]:
     persisted_events: list[OperatorIncidentEvent] = []
     delivery_records: list[OperatorIncidentDelivery] = []
+    auto_remediation_executed = False
     for incident in incident_events:
       records = self._operator_alert_delivery.deliver(
         incident=incident,
@@ -5772,6 +5914,12 @@ class TradingApplication:
       )
       delivery_records.extend(records)
       if incident.kind == "incident_opened":
+        persisted_events[-1], auto_results = self._execute_local_incident_remediation(
+          incident=persisted_events[-1],
+          actor="system",
+          current_time=current_time,
+        )
+        auto_remediation_executed = auto_remediation_executed or bool(auto_results)
         persisted_events[-1], remediation_records = self._request_incident_remediation(
           incident=persisted_events[-1],
           delivery_history=tuple(delivery_records),
@@ -5781,7 +5929,7 @@ class TradingApplication:
         )
         if remediation_records:
           delivery_records.extend(remediation_records)
-    return tuple(persisted_events), tuple(delivery_records)
+    return tuple(persisted_events), tuple(delivery_records), auto_remediation_executed
 
   def _retry_guarded_live_incident_deliveries(
     self,
@@ -6056,7 +6204,15 @@ class TradingApplication:
     records: tuple[OperatorIncidentDelivery, ...],
     current_state: str,
   ) -> str:
-    if current_state in {"executed", "partial", "failed", "skipped", "completed"}:
+    if current_state in {
+      "executed",
+      "partial",
+      "failed",
+      "skipped",
+      "completed",
+      "provider_recovering",
+      "provider_recovered",
+    }:
       return current_state
     delivery_state = self._resolve_incident_delivery_state(records=records)
     mapping = {
@@ -6580,6 +6736,10 @@ class TradingApplication:
       "acknowledged": "provider_acknowledge",
       "escalated": "provider_escalate",
       "resolved": "provider_resolve",
+      "remediation_requested": "provider_remediate",
+      "remediation_started": "provider_remediate",
+      "remediation_completed": "provider_remediate",
+      "remediation_failed": "provider_remediate",
     }
     return mapping.get(event_kind)
 
