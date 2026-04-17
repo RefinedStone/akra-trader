@@ -300,6 +300,10 @@ class BinanceWebSocketMarketStreamSession:
           event["e"] = "bookTicker"
         elif stream_name.endswith("@trade"):
           event["e"] = "trade"
+        elif "@depth" in stream_name:
+          event["e"] = "depthUpdate"
+        elif "@kline_" in stream_name:
+          event["e"] = "kline"
       event["stream_scope"] = "market_data"
       event["stream"] = stream_name
       event.setdefault("_received_at_ms", int(self._clock().timestamp() * 1000))
@@ -319,18 +323,25 @@ class BinanceWebSocketMarketStreamClient:
     self,
     *,
     symbol: str,
+    timeframe: str,
     websocket_url: str = "wss://stream.binance.com:9443/stream",
     clock: Callable[[], datetime] | None = None,
   ) -> None:
     self._symbol = symbol
+    self._timeframe = timeframe
     self._websocket_url = websocket_url.rstrip("/")
     self._clock = clock or (lambda: datetime.now(UTC))
 
   def open_session(self) -> BinanceVenueStreamSession:
     market_symbol = _normalize_binance_stream_symbol(self._symbol)
-    streams = f"{market_symbol}@trade/{market_symbol}@bookTicker"
+    streams = (
+      f"{market_symbol}@trade/"
+      f"{market_symbol}@bookTicker/"
+      f"{market_symbol}@depth20@100ms/"
+      f"{market_symbol}@kline_{self._timeframe}"
+    )
     return BinanceWebSocketMarketStreamSession(
-      session_id=f"market:{market_symbol}:trade+bookTicker",
+      session_id=f"market:{market_symbol}:trade+bookTicker+depth+kline_{self._timeframe}",
       websocket_url=f"{self._websocket_url}?streams={streams}",
       clock=self._clock,
     )
@@ -383,6 +394,7 @@ class BinanceCombinedWebSocketVenueStreamClient:
     *,
     api_key: str,
     symbol: str,
+    timeframe: str,
     rest_base_url: str = "https://api.binance.com",
     user_data_websocket_url: str = "wss://stream.binance.com:9443/ws",
     market_websocket_url: str = "wss://stream.binance.com:9443/stream",
@@ -396,6 +408,7 @@ class BinanceCombinedWebSocketVenueStreamClient:
     )
     self._market_stream_client = BinanceWebSocketMarketStreamClient(
       symbol=symbol,
+      timeframe=timeframe,
       websocket_url=market_websocket_url,
       clock=clock,
     )
@@ -422,6 +435,8 @@ BINANCE_USER_DATA_STREAM_COVERAGE = (
 BINANCE_MARKET_STREAM_COVERAGE = (
   "trade_ticks",
   "book_ticker",
+  "depth_updates",
+  "kline_candles",
 )
 BINANCE_VENUE_STREAM_COVERAGE = (
   *BINANCE_USER_DATA_STREAM_COVERAGE,
@@ -573,6 +588,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
     self,
     *,
     symbol: str,
+    timeframe: str,
     owner_run_id: str,
     owner_session_id: str | None,
     owned_order_ids: tuple[str, ...],
@@ -585,6 +601,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       source="seeded_venue_execution",
       venue=self._venue,
       symbol=symbol,
+      timeframe=timeframe,
       owner_run_id=owner_run_id,
       owner_session_id=owner_session_id,
       venue_session_id=session_key,
@@ -622,6 +639,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       source=existing.source or handoff.source or "seeded_venue_execution",
       venue=existing.venue or handoff.venue or self._venue,
       symbol=existing.symbol or handoff.symbol,
+      timeframe=existing.timeframe or handoff.timeframe,
       owner_run_id=existing.owner_run_id or handoff.owner_run_id,
       owner_session_id=existing.owner_session_id or handoff.owner_session_id,
       venue_session_id=session_key or None,
@@ -633,9 +651,14 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       failover_count=existing.failover_count or handoff.failover_count,
       last_failover_at=existing.last_failover_at or handoff.last_failover_at,
       coverage=existing.coverage or handoff.coverage or ("execution_reports",),
+      last_market_event_at=existing.last_market_event_at or handoff.last_market_event_at,
+      last_depth_event_at=existing.last_depth_event_at or handoff.last_depth_event_at,
+      last_kline_event_at=existing.last_kline_event_at or handoff.last_kline_event_at,
       last_account_event_at=existing.last_account_event_at or handoff.last_account_event_at,
       last_balance_event_at=existing.last_balance_event_at or handoff.last_balance_event_at,
       last_order_list_event_at=existing.last_order_list_event_at or handoff.last_order_list_event_at,
+      last_trade_event_at=existing.last_trade_event_at or handoff.last_trade_event_at,
+      last_book_ticker_event_at=existing.last_book_ticker_event_at or handoff.last_book_ticker_event_at,
       active_order_count=len(open_orders),
       issues=(),
     )
@@ -664,6 +687,7 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       source=handoff.source or "seeded_venue_execution",
       venue=handoff.venue or self._venue,
       symbol=handoff.symbol,
+      timeframe=handoff.timeframe,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
       venue_session_id=handoff.venue_session_id,
@@ -675,9 +699,14 @@ class SeededVenueExecutionAdapter(VenueExecutionPort):
       failover_count=handoff.failover_count,
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
+      last_market_event_at=handoff.last_market_event_at,
+      last_depth_event_at=handoff.last_depth_event_at,
+      last_kline_event_at=handoff.last_kline_event_at,
       last_account_event_at=handoff.last_account_event_at,
       last_balance_event_at=handoff.last_balance_event_at,
       last_order_list_event_at=handoff.last_order_list_event_at,
+      last_trade_event_at=handoff.last_trade_event_at,
+      last_book_ticker_event_at=handoff.last_book_ticker_event_at,
       active_order_count=0,
       issues=handoff.issues,
     )
@@ -1036,13 +1065,14 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     self,
     *,
     symbol: str,
+    timeframe: str,
     owner_run_id: str,
     owner_session_id: str | None,
     owned_order_ids: tuple[str, ...],
   ) -> GuardedLiveVenueSessionHandoff:
     current_time = self._clock()
     restore = self.restore_session(symbol=symbol, owned_order_ids=owned_order_ids)
-    stream_client = self._resolve_stream_client(symbol=symbol)
+    stream_client = self._resolve_stream_client(symbol=symbol, timeframe=timeframe)
     if stream_client is None:
       return GuardedLiveVenueSessionHandoff(
         state="unavailable",
@@ -1050,6 +1080,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         source="binance_venue_stream",
         venue=self._venue,
         symbol=symbol,
+        timeframe=timeframe,
         owner_run_id=owner_run_id,
         owner_session_id=owner_session_id,
         transport="binance_multi_stream_websocket",
@@ -1067,6 +1098,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         source="binance_venue_stream",
         venue=self._venue,
         symbol=symbol,
+        timeframe=timeframe,
         owner_run_id=owner_run_id,
         owner_session_id=owner_session_id,
         transport="binance_multi_stream_websocket",
@@ -1083,6 +1115,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       source="binance_venue_stream",
       venue=self._venue,
       symbol=symbol,
+      timeframe=timeframe,
       owner_run_id=owner_run_id,
       owner_session_id=owner_session_id,
       venue_session_id=session_id,
@@ -1112,6 +1145,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     coverage = handoff.coverage or BINANCE_VENUE_STREAM_COVERAGE
     last_event_at = handoff.last_event_at
     last_market_event_at = handoff.last_market_event_at
+    last_depth_event_at = handoff.last_depth_event_at
+    last_kline_event_at = handoff.last_kline_event_at
     last_account_event_at = handoff.last_account_event_at
     last_balance_event_at = handoff.last_balance_event_at
     last_order_list_event_at = handoff.last_order_list_event_at
@@ -1122,6 +1157,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       failover = self._failover_stream_session(
         session_id=session_id,
         symbol=handoff.symbol or "",
+        timeframe=handoff.timeframe or "5m",
         current_issues=tuple(issues),
         reason="session_missing",
       )
@@ -1177,6 +1213,18 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         event_count += 1
         last_event_at = event_at
         continue
+      if event_type == "depthUpdate":
+        last_market_event_at = event_at
+        last_depth_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
+      if event_type == "kline":
+        last_market_event_at = event_at
+        last_kline_event_at = event_at
+        event_count += 1
+        last_event_at = event_at
+        continue
       result, event_issues = self._build_order_result_from_stream_event(
         event=event,
         fallback_symbol=handoff.symbol or "",
@@ -1191,6 +1239,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       failover = self._failover_stream_session(
         session_id=session_id,
         symbol=handoff.symbol or "",
+        timeframe=handoff.timeframe or "5m",
         current_issues=tuple(issues),
         reason=failover_reason,
       )
@@ -1217,6 +1266,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       source=handoff.source or "binance_venue_stream",
       venue=handoff.venue or self._venue,
       symbol=handoff.symbol,
+      timeframe=handoff.timeframe,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
       venue_session_id=session_id or handoff.venue_session_id,
@@ -1233,6 +1283,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       last_failover_at=last_failover_at,
       coverage=coverage,
       last_market_event_at=last_market_event_at,
+      last_depth_event_at=last_depth_event_at,
+      last_kline_event_at=last_kline_event_at,
       last_account_event_at=last_account_event_at,
       last_balance_event_at=last_balance_event_at,
       last_order_list_event_at=last_order_list_event_at,
@@ -1271,6 +1323,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       source=handoff.source or "binance_venue_stream",
       venue=handoff.venue or self._venue,
       symbol=handoff.symbol,
+      timeframe=handoff.timeframe,
       owner_run_id=handoff.owner_run_id,
       owner_session_id=handoff.owner_session_id,
       venue_session_id=handoff.venue_session_id,
@@ -1283,6 +1336,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       last_failover_at=handoff.last_failover_at,
       coverage=handoff.coverage,
       last_market_event_at=handoff.last_market_event_at,
+      last_depth_event_at=handoff.last_depth_event_at,
+      last_kline_event_at=handoff.last_kline_event_at,
       last_account_event_at=handoff.last_account_event_at,
       last_balance_event_at=handoff.last_balance_event_at,
       last_order_list_event_at=handoff.last_order_list_event_at,
@@ -1415,15 +1470,16 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         self._order_states[result.order_id] = result
     return tuple(results)
 
-  def _resolve_stream_client(self, *, symbol: str) -> BinanceVenueStreamClient | None:
+  def _resolve_stream_client(self, *, symbol: str, timeframe: str) -> BinanceVenueStreamClient | None:
     if self._venue_stream_client is not None:
       return self._venue_stream_client
-    if not self._api_key or not symbol:
+    if not self._api_key or not symbol or not timeframe:
       return None
     try:
       return BinanceCombinedWebSocketVenueStreamClient(
         api_key=self._api_key,
         symbol=symbol,
+        timeframe=timeframe,
         clock=self._clock,
       )
     except Exception:
@@ -1440,6 +1496,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
     *,
     session_id: str,
     symbol: str,
+    timeframe: str,
     current_issues: tuple[str, ...],
     reason: str,
   ) -> dict[str, object]:
@@ -1450,7 +1507,7 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
         previous_session.close()
       except Exception as exc:
         issues.append(f"binance_venue_stream_close_failed:{exc}")
-    stream_client = self._resolve_stream_client(symbol=symbol)
+    stream_client = self._resolve_stream_client(symbol=symbol, timeframe=timeframe)
     if stream_client is None:
       issues.append(f"binance_venue_stream_failover_failed:{reason}:stream_unavailable")
       return {
@@ -1487,6 +1544,8 @@ class BinanceVenueExecutionAdapter(VenueExecutionPort):
       or _coerce_datetime(None, event.get("_received_at_ms"))
       or _coerce_datetime(None, event.get("T"))
       or _coerce_datetime(None, event.get("u"))
+      or _coerce_datetime(None, _extract_nested_value(event, ("k", "T")))
+      or _coerce_datetime(None, _extract_nested_value(event, ("k", "t")))
     )
 
   def _build_synced_orders_from_state(

@@ -294,6 +294,7 @@ class TradingApplication:
       self,
       *,
       symbol: str,
+      timeframe: str,
       owner_run_id: str,
       owner_session_id: str | None,
       owned_order_ids: tuple[str, ...],
@@ -1675,6 +1676,7 @@ class TradingApplication:
         session_handoff,
         venue=session_handoff.venue or run.config.venue,
         symbol=session_handoff.symbol or symbol,
+        timeframe=session_handoff.timeframe or run.config.timeframe,
         owner_run_id=run.config.run_id,
         owner_session_id=session_id,
       )
@@ -1683,6 +1685,7 @@ class TradingApplication:
         existing,
         venue=existing.venue or run.config.venue,
         symbol=existing.symbol or symbol,
+        timeframe=existing.timeframe or run.config.timeframe,
         owner_run_id=run.config.run_id,
         owner_session_id=session_id,
       )
@@ -1691,6 +1694,7 @@ class TradingApplication:
       source="live_start",
       venue=run.config.venue,
       symbol=symbol,
+      timeframe=run.config.timeframe,
       owner_run_id=run.config.run_id,
       owner_session_id=session_id,
     )
@@ -1704,6 +1708,7 @@ class TradingApplication:
     session = run.provenance.runtime_session
     handoff = self._venue_execution.handoff_session(
       symbol=run.config.symbols[0],
+      timeframe=run.config.timeframe,
       owner_run_id=run.config.run_id,
       owner_session_id=session.session_id if session is not None else None,
       owned_order_ids=tuple(order.order_id for order in run.orders),

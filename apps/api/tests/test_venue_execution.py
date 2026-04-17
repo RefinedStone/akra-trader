@@ -204,6 +204,7 @@ def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stre
 
   client = BinanceWebSocketMarketStreamClient(
     symbol="ETH/USDT",
+    timeframe="5m",
     websocket_url="wss://stream.binance.test/stream",
     clock=clock,
   )
@@ -235,7 +236,7 @@ def test_binance_websocket_market_stream_client_opens_trade_and_book_ticker_stre
 
   assert session.transport == "binance_market_data_websocket"
   assert request_urls == [
-    "wss://stream.binance.test/stream?streams=ethusdt@trade/ethusdt@bookTicker"
+    "wss://stream.binance.test/stream?streams=ethusdt@trade/ethusdt@bookTicker/ethusdt@depth20@100ms/ethusdt@kline_5m"
   ]
   assert events[0]["e"] == "trade"
   assert events[0]["stream_scope"] == "market_data"
@@ -276,6 +277,7 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
 
   handoff = adapter.handoff_session(
     symbol="ETH/USDT",
+    timeframe="5m",
     owner_run_id="run-live-1",
     owner_session_id="worker-live-1",
     owned_order_ids=("order-1",),
@@ -294,6 +296,8 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
     "order_list_status",
     "trade_ticks",
     "book_ticker",
+    "depth_updates",
+    "kline_candles",
   )
   assert handoff.active_order_count == 1
   assert stream_client.open_count == 1
@@ -365,6 +369,23 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   )
   second_stream_session.push(
     {
+      "e": "depthUpdate",
+      "E": int(clock().timestamp() * 1000),
+    }
+  )
+  second_stream_session.push(
+    {
+      "e": "kline",
+      "E": int(clock().timestamp() * 1000),
+      "k": {
+        "i": "5m",
+        "t": int(clock().timestamp() * 1000),
+        "T": int(clock().timestamp() * 1000),
+      },
+    }
+  )
+  second_stream_session.push(
+    {
       "e": "listStatus",
       "E": int(clock().timestamp() * 1000),
     }
@@ -387,9 +408,11 @@ def test_binance_adapter_handoff_failsover_and_tracks_broader_stream_coverage() 
   second_sync = adapter.sync_session(handoff=first_sync.handoff, order_ids=("order-1",))
   released = adapter.release_session(handoff=second_sync.handoff)
 
-  assert second_sync.handoff.cursor == "event-9"
+  assert second_sync.handoff.cursor == "event-11"
   assert second_sync.handoff.active_order_count == 0
   assert second_sync.handoff.last_market_event_at == clock()
+  assert second_sync.handoff.last_depth_event_at == clock()
+  assert second_sync.handoff.last_kline_event_at == clock()
   assert second_sync.handoff.last_balance_event_at == clock()
   assert second_sync.handoff.last_order_list_event_at == clock()
   assert second_sync.handoff.last_trade_event_at == clock()

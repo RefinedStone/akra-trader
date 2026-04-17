@@ -140,6 +140,7 @@ class VenueExecutionPort(Protocol):
     self,
     *,
     symbol: str,
+    timeframe: str,
     owner_run_id: str,
     owner_session_id: str | None,
     owned_order_ids: tuple[str, ...],

@@ -63,8 +63,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   maintenance keeps following the same venue-owned lifecycle after resume, and Binance now uses a
   venue-push multi-stream websocket transport for that handoff
 - Binance push-session supervision now performs automatic listen-key failover and records broader
-  account-position, balance-update, order-list, trade-tick, and book-ticker coverage alongside
-  execution events
+  account-position, balance-update, order-list, trade-tick, book-ticker, depth, and kline
+  coverage alongside execution events
 
 ### Control room
 
@@ -80,8 +80,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live panel with persisted kill-switch state, candidacy blockers, reconciliation findings,
   venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
   live-owner visibility, venue-native session-restore state, durable order-book visibility,
-  venue session handoff supervision/failover coverage plus market-event visibility, guarded-live
-  resume controls, and guarded-live audit history
+  venue session handoff supervision/failover coverage plus market/depth/kline event visibility,
+  guarded-live resume controls, and guarded-live audit history
 - side-by-side backtest comparison with narratives
 
 ## Partial or Fragile Areas
@@ -92,7 +92,7 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
   recovery/live resume currently restores tracked venue order lifecycle state before falling back to
   persisted control-plane state, but it still does not revive broader venue-native stream or market
-  session coverage beyond Binance multi-stream account/order/market events
+  session coverage beyond Binance multi-stream account/order/trade/book-ticker/depth/kline events
 - guarded-live order sync now persists lifecycle progression, a durable open-order snapshot, and
   session ownership for resume, but it still does not restore a full exchange session lifecycle
 - custom strategy registration exists, but registration metadata is process-local rather than durable
@@ -106,7 +106,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - durable operator event storage and external alert delivery
 - operator alerts for risk breaches, live-path faults, and wider market-data freshness policies
 - full live order lifecycle management beyond cancel/replace, including venue-native amend flows
-- broader venue-native session continuation beyond Binance multi-stream account/order/market-event streaming
+- broader venue-native session continuation beyond Binance multi-stream
+  account/order/trade/book-ticker/depth/kline streaming
 - live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
 
@@ -115,5 +116,5 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
 2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
 3. Turn runtime-derived operator visibility into durable alert delivery and audit storage.
-4. Expand guarded-live controls from supervised Binance multi-stream transport into wider live-path audit coverage and broader venue-native session management.
+4. Expand guarded-live controls from supervised Binance multi-stream account/order/depth/kline transport into wider live-path audit coverage and broader venue-native session management.
 5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.

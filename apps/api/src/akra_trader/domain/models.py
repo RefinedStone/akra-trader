@@ -642,6 +642,7 @@ class GuardedLiveVenueSessionRestore:
   source: str = "none"
   venue: str | None = None
   symbol: str | None = None
+  timeframe: str | None = None
   owner_run_id: str | None = None
   owner_session_id: str | None = None
   open_orders: tuple[GuardedLiveVenueOpenOrder, ...] = ()
@@ -657,6 +658,7 @@ class GuardedLiveVenueSessionHandoff:
   source: str = "none"
   venue: str | None = None
   symbol: str | None = None
+  timeframe: str | None = None
   owner_run_id: str | None = None
   owner_session_id: str | None = None
   venue_session_id: str | None = None
@@ -669,6 +671,8 @@ class GuardedLiveVenueSessionHandoff:
   last_failover_at: datetime | None = None
   coverage: tuple[str, ...] = ()
   last_market_event_at: datetime | None = None
+  last_depth_event_at: datetime | None = None
+  last_kline_event_at: datetime | None = None
   last_account_event_at: datetime | None = None
   last_balance_event_at: datetime | None = None
   last_order_list_event_at: datetime | None = None

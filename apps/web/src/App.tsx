@@ -475,6 +475,8 @@ type GuardedLiveStatus = {
     last_failover_at?: string | null;
     coverage: string[];
     last_market_event_at?: string | null;
+    last_depth_event_at?: string | null;
+    last_kline_event_at?: string | null;
     last_account_event_at?: string | null;
     last_balance_event_at?: string | null;
     last_order_list_event_at?: string | null;
@@ -2255,6 +2257,14 @@ export default function App() {
                       <tr>
                         <th>Last market event</th>
                         <td>{formatTimestamp(guardedLive.session_handoff.last_market_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last depth update</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_depth_event_at ?? null)}</td>
+                      </tr>
+                      <tr>
+                        <th>Last kline update</th>
+                        <td>{formatTimestamp(guardedLive.session_handoff.last_kline_event_at ?? null)}</td>
                       </tr>
                       <tr>
                         <th>Last account event</th>
