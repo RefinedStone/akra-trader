@@ -530,6 +530,7 @@ class OperatorIncidentProviderRecoveryStatusMachine:
 
 @dataclass(frozen=True)
 class OperatorIncidentProviderRecoveryTelemetry:
+  source: str = "unknown"
   state: str = "unknown"
   progress_percent: int | None = None
   attempt_count: int = 0

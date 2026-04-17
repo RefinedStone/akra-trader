@@ -46,8 +46,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     pagerduty_integration_key: str | None = None,
     pagerduty_api_token: str | None = None,
     pagerduty_from_email: str | None = None,
+    pagerduty_recovery_engine_url_template: str | None = None,
+    pagerduty_recovery_engine_token: str | None = None,
     opsgenie_api_key: str | None = None,
     opsgenie_api_url: str = "https://api.opsgenie.com",
+    opsgenie_recovery_engine_url_template: str | None = None,
+    opsgenie_recovery_engine_api_key: str | None = None,
     webhook_timeout_seconds: int = 5,
     clock: Callable[[], datetime] | None = None,
     urlopen: Callable[..., object] | None = None,
@@ -63,8 +67,12 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     self._pagerduty_integration_key = pagerduty_integration_key
     self._pagerduty_api_token = pagerduty_api_token
     self._pagerduty_from_email = pagerduty_from_email
+    self._pagerduty_recovery_engine_url_template = pagerduty_recovery_engine_url_template
+    self._pagerduty_recovery_engine_token = pagerduty_recovery_engine_token
     self._opsgenie_api_key = opsgenie_api_key
     self._opsgenie_api_url = opsgenie_api_url.rstrip("/")
+    self._opsgenie_recovery_engine_url_template = opsgenie_recovery_engine_url_template
+    self._opsgenie_recovery_engine_api_key = opsgenie_recovery_engine_api_key
     self._webhook_timeout_seconds = webhook_timeout_seconds
     self._clock = clock or (lambda: datetime.now(UTC))
     self._urlopen = urlopen or urllib_request.urlopen
@@ -176,6 +184,209 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     if normalized_provider == "opsgenie":
       return self._pull_opsgenie_workflow_state(incident=incident)
     return None
+
+  @staticmethod
+  def _build_recovery_engine_template_context(
+    *,
+    workflow_reference: str | None,
+    external_reference: str | None,
+    job_id: str | None,
+  ) -> dict[str, str]:
+    context: dict[str, str] = {}
+    for key, value in {
+      "workflow_reference": workflow_reference,
+      "reference": external_reference,
+      "external_reference": external_reference,
+      "job_id": job_id,
+    }.items():
+      if not value:
+        continue
+      context[key] = value
+      context[f"{key}_urlencoded"] = urllib_parse.quote(value, safe="")
+    return context
+
+  @staticmethod
+  def _format_recovery_engine_url(
+    *,
+    url_template: str | None,
+    direct_url: str | None,
+    workflow_reference: str | None,
+    external_reference: str | None,
+    job_id: str | None,
+  ) -> str | None:
+    if direct_url:
+      return direct_url
+    if not url_template:
+      return None
+    context = OperatorAlertDeliveryAdapter._build_recovery_engine_template_context(
+      workflow_reference=workflow_reference,
+      external_reference=external_reference,
+      job_id=job_id,
+    )
+    try:
+      return url_template.format_map(context)
+    except KeyError:
+      return None
+
+  def _build_pagerduty_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    headers = {
+      "Accept": "application/json",
+    }
+    if self._pagerduty_recovery_engine_token:
+      headers["Authorization"] = f"Bearer {self._pagerduty_recovery_engine_token}"
+    elif self._pagerduty_api_token:
+      headers["Authorization"] = f"Token token={self._pagerduty_api_token}"
+      headers["Accept"] = "application/vnd.pagerduty+json;version=2"
+      if self._pagerduty_from_email:
+        headers["From"] = self._pagerduty_from_email
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_opsgenie_recovery_engine_request(self, *, url: str) -> urllib_request.Request:
+    api_key = self._opsgenie_recovery_engine_api_key or self._opsgenie_api_key
+    headers = {
+      "Accept": "application/json",
+    }
+    if api_key:
+      headers["Authorization"] = f"GenieKey {api_key}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _normalize_recovery_engine_payload(
+    self,
+    *,
+    payload: dict[str, Any],
+    provider: str,
+  ) -> dict[str, Any]:
+    body = self._extract_mapping(
+      payload.get("data"),
+      payload.get("job"),
+      payload.get("telemetry"),
+      payload,
+    )
+    telemetry = self._extract_mapping(
+      body.get("telemetry"),
+      body.get("status"),
+      body.get("progress"),
+    )
+    merged = {**body, **telemetry}
+    state = self._first_non_empty_string(
+      merged.get("state"),
+      merged.get("status"),
+      merged.get("phase"),
+    )
+    progress = (
+      merged.get("progress_percent")
+      if isinstance(merged.get("progress_percent"), int)
+      else (
+        merged.get("progressPercent")
+        if isinstance(merged.get("progressPercent"), int)
+        else (
+          merged.get("completion_percent")
+          if isinstance(merged.get("completion_percent"), int)
+          else merged.get("percent_complete")
+        )
+      )
+    )
+    attempt_count = (
+      merged.get("attempt_count")
+      if isinstance(merged.get("attempt_count"), int)
+      else (
+        merged.get("attempts")
+        if isinstance(merged.get("attempts"), int)
+        else merged.get("retry_count")
+      )
+    )
+    return {
+      "source": "provider_engine",
+      "state": state,
+      "progress_percent": progress,
+      "attempt_count": attempt_count,
+      "current_step": self._first_non_empty_string(
+        merged.get("current_step"),
+        merged.get("step"),
+        merged.get("stage"),
+        merged.get("phase"),
+      ),
+      "last_message": self._first_non_empty_string(
+        merged.get("last_message"),
+        merged.get("message"),
+        merged.get("summary"),
+        merged.get("detail"),
+      ),
+      "last_error": self._first_non_empty_string(
+        merged.get("last_error"),
+        merged.get("error"),
+      ),
+      "external_run_id": self._first_non_empty_string(
+        merged.get("external_run_id"),
+        merged.get("run_id"),
+        merged.get("execution_id"),
+        merged.get("job_id"),
+        merged.get("id"),
+      ),
+      "job_url": self._first_non_empty_string(
+        merged.get("job_url"),
+        merged.get("url"),
+        merged.get("html_url"),
+      ),
+      "started_at": self._parse_provider_datetime(
+        merged.get("started_at"),
+        merged.get("created_at"),
+        merged.get("createdAt"),
+      ),
+      "finished_at": self._parse_provider_datetime(
+        merged.get("finished_at"),
+        merged.get("completed_at"),
+        merged.get("completedAt"),
+        merged.get("finishedAt"),
+      ),
+      "updated_at": self._parse_provider_datetime(
+        merged.get("updated_at"),
+        merged.get("updatedAt"),
+        merged.get("last_update_at"),
+        merged.get("lastUpdateAt"),
+      ),
+      "provider": provider,
+    }
+
+  def _poll_recovery_engine_payload(
+    self,
+    *,
+    provider: str,
+    workflow_reference: str | None,
+    external_reference: str | None,
+    direct_url: str | None,
+    job_id: str | None,
+  ) -> dict[str, Any]:
+    if provider == "pagerduty":
+      url = self._format_recovery_engine_url(
+        url_template=self._pagerduty_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_pagerduty_recovery_engine_request(url=url)
+    elif provider == "opsgenie":
+      url = self._format_recovery_engine_url(
+        url_template=self._opsgenie_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_opsgenie_recovery_engine_request(url=url)
+    else:
+      return {}
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return {}
+    return self._normalize_recovery_engine_payload(payload=payload, provider=provider)
 
   def _deliver_console(
     self,
@@ -917,6 +1128,23 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       provider_recovery.get("status_machine"),
       provider_payload.get("status_machine"),
     )
+    job_id = self._first_non_empty_string(
+      provider_recovery.get("job_id"),
+      provider_payload.get("job_id"),
+    )
+    direct_telemetry_url = self._first_non_empty_string(
+      provider_payload.get("remediation_provider_telemetry_url"),
+      provider_payload.get("provider_telemetry_url"),
+      provider_payload.get("telemetry_url"),
+      self._extract_mapping(provider_recovery.get("telemetry")).get("job_url"),
+    )
+    engine_telemetry = self._poll_recovery_engine_payload(
+      provider=provider,
+      workflow_reference=workflow_reference,
+      external_reference=external_reference,
+      direct_url=direct_telemetry_url,
+      job_id=job_id,
+    )
     provider_schema_payload: dict[str, Any] = {}
     if provider == "pagerduty":
       pagerduty_urgency = self._first_non_empty_string(
@@ -1135,6 +1363,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           provider_payload.get("updatedAt"),
         ),
       }
+    merged_telemetry = {
+      **provider_telemetry,
+      **{key: value for key, value in engine_telemetry.items() if value is not None},
+    }
     merged_payload: dict[str, Any] = dict(remediation_payload)
     merged_payload.update({
       "workflow_reference": workflow_reference,
@@ -1142,6 +1374,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       "status": self._first_non_empty_string(
         provider_recovery.get("job_state"),
         provider_payload.get("remediation_state"),
+        merged_telemetry.get("state"),
       ),
       "recovery_state": self._first_non_empty_string(
         provider_recovery.get("lifecycle_state"),
@@ -1182,63 +1415,66 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         ),
       },
       "telemetry": {
+        "source": self._first_non_empty_string(
+          merged_telemetry.get("source"),
+        ),
         "state": self._first_non_empty_string(
-          provider_telemetry.get("state"),
+          merged_telemetry.get("state"),
           provider_recovery.get("job_state"),
           provider_payload.get("remediation_state"),
         ),
         "progress_percent": (
-          provider_telemetry.get("progress_percent")
-          if isinstance(provider_telemetry.get("progress_percent"), int)
-          else provider_telemetry.get("progressPercent")
+          merged_telemetry.get("progress_percent")
+          if isinstance(merged_telemetry.get("progress_percent"), int)
+          else merged_telemetry.get("progressPercent")
         ),
         "attempt_count": (
-          provider_telemetry.get("attempt_count")
-          if isinstance(provider_telemetry.get("attempt_count"), int)
+          merged_telemetry.get("attempt_count")
+          if isinstance(merged_telemetry.get("attempt_count"), int)
           else (
-            provider_telemetry.get("attempts")
-            if isinstance(provider_telemetry.get("attempts"), int)
+            merged_telemetry.get("attempts")
+            if isinstance(merged_telemetry.get("attempts"), int)
             else status_machine_payload.get("attempt_number")
           )
         ),
         "current_step": self._first_non_empty_string(
-          provider_telemetry.get("current_step"),
-          provider_telemetry.get("step"),
-          provider_telemetry.get("phase"),
+          merged_telemetry.get("current_step"),
+          merged_telemetry.get("step"),
+          merged_telemetry.get("phase"),
         ),
         "last_message": self._first_non_empty_string(
-          provider_telemetry.get("last_message"),
-          provider_telemetry.get("message"),
-          provider_telemetry.get("summary"),
+          merged_telemetry.get("last_message"),
+          merged_telemetry.get("message"),
+          merged_telemetry.get("summary"),
           provider_recovery.get("detail"),
           detail,
         ),
         "last_error": self._first_non_empty_string(
-          provider_telemetry.get("last_error"),
-          provider_telemetry.get("error"),
+          merged_telemetry.get("last_error"),
+          merged_telemetry.get("error"),
         ),
         "external_run_id": self._first_non_empty_string(
-          provider_telemetry.get("external_run_id"),
-          provider_telemetry.get("run_id"),
-          provider_telemetry.get("execution_id"),
+          merged_telemetry.get("external_run_id"),
+          merged_telemetry.get("run_id"),
+          merged_telemetry.get("execution_id"),
           provider_recovery.get("job_id"),
           provider_payload.get("job_id"),
         ),
         "job_url": self._first_non_empty_string(
-          provider_telemetry.get("job_url"),
-          provider_telemetry.get("url"),
+          merged_telemetry.get("job_url"),
+          merged_telemetry.get("url"),
         ),
         "started_at": self._parse_provider_datetime(
-          provider_telemetry.get("started_at"),
-          provider_telemetry.get("created_at"),
+          merged_telemetry.get("started_at"),
+          merged_telemetry.get("created_at"),
         ),
         "finished_at": self._parse_provider_datetime(
-          provider_telemetry.get("finished_at"),
-          provider_telemetry.get("completed_at"),
+          merged_telemetry.get("finished_at"),
+          merged_telemetry.get("completed_at"),
         ),
         "updated_at": self._parse_provider_datetime(
-          provider_telemetry.get("updated_at"),
-          provider_telemetry.get("last_update_at"),
+          merged_telemetry.get("updated_at"),
+          merged_telemetry.get("last_update_at"),
           updated_at,
         ),
       },
@@ -1334,6 +1570,7 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
         "issues": provider_recovery.verification.issues,
       },
       "telemetry": {
+        "source": provider_recovery.telemetry.source,
         "state": provider_recovery.telemetry.state,
         "progress_percent": provider_recovery.telemetry.progress_percent,
         "attempt_count": provider_recovery.telemetry.attempt_count,

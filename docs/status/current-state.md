@@ -127,7 +127,8 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
   flattened generic payload, and each provider branch now carries its own native recovery phase
   graph alongside the shared machine. Authoritative provider pull-sync now also promotes recovery
   telemetry like progress, step, attempt count, provider run id, and last message into typed
-  recovery state. When local verification closes the
+  recovery state. When configured, PagerDuty/Opsgenie remediation-engine endpoints are also polled
+  directly so engine telemetry overrides stale copies embedded in incident bodies. When local verification closes the
   incident, the provider-native remediation workflow is resolved back out through the same
   bidirectional incident channel
 - durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,

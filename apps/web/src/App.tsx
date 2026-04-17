@@ -381,6 +381,7 @@ type OperatorVisibility = {
           issues: string[];
         };
         telemetry: {
+          source: string;
           state: string;
           progress_percent?: number | null;
           attempt_count: number;
@@ -577,6 +578,7 @@ type GuardedLiveStatus = {
           issues: string[];
         };
         telemetry: {
+          source: string;
           state: string;
           progress_percent?: number | null;
           attempt_count: number;
@@ -8141,6 +8143,7 @@ function formatProviderRecoverySchema(providerRecovery: {
 
 function formatProviderRecoveryTelemetry(providerRecovery: {
   telemetry: {
+    source: string;
     state: string;
     progress_percent?: number | null;
     attempt_count: number;
@@ -8152,6 +8155,9 @@ function formatProviderRecoveryTelemetry(providerRecovery: {
   };
 }) {
   const details = [
+    providerRecovery.telemetry.source !== "unknown"
+      ? `source ${providerRecovery.telemetry.source}`
+      : null,
     providerRecovery.telemetry.state !== "unknown"
       ? `state ${providerRecovery.telemetry.state}`
       : null,

@@ -121,8 +121,16 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
     pagerduty_integration_key=settings.operator_alert_pagerduty_integration_key,
     pagerduty_api_token=settings.operator_alert_pagerduty_api_token,
     pagerduty_from_email=settings.operator_alert_pagerduty_from_email,
+    pagerduty_recovery_engine_url_template=(
+      settings.operator_alert_pagerduty_recovery_engine_url_template
+    ),
+    pagerduty_recovery_engine_token=settings.operator_alert_pagerduty_recovery_engine_token,
     opsgenie_api_key=settings.operator_alert_opsgenie_api_key,
     opsgenie_api_url=settings.operator_alert_opsgenie_api_url,
+    opsgenie_recovery_engine_url_template=(
+      settings.operator_alert_opsgenie_recovery_engine_url_template
+    ),
+    opsgenie_recovery_engine_api_key=settings.operator_alert_opsgenie_recovery_engine_api_key,
     webhook_timeout_seconds=settings.operator_alert_webhook_timeout_seconds,
   )
 

@@ -2149,6 +2149,11 @@ class TradingApplication:
       payload.get("job_telemetry"),
     )
     return OperatorIncidentProviderRecoveryTelemetry(
+      source=self._first_non_empty_string(
+        telemetry_payload.get("source"),
+        payload.get("telemetry_source"),
+        existing.source,
+      ) or "unknown",
       state=self._first_non_empty_string(
         telemetry_payload.get("state"),
         telemetry_payload.get("job_state"),

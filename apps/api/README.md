@@ -109,8 +109,12 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_INTEGRATION_KEY`
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_API_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_FROM_EMAIL`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_RECOVERY_ENGINE_URL_TEMPLATE`
+- `AKRA_TRADER_OPERATOR_ALERT_PAGERDUTY_RECOVERY_ENGINE_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_KEY`
 - `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_API_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_RECOVERY_ENGINE_URL_TEMPLATE`
+- `AKRA_TRADER_OPERATOR_ALERT_OPSGENIE_RECOVERY_ENGINE_API_KEY`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_ATTEMPTS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_INITIAL_BACKOFF_SECONDS`
 - `AKRA_TRADER_OPERATOR_ALERT_DELIVERY_MAX_BACKOFF_SECONDS`
@@ -245,8 +249,9 @@ Defaults:
   native recovery phase graph instead of relying only on the shared recovery machine. Provider
   pull-sync now also lifts remediation telemetry such as progress, current step, attempt count,
   provider run id, and last message into typed recovery state so the authoritative recovery sync
-  covers job progress as well as workflow state. That typed state surfaces in the guarded-live
-  incident table and is reused when local remediation closes the loop so
+  covers job progress as well as workflow state. When direct provider remediation-engine endpoints
+  are configured, pull-sync also polls those endpoints and lets engine telemetry override stale
+  incident-body copies. That typed state surfaces in the guarded-live incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
   across PagerDuty and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session

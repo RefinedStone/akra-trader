@@ -155,8 +155,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       pagerduty_integration_key: str | None,
       pagerduty_api_token: str | None,
       pagerduty_from_email: str | None,
+      pagerduty_recovery_engine_url_template: str | None,
+      pagerduty_recovery_engine_token: str | None,
       opsgenie_api_key: str | None,
       opsgenie_api_url: str,
+      opsgenie_recovery_engine_url_template: str | None,
+      opsgenie_recovery_engine_api_key: str | None,
       webhook_timeout_seconds: int,
     ) -> None:
       captured["targets"] = ",".join(targets)
@@ -165,8 +169,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["pagerduty_integration_key"] = pagerduty_integration_key or ""
       captured["pagerduty_api_token"] = pagerduty_api_token or ""
       captured["pagerduty_from_email"] = pagerduty_from_email or ""
+      captured["pagerduty_recovery_engine_url_template"] = pagerduty_recovery_engine_url_template or ""
+      captured["pagerduty_recovery_engine_token"] = pagerduty_recovery_engine_token or ""
       captured["opsgenie_api_key"] = opsgenie_api_key or ""
       captured["opsgenie_api_url"] = opsgenie_api_url
+      captured["opsgenie_recovery_engine_url_template"] = opsgenie_recovery_engine_url_template or ""
+      captured["opsgenie_recovery_engine_api_key"] = opsgenie_recovery_engine_api_key or ""
       captured["webhook_timeout_seconds"] = str(webhook_timeout_seconds)
 
     def list_targets(self) -> tuple[str, ...]:
@@ -213,8 +221,16 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       operator_alert_pagerduty_integration_key="pagerduty-key",
       operator_alert_pagerduty_api_token="pagerduty-api-token",
       operator_alert_pagerduty_from_email="akra-ops@example.com",
+      operator_alert_pagerduty_recovery_engine_url_template=(
+        "https://pagerduty.example/recovery/{job_id_urlencoded}"
+      ),
+      operator_alert_pagerduty_recovery_engine_token="pagerduty-recovery-token",
       operator_alert_opsgenie_api_key="opsgenie-key",
       operator_alert_opsgenie_api_url="https://api.opsgenie.example",
+      operator_alert_opsgenie_recovery_engine_url_template=(
+        "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_opsgenie_recovery_engine_api_key="opsgenie-recovery-key",
       operator_alert_webhook_timeout_seconds=7,
       operator_alert_paging_policy_default_provider="pagerduty",
       operator_alert_paging_policy_warning_targets=("slack", "pagerduty"),
@@ -234,8 +250,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["pagerduty_integration_key"] == "pagerduty-key"
   assert captured["pagerduty_api_token"] == "pagerduty-api-token"
   assert captured["pagerduty_from_email"] == "akra-ops@example.com"
+  assert captured["pagerduty_recovery_engine_url_template"] == "https://pagerduty.example/recovery/{job_id_urlencoded}"
+  assert captured["pagerduty_recovery_engine_token"] == "pagerduty-recovery-token"
   assert captured["opsgenie_api_key"] == "opsgenie-key"
   assert captured["opsgenie_api_url"] == "https://api.opsgenie.example"
+  assert captured["opsgenie_recovery_engine_url_template"] == "https://opsgenie.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["opsgenie_recovery_engine_api_key"] == "opsgenie-recovery-key"
   assert captured["webhook_timeout_seconds"] == "7"
   assert container.app._operator_alert_paging_policy_default_provider == "pagerduty"
   assert container.app._operator_alert_paging_policy_warning_targets == (

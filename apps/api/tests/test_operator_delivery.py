@@ -215,52 +215,76 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
 
   def fake_urlopen(request, timeout: float):
     requests.append((request.full_url, request.method, dict(request.headers), timeout))
-    return FakeResponse(
-      200,
-      json.dumps(
-        {
-          "incident": {
-            "id": "PDINC-123",
-            "incident_key": "guarded-live:market-data:5m",
-            "status": "acknowledged",
-            "title": "Guarded-live market-data incident",
-            "updated_at": "2025-01-03T14:05:00Z",
-            "custom_details": {
-              "remediation_state": "provider_recovered",
-              "remediation_provider_payload": {
-                "job_id": "pd-job-9",
-                "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
-                "verification": {"state": "passed"},
+    if request.full_url == "https://api.pagerduty.com/incidents/PDINC-123":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "incident": {
+              "id": "PDINC-123",
+              "incident_key": "guarded-live:market-data:5m",
+              "status": "acknowledged",
+              "title": "Guarded-live market-data incident",
+              "updated_at": "2025-01-03T14:05:00Z",
+              "custom_details": {
+                "remediation_state": "provider_recovered",
+                "remediation_provider_payload": {
+                  "job_id": "pd-job-9",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                  "verification": {"state": "passed"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovered",
+                  "job_id": "pd-job-9",
+                  "channels": ["depth", "kline"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "verification_state": "passed",
+                  "status_machine_state": "provider_running",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "completed",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "completed",
+                  "progress_percent": 60,
+                  "attempt_count": 1,
+                  "current_step": "incident_body",
+                  "last_message": "provider incident body still lagging",
+                  "external_run_id": "pd-body-9",
+                },
               },
-              "remediation_provider_recovery": {
-                "lifecycle_state": "recovered",
-                "job_id": "pd-job-9",
-                "channels": ["depth", "kline"],
-                "symbols": ["ETH/USDT"],
-                "timeframe": "5m",
-                "verification_state": "passed",
-                "status_machine_state": "provider_running",
-                "status_machine_workflow_state": "acknowledged",
-                "status_machine_job_state": "completed",
-              },
-              "remediation_provider_telemetry": {
-                "state": "completed",
-                "progress_percent": 100,
-                "attempt_count": 2,
-                "current_step": "verification",
-                "last_message": "provider confirmed repair",
-                "external_run_id": "pd-rem-9",
-              },
-            },
+            }
           }
-        }
-      ).encode("utf-8"),
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://pagerduty-engine.example/recovery/pd-job-9":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "job": {
+              "state": "completed",
+              "progress_percent": 100,
+              "attempt_count": 2,
+              "current_step": "verification",
+              "last_message": "provider engine completed verification",
+              "external_run_id": "pd-engine-9",
+              "updated_at": "2025-01-03T14:06:00Z",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    return FakeResponse(
+      404,
     )
 
   adapter = OperatorAlertDeliveryAdapter(
     targets=("pagerduty",),
     pagerduty_api_token="pagerduty-api-token",
     pagerduty_from_email="akra-ops@example.com",
+    pagerduty_recovery_engine_url_template="https://pagerduty-engine.example/recovery/{job_id_urlencoded}",
+    pagerduty_recovery_engine_token="pagerduty-recovery-token",
     urlopen=fake_urlopen,
   )
   incident = OperatorIncidentEvent(
@@ -296,13 +320,20 @@ def test_operator_alert_delivery_adapter_pulls_pagerduty_provider_state() -> Non
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["incident_phase"] == "acknowledged"
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["workflow_phase"] == "awaiting_local_verification"
   assert snapshot.payload["provider_schema"]["pagerduty"]["phase_graph"]["responder_phase"] == "engaged"
+  assert snapshot.payload["telemetry"]["source"] == "provider_engine"
   assert snapshot.payload["telemetry"]["state"] == "completed"
   assert snapshot.payload["telemetry"]["progress_percent"] == 100
   assert snapshot.payload["telemetry"]["attempt_count"] == 2
   assert snapshot.payload["telemetry"]["current_step"] == "verification"
+  assert snapshot.payload["telemetry"]["last_message"] == "provider engine completed verification"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "pd-engine-9"
   assert requests[0][0].endswith("/incidents/PDINC-123")
   assert requests[0][1] == "GET"
   assert requests[0][2]["From"] == "akra-ops@example.com"
+  assert requests[1][0] == "https://pagerduty-engine.example/recovery/pd-job-9"
+  assert requests[1][1] == "GET"
+  assert requests[1][2]["Authorization"] == "Bearer pagerduty-recovery-token"
+  assert "From" not in requests[1][2]
 
 
 def test_operator_alert_delivery_adapter_supports_opsgenie_target_and_resolution() -> None:
@@ -465,50 +496,72 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
 
   def fake_urlopen(request, timeout: float):
     requests.append((request.full_url, request.method, dict(request.headers), timeout))
-    return FakeResponse(
-      200,
-      json.dumps(
-        {
-          "data": {
-            "id": "OG-123",
-            "alias": "guarded-live:market-data:5m",
-            "status": "acknowledged",
-            "message": "Guarded-live market-data incident",
-            "updatedAt": "2025-01-03T14:12:00Z",
-            "details": {
-              "remediation_state": "requested",
-              "remediation_provider_payload": {
-                "job_id": "og-job-7",
-                "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+    if request.full_url == "https://api.opsgenie.example/v2/alerts/OG-123?identifierType=id":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "data": {
+              "id": "OG-123",
+              "alias": "guarded-live:market-data:5m",
+              "status": "acknowledged",
+              "message": "Guarded-live market-data incident",
+              "updatedAt": "2025-01-03T14:12:00Z",
+              "details": {
+                "remediation_state": "requested",
+                "remediation_provider_payload": {
+                  "job_id": "og-job-7",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovering",
+                  "job_id": "og-job-7",
+                  "channels": ["kline"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "status_machine_state": "provider_requested",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "requested",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "running",
+                  "progress_percent": 45,
+                  "attempt_count": 1,
+                  "current_step": "backfill",
+                  "last_message": "repair job started",
+                  "external_run_id": "og-rem-7",
+                },
+                "remediation_provider_telemetry_url": "https://opsgenie-engine.example/recovery/og-job-7",
               },
-              "remediation_provider_recovery": {
-                "lifecycle_state": "recovering",
-                "job_id": "og-job-7",
-                "channels": ["kline"],
-                "symbols": ["ETH/USDT"],
-                "timeframe": "5m",
-                "status_machine_state": "provider_requested",
-                "status_machine_workflow_state": "acknowledged",
-                "status_machine_job_state": "requested",
-              },
-              "remediation_provider_telemetry": {
-                "state": "running",
-                "progress_percent": 45,
-                "attempt_count": 1,
-                "current_step": "backfill",
-                "last_message": "repair job started",
-                "external_run_id": "og-rem-7",
-              },
-            },
+            }
           }
-        }
-      ).encode("utf-8"),
-    )
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://opsgenie-engine.example/recovery/og-job-7":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "data": {
+              "state": "running",
+              "progress_percent": 80,
+              "attempt_count": 2,
+              "current_step": "verify_restored_channels",
+              "last_message": "provider engine is verifying restored channels",
+              "external_run_id": "og-engine-7",
+              "updatedAt": "2025-01-03T14:13:00Z",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    return FakeResponse(404)
 
   adapter = OperatorAlertDeliveryAdapter(
     targets=("opsgenie",),
     opsgenie_api_key="opsgenie-key",
     opsgenie_api_url="https://api.opsgenie.example",
+    opsgenie_recovery_engine_api_key="opsgenie-recovery-key",
     urlopen=fake_urlopen,
   )
   incident = OperatorIncidentEvent(
@@ -544,9 +597,15 @@ def test_operator_alert_delivery_adapter_pulls_opsgenie_provider_state() -> None
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["alert_phase"] == "acknowledged"
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["workflow_phase"] == "provider_recovering"
   assert snapshot.payload["provider_schema"]["opsgenie"]["phase_graph"]["acknowledgment_phase"] == "acknowledged"
+  assert snapshot.payload["telemetry"]["source"] == "provider_engine"
   assert snapshot.payload["telemetry"]["state"] == "running"
-  assert snapshot.payload["telemetry"]["progress_percent"] == 45
-  assert snapshot.payload["telemetry"]["attempt_count"] == 1
-  assert snapshot.payload["telemetry"]["current_step"] == "backfill"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 80
+  assert snapshot.payload["telemetry"]["attempt_count"] == 2
+  assert snapshot.payload["telemetry"]["current_step"] == "verify_restored_channels"
+  assert snapshot.payload["telemetry"]["last_message"] == "provider engine is verifying restored channels"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "og-engine-7"
   assert requests[0][0].endswith("/v2/alerts/OG-123?identifierType=id")
   assert requests[0][1] == "GET"
+  assert requests[1][0] == "https://opsgenie-engine.example/recovery/og-job-7"
+  assert requests[1][1] == "GET"
+  assert requests[1][2]["Authorization"] == "GenieKey opsgenie-recovery-key"
