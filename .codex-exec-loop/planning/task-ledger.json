@@ -383,16 +383,16 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Extend durable incident workflow to risk breaches and broader live-path faults",
       "description": "Expand the new durable incident workflow beyond the current guarded-live incident set by persisting risk-breach and adjacent live-path fault lifecycle state, surfacing those wider operator-visible incident categories, and making them inspectable through the same incident and delivery history instead of only current in-memory status or narrow guarded-live alerts.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 79,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "Commit 75b3f77 strengthened the provider-native workflow and paging-policy substrate, but the latest main-session reply still explicitly says risk breaches and broader live-path faults are not yet raised through the same durable incident path, so this remains the next scope-expansion follow-up after provider breadth.",
+      "dynamic_priority_delta": 9,
+      "priority_reason": "With commit 0c56893 completing the immediate provider-breadth step, the latest main-session reply now leaves risk breaches and broader live-path faults outside the durable paging-policy workflow as the clearest next executable queue head.",
       "depends_on": [
         "planning-operator-trust-durable-alert-history-and-delivery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:40:00Z",
+      "updated_at": "2026-04-17T12:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps operator trust consistent across execution lanes by extending the same durable incident and delivery-history discipline from guarded-live incidents into risk breaches and adjacent live-path faults."
     },
@@ -455,18 +455,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Generalize provider-native incident orchestration beyond PagerDuty",
       "description": "Extend the newly completed provider-native incident workflow so native acknowledge, escalation, resolution, and callback reconciliation semantics are not PagerDuty-specific, giving other supported incident providers the same durable paging-policy and workflow-state contract.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 81,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly says provider-native bidirectional workflow is still PagerDuty-centered and other incident providers do not yet have native ack or escalation orchestration, so this is the clearest next executable queue head after commit 75b3f77.",
+      "priority_reason": "Completed in main session commit 0c56893, which added Opsgenie-native alert delivery and workflow synchronization, generalized paging-provider inference and bootstrap wiring beyond PagerDuty, updated docs, and passed API pytest plus web typecheck and build verification.",
       "depends_on": [
         "planning-operator-trust-provider-native-bidirectional-incident-workflow"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T12:40:00Z",
+      "updated_at": "2026-04-17T12:55:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by keeping durable incident workflows provider-agnostic instead of leaving the native downstream response contract effectively tied to one paging vendor."
+      "direction_relation_note": "Closed the immediate provider-generalization gap for operator trust by extending native incident workflow orchestration to Opsgenie as well as PagerDuty, which now leaves broader provider coverage and richer provider-owned escalation behavior as follow-up work."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-native-escalation-coverage",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-native escalation coverage beyond PagerDuty and Opsgenie",
+      "description": "Build on the generalized provider-native incident workflow by adding additional incident providers and richer provider-owned escalation semantics, so durable paging-policy orchestration does not stop at the current PagerDuty and Opsgenie feature set.",
+      "status": "proposed",
+      "base_priority": 80,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply says provider-native orchestration now reaches PagerDuty and Opsgenie, but wider provider coverage and richer provider-owned escalation workflow still remain after commit 0c56893.",
+      "depends_on": [
+        "planning-operator-trust-generalize-provider-native-incident-orchestration"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-17T12:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic incident handling by treating PagerDuty and Opsgenie as the first provider-native workflow set rather than the final scope."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
