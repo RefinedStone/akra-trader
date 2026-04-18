@@ -108,6 +108,8 @@ from akra_trader.domain.models import OperatorIncidentHaloItsmRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentHaloItsmRecoveryState
 from akra_trader.domain.models import OperatorIncidentIncidentManagerIoRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIncidentManagerIoRecoveryState
+from akra_trader.domain.models import OperatorIncidentOneUptimeRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentOneUptimeRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
@@ -1892,6 +1894,17 @@ class TradingApplication:
             aligned_provider_recovery,
             incidentmanagerio=replace(
               aligned_provider_recovery.incidentmanagerio,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "oneuptime"
+          and provider_recovery.oneuptime.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            oneuptime=replace(
+              aligned_provider_recovery.oneuptime,
               alert_status="delivered",
             ),
           )
@@ -6247,6 +6260,139 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_oneuptime_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_oneuptime_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_oneuptime_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_oneuptime_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_oneuptime_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_oneuptime_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentOneUptimeRecoveryState,
+  ) -> OperatorIncidentOneUptimeRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_oneuptime_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_oneuptime_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentOneUptimeRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_oneuptime_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_oneuptime_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_oneuptime_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_opsramp_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -9485,6 +9631,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "incidentmanagerio"
+    oneuptime_schema = existing.oneuptime
+    oneuptime_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("oneuptime"),
+      payload.get("oneuptime"),
+      payload.get("oneuptime_alert"),
+    )
+    if normalized_provider == "oneuptime" or oneuptime_payload:
+      oneuptime_status = self._first_non_empty_string(
+        oneuptime_payload.get("alert_status"),
+        oneuptime_payload.get("status"),
+        oneuptime_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.oneuptime.alert_status,
+      ) or "unknown"
+      oneuptime_schema = OperatorIncidentOneUptimeRecoveryState(
+        alert_id=self._first_non_empty_string(
+          oneuptime_payload.get("alert_id"),
+          oneuptime_payload.get("id"),
+          oneuptime_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.oneuptime.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          oneuptime_payload.get("external_reference"),
+          oneuptime_payload.get("reference"),
+          reference,
+          existing.oneuptime.external_reference,
+        ),
+        alert_status=oneuptime_status,
+        priority=self._first_non_empty_string(
+          oneuptime_payload.get("priority"),
+          oneuptime_payload.get("severity"),
+          oneuptime_payload.get("urgency"),
+          existing.oneuptime.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          oneuptime_payload.get("escalation_policy"),
+          oneuptime_payload.get("escalationPolicy"),
+          oneuptime_payload.get("policy"),
+          oneuptime_payload.get("source"),
+          existing.oneuptime.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          oneuptime_payload.get("assignee"),
+          oneuptime_payload.get("owner"),
+          oneuptime_payload.get("assigned_to"),
+          existing.oneuptime.assignee,
+        ),
+        url=self._first_non_empty_string(
+          oneuptime_payload.get("url"),
+          oneuptime_payload.get("html_url"),
+          oneuptime_payload.get("link"),
+          existing.oneuptime.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(oneuptime_payload.get("updated_at"))
+          or existing.oneuptime.updated_at
+        ),
+        phase_graph=self._build_oneuptime_recovery_phase_graph(
+          payload=oneuptime_payload,
+          alert_status=oneuptime_status,
+          priority=self._first_non_empty_string(
+            oneuptime_payload.get("priority"),
+            oneuptime_payload.get("severity"),
+            oneuptime_payload.get("urgency"),
+            existing.oneuptime.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            oneuptime_payload.get("escalation_policy"),
+            oneuptime_payload.get("escalationPolicy"),
+            oneuptime_payload.get("policy"),
+            oneuptime_payload.get("source"),
+            existing.oneuptime.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            oneuptime_payload.get("assignee"),
+            oneuptime_payload.get("owner"),
+            oneuptime_payload.get("assigned_to"),
+            existing.oneuptime.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.oneuptime,
+        ),
+      )
+      provider_schema_kind = "oneuptime"
     opsramp_schema = existing.opsramp
     opsramp_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("opsramp"),
@@ -9665,6 +9904,7 @@ class TradingApplication:
       cabot=cabot_schema,
       haloitsm=haloitsm_schema,
       incidentmanagerio=incidentmanagerio_schema,
+      oneuptime=oneuptime_schema,
       opsramp=opsramp_schema,
       updated_at=synced_at,
     )
@@ -10095,6 +10335,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.incidentmanagerio,
+        ),
+      ),
+      oneuptime=replace(
+        provider_recovery.oneuptime,
+        phase_graph=self._build_oneuptime_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.oneuptime.alert_status,
+          priority=provider_recovery.oneuptime.priority,
+          escalation_policy=provider_recovery.oneuptime.escalation_policy,
+          assignee=provider_recovery.oneuptime.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.oneuptime,
         ),
       ),
       opsramp=replace(
@@ -14548,6 +14802,10 @@ class TradingApplication:
       return "incidentmanagerio"
     if normalized in {"incidentmanagerio_incidents", "operator_incidentmanagerio"}:
       return "incidentmanagerio"
+    if normalized in {"oneuptime_alerts", "one_uptime", "operator_oneuptime"}:
+      return "oneuptime"
+    if normalized in {"oneuptime_incidents", "operator_oneuptime"}:
+      return "oneuptime"
     if normalized in {"opsramp_alerts", "ops_ramp", "operator_opsramp"}:
       return "opsramp"
     if normalized in {"opsramp_incidents", "operator_opsramp"}:
@@ -14769,6 +15027,8 @@ class TradingApplication:
       return "haloitsm"
     if "incidentmanagerio_incidents" in combined or "incidentmanagerio_alerts" in combined:
       return "incidentmanagerio"
+    if "oneuptime_incidents" in combined or "oneuptime_alerts" in combined:
+      return "oneuptime"
     if "opsramp_incidents" in combined or "opsramp_alerts" in combined:
       return "opsramp"
     if "opsgenie_alerts" in combined:

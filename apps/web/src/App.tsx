@@ -934,6 +934,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        oneuptime: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1639,6 +1657,24 @@ type GuardedLiveStatus = {
           };
         };
         incidentmanagerio: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        oneuptime: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9618,6 +9654,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  oneuptime: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -10522,6 +10576,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `incidentmanager.io schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "oneuptime") {
+    const details = [
+      providerRecovery.oneuptime.alert_id ? `alert ${providerRecovery.oneuptime.alert_id}` : null,
+      providerRecovery.oneuptime.alert_status !== "unknown"
+        ? `status ${providerRecovery.oneuptime.alert_status}`
+        : null,
+      providerRecovery.oneuptime.priority ? `priority ${providerRecovery.oneuptime.priority}` : null,
+      providerRecovery.oneuptime.escalation_policy
+        ? `policy ${providerRecovery.oneuptime.escalation_policy}`
+        : null,
+      providerRecovery.oneuptime.assignee ? `assignee ${providerRecovery.oneuptime.assignee}` : null,
+      providerRecovery.oneuptime.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.oneuptime.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.oneuptime.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.oneuptime.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.oneuptime.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.oneuptime.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.oneuptime.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.oneuptime.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.oneuptime.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.oneuptime.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `OneUptime schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

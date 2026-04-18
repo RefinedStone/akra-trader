@@ -297,6 +297,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
     incidentmanagerio_recovery_engine_token=(
       settings.operator_alert_incidentmanagerio_recovery_engine_token
     ),
+    oneuptime_api_token=settings.operator_alert_oneuptime_api_token,
+    oneuptime_api_url=settings.operator_alert_oneuptime_api_url,
+    oneuptime_recovery_engine_url_template=(
+      settings.operator_alert_oneuptime_recovery_engine_url_template
+    ),
+    oneuptime_recovery_engine_token=settings.operator_alert_oneuptime_recovery_engine_token,
     opsramp_api_token=settings.operator_alert_opsramp_api_token,
     opsramp_api_url=settings.operator_alert_opsramp_api_url,
     opsramp_recovery_engine_url_template=(
