@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
-      "description": "Build on the now-broader provider-managed remediation set through Zendesk by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
+      "description": "Build on the now-broader provider-managed remediation set through Zoho Desk by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 24,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and UI schema display now extend through Zendesk in commit d46397a on 2026-04-18, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and UI schema display now extend through Zoho Desk in commit 771bc22 on 2026-04-18, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T05:25:00Z",
+      "updated_at": "2026-04-18T05:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once authoritative engine endpoints, typed recovery schemas, workflow sync, phase graphs, and paging-provider inference are already generalized across the current provider set through Zendesk."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once authoritative engine endpoints, typed recovery schemas, workflow sync, phase graphs, and paging-provider inference are already generalized across the current provider set through Zoho Desk."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1643,19 +1643,37 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-zendesk",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Zendesk",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, and Zendesk adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-four providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, and Zendesk adapters to Zoho Desk, adding the `zohodesk_incidents` target, workflow sync, provider pull-sync, recovery-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans forty-five providers.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 45,
-      "priority_reason": "The latest main-session reply explicitly lists continuing provider-managed remediation coverage beyond Zendesk as the first remaining item after commit d46397a on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "priority_reason": "Completed in main session commit 771bc22, which expanded provider-managed remediation coverage through Zoho Desk across operator delivery, application wiring, workflow sync, provider pull-sync, recovery-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI schema display, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-happyfox"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T05:25:00Z",
+      "updated_at": "2026-04-18T05:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Zendesk as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Zendesk to Zoho Desk, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-zohodesk",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Zoho Desk",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, and Zoho Desk adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-five providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 46,
+      "priority_reason": "The latest main-session reply explicitly lists continuing provider-managed remediation coverage beyond the current provider set as the first remaining item after commit 771bc22 on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-zendesk"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T05:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Zoho Desk as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
