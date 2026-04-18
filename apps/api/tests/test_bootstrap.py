@@ -257,6 +257,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       cabot_api_url: str,
       cabot_recovery_engine_url_template: str | None,
       cabot_recovery_engine_token: str | None,
+      haloitsm_api_token: str | None,
+      haloitsm_api_url: str,
+      haloitsm_recovery_engine_url_template: str | None,
+      haloitsm_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -415,6 +419,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         cabot_recovery_engine_url_template or ""
       )
       captured["cabot_recovery_engine_token"] = cabot_recovery_engine_token or ""
+      captured["haloitsm_api_token"] = haloitsm_api_token or ""
+      captured["haloitsm_api_url"] = haloitsm_api_url
+      captured["haloitsm_recovery_engine_url_template"] = (
+        haloitsm_recovery_engine_url_template or ""
+      )
+      captured["haloitsm_recovery_engine_token"] = haloitsm_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -629,6 +639,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://cabot.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_cabot_recovery_engine_token="cabot-recovery-token",
+      operator_alert_haloitsm_api_token="haloitsm-token",
+      operator_alert_haloitsm_api_url="https://api.haloitsm.example",
+      operator_alert_haloitsm_recovery_engine_url_template=(
+        "https://haloitsm.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_haloitsm_recovery_engine_token="haloitsm-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -768,6 +784,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["cabot_api_url"] == "https://api.cabot.example"
   assert captured["cabot_recovery_engine_url_template"] == "https://cabot.example/recovery/{workflow_reference_urlencoded}"
   assert captured["cabot_recovery_engine_token"] == "cabot-recovery-token"
+  assert captured["haloitsm_api_token"] == "haloitsm-token"
+  assert captured["haloitsm_api_url"] == "https://api.haloitsm.example"
+  assert captured["haloitsm_recovery_engine_url_template"] == "https://haloitsm.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["haloitsm_recovery_engine_token"] == "haloitsm-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
