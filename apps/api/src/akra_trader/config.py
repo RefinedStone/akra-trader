@@ -177,6 +177,10 @@ class Settings:
   operator_alert_sysaid_api_url: str = "https://api.sysaid.com/v1"
   operator_alert_sysaid_recovery_engine_url_template: str | None = None
   operator_alert_sysaid_recovery_engine_token: str | None = None
+  operator_alert_bmchelix_api_token: str | None = None
+  operator_alert_bmchelix_api_url: str = "https://api.bmchelix.com/v1"
+  operator_alert_bmchelix_recovery_engine_url_template: str | None = None
+  operator_alert_bmchelix_recovery_engine_token: str | None = None
   operator_alert_opsramp_api_token: str | None = None
   operator_alert_opsramp_api_url: str = "https://api.opsramp.com/v1"
   operator_alert_opsramp_recovery_engine_url_template: str | None = None
@@ -710,6 +714,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_sysaid_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_SYSAID_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_bmchelix_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_BMCHELIX_API_TOKEN") or None
+    ),
+    operator_alert_bmchelix_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_BMCHELIX_API_URL",
+      "https://api.bmchelix.com/v1",
+    ),
+    operator_alert_bmchelix_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_BMCHELIX_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_bmchelix_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_BMCHELIX_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsramp_api_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSRAMP_API_TOKEN") or None

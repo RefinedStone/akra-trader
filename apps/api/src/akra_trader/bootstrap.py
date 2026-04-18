@@ -333,6 +333,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_sysaid_recovery_engine_url_template
     ),
     sysaid_recovery_engine_token=settings.operator_alert_sysaid_recovery_engine_token,
+    bmchelix_api_token=settings.operator_alert_bmchelix_api_token,
+    bmchelix_api_url=settings.operator_alert_bmchelix_api_url,
+    bmchelix_recovery_engine_url_template=(
+      settings.operator_alert_bmchelix_recovery_engine_url_template
+    ),
+    bmchelix_recovery_engine_token=settings.operator_alert_bmchelix_recovery_engine_token,
     opsramp_api_token=settings.operator_alert_opsramp_api_token,
     opsramp_api_url=settings.operator_alert_opsramp_api_url,
     opsramp_recovery_engine_url_template=(

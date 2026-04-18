@@ -289,6 +289,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       sysaid_api_url: str,
       sysaid_recovery_engine_url_template: str | None,
       sysaid_recovery_engine_token: str | None,
+      bmchelix_api_token: str | None,
+      bmchelix_api_url: str,
+      bmchelix_recovery_engine_url_template: str | None,
+      bmchelix_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -495,6 +499,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["sysaid_api_url"] = sysaid_api_url
       captured["sysaid_recovery_engine_url_template"] = sysaid_recovery_engine_url_template or ""
       captured["sysaid_recovery_engine_token"] = sysaid_recovery_engine_token or ""
+      captured["bmchelix_api_token"] = bmchelix_api_token or ""
+      captured["bmchelix_api_url"] = bmchelix_api_url
+      captured["bmchelix_recovery_engine_url_template"] = bmchelix_recovery_engine_url_template or ""
+      captured["bmchelix_recovery_engine_token"] = bmchelix_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -757,6 +765,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://sysaid.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_sysaid_recovery_engine_token="sysaid-recovery-token",
+      operator_alert_bmchelix_api_token="bmchelix-token",
+      operator_alert_bmchelix_api_url="https://api.bmchelix.example",
+      operator_alert_bmchelix_recovery_engine_url_template=(
+        "https://bmchelix.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_bmchelix_recovery_engine_token="bmchelix-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -928,6 +942,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["sysaid_api_url"] == "https://api.sysaid.example"
   assert captured["sysaid_recovery_engine_url_template"] == "https://sysaid.example/recovery/{workflow_reference_urlencoded}"
   assert captured["sysaid_recovery_engine_token"] == "sysaid-recovery-token"
+  assert captured["bmchelix_api_token"] == "bmchelix-token"
+  assert captured["bmchelix_api_url"] == "https://api.bmchelix.example"
+  assert captured["bmchelix_recovery_engine_url_template"] == "https://bmchelix.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["bmchelix_recovery_engine_token"] == "bmchelix-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
