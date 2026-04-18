@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
-      "description": "Build on the now-broader provider-managed remediation set through ManageEngine ServiceDesk Plus by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, and native phase graphs can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
+      "description": "Build on the now-broader provider-managed remediation set through SolarWinds Service Desk by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, and native phase graphs can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
-      "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference now extend through ManageEngine ServiceDesk Plus, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
+      "dynamic_priority_delta": 23,
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference now extend through SolarWinds Service Desk, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T16:50:00Z",
+      "updated_at": "2026-04-18T17:35:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, workflow sync, and phase graphs are already generalized across the current provider set through ManageEngine ServiceDesk Plus."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, workflow sync, and phase graphs are already generalized across the current provider set through SolarWinds Service Desk."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1499,19 +1499,73 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-servicedeskplus",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond ManageEngine ServiceDesk Plus",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, and ManageEngine ServiceDesk Plus adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current thirty-six providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, and ManageEngine ServiceDesk Plus adapters to SysAid, adding the `sysaid_incidents` target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans thirty-seven providers.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 37,
-      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage beyond ManageEngine ServiceDesk Plus as the first remaining item after commit bda0c3a on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "priority_reason": "Completed in main session commit 2015ef6, which expanded provider-managed remediation coverage through SysAid across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-freshservice"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T16:50:00Z",
+      "updated_at": "2026-04-18T17:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating ManageEngine ServiceDesk Plus as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond ManageEngine ServiceDesk Plus to SysAid, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-sysaid",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond SysAid",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, and SysAid adapters to BMC Helix, adding the `bmchelix_incidents` target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans thirty-eight providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 38,
+      "priority_reason": "Completed in main session commit 763bf4f, which expanded provider-managed remediation coverage through BMC Helix across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-servicedeskplus"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T17:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond SysAid to BMC Helix, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-bmchelix",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond BMC Helix",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, and BMC Helix adapters to SolarWinds Service Desk, adding the `solarwindsservicedesk_incidents` target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans thirty-nine providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 39,
+      "priority_reason": "Completed in main session commit 0f03e66, which expanded provider-managed remediation coverage through SolarWinds Service Desk across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-sysaid"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T17:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond BMC Helix to SolarWinds Service Desk, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-solarwinds-service-desk",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond SolarWinds Service Desk",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, and SolarWinds Service Desk adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current thirty-nine providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 40,
+      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage beyond SolarWinds Service Desk as the first remaining item after commit 0f03e66 on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-bmchelix"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T17:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating SolarWinds Service Desk as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
