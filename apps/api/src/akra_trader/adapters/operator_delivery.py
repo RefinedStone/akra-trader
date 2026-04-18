@@ -171,6 +171,8 @@ def _normalize_target(target: str) -> str | None:
     "operator_solarwindsservicedesk",
   }:
     return "solarwindsservicedesk_incidents"
+  if normalized in {"topdesk", "topdesk_incidents", "topdesk_alerts", "operator_topdesk"}:
+    return "topdesk_incidents"
   if normalized in {"opsramp", "ops_ramp", "opsramp_incidents", "opsramp_alerts", "operator_opsramp"}:
     return "opsramp_incidents"
   if normalized in {"opsgenie", "opsgenie_alerts", "operator_opsgenie"}:
@@ -334,6 +336,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
     solarwindsservicedesk_api_url: str = "https://api.solarwinds.com/servicedesk/v1",
     solarwindsservicedesk_recovery_engine_url_template: str | None = None,
     solarwindsservicedesk_recovery_engine_token: str | None = None,
+    topdesk_api_token: str | None = None,
+    topdesk_api_url: str = "https://api.topdesk.com/tas/api",
+    topdesk_recovery_engine_url_template: str | None = None,
+    topdesk_recovery_engine_token: str | None = None,
     opsramp_api_token: str | None = None,
     opsramp_api_url: str = "https://api.opsramp.com/v1",
     opsramp_recovery_engine_url_template: str | None = None,
@@ -511,6 +517,10 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       solarwindsservicedesk_recovery_engine_url_template
     )
     self._solarwindsservicedesk_recovery_engine_token = solarwindsservicedesk_recovery_engine_token
+    self._topdesk_api_token = topdesk_api_token
+    self._topdesk_api_url = topdesk_api_url.rstrip("/")
+    self._topdesk_recovery_engine_url_template = topdesk_recovery_engine_url_template
+    self._topdesk_recovery_engine_token = topdesk_recovery_engine_token
     self._opsramp_api_token = opsramp_api_token
     self._opsramp_api_url = opsramp_api_url.rstrip("/")
     self._opsramp_recovery_engine_url_template = opsramp_recovery_engine_url_template
@@ -602,6 +612,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       providers.append("bmchelix")
     if self._solarwindsservicedesk_api_token:
       providers.append("solarwindsservicedesk")
+    if self._topdesk_api_token:
+      providers.append("topdesk")
     if self._opsramp_api_token:
       providers.append("opsramp")
     if self._opsgenie_api_key:
@@ -889,6 +901,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if target == "solarwindsservicedesk_incidents":
         records.append(
           self._deliver_solarwindsservicedesk(
+            incident=incident,
+            attempt_number=attempt_number,
+            phase=phase,
+          )
+        )
+        continue
+      if target == "topdesk_incidents":
+        records.append(
+          self._deliver_topdesk(
             incident=incident,
             attempt_number=attempt_number,
             phase=phase,
@@ -1328,6 +1349,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           attempt_number=attempt_number,
         ),
       )
+    if normalized_provider == "topdesk":
+      return (
+        self._sync_topdesk_workflow(
+          incident=incident,
+          action=normalized_action,
+          actor=actor,
+          detail=detail,
+          payload=payload,
+          attempt_number=attempt_number,
+        ),
+      )
     if normalized_provider == "opsramp":
       return (
         self._sync_opsramp_workflow(
@@ -1453,6 +1485,8 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       return self._pull_bmchelix_workflow_state(incident=incident)
     if normalized_provider == "solarwindsservicedesk":
       return self._pull_solarwindsservicedesk_workflow_state(incident=incident)
+    if normalized_provider == "topdesk":
+      return self._pull_topdesk_workflow_state(incident=incident)
     if normalized_provider == "opsramp":
       return self._pull_opsramp_workflow_state(incident=incident)
     if normalized_provider == "opsgenie":
@@ -1947,6 +1981,19 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       self._solarwindsservicedesk_recovery_engine_token
       or self._solarwindsservicedesk_api_token
     )
+    headers = {
+      "Accept": "application/json",
+    }
+    if token:
+      headers["Authorization"] = f"Bearer {token}"
+    return urllib_request.Request(url, headers=headers, method="GET")
+
+  def _build_topdesk_recovery_engine_request(
+    self,
+    *,
+    url: str,
+  ) -> urllib_request.Request:
+    token = self._topdesk_recovery_engine_token or self._topdesk_api_token
     headers = {
       "Accept": "application/json",
     }
@@ -2481,6 +2528,17 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       if not url:
         return {}
       request = self._build_solarwindsservicedesk_recovery_engine_request(url=url)
+    elif provider == "topdesk":
+      url = self._format_recovery_engine_url(
+        url_template=self._topdesk_recovery_engine_url_template,
+        direct_url=direct_url,
+        workflow_reference=workflow_reference,
+        external_reference=external_reference,
+        job_id=job_id,
+      )
+      if not url:
+        return {}
+      request = self._build_topdesk_recovery_engine_request(url=url)
     elif provider == "opsramp":
       url = self._format_recovery_engine_url(
         url_template=self._opsramp_recovery_engine_url_template,
@@ -12153,6 +12211,274 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       ),
     )
 
+  def _deliver_topdesk(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    attempt_number: int,
+    phase: str,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    reference = incident.external_reference or incident.alert_id
+    if not self._topdesk_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:topdesk_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="topdesk_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail="topdesk_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+    request = self._build_topdesk_delivery_request(
+      incident=incident,
+      reference=reference,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:topdesk_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="topdesk_incidents",
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"topdesk_status:{status_code}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:topdesk_incidents:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target="topdesk_incidents",
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"topdesk_delivery_failed:{exc}",
+        attempt_number=attempt_number,
+        phase=phase,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _sync_topdesk_workflow(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    attempt_number: int,
+  ) -> OperatorIncidentDelivery:
+    attempted_at = self._clock()
+    target = "topdesk_workflow"
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._topdesk_api_token:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="topdesk_api_token_unconfigured",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+    if not reference:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail="topdesk_workflow_reference_unavailable",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="topdesk",
+        external_reference=None,
+        source=incident.source,
+      )
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_topdesk_workflow_request(
+      incident=incident,
+      action=action,
+      actor=actor,
+      detail=detail,
+      payload=payload,
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        status_code = getattr(response, "status", 202)
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="delivered",
+        attempted_at=attempted_at,
+        detail=f"topdesk_workflow_status:{status_code}:{action}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+    except (urllib_error.URLError, TimeoutError, ValueError) as exc:
+      return OperatorIncidentDelivery(
+        delivery_id=f"{incident.event_id}:{target}:{action}:attempt-{attempt_number}",
+        incident_event_id=incident.event_id,
+        alert_id=incident.alert_id,
+        incident_kind=incident.kind,
+        target=target,
+        status="failed",
+        attempted_at=attempted_at,
+        detail=f"topdesk_workflow_failed:{action}:{exc}",
+        attempt_number=attempt_number,
+        phase=f"provider_{action}",
+        provider_action=action,
+        external_provider="topdesk",
+        external_reference=reference,
+        source=incident.source,
+      )
+
+  def _pull_topdesk_workflow_state(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+  ) -> OperatorIncidentProviderPullSync | None:
+    reference = incident.provider_workflow_reference or incident.external_reference or incident.alert_id
+    if not self._topdesk_api_token or not reference:
+      return None
+    reference_type = "id" if incident.provider_workflow_reference else "external_reference"
+    request = self._build_topdesk_pull_request(
+      reference=reference,
+      reference_type=reference_type,
+    )
+    try:
+      with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
+        payload = self._read_json_response(response)
+    except (urllib_error.URLError, TimeoutError, ValueError, json.JSONDecodeError):
+      return None
+    alert_payload = self._extract_mapping(
+      payload.get("result"),
+      payload.get("data"),
+      payload.get("alert"),
+      payload.get("incident"),
+      payload,
+    )
+    attributes = self._extract_mapping(
+      alert_payload.get("attributes"),
+      alert_payload.get("alert"),
+      alert_payload.get("incident"),
+      alert_payload,
+    )
+    metadata_payload = self._extract_mapping(
+      alert_payload.get("metadata"),
+      attributes.get("metadata"),
+      attributes.get("details"),
+      alert_payload.get("custom_fields"),
+    )
+    provider_payload = dict(metadata_payload)
+    provider_payload.update({
+      "priority": self._first_non_empty_string(
+        alert_payload.get("priority"),
+        alert_payload.get("severity"),
+        attributes.get("priority"),
+      ),
+      "escalation_policy": self._first_non_empty_string(
+        alert_payload.get("escalation_policy"),
+        alert_payload.get("escalationPolicy"),
+        alert_payload.get("policy"),
+        alert_payload.get("source"),
+        attributes.get("source"),
+      ),
+      "assignee": self._first_non_empty_string(
+        alert_payload.get("assignee"),
+        alert_payload.get("owner"),
+        attributes.get("assignee"),
+        self._extract_mapping(alert_payload.get("owner")).get("display_name"),
+        self._extract_mapping(alert_payload.get("owner")).get("name"),
+      ),
+      "url": self._first_non_empty_string(
+        alert_payload.get("url"),
+        attributes.get("url"),
+        alert_payload.get("html_url"),
+      ),
+      "updated_at": self._first_non_empty_string(
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+      "external_reference": self._first_non_empty_string(
+        alert_payload.get("external_reference"),
+        attributes.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+    })
+    return self._build_provider_pull_sync(
+      provider="topdesk",
+      workflow_reference=self._first_non_empty_string(
+        alert_payload.get("alert_id"),
+        alert_payload.get("id"),
+        alert_payload.get("alertId"),
+        incident.provider_workflow_reference,
+        reference if reference_type == "id" else None,
+      ),
+      external_reference=self._first_non_empty_string(
+        provider_payload.get("external_reference"),
+        incident.external_reference,
+        incident.alert_id,
+      ),
+      workflow_state=self._first_non_empty_string(
+        alert_payload.get("alert_status"),
+        alert_payload.get("status"),
+        alert_payload.get("state"),
+        attributes.get("alert_status"),
+        attributes.get("status"),
+        attributes.get("state"),
+      ) or "unknown",
+      detail=self._first_non_empty_string(
+        alert_payload.get("summary"),
+        alert_payload.get("subject"),
+        attributes.get("summary"),
+        incident.summary,
+      ),
+      provider_payload=provider_payload,
+      updated_at=self._parse_provider_datetime(
+        provider_payload.get("updated_at"),
+        alert_payload.get("updated_at"),
+        attributes.get("updated_at"),
+      ),
+    )
+
   def _deliver_opsramp(
     self,
     *,
@@ -18109,6 +18435,119 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           updated_at,
         ),
       }
+    elif provider == "topdesk":
+      topdesk_priority = self._first_non_empty_string(
+        provider_specific_recovery.get("priority"),
+        provider_payload.get("priority"),
+        provider_payload.get("severity"),
+        provider_payload.get("urgency"),
+      )
+      topdesk_escalation_policy = self._first_non_empty_string(
+        provider_specific_recovery.get("escalation_policy"),
+        provider_payload.get("escalation_policy"),
+        provider_payload.get("escalationPolicy"),
+        provider_payload.get("policy"),
+        provider_payload.get("source"),
+      )
+      topdesk_assignee = self._first_non_empty_string(
+        provider_specific_recovery.get("assignee"),
+        provider_payload.get("assignee"),
+        provider_payload.get("owner"),
+        self._extract_mapping(provider_payload.get("owner")).get("display_name"),
+      )
+      topdesk_status = self._first_non_empty_string(
+        workflow_state,
+        provider_payload.get("alert_status"),
+        provider_payload.get("status"),
+        provider_payload.get("state"),
+      ) or "unknown"
+      topdesk_alert_phase = self._first_non_empty_string(
+        self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("alert_phase"),
+        self._resolve_moogsoft_alert_phase(topdesk_status),
+      ) or "unknown"
+      provider_schema_payload = {
+        "kind": "topdesk",
+        "topdesk": {
+          "alert_id": self._first_non_empty_string(
+            provider_specific_recovery.get("alert_id"),
+            provider_payload.get("alert_id"),
+            provider_payload.get("alertId"),
+            provider_payload.get("id"),
+            workflow_reference,
+          ),
+          "external_reference": external_reference,
+          "alert_status": topdesk_status,
+          "priority": topdesk_priority,
+          "escalation_policy": topdesk_escalation_policy,
+          "assignee": topdesk_assignee,
+          "url": self._first_non_empty_string(
+            provider_payload.get("url"),
+            provider_payload.get("html_url"),
+          ),
+          "updated_at": (
+            self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ).isoformat()
+            if self._parse_provider_datetime(
+              provider_payload.get("updated_at"),
+              updated_at,
+            ) is not None
+            else None
+          ),
+          "phase_graph": {
+            "alert_phase": topdesk_alert_phase,
+            "workflow_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("workflow_phase"),
+            ) or self._resolve_moogsoft_workflow_phase(
+              lifecycle_state=self._first_non_empty_string(
+                provider_recovery.get("lifecycle_state"),
+                provider_payload.get("recovery_state"),
+              ),
+              workflow_state=topdesk_status,
+            ),
+            "ownership_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("ownership_phase"),
+            ) or self._resolve_moogsoft_ownership_phase(topdesk_assignee),
+            "priority_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("priority_phase"),
+            ) or self._resolve_moogsoft_priority_phase(topdesk_priority),
+            "escalation_phase": self._first_non_empty_string(
+              self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("escalation_phase"),
+            ) or self._resolve_moogsoft_escalation_phase(topdesk_escalation_policy),
+            "last_transition_at": (
+              self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ).isoformat()
+              if self._parse_provider_datetime(
+                self._extract_mapping(provider_specific_recovery.get("phase_graph")).get("last_transition_at"),
+                provider_payload.get("updated_at"),
+                updated_at,
+              ) is not None
+              else None
+            ),
+          },
+        },
+      }
+      provider_telemetry = {
+        **provider_telemetry,
+        "state": self._first_non_empty_string(
+          provider_telemetry.get("state"),
+          provider_recovery.get("job_state"),
+          topdesk_status,
+        ),
+        "job_url": self._first_non_empty_string(
+          provider_telemetry.get("job_url"),
+          provider_payload.get("url"),
+        ),
+        "updated_at": self._parse_provider_datetime(
+          provider_telemetry.get("updated_at"),
+          provider_payload.get("updated_at"),
+          updated_at,
+        ),
+      }
     elif provider == "opsramp":
       opsramp_priority = self._first_non_empty_string(
         provider_specific_recovery.get("priority"),
@@ -19586,6 +20025,32 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
           "last_transition_at": (
             provider_recovery.solarwindsservicedesk.phase_graph.last_transition_at.isoformat()
             if provider_recovery.solarwindsservicedesk.phase_graph.last_transition_at is not None
+            else None
+          ),
+        },
+      },
+      "topdesk": {
+        "alert_id": provider_recovery.topdesk.alert_id,
+        "external_reference": provider_recovery.topdesk.external_reference,
+        "alert_status": provider_recovery.topdesk.alert_status,
+        "priority": provider_recovery.topdesk.priority,
+        "escalation_policy": provider_recovery.topdesk.escalation_policy,
+        "assignee": provider_recovery.topdesk.assignee,
+        "url": provider_recovery.topdesk.url,
+        "updated_at": (
+          provider_recovery.topdesk.updated_at.isoformat()
+          if provider_recovery.topdesk.updated_at is not None
+          else None
+        ),
+        "phase_graph": {
+          "alert_phase": provider_recovery.topdesk.phase_graph.alert_phase,
+          "workflow_phase": provider_recovery.topdesk.phase_graph.workflow_phase,
+          "ownership_phase": provider_recovery.topdesk.phase_graph.ownership_phase,
+          "priority_phase": provider_recovery.topdesk.phase_graph.priority_phase,
+          "escalation_phase": provider_recovery.topdesk.phase_graph.escalation_phase,
+          "last_transition_at": (
+            provider_recovery.topdesk.phase_graph.last_transition_at.isoformat()
+            if provider_recovery.topdesk.phase_graph.last_transition_at is not None
             else None
           ),
         },
@@ -23299,6 +23764,25 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       method="GET",
     )
 
+  def _build_topdesk_pull_request(
+    self,
+    *,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    return urllib_request.Request(
+      (
+        f"{self._topdesk_api_url}/incidents/{encoded_reference}"
+        f"?identifier_type={reference_type}"
+      ),
+      headers={
+        "Authorization": f"Bearer {self._topdesk_api_token}",
+        "Content-Type": "application/json",
+      },
+      method="GET",
+    )
+
   def _build_incidenthub_delivery_request(
     self,
     *,
@@ -24089,6 +24573,64 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
             "description": incident.detail,
             "status": "pending",
             "priority": self._map_solarwindsservicedesk_priority(incident.severity),
+            "external_reference": reference,
+            "source": "akra_trader",
+            "metadata": {
+              "alert_id": incident.alert_id,
+              "event_id": incident.event_id,
+              "incident_kind": incident.kind,
+              "run_id": incident.run_id,
+              "session_id": incident.session_id,
+              "remediation_state": incident.remediation.state,
+              "remediation_kind": incident.remediation.kind,
+              "remediation_runbook": incident.remediation.runbook,
+              "remediation_summary": incident.remediation.summary,
+              "remediation_provider_payload": incident.remediation.provider_payload,
+              "remediation_provider_recovery": OperatorAlertDeliveryAdapter._build_provider_recovery_payload(incident),
+            },
+          }
+        }
+      ).encode("utf-8"),
+      headers=headers,
+      method="POST",
+    )
+
+  def _build_topdesk_delivery_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    reference: str,
+  ) -> urllib_request.Request:
+    headers = {
+      "Authorization": f"Bearer {self._topdesk_api_token}",
+      "Content-Type": "application/json",
+    }
+    if incident.kind == "incident_resolved":
+      encoded_reference = urllib_parse.quote(reference, safe="")
+      return urllib_request.Request(
+        (
+          f"{self._topdesk_api_url}/incidents/{encoded_reference}/resolve"
+          "?identifier_type=external_reference"
+        ),
+        data=json.dumps(
+          {
+            "actor": "Akra Trader",
+            "note": incident.detail,
+            "source": incident.source,
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    return urllib_request.Request(
+      f"{self._topdesk_api_url}/incidents",
+      data=json.dumps(
+        {
+          "alert": {
+            "summary": incident.summary[:255],
+            "description": incident.detail,
+            "status": "pending",
+            "priority": self._map_topdesk_priority(incident.severity),
             "external_reference": reference,
             "source": "akra_trader",
             "metadata": {
@@ -25105,6 +25647,72 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
       )
     raise ValueError(f"unsupported solarwindsservicedesk workflow action: {action}")
 
+  def _build_topdesk_workflow_request(
+    self,
+    *,
+    incident: OperatorIncidentEvent,
+    action: str,
+    actor: str,
+    detail: str,
+    payload: dict[str, Any] | None,
+    reference: str,
+    reference_type: str,
+  ) -> urllib_request.Request:
+    encoded_reference = urllib_parse.quote(reference, safe="")
+    suffix = f"?identifier_type={reference_type}"
+    headers = {
+      "Authorization": f"Bearer {self._topdesk_api_token}",
+      "Content-Type": "application/json",
+    }
+    if action == "acknowledge":
+      return urllib_request.Request(
+        f"{self._topdesk_api_url}/incidents/{encoded_reference}/acknowledge{suffix}",
+        data=json.dumps({"actor": actor, "note": detail}).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "resolve":
+      return urllib_request.Request(
+        f"{self._topdesk_api_url}/incidents/{encoded_reference}/resolve{suffix}",
+        data=json.dumps(
+          {"actor": actor, "note": f"{detail}{self._format_workflow_payload_context(payload)}"}
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "escalate":
+      return urllib_request.Request(
+        f"{self._topdesk_api_url}/incidents/{encoded_reference}/escalate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra escalated alert to level {incident.escalation_level}. "
+              f"Actor: {actor}. Detail: {detail}."
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    if action == "remediate":
+      return urllib_request.Request(
+        f"{self._topdesk_api_url}/incidents/{encoded_reference}/remediate{suffix}",
+        data=json.dumps(
+          {
+            "actor": actor,
+            "note": (
+              f"Akra requested remediation. Summary: {incident.remediation.summary or incident.summary}. "
+              f"Runbook: {incident.remediation.runbook or 'n/a'}. Detail: {detail}."
+              f"{self._format_workflow_payload_context(payload)}"
+            ),
+          }
+        ).encode("utf-8"),
+        headers=headers,
+        method="PUT",
+      )
+    raise ValueError(f"unsupported topdesk workflow action: {action}")
+
   def _build_opsramp_workflow_request(
     self,
     *,
@@ -25746,6 +26354,15 @@ class OperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
 
   @staticmethod
   def _map_solarwindsservicedesk_priority(severity: str) -> str:
+    normalized = severity.lower()
+    if normalized in {"critical", "error"}:
+      return "high"
+    if normalized in {"warning", "warn"}:
+      return "medium"
+    return "low"
+
+  @staticmethod
+  def _map_topdesk_priority(severity: str) -> str:
     normalized = severity.lower()
     if normalized in {"critical", "error"}:
       return "high"

@@ -1501,6 +1501,31 @@ class OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentTopdeskRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentTopdeskRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentTopdeskRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentTopdeskRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentOpsRampRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1660,6 +1685,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   solarwindsservicedesk: OperatorIncidentSolarWindsServiceDeskRecoveryState = field(
     default_factory=OperatorIncidentSolarWindsServiceDeskRecoveryState
+  )
+  topdesk: OperatorIncidentTopdeskRecoveryState = field(
+    default_factory=OperatorIncidentTopdeskRecoveryState
   )
   opsramp: OperatorIncidentOpsRampRecoveryState = field(
     default_factory=OperatorIncidentOpsRampRecoveryState

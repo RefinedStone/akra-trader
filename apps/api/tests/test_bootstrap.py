@@ -297,6 +297,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       solarwindsservicedesk_api_url: str,
       solarwindsservicedesk_recovery_engine_url_template: str | None,
       solarwindsservicedesk_recovery_engine_token: str | None,
+      topdesk_api_token: str | None,
+      topdesk_api_url: str,
+      topdesk_recovery_engine_url_template: str | None,
+      topdesk_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -515,6 +519,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["solarwindsservicedesk_recovery_engine_token"] = (
         solarwindsservicedesk_recovery_engine_token or ""
       )
+      captured["topdesk_api_token"] = topdesk_api_token or ""
+      captured["topdesk_api_url"] = topdesk_api_url
+      captured["topdesk_recovery_engine_url_template"] = topdesk_recovery_engine_url_template or ""
+      captured["topdesk_recovery_engine_token"] = topdesk_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -791,6 +799,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       operator_alert_solarwindsservicedesk_recovery_engine_token=(
         "solarwindsservicedesk-recovery-token"
       ),
+      operator_alert_topdesk_api_token="topdesk-token",
+      operator_alert_topdesk_api_url="https://api.topdesk.example",
+      operator_alert_topdesk_recovery_engine_url_template=(
+        "https://topdesk.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_topdesk_recovery_engine_token="topdesk-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -974,6 +988,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["solarwindsservicedesk_recovery_engine_token"] == (
     "solarwindsservicedesk-recovery-token"
   )
+  assert captured["topdesk_api_token"] == "topdesk-token"
+  assert captured["topdesk_api_url"] == "https://api.topdesk.example"
+  assert captured["topdesk_recovery_engine_url_template"] == (
+    "https://topdesk.example/recovery/{workflow_reference_urlencoded}"
+  )
+  assert captured["topdesk_recovery_engine_token"] == "topdesk-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"

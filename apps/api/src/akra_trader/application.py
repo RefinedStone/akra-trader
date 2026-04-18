@@ -124,6 +124,8 @@ from akra_trader.domain.models import OperatorIncidentBmcHelixRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentBmcHelixRecoveryState
 from akra_trader.domain.models import OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentSolarWindsServiceDeskRecoveryState
+from akra_trader.domain.models import OperatorIncidentTopdeskRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentTopdeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentOpsRampRecoveryState
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
@@ -1996,6 +1998,17 @@ class TradingApplication:
             aligned_provider_recovery,
             solarwindsservicedesk=replace(
               aligned_provider_recovery.solarwindsservicedesk,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "topdesk"
+          and provider_recovery.topdesk.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            topdesk=replace(
+              aligned_provider_recovery.topdesk,
               alert_status="delivered",
             ),
           )
@@ -7415,6 +7428,139 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_topdesk_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_topdesk_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_topdesk_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_topdesk_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_topdesk_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_topdesk_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentTopdeskRecoveryState,
+  ) -> OperatorIncidentTopdeskRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_topdesk_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_topdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentTopdeskRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_topdesk_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_topdesk_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_topdesk_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_opsramp_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -11397,6 +11543,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "solarwindsservicedesk"
+    topdesk_schema = existing.topdesk
+    topdesk_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("topdesk"),
+      payload.get("topdesk"),
+      payload.get("topdesk_alert"),
+    )
+    if normalized_provider == "topdesk" or topdesk_payload:
+      topdesk_status = self._first_non_empty_string(
+        topdesk_payload.get("alert_status"),
+        topdesk_payload.get("status"),
+        topdesk_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.topdesk.alert_status,
+      ) or "unknown"
+      topdesk_schema = OperatorIncidentTopdeskRecoveryState(
+        alert_id=self._first_non_empty_string(
+          topdesk_payload.get("alert_id"),
+          topdesk_payload.get("id"),
+          topdesk_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.topdesk.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          topdesk_payload.get("external_reference"),
+          topdesk_payload.get("reference"),
+          reference,
+          existing.topdesk.external_reference,
+        ),
+        alert_status=topdesk_status,
+        priority=self._first_non_empty_string(
+          topdesk_payload.get("priority"),
+          topdesk_payload.get("severity"),
+          topdesk_payload.get("urgency"),
+          existing.topdesk.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          topdesk_payload.get("escalation_policy"),
+          topdesk_payload.get("escalationPolicy"),
+          topdesk_payload.get("policy"),
+          topdesk_payload.get("source"),
+          existing.topdesk.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          topdesk_payload.get("assignee"),
+          topdesk_payload.get("owner"),
+          topdesk_payload.get("assigned_to"),
+          existing.topdesk.assignee,
+        ),
+        url=self._first_non_empty_string(
+          topdesk_payload.get("url"),
+          topdesk_payload.get("html_url"),
+          topdesk_payload.get("link"),
+          existing.topdesk.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(topdesk_payload.get("updated_at"))
+          or existing.topdesk.updated_at
+        ),
+        phase_graph=self._build_topdesk_recovery_phase_graph(
+          payload=topdesk_payload,
+          alert_status=topdesk_status,
+          priority=self._first_non_empty_string(
+            topdesk_payload.get("priority"),
+            topdesk_payload.get("severity"),
+            topdesk_payload.get("urgency"),
+            existing.topdesk.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            topdesk_payload.get("escalation_policy"),
+            topdesk_payload.get("escalationPolicy"),
+            topdesk_payload.get("policy"),
+            topdesk_payload.get("source"),
+            existing.topdesk.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            topdesk_payload.get("assignee"),
+            topdesk_payload.get("owner"),
+            topdesk_payload.get("assigned_to"),
+            existing.topdesk.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.topdesk,
+        ),
+      )
+      provider_schema_kind = "topdesk"
     opsramp_schema = existing.opsramp
     opsramp_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("opsramp"),
@@ -11585,6 +11824,7 @@ class TradingApplication:
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
       solarwindsservicedesk=solarwindsservicedesk_schema,
+      topdesk=topdesk_schema,
       opsramp=opsramp_schema,
       updated_at=synced_at,
     )
@@ -12127,6 +12367,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.solarwindsservicedesk,
+        ),
+      ),
+      topdesk=replace(
+        provider_recovery.topdesk,
+        phase_graph=self._build_topdesk_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.topdesk.alert_status,
+          priority=provider_recovery.topdesk.priority,
+          escalation_policy=provider_recovery.topdesk.escalation_policy,
+          assignee=provider_recovery.topdesk.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.topdesk,
         ),
       ),
       opsramp=replace(
@@ -16624,6 +16878,10 @@ class TradingApplication:
       return "solarwindsservicedesk"
     if normalized in {"solarwindsservicedesk_incidents", "operator_solarwindsservicedesk"}:
       return "solarwindsservicedesk"
+    if normalized in {"topdesk_alerts", "topdesk", "operator_topdesk"}:
+      return "topdesk"
+    if normalized in {"topdesk_incidents", "operator_topdesk"}:
+      return "topdesk"
     if normalized in {"sysaid_alerts", "sysaid", "sys_aid", "operator_sysaid"}:
       return "sysaid"
     if normalized in {"sysaid_incidents", "operator_sysaid"}:
@@ -16866,6 +17124,8 @@ class TradingApplication:
       or "solarwindsservicedesk_alerts" in combined
     ):
       return "solarwindsservicedesk"
+    if "topdesk_incidents" in combined or "topdesk_alerts" in combined:
+      return "topdesk"
     if "sysaid_incidents" in combined or "sysaid_alerts" in combined:
       return "sysaid"
     if "opsramp_incidents" in combined or "opsramp_alerts" in combined:

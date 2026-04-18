@@ -10023,6 +10023,277 @@ def test_operator_alert_delivery_adapter_pulls_solarwindsservicedesk_provider_st
   assert requests[1][2]["Authorization"] == "Bearer solarwindsservicedesk-recovery-token"
 
 
+def test_operator_alert_delivery_adapter_supports_topdesk_target_and_resolution() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def handler(request, timeout: float):
+    body = request.data or b""
+    requests.append((request.full_url, request.method, body, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("topdesk",),
+    topdesk_api_token="topdesk-token",
+    topdesk_api_url="https://api.topdesk.example",
+    webhook_timeout_seconds=17,
+    urlopen=handler,
+  )
+  opened_records = adapter.deliver(
+    incident=OperatorIncidentEvent(
+      event_id="incident-opened-topdesk-1",
+      alert_id="guarded-live:market-data:5m",
+      timestamp=datetime(2025, 1, 3, 17, 0, tzinfo=UTC),
+      kind="incident_opened",
+      severity="warning",
+      summary="Guarded-live market-data incident",
+      detail="market-data freshness degraded",
+    ),
+  )
+  resolved_records = adapter.deliver(
+    incident=OperatorIncidentEvent(
+      event_id="incident-resolved-topdesk-1",
+      alert_id="guarded-live:market-data:5m",
+      timestamp=datetime(2025, 1, 3, 17, 2, tzinfo=UTC),
+      kind="incident_resolved",
+      severity="warning",
+      summary="Guarded-live market-data incident resolved",
+      detail="market-data freshness recovered",
+      external_reference="guarded-live:market-data:5m",
+    ),
+  )
+
+  assert adapter.list_targets() == ("topdesk_incidents",)
+  assert opened_records[0].target == "topdesk_incidents"
+  assert opened_records[0].external_provider == "topdesk"
+  assert opened_records[0].status == "delivered"
+  assert resolved_records[0].status == "delivered"
+  create_request = requests[0]
+  resolve_request = requests[1]
+  assert create_request[0] == "https://api.topdesk.example/incidents"
+  assert create_request[1] == "POST"
+  assert create_request[3]["Authorization"] == "Bearer topdesk-token"
+  assert create_request[4] == 17
+  create_payload = json.loads(create_request[2].decode("utf-8"))
+  assert create_payload["alert"]["summary"] == "Guarded-live market-data incident"
+  assert create_payload["alert"]["priority"] == "medium"
+  assert create_payload["alert"]["external_reference"] == "guarded-live:market-data:5m"
+  assert (
+    resolve_request[0]
+    == "https://api.topdesk.example/incidents/guarded-live%3Amarket-data%3A5m/resolve?identifier_type=external_reference"
+  )
+  assert resolve_request[1] == "PUT"
+  resolve_payload = json.loads(resolve_request[2].decode("utf-8"))
+  assert resolve_payload["note"] == "market-data freshness recovered"
+
+
+def test_operator_alert_delivery_adapter_syncs_topdesk_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def handler(request, timeout: float):
+    body = request.data or b""
+    requests.append((request.full_url, request.method, body, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("topdesk",),
+    topdesk_api_token="topdesk-token",
+    topdesk_api_url="https://api.topdesk.example",
+    webhook_timeout_seconds=11,
+    urlopen=handler,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-topdesk-2",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 17, 5, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="topdesk",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="TOP-123",
+    remediation=OperatorIncidentRemediation(
+      state="requested",
+      kind="historical_backfill",
+      owner="provider",
+      provider="topdesk",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        provider="topdesk",
+        job_id="topdesk-job-existing",
+      ),
+      summary="Backfill the degraded historical window.",
+      runbook="market_data.backfill_history",
+    ),
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="topdesk",
+    action="acknowledge",
+    actor="operator",
+    detail="operator_ack",
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="topdesk",
+    action="escalate",
+    actor="operator",
+    detail="operator_escalate",
+  )
+  resolve = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="topdesk",
+    action="resolve",
+    actor="operator",
+    detail="operator_resolve",
+    payload={"job_id": "topdesk-job-1", "verification": {"state": "passed"}},
+  )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="topdesk",
+    action="remediate",
+    actor="operator",
+    detail="operator_remediate",
+    payload={"job_id": "topdesk-job-2", "channels": ["kline", "depth"]},
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("topdesk",)
+  assert acknowledge[0].target == "topdesk_workflow"
+  assert acknowledge[0].status == "delivered"
+  assert escalate[0].status == "delivered"
+  assert resolve[0].status == "delivered"
+  assert remediate[0].status == "delivered"
+  assert requests[0][0].endswith("/incidents/TOP-123/acknowledge?identifier_type=id")
+  assert requests[0][1] == "PUT"
+  assert requests[0][3]["Authorization"] == "Bearer topdesk-token"
+  assert requests[1][0].endswith("/incidents/TOP-123/escalate?identifier_type=id")
+  assert requests[2][0].endswith("/incidents/TOP-123/resolve?identifier_type=id")
+  assert requests[3][0].endswith("/incidents/TOP-123/remediate?identifier_type=id")
+  resolve_payload = json.loads(requests[2][2].decode("utf-8"))
+  remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  assert '"job_id": "topdesk-job-1"' in resolve_payload["note"]
+  assert '"job_id": "topdesk-job-2"' in remediate_payload["note"]
+
+
+def test_operator_alert_delivery_adapter_pulls_topdesk_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str]]] = []
+
+  def handler(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers)))
+    if request.full_url == "https://api.topdesk.example/incidents/TOP-123?identifier_type=id":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "incident": {
+              "id": "TOP-123",
+              "alert_status": "acknowledged",
+              "priority": "high",
+              "source": "market-data-primary",
+              "owner": {"display_name": "market-data-oncall"},
+              "url": "https://topdesk.example/incidents/TOP-123",
+              "updated_at": "2025-01-03T17:08:00+00:00",
+              "metadata": {
+                "remediation_state": "recovering",
+                "remediation_provider_payload": {
+                  "job_id": "topdesk-job-9",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                  "verification": {"state": "pending"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovering",
+                  "job_id": "topdesk-job-9",
+                  "channels": ["kline", "depth"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "status_machine_state": "provider_running",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "running",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "running",
+                  "progress_percent": 70,
+                  "attempt_count": 1,
+                  "current_step": "restore_market_channels",
+                  "last_message": "provider body placeholder",
+                  "external_run_id": "topdesk-body-9",
+                },
+                "remediation_provider_telemetry_url": "https://topdesk-engine.example/recovery/topdesk-job-9",
+              },
+            }
+          }
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://topdesk-engine.example/recovery/topdesk-job-9":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "job": {
+              "state": "running",
+              "progress_percent": 95,
+              "attempt_count": 2,
+              "current_step": "verify_restored_channels",
+              "last_message": "TOPdesk engine is verifying restored channels",
+              "external_run_id": "topdesk-engine-9",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    raise AssertionError(f"unexpected request: {request.full_url}")
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("topdesk",),
+    topdesk_api_token="topdesk-token",
+    topdesk_api_url="https://api.topdesk.example",
+    topdesk_recovery_engine_url_template=(
+      "https://topdesk-engine.example/recovery/{workflow_reference_urlencoded}"
+    ),
+    topdesk_recovery_engine_token="topdesk-recovery-token",
+    urlopen=handler,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-topdesk-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 17, 3, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="topdesk",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="TOP-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="topdesk",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "topdesk"
+  assert snapshot.workflow_reference == "TOP-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "recovering"
+  assert snapshot.payload["job_id"] == "topdesk-job-9"
+  assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert snapshot.payload["provider_schema"]["kind"] == "topdesk"
+  assert snapshot.payload["provider_schema"]["topdesk"]["alert_id"] == "TOP-123"
+  assert snapshot.payload["provider_schema"]["topdesk"]["alert_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["topdesk"]["phase_graph"]["alert_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["topdesk"]["phase_graph"]["workflow_phase"] == "provider_recovering"
+  assert snapshot.payload["provider_schema"]["topdesk"]["phase_graph"]["ownership_phase"] == "assigned"
+  assert snapshot.payload["provider_schema"]["topdesk"]["phase_graph"]["escalation_phase"] == "configured"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "topdesk-engine-9"
+  assert snapshot.payload["telemetry"]["last_message"] == "TOPdesk engine is verifying restored channels"
+  assert requests[0][2]["Authorization"] == "Bearer topdesk-token"
+  assert requests[1][0] == "https://topdesk-engine.example/recovery/topdesk-job-9"
+  assert requests[1][2]["Authorization"] == "Bearer topdesk-recovery-token"
+
+
 def test_operator_alert_delivery_adapter_supports_opsramp_target_and_resolution() -> None:
   requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
 

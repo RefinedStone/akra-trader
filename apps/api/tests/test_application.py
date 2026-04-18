@@ -272,6 +272,8 @@ class FakeOperatorAlertDeliveryAdapter:
         external_provider = "bmchelix"
       elif target == "solarwindsservicedesk_incidents":
         external_provider = "solarwindsservicedesk"
+      elif target == "topdesk_incidents":
+        external_provider = "topdesk"
       elif target == "opsramp_incidents":
         external_provider = "opsramp"
       elif target == "zenduty_incidents":
@@ -10755,6 +10757,203 @@ def test_incident_paging_provider_can_be_inferred_for_solarwindsservicedesk_work
   assert updated.provider_workflow_action == "acknowledge"
   assert any(
     attempt[1:] == ("solarwindsservicedesk", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
+
+
+def test_external_topdesk_recovery_sync_populates_topdesk_typed_schema(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 19, 29, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("topdesk_incidents",),
+    supported_workflow_providers=("topdesk",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="topdesk",
+    operator_alert_paging_policy_warning_targets=("topdesk_incidents",),
+    operator_alert_paging_policy_critical_targets=("topdesk_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="topdesk_market_data_recovery_sync",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="topdesk",
+    event_kind="remediation_started",
+    actor="topdesk",
+    detail="topdesk_market_data_recovery_started",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="TOP-123",
+    occurred_at=clock.current + timedelta(minutes=1),
+    payload={
+      "job_id": "topdesk-job-11",
+      "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+      "topdesk": {
+        "alert_id": "TOP-123",
+        "external_reference": "guarded-live:market-data:5m",
+        "alert_status": "acknowledged",
+        "priority": "high",
+        "escalation_policy": "market-data-primary",
+        "assignee": "market-data-oncall",
+        "url": "https://topdesk.example/incidents/TOP-123",
+      },
+      "telemetry": {
+        "state": "running",
+        "progress_percent": 82,
+        "attempt_count": 1,
+        "current_step": "verify_repaired_window",
+        "last_message": "topdesk recovery started",
+        "external_run_id": "topdesk-telemetry-1",
+      },
+    },
+  )
+
+  updated_incident = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert updated_incident.remediation.provider_recovery.provider_schema_kind == "topdesk"
+  assert updated_incident.remediation.provider_recovery.topdesk.alert_id == "TOP-123"
+  assert updated_incident.remediation.provider_recovery.topdesk.external_reference == "guarded-live:market-data:5m"
+  assert updated_incident.remediation.provider_recovery.topdesk.alert_status == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.topdesk.priority == "high"
+  assert updated_incident.remediation.provider_recovery.topdesk.escalation_policy == "market-data-primary"
+  assert updated_incident.remediation.provider_recovery.topdesk.assignee == "market-data-oncall"
+  assert updated_incident.remediation.provider_recovery.topdesk.phase_graph.alert_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.topdesk.phase_graph.workflow_phase == "provider_recovering"
+  assert updated_incident.remediation.provider_recovery.topdesk.phase_graph.ownership_phase == "assigned"
+  assert updated_incident.remediation.provider_recovery.topdesk.phase_graph.escalation_phase == "configured"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 82
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verify_repaired_window"
+
+
+def test_incident_paging_provider_can_be_inferred_for_topdesk_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 18, 24, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("topdesk_incidents",),
+    supported_workflow_providers=("topdesk",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_warning_targets=("topdesk_incidents",),
+    operator_alert_paging_policy_critical_targets=("topdesk_incidents",),
+    operator_alert_paging_policy_warning_escalation_targets=("topdesk_incidents",),
+    operator_alert_paging_policy_critical_escalation_targets=("topdesk_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="topdesk_policy")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_provider == "topdesk"
+  assert incident.delivery_targets == ("topdesk_incidents",)
+  assert incident.escalation_targets == ("topdesk_incidents",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="topdesk",
+    event_kind="triggered",
+    actor="topdesk",
+    detail="provider_alert_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="TOP-123",
+    occurred_at=clock.current + timedelta(minutes=1),
+  )
+  triggered = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered.external_provider == "topdesk"
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="topdesk_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert any(
+    attempt[1:] == ("topdesk", "acknowledge", 1)
     for attempt in delivery.workflow_attempts
   )
 

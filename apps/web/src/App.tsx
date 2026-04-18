@@ -1078,6 +1078,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        topdesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1927,6 +1945,24 @@ type GuardedLiveStatus = {
           };
         };
         solarwindsservicedesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        topdesk: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10050,6 +10086,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  topdesk: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11212,6 +11266,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `SolarWinds Service Desk schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "topdesk") {
+    const details = [
+      providerRecovery.topdesk.alert_id ? `alert ${providerRecovery.topdesk.alert_id}` : null,
+      providerRecovery.topdesk.alert_status !== "unknown"
+        ? `status ${providerRecovery.topdesk.alert_status}`
+        : null,
+      providerRecovery.topdesk.priority ? `priority ${providerRecovery.topdesk.priority}` : null,
+      providerRecovery.topdesk.escalation_policy
+        ? `policy ${providerRecovery.topdesk.escalation_policy}`
+        : null,
+      providerRecovery.topdesk.assignee ? `assignee ${providerRecovery.topdesk.assignee}` : null,
+      providerRecovery.topdesk.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.topdesk.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.topdesk.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.topdesk.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.topdesk.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.topdesk.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.topdesk.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.topdesk.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.topdesk.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.topdesk.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `TOPdesk schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

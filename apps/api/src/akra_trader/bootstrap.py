@@ -347,6 +347,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
     solarwindsservicedesk_recovery_engine_token=(
       settings.operator_alert_solarwindsservicedesk_recovery_engine_token
     ),
+    topdesk_api_token=settings.operator_alert_topdesk_api_token,
+    topdesk_api_url=settings.operator_alert_topdesk_api_url,
+    topdesk_recovery_engine_url_template=(
+      settings.operator_alert_topdesk_recovery_engine_url_template
+    ),
+    topdesk_recovery_engine_token=settings.operator_alert_topdesk_recovery_engine_token,
     opsramp_api_token=settings.operator_alert_opsramp_api_token,
     opsramp_api_url=settings.operator_alert_opsramp_api_url,
     opsramp_recovery_engine_url_template=(
