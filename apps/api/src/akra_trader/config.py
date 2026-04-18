@@ -157,6 +157,10 @@ class Settings:
   operator_alert_oneuptime_api_url: str = "https://api.oneuptime.com/v1"
   operator_alert_oneuptime_recovery_engine_url_template: str | None = None
   operator_alert_oneuptime_recovery_engine_token: str | None = None
+  operator_alert_squzy_api_token: str | None = None
+  operator_alert_squzy_api_url: str = "https://api.squzy.app/v1"
+  operator_alert_squzy_recovery_engine_url_template: str | None = None
+  operator_alert_squzy_recovery_engine_token: str | None = None
   operator_alert_opsramp_api_token: str | None = None
   operator_alert_opsramp_api_url: str = "https://api.opsramp.com/v1"
   operator_alert_opsramp_recovery_engine_url_template: str | None = None
@@ -624,6 +628,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_oneuptime_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_ONEUPTIME_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_squzy_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUZY_API_TOKEN") or None
+    ),
+    operator_alert_squzy_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_SQUZY_API_URL",
+      "https://api.squzy.app/v1",
+    ),
+    operator_alert_squzy_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUZY_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_squzy_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_SQUZY_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsramp_api_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSRAMP_API_TOKEN") or None

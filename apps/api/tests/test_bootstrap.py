@@ -269,6 +269,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       oneuptime_api_url: str,
       oneuptime_recovery_engine_url_template: str | None,
       oneuptime_recovery_engine_token: str | None,
+      squzy_api_token: str | None,
+      squzy_api_url: str,
+      squzy_recovery_engine_url_template: str | None,
+      squzy_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -447,6 +451,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         oneuptime_recovery_engine_url_template or ""
       )
       captured["oneuptime_recovery_engine_token"] = oneuptime_recovery_engine_token or ""
+      captured["squzy_api_token"] = squzy_api_token or ""
+      captured["squzy_api_url"] = squzy_api_url
+      captured["squzy_recovery_engine_url_template"] = (
+        squzy_recovery_engine_url_template or ""
+      )
+      captured["squzy_recovery_engine_token"] = squzy_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -679,6 +689,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://oneuptime.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_oneuptime_recovery_engine_token="oneuptime-recovery-token",
+      operator_alert_squzy_api_token="squzy-token",
+      operator_alert_squzy_api_url="https://api.squzy.example",
+      operator_alert_squzy_recovery_engine_url_template=(
+        "https://squzy.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_squzy_recovery_engine_token="squzy-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -830,6 +846,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["oneuptime_api_url"] == "https://api.oneuptime.example"
   assert captured["oneuptime_recovery_engine_url_template"] == "https://oneuptime.example/recovery/{workflow_reference_urlencoded}"
   assert captured["oneuptime_recovery_engine_token"] == "oneuptime-recovery-token"
+  assert captured["squzy_api_token"] == "squzy-token"
+  assert captured["squzy_api_url"] == "https://api.squzy.example"
+  assert captured["squzy_recovery_engine_url_template"] == "https://squzy.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["squzy_recovery_engine_token"] == "squzy-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"

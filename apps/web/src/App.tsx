@@ -952,6 +952,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        squzy: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1675,6 +1693,24 @@ type GuardedLiveStatus = {
           };
         };
         oneuptime: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        squzy: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9672,6 +9708,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  squzy: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -10605,6 +10659,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `OneUptime schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "squzy") {
+    const details = [
+      providerRecovery.squzy.alert_id ? `alert ${providerRecovery.squzy.alert_id}` : null,
+      providerRecovery.squzy.alert_status !== "unknown"
+        ? `status ${providerRecovery.squzy.alert_status}`
+        : null,
+      providerRecovery.squzy.priority ? `priority ${providerRecovery.squzy.priority}` : null,
+      providerRecovery.squzy.escalation_policy
+        ? `policy ${providerRecovery.squzy.escalation_policy}`
+        : null,
+      providerRecovery.squzy.assignee ? `assignee ${providerRecovery.squzy.assignee}` : null,
+      providerRecovery.squzy.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.squzy.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.squzy.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.squzy.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.squzy.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.squzy.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.squzy.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.squzy.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.squzy.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.squzy.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Squzy schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

@@ -1326,6 +1326,31 @@ class OperatorIncidentOneUptimeRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentSquzyRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentSquzyRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentSquzyRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentSquzyRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentOpsRampRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1464,6 +1489,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   oneuptime: OperatorIncidentOneUptimeRecoveryState = field(
     default_factory=OperatorIncidentOneUptimeRecoveryState
+  )
+  squzy: OperatorIncidentSquzyRecoveryState = field(
+    default_factory=OperatorIncidentSquzyRecoveryState
   )
   opsramp: OperatorIncidentOpsRampRecoveryState = field(
     default_factory=OperatorIncidentOpsRampRecoveryState
