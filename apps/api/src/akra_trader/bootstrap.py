@@ -357,6 +357,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_kayako_recovery_engine_url_template
     ),
     kayako_recovery_engine_token=settings.operator_alert_kayako_recovery_engine_token,
+    intercom_api_token=settings.operator_alert_intercom_api_token,
+    intercom_api_url=settings.operator_alert_intercom_api_url,
+    intercom_recovery_engine_url_template=(
+      settings.operator_alert_intercom_recovery_engine_url_template
+    ),
+    intercom_recovery_engine_token=settings.operator_alert_intercom_recovery_engine_token,
     servicedeskplus_api_token=settings.operator_alert_servicedeskplus_api_token,
     servicedeskplus_api_url=settings.operator_alert_servicedeskplus_api_url,
     servicedeskplus_recovery_engine_url_template=(

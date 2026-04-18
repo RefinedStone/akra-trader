@@ -305,6 +305,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       kayako_api_url: str,
       kayako_recovery_engine_url_template: str | None,
       kayako_recovery_engine_token: str | None,
+      intercom_api_token: str | None,
+      intercom_api_url: str,
+      intercom_recovery_engine_url_template: str | None,
+      intercom_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -561,6 +565,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         kayako_recovery_engine_url_template or ""
       )
       captured["kayako_recovery_engine_token"] = kayako_recovery_engine_token or ""
+      captured["intercom_api_token"] = intercom_api_token or ""
+      captured["intercom_api_url"] = intercom_api_url
+      captured["intercom_recovery_engine_url_template"] = (
+        intercom_recovery_engine_url_template or ""
+      )
+      captured["intercom_recovery_engine_token"] = intercom_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -881,6 +891,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://kayako.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_kayako_recovery_engine_token="kayako-recovery-token",
+      operator_alert_intercom_api_token="intercom-token",
+      operator_alert_intercom_api_url="https://api.intercom.example",
+      operator_alert_intercom_recovery_engine_url_template=(
+        "https://intercom.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_intercom_recovery_engine_token="intercom-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1108,6 +1124,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["kayako_api_url"] == "https://api.kayako.example/v1"
   assert captured["kayako_recovery_engine_url_template"] == "https://kayako.example/recovery/{workflow_reference_urlencoded}"
   assert captured["kayako_recovery_engine_token"] == "kayako-recovery-token"
+  assert captured["intercom_api_token"] == "intercom-token"
+  assert captured["intercom_api_url"] == "https://api.intercom.example"
+  assert captured["intercom_recovery_engine_url_template"] == "https://intercom.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["intercom_recovery_engine_token"] == "intercom-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"

@@ -1114,6 +1114,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        intercom: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         servicedeskplus: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -2107,6 +2125,24 @@ type GuardedLiveStatus = {
           };
         };
         kayako: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        intercom: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10374,6 +10410,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  intercom: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   servicedeskplus: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11724,6 +11778,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Kayako schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "intercom") {
+    const details = [
+      providerRecovery.intercom.alert_id
+        ? `conversation ${providerRecovery.intercom.alert_id}`
+        : null,
+      providerRecovery.intercom.alert_status !== "unknown"
+        ? `status ${providerRecovery.intercom.alert_status}`
+        : null,
+      providerRecovery.intercom.priority
+        ? `priority ${providerRecovery.intercom.priority}`
+        : null,
+      providerRecovery.intercom.escalation_policy
+        ? `policy ${providerRecovery.intercom.escalation_policy}`
+        : null,
+      providerRecovery.intercom.assignee
+        ? `assignee ${providerRecovery.intercom.assignee}`
+        : null,
+      providerRecovery.intercom.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.intercom.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.intercom.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.intercom.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.intercom.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.intercom.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.intercom.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.intercom.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.intercom.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.intercom.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Intercom schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "servicedeskplus") {
     const details = [
