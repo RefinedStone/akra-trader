@@ -293,6 +293,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       zendesk_api_url: str,
       zendesk_recovery_engine_url_template: str | None,
       zendesk_recovery_engine_token: str | None,
+      zohodesk_api_token: str | None,
+      zohodesk_api_url: str,
+      zohodesk_recovery_engine_url_template: str | None,
+      zohodesk_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -531,6 +535,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         zendesk_recovery_engine_url_template or ""
       )
       captured["zendesk_recovery_engine_token"] = zendesk_recovery_engine_token or ""
+      captured["zohodesk_api_token"] = zohodesk_api_token or ""
+      captured["zohodesk_api_url"] = zohodesk_api_url
+      captured["zohodesk_recovery_engine_url_template"] = (
+        zohodesk_recovery_engine_url_template or ""
+      )
+      captured["zohodesk_recovery_engine_token"] = zohodesk_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -833,6 +843,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://zendesk.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_zendesk_recovery_engine_token="zendesk-recovery-token",
+      operator_alert_zohodesk_api_token="zohodesk-token",
+      operator_alert_zohodesk_api_url="https://desk.zoho.example/api/v1",
+      operator_alert_zohodesk_recovery_engine_url_template=(
+        "https://zohodesk.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_zohodesk_recovery_engine_token="zohodesk-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1048,6 +1064,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["zendesk_api_url"] == "https://api.zendesk.example/api/v2"
   assert captured["zendesk_recovery_engine_url_template"] == "https://zendesk.example/recovery/{workflow_reference_urlencoded}"
   assert captured["zendesk_recovery_engine_token"] == "zendesk-recovery-token"
+  assert captured["zohodesk_api_token"] == "zohodesk-token"
+  assert captured["zohodesk_api_url"] == "https://desk.zoho.example/api/v1"
+  assert captured["zohodesk_recovery_engine_url_template"] == "https://zohodesk.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["zohodesk_recovery_engine_token"] == "zohodesk-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"

@@ -1060,6 +1060,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        zohodesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         servicedeskplus: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1999,6 +2017,24 @@ type GuardedLiveStatus = {
           };
         };
         zendesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        zohodesk: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10212,6 +10248,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  zohodesk: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   servicedeskplus: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11457,6 +11511,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Zendesk schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "zohodesk") {
+    const details = [
+      providerRecovery.zohodesk.alert_id
+        ? `alert ${providerRecovery.zohodesk.alert_id}`
+        : null,
+      providerRecovery.zohodesk.alert_status !== "unknown"
+        ? `status ${providerRecovery.zohodesk.alert_status}`
+        : null,
+      providerRecovery.zohodesk.priority
+        ? `priority ${providerRecovery.zohodesk.priority}`
+        : null,
+      providerRecovery.zohodesk.escalation_policy
+        ? `policy ${providerRecovery.zohodesk.escalation_policy}`
+        : null,
+      providerRecovery.zohodesk.assignee
+        ? `assignee ${providerRecovery.zohodesk.assignee}`
+        : null,
+      providerRecovery.zohodesk.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.zohodesk.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.zohodesk.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.zohodesk.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.zohodesk.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.zohodesk.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.zohodesk.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.zohodesk.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.zohodesk.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.zohodesk.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Zoho Desk schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "servicedeskplus") {
     const details = [

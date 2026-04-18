@@ -122,6 +122,8 @@ from akra_trader.domain.models import OperatorIncidentHappyfoxRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentHappyfoxRecoveryState
 from akra_trader.domain.models import OperatorIncidentZendeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentZendeskRecoveryState
+from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryState
 from akra_trader.domain.models import OperatorIncidentSysAidRecoveryPhaseGraph
@@ -1995,6 +1997,17 @@ class TradingApplication:
             aligned_provider_recovery,
             zendesk=replace(
               aligned_provider_recovery.zendesk,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "zohodesk"
+          and provider_recovery.zohodesk.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            zohodesk=replace(
+              aligned_provider_recovery.zohodesk,
               alert_status="delivered",
             ),
           )
@@ -7285,6 +7298,108 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_zohodesk_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._normalize_freshdesk_alert_phase(status, existing_phase)
+
+  @staticmethod
+  def _resolve_zohodesk_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_ownership_phase(assignee, existing_phase)
+
+  @staticmethod
+  def _resolve_zohodesk_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_priority_phase(priority, existing_phase)
+
+  @staticmethod
+  def _resolve_zohodesk_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_escalation_phase(
+      escalation_policy,
+      existing_phase,
+    )
+
+  @staticmethod
+  def _resolve_zohodesk_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=workflow_state,
+    )
+
+  def _build_zohodesk_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentZohoDeskRecoveryState,
+  ) -> OperatorIncidentZohoDeskRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_zohodesk_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_zohodesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentZohoDeskRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_zohodesk_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_zohodesk_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_zohodesk_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -11974,6 +12089,100 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "zendesk"
+    zohodesk_schema = existing.zohodesk
+    zohodesk_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("zohodesk"),
+      payload.get("zohodesk"),
+      payload.get("zohodesk_alert"),
+      payload.get("zohodesk_ticket"),
+    )
+    if normalized_provider == "zohodesk" or zohodesk_payload:
+      zohodesk_status = self._first_non_empty_string(
+        zohodesk_payload.get("alert_status"),
+        zohodesk_payload.get("status"),
+        zohodesk_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.zohodesk.alert_status,
+      ) or "unknown"
+      zohodesk_schema = OperatorIncidentZohoDeskRecoveryState(
+        alert_id=self._first_non_empty_string(
+          zohodesk_payload.get("alert_id"),
+          zohodesk_payload.get("id"),
+          zohodesk_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.zohodesk.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          zohodesk_payload.get("external_reference"),
+          zohodesk_payload.get("reference"),
+          reference,
+          existing.zohodesk.external_reference,
+        ),
+        alert_status=zohodesk_status,
+        priority=self._first_non_empty_string(
+          zohodesk_payload.get("priority"),
+          zohodesk_payload.get("severity"),
+          zohodesk_payload.get("urgency"),
+          existing.zohodesk.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          zohodesk_payload.get("escalation_policy"),
+          zohodesk_payload.get("escalationPolicy"),
+          zohodesk_payload.get("policy"),
+          zohodesk_payload.get("source"),
+          existing.zohodesk.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          zohodesk_payload.get("assignee"),
+          zohodesk_payload.get("owner"),
+          zohodesk_payload.get("assigned_to"),
+          existing.zohodesk.assignee,
+        ),
+        url=self._first_non_empty_string(
+          zohodesk_payload.get("url"),
+          zohodesk_payload.get("html_url"),
+          zohodesk_payload.get("link"),
+          existing.zohodesk.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(zohodesk_payload.get("updated_at"))
+          or existing.zohodesk.updated_at
+        ),
+        phase_graph=self._build_zohodesk_recovery_phase_graph(
+          payload=zohodesk_payload,
+          alert_status=zohodesk_status,
+          priority=self._first_non_empty_string(
+            zohodesk_payload.get("priority"),
+            zohodesk_payload.get("severity"),
+            zohodesk_payload.get("urgency"),
+            existing.zohodesk.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            zohodesk_payload.get("escalation_policy"),
+            zohodesk_payload.get("escalationPolicy"),
+            zohodesk_payload.get("policy"),
+            zohodesk_payload.get("source"),
+            existing.zohodesk.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            zohodesk_payload.get("assignee"),
+            zohodesk_payload.get("owner"),
+            zohodesk_payload.get("assigned_to"),
+            existing.zohodesk.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.zohodesk,
+        ),
+      )
+      provider_schema_kind = "zohodesk"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -12719,6 +12928,7 @@ class TradingApplication:
       freshdesk=freshdesk_schema,
       happyfox=happyfox_schema,
       zendesk=zendesk_schema,
+      zohodesk=zohodesk_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -13253,6 +13463,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.zendesk,
+        ),
+      ),
+      zohodesk=replace(
+        provider_recovery.zohodesk,
+        phase_graph=self._build_zohodesk_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.zohodesk.alert_status,
+          priority=provider_recovery.zohodesk.priority,
+          escalation_policy=provider_recovery.zohodesk.escalation_policy,
+          assignee=provider_recovery.zohodesk.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.zohodesk,
         ),
       ),
       servicedeskplus=replace(
@@ -17823,6 +18047,10 @@ class TradingApplication:
       return "zendesk"
     if normalized in {"zendesk_incidents", "operator_zendesk"}:
       return "zendesk"
+    if normalized in {"zohodesk_alerts", "zohodesk", "zoho_desk", "operator_zohodesk"}:
+      return "zohodesk"
+    if normalized in {"zohodesk_incidents", "operator_zohodesk"}:
+      return "zohodesk"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -18099,6 +18327,8 @@ class TradingApplication:
       return "happyfox"
     if "zendesk_incidents" in combined or "zendesk_alerts" in combined:
       return "zendesk"
+    if "zohodesk_incidents" in combined or "zohodesk_alerts" in combined:
+      return "zohodesk"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:
