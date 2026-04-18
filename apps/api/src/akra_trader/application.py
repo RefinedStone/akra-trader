@@ -126,6 +126,8 @@ from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryState
+from akra_trader.domain.models import OperatorIncidentFrontRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentFrontRecoveryState
 from akra_trader.domain.models import OperatorIncidentIntercomRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentIntercomRecoveryState
 from akra_trader.domain.models import OperatorIncidentKayakoRecoveryPhaseGraph
@@ -2047,6 +2049,17 @@ class TradingApplication:
             aligned_provider_recovery,
             intercom=replace(
               aligned_provider_recovery.intercom,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "front"
+          and provider_recovery.front.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            front=replace(
+              aligned_provider_recovery.front,
               alert_status="delivered",
             ),
           )
@@ -7745,6 +7758,108 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_front_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._normalize_freshdesk_alert_phase(status, existing_phase)
+
+  @staticmethod
+  def _resolve_front_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_ownership_phase(assignee, existing_phase)
+
+  @staticmethod
+  def _resolve_front_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_priority_phase(priority, existing_phase)
+
+  @staticmethod
+  def _resolve_front_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_escalation_phase(
+      escalation_policy,
+      existing_phase,
+    )
+
+  @staticmethod
+  def _resolve_front_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=workflow_state,
+    )
+
+  def _build_front_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentFrontRecoveryState,
+  ) -> OperatorIncidentFrontRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_front_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_front_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentFrontRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_front_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_front_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_front_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -12810,6 +12925,100 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "intercom"
+    front_schema = existing.front
+    front_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("front"),
+      payload.get("front"),
+      payload.get("front_alert"),
+      payload.get("front_conversation"),
+    )
+    if normalized_provider == "front" or front_payload:
+      front_status = self._first_non_empty_string(
+        front_payload.get("alert_status"),
+        front_payload.get("status"),
+        front_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.front.alert_status,
+      ) or "unknown"
+      front_schema = OperatorIncidentFrontRecoveryState(
+        alert_id=self._first_non_empty_string(
+          front_payload.get("alert_id"),
+          front_payload.get("id"),
+          front_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.front.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          front_payload.get("external_reference"),
+          front_payload.get("reference"),
+          reference,
+          existing.front.external_reference,
+        ),
+        alert_status=front_status,
+        priority=self._first_non_empty_string(
+          front_payload.get("priority"),
+          front_payload.get("severity"),
+          front_payload.get("urgency"),
+          existing.front.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          front_payload.get("escalation_policy"),
+          front_payload.get("escalationPolicy"),
+          front_payload.get("policy"),
+          front_payload.get("source"),
+          existing.front.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          front_payload.get("assignee"),
+          front_payload.get("owner"),
+          front_payload.get("assigned_to"),
+          existing.front.assignee,
+        ),
+        url=self._first_non_empty_string(
+          front_payload.get("url"),
+          front_payload.get("html_url"),
+          front_payload.get("link"),
+          existing.front.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(front_payload.get("updated_at"))
+          or existing.front.updated_at
+        ),
+        phase_graph=self._build_front_recovery_phase_graph(
+          payload=front_payload,
+          alert_status=front_status,
+          priority=self._first_non_empty_string(
+            front_payload.get("priority"),
+            front_payload.get("severity"),
+            front_payload.get("urgency"),
+            existing.front.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            front_payload.get("escalation_policy"),
+            front_payload.get("escalationPolicy"),
+            front_payload.get("policy"),
+            front_payload.get("source"),
+            existing.front.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            front_payload.get("assignee"),
+            front_payload.get("owner"),
+            front_payload.get("assigned_to"),
+            existing.front.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.front,
+        ),
+      )
+      provider_schema_kind = "front"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -13559,6 +13768,7 @@ class TradingApplication:
       helpscout=helpscout_schema,
       kayako=kayako_schema,
       intercom=intercom_schema,
+      front=front_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -14149,6 +14359,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.intercom,
+        ),
+      ),
+      front=replace(
+        provider_recovery.front,
+        phase_graph=self._build_front_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.front.alert_status,
+          priority=provider_recovery.front.priority,
+          escalation_policy=provider_recovery.front.escalation_policy,
+          assignee=provider_recovery.front.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.front,
         ),
       ),
       servicedeskplus=replace(
@@ -18735,6 +18959,10 @@ class TradingApplication:
       return "intercom"
     if normalized in {"intercom_incidents", "operator_intercom"}:
       return "intercom"
+    if normalized in {"front_alerts", "front", "operator_front"}:
+      return "front"
+    if normalized in {"front_incidents", "operator_front"}:
+      return "front"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -19019,6 +19247,8 @@ class TradingApplication:
       return "kayako"
     if "intercom_incidents" in combined or "intercom_alerts" in combined:
       return "intercom"
+    if "front_incidents" in combined or "front_alerts" in combined:
+      return "front"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:

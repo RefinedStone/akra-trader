@@ -309,6 +309,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       intercom_api_url: str,
       intercom_recovery_engine_url_template: str | None,
       intercom_recovery_engine_token: str | None,
+      front_api_token: str | None,
+      front_api_url: str,
+      front_recovery_engine_url_template: str | None,
+      front_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -571,6 +575,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         intercom_recovery_engine_url_template or ""
       )
       captured["intercom_recovery_engine_token"] = intercom_recovery_engine_token or ""
+      captured["front_api_token"] = front_api_token or ""
+      captured["front_api_url"] = front_api_url
+      captured["front_recovery_engine_url_template"] = (
+        front_recovery_engine_url_template or ""
+      )
+      captured["front_recovery_engine_token"] = front_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -897,6 +907,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://intercom.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_intercom_recovery_engine_token="intercom-recovery-token",
+      operator_alert_front_api_token="front-token",
+      operator_alert_front_api_url="https://api.front.example",
+      operator_alert_front_recovery_engine_url_template=(
+        "https://front.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_front_recovery_engine_token="front-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1128,6 +1144,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["intercom_api_url"] == "https://api.intercom.example"
   assert captured["intercom_recovery_engine_url_template"] == "https://intercom.example/recovery/{workflow_reference_urlencoded}"
   assert captured["intercom_recovery_engine_token"] == "intercom-recovery-token"
+  assert captured["front_api_token"] == "front-token"
+  assert captured["front_api_url"] == "https://api.front.example"
+  assert captured["front_recovery_engine_url_template"] == "https://front.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["front_recovery_engine_token"] == "front-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"

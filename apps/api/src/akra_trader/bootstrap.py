@@ -363,6 +363,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_intercom_recovery_engine_url_template
     ),
     intercom_recovery_engine_token=settings.operator_alert_intercom_recovery_engine_token,
+    front_api_token=settings.operator_alert_front_api_token,
+    front_api_url=settings.operator_alert_front_api_url,
+    front_recovery_engine_url_template=(
+      settings.operator_alert_front_recovery_engine_url_template
+    ),
+    front_recovery_engine_token=settings.operator_alert_front_recovery_engine_token,
     servicedeskplus_api_token=settings.operator_alert_servicedeskplus_api_token,
     servicedeskplus_api_url=settings.operator_alert_servicedeskplus_api_url,
     servicedeskplus_recovery_engine_url_template=(

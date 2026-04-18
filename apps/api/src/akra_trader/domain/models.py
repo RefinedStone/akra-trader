@@ -1576,6 +1576,31 @@ class OperatorIncidentIntercomRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentFrontRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentFrontRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentFrontRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentFrontRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentServiceDeskPlusRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1894,6 +1919,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   intercom: OperatorIncidentIntercomRecoveryState = field(
     default_factory=OperatorIncidentIntercomRecoveryState
+  )
+  front: OperatorIncidentFrontRecoveryState = field(
+    default_factory=OperatorIncidentFrontRecoveryState
   )
   servicedeskplus: OperatorIncidentServiceDeskPlusRecoveryState = field(
     default_factory=OperatorIncidentServiceDeskPlusRecoveryState
