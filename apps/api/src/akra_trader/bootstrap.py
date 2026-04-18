@@ -345,6 +345,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_zohodesk_recovery_engine_url_template
     ),
     zohodesk_recovery_engine_token=settings.operator_alert_zohodesk_recovery_engine_token,
+    helpscout_api_token=settings.operator_alert_helpscout_api_token,
+    helpscout_api_url=settings.operator_alert_helpscout_api_url,
+    helpscout_recovery_engine_url_template=(
+      settings.operator_alert_helpscout_recovery_engine_url_template
+    ),
+    helpscout_recovery_engine_token=settings.operator_alert_helpscout_recovery_engine_token,
     servicedeskplus_api_token=settings.operator_alert_servicedeskplus_api_token,
     servicedeskplus_api_url=settings.operator_alert_servicedeskplus_api_url,
     servicedeskplus_recovery_engine_url_template=(

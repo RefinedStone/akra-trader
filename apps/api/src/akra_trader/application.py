@@ -124,6 +124,8 @@ from akra_trader.domain.models import OperatorIncidentZendeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentZendeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryState
+from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryState
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryState
 from akra_trader.domain.models import OperatorIncidentSysAidRecoveryPhaseGraph
@@ -2008,6 +2010,17 @@ class TradingApplication:
             aligned_provider_recovery,
             zohodesk=replace(
               aligned_provider_recovery.zohodesk,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "helpscout"
+          and provider_recovery.helpscout.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            helpscout=replace(
+              aligned_provider_recovery.helpscout,
               alert_status="delivered",
             ),
           )
@@ -7400,6 +7413,108 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_helpscout_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._normalize_freshdesk_alert_phase(status, existing_phase)
+
+  @staticmethod
+  def _resolve_helpscout_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_ownership_phase(assignee, existing_phase)
+
+  @staticmethod
+  def _resolve_helpscout_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_priority_phase(priority, existing_phase)
+
+  @staticmethod
+  def _resolve_helpscout_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_escalation_phase(
+      escalation_policy,
+      existing_phase,
+    )
+
+  @staticmethod
+  def _resolve_helpscout_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=workflow_state,
+    )
+
+  def _build_helpscout_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentHelpScoutRecoveryState,
+  ) -> OperatorIncidentHelpScoutRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_helpscout_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_helpscout_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentHelpScoutRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_helpscout_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_helpscout_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_helpscout_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -12183,6 +12298,100 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "zohodesk"
+    helpscout_schema = existing.helpscout
+    helpscout_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("helpscout"),
+      payload.get("helpscout"),
+      payload.get("helpscout_alert"),
+      payload.get("helpscout_conversation"),
+    )
+    if normalized_provider == "helpscout" or helpscout_payload:
+      helpscout_status = self._first_non_empty_string(
+        helpscout_payload.get("alert_status"),
+        helpscout_payload.get("status"),
+        helpscout_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.helpscout.alert_status,
+      ) or "unknown"
+      helpscout_schema = OperatorIncidentHelpScoutRecoveryState(
+        alert_id=self._first_non_empty_string(
+          helpscout_payload.get("alert_id"),
+          helpscout_payload.get("id"),
+          helpscout_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.helpscout.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          helpscout_payload.get("external_reference"),
+          helpscout_payload.get("reference"),
+          reference,
+          existing.helpscout.external_reference,
+        ),
+        alert_status=helpscout_status,
+        priority=self._first_non_empty_string(
+          helpscout_payload.get("priority"),
+          helpscout_payload.get("severity"),
+          helpscout_payload.get("urgency"),
+          existing.helpscout.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          helpscout_payload.get("escalation_policy"),
+          helpscout_payload.get("escalationPolicy"),
+          helpscout_payload.get("policy"),
+          helpscout_payload.get("source"),
+          existing.helpscout.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          helpscout_payload.get("assignee"),
+          helpscout_payload.get("owner"),
+          helpscout_payload.get("assigned_to"),
+          existing.helpscout.assignee,
+        ),
+        url=self._first_non_empty_string(
+          helpscout_payload.get("url"),
+          helpscout_payload.get("html_url"),
+          helpscout_payload.get("link"),
+          existing.helpscout.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(helpscout_payload.get("updated_at"))
+          or existing.helpscout.updated_at
+        ),
+        phase_graph=self._build_helpscout_recovery_phase_graph(
+          payload=helpscout_payload,
+          alert_status=helpscout_status,
+          priority=self._first_non_empty_string(
+            helpscout_payload.get("priority"),
+            helpscout_payload.get("severity"),
+            helpscout_payload.get("urgency"),
+            existing.helpscout.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            helpscout_payload.get("escalation_policy"),
+            helpscout_payload.get("escalationPolicy"),
+            helpscout_payload.get("policy"),
+            helpscout_payload.get("source"),
+            existing.helpscout.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            helpscout_payload.get("assignee"),
+            helpscout_payload.get("owner"),
+            helpscout_payload.get("assigned_to"),
+            existing.helpscout.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.helpscout,
+        ),
+      )
+      provider_schema_kind = "helpscout"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -12929,6 +13138,7 @@ class TradingApplication:
       happyfox=happyfox_schema,
       zendesk=zendesk_schema,
       zohodesk=zohodesk_schema,
+      helpscout=helpscout_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -13477,6 +13687,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.zohodesk,
+        ),
+      ),
+      helpscout=replace(
+        provider_recovery.helpscout,
+        phase_graph=self._build_helpscout_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.helpscout.alert_status,
+          priority=provider_recovery.helpscout.priority,
+          escalation_policy=provider_recovery.helpscout.escalation_policy,
+          assignee=provider_recovery.helpscout.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.helpscout,
         ),
       ),
       servicedeskplus=replace(
@@ -18051,6 +18275,10 @@ class TradingApplication:
       return "zohodesk"
     if normalized in {"zohodesk_incidents", "operator_zohodesk"}:
       return "zohodesk"
+    if normalized in {"helpscout_alerts", "helpscout", "help_scout", "operator_helpscout"}:
+      return "helpscout"
+    if normalized in {"helpscout_incidents", "operator_helpscout"}:
+      return "helpscout"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -18329,6 +18557,8 @@ class TradingApplication:
       return "zendesk"
     if "zohodesk_incidents" in combined or "zohodesk_alerts" in combined:
       return "zohodesk"
+    if "helpscout_incidents" in combined or "helpscout_alerts" in combined:
+      return "helpscout"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:

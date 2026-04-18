@@ -1501,6 +1501,31 @@ class OperatorIncidentZohoDeskRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentHelpScoutRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentHelpScoutRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentHelpScoutRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentHelpScoutRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentServiceDeskPlusRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1810,6 +1835,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   zohodesk: OperatorIncidentZohoDeskRecoveryState = field(
     default_factory=OperatorIncidentZohoDeskRecoveryState
+  )
+  helpscout: OperatorIncidentHelpScoutRecoveryState = field(
+    default_factory=OperatorIncidentHelpScoutRecoveryState
   )
   servicedeskplus: OperatorIncidentServiceDeskPlusRecoveryState = field(
     default_factory=OperatorIncidentServiceDeskPlusRecoveryState

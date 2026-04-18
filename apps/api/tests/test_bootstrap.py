@@ -297,6 +297,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       zohodesk_api_url: str,
       zohodesk_recovery_engine_url_template: str | None,
       zohodesk_recovery_engine_token: str | None,
+      helpscout_api_token: str | None,
+      helpscout_api_url: str,
+      helpscout_recovery_engine_url_template: str | None,
+      helpscout_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -541,6 +545,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         zohodesk_recovery_engine_url_template or ""
       )
       captured["zohodesk_recovery_engine_token"] = zohodesk_recovery_engine_token or ""
+      captured["helpscout_api_token"] = helpscout_api_token or ""
+      captured["helpscout_api_url"] = helpscout_api_url
+      captured["helpscout_recovery_engine_url_template"] = (
+        helpscout_recovery_engine_url_template or ""
+      )
+      captured["helpscout_recovery_engine_token"] = helpscout_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -849,6 +859,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://zohodesk.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_zohodesk_recovery_engine_token="zohodesk-recovery-token",
+      operator_alert_helpscout_api_token="helpscout-token",
+      operator_alert_helpscout_api_url="https://api.helpscout.example/v2",
+      operator_alert_helpscout_recovery_engine_url_template=(
+        "https://helpscout.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_helpscout_recovery_engine_token="helpscout-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1068,6 +1084,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["zohodesk_api_url"] == "https://desk.zoho.example/api/v1"
   assert captured["zohodesk_recovery_engine_url_template"] == "https://zohodesk.example/recovery/{workflow_reference_urlencoded}"
   assert captured["zohodesk_recovery_engine_token"] == "zohodesk-recovery-token"
+  assert captured["helpscout_api_token"] == "helpscout-token"
+  assert captured["helpscout_api_url"] == "https://api.helpscout.example/v2"
+  assert captured["helpscout_recovery_engine_url_template"] == "https://helpscout.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["helpscout_recovery_engine_token"] == "helpscout-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
