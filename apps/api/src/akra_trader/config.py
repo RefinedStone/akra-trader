@@ -165,6 +165,10 @@ class Settings:
   operator_alert_crisescontrol_api_url: str = "https://api.crises-control.com/v1"
   operator_alert_crisescontrol_recovery_engine_url_template: str | None = None
   operator_alert_crisescontrol_recovery_engine_token: str | None = None
+  operator_alert_freshservice_api_token: str | None = None
+  operator_alert_freshservice_api_url: str = "https://api.freshservice.com/v2"
+  operator_alert_freshservice_recovery_engine_url_template: str | None = None
+  operator_alert_freshservice_recovery_engine_token: str | None = None
   operator_alert_opsramp_api_token: str | None = None
   operator_alert_opsramp_api_url: str = "https://api.opsramp.com/v1"
   operator_alert_opsramp_recovery_engine_url_template: str | None = None
@@ -658,6 +662,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_crisescontrol_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_CRISESCONTROL_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_freshservice_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_API_TOKEN") or None
+    ),
+    operator_alert_freshservice_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_API_URL",
+      "https://api.freshservice.com/v2",
+    ),
+    operator_alert_freshservice_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_freshservice_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_opsramp_api_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_OPSRAMP_API_TOKEN") or None
