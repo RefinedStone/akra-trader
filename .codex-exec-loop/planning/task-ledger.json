@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
-      "description": "Build on the now-broader provider-managed remediation set through Help Scout by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
+      "description": "Build on the now-broader provider-managed remediation set through Intercom by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 24,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and UI schema display now extend through Help Scout in commit c0b48cb on 2026-04-18, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, and UI schema display now extend through Intercom in commit f24801b on 2026-04-18, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T06:00:00Z",
+      "updated_at": "2026-04-18T06:45:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once authoritative engine endpoints, typed recovery schemas, workflow sync, phase graphs, and paging-provider inference are already generalized across the current provider set through Help Scout."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once authoritative engine endpoints, typed recovery schemas, workflow sync, phase graphs, and paging-provider inference are already generalized across the current provider set through Intercom."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1679,19 +1679,55 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-helpscout",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Help Scout",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, and Help Scout adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-six providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, and Help Scout adapters to Kayako, adding the `kayako_incidents` target, workflow sync, provider pull-sync, direct recovery-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans forty-seven providers.",
+      "status": "done",
       "base_priority": 80,
       "dynamic_priority_delta": 47,
-      "priority_reason": "The latest main-session reply explicitly lists continuing provider-managed remediation coverage beyond the current provider set as the first remaining item after commit c0b48cb on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "priority_reason": "Completed in main session commit 3a0a77d, which expanded provider-managed remediation coverage through Kayako across operator delivery, application wiring, workflow sync, provider pull-sync, direct recovery-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-zohodesk"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T06:00:00Z",
+      "updated_at": "2026-04-18T06:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Help Scout as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Help Scout to Kayako, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-kayako",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Kayako",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, Help Scout, and Kayako adapters to Intercom, adding the `intercom_incidents` target, workflow sync, provider pull-sync, direct recovery-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans forty-eight providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 48,
+      "priority_reason": "Completed in main session commit f24801b, which expanded provider-managed remediation coverage through Intercom across operator delivery, application wiring, workflow sync, provider pull-sync, direct recovery-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-helpscout"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T06:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Kayako to Intercom, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-intercom",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Intercom",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, Help Scout, Kayako, and Intercom adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-eight providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 49,
+      "priority_reason": "The latest main-session reply explicitly lists expanding provider-managed remediation coverage beyond Intercom as the first remaining item after commit f24801b on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-kayako"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T06:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Intercom as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
