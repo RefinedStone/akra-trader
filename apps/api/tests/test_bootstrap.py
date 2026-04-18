@@ -301,6 +301,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       topdesk_api_url: str,
       topdesk_recovery_engine_url_template: str | None,
       topdesk_recovery_engine_token: str | None,
+      invgateservicedesk_api_token: str | None,
+      invgateservicedesk_api_url: str,
+      invgateservicedesk_recovery_engine_url_template: str | None,
+      invgateservicedesk_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -523,6 +527,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["topdesk_api_url"] = topdesk_api_url
       captured["topdesk_recovery_engine_url_template"] = topdesk_recovery_engine_url_template or ""
       captured["topdesk_recovery_engine_token"] = topdesk_recovery_engine_token or ""
+      captured["invgateservicedesk_api_token"] = invgateservicedesk_api_token or ""
+      captured["invgateservicedesk_api_url"] = invgateservicedesk_api_url
+      captured["invgateservicedesk_recovery_engine_url_template"] = (
+        invgateservicedesk_recovery_engine_url_template or ""
+      )
+      captured["invgateservicedesk_recovery_engine_token"] = (
+        invgateservicedesk_recovery_engine_token or ""
+      )
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -805,6 +817,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://topdesk.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_topdesk_recovery_engine_token="topdesk-recovery-token",
+      operator_alert_invgateservicedesk_api_token="invgateservicedesk-token",
+      operator_alert_invgateservicedesk_api_url="https://api.invgateservicedesk.example",
+      operator_alert_invgateservicedesk_recovery_engine_url_template=(
+        "https://invgateservicedesk.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_invgateservicedesk_recovery_engine_token=(
+        "invgateservicedesk-recovery-token"
+      ),
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -994,6 +1014,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
     "https://topdesk.example/recovery/{workflow_reference_urlencoded}"
   )
   assert captured["topdesk_recovery_engine_token"] == "topdesk-recovery-token"
+  assert captured["invgateservicedesk_api_token"] == "invgateservicedesk-token"
+  assert captured["invgateservicedesk_api_url"] == "https://api.invgateservicedesk.example"
+  assert captured["invgateservicedesk_recovery_engine_url_template"] == (
+    "https://invgateservicedesk.example/recovery/{workflow_reference_urlencoded}"
+  )
+  assert captured["invgateservicedesk_recovery_engine_token"] == (
+    "invgateservicedesk-recovery-token"
+  )
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"

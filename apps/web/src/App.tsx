@@ -1096,6 +1096,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        invgateservicedesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1963,6 +1981,24 @@ type GuardedLiveStatus = {
           };
         };
         topdesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        invgateservicedesk: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10104,6 +10140,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  invgateservicedesk: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11295,6 +11349,43 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `TOPdesk schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "invgateservicedesk") {
+    const details = [
+      providerRecovery.invgateservicedesk.alert_id
+        ? `alert ${providerRecovery.invgateservicedesk.alert_id}`
+        : null,
+      providerRecovery.invgateservicedesk.alert_status !== "unknown"
+        ? `status ${providerRecovery.invgateservicedesk.alert_status}`
+        : null,
+      providerRecovery.invgateservicedesk.priority
+        ? `priority ${providerRecovery.invgateservicedesk.priority}`
+        : null,
+      providerRecovery.invgateservicedesk.escalation_policy
+        ? `policy ${providerRecovery.invgateservicedesk.escalation_policy}`
+        : null,
+      providerRecovery.invgateservicedesk.assignee
+        ? `assignee ${providerRecovery.invgateservicedesk.assignee}`
+        : null,
+      providerRecovery.invgateservicedesk.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.invgateservicedesk.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.invgateservicedesk.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.invgateservicedesk.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.invgateservicedesk.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.invgateservicedesk.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.invgateservicedesk.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.invgateservicedesk.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.invgateservicedesk.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(
+            providerRecovery.invgateservicedesk.phase_graph.last_transition_at
+          )}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `InvGate Service Desk schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [
