@@ -1024,6 +1024,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        sysaid: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1819,6 +1837,24 @@ type GuardedLiveStatus = {
           };
         };
         servicedeskplus: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        sysaid: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9888,6 +9924,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  sysaid: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -10955,6 +11009,35 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `ManageEngine ServiceDesk Plus schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "sysaid") {
+    const details = [
+      providerRecovery.sysaid.alert_id ? `alert ${providerRecovery.sysaid.alert_id}` : null,
+      providerRecovery.sysaid.alert_status !== "unknown"
+        ? `status ${providerRecovery.sysaid.alert_status}`
+        : null,
+      providerRecovery.sysaid.priority ? `priority ${providerRecovery.sysaid.priority}` : null,
+      providerRecovery.sysaid.escalation_policy
+        ? `policy ${providerRecovery.sysaid.escalation_policy}`
+        : null,
+      providerRecovery.sysaid.assignee ? `assignee ${providerRecovery.sysaid.assignee}` : null,
+      providerRecovery.sysaid.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.sysaid.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.sysaid.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.sysaid.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.sysaid.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.sysaid.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.sysaid.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.sysaid.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.sysaid.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.sysaid.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `SysAid schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

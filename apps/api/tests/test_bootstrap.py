@@ -285,6 +285,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
       servicedeskplus_recovery_engine_token: str | None,
+      sysaid_api_token: str | None,
+      sysaid_api_url: str,
+      sysaid_recovery_engine_url_template: str | None,
+      sysaid_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -487,6 +491,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         servicedeskplus_recovery_engine_url_template or ""
       )
       captured["servicedeskplus_recovery_engine_token"] = servicedeskplus_recovery_engine_token or ""
+      captured["sysaid_api_token"] = sysaid_api_token or ""
+      captured["sysaid_api_url"] = sysaid_api_url
+      captured["sysaid_recovery_engine_url_template"] = sysaid_recovery_engine_url_template or ""
+      captured["sysaid_recovery_engine_token"] = sysaid_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -743,6 +751,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_servicedeskplus_recovery_engine_token="servicedeskplus-recovery-token",
+      operator_alert_sysaid_api_token="sysaid-token",
+      operator_alert_sysaid_api_url="https://api.sysaid.example",
+      operator_alert_sysaid_recovery_engine_url_template=(
+        "https://sysaid.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_sysaid_recovery_engine_token="sysaid-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -910,6 +924,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
   assert captured["servicedeskplus_recovery_engine_token"] == "servicedeskplus-recovery-token"
+  assert captured["sysaid_api_token"] == "sysaid-token"
+  assert captured["sysaid_api_url"] == "https://api.sysaid.example"
+  assert captured["sysaid_recovery_engine_url_template"] == "https://sysaid.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["sysaid_recovery_engine_token"] == "sysaid-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
