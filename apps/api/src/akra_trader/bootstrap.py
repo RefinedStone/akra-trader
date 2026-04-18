@@ -327,6 +327,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_freshdesk_recovery_engine_url_template
     ),
     freshdesk_recovery_engine_token=settings.operator_alert_freshdesk_recovery_engine_token,
+    happyfox_api_token=settings.operator_alert_happyfox_api_token,
+    happyfox_api_url=settings.operator_alert_happyfox_api_url,
+    happyfox_recovery_engine_url_template=(
+      settings.operator_alert_happyfox_recovery_engine_url_template
+    ),
+    happyfox_recovery_engine_token=settings.operator_alert_happyfox_recovery_engine_token,
     servicedeskplus_api_token=settings.operator_alert_servicedeskplus_api_token,
     servicedeskplus_api_url=settings.operator_alert_servicedeskplus_api_url,
     servicedeskplus_recovery_engine_url_template=(

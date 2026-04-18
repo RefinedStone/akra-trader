@@ -1426,6 +1426,31 @@ class OperatorIncidentFreshdeskRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentHappyfoxRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentHappyfoxRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentHappyfoxRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentHappyfoxRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentServiceDeskPlusRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1726,6 +1751,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   freshdesk: OperatorIncidentFreshdeskRecoveryState = field(
     default_factory=OperatorIncidentFreshdeskRecoveryState
+  )
+  happyfox: OperatorIncidentHappyfoxRecoveryState = field(
+    default_factory=OperatorIncidentHappyfoxRecoveryState
   )
   servicedeskplus: OperatorIncidentServiceDeskPlusRecoveryState = field(
     default_factory=OperatorIncidentServiceDeskPlusRecoveryState

@@ -118,6 +118,8 @@ from akra_trader.domain.models import OperatorIncidentFreshserviceRecoveryPhaseG
 from akra_trader.domain.models import OperatorIncidentFreshserviceRecoveryState
 from akra_trader.domain.models import OperatorIncidentFreshdeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentFreshdeskRecoveryState
+from akra_trader.domain.models import OperatorIncidentHappyfoxRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentHappyfoxRecoveryState
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryState
 from akra_trader.domain.models import OperatorIncidentSysAidRecoveryPhaseGraph
@@ -1969,6 +1971,17 @@ class TradingApplication:
             aligned_provider_recovery,
             freshdesk=replace(
               aligned_provider_recovery.freshdesk,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "happyfox"
+          and provider_recovery.happyfox.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            happyfox=replace(
+              aligned_provider_recovery.happyfox,
               alert_status="delivered",
             ),
           )
@@ -7055,6 +7068,108 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_happyfox_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._normalize_freshdesk_alert_phase(status, existing_phase)
+
+  @staticmethod
+  def _resolve_happyfox_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_ownership_phase(assignee, existing_phase)
+
+  @staticmethod
+  def _resolve_happyfox_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_priority_phase(priority, existing_phase)
+
+  @staticmethod
+  def _resolve_happyfox_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_escalation_phase(
+      escalation_policy,
+      existing_phase,
+    )
+
+  @staticmethod
+  def _resolve_happyfox_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=workflow_state,
+    )
+
+  def _build_happyfox_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentHappyfoxRecoveryState,
+  ) -> OperatorIncidentHappyfoxRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_happyfox_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_happyfox_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentHappyfoxRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_happyfox_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_happyfox_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_happyfox_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -11556,6 +11671,100 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "freshdesk"
+    happyfox_schema = existing.happyfox
+    happyfox_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("happyfox"),
+      payload.get("happyfox"),
+      payload.get("happyfox_alert"),
+      payload.get("happyfox_ticket"),
+    )
+    if normalized_provider == "happyfox" or happyfox_payload:
+      happyfox_status = self._first_non_empty_string(
+        happyfox_payload.get("alert_status"),
+        happyfox_payload.get("status"),
+        happyfox_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.happyfox.alert_status,
+      ) or "unknown"
+      happyfox_schema = OperatorIncidentHappyfoxRecoveryState(
+        alert_id=self._first_non_empty_string(
+          happyfox_payload.get("alert_id"),
+          happyfox_payload.get("id"),
+          happyfox_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.happyfox.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          happyfox_payload.get("external_reference"),
+          happyfox_payload.get("reference"),
+          reference,
+          existing.happyfox.external_reference,
+        ),
+        alert_status=happyfox_status,
+        priority=self._first_non_empty_string(
+          happyfox_payload.get("priority"),
+          happyfox_payload.get("severity"),
+          happyfox_payload.get("urgency"),
+          existing.happyfox.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          happyfox_payload.get("escalation_policy"),
+          happyfox_payload.get("escalationPolicy"),
+          happyfox_payload.get("policy"),
+          happyfox_payload.get("source"),
+          existing.happyfox.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          happyfox_payload.get("assignee"),
+          happyfox_payload.get("owner"),
+          happyfox_payload.get("assigned_to"),
+          existing.happyfox.assignee,
+        ),
+        url=self._first_non_empty_string(
+          happyfox_payload.get("url"),
+          happyfox_payload.get("html_url"),
+          happyfox_payload.get("link"),
+          existing.happyfox.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(happyfox_payload.get("updated_at"))
+          or existing.happyfox.updated_at
+        ),
+        phase_graph=self._build_happyfox_recovery_phase_graph(
+          payload=happyfox_payload,
+          alert_status=happyfox_status,
+          priority=self._first_non_empty_string(
+            happyfox_payload.get("priority"),
+            happyfox_payload.get("severity"),
+            happyfox_payload.get("urgency"),
+            existing.happyfox.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            happyfox_payload.get("escalation_policy"),
+            happyfox_payload.get("escalationPolicy"),
+            happyfox_payload.get("policy"),
+            happyfox_payload.get("source"),
+            existing.happyfox.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            happyfox_payload.get("assignee"),
+            happyfox_payload.get("owner"),
+            happyfox_payload.get("assigned_to"),
+            existing.happyfox.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.happyfox,
+        ),
+      )
+      provider_schema_kind = "happyfox"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -12299,6 +12508,7 @@ class TradingApplication:
       crisescontrol=crisescontrol_schema,
       freshservice=freshservice_schema,
       freshdesk=freshdesk_schema,
+      happyfox=happyfox_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -12805,6 +13015,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.freshdesk,
+        ),
+      ),
+      happyfox=replace(
+        provider_recovery.happyfox,
+        phase_graph=self._build_happyfox_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.happyfox.alert_status,
+          priority=provider_recovery.happyfox.priority,
+          escalation_policy=provider_recovery.happyfox.escalation_policy,
+          assignee=provider_recovery.happyfox.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.happyfox,
         ),
       ),
       servicedeskplus=replace(
@@ -17367,6 +17591,10 @@ class TradingApplication:
       return "freshdesk"
     if normalized in {"freshdesk_incidents", "operator_freshdesk"}:
       return "freshdesk"
+    if normalized in {"happyfox_alerts", "happyfox", "operator_happyfox"}:
+      return "happyfox"
+    if normalized in {"happyfox_incidents", "operator_happyfox"}:
+      return "happyfox"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -17639,6 +17867,8 @@ class TradingApplication:
       return "freshservice"
     if "freshdesk_incidents" in combined or "freshdesk_alerts" in combined:
       return "freshdesk"
+    if "happyfox_incidents" in combined or "happyfox_alerts" in combined:
+      return "happyfox"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:

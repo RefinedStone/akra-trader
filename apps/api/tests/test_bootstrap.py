@@ -285,6 +285,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       freshdesk_api_url: str,
       freshdesk_recovery_engine_url_template: str | None,
       freshdesk_recovery_engine_token: str | None,
+      happyfox_api_token: str | None,
+      happyfox_api_url: str,
+      happyfox_recovery_engine_url_template: str | None,
+      happyfox_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -511,6 +515,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         freshdesk_recovery_engine_url_template or ""
       )
       captured["freshdesk_recovery_engine_token"] = freshdesk_recovery_engine_token or ""
+      captured["happyfox_api_token"] = happyfox_api_token or ""
+      captured["happyfox_api_url"] = happyfox_api_url
+      captured["happyfox_recovery_engine_url_template"] = (
+        happyfox_recovery_engine_url_template or ""
+      )
+      captured["happyfox_recovery_engine_token"] = happyfox_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -801,6 +811,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://freshdesk.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_freshdesk_recovery_engine_token="freshdesk-recovery-token",
+      operator_alert_happyfox_api_token="happyfox-token",
+      operator_alert_happyfox_api_url="https://api.happyfox.example",
+      operator_alert_happyfox_recovery_engine_url_template=(
+        "https://happyfox.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_happyfox_recovery_engine_token="happyfox-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1008,6 +1024,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["freshdesk_api_url"] == "https://api.freshdesk.example"
   assert captured["freshdesk_recovery_engine_url_template"] == "https://freshdesk.example/recovery/{workflow_reference_urlencoded}"
   assert captured["freshdesk_recovery_engine_token"] == "freshdesk-recovery-token"
+  assert captured["happyfox_api_token"] == "happyfox-token"
+  assert captured["happyfox_api_url"] == "https://api.happyfox.example"
+  assert captured["happyfox_recovery_engine_url_template"] == "https://happyfox.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["happyfox_recovery_engine_token"] == "happyfox-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
