@@ -1476,6 +1476,31 @@ class OperatorIncidentBmcHelixRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentSolarWindsServiceDeskRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentSolarWindsServiceDeskRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentOpsRampRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1632,6 +1657,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   bmchelix: OperatorIncidentBmcHelixRecoveryState = field(
     default_factory=OperatorIncidentBmcHelixRecoveryState
+  )
+  solarwindsservicedesk: OperatorIncidentSolarWindsServiceDeskRecoveryState = field(
+    default_factory=OperatorIncidentSolarWindsServiceDeskRecoveryState
   )
   opsramp: OperatorIncidentOpsRampRecoveryState = field(
     default_factory=OperatorIncidentOpsRampRecoveryState

@@ -1060,6 +1060,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        solarwindsservicedesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1891,6 +1909,24 @@ type GuardedLiveStatus = {
           };
         };
         bmchelix: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        solarwindsservicedesk: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9996,6 +10032,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  solarwindsservicedesk: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11121,6 +11175,43 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `BMC Helix schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "solarwindsservicedesk") {
+    const details = [
+      providerRecovery.solarwindsservicedesk.alert_id
+        ? `alert ${providerRecovery.solarwindsservicedesk.alert_id}`
+        : null,
+      providerRecovery.solarwindsservicedesk.alert_status !== "unknown"
+        ? `status ${providerRecovery.solarwindsservicedesk.alert_status}`
+        : null,
+      providerRecovery.solarwindsservicedesk.priority
+        ? `priority ${providerRecovery.solarwindsservicedesk.priority}`
+        : null,
+      providerRecovery.solarwindsservicedesk.escalation_policy
+        ? `policy ${providerRecovery.solarwindsservicedesk.escalation_policy}`
+        : null,
+      providerRecovery.solarwindsservicedesk.assignee
+        ? `assignee ${providerRecovery.solarwindsservicedesk.assignee}`
+        : null,
+      providerRecovery.solarwindsservicedesk.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.solarwindsservicedesk.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.solarwindsservicedesk.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.solarwindsservicedesk.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.solarwindsservicedesk.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.solarwindsservicedesk.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.solarwindsservicedesk.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.solarwindsservicedesk.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.solarwindsservicedesk.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(
+            providerRecovery.solarwindsservicedesk.phase_graph.last_transition_at
+          )}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `SolarWinds Service Desk schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

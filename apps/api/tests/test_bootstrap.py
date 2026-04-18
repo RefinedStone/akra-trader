@@ -293,6 +293,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       bmchelix_api_url: str,
       bmchelix_recovery_engine_url_template: str | None,
       bmchelix_recovery_engine_token: str | None,
+      solarwindsservicedesk_api_token: str | None,
+      solarwindsservicedesk_api_url: str,
+      solarwindsservicedesk_recovery_engine_url_template: str | None,
+      solarwindsservicedesk_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -503,6 +507,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       captured["bmchelix_api_url"] = bmchelix_api_url
       captured["bmchelix_recovery_engine_url_template"] = bmchelix_recovery_engine_url_template or ""
       captured["bmchelix_recovery_engine_token"] = bmchelix_recovery_engine_token or ""
+      captured["solarwindsservicedesk_api_token"] = solarwindsservicedesk_api_token or ""
+      captured["solarwindsservicedesk_api_url"] = solarwindsservicedesk_api_url
+      captured["solarwindsservicedesk_recovery_engine_url_template"] = (
+        solarwindsservicedesk_recovery_engine_url_template or ""
+      )
+      captured["solarwindsservicedesk_recovery_engine_token"] = (
+        solarwindsservicedesk_recovery_engine_token or ""
+      )
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -771,6 +783,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://bmchelix.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_bmchelix_recovery_engine_token="bmchelix-recovery-token",
+      operator_alert_solarwindsservicedesk_api_token="solarwindsservicedesk-token",
+      operator_alert_solarwindsservicedesk_api_url="https://api.solarwindsservicedesk.example",
+      operator_alert_solarwindsservicedesk_recovery_engine_url_template=(
+        "https://solarwindsservicedesk.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_solarwindsservicedesk_recovery_engine_token=(
+        "solarwindsservicedesk-recovery-token"
+      ),
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -946,6 +966,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["bmchelix_api_url"] == "https://api.bmchelix.example"
   assert captured["bmchelix_recovery_engine_url_template"] == "https://bmchelix.example/recovery/{workflow_reference_urlencoded}"
   assert captured["bmchelix_recovery_engine_token"] == "bmchelix-recovery-token"
+  assert captured["solarwindsservicedesk_api_token"] == "solarwindsservicedesk-token"
+  assert captured["solarwindsservicedesk_api_url"] == "https://api.solarwindsservicedesk.example"
+  assert captured["solarwindsservicedesk_recovery_engine_url_template"] == (
+    "https://solarwindsservicedesk.example/recovery/{workflow_reference_urlencoded}"
+  )
+  assert captured["solarwindsservicedesk_recovery_engine_token"] == (
+    "solarwindsservicedesk-recovery-token"
+  )
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
