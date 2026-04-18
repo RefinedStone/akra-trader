@@ -261,6 +261,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       haloitsm_api_url: str,
       haloitsm_recovery_engine_url_template: str | None,
       haloitsm_recovery_engine_token: str | None,
+      incidentmanagerio_api_token: str | None,
+      incidentmanagerio_api_url: str,
+      incidentmanagerio_recovery_engine_url_template: str | None,
+      incidentmanagerio_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -425,6 +429,14 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         haloitsm_recovery_engine_url_template or ""
       )
       captured["haloitsm_recovery_engine_token"] = haloitsm_recovery_engine_token or ""
+      captured["incidentmanagerio_api_token"] = incidentmanagerio_api_token or ""
+      captured["incidentmanagerio_api_url"] = incidentmanagerio_api_url
+      captured["incidentmanagerio_recovery_engine_url_template"] = (
+        incidentmanagerio_recovery_engine_url_template or ""
+      )
+      captured["incidentmanagerio_recovery_engine_token"] = (
+        incidentmanagerio_recovery_engine_token or ""
+      )
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -645,6 +657,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://haloitsm.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_haloitsm_recovery_engine_token="haloitsm-recovery-token",
+      operator_alert_incidentmanagerio_api_token="incidentmanagerio-token",
+      operator_alert_incidentmanagerio_api_url="https://api.incidentmanagerio.example",
+      operator_alert_incidentmanagerio_recovery_engine_url_template=(
+        "https://incidentmanagerio.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_incidentmanagerio_recovery_engine_token="incidentmanagerio-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -788,6 +806,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["haloitsm_api_url"] == "https://api.haloitsm.example"
   assert captured["haloitsm_recovery_engine_url_template"] == "https://haloitsm.example/recovery/{workflow_reference_urlencoded}"
   assert captured["haloitsm_recovery_engine_token"] == "haloitsm-recovery-token"
+  assert captured["incidentmanagerio_api_token"] == "incidentmanagerio-token"
+  assert captured["incidentmanagerio_api_url"] == "https://api.incidentmanagerio.example"
+  assert captured["incidentmanagerio_recovery_engine_url_template"] == "https://incidentmanagerio.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["incidentmanagerio_recovery_engine_token"] == "incidentmanagerio-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
