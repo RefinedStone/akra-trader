@@ -289,6 +289,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       happyfox_api_url: str,
       happyfox_recovery_engine_url_template: str | None,
       happyfox_recovery_engine_token: str | None,
+      zendesk_api_token: str | None,
+      zendesk_api_url: str,
+      zendesk_recovery_engine_url_template: str | None,
+      zendesk_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -521,6 +525,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         happyfox_recovery_engine_url_template or ""
       )
       captured["happyfox_recovery_engine_token"] = happyfox_recovery_engine_token or ""
+      captured["zendesk_api_token"] = zendesk_api_token or ""
+      captured["zendesk_api_url"] = zendesk_api_url
+      captured["zendesk_recovery_engine_url_template"] = (
+        zendesk_recovery_engine_url_template or ""
+      )
+      captured["zendesk_recovery_engine_token"] = zendesk_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -817,6 +827,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://happyfox.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_happyfox_recovery_engine_token="happyfox-recovery-token",
+      operator_alert_zendesk_api_token="zendesk-token",
+      operator_alert_zendesk_api_url="https://api.zendesk.example/api/v2",
+      operator_alert_zendesk_recovery_engine_url_template=(
+        "https://zendesk.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_zendesk_recovery_engine_token="zendesk-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1028,6 +1044,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["happyfox_api_url"] == "https://api.happyfox.example"
   assert captured["happyfox_recovery_engine_url_template"] == "https://happyfox.example/recovery/{workflow_reference_urlencoded}"
   assert captured["happyfox_recovery_engine_token"] == "happyfox-recovery-token"
+  assert captured["zendesk_api_token"] == "zendesk-token"
+  assert captured["zendesk_api_url"] == "https://api.zendesk.example/api/v2"
+  assert captured["zendesk_recovery_engine_url_template"] == "https://zendesk.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["zendesk_recovery_engine_token"] == "zendesk-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
