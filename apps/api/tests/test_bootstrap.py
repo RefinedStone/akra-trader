@@ -301,6 +301,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       helpscout_api_url: str,
       helpscout_recovery_engine_url_template: str | None,
       helpscout_recovery_engine_token: str | None,
+      kayako_api_token: str | None,
+      kayako_api_url: str,
+      kayako_recovery_engine_url_template: str | None,
+      kayako_recovery_engine_token: str | None,
       servicedeskplus_api_token: str | None,
       servicedeskplus_api_url: str,
       servicedeskplus_recovery_engine_url_template: str | None,
@@ -551,6 +555,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         helpscout_recovery_engine_url_template or ""
       )
       captured["helpscout_recovery_engine_token"] = helpscout_recovery_engine_token or ""
+      captured["kayako_api_token"] = kayako_api_token or ""
+      captured["kayako_api_url"] = kayako_api_url
+      captured["kayako_recovery_engine_url_template"] = (
+        kayako_recovery_engine_url_template or ""
+      )
+      captured["kayako_recovery_engine_token"] = kayako_recovery_engine_token or ""
       captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
       captured["servicedeskplus_api_url"] = servicedeskplus_api_url
       captured["servicedeskplus_recovery_engine_url_template"] = (
@@ -865,6 +875,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://helpscout.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_helpscout_recovery_engine_token="helpscout-recovery-token",
+      operator_alert_kayako_api_token="kayako-token",
+      operator_alert_kayako_api_url="https://api.kayako.example/v1",
+      operator_alert_kayako_recovery_engine_url_template=(
+        "https://kayako.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_kayako_recovery_engine_token="kayako-recovery-token",
       operator_alert_servicedeskplus_api_token="servicedeskplus-token",
       operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
       operator_alert_servicedeskplus_recovery_engine_url_template=(
@@ -1088,6 +1104,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["helpscout_api_url"] == "https://api.helpscout.example/v2"
   assert captured["helpscout_recovery_engine_url_template"] == "https://helpscout.example/recovery/{workflow_reference_urlencoded}"
   assert captured["helpscout_recovery_engine_token"] == "helpscout-recovery-token"
+  assert captured["kayako_api_token"] == "kayako-token"
+  assert captured["kayako_api_url"] == "https://api.kayako.example/v1"
+  assert captured["kayako_recovery_engine_url_template"] == "https://kayako.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["kayako_recovery_engine_token"] == "kayako-recovery-token"
   assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
   assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
   assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"

@@ -1096,6 +1096,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        kayako: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         servicedeskplus: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -2071,6 +2089,24 @@ type GuardedLiveStatus = {
           };
         };
         helpscout: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        kayako: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10320,6 +10356,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  kayako: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   servicedeskplus: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11635,6 +11689,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Help Scout schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "kayako") {
+    const details = [
+      providerRecovery.kayako.alert_id
+        ? `case ${providerRecovery.kayako.alert_id}`
+        : null,
+      providerRecovery.kayako.alert_status !== "unknown"
+        ? `status ${providerRecovery.kayako.alert_status}`
+        : null,
+      providerRecovery.kayako.priority
+        ? `priority ${providerRecovery.kayako.priority}`
+        : null,
+      providerRecovery.kayako.escalation_policy
+        ? `policy ${providerRecovery.kayako.escalation_policy}`
+        : null,
+      providerRecovery.kayako.assignee
+        ? `assignee ${providerRecovery.kayako.assignee}`
+        : null,
+      providerRecovery.kayako.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.kayako.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.kayako.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.kayako.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.kayako.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.kayako.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.kayako.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.kayako.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.kayako.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.kayako.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Kayako schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "servicedeskplus") {
     const details = [

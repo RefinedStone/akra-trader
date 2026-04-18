@@ -1526,6 +1526,31 @@ class OperatorIncidentHelpScoutRecoveryPhaseGraph:
 
 
 @dataclass(frozen=True)
+class OperatorIncidentKayakoRecoveryState:
+  alert_id: str | None = None
+  external_reference: str | None = None
+  alert_status: str = "unknown"
+  priority: str | None = None
+  escalation_policy: str | None = None
+  assignee: str | None = None
+  url: str | None = None
+  updated_at: datetime | None = None
+  phase_graph: "OperatorIncidentKayakoRecoveryPhaseGraph" = field(
+    default_factory=lambda: OperatorIncidentKayakoRecoveryPhaseGraph()
+  )
+
+
+@dataclass(frozen=True)
+class OperatorIncidentKayakoRecoveryPhaseGraph:
+  alert_phase: str = "unknown"
+  workflow_phase: str = "unknown"
+  ownership_phase: str = "unknown"
+  priority_phase: str = "unknown"
+  escalation_phase: str = "unknown"
+  last_transition_at: datetime | None = None
+
+
+@dataclass(frozen=True)
 class OperatorIncidentServiceDeskPlusRecoveryState:
   alert_id: str | None = None
   external_reference: str | None = None
@@ -1838,6 +1863,9 @@ class OperatorIncidentProviderRecoveryState:
   )
   helpscout: OperatorIncidentHelpScoutRecoveryState = field(
     default_factory=OperatorIncidentHelpScoutRecoveryState
+  )
+  kayako: OperatorIncidentKayakoRecoveryState = field(
+    default_factory=OperatorIncidentKayakoRecoveryState
   )
   servicedeskplus: OperatorIncidentServiceDeskPlusRecoveryState = field(
     default_factory=OperatorIncidentServiceDeskPlusRecoveryState

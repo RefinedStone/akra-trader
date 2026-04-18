@@ -10315,6 +10315,288 @@ def test_operator_alert_delivery_adapter_pulls_helpscout_provider_state() -> Non
   assert requests[1][2]["Authorization"] == "Bearer helpscout-recovery-token"
 
 
+def test_operator_alert_delivery_adapter_supports_kayako_target_and_resolution() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("kayako",),
+    kayako_api_token="kayako-token",
+    kayako_api_url="https://api.kayako.example/v1",
+    webhook_timeout_seconds=9,
+    urlopen=fake_urlopen,
+  )
+  opened = OperatorIncidentEvent(
+    event_id="incident-opened-kayako-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 18, 31, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live market-data freshness degraded.",
+    detail="market-data freshness degraded",
+  )
+  resolved = OperatorIncidentEvent(
+    event_id="incident-resolved-kayako-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 18, 33, tzinfo=UTC),
+    kind="incident_resolved",
+    severity="warning",
+    summary="Resolved: Guarded-live market-data freshness degraded.",
+    detail="market-data freshness recovered",
+    external_reference="guarded-live:market-data:5m",
+  )
+
+  opened_records = adapter.deliver(incident=opened)
+  resolved_records = adapter.deliver(incident=resolved)
+
+  assert adapter.list_targets() == ("kayako_incidents",)
+  assert opened_records[0].target == "kayako_incidents"
+  assert opened_records[0].external_provider == "kayako"
+  assert resolved_records[0].external_reference == "guarded-live:market-data:5m"
+
+  create_request = requests[0]
+  resolve_request = requests[1]
+  assert create_request[0] == "https://api.kayako.example/v1/cases"
+  assert create_request[1] == "POST"
+  assert create_request[3]["Authorization"] == "Bearer kayako-token"
+  create_payload = json.loads(create_request[2].decode("utf-8"))
+  assert create_payload["case"]["external_reference"] == "guarded-live:market-data:5m"
+  assert create_payload["case"]["priority"] == "high"
+  assert create_payload["case"]["status"] == "pending"
+
+  assert resolve_request[0].endswith(
+    "/cases/guarded-live%3Amarket-data%3A5m/resolve?identifier_type=external_reference"
+  )
+  assert resolve_request[1] == "PUT"
+  resolve_payload = json.loads(resolve_request[2].decode("utf-8"))
+  assert resolve_payload["note"] == "market-data freshness recovered"
+
+
+def test_operator_alert_delivery_adapter_syncs_kayako_workflow_actions() -> None:
+  requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, request.data, dict(request.headers), timeout))
+    return FakeResponse(202)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("kayako",),
+    kayako_api_token="kayako-token",
+    kayako_api_url="https://api.kayako.example/v1",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-kayako-2",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 18, 39, tzinfo=UTC),
+    kind="incident_opened",
+    severity="critical",
+    summary="Guarded-live market-data freshness degraded.",
+    detail="market-data freshness degraded",
+    external_provider="kayako",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="KY-123",
+    escalation_level=2,
+    remediation=OperatorIncidentRemediation(
+      state="suggested",
+      kind="recent_sync",
+      runbook="market_data.sync_recent",
+      summary="Refresh the live timeframe sync window.",
+      provider="kayako",
+      provider_recovery=OperatorIncidentProviderRecoveryState(
+        provider="kayako",
+        job_id="kayako-job-existing",
+      ),
+    ),
+  )
+
+  acknowledge = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="kayako",
+    action="acknowledge",
+    actor="operator",
+    detail="operator acknowledged",
+    payload=None,
+  )
+  escalate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="kayako",
+    action="escalate",
+    actor="operator",
+    detail="operator escalated",
+    payload=None,
+  )
+  resolve = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="kayako",
+    action="resolve",
+    actor="operator",
+    detail="recovered",
+    payload={"job_id": "kayako-job-1", "verification": {"state": "passed"}},
+  )
+  remediate = adapter.sync_incident_workflow(
+    incident=incident,
+    provider="kayako",
+    action="remediate",
+    actor="operator",
+    detail="requested remediation",
+    payload={"job_id": "kayako-job-2", "channels": ["kline", "depth"]},
+  )
+
+  assert adapter.list_supported_workflow_providers() == ("kayako",)
+  assert acknowledge[0].target == "kayako_workflow"
+  assert escalate[0].target == "kayako_workflow"
+  assert resolve[0].target == "kayako_workflow"
+  assert remediate[0].target == "kayako_workflow"
+
+  assert requests[0][0] == "https://api.kayako.example/v1/cases/KY-123/acknowledge?identifier_type=id"
+  assert requests[1][0] == "https://api.kayako.example/v1/cases/KY-123/escalate?identifier_type=id"
+  assert requests[2][0] == "https://api.kayako.example/v1/cases/KY-123/resolve?identifier_type=id"
+  assert requests[3][0] == "https://api.kayako.example/v1/cases/KY-123/remediate?identifier_type=id"
+  assert requests[0][3]["Authorization"] == "Bearer kayako-token"
+  escalate_payload = json.loads(requests[1][2].decode("utf-8"))
+  resolve_payload = json.loads(requests[2][2].decode("utf-8"))
+  remediate_payload = json.loads(requests[3][2].decode("utf-8"))
+  assert "level 2" in escalate_payload["note"]
+  assert '"job_id": "kayako-job-1"' in resolve_payload["note"]
+  assert "requested remediation" in remediate_payload["note"]
+  assert "market_data.sync_recent" in remediate_payload["note"]
+  assert '"job_id": "kayako-job-2"' in remediate_payload["note"]
+
+
+def test_operator_alert_delivery_adapter_pulls_kayako_provider_state() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    if request.full_url == "https://api.kayako.example/v1/cases/KY-123?identifier_type=id":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "result": {
+              "alert_id": "KY-123",
+              "external_reference": "guarded-live:market-data:5m",
+              "alert_status": "acknowledged",
+              "summary": "Guarded-live market-data incident",
+              "updated_at": "2025-01-03T18:42:00Z",
+              "priority": "high",
+              "escalation_policy": "market-data-primary",
+              "assignee": "market-data-oncall",
+              "url": "https://api.kayako.example/cases/KY-123",
+              "metadata": {
+                "remediation_state": "recovering",
+                "remediation_provider_payload": {
+                  "job_id": "kayako-job-9",
+                  "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+                  "verification": {"state": "pending"},
+                },
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovering",
+                  "job_id": "kayako-job-9",
+                  "channels": ["depth", "kline"],
+                  "symbols": ["ETH/USDT"],
+                  "timeframe": "5m",
+                  "status_machine_state": "provider_running",
+                  "status_machine_workflow_state": "acknowledged",
+                  "status_machine_job_state": "running",
+                },
+                "remediation_provider_telemetry": {
+                  "source": "provider_payload",
+                  "state": "running",
+                  "progress_percent": 68,
+                  "attempt_count": 1,
+                  "current_step": "case_body",
+                  "last_message": "case telemetry is lagging",
+                  "external_run_id": "kayako-body-9",
+                },
+                "remediation_provider_telemetry_url": "https://kayako-engine.example/recovery/kayako-job-9",
+              },
+            }
+          }
+        ).encode("utf-8"),
+      )
+    if request.full_url == "https://kayako-engine.example/recovery/kayako-job-9":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "job": {
+              "state": "running",
+              "progress_percent": 95,
+              "attempt_count": 2,
+              "current_step": "verify_restored_channels",
+              "last_message": "Kayako engine is verifying restored channels",
+              "external_run_id": "kayako-engine-9",
+              "updated_at": "2025-01-03T18:43:00Z",
+            }
+          }
+        ).encode("utf-8"),
+      )
+    return FakeResponse(404)
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("kayako",),
+    kayako_api_token="kayako-token",
+    kayako_api_url="https://api.kayako.example/v1",
+    kayako_recovery_engine_url_template=(
+      "https://kayako-engine.example/recovery/{workflow_reference_urlencoded}"
+    ),
+    kayako_recovery_engine_token="kayako-recovery-token",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-kayako-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 18, 41, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="kayako",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="KY-123",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="kayako",
+  )
+
+  assert snapshot is not None
+  assert snapshot.provider == "kayako"
+  assert snapshot.workflow_reference == "KY-123"
+  assert snapshot.external_reference == "guarded-live:market-data:5m"
+  assert snapshot.workflow_state == "acknowledged"
+  assert snapshot.remediation_state == "recovering"
+  assert snapshot.payload["job_id"] == "kayako-job-9"
+  assert snapshot.payload["targets"]["symbols"] == ["ETH/USDT"]
+  assert snapshot.payload["status_machine"]["sync_state"] == "provider_authoritative"
+  assert snapshot.payload["provider_schema"]["kind"] == "kayako"
+  assert snapshot.payload["provider_schema"]["kayako"]["alert_id"] == "KY-123"
+  assert snapshot.payload["provider_schema"]["kayako"]["alert_status"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["kayako"]["phase_graph"]["alert_phase"] == "acknowledged"
+  assert snapshot.payload["provider_schema"]["kayako"]["phase_graph"]["workflow_phase"] == "provider_recovering"
+  assert snapshot.payload["provider_schema"]["kayako"]["phase_graph"]["ownership_phase"] == "assigned"
+  assert snapshot.payload["provider_schema"]["kayako"]["phase_graph"]["escalation_phase"] == "configured"
+  assert snapshot.payload["telemetry"]["source"] == "provider_engine"
+  assert snapshot.payload["telemetry"]["state"] == "running"
+  assert snapshot.payload["telemetry"]["progress_percent"] == 95
+  assert snapshot.payload["telemetry"]["attempt_count"] == 2
+  assert snapshot.payload["telemetry"]["current_step"] == "verify_restored_channels"
+  assert snapshot.payload["telemetry"]["last_message"] == "Kayako engine is verifying restored channels"
+  assert snapshot.payload["telemetry"]["external_run_id"] == "kayako-engine-9"
+  assert requests[0][0] == "https://api.kayako.example/v1/cases/KY-123?identifier_type=id"
+  assert requests[0][1] == "GET"
+  assert requests[0][2]["Authorization"] == "Bearer kayako-token"
+  assert requests[1][0] == "https://kayako-engine.example/recovery/kayako-job-9"
+  assert requests[1][1] == "GET"
+  assert requests[1][2]["Authorization"] == "Bearer kayako-recovery-token"
+
+
 def test_operator_alert_delivery_adapter_supports_servicedeskplus_target_and_resolution() -> None:
   requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
 

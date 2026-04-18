@@ -126,6 +126,8 @@ from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentZohoDeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentHelpScoutRecoveryState
+from akra_trader.domain.models import OperatorIncidentKayakoRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentKayakoRecoveryState
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryState
 from akra_trader.domain.models import OperatorIncidentSysAidRecoveryPhaseGraph
@@ -2021,6 +2023,17 @@ class TradingApplication:
             aligned_provider_recovery,
             helpscout=replace(
               aligned_provider_recovery.helpscout,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "kayako"
+          and provider_recovery.kayako.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            kayako=replace(
+              aligned_provider_recovery.kayako,
               alert_status="delivered",
             ),
           )
@@ -7515,6 +7528,108 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_kayako_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._normalize_freshdesk_alert_phase(status, existing_phase)
+
+  @staticmethod
+  def _resolve_kayako_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_ownership_phase(assignee, existing_phase)
+
+  @staticmethod
+  def _resolve_kayako_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_priority_phase(priority, existing_phase)
+
+  @staticmethod
+  def _resolve_kayako_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_escalation_phase(
+      escalation_policy,
+      existing_phase,
+    )
+
+  @staticmethod
+  def _resolve_kayako_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    return TradingApplication._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=workflow_state,
+    )
+
+  def _build_kayako_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentKayakoRecoveryState,
+  ) -> OperatorIncidentKayakoRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_kayako_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_kayako_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentKayakoRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_kayako_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_kayako_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_kayako_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -12392,6 +12507,100 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "helpscout"
+    kayako_schema = existing.kayako
+    kayako_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("kayako"),
+      payload.get("kayako"),
+      payload.get("kayako_alert"),
+      payload.get("kayako_case"),
+    )
+    if normalized_provider == "kayako" or kayako_payload:
+      kayako_status = self._first_non_empty_string(
+        kayako_payload.get("alert_status"),
+        kayako_payload.get("status"),
+        kayako_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.kayako.alert_status,
+      ) or "unknown"
+      kayako_schema = OperatorIncidentKayakoRecoveryState(
+        alert_id=self._first_non_empty_string(
+          kayako_payload.get("alert_id"),
+          kayako_payload.get("id"),
+          kayako_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.kayako.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          kayako_payload.get("external_reference"),
+          kayako_payload.get("reference"),
+          reference,
+          existing.kayako.external_reference,
+        ),
+        alert_status=kayako_status,
+        priority=self._first_non_empty_string(
+          kayako_payload.get("priority"),
+          kayako_payload.get("severity"),
+          kayako_payload.get("urgency"),
+          existing.kayako.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          kayako_payload.get("escalation_policy"),
+          kayako_payload.get("escalationPolicy"),
+          kayako_payload.get("policy"),
+          kayako_payload.get("source"),
+          existing.kayako.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          kayako_payload.get("assignee"),
+          kayako_payload.get("owner"),
+          kayako_payload.get("assigned_to"),
+          existing.kayako.assignee,
+        ),
+        url=self._first_non_empty_string(
+          kayako_payload.get("url"),
+          kayako_payload.get("html_url"),
+          kayako_payload.get("link"),
+          existing.kayako.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(kayako_payload.get("updated_at"))
+          or existing.kayako.updated_at
+        ),
+        phase_graph=self._build_kayako_recovery_phase_graph(
+          payload=kayako_payload,
+          alert_status=kayako_status,
+          priority=self._first_non_empty_string(
+            kayako_payload.get("priority"),
+            kayako_payload.get("severity"),
+            kayako_payload.get("urgency"),
+            existing.kayako.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            kayako_payload.get("escalation_policy"),
+            kayako_payload.get("escalationPolicy"),
+            kayako_payload.get("policy"),
+            kayako_payload.get("source"),
+            existing.kayako.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            kayako_payload.get("assignee"),
+            kayako_payload.get("owner"),
+            kayako_payload.get("assigned_to"),
+            existing.kayako.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.kayako,
+        ),
+      )
+      provider_schema_kind = "kayako"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -13139,6 +13348,7 @@ class TradingApplication:
       zendesk=zendesk_schema,
       zohodesk=zohodesk_schema,
       helpscout=helpscout_schema,
+      kayako=kayako_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -13701,6 +13911,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.helpscout,
+        ),
+      ),
+      kayako=replace(
+        provider_recovery.kayako,
+        phase_graph=self._build_kayako_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.kayako.alert_status,
+          priority=provider_recovery.kayako.priority,
+          escalation_policy=provider_recovery.kayako.escalation_policy,
+          assignee=provider_recovery.kayako.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.kayako,
         ),
       ),
       servicedeskplus=replace(
@@ -18279,6 +18503,10 @@ class TradingApplication:
       return "helpscout"
     if normalized in {"helpscout_incidents", "operator_helpscout"}:
       return "helpscout"
+    if normalized in {"kayako_alerts", "kayako", "operator_kayako"}:
+      return "kayako"
+    if normalized in {"kayako_incidents", "operator_kayako"}:
+      return "kayako"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -18559,6 +18787,8 @@ class TradingApplication:
       return "zohodesk"
     if "helpscout_incidents" in combined or "helpscout_alerts" in combined:
       return "helpscout"
+    if "kayako_incidents" in combined or "kayako_alerts" in combined:
+      return "kayako"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:
