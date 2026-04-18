@@ -309,6 +309,12 @@ def build_operator_alert_delivery_adapter(settings: Settings) -> OperatorAlertDe
       settings.operator_alert_squzy_recovery_engine_url_template
     ),
     squzy_recovery_engine_token=settings.operator_alert_squzy_recovery_engine_token,
+    crisescontrol_api_token=settings.operator_alert_crisescontrol_api_token,
+    crisescontrol_api_url=settings.operator_alert_crisescontrol_api_url,
+    crisescontrol_recovery_engine_url_template=(
+      settings.operator_alert_crisescontrol_recovery_engine_url_template
+    ),
+    crisescontrol_recovery_engine_token=settings.operator_alert_crisescontrol_recovery_engine_token,
     opsramp_api_token=settings.operator_alert_opsramp_api_token,
     opsramp_api_url=settings.operator_alert_opsramp_api_url,
     opsramp_recovery_engine_url_template=(

@@ -970,6 +970,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        crisescontrol: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         opsramp: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1711,6 +1729,24 @@ type GuardedLiveStatus = {
           };
         };
         squzy: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        crisescontrol: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -9726,6 +9762,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  crisescontrol: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   opsramp: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -10688,6 +10742,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Squzy schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "crisescontrol") {
+    const details = [
+      providerRecovery.crisescontrol.alert_id
+        ? `alert ${providerRecovery.crisescontrol.alert_id}`
+        : null,
+      providerRecovery.crisescontrol.alert_status !== "unknown"
+        ? `status ${providerRecovery.crisescontrol.alert_status}`
+        : null,
+      providerRecovery.crisescontrol.priority
+        ? `priority ${providerRecovery.crisescontrol.priority}`
+        : null,
+      providerRecovery.crisescontrol.escalation_policy
+        ? `policy ${providerRecovery.crisescontrol.escalation_policy}`
+        : null,
+      providerRecovery.crisescontrol.assignee
+        ? `assignee ${providerRecovery.crisescontrol.assignee}`
+        : null,
+      providerRecovery.crisescontrol.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.crisescontrol.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.crisescontrol.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.crisescontrol.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.crisescontrol.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.crisescontrol.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.crisescontrol.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.crisescontrol.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.crisescontrol.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.crisescontrol.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Crises Control schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "opsramp") {
     const details = [

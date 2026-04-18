@@ -273,6 +273,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       squzy_api_url: str,
       squzy_recovery_engine_url_template: str | None,
       squzy_recovery_engine_token: str | None,
+      crisescontrol_api_token: str | None,
+      crisescontrol_api_url: str,
+      crisescontrol_recovery_engine_url_template: str | None,
+      crisescontrol_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -457,6 +461,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         squzy_recovery_engine_url_template or ""
       )
       captured["squzy_recovery_engine_token"] = squzy_recovery_engine_token or ""
+      captured["crisescontrol_api_token"] = crisescontrol_api_token or ""
+      captured["crisescontrol_api_url"] = crisescontrol_api_url
+      captured["crisescontrol_recovery_engine_url_template"] = (
+        crisescontrol_recovery_engine_url_template or ""
+      )
+      captured["crisescontrol_recovery_engine_token"] = crisescontrol_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -695,6 +705,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://squzy.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_squzy_recovery_engine_token="squzy-recovery-token",
+      operator_alert_crisescontrol_api_token="crisescontrol-token",
+      operator_alert_crisescontrol_api_url="https://api.crisescontrol.example",
+      operator_alert_crisescontrol_recovery_engine_url_template=(
+        "https://crisescontrol.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_crisescontrol_recovery_engine_token="crisescontrol-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -850,6 +866,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["squzy_api_url"] == "https://api.squzy.example"
   assert captured["squzy_recovery_engine_url_template"] == "https://squzy.example/recovery/{workflow_reference_urlencoded}"
   assert captured["squzy_recovery_engine_token"] == "squzy-recovery-token"
+  assert captured["crisescontrol_api_token"] == "crisescontrol-token"
+  assert captured["crisescontrol_api_url"] == "https://api.crisescontrol.example"
+  assert captured["crisescontrol_recovery_engine_url_template"] == "https://crisescontrol.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["crisescontrol_recovery_engine_token"] == "crisescontrol-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
