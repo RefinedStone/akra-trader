@@ -246,6 +246,8 @@ class FakeOperatorAlertDeliveryAdapter:
         external_provider = "dutycalls"
       elif target == "incidenthub_incidents":
         external_provider = "incidenthub"
+      elif target == "resolver_incidents":
+        external_provider = "resolver"
       elif target == "opsramp_incidents":
         external_provider = "opsramp"
       elif target == "zenduty_incidents":
@@ -8099,6 +8101,210 @@ def test_external_opsramp_recovery_sync_populates_opsramp_typed_schema(
   assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
   assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 79
   assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verify_repaired_window"
+
+
+def test_external_resolver_recovery_sync_populates_resolver_typed_schema(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 17, 41, tzinfo=UTC))
+  market_data = StatusOverrideSeededMarketDataAdapter()
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("resolver_incidents",),
+    supported_workflow_providers=("resolver",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=market_data,
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    guarded_live_state=guarded_live_state,
+    clock=clock,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_default_provider="resolver",
+    operator_alert_paging_policy_warning_targets=("resolver_incidents",),
+    operator_alert_paging_policy_critical_targets=("resolver_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=10_000.0, used=0.0),),
+      )
+    ),
+    venue_execution=SeededVenueExecutionAdapter(clock=clock),
+    guarded_live_execution_enabled=True,
+    market_data_sync_timeframes=("5m",),
+  )
+
+  app.run_guarded_live_reconciliation(actor="operator", reason="pre_live_check")
+  app.recover_guarded_live_runtime_state(actor="operator", reason="pre_live_recovery")
+  app.start_live_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    operator_reason="resolver_market_data_recovery_sync",
+  )
+  market_data.set_status(
+    timeframe="5m",
+    status=MarketDataStatus(
+      provider="binance",
+      venue="binance",
+      instruments=[
+        InstrumentStatus(
+          instrument_id="binance:ETH/USDT",
+          timeframe="5m",
+          candle_count=288,
+          first_timestamp=clock.current - timedelta(hours=24),
+          last_timestamp=clock.current - timedelta(minutes=20),
+          sync_status="stale",
+          lag_seconds=1_200,
+          last_sync_at=clock.current - timedelta(minutes=15),
+          issues=("freshness_threshold_exceeded:1200:600",),
+        ),
+      ],
+    ),
+  )
+
+  opened = app.get_guarded_live_status()
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:market-data:5m"
+  )
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="resolver",
+    event_kind="remediation_started",
+    actor="resolver",
+    detail="resolver_market_data_recovery_started",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="RV-123",
+    occurred_at=clock.current + timedelta(minutes=1),
+    payload={
+      "job_id": "resolver-job-11",
+      "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+      "resolver": {
+        "alert_id": "RV-123",
+        "external_reference": "guarded-live:market-data:5m",
+        "alert_status": "acknowledged",
+        "priority": "high",
+        "escalation_policy": "market-data-primary",
+        "assignee": "market-data-oncall",
+        "url": "https://resolver.example/alerts/RV-123",
+      },
+      "telemetry": {
+        "state": "running",
+        "progress_percent": 79,
+        "attempt_count": 1,
+        "current_step": "verify_repaired_window",
+        "last_message": "resolver recovery started",
+        "external_run_id": "resolver-telemetry-1",
+      },
+    },
+  )
+
+  updated_incident = next(
+    event
+    for event in synced.incident_events
+    if event.event_id == incident.event_id
+  )
+  assert updated_incident.remediation.provider_recovery.provider_schema_kind == "resolver"
+  assert updated_incident.remediation.provider_recovery.resolver.alert_id == "RV-123"
+  assert updated_incident.remediation.provider_recovery.resolver.external_reference == "guarded-live:market-data:5m"
+  assert updated_incident.remediation.provider_recovery.resolver.alert_status == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.resolver.priority == "high"
+  assert updated_incident.remediation.provider_recovery.resolver.escalation_policy == "market-data-primary"
+  assert updated_incident.remediation.provider_recovery.resolver.assignee == "market-data-oncall"
+  assert updated_incident.remediation.provider_recovery.resolver.phase_graph.alert_phase == "acknowledged"
+  assert updated_incident.remediation.provider_recovery.resolver.phase_graph.workflow_phase == "provider_recovering"
+  assert updated_incident.remediation.provider_recovery.resolver.phase_graph.ownership_phase == "assigned"
+  assert updated_incident.remediation.provider_recovery.resolver.phase_graph.escalation_phase == "configured"
+  assert updated_incident.remediation.provider_recovery.telemetry.state == "running"
+  assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 79
+  assert updated_incident.remediation.provider_recovery.telemetry.current_step == "verify_repaired_window"
+
+
+def test_incident_paging_provider_can_be_inferred_for_resolver_workflow(
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  guarded_live_state = build_guarded_live_repository(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 16, 54, tzinfo=UTC))
+  delivery = FakeOperatorAlertDeliveryAdapter(
+    targets=("resolver_incidents",),
+    supported_workflow_providers=("resolver",),
+    clock=clock,
+  )
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+    guarded_live_state=guarded_live_state,
+    operator_alert_delivery=delivery,
+    operator_alert_paging_policy_warning_targets=("resolver_incidents",),
+    operator_alert_paging_policy_critical_targets=("resolver_incidents",),
+    operator_alert_paging_policy_warning_escalation_targets=("resolver_incidents",),
+    operator_alert_paging_policy_critical_escalation_targets=("resolver_incidents",),
+    venue_state=StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=clock(),
+        balances=(GuardedLiveVenueBalance(asset="ETH", total=0.3, free=0.3, used=0.0),),
+      )
+    ),
+    guarded_live_execution_enabled=True,
+  )
+
+  opened = app.run_guarded_live_reconciliation(actor="operator", reason="resolver_policy")
+  incident = next(
+    event
+    for event in opened.incident_events
+    if event.kind == "incident_opened" and event.alert_id == "guarded-live:reconciliation"
+  )
+  assert incident.paging_provider == "resolver"
+  assert incident.delivery_targets == ("resolver_incidents",)
+  assert incident.escalation_targets == ("resolver_incidents",)
+
+  synced = app.sync_guarded_live_incident_from_external(
+    provider="resolver",
+    event_kind="triggered",
+    actor="resolver",
+    detail="provider_alert_opened",
+    alert_id=incident.alert_id,
+    external_reference=incident.alert_id,
+    workflow_reference="RV-123",
+    occurred_at=clock.current + timedelta(seconds=15),
+  )
+  triggered = next(event for event in synced.incident_events if event.event_id == incident.event_id)
+  assert triggered.provider_workflow_reference == "RV-123"
+  assert triggered.external_provider == "resolver"
+
+  clock.advance(timedelta(minutes=1))
+  acknowledged = app.acknowledge_guarded_live_incident(
+    event_id=incident.event_id,
+    actor="operator",
+    reason="resolver_ack",
+  )
+  updated = next(event for event in acknowledged.incident_events if event.event_id == incident.event_id)
+  assert updated.provider_workflow_state == "delivered"
+  assert updated.provider_workflow_action == "acknowledge"
+  assert any(
+    attempt[1:] == ("resolver", "acknowledge", 1)
+    for attempt in delivery.workflow_attempts
+  )
 
 
 def test_incident_paging_provider_can_be_inferred_for_opsramp_workflow(
