@@ -281,6 +281,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       freshservice_api_url: str,
       freshservice_recovery_engine_url_template: str | None,
       freshservice_recovery_engine_token: str | None,
+      servicedeskplus_api_token: str | None,
+      servicedeskplus_api_url: str,
+      servicedeskplus_recovery_engine_url_template: str | None,
+      servicedeskplus_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -477,6 +481,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         freshservice_recovery_engine_url_template or ""
       )
       captured["freshservice_recovery_engine_token"] = freshservice_recovery_engine_token or ""
+      captured["servicedeskplus_api_token"] = servicedeskplus_api_token or ""
+      captured["servicedeskplus_api_url"] = servicedeskplus_api_url
+      captured["servicedeskplus_recovery_engine_url_template"] = (
+        servicedeskplus_recovery_engine_url_template or ""
+      )
+      captured["servicedeskplus_recovery_engine_token"] = servicedeskplus_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -727,6 +737,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://freshservice.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_freshservice_recovery_engine_token="freshservice-recovery-token",
+      operator_alert_servicedeskplus_api_token="servicedeskplus-token",
+      operator_alert_servicedeskplus_api_url="https://api.servicedeskplus.example",
+      operator_alert_servicedeskplus_recovery_engine_url_template=(
+        "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_servicedeskplus_recovery_engine_token="servicedeskplus-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -890,6 +906,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["freshservice_api_url"] == "https://api.freshservice.example"
   assert captured["freshservice_recovery_engine_url_template"] == "https://freshservice.example/recovery/{workflow_reference_urlencoded}"
   assert captured["freshservice_recovery_engine_token"] == "freshservice-recovery-token"
+  assert captured["servicedeskplus_api_token"] == "servicedeskplus-token"
+  assert captured["servicedeskplus_api_url"] == "https://api.servicedeskplus.example"
+  assert captured["servicedeskplus_recovery_engine_url_template"] == "https://servicedeskplus.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["servicedeskplus_recovery_engine_token"] == "servicedeskplus-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
