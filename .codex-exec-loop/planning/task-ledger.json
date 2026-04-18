@@ -779,19 +779,19 @@
       "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
       "direction_id": "operator-trust-and-discipline",
       "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
-      "description": "Build on the now-broader provider-managed remediation set through Resolver by deepening the local typed recovery model so provider-authoritative sync, direct polling, typed recovery schemas, and native phase graphs can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
+      "description": "Build on the now-broader provider-managed remediation set through Cabot by deepening the local typed recovery model so provider-authoritative sync, direct polling, typed recovery schemas, and native phase graphs can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
       "status": "proposed",
       "base_priority": 78,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, direct polling, native phase graphs, and paging-provider inference now extend through Resolver, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply listed wider provider coverage first and this deeper mirroring second.",
+      "priority_reason": "The latest main-session reply says provider-authoritative sync, typed recovery schemas, provider pull-sync, direct polling, native phase graphs, and paging-provider inference now extend through Cabot, but provider-private remediation-engine phase graphs and richer native metrics still are not mirrored 1:1; it remains the clearest secondary follow-up because the reply again listed wider provider coverage first and this deeper mirroring second.",
       "depends_on": [
         "planning-operator-trust-direct-provider-remediation-endpoint-polling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T14:05:00Z",
+      "updated_at": "2026-04-18T00:45:20Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through Resolver."
+      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once the authoritative engine endpoints, typed recovery schemas, and phase graphs are already generalized across the current provider set through Cabot."
     },
     {
       "id": "planning-operator-trust-external-incident-workflow-and-escalation",
@@ -1337,19 +1337,55 @@
       "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-resolver",
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Resolver",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, and Resolver adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current twenty-seven providers.",
-      "status": "ready",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, and Resolver adapters to OpenDuty, adding the `openduty_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty-eight providers.",
+      "status": "done",
       "base_priority": 80,
-      "dynamic_priority_delta": 32,
-      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage beyond Resolver as the first remaining item after commit 4a1eaee on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head for builtin next-task progression while deeper telemetry mirroring remains a secondary proposal.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 42b7ee9, which expanded provider-managed remediation coverage through OpenDuty across operator delivery, application wiring, provider pull-sync, remediation-engine polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-opsramp"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T14:05:00Z",
+      "updated_at": "2026-04-18T14:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Resolver as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond Resolver to OpenDuty, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-openduty",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond OpenDuty",
+      "description": "Completed by extending the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, and OpenDuty adapters to Cabot, adding the `cabot_incidents` delivery target, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase-graph handling, paging-provider inference, and aligned UI, docs, and verification coverage so authoritative external remediation ownership now spans twenty-nine providers.",
+      "status": "done",
+      "base_priority": 80,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 31a9835, which expanded provider-managed remediation coverage through Cabot across operator delivery, application wiring, workflow sync, provider pull-sync, remediation-engine direct polling, typed recovery schemas, native phase graphs, paging-provider inference, UI rendering, docs, and verification.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-resolver"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T00:45:20Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the next provider-breadth gap for operator trust by extending authoritative provider-managed remediation beyond OpenDuty to Cabot, which now leaves the next provider expansion and deeper provider-native telemetry mirroring as the direct follow-ups."
+    },
+    {
+      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-cabot",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Expand provider-managed remediation coverage beyond Cabot",
+      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, and Cabot adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current twenty-nine providers.",
+      "status": "ready",
+      "base_priority": 80,
+      "dynamic_priority_delta": 33,
+      "priority_reason": "The latest main-session reply lists broader provider-managed remediation coverage beyond Cabot as the first remaining item after commit 31a9835 on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head for builtin next-task progression while deeper provider-native telemetry mirroring remains the secondary proposal.",
+      "depends_on": [
+        "planning-operator-trust-expand-provider-managed-remediation-beyond-openduty"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-18T00:45:20Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Cabot as the new waypoint and continuing breadth expansion to the next incident-management adapter."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
