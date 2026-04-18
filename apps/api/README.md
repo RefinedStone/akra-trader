@@ -61,7 +61,7 @@ Implemented now:
   public heartbeat/ticker/trade/level2/candle continuation, and Kraken spot can supply public
   heartbeat/ticker/trade/book/ohlc continuation through the same handoff surface
 - guarded-live incident delivery now supports console, generic webhook, Slack webhook, PagerDuty
-  Events API, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, OpsRamp, Zenduty, and Opsgenie Alert API targets with persisted attempt history, operator
+  Events API, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, Freshdesk, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, OpsRamp, Zenduty, and Opsgenie Alert API targets with persisted attempt history, operator
   acknowledgment, manual/automatic escalation, and retry/backoff scheduling
 - durable incidents now persist paging policy selection, provider workflow state/reference, and
   can sync provider callbacks plus local provider-native workflow actions bidirectionally through
@@ -75,7 +75,7 @@ Not implemented yet:
 
 - richer venue order management beyond cancel/replace, including venue-native amend flows
 - full external incident-management workflow such as provider-managed incident ownership beyond the
-  current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/ServiceDeskPlus/SysAid/BMCHelix/SolarWindsServiceDesk/TOPdesk/InvGateServiceDesk/OpsRamp/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
+  current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/ServiceDeskPlus/SysAid/BMCHelix/SolarWindsServiceDesk/TOPdesk/InvGateServiceDesk/OpsRamp/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, and broader
   paging policy management
 - durable custom strategy registration lifecycle
 - concrete LLM provider adapters
@@ -235,6 +235,10 @@ Useful environment variables:
 - `AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_API_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_RECOVERY_ENGINE_URL_TEMPLATE`
 - `AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_RECOVERY_ENGINE_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_API_TOKEN`
+- `AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_API_URL`
+- `AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_RECOVERY_ENGINE_URL_TEMPLATE`
+- `AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_RECOVERY_ENGINE_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_SERVICEDESKPLUS_API_TOKEN`
 - `AKRA_TRADER_OPERATOR_ALERT_SERVICEDESKPLUS_API_URL`
 - `AKRA_TRADER_OPERATOR_ALERT_SERVICEDESKPLUS_RECOVERY_ENGINE_URL_TEMPLATE`
@@ -372,7 +376,7 @@ Defaults:
 - guarded-live alert transitions now emit durable incident-opened/resolved events and outbound
   delivery attempts through configured operator delivery targets such as console logging, generic
   webhook delivery, Slack webhook delivery, PagerDuty Events API delivery, incident.io delivery,
-  FireHydrant delivery, Rootly delivery, Blameless delivery, xMatters delivery, ServiceNow delivery, Squadcast delivery, BigPanda delivery, Grafana OnCall delivery, Splunk On-Call delivery, Jira Service Management delivery, iLert delivery, Better Stack delivery, OnPage delivery, All Quiet delivery, Moogsoft delivery, Spike.sh delivery, DutyCalls delivery, IncidentHub delivery, Resolver delivery, OpenDuty delivery, Cabot delivery, HaloITSM delivery, incidentmanager.io delivery, OneUptime delivery, Squzy delivery, Crises Control delivery, Freshservice delivery, ManageEngine ServiceDesk Plus delivery, SysAid delivery, BMC Helix delivery, SolarWinds Service Desk delivery, TOPdesk delivery, InvGate Service Desk delivery, OpsRamp delivery, Zenduty delivery, or Opsgenie Alert API
+  FireHydrant delivery, Rootly delivery, Blameless delivery, xMatters delivery, ServiceNow delivery, Squadcast delivery, BigPanda delivery, Grafana OnCall delivery, Splunk On-Call delivery, Jira Service Management delivery, iLert delivery, Better Stack delivery, OnPage delivery, All Quiet delivery, Moogsoft delivery, Spike.sh delivery, DutyCalls delivery, IncidentHub delivery, Resolver delivery, OpenDuty delivery, Cabot delivery, HaloITSM delivery, incidentmanager.io delivery, OneUptime delivery, Squzy delivery, Crises Control delivery, Freshservice delivery, Freshdesk delivery, ManageEngine ServiceDesk Plus delivery, SysAid delivery, BMC Helix delivery, SolarWinds Service Desk delivery, TOPdesk delivery, InvGate Service Desk delivery, OpsRamp delivery, Zenduty delivery, or Opsgenie Alert API
   delivery, while persisting the attempt history for operator review
 - failed outbound incident deliveries now persist `attempt_number` and `next_retry_at`, and the
   application applies bounded exponential backoff before retrying due targets on subsequent
@@ -398,10 +402,10 @@ Defaults:
   on incident remediation state as both raw payload and typed provider recovery state
   (`job_id`, channels, symbols, timeframe, verification result) plus a provider-side status
   machine that tracks workflow phase, job phase, sync state, last provider event, and attempt
-  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/ServiceDeskPlus/SysAid/BMCHelix/SolarWindsServiceDesk/TOPdesk/InvGateServiceDesk/OpsRamp/Zenduty/Opsgenie
+  count. Guarded-live state refresh now also pull-syncs the current PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/ServiceDeskPlus/SysAid/BMCHelix/SolarWindsServiceDesk/TOPdesk/InvGateServiceDesk/OpsRamp/Zenduty/Opsgenie
   incident/alert body so provider-stored workflow and recovery details become the authoritative
   reconciliation source even when callbacks lag. The typed recovery state now also preserves
-  provider-specific schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, iLert alerts, Better Stack alerts, OnPage alerts, All Quiet alerts, Moogsoft alerts, Spike.sh alerts, DutyCalls alerts, IncidentHub alerts, Resolver alerts, OpenDuty alerts, Cabot alerts, HaloITSM alerts, incidentmanager.io alerts, OneUptime alerts, Squzy alerts, Crises Control alerts, Freshservice alerts, ServiceDesk Plus alerts, SysAid alerts, BMC Helix alerts, SolarWinds Service Desk alerts, TOPdesk alerts, InvGate Service Desk alerts, OpsRamp alerts, Zenduty incidents, and Opsgenie alerts instead of
+  provider-specific schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, iLert alerts, Better Stack alerts, OnPage alerts, All Quiet alerts, Moogsoft alerts, Spike.sh alerts, DutyCalls alerts, IncidentHub alerts, Resolver alerts, OpenDuty alerts, Cabot alerts, HaloITSM alerts, incidentmanager.io alerts, OneUptime alerts, Squzy alerts, Crises Control alerts, Freshservice alerts, Freshdesk tickets, ServiceDesk Plus alerts, SysAid alerts, BMC Helix alerts, SolarWinds Service Desk alerts, TOPdesk alerts, InvGate Service Desk alerts, OpsRamp alerts, Zenduty incidents, and Opsgenie alerts instead of
   flattening every provider into one generic shape, and each provider schema now carries its own
   native recovery phase graph instead of relying only on the shared recovery machine. Provider
   pull-sync now also lifts remediation telemetry such as progress, current step, attempt count,
@@ -410,7 +414,7 @@ Defaults:
   are configured, pull-sync also polls those endpoints and lets engine telemetry override stale
   incident-body copies. That typed state surfaces in the guarded-live incident table and is reused when local remediation closes the loop so
   provider-native workflow `resolve` actions are pushed back out after successful verification
-  across PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, OpsRamp, Zenduty, and Opsgenie
+  across PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, Freshdesk, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, OpsRamp, Zenduty, and Opsgenie
 - guarded-live maintenance now keeps a persisted venue session handoff with transport/session
   metadata so the resumed worker can continue through the Binance multi-stream websocket transport
   and the same venue-owned lifecycle

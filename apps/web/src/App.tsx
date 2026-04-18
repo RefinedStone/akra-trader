@@ -1006,6 +1006,24 @@ type OperatorVisibility = {
             last_transition_at?: string | null;
           };
         };
+        freshdesk: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
         servicedeskplus: {
           alert_id?: string | null;
           external_reference?: string | null;
@@ -1891,6 +1909,24 @@ type GuardedLiveStatus = {
           };
         };
         freshservice: {
+          alert_id?: string | null;
+          external_reference?: string | null;
+          alert_status: string;
+          priority?: string | null;
+          escalation_policy?: string | null;
+          assignee?: string | null;
+          url?: string | null;
+          updated_at?: string | null;
+          phase_graph: {
+            alert_phase: string;
+            workflow_phase: string;
+            ownership_phase: string;
+            priority_phase: string;
+            escalation_phase: string;
+            last_transition_at?: string | null;
+          };
+        };
+        freshdesk: {
           alert_id?: string | null;
           external_reference?: string | null;
           alert_status: string;
@@ -10050,6 +10086,24 @@ function formatProviderRecoverySchema(providerRecovery: {
       last_transition_at?: string | null;
     };
   };
+  freshdesk: {
+    alert_id?: string | null;
+    external_reference?: string | null;
+    alert_status: string;
+    priority?: string | null;
+    escalation_policy?: string | null;
+    assignee?: string | null;
+    url?: string | null;
+    updated_at?: string | null;
+    phase_graph: {
+      alert_phase: string;
+      workflow_phase: string;
+      ownership_phase: string;
+      priority_phase: string;
+      escalation_phase: string;
+      last_transition_at?: string | null;
+    };
+  };
   servicedeskplus: {
     alert_id?: string | null;
     external_reference?: string | null;
@@ -11190,6 +11244,41 @@ function formatProviderRecoverySchema(providerRecovery: {
         : null,
     ].filter(Boolean);
     return details.length ? `Freshservice schema: ${details.join(" / ")}` : null;
+  }
+  if (providerRecovery.provider_schema_kind === "freshdesk") {
+    const details = [
+      providerRecovery.freshdesk.alert_id
+        ? `alert ${providerRecovery.freshdesk.alert_id}`
+        : null,
+      providerRecovery.freshdesk.alert_status !== "unknown"
+        ? `status ${providerRecovery.freshdesk.alert_status}`
+        : null,
+      providerRecovery.freshdesk.priority
+        ? `priority ${providerRecovery.freshdesk.priority}`
+        : null,
+      providerRecovery.freshdesk.escalation_policy
+        ? `policy ${providerRecovery.freshdesk.escalation_policy}`
+        : null,
+      providerRecovery.freshdesk.assignee
+        ? `assignee ${providerRecovery.freshdesk.assignee}`
+        : null,
+      providerRecovery.freshdesk.phase_graph.alert_phase !== "unknown"
+        ? `alert phase ${providerRecovery.freshdesk.phase_graph.alert_phase}`
+        : null,
+      providerRecovery.freshdesk.phase_graph.workflow_phase !== "unknown"
+        ? `workflow ${providerRecovery.freshdesk.phase_graph.workflow_phase}`
+        : null,
+      providerRecovery.freshdesk.phase_graph.ownership_phase !== "unknown"
+        ? `ownership ${providerRecovery.freshdesk.phase_graph.ownership_phase}`
+        : null,
+      providerRecovery.freshdesk.phase_graph.escalation_phase !== "unknown"
+        ? `escalation ${providerRecovery.freshdesk.phase_graph.escalation_phase}`
+        : null,
+      providerRecovery.freshdesk.phase_graph.last_transition_at
+        ? `phase changed ${formatTimestamp(providerRecovery.freshdesk.phase_graph.last_transition_at)}`
+        : null,
+    ].filter(Boolean);
+    return details.length ? `Freshdesk schema: ${details.join(" / ")}` : null;
   }
   if (providerRecovery.provider_schema_kind === "servicedeskplus") {
     const details = [

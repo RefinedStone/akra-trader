@@ -116,6 +116,8 @@ from akra_trader.domain.models import OperatorIncidentCrisesControlRecoveryPhase
 from akra_trader.domain.models import OperatorIncidentCrisesControlRecoveryState
 from akra_trader.domain.models import OperatorIncidentFreshserviceRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentFreshserviceRecoveryState
+from akra_trader.domain.models import OperatorIncidentFreshdeskRecoveryPhaseGraph
+from akra_trader.domain.models import OperatorIncidentFreshdeskRecoveryState
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryPhaseGraph
 from akra_trader.domain.models import OperatorIncidentServiceDeskPlusRecoveryState
 from akra_trader.domain.models import OperatorIncidentSysAidRecoveryPhaseGraph
@@ -1956,6 +1958,17 @@ class TradingApplication:
             aligned_provider_recovery,
             freshservice=replace(
               aligned_provider_recovery.freshservice,
+              alert_status="delivered",
+            ),
+          )
+        elif (
+          normalized_provider == "freshdesk"
+          and provider_recovery.freshdesk.alert_status in generic_workflow_states
+        ):
+          aligned_provider_recovery = replace(
+            aligned_provider_recovery,
+            freshdesk=replace(
+              aligned_provider_recovery.freshdesk,
               alert_status="delivered",
             ),
           )
@@ -6909,6 +6922,139 @@ class TradingApplication:
     )
 
   @staticmethod
+  def _normalize_freshdesk_alert_phase(
+    status: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (status or "").strip().lower().replace(" ", "_")
+    if normalized in {
+      "triggered",
+      "open",
+      "pending",
+      "accepted",
+      "acknowledged",
+      "in_progress",
+      "resolved",
+      "closed",
+      "escalated",
+    }:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_freshdesk_ownership_phase(
+    assignee: str | None,
+    existing_phase: str,
+  ) -> str:
+    if assignee:
+      return "assigned"
+    return existing_phase or "unassigned"
+
+  @staticmethod
+  def _resolve_freshdesk_priority_phase(
+    priority: str | None,
+    existing_phase: str,
+  ) -> str:
+    normalized = (priority or "").strip().lower().replace(" ", "_")
+    if normalized:
+      return normalized
+    return existing_phase or "unknown"
+
+  @staticmethod
+  def _resolve_freshdesk_escalation_phase(
+    escalation_policy: str | None,
+    existing_phase: str,
+  ) -> str:
+    if escalation_policy:
+      return "configured"
+    return existing_phase or "unconfigured"
+
+  @staticmethod
+  def _resolve_freshdesk_workflow_phase(
+    *,
+    lifecycle_state: str | None,
+    workflow_state: str,
+  ) -> str:
+    normalized_lifecycle = (lifecycle_state or "").strip().lower().replace(" ", "_")
+    if workflow_state in {"resolved", "closed", "canceled"}:
+      return "resolved_back_synced"
+    if normalized_lifecycle == "verified":
+      return "verified_pending_resolve"
+    if normalized_lifecycle == "recovered":
+      return "awaiting_local_verification"
+    if normalized_lifecycle == "recovering":
+      return "provider_recovering"
+    if normalized_lifecycle == "requested":
+      return "remediation_requested"
+    if normalized_lifecycle == "failed":
+      return "recovery_failed"
+    if workflow_state in {"accepted", "acknowledged"}:
+      return "alert_acknowledged"
+    if workflow_state in {"triggered", "open", "pending", "in_progress", "escalated"}:
+      return "alert_active"
+    return "idle"
+
+  def _build_freshdesk_recovery_phase_graph(
+    self,
+    *,
+    payload: dict[str, Any],
+    alert_status: str,
+    priority: str | None,
+    escalation_policy: str | None,
+    assignee: str | None,
+    lifecycle_state: str | None,
+    status_machine: OperatorIncidentProviderRecoveryStatusMachine,
+    synced_at: datetime,
+    existing: OperatorIncidentFreshdeskRecoveryState,
+  ) -> OperatorIncidentFreshdeskRecoveryPhaseGraph:
+    alert_phase = self._first_non_empty_string(
+      payload.get("alert_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("alert_phase"),
+    ) or self._normalize_freshdesk_alert_phase(
+      alert_status,
+      existing.phase_graph.alert_phase,
+    )
+    workflow_phase = self._first_non_empty_string(
+      payload.get("workflow_phase"),
+      self._extract_payload_mapping(payload.get("phase_graph")).get("workflow_phase"),
+    ) or self._resolve_freshdesk_workflow_phase(
+      lifecycle_state=lifecycle_state,
+      workflow_state=alert_status,
+    )
+    return OperatorIncidentFreshdeskRecoveryPhaseGraph(
+      alert_phase=alert_phase,
+      workflow_phase=workflow_phase,
+      ownership_phase=self._first_non_empty_string(
+        payload.get("ownership_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("ownership_phase"),
+      ) or self._resolve_freshdesk_ownership_phase(
+        assignee,
+        existing.phase_graph.ownership_phase,
+      ),
+      priority_phase=self._first_non_empty_string(
+        payload.get("priority_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("priority_phase"),
+      ) or self._resolve_freshdesk_priority_phase(
+        priority,
+        existing.phase_graph.priority_phase,
+      ),
+      escalation_phase=self._first_non_empty_string(
+        payload.get("escalation_phase"),
+        self._extract_payload_mapping(payload.get("phase_graph")).get("escalation_phase"),
+      ) or self._resolve_freshdesk_escalation_phase(
+        escalation_policy,
+        existing.phase_graph.escalation_phase,
+      ),
+      last_transition_at=(
+        self._parse_payload_datetime(payload.get("updated_at"))
+        or self._parse_payload_datetime(
+          self._extract_payload_mapping(payload.get("phase_graph")).get("last_transition_at")
+        )
+        or synced_at
+      ),
+    )
+
+  @staticmethod
   def _normalize_servicedeskplus_alert_phase(
     status: str | None,
     existing_phase: str,
@@ -11317,6 +11463,99 @@ class TradingApplication:
         ),
       )
       provider_schema_kind = "freshservice"
+    freshdesk_schema = existing.freshdesk
+    freshdesk_payload = self._merge_payload_mappings(
+      self._extract_payload_mapping(payload.get("provider_schema")).get("freshdesk"),
+      payload.get("freshdesk"),
+      payload.get("freshdesk_alert"),
+    )
+    if normalized_provider == "freshdesk" or freshdesk_payload:
+      freshdesk_status = self._first_non_empty_string(
+        freshdesk_payload.get("alert_status"),
+        freshdesk_payload.get("status"),
+        freshdesk_payload.get("state"),
+        status_machine.workflow_state,
+        payload.get("workflow_state"),
+        existing.freshdesk.alert_status,
+      ) or "unknown"
+      freshdesk_schema = OperatorIncidentFreshdeskRecoveryState(
+        alert_id=self._first_non_empty_string(
+          freshdesk_payload.get("alert_id"),
+          freshdesk_payload.get("id"),
+          freshdesk_payload.get("alertId"),
+          self._first_non_empty_string(
+            workflow_reference,
+            payload.get("workflow_reference"),
+            payload.get("provider_workflow_reference"),
+            existing.workflow_reference,
+          ),
+          existing.freshdesk.alert_id,
+        ),
+        external_reference=self._first_non_empty_string(
+          freshdesk_payload.get("external_reference"),
+          freshdesk_payload.get("reference"),
+          reference,
+          existing.freshdesk.external_reference,
+        ),
+        alert_status=freshdesk_status,
+        priority=self._first_non_empty_string(
+          freshdesk_payload.get("priority"),
+          freshdesk_payload.get("severity"),
+          freshdesk_payload.get("urgency"),
+          existing.freshdesk.priority,
+        ),
+        escalation_policy=self._first_non_empty_string(
+          freshdesk_payload.get("escalation_policy"),
+          freshdesk_payload.get("escalationPolicy"),
+          freshdesk_payload.get("policy"),
+          freshdesk_payload.get("source"),
+          existing.freshdesk.escalation_policy,
+        ),
+        assignee=self._first_non_empty_string(
+          freshdesk_payload.get("assignee"),
+          freshdesk_payload.get("owner"),
+          freshdesk_payload.get("assigned_to"),
+          existing.freshdesk.assignee,
+        ),
+        url=self._first_non_empty_string(
+          freshdesk_payload.get("url"),
+          freshdesk_payload.get("html_url"),
+          freshdesk_payload.get("link"),
+          existing.freshdesk.url,
+        ),
+        updated_at=(
+          self._parse_payload_datetime(freshdesk_payload.get("updated_at"))
+          or existing.freshdesk.updated_at
+        ),
+        phase_graph=self._build_freshdesk_recovery_phase_graph(
+          payload=freshdesk_payload,
+          alert_status=freshdesk_status,
+          priority=self._first_non_empty_string(
+            freshdesk_payload.get("priority"),
+            freshdesk_payload.get("severity"),
+            freshdesk_payload.get("urgency"),
+            existing.freshdesk.priority,
+          ),
+          escalation_policy=self._first_non_empty_string(
+            freshdesk_payload.get("escalation_policy"),
+            freshdesk_payload.get("escalationPolicy"),
+            freshdesk_payload.get("policy"),
+            freshdesk_payload.get("source"),
+            existing.freshdesk.escalation_policy,
+          ),
+          assignee=self._first_non_empty_string(
+            freshdesk_payload.get("assignee"),
+            freshdesk_payload.get("owner"),
+            freshdesk_payload.get("assigned_to"),
+            existing.freshdesk.assignee,
+          ),
+          lifecycle_state=lifecycle_state,
+          status_machine=status_machine,
+          synced_at=synced_at,
+          existing=existing.freshdesk,
+        ),
+      )
+      provider_schema_kind = "freshdesk"
     servicedeskplus_schema = existing.servicedeskplus
     servicedeskplus_payload = self._merge_payload_mappings(
       self._extract_payload_mapping(payload.get("provider_schema")).get("servicedeskplus"),
@@ -12059,6 +12298,7 @@ class TradingApplication:
       squzy=squzy_schema,
       crisescontrol=crisescontrol_schema,
       freshservice=freshservice_schema,
+      freshdesk=freshdesk_schema,
       servicedeskplus=servicedeskplus_schema,
       sysaid=sysaid_schema,
       bmchelix=bmchelix_schema,
@@ -12551,6 +12791,20 @@ class TradingApplication:
           status_machine=provider_recovery.status_machine,
           synced_at=synced_at,
           existing=provider_recovery.freshservice,
+        ),
+      ),
+      freshdesk=replace(
+        provider_recovery.freshdesk,
+        phase_graph=self._build_freshdesk_recovery_phase_graph(
+          payload={},
+          alert_status=provider_recovery.freshdesk.alert_status,
+          priority=provider_recovery.freshdesk.priority,
+          escalation_policy=provider_recovery.freshdesk.escalation_policy,
+          assignee=provider_recovery.freshdesk.assignee,
+          lifecycle_state=provider_recovery.lifecycle_state,
+          status_machine=provider_recovery.status_machine,
+          synced_at=synced_at,
+          existing=provider_recovery.freshdesk,
         ),
       ),
       servicedeskplus=replace(
@@ -17109,6 +17363,10 @@ class TradingApplication:
       return "freshservice"
     if normalized in {"freshservice_incidents", "operator_freshservice"}:
       return "freshservice"
+    if normalized in {"freshdesk_alerts", "freshdesk", "operator_freshdesk"}:
+      return "freshdesk"
+    if normalized in {"freshdesk_incidents", "operator_freshdesk"}:
+      return "freshdesk"
     if normalized in {
       "servicedeskplus_alerts",
       "servicedeskplus",
@@ -17379,6 +17637,8 @@ class TradingApplication:
       return "crisescontrol"
     if "freshservice_incidents" in combined or "freshservice_alerts" in combined:
       return "freshservice"
+    if "freshdesk_incidents" in combined or "freshdesk_alerts" in combined:
+      return "freshdesk"
     if "servicedeskplus_incidents" in combined or "servicedeskplus_alerts" in combined:
       return "servicedeskplus"
     if "bmchelix_incidents" in combined or "bmchelix_alerts" in combined:

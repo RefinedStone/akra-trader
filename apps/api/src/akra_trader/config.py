@@ -169,6 +169,10 @@ class Settings:
   operator_alert_freshservice_api_url: str = "https://api.freshservice.com/v2"
   operator_alert_freshservice_recovery_engine_url_template: str | None = None
   operator_alert_freshservice_recovery_engine_token: str | None = None
+  operator_alert_freshdesk_api_token: str | None = None
+  operator_alert_freshdesk_api_url: str = "https://api.freshdesk.com/v2"
+  operator_alert_freshdesk_recovery_engine_url_template: str | None = None
+  operator_alert_freshdesk_recovery_engine_token: str | None = None
   operator_alert_servicedeskplus_api_token: str | None = None
   operator_alert_servicedeskplus_api_url: str = "https://api.manageengine.com/servicedeskplus/v3"
   operator_alert_servicedeskplus_recovery_engine_url_template: str | None = None
@@ -699,6 +703,19 @@ def load_settings() -> Settings:
     ),
     operator_alert_freshservice_recovery_engine_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHSERVICE_RECOVERY_ENGINE_TOKEN") or None
+    ),
+    operator_alert_freshdesk_api_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_API_TOKEN") or None
+    ),
+    operator_alert_freshdesk_api_url=os.getenv(
+      "AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_API_URL",
+      "https://api.freshdesk.com/v2",
+    ),
+    operator_alert_freshdesk_recovery_engine_url_template=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_RECOVERY_ENGINE_URL_TEMPLATE") or None
+    ),
+    operator_alert_freshdesk_recovery_engine_token=(
+      os.getenv("AKRA_TRADER_OPERATOR_ALERT_FRESHDESK_RECOVERY_ENGINE_TOKEN") or None
     ),
     operator_alert_servicedeskplus_api_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_SERVICEDESKPLUS_API_TOKEN") or None
