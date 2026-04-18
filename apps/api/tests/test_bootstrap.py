@@ -249,6 +249,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
       resolver_api_url: str,
       resolver_recovery_engine_url_template: str | None,
       resolver_recovery_engine_token: str | None,
+      openduty_api_token: str | None,
+      openduty_api_url: str,
+      openduty_recovery_engine_url_template: str | None,
+      openduty_recovery_engine_token: str | None,
       opsramp_api_token: str | None,
       opsramp_api_url: str,
       opsramp_recovery_engine_url_template: str | None,
@@ -395,6 +399,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         resolver_recovery_engine_url_template or ""
       )
       captured["resolver_recovery_engine_token"] = resolver_recovery_engine_token or ""
+      captured["openduty_api_token"] = openduty_api_token or ""
+      captured["openduty_api_url"] = openduty_api_url
+      captured["openduty_recovery_engine_url_template"] = (
+        openduty_recovery_engine_url_template or ""
+      )
+      captured["openduty_recovery_engine_token"] = openduty_recovery_engine_token or ""
       captured["opsramp_api_token"] = opsramp_api_token or ""
       captured["opsramp_api_url"] = opsramp_api_url
       captured["opsramp_recovery_engine_url_template"] = (
@@ -597,6 +607,12 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
         "https://resolver.example/recovery/{workflow_reference_urlencoded}"
       ),
       operator_alert_resolver_recovery_engine_token="resolver-recovery-token",
+      operator_alert_openduty_api_token="openduty-token",
+      operator_alert_openduty_api_url="https://api.openduty.example",
+      operator_alert_openduty_recovery_engine_url_template=(
+        "https://openduty.example/recovery/{workflow_reference_urlencoded}"
+      ),
+      operator_alert_openduty_recovery_engine_token="openduty-recovery-token",
       operator_alert_opsramp_api_token="opsramp-token",
       operator_alert_opsramp_api_url="https://api.opsramp.example",
       operator_alert_opsramp_recovery_engine_url_template=(
@@ -728,6 +744,10 @@ def test_build_container_wires_operator_alert_delivery_settings(monkeypatch) -> 
   assert captured["resolver_api_url"] == "https://api.resolver.example"
   assert captured["resolver_recovery_engine_url_template"] == "https://resolver.example/recovery/{workflow_reference_urlencoded}"
   assert captured["resolver_recovery_engine_token"] == "resolver-recovery-token"
+  assert captured["openduty_api_token"] == "openduty-token"
+  assert captured["openduty_api_url"] == "https://api.openduty.example"
+  assert captured["openduty_recovery_engine_url_template"] == "https://openduty.example/recovery/{workflow_reference_urlencoded}"
+  assert captured["openduty_recovery_engine_token"] == "openduty-recovery-token"
   assert captured["opsramp_api_token"] == "opsramp-token"
   assert captured["opsramp_api_url"] == "https://api.opsramp.example"
   assert captured["opsramp_recovery_engine_url_template"] == "https://opsramp.example/recovery/{workflow_reference_urlencoded}"
