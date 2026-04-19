@@ -177,6 +177,36 @@ def test_list_strategies_can_filter_by_lane_and_lifecycle_stage(tmp_path: Path) 
   assert payload
   assert all(item["runtime"] == "freqtrade_reference" for item in payload)
   assert all(item["lifecycle"]["stage"] == "imported" for item in payload)
+  assert all(item["catalog_semantics"]["strategy_kind"] == "reference_delegate" for item in payload)
+  assert all(item["catalog_semantics"]["source_descriptor"] for item in payload)
+  assert all(
+    "Freqtrade reference runtime" in item["catalog_semantics"]["execution_model"]
+    for item in payload
+  )
+
+
+def test_register_strategy_endpoint_returns_import_catalog_semantics(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  response = client.post(
+    "/api/strategies/register",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "module_path": "akra_trader.strategies.examples",
+      "class_name": "MovingAverageCrossStrategy",
+    },
+  )
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["catalog_semantics"]["strategy_kind"] == "imported_module"
+  assert payload["catalog_semantics"]["source_descriptor"] == (
+    "akra_trader.strategies.examples:MovingAverageCrossStrategy"
+  )
+  assert "typed parameter schema" in payload["catalog_semantics"]["parameter_contract"]
+  assert "locally registered module" in payload["catalog_semantics"]["execution_model"]
+  assert "Imported from a locally registered module path." in payload["catalog_semantics"]["operator_notes"]
+  assert payload["lifecycle"]["registered_at"] is not None
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:

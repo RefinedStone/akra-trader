@@ -21,6 +21,7 @@ from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
+from akra_trader.domain.models import StrategyCatalogSemantics
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.ports import MarketDataPort
@@ -355,9 +356,29 @@ class LocalStrategyCatalog(StrategyCatalogPort):
     registration = self._registrations.get(metadata.strategy_id)
     if registration is None or metadata.lifecycle.registered_at is not None:
       return metadata
+    base_semantics = metadata.catalog_semantics
+    parameter_contract = (
+      base_semantics.parameter_contract
+      or (
+        "Publishes a typed parameter schema for presets and semantic diffs."
+        if metadata.parameter_schema
+        else "Does not advertise a typed parameter schema; presets can only store freeform parameters."
+      )
+    )
+    operator_notes = tuple(dict.fromkeys((*base_semantics.operator_notes, "Imported from a locally registered module path.")))
     return replace(
       metadata,
       lifecycle=replace(metadata.lifecycle, registered_at=registration.registered_at),
+      catalog_semantics=StrategyCatalogSemantics(
+        strategy_kind="imported_module",
+        execution_model=(
+          base_semantics.execution_model
+          or "Loaded from a locally registered module and executed through the declared runtime."
+        ),
+        parameter_contract=parameter_contract,
+        source_descriptor=f"{registration.module_path}:{registration.class_name}",
+        operator_notes=operator_notes,
+      ),
     )
 
 

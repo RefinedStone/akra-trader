@@ -43,6 +43,13 @@ type Strategy = {
     stage: string;
     registered_at?: string | null;
   };
+  catalog_semantics: {
+    strategy_kind: string;
+    execution_model: string;
+    parameter_contract: string;
+    source_descriptor?: string | null;
+    operator_notes: string[];
+  };
   reference_id?: string | null;
   reference_path?: string | null;
   entrypoint?: string | null;
@@ -7346,6 +7353,9 @@ function StrategyColumn({
               <span>{formatVersionLineage(strategy.version_lineage, strategy.version)}</span>
             </div>
             <p>{strategy.description}</p>
+            {strategy.catalog_semantics.execution_model ? (
+              <p className="run-note">{strategy.catalog_semantics.execution_model}</p>
+            ) : null}
             <dl>
               <div>
                 <dt>ID</dt>
@@ -7363,6 +7373,18 @@ function StrategyColumn({
                 <dt>Defaults</dt>
                 <dd>{formatParameterMap(extractDefaultParameters(strategy.parameter_schema))}</dd>
               </div>
+              {strategy.catalog_semantics.parameter_contract ? (
+                <div>
+                  <dt>Parameter contract</dt>
+                  <dd>{strategy.catalog_semantics.parameter_contract}</dd>
+                </div>
+              ) : null}
+              {strategy.catalog_semantics.source_descriptor ? (
+                <div>
+                  <dt>Source</dt>
+                  <dd>{strategy.catalog_semantics.source_descriptor}</dd>
+                </div>
+              ) : null}
               {strategy.reference_path ? (
                 <div>
                   <dt>Reference</dt>
@@ -7379,6 +7401,12 @@ function StrategyColumn({
                 <div>
                   <dt>Registered</dt>
                   <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
+                </div>
+              ) : null}
+              {strategy.catalog_semantics.operator_notes.length ? (
+                <div>
+                  <dt>Operator notes</dt>
+                  <dd>{strategy.catalog_semantics.operator_notes.join(" | ")}</dd>
                 </div>
               ) : null}
             </dl>

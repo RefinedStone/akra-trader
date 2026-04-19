@@ -107,6 +107,15 @@ class StrategyLifecycle:
 
 
 @dataclass(frozen=True)
+class StrategyCatalogSemantics:
+  strategy_kind: str = "standard"
+  execution_model: str = ""
+  parameter_contract: str = ""
+  source_descriptor: str | None = None
+  operator_notes: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class StrategyMetadata:
   strategy_id: str
   name: str
@@ -117,6 +126,7 @@ class StrategyMetadata:
   parameter_schema: dict[str, Any]
   description: str
   lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+  catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   version_lineage: tuple[str, ...] = ()
   reference_id: str | None = None
   reference_path: str | None = None

@@ -7,6 +7,7 @@ import pandas as pd
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
+from akra_trader.domain.models import StrategyCatalogSemantics
 from akra_trader.domain.models import StrategyDecisionContext
 from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyMetadata
@@ -51,6 +52,19 @@ class ReferenceFreqtradeStrategy(PolicyBackedStrategy):
       parameter_schema={},
       description=self._definition.description,
       lifecycle=StrategyLifecycle(stage="imported"),
+      catalog_semantics=StrategyCatalogSemantics(
+        strategy_kind="reference_delegate",
+        execution_model="Delegated to the upstream Freqtrade reference runtime for benchmark execution.",
+        parameter_contract=(
+          "akra-trader tracks presets and experiment labels locally, but this delegate does not "
+          "publish a typed override schema in the strategy catalog."
+        ),
+        source_descriptor=f"{self._definition.reference_id}:{self._definition.entrypoint}",
+        operator_notes=(
+          "Use for benchmark comparison and provenance capture.",
+          "Execution behavior stays owned by the imported reference code.",
+        ),
+      ),
       version_lineage=(self._definition.version,),
       reference_id=self._definition.reference_id,
       reference_path=self._definition.reference_path,

@@ -22601,6 +22601,7 @@ def serialize_strategy(strategy: StrategyMetadata) -> dict:
   payload["asset_types"] = [asset_type.value for asset_type in strategy.asset_types]
   payload["supported_timeframes"] = list(strategy.supported_timeframes)
   payload["version_lineage"] = list(strategy.version_lineage or (strategy.version,))
+  payload["catalog_semantics"]["operator_notes"] = list(strategy.catalog_semantics.operator_notes)
   return payload
 
 
