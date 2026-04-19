@@ -2758,18 +2758,36 @@
       "direction_id": "experiment-os",
       "title": "Expose semantic score breakdown in comparison payloads",
       "description": "Build on the richer comparison `insight_score` by returning an operator-visible breakdown of which semantic vocabulary, parameter-schema, delta-label, semantic-rank, unit, and provenance-richness features contributed to each score, so semantic ranking is explainable instead of remaining a single opaque number.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is semantic scoring explainability: the scorer now uses vocabulary and provenance richness, but the comparison payload still does not expose which semantic features produced the score. That is the clearest executable next step and should become the new queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 768d379, which added `score_breakdown` with metrics, semantics, context, and total contributions to comparison payloads, serialized per-feature semantic raw units and weighted contributions, verified with py_compile, six targeted pytest cases, `git diff --check`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-deepen-semantic-score-interpretation-with-vocabulary-and-provenance-richness"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T12:10:00Z",
+      "updated_at": "2026-04-19T12:37:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os comparison trust by turning the new semantic-aware ranking inputs into inspectable operator evidence, which makes comparison ordering defensible during promotion and benchmark review."
+    },
+    {
+      "id": "planning-experiment-os-render-semantic-score-breakdown-in-control-room-comparison-ui",
+      "direction_id": "experiment-os",
+      "title": "Render semantic score breakdown in control-room comparison UI",
+      "description": "Use the newly shipped comparison `score_breakdown` payload in the control room so comparison cards or rows show metrics, semantics, context, total, and the semantic feature-level contributors instead of only an opaque `insight_score` total.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply says the remaining work is consumer-side exposure: `score_breakdown` now exists in the API and application model, but the control room still renders only the total `insight_score`. That makes the UI integration the clearest executable next task and the new queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-expose-semantic-score-breakdown-in-comparison-payloads"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T12:37:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completes the experiment-os comparison explainability loop by turning backend score-breakdown evidence into operator-visible UI context where run ranking decisions are actually reviewed."
     }
   ]
 }
