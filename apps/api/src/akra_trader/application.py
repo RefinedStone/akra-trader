@@ -22959,6 +22959,14 @@ def _serialize_run_subresource_envelope(
   }
 
 
+@dataclass(frozen=True)
+class RunSubresourceSerializerSpec:
+  subresource_key: str
+  body_key: str
+  response_title: str
+  body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -23011,23 +23019,42 @@ def _serialize_run_metrics_subresource_body(
   return deepcopy(run.metrics)
 
 
-RUN_SUBRESOURCE_BODY_SERIALIZERS: dict[
-  str,
-  Callable[[RunRecord, RunSurfaceCapabilities], Any],
-] = {
-  "orders": lambda run, capabilities: _serialize_run_orders_subresource_body(
-    run,
-    capabilities=capabilities,
+RUN_SUBRESOURCE_SERIALIZER_SPECS: dict[str, RunSubresourceSerializerSpec] = {
+  "orders": RunSubresourceSerializerSpec(
+    subresource_key="orders",
+    body_key="orders",
+    response_title="Run order list",
+    body_serializer=lambda run, capabilities: _serialize_run_orders_subresource_body(
+      run,
+      capabilities=capabilities,
+    ),
   ),
-  "positions": lambda run, capabilities: _serialize_run_positions_subresource_body(
-    run,
-    capabilities=capabilities,
+  "positions": RunSubresourceSerializerSpec(
+    subresource_key="positions",
+    body_key="positions",
+    response_title="Run positions",
+    body_serializer=lambda run, capabilities: _serialize_run_positions_subresource_body(
+      run,
+      capabilities=capabilities,
+    ),
   ),
-  "metrics": lambda run, capabilities: _serialize_run_metrics_subresource_body(
-    run,
-    capabilities=capabilities,
+  "metrics": RunSubresourceSerializerSpec(
+    subresource_key="metrics",
+    body_key="metrics",
+    response_title="Run metrics",
+    body_serializer=lambda run, capabilities: _serialize_run_metrics_subresource_body(
+      run,
+      capabilities=capabilities,
+    ),
   ),
 }
+
+
+def get_run_subresource_serializer_spec(subresource_key: str) -> RunSubresourceSerializerSpec:
+  spec = RUN_SUBRESOURCE_SERIALIZER_SPECS.get(subresource_key)
+  if spec is None:
+    raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+  return spec
 
 
 def serialize_run_subresource_response(
@@ -23037,14 +23064,12 @@ def serialize_run_subresource_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  body_serializer = RUN_SUBRESOURCE_BODY_SERIALIZERS.get(subresource_key)
-  if body_serializer is None:
-    raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+  spec = get_run_subresource_serializer_spec(subresource_key)
   return _serialize_run_subresource_envelope(
     run,
     capabilities=resolved_capabilities,
-    body_key=subresource_key,
-    body_value=body_serializer(run, resolved_capabilities),
+    body_key=spec.body_key,
+    body_value=spec.body_serializer(run, resolved_capabilities),
   )
 
 

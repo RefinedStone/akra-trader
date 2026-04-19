@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -14,6 +15,7 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from akra_trader.application import TradingApplication
+from akra_trader.application import get_run_subresource_serializer_spec
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_run_subresource_response
@@ -131,6 +133,13 @@ class ExternalIncidentSyncRequest(BaseModel):
   payload: dict[str, Any] = Field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class RunSubresourceRouteBinding:
+  path: str
+  route_name: str
+  subresource_key: str
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -148,6 +157,23 @@ def create_router(container: Container) -> APIRouter:
       comparison,
       capabilities=app.get_run_surface_capabilities(),
     )
+
+  def build_run_subresource_route_handler(binding: RunSubresourceRouteBinding):
+    def get_run_subresource(
+      run_id: str,
+      app: TradingApplication = Depends(get_app),
+    ) -> dict[str, Any]:
+      run = app.get_run(run_id)
+      if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+      return serialize_run_subresource_response(
+        run,
+        subresource_key=binding.subresource_key,
+        capabilities=app.get_run_surface_capabilities(),
+      )
+
+    get_run_subresource.__name__ = binding.route_name
+    return get_run_subresource
 
   @router.get("/health")
   def health() -> dict[str, str]:
@@ -562,37 +588,31 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run_response(run, app)
 
-  @router.get("/runs/{run_id}/orders")
-  def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.get_run(run_id)
-    if run is None:
-      raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_subresource_response(
-      run,
+  run_subresource_route_bindings = (
+    RunSubresourceRouteBinding(
+      path="/runs/{run_id}/orders",
+      route_name="get_run_orders",
       subresource_key="orders",
-      capabilities=app.get_run_surface_capabilities(),
-    )
-
-  @router.get("/runs/{run_id}/positions")
-  def get_run_positions(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.get_run(run_id)
-    if run is None:
-      raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_subresource_response(
-      run,
+    ),
+    RunSubresourceRouteBinding(
+      path="/runs/{run_id}/positions",
+      route_name="get_run_positions",
       subresource_key="positions",
-      capabilities=app.get_run_surface_capabilities(),
-    )
-
-  @router.get("/runs/{run_id}/metrics")
-  def get_run_metrics(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.get_run(run_id)
-    if run is None:
-      raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_subresource_response(
-      run,
+    ),
+    RunSubresourceRouteBinding(
+      path="/runs/{run_id}/metrics",
+      route_name="get_run_metrics",
       subresource_key="metrics",
-      capabilities=app.get_run_surface_capabilities(),
+    ),
+  )
+  for binding in run_subresource_route_bindings:
+    spec = get_run_subresource_serializer_spec(binding.subresource_key)
+    router.add_api_route(
+      binding.path,
+      build_run_subresource_route_handler(binding),
+      methods=["GET"],
+      name=binding.route_name,
+      summary=spec.response_title,
     )
 
   @router.get("/market-data/status")

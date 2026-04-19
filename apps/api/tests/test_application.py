@@ -19,6 +19,7 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
+from akra_trader.application import get_run_subresource_serializer_spec
 from akra_trader.application import serialize_run_subresource_response
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
@@ -13782,6 +13783,20 @@ def test_run_subresource_serializer_registry_rejects_unknown_key(tmp_path: Path)
 
   with pytest.raises(ValueError, match="Unsupported run subresource serializer: unknown"):
     serialize_run_subresource_response(run, subresource_key="unknown")
+
+
+def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
+  orders_spec = get_run_subresource_serializer_spec("orders")
+  positions_spec = get_run_subresource_serializer_spec("positions")
+  metrics_spec = get_run_subresource_serializer_spec("metrics")
+
+  assert orders_spec.subresource_key == "orders"
+  assert orders_spec.body_key == "orders"
+  assert orders_spec.response_title == "Run order list"
+  assert positions_spec.body_key == "positions"
+  assert positions_spec.response_title == "Run positions"
+  assert metrics_spec.body_key == "metrics"
+  assert metrics_spec.response_title == "Run metrics"
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
