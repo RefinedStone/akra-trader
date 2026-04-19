@@ -2992,36 +2992,54 @@
       "direction_id": "experiment-os",
       "title": "Add tab identity and conflict audit trail for comparison history sync",
       "description": "Build on the shipped cross-tab comparison history sync by attaching explicit tab identity and per-change metadata to persisted panel-state updates, so concurrent tabs can attribute who last changed inventory, open state, filters, and tombstones and can surface conflict or overwrite hints instead of relying on unaudited near-real-time propagation alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says the remaining gap after commit 50860b6 is a stronger multi-tab collaboration layer because the current localStorage `storage` sync still has no explicit tab identity or conflict audit trail. That makes attribution and conflict visibility the clearest directly executable next task.",
+      "priority_reason": "Completed in main session commit c85feec, which added shared last-writer tab identity and timestamp metadata, kept tab-local sync and conflict audit trails in sessionStorage, logged remote step merges plus same-step conflicts plus browser-state sync events, surfaced tab badges and recent audit logs in the history browser panel, skipped immediate local overwrite after remote sync, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-coordinate-persisted-comparison-history-across-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:20:00Z",
+      "updated_at": "2026-04-19T15:55:48Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison-state collaboration beyond basic cross-tab propagation into an operator-trustable multi-tab model where concurrent edits can be attributed and conflict-prone state changes can be reviewed instead of silently merged."
     },
     {
-      "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
+      "id": "planning-experiment-os-add-field-level-conflict-review-and-manual-resolution-for-comparison-history-sync",
       "direction_id": "experiment-os",
-      "title": "Add export/import or profile-scoped sync for comparison history state",
-      "description": "Extend the durable comparison history panel beyond device-local browser storage by supporting either explicit export or import of history state, profile-scoped sync, or another portable state contract, so operators can carry curated comparison timelines across browser contexts without relying on one localStorage bucket.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly says panel-state export or import and profile-scoped sync are still absent, but that next step still needs a product-shape choice between portable transfer and account-level syncing. Keep it proposed behind the clearly executable multi-tab coordination pass.",
+      "title": "Add field-level conflict review and manual resolution for comparison history sync",
+      "description": "Build on the newly shipped tab identity and audit trail by turning conflict summaries into an operator-usable review and resolve workflow, including field-level diffing for competing comparison history state, explicit keep-local or keep-remote or merge actions, and a durable resolution record in the tab audit surface.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply says conflict handling now stops at summary audit logs and still lacks a field-by-field manual resolution workflow. That is the clearest directly executable next task after commit c85feec because the attribution and conflict-detection foundation is already in place.",
       "depends_on": [
-        "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
+        "planning-experiment-os-add-tab-identity-and-conflict-audit-for-comparison-history-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:05:00Z",
+      "updated_at": "2026-04-19T15:55:48Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os comparison-history durability from one browser's local recovery model into a portable or account-scoped operator artifact, which helps comparison review survive beyond one device or profile."
+      "direction_relation_note": "Extends experiment-os comparison-state collaboration from passive conflict logging into an operator-trustable resolution workflow, so concurrent tab edits can be reconciled deliberately instead of only being detected after the fact."
+    },
+    {
+      "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
+      "direction_id": "experiment-os",
+      "title": "Add export/import or profile-scoped retention for comparison history state and audit trails",
+      "description": "Extend the durable comparison history panel beyond device-local browser storage and tab-session audit logs by supporting explicit export or import, profile-scoped sync, or another portable retention contract for comparison history state plus sync or conflict audit trails, so operators can carry curated timelines and their operational context across browser contexts without relying on one localStorage bucket and one sessionStorage scope.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply explicitly says the new audit trail remains tab-session scoped and still lacks export or import and longer-term retention. That follow-up remains valid, but it still needs a product-shape choice between portable transfer, profile-scoped sync, and retention posture, so keep it proposed behind the now-clear conflict-resolution workflow.",
+      "depends_on": [
+        "planning-experiment-os-add-tab-identity-and-conflict-audit-for-comparison-history-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T15:55:48Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison-history durability from one browser's local recovery model and one tab's audit scope into a portable or account-scoped operator artifact, which helps comparison review and sync forensics survive beyond one device, profile, or session."
     },
     {
       "id": "planning-experiment-os-decide-whether-to-reconstruct-browser-history-from-persisted-comparison-timeline",
