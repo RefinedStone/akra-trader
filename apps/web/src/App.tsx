@@ -3139,7 +3139,20 @@ function formatPresetStructuredDiffDisplayValue(value: string) {
   return value || "none";
 }
 
-function buildPresetStructuredDiffDelta(existingValue: string, incomingValue: string) {
+function isPresetStructuredDiffObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isPresetStructuredDiffScalar(value: unknown) {
+  return value === null || ["boolean", "number", "string"].includes(typeof value);
+}
+
+function buildPresetStructuredDiffDelta(
+  existingValue: string,
+  incomingValue: string,
+  existingRaw: unknown = existingValue,
+  incomingRaw: unknown = incomingValue,
+) {
   if (existingValue === incomingValue) {
     return {
       direction: "same" as const,
@@ -3158,6 +3171,59 @@ function buildPresetStructuredDiffDelta(existingValue: string, incomingValue: st
       label: "removed",
     };
   }
+  if (
+    typeof existingRaw === "number" &&
+    Number.isFinite(existingRaw) &&
+    typeof incomingRaw === "number" &&
+    Number.isFinite(incomingRaw)
+  ) {
+    const delta = incomingRaw - existingRaw;
+    if (delta === 0) {
+      return {
+        direction: "same" as const,
+        label: "match",
+      };
+    }
+    return {
+      direction: delta > 0 ? ("higher" as const) : ("lower" as const),
+      label: `${delta > 0 ? "higher " : "lower "}${delta > 0 ? "+" : ""}${formatComparisonTooltipTuningValue(delta)}`,
+    };
+  }
+  if (typeof existingRaw === "boolean" && typeof incomingRaw === "boolean") {
+    return {
+      direction: incomingRaw ? ("higher" as const) : ("lower" as const),
+      label: incomingRaw ? "enabled" : "disabled",
+    };
+  }
+  if (
+    Array.isArray(existingRaw) &&
+    Array.isArray(incomingRaw) &&
+    existingRaw.every(isPresetStructuredDiffScalar) &&
+    incomingRaw.every(isPresetStructuredDiffScalar)
+  ) {
+    const existingItems = existingRaw.map((item) => formatParameterValue(item));
+    const incomingItems = incomingRaw.map((item) => formatParameterValue(item));
+    const addedItems = incomingItems.filter((item) => !existingItems.includes(item));
+    const removedItems = existingItems.filter((item) => !incomingItems.includes(item));
+    if (addedItems.length && !removedItems.length) {
+      return {
+        direction: "higher" as const,
+        label: `${addedItems.length} added`,
+      };
+    }
+    if (removedItems.length && !addedItems.length) {
+      return {
+        direction: "lower" as const,
+        label: `${removedItems.length} removed`,
+      };
+    }
+    if (addedItems.length || removedItems.length) {
+      return {
+        direction: addedItems.length >= removedItems.length ? ("higher" as const) : ("lower" as const),
+        label: `${addedItems.length} added · ${removedItems.length} removed`,
+      };
+    }
+  }
   return {
     direction: "higher" as const,
     label: "changed",
@@ -3170,10 +3236,10 @@ function summarizePresetStructuredDiffGroup(group: PresetStructuredDiffGroup) {
   }
   const parts = [`${group.changed_count} changed`];
   if (group.higher_count) {
-    parts.push(`${group.higher_count} added/updated`);
+    parts.push(`${group.higher_count} higher/add`);
   }
   if (group.lower_count) {
-    parts.push(`${group.lower_count} removed`);
+    parts.push(`${group.lower_count} lower/remove`);
   }
   if (group.same_count) {
     parts.push(`${group.same_count} unchanged`);
@@ -3233,8 +3299,10 @@ function buildPresetStructuredDiffRows(
     groupKey: string,
     groupLabel: string,
     groupOrder: number,
+    existingRaw: unknown = existingValue,
+    incomingRaw: unknown = incomingValue,
   ) => {
-    const delta = buildPresetStructuredDiffDelta(existingValue, incomingValue);
+    const delta = buildPresetStructuredDiffDelta(existingValue, incomingValue, existingRaw, incomingRaw);
     rows.push({
       changed: existingValue !== incomingValue,
       delta_direction: delta.direction,
@@ -3247,6 +3315,96 @@ function buildPresetStructuredDiffRows(
       key,
       label,
     });
+  };
+  const formatParameterPathLabel = (segments: string[]) =>
+    segments.reduce((label, segment) => {
+      if (!label) {
+        return segment;
+      }
+      if (segment.startsWith("[")) {
+        return `${label}${segment}`;
+      }
+      return `${label}.${segment}`;
+    }, "");
+  const pushParameterRow = (
+    pathSegments: string[],
+    existingParameter: unknown,
+    incomingParameter: unknown,
+  ) => {
+    const label = formatParameterPathLabel(pathSegments) || "Parameter bundle";
+    const existingValue = existingParameter === undefined ? "" : formatParameterValue(existingParameter);
+    const incomingValue = incomingParameter === undefined ? "" : formatParameterValue(incomingParameter);
+    pushRow(
+      `parameter:${label}`,
+      label,
+      existingValue,
+      incomingValue,
+      "parameters",
+      "Parameters",
+      3,
+      existingParameter,
+      incomingParameter,
+    );
+  };
+  const appendParameterRows = (
+    existingParameter: unknown,
+    incomingParameter: unknown,
+    pathSegments: string[] = [],
+  ) => {
+    if (isPresetStructuredDiffObject(existingParameter) && incomingParameter === undefined) {
+      appendParameterRows(existingParameter, {}, pathSegments);
+      return;
+    }
+    if (existingParameter === undefined && isPresetStructuredDiffObject(incomingParameter)) {
+      appendParameterRows({}, incomingParameter, pathSegments);
+      return;
+    }
+    if (Array.isArray(existingParameter) && incomingParameter === undefined) {
+      if (existingParameter.every(isPresetStructuredDiffScalar)) {
+        pushParameterRow(pathSegments, existingParameter, incomingParameter);
+      } else {
+        appendParameterRows(existingParameter, [], pathSegments);
+      }
+      return;
+    }
+    if (existingParameter === undefined && Array.isArray(incomingParameter)) {
+      if (incomingParameter.every(isPresetStructuredDiffScalar)) {
+        pushParameterRow(pathSegments, existingParameter, incomingParameter);
+      } else {
+        appendParameterRows([], incomingParameter, pathSegments);
+      }
+      return;
+    }
+    if (
+      Array.isArray(existingParameter) &&
+      Array.isArray(incomingParameter) &&
+      existingParameter.every(isPresetStructuredDiffScalar) &&
+      incomingParameter.every(isPresetStructuredDiffScalar)
+    ) {
+      pushParameterRow(pathSegments, existingParameter, incomingParameter);
+      return;
+    }
+    if (Array.isArray(existingParameter) && Array.isArray(incomingParameter)) {
+      const length = Math.max(existingParameter.length, incomingParameter.length);
+      for (let index = 0; index < length; index += 1) {
+        appendParameterRows(existingParameter[index], incomingParameter[index], [...pathSegments, `[${index}]`]);
+      }
+      return;
+    }
+    if (isPresetStructuredDiffObject(existingParameter) && isPresetStructuredDiffObject(incomingParameter)) {
+      const keys = Array.from(
+        new Set([...Object.keys(existingParameter), ...Object.keys(incomingParameter)]),
+      ).sort();
+      if (!keys.length) {
+        pushParameterRow(pathSegments, existingParameter, incomingParameter);
+        return;
+      }
+      keys.forEach((key) => {
+        appendParameterRows(existingParameter[key], incomingParameter[key], [...pathSegments, key]);
+      });
+      return;
+    }
+    pushParameterRow(pathSegments, existingParameter, incomingParameter);
   };
 
   pushRow("name", "Name", existing.name, incoming.name, "identity", "Identity", 0);
@@ -3303,21 +3461,7 @@ function buildPresetStructuredDiffRows(
     pushRow("parameters", "Parameter bundle", "", "", "parameters", "Parameters", 3);
   } else {
     parameterKeys.forEach((key) => {
-      const existingValue = Object.prototype.hasOwnProperty.call(existing.parameters, key)
-        ? formatParameterValue(existing.parameters[key])
-        : "";
-      const incomingValue = Object.prototype.hasOwnProperty.call(incoming.parameters, key)
-        ? formatParameterValue(incoming.parameters[key])
-        : "";
-      pushRow(
-        `parameter:${key}`,
-        key,
-        existingValue,
-        incomingValue,
-        "parameters",
-        "Parameters",
-        3,
-      );
+      appendParameterRows(existing.parameters[key], incoming.parameters[key], [key]);
     });
   }
   return rows;
@@ -3354,10 +3498,12 @@ function describePresetDraftConflict(
 ): PresetDraftConflict {
   const savedForm = buildPresetFormFromPreset(preset);
   let normalizedDraftParameters = form.parameters_text.trim();
+  let parsedDraftParameters: Record<string, unknown> = {};
   let hasInvalidParameters = false;
   if (normalizedDraftParameters) {
     try {
-      normalizedDraftParameters = JSON.stringify(parseJsonObjectInput(form.parameters_text), null, 2);
+      parsedDraftParameters = parseJsonObjectInput(form.parameters_text);
+      normalizedDraftParameters = JSON.stringify(parsedDraftParameters, null, 2);
     } catch {
       hasInvalidParameters = true;
     }
@@ -3424,15 +3570,32 @@ function describePresetDraftConflict(
     "Metadata",
     2,
   );
-  pushRow(
-    "parameters_json",
-    hasInvalidParameters ? "Parameters JSON (invalid draft)" : "Parameters JSON",
-    savedForm.parameters_text.trim(),
-    normalizedDraftParameters,
-    "parameters",
-    "Parameters",
-    3,
-  );
+  if (hasInvalidParameters) {
+    pushRow(
+      "parameters_json",
+      "Parameters JSON (invalid draft)",
+      savedForm.parameters_text.trim(),
+      normalizedDraftParameters,
+      "parameters",
+      "Parameters",
+      3,
+    );
+  } else {
+    const revisionRows = buildPresetStructuredDiffRows(
+      buildCurrentPresetRevisionSnapshot(preset),
+      {
+        ...buildCurrentPresetRevisionSnapshot(preset),
+        name: form.name,
+        description: form.description,
+        strategy_id: form.strategy_id || null,
+        timeframe: form.timeframe.trim() || null,
+        benchmark_family: form.benchmark_family.trim() || null,
+        tags: parseExperimentTags(form.tags_text),
+        parameters: parsedDraftParameters,
+      },
+    );
+    rows.push(...revisionRows.filter((row) => row.group_key === "parameters"));
+  }
   const groups = groupPresetStructuredDiffRows(rows.filter((row) => row.changed));
   const changeCount = groups.reduce((total, group) => total + group.changed_count, 0);
   return {
