@@ -2902,18 +2902,36 @@
       "direction_id": "experiment-os",
       "title": "Label and summarize comparison history steps for navigation",
       "description": "Build on the new pushed comparison-history timeline by adding human-readable compare-step labeling and explicit summary surfaces for the current history entry, so operators can understand what back or forward will restore instead of navigating opaque URL-only state transitions.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply says the remaining work is history UX tuning: comparison state now lands in browser history, but entries still lack human-readable labels or explicit compare-step summaries. That is the clearest next executable follow-up now that history push semantics are complete.",
+      "priority_reason": "Completed in main session commit 8744831, which added human-readable comparison step labels and summaries, stored them in browser history state and `document.title`, surfaced the current step summary in the comparison toolbar, and hardened `popstate` restoration to read stored browser state before passing `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` and pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-push-comparison-state-transitions-into-history-timeline"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:10:00Z",
+      "updated_at": "2026-04-20T00:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison navigation from technically correct browser-history stepping into operator-readable timeline semantics, which improves trust and usability during multi-step comparison review."
+    },
+    {
+      "id": "planning-experiment-os-add-comparison-history-browser-panel",
+      "direction_id": "experiment-os",
+      "title": "Add a comparison history browser panel for direct step navigation",
+      "description": "Build the next comparison-history UX pass by exposing the stored compare-step metadata as a visible history or timeline panel that can list prior comparison entries and let operators jump directly to a selected step instead of relying only on browser back or forward plus the current-step summary.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is a separate history-browser UI: labels and summaries now exist on each history entry and the current toolbar, but operators still cannot expand compare steps into a list or jump directly through a timeline panel. That is the clearest executable next task after the completed history-labeling pass.",
+      "depends_on": [
+        "planning-experiment-os-label-and-summarize-comparison-history-steps"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T00:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os comparison navigation from a readable current-step model into a full operator-browsable history surface, so multi-step comparison review supports direct timeline inspection and recovery instead of browser-only stepping."
     },
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
@@ -2923,13 +2941,13 @@
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 5,
-      "priority_reason": "Cross-subview deep-link coordination remains valid follow-up, but the latest main-session reply now names human-readable comparison history labels or step summaries as the more immediate gap after push-state timeline support shipped. Keep this behind history-step readability work.",
+      "priority_reason": "Cross-subview deep-link coordination remains valid follow-up, but the latest main-session reply now names a separate comparison history-browser or timeline panel as the immediate remaining gap after labels, summaries, and `popstate` restoration shipped. Keep this behind direct history browsing work.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:10:00Z",
+      "updated_at": "2026-04-20T00:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison deep linking from one surface-local persistence feature into a control-room-wide navigation contract that keeps analysis context coherent as operators move across subviews."
     },
@@ -2941,13 +2959,13 @@
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 1,
-      "priority_reason": "Reverse drill-back for non-provenance semantic lines is still valid follow-up, but the latest main-session reply names browser-history rehydrate and cross-subview deep-link coordination as the more immediate remaining work after persistence shipped.",
+      "priority_reason": "Reverse drill-back for non-provenance semantic lines is still valid follow-up, but the latest main-session reply now leaves comparison history browsing and later cross-subview deep-link coordination as the more immediate navigation work after history labels, summaries, and `popstate` restoration shipped.",
       "depends_on": [
         "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:13:44Z",
+      "updated_at": "2026-04-20T00:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Further deepens experiment-os comparison traceability by widening bidirectional score-component selection beyond provenance panels into the remaining semantic explanation lines operators read during comparison review."
     }
