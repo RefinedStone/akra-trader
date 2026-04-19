@@ -3262,18 +3262,36 @@
       "direction_id": "experiment-os",
       "title": "Align manual gap-window picker haptics with concrete host shell contracts",
       "description": "Narrow the newly shipped best-effort host haptic bridge seam for manual gap-window picker sweep activation so Telegram, iOS or webview, and React Native shell integrations use the actual handler names and payload contracts expected by the host environments the app runs inside, instead of relying on broad candidate bridge guesses.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 19,
-      "priority_reason": "The latest main-session reply says the broad bridge fallback chain is now shipped, and explicitly calls out host integration concrete handler names and payloads as the remaining work. That makes shell-contract alignment the clearest executable next task after commit b6f45ff.",
+      "priority_reason": "Completed in main session commit 9810cf4, which replaced broad host-bridge guesses with explicit Telegram `HapticFeedback.impactOccurred(\"light\")`, `window.webkit.messageHandlers.akraTouchFeedback`, `ReactNativeWebView.postMessage(...)`, and `akra-trader:haptic-feedback` custom-event contracts, then verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-manual-gap-window-picker-touch-feedback-beyond-navigator-vibrate"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:00:00Z",
+      "updated_at": "2026-04-20T19:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os touch gesture trust moving from a generic best-effort host bridge chain toward production-ready shell-specific haptic contracts, so activation feedback can be dependable inside the actual native containers operators use."
+      "direction_relation_note": "Closed the web-side contract alignment gap for experiment-os touch gesture trust by fixing the haptic bridge to explicit Telegram, webkit, React Native WebView, and custom-event interfaces that host shells can now implement directly."
+    },
+    {
+      "id": "planning-experiment-os-implement-native-host-receivers-for-manual-gap-picker-haptic-contracts",
+      "direction_id": "experiment-os",
+      "title": "Implement native host receivers for manual gap-picker haptic contracts",
+      "description": "Carry the now-stable manual gap-window picker haptic contract into the actual host shells by wiring native-side receivers for the `akra-trader:haptic-feedback` envelope and `akraTouchFeedback` handler in each supported container, so the web app's activation feedback path is backed by concrete shell implementations instead of stopping at emitted bridge messages.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply says contract alignment is finished in commit 9810cf4 and explicitly names actual host shell implementation as the remaining step. That makes native receiver wiring the clearest executable next task for this queue refresh.",
+      "depends_on": [
+        "planning-experiment-os-align-manual-gap-window-picker-haptics-to-concrete-host-shell-contracts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os touch gesture trust from a web-side contract definition into end-to-end shell behavior, which is required before operators inside native containers can rely on the picker's haptic activation feedback."
     },
     {
       "id": "planning-experiment-os-differentiate-touch-hold-feedback-by-cancellation-reason-in-manual-gap-window-picker",
