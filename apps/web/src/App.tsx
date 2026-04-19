@@ -3005,6 +3005,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   showPinnedOnly: boolean;
   auditFilter: ComparisonHistorySyncAuditFilter;
   showResolvedAuditEntries: boolean;
+  expandedConflictReviewIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4790,6 +4791,11 @@ export default function App() {
   const [comparisonHistoryShowResolvedAuditEntries, setComparisonHistoryShowResolvedAuditEntries] = useState(
     () => initialComparisonHistoryPanelUiStateRef.current?.showResolvedAuditEntries ?? true,
   );
+  const [expandedHistoryConflictReviewIds, setExpandedHistoryConflictReviewIds] = useState<
+    Record<string, boolean>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.expandedConflictReviewIds ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5205,6 +5211,7 @@ export default function App() {
         showPinnedOnly: comparisonHistoryShowPinnedOnly,
         auditFilter: comparisonHistoryAuditFilter,
         showResolvedAuditEntries: comparisonHistoryShowResolvedAuditEntries,
+        expandedConflictReviewIds: expandedHistoryConflictReviewIds,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5219,6 +5226,7 @@ export default function App() {
     comparisonHistoryShowPinnedOnly,
     comparisonHistoryAuditFilter,
     comparisonHistoryShowResolvedAuditEntries,
+    expandedHistoryConflictReviewIds,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8157,6 +8165,7 @@ export default function App() {
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
             latestWorkspaceSyncState,
+            expandedHistoryConflictReviewIds,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8185,6 +8194,11 @@ export default function App() {
             onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
             onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
             onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
+            onToggleHistoryConflictReview: (auditId) =>
+              setExpandedHistoryConflictReviewIds((current) => ({
+                ...current,
+                [auditId]: !current[auditId],
+              })),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
@@ -9216,6 +9230,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     showPinnedOnly: false,
     auditFilter: "all",
     showResolvedAuditEntries: true,
+    expandedConflictReviewIds: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -9805,6 +9820,18 @@ function normalizeComparisonHistoryPanelUiState(
     showPinnedOnly: value?.showPinnedOnly === true,
     auditFilter: normalizeComparisonHistorySyncAuditFilter(value?.auditFilter),
     showResolvedAuditEntries: value?.showResolvedAuditEntries !== false,
+    expandedConflictReviewIds:
+      value?.expandedConflictReviewIds && typeof value.expandedConflictReviewIds === "object"
+        ? Object.entries(value.expandedConflictReviewIds).reduce<Record<string, boolean>>(
+            (accumulator, [key, candidate]) => {
+              if (candidate === true) {
+                accumulator[key] = true;
+              }
+              return accumulator;
+            },
+            {},
+          )
+        : {},
     activeWorkspaceOverviewRowId:
       typeof value?.activeWorkspaceOverviewRowId === "string"
         ? value.activeWorkspaceOverviewRowId.trim() || null
@@ -13003,6 +13030,7 @@ type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
   latestWorkspaceSyncState: ComparisonHistorySyncWorkspaceState;
+  expandedHistoryConflictReviewIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13032,6 +13060,7 @@ type RunSectionComparisonControls = {
   onChangeShowPinnedHistoryOnly: (value: boolean) => void;
   onChangeHistoryAuditFilter: (value: ComparisonHistorySyncAuditFilter) => void;
   onChangeShowResolvedHistoryAudits: (value: boolean) => void;
+  onToggleHistoryConflictReview: (auditId: string) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
@@ -13113,9 +13142,6 @@ function RunSection({
   onStop?: (runId: string) => Promise<void>;
   getOrderControls?: (run: Run) => RunOrderControls | null;
 }) {
-  const [expandedHistoryConflictReviewIds, setExpandedHistoryConflictReviewIds] = useState<
-    Record<string, boolean>
-  >({});
   const [expandedWorkspaceScoreDetailIds, setExpandedWorkspaceScoreDetailIds] = useState<
     Record<string, boolean>
   >({});
@@ -13175,11 +13201,6 @@ function RunSection({
           return true;
         })
     : [];
-  const toggleHistoryConflictReview = (auditId: string) =>
-    setExpandedHistoryConflictReviewIds((current) => ({
-      ...current,
-      [auditId]: !current[auditId],
-    }));
   const buildWorkspaceReviewRowSelectionId = (
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
@@ -13539,7 +13560,9 @@ function RunSection({
                                 )
                               : flatReviewRows.filter((row) => row.selectedSource === "local").length;
                             const remoteChoiceCount = reviewFieldCount - localChoiceCount;
-                            const reviewExpanded = Boolean(expandedHistoryConflictReviewIds[entry.auditId]);
+                            const reviewExpanded = Boolean(
+                              comparison.expandedHistoryConflictReviewIds[entry.auditId],
+                            );
                             const reviewResolvedAt =
                               conflictReview?.resolvedAt
                               ?? preferenceReview?.resolvedAt
@@ -13574,7 +13597,7 @@ function RunSection({
                                     <div className="comparison-history-browser-audit-actions">
                                       <button
                                         className="ghost-button"
-                                        onClick={() => toggleHistoryConflictReview(entry.auditId)}
+                                        onClick={() => comparison.onToggleHistoryConflictReview(entry.auditId)}
                                         type="button"
                                       >
                                         {reviewExpanded
