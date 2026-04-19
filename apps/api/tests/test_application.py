@@ -13792,6 +13792,11 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   orders_contract = get_run_subresource_contract("orders")
   positions_contract = get_run_subresource_contract("positions")
   metrics_contract = get_run_subresource_contract("metrics")
+  capabilities = RunSurfaceCapabilities()
+  shared_contracts = {
+    contract.contract_key: contract
+    for contract in capabilities.shared_contracts
+  }
 
   assert [contract.subresource_key for contract in contracts] == ["orders", "positions", "metrics"]
   assert orders_contract.body_key == "orders"
@@ -13806,8 +13811,15 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   assert metrics_contract.response_title == "Run metrics"
   assert metrics_contract.route_path == "/runs/{run_id}/metrics"
   assert metrics_contract.route_name == "get_run_metrics"
+  assert shared_contracts["subresource:orders"].schema_detail == {
+    "body_key": "orders",
+    "route_path": "/runs/{run_id}/orders",
+    "route_name": "get_run_orders",
+  }
+  assert shared_contracts["subresource:orders"].title == "Run order list"
+  assert shared_contracts["subresource:metrics"].member_keys == ("body:metrics", "route:get_run_metrics")
 
-  payload = serialize_run_surface_capabilities(RunSurfaceCapabilities())
+  payload = serialize_run_surface_capabilities(capabilities)
 
   assert payload["discovery"].keys() == {"shared_contracts"}
   assert "families" not in payload

@@ -23023,49 +23023,57 @@ def _serialize_run_metrics_subresource_body(
   return deepcopy(run.metrics)
 
 
-RUN_SUBRESOURCE_CONTRACTS: tuple[RunSubresourceContract, ...] = (
-  RunSubresourceContract(
-    subresource_key="orders",
-    body_key="orders",
-    response_title="Run order list",
-    route_path="/runs/{run_id}/orders",
-    route_name="get_run_orders",
-    body_serializer=lambda run, capabilities: _serialize_run_orders_subresource_body(
-      run,
-      capabilities=capabilities,
-    ),
+RUN_SUBRESOURCE_BODY_SERIALIZERS: dict[str, Callable[[RunRecord, RunSurfaceCapabilities], Any]] = {
+  "orders": lambda run, capabilities: _serialize_run_orders_subresource_body(
+    run,
+    capabilities=capabilities,
   ),
-  RunSubresourceContract(
-    subresource_key="positions",
-    body_key="positions",
-    response_title="Run positions",
-    route_path="/runs/{run_id}/positions",
-    route_name="get_run_positions",
-    body_serializer=lambda run, capabilities: _serialize_run_positions_subresource_body(
-      run,
-      capabilities=capabilities,
-    ),
+  "positions": lambda run, capabilities: _serialize_run_positions_subresource_body(
+    run,
+    capabilities=capabilities,
   ),
-  RunSubresourceContract(
-    subresource_key="metrics",
-    body_key="metrics",
-    response_title="Run metrics",
-    route_path="/runs/{run_id}/metrics",
-    route_name="get_run_metrics",
-    body_serializer=lambda run, capabilities: _serialize_run_metrics_subresource_body(
-      run,
-      capabilities=capabilities,
-    ),
+  "metrics": lambda run, capabilities: _serialize_run_metrics_subresource_body(
+    run,
+    capabilities=capabilities,
   ),
-)
+}
 
 
-def list_run_subresource_contracts() -> tuple[RunSubresourceContract, ...]:
-  return RUN_SUBRESOURCE_CONTRACTS
+def list_run_subresource_contracts(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> tuple[RunSubresourceContract, ...]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  contracts: list[RunSubresourceContract] = []
+  for shared_contract in resolved_capabilities.shared_contracts:
+    if shared_contract.contract_kind != "run_subresource":
+      continue
+    subresource_key = shared_contract.contract_key.removeprefix("subresource:")
+    body_serializer = RUN_SUBRESOURCE_BODY_SERIALIZERS.get(subresource_key)
+    if body_serializer is None:
+      raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+    body_key = shared_contract.schema_detail.get("body_key")
+    route_path = shared_contract.schema_detail.get("route_path")
+    route_name = shared_contract.schema_detail.get("route_name")
+    if not all(isinstance(value, str) and value for value in (body_key, route_path, route_name)):
+      raise ValueError(f"Invalid run subresource contract metadata: {shared_contract.contract_key}")
+    contracts.append(
+      RunSubresourceContract(
+        subresource_key=subresource_key,
+        body_key=body_key,
+        response_title=shared_contract.title,
+        route_path=route_path,
+        route_name=route_name,
+        body_serializer=body_serializer,
+      )
+    )
+  return tuple(contracts)
 
 
-def get_run_subresource_contract(subresource_key: str) -> RunSubresourceContract:
-  for contract in RUN_SUBRESOURCE_CONTRACTS:
+def get_run_subresource_contract(
+  subresource_key: str,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> RunSubresourceContract:
+  for contract in list_run_subresource_contracts(capabilities):
     if contract.subresource_key == subresource_key:
       return contract
   raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
@@ -23075,32 +23083,7 @@ def list_run_surface_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[RunSurfaceSharedContract, ...]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  base_contracts = tuple(
-    contract
-    for contract in resolved_capabilities.shared_contracts
-    if contract.contract_kind != "run_subresource"
-  )
-  subresource_contracts = tuple(
-    RunSurfaceSharedContract(
-      contract_key=f"subresource:{contract.subresource_key}",
-      contract_kind="run_subresource",
-      title=contract.response_title,
-      summary=(
-        f"Declarative route binding and serializer contract for the standalone "
-        f"`{contract.subresource_key}` run subresource."
-      ),
-      source_of_truth="run_subresource_contracts",
-      related_family_keys=(),
-      member_keys=(f"body:{contract.body_key}", f"route:{contract.route_name}"),
-      schema_detail={
-        "body_key": contract.body_key,
-        "route_path": contract.route_path,
-        "route_name": contract.route_name,
-      },
-    )
-    for contract in list_run_subresource_contracts()
-  )
-  return (*base_contracts, *subresource_contracts)
+  return resolved_capabilities.shared_contracts
 
 
 def serialize_run_surface_shared_contracts(
@@ -23164,7 +23147,7 @@ def serialize_run_subresource_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  contract = get_run_subresource_contract(subresource_key)
+  contract = get_run_subresource_contract(subresource_key, resolved_capabilities)
   return _serialize_run_subresource_envelope(
     run,
     capabilities=resolved_capabilities,

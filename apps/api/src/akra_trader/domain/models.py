@@ -979,6 +979,48 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
         ),
       ),
     ),
+    RunSurfaceSharedContract(
+      contract_key="subresource:orders",
+      contract_kind="run_subresource",
+      title="Run order list",
+      summary="Declarative route binding and serializer contract for the standalone `orders` run subresource.",
+      source_of_truth="run_subresource_contracts",
+      related_family_keys=(),
+      member_keys=("body:orders", "route:get_run_orders"),
+      schema_detail={
+        "body_key": "orders",
+        "route_path": "/runs/{run_id}/orders",
+        "route_name": "get_run_orders",
+      },
+    ),
+    RunSurfaceSharedContract(
+      contract_key="subresource:positions",
+      contract_kind="run_subresource",
+      title="Run positions",
+      summary="Declarative route binding and serializer contract for the standalone `positions` run subresource.",
+      source_of_truth="run_subresource_contracts",
+      related_family_keys=(),
+      member_keys=("body:positions", "route:get_run_positions"),
+      schema_detail={
+        "body_key": "positions",
+        "route_path": "/runs/{run_id}/positions",
+        "route_name": "get_run_positions",
+      },
+    ),
+    RunSurfaceSharedContract(
+      contract_key="subresource:metrics",
+      contract_kind="run_subresource",
+      title="Run metrics",
+      summary="Declarative route binding and serializer contract for the standalone `metrics` run subresource.",
+      source_of_truth="run_subresource_contracts",
+      related_family_keys=(),
+      member_keys=("body:metrics", "route:get_run_metrics"),
+      schema_detail={
+        "body_key": "metrics",
+        "route_path": "/runs/{run_id}/metrics",
+        "route_name": "get_run_metrics",
+      },
+    ),
   )
 
 
