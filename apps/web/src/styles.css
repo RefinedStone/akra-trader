@@ -214,6 +214,28 @@ select {
   font-size: 0.88rem;
 }
 
+.run-surface-family-rule-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.run-surface-family-rule-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-surface-family-rule-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
 .run-surface-family-section > span {
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
@@ -3908,6 +3930,7 @@ select {
   .grid,
   .strategy-columns,
   .run-surface-family-policy-grid,
+  .run-surface-family-rule-grid,
   .run-surface-family-grid,
   .run-surface-capability-grid,
   .run-list,

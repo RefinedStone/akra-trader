@@ -14541,7 +14541,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v3"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v4"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",
@@ -14552,9 +14552,12 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert "Run-list metric tiles" in capabilities.families[0].ui_surfaces
   assert capabilities.families[0].policy.policy_key == "comparison_surface_allowlist"
   assert capabilities.families[0].enforcement.level == "hard_gate"
+  assert capabilities.families[0].surface_rules[0].rule_key == "run_list_metric_tile_gate"
+  assert capabilities.families[0].surface_rules[0].surface_key == "run_list_metric_tiles"
   assert capabilities.families[1].family_key == "strategy_schema"
   assert capabilities.families[1].policy.policy_mode == "schema_contract"
   assert capabilities.families[1].enforcement.level == "advisory"
+  assert capabilities.families[1].surface_rules[1].surface_key == "preset_parameter_editor"
   assert capabilities.comparison_eligibility_contract.surfaces["return"].eligibility == "eligible"
   assert capabilities.comparison_eligibility_contract.surfaces["compare_toggle"].group == (
     "operational_workflow"

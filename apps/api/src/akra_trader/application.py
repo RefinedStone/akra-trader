@@ -22708,6 +22708,10 @@ def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> 
           **asdict(family.enforcement),
           "enforcement_points": list(family.enforcement.enforcement_points),
         },
+        "surface_rules": [
+          asdict(rule)
+          for rule in family.surface_rules
+        ],
         "ui_surfaces": list(family.ui_surfaces),
         "schema_sources": list(family.schema_sources),
       }

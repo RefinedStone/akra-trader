@@ -629,6 +629,17 @@ class RunSurfaceCapabilities:
     source_of_truth: str = ""
 
   @dataclass(frozen=True)
+  class SurfaceRule:
+    rule_key: str = ""
+    surface_key: str = ""
+    surface_label: str = ""
+    enforcement_point: str = ""
+    enforcement_mode: str = ""
+    level: str = ""
+    fallback_behavior: str = ""
+    source_of_truth: str = ""
+
+  @dataclass(frozen=True)
   class Family:
     family_key: str
     title: str
@@ -640,6 +651,7 @@ class RunSurfaceCapabilities:
     enforcement: "RunSurfaceCapabilities.Enforcement" = field(
       default_factory=lambda: RunSurfaceCapabilities.Enforcement()
     )
+    surface_rules: tuple["RunSurfaceCapabilities.SurfaceRule", ...] = ()
 
   comparison_eligibility_contract: ComparisonEligibilityContract = field(
     default_factory=default_comparison_eligibility_contract
@@ -673,6 +685,38 @@ class RunSurfaceCapabilities:
           level="hard_gate",
           source_of_truth="run_surface_capability_endpoint",
         ),
+        surface_rules=(
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="run_list_metric_tile_gate",
+            surface_key="run_list_metric_tiles",
+            surface_label="Run-list metric tiles",
+            enforcement_point="run_list_metric_gating",
+            enforcement_mode="eligible_only_drillback",
+            level="hard_gate",
+            fallback_behavior="render_metric_as_descriptive_only_when_surface_is_not_eligible",
+            source_of_truth="comparison_eligibility_contract.surfaces",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="boundary_note_group_annotation",
+            surface_key="boundary_note_panels",
+            surface_label="Boundary note panels",
+            enforcement_point="boundary_note_rendering",
+            enforcement_mode="group_boundary_annotation",
+            level="hard_gate",
+            fallback_behavior="render_shared_boundary_copy_without_surface_specific_drill_links",
+            source_of_truth="comparison_eligibility_contract.groups",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="order_workflow_score_link_exclusion",
+            surface_key="order_workflow_gates",
+            surface_label="Order workflow gates",
+            enforcement_point="drill_back_selection",
+            enforcement_mode="score_link_exclusion",
+            level="hard_gate",
+            fallback_behavior="keep_operational_workflow_controls_non_selectable",
+            source_of_truth="comparison_eligibility_contract.groups",
+          ),
+        ),
       ),
       RunSurfaceCapabilities.Family(
         family_key="strategy_schema",
@@ -700,6 +744,38 @@ class RunSurfaceCapabilities:
           fallback_behavior="fallback_to_freeform_parameter_entry_when_schema_missing",
           level="advisory",
           source_of_truth="strategy_metadata.parameter_schema",
+        ),
+        surface_rules=(
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="strategy_catalog_schema_hints",
+            surface_key="strategy_catalog_cards",
+            surface_label="Strategy catalog cards",
+            enforcement_point="schema_hint_rendering",
+            enforcement_mode="schema_hint_annotation",
+            level="advisory",
+            fallback_behavior="render_strategy_summary_without_typed_parameter_hints",
+            source_of_truth="strategy_metadata.parameter_schema",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="preset_editor_default_hydration",
+            surface_key="preset_parameter_editor",
+            surface_label="Preset parameter editor",
+            enforcement_point="parameter_editor_defaults",
+            enforcement_mode="typed_default_hydration",
+            level="advisory",
+            fallback_behavior="fallback_to_freeform_json_parameter_entry",
+            source_of_truth="strategy_metadata.parameter_schema",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="preset_revision_schema_diff",
+            surface_key="preset_revision_semantic_diffs",
+            surface_label="Preset revision semantic diffs",
+            enforcement_point="preset_diff_semantics",
+            enforcement_mode="schema_aware_delta_annotation",
+            level="advisory",
+            fallback_behavior="render_generic_revision_value_deltas",
+            source_of_truth="strategy_catalog_semantics",
+          ),
         ),
       ),
       RunSurfaceCapabilities.Family(
@@ -729,6 +805,38 @@ class RunSurfaceCapabilities:
           level="snapshot_required",
           source_of_truth="run_provenance.strategy",
         ),
+        surface_rules=(
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="run_snapshot_semantic_embed",
+            surface_key="run_strategy_snapshot",
+            surface_label="Run strategy snapshot",
+            enforcement_point="snapshot_serialization",
+            enforcement_mode="semantic_snapshot_embed",
+            level="snapshot_required",
+            fallback_behavior="render_snapshot_without_catalog_semantics",
+            source_of_truth="run_provenance.strategy",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="reference_provenance_semantic_render",
+            surface_key="reference_provenance_panels",
+            surface_label="Reference provenance panels",
+            enforcement_point="provenance_panel_rendering",
+            enforcement_mode="semantic_source_highlighting",
+            level="snapshot_required",
+            fallback_behavior="render_provenance_without_semantic_source_emphasis",
+            source_of_truth="run_provenance.strategy.catalog_semantics",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="artifact_deep_link_restore",
+            surface_key="benchmark_artifact_summaries",
+            surface_label="Benchmark artifact summaries",
+            enforcement_point="deep_link_restore",
+            enforcement_mode="artifact_subfocus_restore",
+            level="snapshot_required",
+            fallback_behavior="restore_artifact_panel_without_subfocus_state",
+            source_of_truth="benchmark_artifact_metadata",
+          ),
+        ),
       ),
       RunSurfaceCapabilities.Family(
         family_key="execution_controls",
@@ -757,6 +865,38 @@ class RunSurfaceCapabilities:
           level="hard_gate",
           source_of_truth="run_surface_capability_endpoint",
         ),
+        surface_rules=(
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="rerun_stop_button_gate",
+            surface_key="rerun_and_stop_controls",
+            surface_label="Rerun and stop controls",
+            enforcement_point="button_visibility",
+            enforcement_mode="mutation_control_gate",
+            level="hard_gate",
+            fallback_behavior="render_controls_as_operational_only_without_score_links",
+            source_of_truth="run_surface_capability_endpoint",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="compare_selection_operational_exclusion",
+            surface_key="compare_selection_workflow",
+            surface_label="Compare selection workflow",
+            enforcement_point="comparison_selection_exclusion",
+            enforcement_mode="selection_exclusion_gate",
+            level="hard_gate",
+            fallback_behavior="exclude_mutating_controls_from_comparison_selection",
+            source_of_truth="run_surface_capability_endpoint",
+          ),
+          RunSurfaceCapabilities.SurfaceRule(
+            rule_key="order_replace_cancel_boundary_note",
+            surface_key="order_replace_cancel_actions",
+            surface_label="Order replace/cancel actions",
+            enforcement_point="order_action_boundary_notes",
+            enforcement_mode="operational_boundary_annotation",
+            level="hard_gate",
+            fallback_behavior="render_order_actions_as_operational_only",
+            source_of_truth="order_lifecycle_summary",
+          ),
+        ),
       ),
     )
   )
@@ -775,10 +915,10 @@ class RunSurfaceCapabilities:
         "execution_controls",
       ),
       "schema_summary": (
-        "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, and machine-readable policy enforcement."
+        "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
       ),
       "schema_title": "Run-surface capability contract",
-      "schema_version": "run-surface-capabilities.v3",
+      "schema_version": "run-surface-capabilities.v4",
     }
   )
 
