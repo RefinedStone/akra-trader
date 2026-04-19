@@ -13926,7 +13926,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   }
 
   assert set(bindings_by_key) == {
+    "health_status",
     "run_surface_capabilities",
+    "market_data_status",
+    "operator_visibility",
+    "guarded_live_status",
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
     "preset_catalog_discovery",
@@ -13934,16 +13938,38 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "run_subresource:positions",
     "run_subresource:metrics",
   }
+  assert bindings_by_key["health_status"].scope == "app"
+  assert bindings_by_key["health_status"].route_path == "/health"
   assert bindings_by_key["run_surface_capabilities"].scope == "app"
   assert bindings_by_key["run_surface_capabilities"].route_path == "/capabilities/run-surfaces"
+  assert bindings_by_key["market_data_status"].route_path == "/market-data/status"
+  assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
+  assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
   assert bindings_by_key["run_subresource:orders"].scope == "run"
   assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
 
+  health_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["health_status"],
+    app=app,
+  )
   capabilities_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["run_surface_capabilities"],
+    app=app,
+  )
+  market_data_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["market_data_status"],
+    app=app,
+    filters={"timeframe": "5m"},
+  )
+  operator_visibility_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["operator_visibility"],
+    app=app,
+  )
+  guarded_live_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["guarded_live_status"],
     app=app,
   )
   orders_payload = serialize_standalone_surface_response(
@@ -13966,7 +13992,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     filters={"strategy_id": "ma_cross_v1"},
   )
 
+  assert health_payload == {"status": "ok"}
   assert capabilities_payload["discovery"]["shared_contracts"]
+  assert market_data_payload["provider"] == "seeded"
+  assert market_data_payload["venue"] == "binance"
+  assert market_data_payload["instruments"]
+  assert operator_visibility_payload["generated_at"]
+  assert "alerts" in operator_visibility_payload
+  assert guarded_live_payload["generated_at"]
+  assert "candidacy_status" in guarded_live_payload
   assert orders_payload["run_id"] == run.config.run_id
   assert "orders" in orders_payload
   assert strategy_payload

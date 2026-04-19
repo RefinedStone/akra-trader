@@ -177,10 +177,6 @@ def create_router(container: Container) -> APIRouter:
     get_run_surface.__name__ = binding.route_name
     return get_run_surface
 
-  @router.get("/health")
-  def health() -> dict[str, str]:
-    return {"status": "ok"}
-
   @router.get("/strategies")
   def list_strategies(
     lane: str | None = None,
@@ -201,14 +197,6 @@ def create_router(container: Container) -> APIRouter:
         "version": version,
       },
     )
-
-  @router.get("/references")
-  def list_references(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
-    binding = get_standalone_surface_runtime_binding(
-      "reference_catalog_discovery",
-      app.get_run_surface_capabilities(),
-    )
-    return serialize_standalone_surface_response(binding=binding, app=app)
 
   @router.get("/presets")
   def list_presets(
@@ -601,6 +589,8 @@ def create_router(container: Container) -> APIRouter:
     return serialize_run_response(run, app)
 
   for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
+    if binding.scope == "app" and binding.filter_keys:
+      continue
     router.add_api_route(
       binding.route_path,
       build_standalone_surface_route_handler(binding),
@@ -611,13 +601,15 @@ def create_router(container: Container) -> APIRouter:
 
   @router.get("/market-data/status")
   def get_market_data_status(timeframe: str = "5m", app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    status = app.get_market_data_status(timeframe)
-    return asdict(status)
-
-  @router.get("/operator/visibility")
-  def get_operator_visibility(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    visibility = app.get_operator_visibility()
-    return asdict(visibility)
+    binding = get_standalone_surface_runtime_binding(
+      "market_data_status",
+      app.get_run_surface_capabilities(),
+    )
+    return serialize_standalone_surface_response(
+      binding=binding,
+      app=app,
+      filters={"timeframe": timeframe},
+    )
 
   @router.post("/operator/incidents/external-sync")
   def sync_external_incident(
@@ -645,11 +637,6 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return asdict(status)
-
-  @router.get("/guarded-live")
-  def get_guarded_live_status(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    status = app.get_guarded_live_status()
     return asdict(status)
 
   @router.post("/guarded-live/kill-switch/engage")

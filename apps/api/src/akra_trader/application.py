@@ -23123,6 +23123,14 @@ def list_standalone_surface_runtime_bindings(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[StandaloneSurfaceRuntimeBinding, ...]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  health_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="health_status",
+    route_path="/health",
+    route_name="health",
+    response_title="Health",
+    scope="app",
+    binding_kind="health_status",
+  )
   capability_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="run_surface_capabilities",
     route_path="/capabilities/run-surfaces",
@@ -23130,6 +23138,31 @@ def list_standalone_surface_runtime_bindings(
     response_title="Run surface capabilities",
     scope="app",
     binding_kind="run_surface_capabilities",
+  )
+  market_data_status_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="market_data_status",
+    route_path="/market-data/status",
+    route_name="get_market_data_status",
+    response_title="Market data status",
+    scope="app",
+    binding_kind="market_data_status",
+    filter_keys=("timeframe",),
+  )
+  operator_visibility_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_visibility",
+    route_path="/operator/visibility",
+    route_name="get_operator_visibility",
+    response_title="Operator visibility",
+    scope="app",
+    binding_kind="operator_visibility",
+  )
+  guarded_live_status_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_status",
+    route_path="/guarded-live",
+    route_name="get_guarded_live_status",
+    response_title="Guarded live status",
+    scope="app",
+    binding_kind="guarded_live_status",
   )
   strategy_discovery_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="strategy_catalog_discovery",
@@ -23170,7 +23203,11 @@ def list_standalone_surface_runtime_bindings(
     for binding in list_run_subresource_runtime_bindings(resolved_capabilities)
   )
   return (
+    health_binding,
     capability_binding,
+    market_data_status_binding,
+    operator_visibility_binding,
+    guarded_live_status_binding,
     strategy_discovery_binding,
     reference_discovery_binding,
     preset_discovery_binding,
@@ -23196,8 +23233,16 @@ def serialize_standalone_surface_response(
   filters: dict[str, Any] | None = None,
 ) -> Any:
   resolved_filters = filters or {}
+  if binding.binding_kind == "health_status":
+    return {"status": "ok"}
   if binding.binding_kind == "run_surface_capabilities":
     return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+  if binding.binding_kind == "market_data_status":
+    return asdict(app.get_market_data_status(resolved_filters.get("timeframe") or "5m"))
+  if binding.binding_kind == "operator_visibility":
+    return asdict(app.get_operator_visibility())
+  if binding.binding_kind == "guarded_live_status":
+    return asdict(app.get_guarded_live_status())
   if binding.binding_kind == "strategy_catalog_discovery":
     return [
       serialize_strategy(strategy)
