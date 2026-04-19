@@ -3729,19 +3729,37 @@
       "id": "planning-experiment-os-persist-transient-interaction-state-inside-comparison-deep-links",
       "direction_id": "experiment-os",
       "title": "Persist transient interaction state inside comparison deep-link surfaces",
-      "description": "Build on the shipped structural `subFocusKey` comparison deep-link model by deciding and persisting the still-ephemeral interaction state inside each selected surface, such as tooltip open state and deeper artifact hover or collapse context, so reopening a deep link can restore the exact transient evidence view instead of stopping at structural provenance line or section anchors.",
-      "status": "ready",
+      "description": "Build on the shipped structural `subFocusKey` comparison deep-link model by deciding and persisting the still-ephemeral interaction state inside each selected surface, such as tooltip open state and deeper artifact hover or collapse context, so reopening a deep link can restore the exact transient evidence view instead of stopping at structural provenance line or section anchors. This task is now completed for the current comparison surface layer through persisted `detailExpanded` and metric-tooltip `tooltipKey` state; a narrower provenance-artifact ephemeral-state follow-up remains.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 33,
-      "priority_reason": "The latest main-session reply says commit b7bc88b completed structural deep-link restoration for provenance line, artifact card, and artifact section targets, and explicitly leaves tooltip-open state plus finer artifact hover or collapse interaction state unrestored. That makes transient interaction-state restoration the clearest executable next task for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit 2f22439, which persisted comparison-surface `detailExpanded` and metric tooltip `tooltipKey` state into selection payloads, URL, and history restoration, verified the behavior with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-restore-deeper-surface-subfocus-inside-comparison-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:56:00Z",
+      "updated_at": "2026-04-20T23:58:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison-state durability from restored structural evidence anchors into the transient interaction state operators actually use while inspecting nested comparison provenance."
+    },
+    {
+      "id": "planning-experiment-os-persist-provenance-artifact-ephemeral-state-inside-comparison-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Persist provenance artifact ephemeral state inside comparison deep-link surfaces",
+      "description": "Narrow the remaining comparison deep-link persistence gap to provenance artifact internals by carrying finer-grained ephemeral interaction state, such as artifact-local hover focus, nested collapse toggles, or similar transient sub-controls, in the deep-link payload and restoration path so reopening a comparison link returns operators to the exact artifact evidence state instead of only the artifact card, section, and current metric-tooltip shell.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 34,
+      "priority_reason": "The latest main-session reply says commit 2f22439 finished comparison-surface transient state for `detailExpanded` and metric tooltip focus, and directly identifies provenance artifact-local hover or extra collapse state as the remaining executable deep-link restoration gap. That makes this the clearest next task for builtin queue continuation.",
+      "depends_on": [
+        "planning-experiment-os-persist-transient-interaction-state-inside-comparison-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:58:30Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison deep links moving from panel-level and current surface transient restoration into the last provenance-artifact micro-interactions operators use while inspecting nested evidence."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
