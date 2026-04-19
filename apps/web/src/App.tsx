@@ -408,6 +408,7 @@ type ComparisonScoreLinkTarget = {
   componentKey: string;
   source: ComparisonScoreLinkSource;
   originRunId: string | null;
+  subFocusKey: string | null;
 };
 
 type ComparisonScoreLinkedRunRole = "baseline" | "target";
@@ -2817,6 +2818,7 @@ const COMPARISON_FOCUS_SECTION_SEARCH_PARAM = "compare_focus_section";
 const COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM = "compare_focus_component";
 const COMPARISON_FOCUS_SOURCE_SEARCH_PARAM = "compare_focus_source";
 const COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM = "compare_focus_origin_run_id";
+const COMPARISON_FOCUS_DETAIL_SEARCH_PARAM = "compare_focus_detail";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
@@ -9628,6 +9630,7 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
     COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM,
     COMPARISON_FOCUS_SOURCE_SEARCH_PARAM,
     COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM,
+    COMPARISON_FOCUS_DETAIL_SEARCH_PARAM,
   ].some((key) => params.has(key));
   if (!hasComparisonParams) {
     return null;
@@ -9643,6 +9646,9 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
     params.get(COMPARISON_FOCUS_SOURCE_SEARCH_PARAM),
   ) ?? "drillback";
   const focusOriginRunId = params.get(COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM)?.trim() ?? "";
+  const focusDetail = normalizeComparisonScoreLinkSubFocusKey(
+    params.get(COMPARISON_FOCUS_DETAIL_SEARCH_PARAM),
+  );
 
   return {
     intent,
@@ -9654,6 +9660,7 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
             originRunId: focusOriginRunId || null,
             section: focusSection,
             source: focusSource,
+            subFocusKey: focusDetail,
           }
         : null,
     selectedRunIds,
@@ -9676,6 +9683,7 @@ function buildComparisonSelectionHistoryUrl(
   params.delete(COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_SOURCE_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_DETAIL_SEARCH_PARAM);
 
   const normalizedSelection = normalizeControlRoomComparisonSelection(selection);
   normalizedSelection.selectedRunIds.forEach((runId) => params.append(COMPARISON_RUN_ID_SEARCH_PARAM, runId));
@@ -9689,6 +9697,9 @@ function buildComparisonSelectionHistoryUrl(
     params.set(COMPARISON_FOCUS_SOURCE_SEARCH_PARAM, normalizedSelection.scoreLink.source);
     if (normalizedSelection.scoreLink.originRunId) {
       params.set(COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM, normalizedSelection.scoreLink.originRunId);
+    }
+    if (normalizedSelection.scoreLink.subFocusKey) {
+      params.set(COMPARISON_FOCUS_DETAIL_SEARCH_PARAM, normalizedSelection.scoreLink.subFocusKey);
     }
   }
   const nextSearch = params.toString();
@@ -12212,6 +12223,7 @@ function normalizeControlRoomComparisonSelection(
               scoreLink.originRunId && selectedRunIds.includes(scoreLink.originRunId)
                 ? scoreLink.originRunId
                 : null,
+            subFocusKey: scoreLink.subFocusKey,
           }
         : null,
   };
@@ -12237,6 +12249,7 @@ function isSameComparisonSelection(
         && normalizedLeft.scoreLink.componentKey === normalizedRight.scoreLink.componentKey
         && normalizedLeft.scoreLink.source === normalizedRight.scoreLink.source
         && normalizedLeft.scoreLink.originRunId === normalizedRight.scoreLink.originRunId
+        && normalizedLeft.scoreLink.subFocusKey === normalizedRight.scoreLink.subFocusKey
       )
     )
   );
@@ -12256,6 +12269,10 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
       ),
     );
     parts.push(formatComparisonScoreLinkSourceLabel(entry.selection.scoreLink.source));
+    const subFocusLabel = formatComparisonScoreLinkSubFocusLabel(entry.selection.scoreLink.subFocusKey);
+    if (subFocusLabel) {
+      parts.push(subFocusLabel);
+    }
   }
   if (entry.pinned) {
     parts.push("Pinned");
@@ -12316,6 +12333,7 @@ function buildComparisonHistoryStepDescriptor(
       normalizedSelection.scoreLink.componentKey,
     );
     const sourceLabel = formatComparisonScoreLinkSourceLabel(normalizedSelection.scoreLink.source);
+    const subFocusLabel = formatComparisonScoreLinkSubFocusLabel(normalizedSelection.scoreLink.subFocusKey);
     const focusRunLabel = resolveComparisonHistoryRunLabel(
       normalizedSelection.scoreLink.narrativeRunId,
       runs,
@@ -12338,6 +12356,7 @@ function buildComparisonHistoryStepDescriptor(
       normalizedSelection.selectedRunIds.length > 1
         ? `${intentLabel} across ${normalizedSelection.selectedRunIds.length} runs.`
         : `${intentLabel} with one staged run.`,
+      subFocusLabel ? `Detail ${subFocusLabel}.` : null,
       originRunLabel && originRunLabel !== focusRunLabel
         ? `Origin run ${originRunLabel}.`
         : null,
@@ -12458,6 +12477,10 @@ function normalizeComparisonScoreLinkSource(value: unknown): ComparisonScoreLink
   return null;
 }
 
+function normalizeComparisonScoreLinkSubFocusKey(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLinkTarget | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -12472,6 +12495,7 @@ function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLink
     typeof candidate.originRunId === "string" && candidate.originRunId.trim()
       ? candidate.originRunId.trim()
       : null;
+  const subFocusKey = normalizeComparisonScoreLinkSubFocusKey(candidate.subFocusKey);
   if (!narrativeRunId || !componentKey || !section) {
     return null;
   }
@@ -12481,6 +12505,7 @@ function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLink
     originRunId,
     section,
     source,
+    subFocusKey,
   };
 }
 
@@ -16780,6 +16805,7 @@ function RunComparisonPanel({
   const scoreDetailRowRefs = useRef(new Map<string, HTMLButtonElement>());
   const metricCellRefs = useRef(new Map<string, HTMLElement>());
   const provenancePanelRefs = useRef(new Map<string, HTMLElement>());
+  const provenanceSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
@@ -17250,6 +17276,8 @@ function RunComparisonPanel({
     componentKey: string,
   ) => `${narrativeRunId}:${section}:${componentKey}`;
   const buildComparisonMetricCellRefKey = (runId: string, componentKey: string) => `${runId}:${componentKey}`;
+  const buildComparisonProvenanceSubFocusRefKey = (runId: string, subFocusKey: string) =>
+    `${runId}:${subFocusKey}`;
 
   const registerComparisonOverviewCardRef =
     (narrativeRunId: string, section: ComparisonScoreSection) =>
@@ -17291,6 +17319,16 @@ function RunComparisonPanel({
     provenancePanelRefs.current.delete(runId);
   };
 
+  const registerComparisonProvenanceSubFocusRef =
+    (runId: string, subFocusKey: string) => (node: HTMLElement | null) => {
+      const key = buildComparisonProvenanceSubFocusRefKey(runId, subFocusKey);
+      if (node) {
+        provenanceSubFocusRefs.current.set(key, node);
+        return;
+      }
+      provenanceSubFocusRefs.current.delete(key);
+    };
+
   const updateSelectedScoreLink = (nextSelection: ComparisonScoreLinkTarget | null) => {
     onChangeScoreLink(nextSelection, nextSelection ? "push" : "replace");
   };
@@ -17300,6 +17338,7 @@ function RunComparisonPanel({
     section: ComparisonScoreSection,
     componentKey: string,
     source: ComparisonScoreLinkSource,
+    subFocusKey: string | null = null,
   ) => {
     const nextSelection = resolveComparisonScoreDrillBackTarget(
       comparison,
@@ -17315,6 +17354,7 @@ function RunComparisonPanel({
       ...nextSelection,
       originRunId: runId,
       source,
+      subFocusKey,
     } satisfies ComparisonScoreLinkTarget;
     updateSelectedScoreLink(
       isSameComparisonScoreLinkTarget(selectedScoreLink, resolvedSelection)
@@ -17707,6 +17747,18 @@ function RunComparisonPanel({
       }
     }
     if (selectedScoreLink.source === "provenance") {
+      if (selectedScoreLink.subFocusKey) {
+        const provenanceSubFocus = provenanceSubFocusRefs.current.get(
+          buildComparisonProvenanceSubFocusRefKey(
+            selectedScoreLink.originRunId ?? selectedScoreLink.narrativeRunId,
+            selectedScoreLink.subFocusKey,
+          ),
+        );
+        if (provenanceSubFocus) {
+          provenanceSubFocus.scrollIntoView(scrollOptions);
+          return;
+        }
+      }
       const provenancePanel = provenancePanelRefs.current.get(
         selectedScoreLink.originRunId ?? selectedScoreLink.narrativeRunId,
       );
@@ -17983,16 +18035,18 @@ function RunComparisonPanel({
                         }
                       : null
                   }
-                  onDrillBackScoreLink={(section, componentKey) =>
+                  onDrillBackScoreLink={(section, componentKey, subFocusKey) =>
                     handleComparisonScoreDrillBack(
                       run.run_id,
                       section,
                       componentKey,
                       "provenance",
+                      subFocusKey,
                     )
                   }
                   panelRef={registerComparisonProvenancePanelRef(run.run_id)}
                   panelRunId={run.run_id}
+                  registerSubFocusRef={registerComparisonProvenanceSubFocusRef}
                   reference={run.reference}
                   referenceVersion={run.reference_version}
                   strategySemantics={run.catalog_semantics}
@@ -18443,6 +18497,7 @@ function ComparisonNarrativeScoreBreakdown({
                             originRunId: null,
                             section: section.key,
                             source: "overview",
+                            subFocusKey: null,
                           },
                     )
                   : undefined
@@ -18513,6 +18568,7 @@ function ComparisonNarrativeScoreBreakdown({
                                 originRunId: null,
                                 section: section.key,
                                 source: "drillback",
+                                subFocusKey: null,
                               },
                         )
                       }
@@ -20278,6 +20334,7 @@ function ReferenceRunProvenanceSummary({
   onDrillBackScoreLink,
   panelRef,
   panelRunId,
+  registerSubFocusRef,
   reference,
   referenceVersion,
   strategySemantics,
@@ -20287,9 +20344,17 @@ function ReferenceRunProvenanceSummary({
   benchmarkArtifacts: BenchmarkArtifact[];
   externalCommand: string[];
   linkedScore?: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
-  onDrillBackScoreLink?: (section: ComparisonScoreSection, componentKey: string) => void;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    subFocusKey?: string | null,
+  ) => void;
   panelRef?: (node: HTMLElement | null) => void;
   panelRunId: string;
+  registerSubFocusRef?: (
+    runId: string,
+    subFocusKey: string,
+  ) => (node: HTMLElement | null) => void;
   reference: ReferenceSource;
   referenceVersion?: string | null;
   strategySemantics?: {
@@ -20357,20 +20422,29 @@ function ReferenceRunProvenanceSummary({
   const highlightOrigin =
     linkedScoreSelection?.source === "provenance"
     && linkedScoreSelection?.originRunId === panelRunId;
+  const activeProvenanceSubFocusKey =
+    linkedScoreSelection?.source === "provenance"
+      ? linkedScoreSelection.subFocusKey
+      : null;
   const renderProvenanceCopyLine = ({
     children,
     componentKey,
     highlighted = false,
+    subFocusKey,
     section,
   }: {
     children: string;
     componentKey?: string;
     highlighted?: boolean;
+    subFocusKey?: string;
     section?: ComparisonScoreSection;
   }) => {
     const className =
       [
         highlighted ? "comparison-linked-copy" : "",
+        subFocusKey && activeProvenanceSubFocusKey === subFocusKey
+          ? "comparison-linked-subfocus"
+          : "",
         section && componentKey && onDrillBackScoreLink
           ? "reference-provenance-link comparison-drillback-target"
           : "",
@@ -20381,20 +20455,23 @@ function ReferenceRunProvenanceSummary({
       return <p className={className}>{children}</p>;
     }
     const isPressed =
-      linkedScoreSelection?.section === section && linkedScoreSelection.componentKey === componentKey;
+      linkedScoreSelection?.section === section
+      && linkedScoreSelection.componentKey === componentKey
+      && (!subFocusKey || !activeProvenanceSubFocusKey || activeProvenanceSubFocusKey === subFocusKey);
     return (
       <button
         aria-label={`Trace ${formatComparisonScoreComponentLabel(section, componentKey)}`}
         aria-pressed={isPressed}
         className={className}
-        onClick={() => onDrillBackScoreLink(section, componentKey)}
+        onClick={() => onDrillBackScoreLink(section, componentKey, subFocusKey ?? null)}
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") {
             return;
           }
           event.preventDefault();
-          onDrillBackScoreLink(section, componentKey);
+          onDrillBackScoreLink(section, componentKey, subFocusKey ?? null);
         }}
+        ref={subFocusKey ? registerSubFocusRef?.(panelRunId, subFocusKey) : undefined}
         type="button"
       >
         {children}
@@ -20426,6 +20503,7 @@ function ReferenceRunProvenanceSummary({
           children: `ID: ${reference.reference_id}`,
           componentKey: "source_descriptor",
           highlighted: highlightReferenceIdentity,
+          subFocusKey: buildComparisonProvenanceLineSubFocusKey("reference_id"),
           section: "semantics",
         })}
         {reference.homepage
@@ -20433,6 +20511,7 @@ function ReferenceRunProvenanceSummary({
               children: `Homepage: ${reference.homepage}`,
               componentKey: "source_descriptor",
               highlighted: highlightReferenceIdentity,
+              subFocusKey: buildComparisonProvenanceLineSubFocusKey("homepage"),
               section: "semantics",
             })
           : null}
@@ -20441,6 +20520,7 @@ function ReferenceRunProvenanceSummary({
             children: `Semantic kind: ${strategySemantics.strategy_kind}`,
             componentKey: "strategy_kind",
             highlighted: highlightStrategyKind,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("strategy_kind"),
             section: "semantics",
           })
         ) : null}
@@ -20449,6 +20529,7 @@ function ReferenceRunProvenanceSummary({
             children: `Execution model: ${strategySemantics.execution_model}`,
             componentKey: "execution_model",
             highlighted: highlightExecutionModel,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("execution_model"),
             section: "semantics",
           })
         ) : null}
@@ -20457,6 +20538,7 @@ function ReferenceRunProvenanceSummary({
             children: `Parameter contract: ${strategySemantics.parameter_contract}`,
             componentKey: "parameter_contract",
             highlighted: highlightParameterContract,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("parameter_contract"),
             section: "semantics",
           })
         ) : null}
@@ -20465,6 +20547,7 @@ function ReferenceRunProvenanceSummary({
             children: `Semantic source: ${strategySemantics.source_descriptor}`,
             componentKey: "source_descriptor",
             highlighted: highlightSourceDescriptor,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("semantic_source"),
             section: "semantics",
           })
         ) : null}
@@ -20473,6 +20556,7 @@ function ReferenceRunProvenanceSummary({
             children: `Operator notes: ${strategySemantics.operator_notes.join(" | ")}`,
             componentKey: "vocabulary",
             highlighted: highlightOperatorNotes,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("operator_notes"),
             section: "semantics",
           })
         ) : null}
@@ -20481,6 +20565,7 @@ function ReferenceRunProvenanceSummary({
               children: `Working dir: ${workingDirectory}`,
               componentKey: "provenance_richness",
               highlighted: highlightExecutionContext,
+              subFocusKey: buildComparisonProvenanceLineSubFocusKey("working_directory"),
               section: "context",
             })
           : null}
@@ -20489,6 +20574,7 @@ function ReferenceRunProvenanceSummary({
               children: `Command: ${externalCommand.join(" ")}`,
               componentKey: "provenance_richness",
               highlighted: highlightExecutionContext,
+              subFocusKey: buildComparisonProvenanceLineSubFocusKey("command"),
               section: "context",
             })
           : null}
@@ -20499,20 +20585,34 @@ function ReferenceRunProvenanceSummary({
               const sectionEntries = formatBenchmarkArtifactSectionEntries(artifact.sections ?? {});
               const artifactComponentKey =
                 summaryEntries.length || sectionEntries.length ? "benchmark_story_bonus" : "provenance_richness";
+              const artifactSubFocusKey = buildComparisonProvenanceArtifactSubFocusKey(artifact.path);
+              const artifactSectionSubFocusPrefix = `provenance-artifact-section:${encodeComparisonScoreLinkToken(
+                artifact.path,
+              )}:`;
               const artifactIsPressed =
                 linkedScoreSelection?.section === "context"
-                && linkedScoreSelection.componentKey === artifactComponentKey;
+                && linkedScoreSelection.componentKey === artifactComponentKey
+                && (
+                  !activeProvenanceSubFocusKey
+                  || activeProvenanceSubFocusKey === artifactSubFocusKey
+                  || activeProvenanceSubFocusKey.startsWith(artifactSectionSubFocusPrefix)
+                );
               return (
                 <article
                   aria-label={`Trace ${formatComparisonScoreComponentLabel("context", artifactComponentKey)}`}
                   aria-pressed={onDrillBackScoreLink ? artifactIsPressed : undefined}
                   className={`reference-artifact-card ${highlightArtifacts ? "is-linked" : ""} ${
+                    activeProvenanceSubFocusKey === artifactSubFocusKey
+                    || activeProvenanceSubFocusKey?.startsWith(artifactSectionSubFocusPrefix)
+                      ? "is-subfocus"
+                      : ""
+                  } ${
                     onDrillBackScoreLink ? "is-drillback comparison-drillback-target" : ""
                   }`.trim()}
                   key={`${artifact.kind}-${artifact.path}`}
                   onClick={
                     onDrillBackScoreLink
-                      ? () => onDrillBackScoreLink("context", artifactComponentKey)
+                      ? () => onDrillBackScoreLink("context", artifactComponentKey, artifactSubFocusKey)
                       : undefined
                   }
                   onKeyDown={
@@ -20522,10 +20622,11 @@ function ReferenceRunProvenanceSummary({
                             return;
                           }
                           event.preventDefault();
-                          onDrillBackScoreLink("context", artifactComponentKey);
+                          onDrillBackScoreLink("context", artifactComponentKey, artifactSubFocusKey);
                         }
                       : undefined
                   }
+                  ref={registerSubFocusRef?.(panelRunId, artifactSubFocusKey)}
                   role={onDrillBackScoreLink ? "button" : undefined}
                   tabIndex={onDrillBackScoreLink ? 0 : undefined}
                 >
@@ -20554,10 +20655,48 @@ function ReferenceRunProvenanceSummary({
                   ) : null}
                   {sectionEntries.length ? (
                     <div className="reference-artifact-sections">
-                      {sectionEntries.map(([key, lines]) => (
-                        <article className="reference-artifact-section-card" key={`${artifact.path}-${key}`}>
+                      {sectionEntries.map(([key, lines]) => {
+                        const sectionSubFocusKey = buildComparisonProvenanceArtifactSectionSubFocusKey(
+                          artifact.path,
+                          key,
+                        );
+                        const sectionIsPressed =
+                          linkedScoreSelection?.section === "context"
+                          && linkedScoreSelection.componentKey === artifactComponentKey
+                          && activeProvenanceSubFocusKey === sectionSubFocusKey;
+                        return (
+                        <article
+                          className={`reference-artifact-section-card ${
+                            activeProvenanceSubFocusKey === sectionSubFocusKey ? "is-subfocus" : ""
+                          }`.trim()}
+                          key={`${artifact.path}-${key}`}
+                        >
                           <div className="reference-artifact-section-head">
-                            <strong>{formatBenchmarkArtifactSectionLabel(key)}</strong>
+                            {onDrillBackScoreLink ? (
+                              <button
+                                aria-label={`Trace ${formatBenchmarkArtifactSectionLabel(key)}`}
+                                aria-pressed={sectionIsPressed}
+                                className="reference-artifact-section-link"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  onDrillBackScoreLink("context", artifactComponentKey, sectionSubFocusKey);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key !== "Enter" && event.key !== " ") {
+                                    return;
+                                  }
+                                  event.preventDefault();
+                                  event.stopPropagation();
+                                  onDrillBackScoreLink("context", artifactComponentKey, sectionSubFocusKey);
+                                }}
+                                ref={registerSubFocusRef?.(panelRunId, sectionSubFocusKey)}
+                                type="button"
+                              >
+                                <strong>{formatBenchmarkArtifactSectionLabel(key)}</strong>
+                              </button>
+                            ) : (
+                              <strong>{formatBenchmarkArtifactSectionLabel(key)}</strong>
+                            )}
                           </div>
                           <div className="reference-artifact-section-body">
                             {lines.map((line) => (
@@ -20565,7 +20704,7 @@ function ReferenceRunProvenanceSummary({
                             ))}
                           </div>
                         </article>
-                      ))}
+                      );})}
                     </div>
                   ) : null}
                 </article>
@@ -20577,6 +20716,7 @@ function ReferenceRunProvenanceSummary({
             children: `Artifacts: ${artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}`,
             componentKey: "provenance_richness",
             highlighted: highlightArtifacts,
+            subFocusKey: buildComparisonProvenanceLineSubFocusKey("provenance_richness"),
             section: "context",
           })
         )}
@@ -20988,6 +21128,64 @@ function formatComparisonScoreLinkSourceLabel(source: ComparisonScoreLinkSource)
   }
 }
 
+function encodeComparisonScoreLinkToken(value: string) {
+  return encodeURIComponent(value);
+}
+
+function decodeComparisonScoreLinkToken(value: string) {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function buildComparisonProvenanceLineSubFocusKey(key: string) {
+  return `provenance-line:${encodeComparisonScoreLinkToken(key)}`;
+}
+
+function buildComparisonProvenanceArtifactSubFocusKey(path: string) {
+  return `provenance-artifact:${encodeComparisonScoreLinkToken(path)}`;
+}
+
+function buildComparisonProvenanceArtifactSectionSubFocusKey(path: string, sectionKey: string) {
+  return `provenance-artifact-section:${encodeComparisonScoreLinkToken(path)}:${encodeComparisonScoreLinkToken(sectionKey)}`;
+}
+
+function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
+  if (!subFocusKey) {
+    return null;
+  }
+  if (subFocusKey.startsWith("provenance-line:")) {
+    const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("provenance-line:".length));
+    const labels: Record<string, string> = {
+      command: "Command",
+      execution_model: "Execution model",
+      homepage: "Homepage",
+      operator_notes: "Operator notes",
+      parameter_contract: "Parameter contract",
+      provenance_richness: "Artifact inventory",
+      reference_id: "Reference ID",
+      semantic_source: "Semantic source",
+      strategy_kind: "Semantic kind",
+      vocabulary: "Vocabulary",
+      working_directory: "Working dir",
+    };
+    return labels[lineKey] ?? lineKey.replace(/_/g, " ");
+  }
+  if (subFocusKey.startsWith("provenance-artifact-section:")) {
+    const [, encodedPath = "", encodedSection = ""] = subFocusKey.split(":");
+    const path = decodeComparisonScoreLinkToken(encodedPath);
+    const sectionKey = decodeComparisonScoreLinkToken(encodedSection);
+    return `${shortenIdentifier(path)} / ${formatBenchmarkArtifactSectionLabel(sectionKey)}`;
+  }
+  if (subFocusKey.startsWith("provenance-artifact:")) {
+    const path = decodeComparisonScoreLinkToken(subFocusKey.slice("provenance-artifact:".length));
+    return shortenIdentifier(path);
+  }
+  return subFocusKey;
+}
+
 function formatComparisonScoreComponentDetail(
   section: "metrics" | "semantics" | "context",
   key: string,
@@ -21134,6 +21332,7 @@ function isSameComparisonScoreLinkTarget(
     && left.componentKey === right.componentKey
     && left.source === right.source
     && left.originRunId === right.originRunId
+    && left.subFocusKey === right.subFocusKey
   );
 }
 
@@ -21158,6 +21357,7 @@ function resolveComparisonScoreDrillBackTarget(
           originRunId: null,
           section,
           source: "drillback",
+          subFocusKey: null,
         }
       : null;
   }
@@ -21183,6 +21383,7 @@ function resolveComparisonScoreDrillBackTarget(
         originRunId: null,
         section,
         source: "drillback",
+        subFocusKey: null,
       }
     : null;
 }

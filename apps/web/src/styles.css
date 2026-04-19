@@ -3037,6 +3037,11 @@ select {
   word-break: break-word;
 }
 
+.comparison-linked-subfocus {
+  color: rgba(255, 255, 255, 0.96);
+  text-shadow: 0 0 12px rgba(var(--comparison-accent-rgb), 0.18);
+}
+
 .reference-artifact-list {
   display: grid;
   gap: 10px;
@@ -3064,6 +3069,16 @@ select {
 .reference-artifact-card.is-drillback:focus-visible {
   border-color: rgba(var(--comparison-accent-rgb), 0.34);
   box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.14);
+}
+
+.reference-artifact-card.is-subfocus {
+  border-color: rgba(var(--comparison-accent-rgb), 0.5);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.16), rgba(var(--comparison-accent-rgb), 0.06)),
+    rgba(4, 10, 17, 0.58);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16),
+    0 10px 20px rgba(0, 0, 0, 0.18);
 }
 
 .reference-artifact-head {
@@ -3135,6 +3150,16 @@ select {
   background: rgba(88, 217, 255, 0.04);
 }
 
+.reference-artifact-section-card.is-subfocus {
+  border-color: rgba(var(--comparison-accent-rgb), 0.44);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.14), rgba(var(--comparison-accent-rgb), 0.05)),
+    rgba(88, 217, 255, 0.05);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.14),
+    0 8px 16px rgba(0, 0, 0, 0.16);
+}
+
 .reference-artifact-section-head {
   display: flex;
   justify-content: space-between;
@@ -3145,6 +3170,25 @@ select {
 .reference-artifact-section-head strong {
   font-size: 0.82rem;
   color: var(--text);
+}
+
+.reference-artifact-section-link {
+  display: inline-flex;
+  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.reference-artifact-section-link:hover,
+.reference-artifact-section-link:focus-visible {
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .reference-artifact-section-body {
