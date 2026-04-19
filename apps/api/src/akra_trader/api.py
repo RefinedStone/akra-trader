@@ -136,6 +136,18 @@ def create_router(container: Container) -> APIRouter:
   def get_app() -> TradingApplication:
     return container.app
 
+  def serialize_run_response(run: Any, app: TradingApplication) -> dict[str, Any]:
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+
+  def serialize_run_comparison_response(
+    comparison: Any,
+    app: TradingApplication,
+  ) -> dict[str, Any]:
+    return serialize_run_comparison(
+      comparison,
+      capabilities=app.get_run_surface_capabilities(),
+    )
+
   @router.get("/health")
   def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -313,7 +325,7 @@ def create_router(container: Container) -> APIRouter:
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
     return [
-      serialize_run(run)
+      serialize_run_response(run, app)
       for run in app.list_runs(
         mode=mode,
         strategy_id=strategy_id,
@@ -338,7 +350,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run_comparison(comparison)
+    return serialize_run_comparison_response(comparison, app)
 
   @router.post("/runs/backtests")
   def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
@@ -359,14 +371,14 @@ def create_router(container: Container) -> APIRouter:
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.get("/runs/backtests/{run_id}")
   def get_backtest_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
     run = app.get_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/backtests")
   def rerun_backtest_from_boundary(
@@ -379,7 +391,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/sandbox")
   def rerun_sandbox_from_boundary(
@@ -392,7 +404,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/paper")
   def rerun_paper_from_boundary(
@@ -405,7 +417,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/sandbox")
   def start_sandbox_run(
@@ -428,14 +440,17 @@ def create_router(container: Container) -> APIRouter:
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/sandbox/{run_id}/stop")
   def stop_sandbox_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.stop_sandbox_run(run_id)
+    try:
+      run = app.stop_sandbox_run(run_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/paper")
   def start_paper_run(
@@ -458,14 +473,17 @@ def create_router(container: Container) -> APIRouter:
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/paper/{run_id}/stop")
   def stop_paper_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.stop_paper_run(run_id)
+    try:
+      run = app.stop_paper_run(run_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/live")
   def start_live_run(
@@ -489,14 +507,17 @@ def create_router(container: Container) -> APIRouter:
         )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/live/{run_id}/stop")
   def stop_live_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.stop_live_run(run_id)
+    try:
+      run = app.stop_live_run(run_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/live/{run_id}/orders/{order_id}/cancel")
   def cancel_live_order(
@@ -516,7 +537,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.post("/runs/live/{run_id}/orders/{order_id}/replace")
   def replace_live_order(
@@ -538,7 +559,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   @router.get("/runs/{run_id}/orders")
   def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
@@ -701,7 +722,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run(run)
+    return serialize_run_response(run, app)
 
   return router
 

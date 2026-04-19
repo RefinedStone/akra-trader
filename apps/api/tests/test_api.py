@@ -28,6 +28,7 @@ from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import Position
+from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionEnvelope
@@ -79,6 +80,30 @@ def create_preset(
   )
   assert response.status_code == 200
   return response.json()
+
+
+def without_surface_rule(
+  capabilities: RunSurfaceCapabilities,
+  *,
+  family_key: str,
+  surface_key: str,
+) -> RunSurfaceCapabilities:
+  return replace(
+    capabilities,
+    families=tuple(
+      replace(
+        family,
+        surface_rules=tuple(
+          rule
+          for rule in family.surface_rules
+          if rule.surface_key != surface_key
+        ),
+      )
+      if family.family_key == family_key
+      else family
+      for family in capabilities.families
+    ),
+  )
 
 
 class StaticVenueStateAdapter:
@@ -447,9 +472,55 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
   assert payload["provenance"]["experiment"]["preset_id"] == "core_5m"
   assert payload["provenance"]["experiment"]["benchmark_family"] == "native_validation"
+  assert payload["surface_enforcement"]["run_strategy_snapshot"]["enabled"] is True
+  assert payload["surface_enforcement"]["compare_selection_workflow"]["enabled"] is True
+  assert payload["action_availability"]["compare_select"]["allowed"] is True
+  assert payload["action_availability"]["rerun_backtest"]["allowed"] is True
+  assert payload["action_availability"]["stop_run"]["allowed"] is False
+  assert payload["action_availability"]["stop_run"]["reason"] == (
+    "Only sandbox, paper, or live runs can be stopped by the operator."
+  )
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
     "candles-v1:"
+  )
+
+
+def test_backtest_endpoint_applies_surface_rule_contract_to_run_payload(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    base_capabilities = app.get_run_surface_capabilities()
+    app.get_run_surface_capabilities = lambda: without_surface_rule(
+      without_surface_rule(
+        base_capabilities,
+        family_key="provenance_semantics",
+        surface_key="run_strategy_snapshot",
+      ),
+      family_key="execution_controls",
+      surface_key="compare_selection_workflow",
+    )
+    response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+      },
+    )
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["surface_enforcement"]["run_strategy_snapshot"]["enabled"] is False
+  assert payload["surface_enforcement"]["compare_selection_workflow"]["enabled"] is False
+  assert payload["provenance"]["strategy"]["catalog_semantics"]["strategy_kind"] == ""
+  assert payload["provenance"]["strategy"]["catalog_semantics"]["operator_notes"] == []
+  assert payload["action_availability"]["compare_select"]["allowed"] is False
+  assert payload["action_availability"]["compare_select"]["reason"] == (
+    "Surface rule compare_selection_workflow is disabled by the run-surface capability contract."
   )
 
 
@@ -1330,6 +1401,38 @@ def test_live_endpoints_launch_and_stop_guarded_live_worker_after_gates_clear(tm
   stopped_payload = stop_response.json()
   assert stopped_payload["status"] == "stopped"
   assert stopped_payload["provenance"]["runtime_session"]["lifecycle_state"] == "stopped"
+
+
+def test_stop_sandbox_endpoint_rejects_when_control_surface_rule_is_disabled(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    run_response = client.post(
+      "/api/runs/sandbox",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+      },
+    )
+    run_id = run_response.json()["config"]["run_id"]
+    base_capabilities = app.get_run_surface_capabilities()
+    app.get_run_surface_capabilities = lambda: without_surface_rule(
+      base_capabilities,
+      family_key="execution_controls",
+      surface_key="rerun_and_stop_controls",
+    )
+
+    stop_response = client.post(f"/api/runs/sandbox/{run_id}/stop")
+
+  assert stop_response.status_code == 400
+  assert stop_response.json()["detail"] == (
+    "Surface rule rerun_and_stop_controls is disabled by the run-surface capability contract."
+  )
 
 
 def test_operator_visibility_endpoint_surfaces_risk_breach_and_live_fault_incidents(
@@ -3082,6 +3185,68 @@ def test_live_order_cancel_endpoint_marks_active_order_canceled(tmp_path: Path) 
   payload = cancel_response.json()
   assert payload["orders"][0]["order_id"] == "venue-open-order-1"
   assert payload["orders"][0]["status"] == "canceled"
+  assert payload["orders"][0]["action_availability"]["cancel"]["allowed"] is False
+  assert payload["orders"][0]["action_availability"]["replace"]["allowed"] is False
+
+
+def test_live_order_cancel_endpoint_rejects_when_order_surface_rule_is_disabled(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 20, 35, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "cancel_surface_rule_test",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+    base_capabilities = app.get_run_surface_capabilities()
+    app.get_run_surface_capabilities = lambda: without_surface_rule(
+      base_capabilities,
+      family_key="execution_controls",
+      surface_key="order_replace_cancel_actions",
+    )
+
+    cancel_response = client.post(
+      f"/api/runs/live/{run_id}/orders/venue-open-order-1/cancel",
+      json={"actor": "operator", "reason": "reduce_venue_risk"},
+    )
+
+  assert cancel_response.status_code == 400
+  assert cancel_response.json()["detail"] == (
+    "Surface rule order_replace_cancel_actions is disabled by the run-surface capability contract."
+  )
 
 
 def test_live_order_replace_endpoint_appends_repriced_limit_order(tmp_path: Path) -> None:

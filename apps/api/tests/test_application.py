@@ -45,6 +45,7 @@ from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import RunConfig
 from akra_trader.domain.models import RunMode
+from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import StrategyMetadata
@@ -83,6 +84,30 @@ def build_runs_repository(tmp_path: Path) -> SqlAlchemyRunRepository:
 
 def build_preset_catalog(tmp_path: Path) -> SqlAlchemyExperimentPresetCatalog:
   return SqlAlchemyExperimentPresetCatalog(f"sqlite:///{tmp_path / 'runs.sqlite3'}")
+
+
+def without_surface_rule(
+  capabilities: RunSurfaceCapabilities,
+  *,
+  family_key: str,
+  surface_key: str,
+) -> RunSurfaceCapabilities:
+  return replace(
+    capabilities,
+    families=tuple(
+      replace(
+        family,
+        surface_rules=tuple(
+          rule
+          for rule in family.surface_rules
+          if rule.surface_key != surface_key
+        ),
+      )
+      if family.family_key == family_key
+      else family
+      for family in capabilities.families
+    ),
+  )
 
 
 class MutableClock:
@@ -14297,6 +14322,35 @@ def test_rerun_backtest_from_boundary_uses_stored_effective_window_and_records_m
   assert rerun.provenance.market_data.effective_end_at == source.provenance.market_data.effective_end_at
   assert rerun.notes[0].startswith("Explicit backtest rerun from boundary ")
   assert rerun.notes[-1] == "Explicit rerun matched the stored rerun boundary."
+
+
+def test_rerun_backtest_from_boundary_rejects_when_control_surface_rule_is_disabled(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  source = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  base_capabilities = app.get_run_surface_capabilities()
+  app.get_run_surface_capabilities = lambda: without_surface_rule(
+    base_capabilities,
+    family_key="execution_controls",
+    surface_key="rerun_and_stop_controls",
+  )
+
+  with pytest.raises(ValueError, match="Surface rule rerun_and_stop_controls is disabled"):
+    app.rerun_backtest_from_boundary(rerun_boundary_id=source.provenance.rerun_boundary_id)
 
 
 def test_rerun_backtest_from_boundary_uses_resolved_strategy_parameters(tmp_path: Path) -> None:

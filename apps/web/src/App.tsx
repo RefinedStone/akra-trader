@@ -203,6 +203,31 @@ type RunListBoundaryContract = {
   >;
 };
 
+type RunSurfaceEnforcementState = {
+  enabled: boolean;
+  family_key: string;
+  family_title?: string | null;
+  surface_key: string;
+  surface_label?: string | null;
+  rule_key?: string | null;
+  enforcement_point?: string | null;
+  enforcement_mode?: string | null;
+  level?: string | null;
+  fallback_behavior?: string | null;
+  source_of_truth?: string | null;
+  reason?: string | null;
+};
+
+type RunActionAvailabilityEntry = {
+  allowed: boolean;
+  reason?: string | null;
+  family_key: string;
+  surface_key: string;
+  rule_key?: string | null;
+  enforcement_mode?: string | null;
+  level?: string | null;
+};
+
 type Run = {
   config: {
     run_id: string;
@@ -322,6 +347,14 @@ type Run = {
     } | null;
   };
   metrics: Record<string, number>;
+  surface_enforcement?: Record<string, RunSurfaceEnforcementState>;
+  action_availability?: {
+    compare_select: RunActionAvailabilityEntry;
+    rerun_backtest: RunActionAvailabilityEntry;
+    rerun_sandbox: RunActionAvailabilityEntry;
+    rerun_paper: RunActionAvailabilityEntry;
+    stop_run: RunActionAvailabilityEntry;
+  };
   orders: {
     order_id: string;
     instrument_id: string;
@@ -338,6 +371,10 @@ type Run = {
     filled_quantity: number;
     remaining_quantity?: number | null;
     last_synced_at?: string | null;
+    action_availability?: {
+      cancel: RunActionAvailabilityEntry;
+      replace: RunActionAvailabilityEntry;
+    };
   }[];
   notes: string[];
 };
@@ -8588,14 +8625,17 @@ export default function App() {
           }}
           rerunActions={[
             {
+              availabilityKey: "rerun_backtest",
               label: "Rerun backtest",
               onRerun: rerunBacktest,
             },
             {
+              availabilityKey: "rerun_sandbox",
               label: "Start sandbox worker",
               onRerun: rerunSandbox,
             },
             {
+              availabilityKey: "rerun_paper",
               label: "Start paper session",
               onRerun: rerunPaper,
             },
@@ -8611,10 +8651,12 @@ export default function App() {
           setFilter={setSandboxRunFilter}
           rerunActions={[
             {
+              availabilityKey: "rerun_sandbox",
               label: "Restore sandbox worker",
               onRerun: rerunSandbox,
             },
             {
+              availabilityKey: "rerun_paper",
               label: "Start paper session",
               onRerun: rerunPaper,
             },
@@ -8631,10 +8673,12 @@ export default function App() {
           setFilter={setPaperRunFilter}
           rerunActions={[
             {
+              availabilityKey: "rerun_sandbox",
               label: "Start sandbox worker",
               onRerun: rerunSandbox,
             },
             {
+              availabilityKey: "rerun_paper",
               label: "Start paper session",
               onRerun: rerunPaper,
             },
@@ -14920,6 +14964,7 @@ type RunSectionComparisonControls = {
 };
 
 type RunSectionRerunAction = {
+  availabilityKey: keyof NonNullable<Run["action_availability"]>;
   label: string;
   onRerun: (rerunBoundaryId: string) => Promise<void>;
 };
@@ -18020,6 +18065,17 @@ function RunSection({
           {runs.map((run) => {
             const orderControls = getOrderControls ? getOrderControls(run) : null;
             const runListBoundaryContract = sharedRunListBoundaryContract;
+            const runSurfaceEnforcement = run.surface_enforcement ?? {};
+            const runActionAvailability = run.action_availability;
+            const compareSelectionAvailability = runActionAvailability?.compare_select;
+            const compareSelectionAllowed = compareSelectionAvailability?.allowed ?? true;
+            const runListMetricSurfaceEnabled =
+              runSurfaceEnforcement.run_list_metric_tiles?.enabled
+              ?? shouldEnableRunListMetricDrillBack(
+                "return",
+                runSurfaceCapabilities,
+                runListBoundaryContract,
+              );
             const comparisonLinkedRunRole =
               comparison?.payload
                 ? getComparisonScoreLinkedRunRole(
@@ -18030,17 +18086,29 @@ function RunSection({
                 : null;
             const runListMetricDrillBackEnabled = (surfaceId: RunListBoundarySurfaceId) =>
               Boolean(comparisonLinkedRunRole)
+              && runListMetricSurfaceEnabled
               && shouldEnableRunListMetricDrillBack(
                 surfaceId,
                 runSurfaceCapabilities,
                 runListBoundaryContract,
               );
-            const runSnapshotSemanticsEnabled = shouldEnableRunSnapshotSemantics(runSurfaceCapabilities);
-            const referenceProvenanceSemanticsEnabled = shouldEnableReferenceProvenanceSemantics(
-              runSurfaceCapabilities,
-            );
-            const workflowBoundaryEnabled = shouldRenderWorkflowControlBoundaryNote(runSurfaceCapabilities);
-            const orderActionBoundaryEnabled = shouldRenderOrderActionBoundaryNote(runSurfaceCapabilities);
+            const runSnapshotSemanticsEnabled =
+              runSurfaceEnforcement.run_strategy_snapshot?.enabled
+              ?? shouldEnableRunSnapshotSemantics(runSurfaceCapabilities);
+            const referenceProvenanceSemanticsEnabled =
+              runSurfaceEnforcement.reference_provenance_panels?.enabled
+              ?? shouldEnableReferenceProvenanceSemantics(
+                runSurfaceCapabilities,
+              );
+            const workflowBoundaryEnabled =
+              runSurfaceEnforcement.compare_selection_workflow?.enabled
+              ?? runSurfaceEnforcement.rerun_and_stop_controls?.enabled
+              ?? shouldRenderWorkflowControlBoundaryNote(runSurfaceCapabilities);
+            const orderActionBoundaryEnabled =
+              runSurfaceEnforcement.order_replace_cancel_actions?.enabled
+              ?? shouldRenderOrderActionBoundaryNote(runSurfaceCapabilities);
+            const stopAvailability = runActionAvailability?.stop_run;
+            const stopAllowed = stopAvailability?.allowed ?? true;
             const linkedRunListSelection =
               comparisonLinkedRunRole && comparison?.selectedScoreLink
                 ? {
@@ -18449,7 +18517,9 @@ function RunSection({
                 {comparison ? (
                   <button
                     className="ghost-button"
+                    disabled={!compareSelectionAllowed}
                     onClick={() => comparison.onToggleRunSelection(run.config.run_id)}
+                    title={!compareSelectionAllowed ? compareSelectionAvailability?.reason ?? undefined : undefined}
                     type="button"
                   >
                     {comparison.selectedRunIds.includes(run.config.run_id)
@@ -18461,8 +18531,14 @@ function RunSection({
                   ? rerunActions.map((action) => (
                     <button
                       className="ghost-button"
+                      disabled={!runActionAvailability?.[action.availabilityKey]?.allowed}
                       key={action.label}
                       onClick={() => void action.onRerun(run.provenance.rerun_boundary_id!)}
+                      title={
+                        runActionAvailability?.[action.availabilityKey]?.allowed
+                          ? undefined
+                          : runActionAvailability?.[action.availabilityKey]?.reason ?? undefined
+                      }
                       type="button"
                     >
                       {action.label}
@@ -18470,9 +18546,15 @@ function RunSection({
                   ))
                   : null}
                 {onStop && run.status === "running" ? (
-                  <button className="ghost-button" onClick={() => void onStop(run.config.run_id)} type="button">
-                    Stop
-                  </button>
+                    <button
+                      className="ghost-button"
+                      disabled={!stopAllowed}
+                      onClick={() => void onStop(run.config.run_id)}
+                      title={!stopAllowed ? stopAvailability?.reason ?? undefined : undefined}
+                      type="button"
+                    >
+                      Stop
+                    </button>
                 ) : null}
               </div>
               {comparison && workflowBoundaryEnabled ? (
@@ -24332,6 +24414,10 @@ function RunOrderActionControls({
 }) {
   const remainingQuantity = order.remaining_quantity ?? Math.max(order.quantity - order.filled_quantity, 0);
   const draft = orderControls.getReplacementDraft(order.order_id, order);
+  const cancelAvailability = order.action_availability?.cancel;
+  const replaceAvailability = order.action_availability?.replace;
+  const cancelAllowed = cancelAvailability?.allowed ?? true;
+  const replaceAllowed = replaceAvailability?.allowed ?? true;
 
   return (
     <div className="run-lineage-order-controls">
@@ -24339,6 +24425,7 @@ function RunOrderActionControls({
         <label>
           New px
           <input
+            disabled={!replaceAllowed}
             min="0"
             onChange={(event) =>
               orderControls.onChangeReplacementDraft(order.order_id, {
@@ -24346,6 +24433,7 @@ function RunOrderActionControls({
                 price: event.target.value,
               })
             }
+            title={!replaceAllowed ? replaceAvailability?.reason ?? undefined : undefined}
             step="any"
             type="number"
             value={draft.price}
@@ -24354,6 +24442,7 @@ function RunOrderActionControls({
         <label>
           Qty
           <input
+            disabled={!replaceAllowed}
             min="0"
             onChange={(event) =>
               orderControls.onChangeReplacementDraft(order.order_id, {
@@ -24363,18 +24452,27 @@ function RunOrderActionControls({
             }
             placeholder={remainingQuantity.toFixed(8)}
             step="any"
+            title={!replaceAllowed ? replaceAvailability?.reason ?? undefined : undefined}
             type="number"
             value={draft.quantity}
           />
         </label>
       </div>
       <div className="run-lineage-order-actions">
-        <button className="ghost-button" onClick={() => void orderControls.onCancelOrder(order.order_id)} type="button">
+        <button
+          className="ghost-button"
+          disabled={!cancelAllowed}
+          onClick={() => void orderControls.onCancelOrder(order.order_id)}
+          title={!cancelAllowed ? cancelAvailability?.reason ?? undefined : undefined}
+          type="button"
+        >
           Cancel order
         </button>
         <button
           className="ghost-button"
+          disabled={!replaceAllowed}
           onClick={() => void orderControls.onReplaceOrder(order.order_id, draft)}
+          title={!replaceAllowed ? replaceAvailability?.reason ?? undefined : undefined}
           type="button"
         >
           Replace order
