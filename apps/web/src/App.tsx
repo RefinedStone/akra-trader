@@ -2781,8 +2781,11 @@ type GuardedLiveStatus = {
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
+const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 2;
+const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
+const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
 const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY = "akra-trader-comparison-tooltip-conflict-ui";
@@ -2807,6 +2810,20 @@ type ControlRoomComparisonSelectionState = {
   selectedRunIds: string[];
   intent: ComparisonIntent;
   scoreLink: ComparisonScoreLinkTarget | null;
+};
+
+type ComparisonHistoryStepDescriptor = {
+  label: string;
+  summary: string;
+  title: string;
+};
+
+type ComparisonHistoryBrowserState = {
+  version: typeof COMPARISON_HISTORY_BROWSER_STATE_VERSION;
+  label: string;
+  summary: string;
+  title: string;
+  selection: ControlRoomComparisonSelectionState;
 };
 
 type ControlRoomUiStateV2 = {
@@ -4433,6 +4450,19 @@ export default function App() {
   );
   const comparisonHistoryWriteModeRef = useRef<ComparisonHistoryWriteMode>("replace");
   const comparisonHistoryUrlRef = useRef<string | null>(null);
+  const comparisonSelection = useMemo(
+    () =>
+      normalizeControlRoomComparisonSelection({
+        intent: comparisonIntent,
+        scoreLink: selectedComparisonScoreLink,
+        selectedRunIds: selectedComparisonRunIds,
+      }),
+    [comparisonIntent, selectedComparisonRunIds, selectedComparisonScoreLink],
+  );
+  const comparisonHistoryStep = useMemo(
+    () => buildComparisonHistoryStepDescriptor(comparisonSelection, backtests, runComparison),
+    [backtests, comparisonSelection, runComparison],
+  );
   const applyComparisonSelectionState = (
     value: ControlRoomComparisonSelectionState,
   ) => {
@@ -4578,10 +4608,12 @@ export default function App() {
       return;
     }
 
-    const handlePopState = () => {
+    const handlePopState = (event: PopStateEvent) => {
       queueComparisonHistoryWriteMode("skip");
       const nextSelection =
-        loadComparisonSelectionFromUrl() ?? defaultControlRoomComparisonSelectionState();
+        loadComparisonSelectionFromUrl()
+        ?? readComparisonHistoryBrowserState(event.state)?.selection
+        ?? defaultControlRoomComparisonSelectionState();
       applyComparisonSelectionState(nextSelection);
     };
 
@@ -4627,37 +4659,37 @@ export default function App() {
   }, [selectedComparisonRunIds, comparisonIntent]);
 
   useEffect(() => {
-    const comparisonSelection = normalizeControlRoomComparisonSelection({
-      intent: comparisonIntent,
-      scoreLink: selectedComparisonScoreLink,
-      selectedRunIds: selectedComparisonRunIds,
-    });
     persistControlRoomUiState({
       comparisonSelection,
       expandedGapRows,
     });
-  }, [comparisonIntent, expandedGapRows, selectedComparisonRunIds, selectedComparisonScoreLink]);
+  }, [comparisonSelection, expandedGapRows]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
-    const comparisonSelection = normalizeControlRoomComparisonSelection({
-      intent: comparisonIntent,
-      scoreLink: selectedComparisonScoreLink,
-      selectedRunIds: selectedComparisonRunIds,
-    });
     const nextUrl = buildComparisonSelectionHistoryUrl(comparisonSelection);
     const currentUrl = buildComparisonSelectionHistoryUrl(
       loadComparisonSelectionFromUrl() ?? defaultControlRoomComparisonSelectionState(),
+    );
+    const currentBrowserState = readComparisonHistoryBrowserState(window.history.state);
+    const nextBrowserState = buildComparisonHistoryBrowserState(
+      window.history.state,
+      comparisonSelection,
+      comparisonHistoryStep,
+    );
+    const metadataChanged = !isSameComparisonHistoryBrowserState(
+      currentBrowserState,
+      readComparisonHistoryBrowserState(nextBrowserState),
     );
     const writeMode = comparisonHistoryWriteModeRef.current;
     comparisonHistoryWriteModeRef.current = "replace";
 
     if (comparisonHistoryUrlRef.current === null) {
       comparisonHistoryUrlRef.current = nextUrl;
-      if (currentUrl !== nextUrl) {
-        persistComparisonSelectionToUrl(comparisonSelection, "replace");
+      if (currentUrl !== nextUrl || metadataChanged) {
+        persistComparisonSelectionToUrl(comparisonSelection, comparisonHistoryStep, "replace");
       }
       return;
     }
@@ -4667,23 +4699,36 @@ export default function App() {
       return;
     }
 
-    if (comparisonHistoryUrlRef.current === nextUrl && currentUrl === nextUrl) {
+    if (
+      comparisonHistoryUrlRef.current === nextUrl
+      && currentUrl === nextUrl
+      && !metadataChanged
+    ) {
       return;
     }
 
     if (writeMode === "push") {
       if (currentUrl !== nextUrl) {
-        persistComparisonSelectionToUrl(comparisonSelection, "push");
+        persistComparisonSelectionToUrl(comparisonSelection, comparisonHistoryStep, "push");
+      } else if (metadataChanged) {
+        persistComparisonSelectionToUrl(comparisonSelection, comparisonHistoryStep, "replace");
       }
       comparisonHistoryUrlRef.current = nextUrl;
       return;
     }
 
-    if (currentUrl !== nextUrl) {
-      persistComparisonSelectionToUrl(comparisonSelection, "replace");
+    if (currentUrl !== nextUrl || metadataChanged) {
+      persistComparisonSelectionToUrl(comparisonSelection, comparisonHistoryStep, "replace");
     }
     comparisonHistoryUrlRef.current = nextUrl;
-  }, [comparisonIntent, selectedComparisonRunIds, selectedComparisonScoreLink]);
+  }, [comparisonHistoryStep, comparisonSelection]);
+
+  useEffect(() => {
+    if (typeof document === "undefined") {
+      return;
+    }
+    document.title = comparisonHistoryStep.title;
+  }, [comparisonHistoryStep]);
 
   useEffect(() => {
     if (!marketStatus) {
@@ -7032,6 +7077,7 @@ export default function App() {
           comparison={{
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
+            historyStep: comparisonHistoryStep,
             selectedScoreLink: selectedComparisonScoreLink,
             payload: runComparison,
             loading: runComparisonLoading,
@@ -7472,19 +7518,87 @@ function buildComparisonSelectionHistoryUrl(
   return `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
 }
 
+function readComparisonHistoryBrowserState(value: unknown): ComparisonHistoryBrowserState | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const candidate = (value as Record<string, unknown>)[COMPARISON_HISTORY_BROWSER_STATE_KEY];
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+  const parsed = candidate as Partial<ComparisonHistoryBrowserState>;
+  if (
+    parsed.version !== COMPARISON_HISTORY_BROWSER_STATE_VERSION
+    || typeof parsed.label !== "string"
+    || typeof parsed.summary !== "string"
+    || typeof parsed.title !== "string"
+  ) {
+    return null;
+  }
+  return {
+    version: parsed.version,
+    label: parsed.label,
+    summary: parsed.summary,
+    title: parsed.title,
+    selection: normalizeControlRoomComparisonSelection(parsed.selection),
+  };
+}
+
+function buildComparisonHistoryBrowserState(
+  currentState: unknown,
+  selection: ControlRoomComparisonSelectionState,
+  step: ComparisonHistoryStepDescriptor,
+) {
+  const nextState =
+    currentState && typeof currentState === "object" && !Array.isArray(currentState)
+      ? { ...(currentState as Record<string, unknown>) }
+      : {};
+  nextState[COMPARISON_HISTORY_BROWSER_STATE_KEY] = {
+    version: COMPARISON_HISTORY_BROWSER_STATE_VERSION,
+    label: step.label,
+    summary: step.summary,
+    title: step.title,
+    selection: normalizeControlRoomComparisonSelection(selection),
+  } satisfies ComparisonHistoryBrowserState;
+  return nextState;
+}
+
+function isSameComparisonHistoryBrowserState(
+  left: ComparisonHistoryBrowserState | null,
+  right: ComparisonHistoryBrowserState | null,
+) {
+  if (left === right) {
+    return true;
+  }
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.label === right.label
+    && left.summary === right.summary
+    && left.title === right.title
+    && isSameComparisonSelection(left.selection, right.selection)
+  );
+}
+
 function persistComparisonSelectionToUrl(
   selection: ControlRoomComparisonSelectionState,
+  step: ComparisonHistoryStepDescriptor,
   mode: Exclude<ComparisonHistoryWriteMode, "skip"> = "replace",
 ) {
   if (typeof window === "undefined") {
     return;
   }
   const nextUrl = buildComparisonSelectionHistoryUrl(selection);
+  const nextState = buildComparisonHistoryBrowserState(window.history.state, selection, step);
+  if (typeof document !== "undefined") {
+    document.title = step.title;
+  }
   if (mode === "push") {
-    window.history.pushState(window.history.state, "", nextUrl);
+    window.history.pushState(nextState, step.title, nextUrl);
     return;
   }
-  window.history.replaceState(window.history.state, "", nextUrl);
+  window.history.replaceState(nextState, step.title, nextUrl);
 }
 
 function loadLegacyExpandedGapRows() {
@@ -7528,6 +7642,151 @@ function normalizeControlRoomComparisonSelection(
         ? scoreLink
         : null,
   };
+}
+
+function isSameComparisonSelection(
+  left: Partial<ControlRoomComparisonSelectionState> | null | undefined,
+  right: Partial<ControlRoomComparisonSelectionState> | null | undefined,
+) {
+  const normalizedLeft = normalizeControlRoomComparisonSelection(left);
+  const normalizedRight = normalizeControlRoomComparisonSelection(right);
+  return (
+    normalizedLeft.intent === normalizedRight.intent
+    && normalizedLeft.selectedRunIds.length === normalizedRight.selectedRunIds.length
+    && normalizedLeft.selectedRunIds.every((runId, index) => runId === normalizedRight.selectedRunIds[index])
+    && (
+      (normalizedLeft.scoreLink === null && normalizedRight.scoreLink === null)
+      || (
+        normalizedLeft.scoreLink !== null
+        && normalizedRight.scoreLink !== null
+        && normalizedLeft.scoreLink.narrativeRunId === normalizedRight.scoreLink.narrativeRunId
+        && normalizedLeft.scoreLink.section === normalizedRight.scoreLink.section
+        && normalizedLeft.scoreLink.componentKey === normalizedRight.scoreLink.componentKey
+      )
+    )
+  );
+}
+
+function buildComparisonHistoryStepDescriptor(
+  selection: ControlRoomComparisonSelectionState,
+  runs: Run[],
+  comparison: RunComparison | null,
+): ComparisonHistoryStepDescriptor {
+  const normalizedSelection = normalizeControlRoomComparisonSelection(selection);
+  const intentLabel = formatComparisonIntentLabel(normalizedSelection.intent);
+  const selectedRuns = normalizedSelection.selectedRunIds.map((runId) => ({
+    runId,
+    label: resolveComparisonHistoryRunLabel(runId, runs, comparison),
+  }));
+  const baselineRunId =
+    comparison?.baseline_run_id && normalizedSelection.selectedRunIds.includes(comparison.baseline_run_id)
+      ? comparison.baseline_run_id
+      : selectedRuns[0]?.runId ?? null;
+  const baselineLabel = baselineRunId
+    ? resolveComparisonHistoryRunLabel(baselineRunId, runs, comparison)
+    : null;
+  const comparisonTargets = selectedRuns.filter((candidate) => candidate.runId !== baselineRunId);
+  const primaryNarrative = comparison?.narratives.find((candidate) => candidate.is_primary) ?? comparison?.narratives[0] ?? null;
+
+  if (normalizedSelection.scoreLink) {
+    const componentLabel = formatComparisonScoreComponentLabel(
+      normalizedSelection.scoreLink.section,
+      normalizedSelection.scoreLink.componentKey,
+    );
+    const focusRunLabel = resolveComparisonHistoryRunLabel(
+      normalizedSelection.scoreLink.narrativeRunId,
+      runs,
+      comparison,
+    );
+    const focusNarrative = comparison?.narratives.find(
+      (candidate) => candidate.run_id === normalizedSelection.scoreLink?.narrativeRunId,
+    ) ?? null;
+    const label = `${truncateLabel(componentLabel, 24)} focus`;
+    const summary = [
+      `${componentLabel} is pinned to ${focusRunLabel}.`,
+      normalizedSelection.selectedRunIds.length > 1
+        ? `${intentLabel} across ${normalizedSelection.selectedRunIds.length} runs.`
+        : `${intentLabel} with one staged run.`,
+      baselineLabel && baselineRunId !== normalizedSelection.scoreLink.narrativeRunId
+        ? `Baseline ${baselineLabel}.`
+        : null,
+      focusNarrative?.title ? `Story: ${truncateLabel(focusNarrative.title, 104)}.` : null,
+    ]
+      .filter(Boolean)
+      .join(" ");
+    return {
+      label,
+      summary,
+      title: `Compare: ${label} | ${DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE}`,
+    };
+  }
+
+  if (!selectedRuns.length) {
+    return {
+      label: "Comparison cleared",
+      summary: `No runs selected. ${intentLabel} is ready for the next comparison step.`,
+      title: `Compare: cleared | ${DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE}`,
+    };
+  }
+
+  if (selectedRuns.length === 1) {
+    const onlyRun = selectedRuns[0];
+    const label = `${truncateLabel(onlyRun.label, 28)} staged`;
+    return {
+      label,
+      summary: `${onlyRun.label} is staged for ${intentLabel.toLowerCase()}. Select one more run to open comparison insights.`,
+      title: `Compare: ${label} | ${DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE}`,
+    };
+  }
+
+  const comparisonLabel =
+    baselineLabel && comparisonTargets[0]
+      ? `${truncateLabel(baselineLabel, 18)} vs ${truncateLabel(comparisonTargets[0].label, 18)}${
+          comparisonTargets.length > 1 ? ` +${comparisonTargets.length - 1}` : ""
+        }`
+      : `${truncateLabel(selectedRuns[0].label, 18)} +${selectedRuns.length - 1}`;
+  const summary = [
+    baselineLabel
+      ? `Baseline ${baselineLabel}${comparisonTargets[0] ? ` against ${comparisonTargets[0].label}` : ""}${
+          comparisonTargets.length > 1 ? ` and ${comparisonTargets.length - 1} more runs` : ""
+        }.`
+      : `Tracking ${selectedRuns.length} runs.`,
+    `${intentLabel} is active.`,
+    primaryNarrative?.title ? `Top insight: ${truncateLabel(primaryNarrative.title, 104)}.` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    label: comparisonLabel,
+    summary,
+    title: `Compare: ${comparisonLabel} | ${DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE}`,
+  };
+}
+
+function resolveComparisonHistoryRunLabel(
+  runId: string,
+  runs: Run[],
+  comparison: RunComparison | null,
+) {
+  const comparisonRun = comparison?.runs.find((candidate) => candidate.run_id === runId);
+  if (comparisonRun) {
+    return (
+      comparisonRun.reference?.title
+      ?? comparisonRun.strategy_name
+      ?? comparisonRun.strategy_id
+      ?? shortenIdentifier(runId)
+    );
+  }
+  const run = runs.find((candidate) => candidate.config.run_id === runId);
+  if (!run) {
+    return shortenIdentifier(runId);
+  }
+  return (
+    run.provenance.reference?.title
+    ?? run.provenance.strategy?.name
+    ?? run.config.strategy_id
+    ?? shortenIdentifier(runId)
+  );
 }
 
 function normalizeComparisonRunIdList(value: unknown) {
@@ -8554,6 +8813,7 @@ function ExperimentMetadataPills({
 type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
+  historyStep: ComparisonHistoryStepDescriptor;
   selectedScoreLink: ComparisonScoreLinkTarget | null;
   payload: RunComparison | null;
   loading: boolean;
@@ -8732,6 +8992,10 @@ function RunSection({
           </div>
           {comparison ? (
             <div className="comparison-toolbar">
+              <div className="comparison-history-step" aria-live="polite">
+                <p className="comparison-history-step-label">{comparison.historyStep.label}</p>
+                <p className="comparison-history-step-summary">{comparison.historyStep.summary}</p>
+              </div>
               <span>
                 Compare {comparison.selectedRunIds.length} / {MAX_COMPARISON_RUNS}
               </span>
