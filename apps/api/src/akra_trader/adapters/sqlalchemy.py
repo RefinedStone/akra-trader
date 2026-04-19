@@ -19,8 +19,10 @@ from sqlalchemy import update
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine import make_url
 
+from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
+from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import RunRepositoryPort
 
 
@@ -47,6 +49,28 @@ run_record_tags = Table(
   Column("run_id", String, primary_key=True),
   Column("tag", String, primary_key=True, index=True),
 )
+experiment_presets = Table(
+  "experiment_presets",
+  metadata,
+  Column("preset_id", String, primary_key=True),
+  Column("strategy_id", String, nullable=True, index=True),
+  Column("timeframe", String, nullable=True, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
+
+
+def _build_engine(database_url: str) -> Engine:
+  url = make_url(database_url)
+  engine_kwargs = {"pool_pre_ping": True}
+  if url.get_backend_name() == "sqlite" and url.database not in {None, "", ":memory:"}:
+    Path(url.database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+    return create_engine(
+      database_url,
+      connect_args={"check_same_thread": False},
+      **engine_kwargs,
+    )
+  return create_engine(database_url, **engine_kwargs)
 
 
 class SqlAlchemyRunRepository(RunRepositoryPort):
@@ -55,7 +79,7 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
-    self._engine = self._build_engine(database_url)
+    self._engine = _build_engine(database_url)
     metadata.create_all(self._engine)
     self._ensure_schema()
 
@@ -213,14 +237,133 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
           f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_name})"
         )
 
-  def _build_engine(self, database_url: str) -> Engine:
-    url = make_url(database_url)
-    engine_kwargs = {"pool_pre_ping": True}
-    if url.get_backend_name() == "sqlite" and url.database not in {None, "", ":memory:"}:
-      Path(url.database).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
-      return create_engine(
-        database_url,
-        connect_args={"check_same_thread": False},
-        **engine_kwargs,
-      )
-    return create_engine(database_url, **engine_kwargs)
+
+class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
+  _adapter = TypeAdapter(ExperimentPreset)
+
+  def __init__(self, database_url: str) -> None:
+    self._database_url = database_url
+    self._engine = _build_engine(database_url)
+    metadata.create_all(self._engine)
+    self._ensure_schema()
+    self._backfill_legacy_presets()
+
+  def list_presets(
+    self,
+    *,
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+  ) -> list[ExperimentPreset]:
+    statement = select(experiment_presets.c.payload).order_by(
+      experiment_presets.c.updated_at.desc(),
+      experiment_presets.c.preset_id.asc(),
+    )
+    if strategy_id is not None:
+      statement = statement.where(experiment_presets.c.strategy_id == strategy_id)
+    if timeframe is not None:
+      statement = statement.where(experiment_presets.c.timeframe == timeframe)
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return [self._adapter.validate_python(row["payload"]) for row in rows]
+
+  def get_preset(self, preset_id: str) -> ExperimentPreset | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(experiment_presets.c.payload).where(experiment_presets.c.preset_id == preset_id)
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._adapter.validate_python(row["payload"])
+
+  def save_preset(self, preset: ExperimentPreset) -> ExperimentPreset:
+    payload = self._adapter.dump_python(preset, mode="json")
+    row = {
+      "preset_id": preset.preset_id,
+      "strategy_id": preset.strategy_id,
+      "timeframe": preset.timeframe,
+      "updated_at": preset.updated_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(experiment_presets.c.preset_id).where(experiment_presets.c.preset_id == preset.preset_id)
+      ).first()
+      if existing is None:
+        connection.execute(insert(experiment_presets).values(**row))
+      else:
+        connection.execute(
+          update(experiment_presets)
+          .where(experiment_presets.c.preset_id == preset.preset_id)
+          .values(**row)
+        )
+    return preset
+
+  def _ensure_schema(self) -> None:
+    with self._engine.begin() as connection:
+      for index_name, column_name in (
+        ("ix_experiment_presets_strategy_id", "strategy_id"),
+        ("ix_experiment_presets_timeframe", "timeframe"),
+        ("ix_experiment_presets_updated_at", "updated_at"),
+      ):
+        connection.exec_driver_sql(
+          f"CREATE INDEX IF NOT EXISTS {index_name} ON experiment_presets ({column_name})"
+        )
+
+  def _backfill_legacy_presets(self) -> None:
+    with self._engine.begin() as connection:
+      existing_ids = {
+        row["preset_id"]
+        for row in connection.execute(select(experiment_presets.c.preset_id)).mappings().all()
+      }
+      rows = connection.execute(
+        select(
+          run_records.c.preset_id,
+          run_records.c.strategy_id,
+          run_records.c.benchmark_family,
+          run_records.c.payload,
+        )
+        .where(run_records.c.preset_id.is_not(None))
+        .order_by(run_records.c.started_at.desc(), run_records.c.run_id.desc())
+      ).mappings().all()
+      for row in rows:
+        preset_id = row["preset_id"]
+        if preset_id in existing_ids:
+          continue
+        payload = row["payload"] or {}
+        config_payload = payload.get("config") or {}
+        provenance_payload = payload.get("provenance") or {}
+        experiment_payload = provenance_payload.get("experiment") or {}
+        preset = ExperimentPreset(
+          preset_id=preset_id,
+          name=preset_id,
+          description="Migrated from legacy run metadata.",
+          strategy_id=row["strategy_id"] or config_payload.get("strategy_id"),
+          timeframe=config_payload.get("timeframe"),
+          benchmark_family=row["benchmark_family"] or experiment_payload.get("benchmark_family"),
+          tags=tuple(
+            tag
+            for tag in experiment_payload.get("tags", ())
+            if isinstance(tag, str) and tag
+          ),
+          created_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
+          updated_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
+        )
+        connection.execute(
+          insert(experiment_presets).values(
+            preset_id=preset.preset_id,
+            strategy_id=preset.strategy_id,
+            timeframe=preset.timeframe,
+            updated_at=preset.updated_at.isoformat(),
+            payload=self._adapter.dump_python(preset, mode="json"),
+          )
+        )
+        existing_ids.add(preset_id)
+
+
+def _coerce_datetime(value: str | None) -> datetime | None:
+  if not value:
+    return None
+  try:
+    return datetime.fromisoformat(value)
+  except ValueError:
+    return None

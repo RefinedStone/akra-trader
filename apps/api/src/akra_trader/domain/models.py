@@ -328,6 +328,19 @@ class BenchmarkArtifact:
 
 
 @dataclass(frozen=True)
+class ExperimentPreset:
+  preset_id: str
+  name: str
+  description: str = ""
+  strategy_id: str | None = None
+  timeframe: str | None = None
+  benchmark_family: str | None = None
+  tags: tuple[str, ...] = ()
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+
+@dataclass(frozen=True)
 class RunExperimentMetadata:
   tags: tuple[str, ...] = ()
   preset_id: str | None = None

@@ -12,6 +12,7 @@ import pandas as pd
 
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataLineage
@@ -23,6 +24,7 @@ from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.ports import MarketDataPort
+from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import RunRepositoryPort
 from akra_trader.ports import StrategyCatalogPort
 from akra_trader.lineage import build_candle_dataset_identity
@@ -239,6 +241,39 @@ class InMemoryRunRepository(RunRepositoryPort):
     if status in {RunStatus.COMPLETED, RunStatus.STOPPED, RunStatus.FAILED}:
       run.ended_at = datetime.now(UTC)
     return run
+
+
+class InMemoryExperimentPresetCatalog(ExperimentPresetCatalogPort):
+  def __init__(self) -> None:
+    self._presets: OrderedDict[str, ExperimentPreset] = OrderedDict()
+
+  def list_presets(
+    self,
+    *,
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+  ) -> list[ExperimentPreset]:
+    presets = list(reversed(self._presets.values()))
+    if strategy_id is not None:
+      presets = [
+        preset
+        for preset in presets
+        if preset.strategy_id is None or preset.strategy_id == strategy_id
+      ]
+    if timeframe is not None:
+      presets = [
+        preset
+        for preset in presets
+        if preset.timeframe is None or preset.timeframe == timeframe
+      ]
+    return presets
+
+  def get_preset(self, preset_id: str) -> ExperimentPreset | None:
+    return self._presets.get(preset_id)
+
+  def save_preset(self, preset: ExperimentPreset) -> ExperimentPreset:
+    self._presets[preset.preset_id] = preset
+    return preset
 
 
 class LocalStrategyCatalog(StrategyCatalogPort):

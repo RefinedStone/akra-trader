@@ -50,6 +50,31 @@ def build_client(
   return TestClient(create_app(settings))
 
 
+def create_preset(
+  client: TestClient,
+  *,
+  name: str,
+  preset_id: str,
+  strategy_id: str | None = None,
+  timeframe: str | None = None,
+  benchmark_family: str | None = None,
+  tags: list[str] | None = None,
+) -> dict:
+  response = client.post(
+    "/api/presets",
+    json={
+      "name": name,
+      "preset_id": preset_id,
+      "strategy_id": strategy_id,
+      "timeframe": timeframe,
+      "benchmark_family": benchmark_family,
+      "tags": tags or [],
+    },
+  )
+  assert response.status_code == 200
+  return response.json()
+
+
 class StaticVenueStateAdapter:
   def __init__(self, snapshot: GuardedLiveVenueStateSnapshot) -> None:
     self._snapshot = snapshot
@@ -137,8 +162,43 @@ def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:
   assert any(item["reference_id"] == "nostalgia-for-infinity" for item in payload)
 
 
+def test_presets_endpoint_persists_catalog_entries_across_restart(tmp_path: Path) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+  client = build_client(database_path)
+
+  created = create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_validation",
+    tags=["baseline"],
+  )
+
+  assert created["preset_id"] == "core_5m"
+  assert created["strategy_id"] == "ma_cross_v1"
+  assert created["benchmark_family"] == "native_validation"
+  assert created["tags"] == ["baseline"]
+
+  restarted_client = build_client(database_path)
+  response = restarted_client.get("/api/presets")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert any(item["preset_id"] == "core_5m" for item in payload)
+
+
 def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_validation",
+  )
   response = client.post(
     "/api/runs/backtests",
     json={
@@ -181,6 +241,26 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
     "candles-v1:"
   )
+
+
+def test_backtest_endpoint_rejects_unknown_preset(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+      "preset_id": "unknown_preset",
+    },
+  )
+
+  assert response.status_code == 400
+  assert response.json()["detail"] == "Preset not found: unknown_preset"
 
 
 def test_backtest_run_survives_app_restart(tmp_path: Path) -> None:
@@ -2958,6 +3038,22 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
 
 def test_runs_endpoint_can_filter_by_experiment_metadata(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_validation",
+  )
+  create_preset(
+    client,
+    name="Tuned 5m",
+    preset_id="tuned_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_tuning",
+  )
 
   baseline_response = client.post(
     "/api/runs/backtests",
@@ -3224,6 +3320,20 @@ def test_rerun_boundary_endpoint_returns_not_found_for_unknown_boundary(tmp_path
 
 def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+  )
+  create_preset(
+    client,
+    name="NFI baseline",
+    preset_id="nfi_baseline",
+    strategy_id="nfi_x7_reference",
+    timeframe="5m",
+  )
 
   native_response = client.post(
     "/api/runs/backtests",

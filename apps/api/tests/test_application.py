@@ -13860,6 +13860,20 @@ def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(t
     references=build_references(),
     runs=runs,
   )
+  app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_validation",
+  )
+  app.create_preset(
+    name="Tuned 5m",
+    preset_id="tuned_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    benchmark_family="native_tuning",
+  )
 
   baseline = app.run_backtest(
     strategy_id="ma_cross_v1",
@@ -13908,6 +13922,27 @@ def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(t
   rerun = app.rerun_backtest_from_boundary(rerun_boundary_id=baseline.provenance.rerun_boundary_id)
 
   assert rerun.provenance.experiment == baseline.provenance.experiment
+
+
+def test_run_backtest_requires_cataloged_preset(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+  )
+
+  with pytest.raises(ValueError, match="Preset not found: missing_preset"):
+    app.run_backtest(
+      strategy_id="ma_cross_v1",
+      symbol="BTC/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      preset_id="missing preset",
+    )
 
 
 def test_list_runs_can_filter_paper_history_separately_from_sandbox(tmp_path: Path) -> None:

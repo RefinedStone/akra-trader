@@ -39,6 +39,7 @@ from akra_trader.domain.models import GuardedLiveSessionOwnership
 from akra_trader.domain.models import GuardedLiveVenueSessionRestore
 from akra_trader.domain.models import GuardedLiveVenueSessionSync
 from akra_trader.domain.models import Fill
+from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import Instrument
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
@@ -174,6 +175,7 @@ from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
 from akra_trader.lineage import build_rerun_boundary_identity
 from akra_trader.ports import GuardedLiveStatePort
+from akra_trader.ports import ExperimentPresetCatalogPort
 from akra_trader.ports import MarketDataPort
 from akra_trader.ports import OperatorAlertDeliveryPort
 from akra_trader.ports import ReferenceCatalogPort
@@ -404,6 +406,38 @@ class TradingApplication:
       self._state = state
       return state
 
+  class _EphemeralExperimentPresetCatalog(ExperimentPresetCatalogPort):
+    def __init__(self) -> None:
+      self._presets: dict[str, ExperimentPreset] = {}
+
+    def list_presets(
+      self,
+      *,
+      strategy_id: str | None = None,
+      timeframe: str | None = None,
+    ) -> list[ExperimentPreset]:
+      presets = list(reversed(tuple(self._presets.values())))
+      if strategy_id is not None:
+        presets = [
+          preset
+          for preset in presets
+          if preset.strategy_id is None or preset.strategy_id == strategy_id
+        ]
+      if timeframe is not None:
+        presets = [
+          preset
+          for preset in presets
+          if preset.timeframe is None or preset.timeframe == timeframe
+        ]
+      return presets
+
+    def get_preset(self, preset_id: str) -> ExperimentPreset | None:
+      return self._presets.get(preset_id)
+
+    def save_preset(self, preset: ExperimentPreset) -> ExperimentPreset:
+      self._presets[preset.preset_id] = preset
+      return preset
+
   class _UnavailableVenueStateAdapter(VenueStatePort):
     def __init__(self, clock: Callable[[], datetime]) -> None:
       self._clock = clock
@@ -528,6 +562,7 @@ class TradingApplication:
     strategies: StrategyCatalogPort,
     references: ReferenceCatalogPort,
     runs: RunRepositoryPort,
+    presets: ExperimentPresetCatalogPort | None = None,
     guarded_live_state: GuardedLiveStatePort | None = None,
     venue_state: VenueStatePort | None = None,
     venue_execution: VenueExecutionPort | None = None,
@@ -564,6 +599,7 @@ class TradingApplication:
     self._market_data = market_data
     self._strategies = strategies
     self._references = references
+    self._presets = presets or self._EphemeralExperimentPresetCatalog()
     self._runs = runs
     self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
     self._venue_state = venue_state or self._UnavailableVenueStateAdapter(self._clock)
@@ -658,6 +694,59 @@ class TradingApplication:
       registered_at=datetime.now(UTC),
     )
     return self._strategies.register(registration)
+
+  def list_presets(
+    self,
+    *,
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+  ) -> list[ExperimentPreset]:
+    return self._presets.list_presets(
+      strategy_id=_normalize_experiment_filter_value(strategy_id),
+      timeframe=_normalize_experiment_filter_value(timeframe),
+    )
+
+  def create_preset(
+    self,
+    *,
+    name: str,
+    preset_id: str | None = None,
+    description: str = "",
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+    tags: Iterable[str] = (),
+    benchmark_family: str | None = None,
+  ) -> ExperimentPreset:
+    normalized_name = name.strip()
+    if not normalized_name:
+      raise ValueError("Preset name is required.")
+    normalized_preset_id = _normalize_experiment_identifier(preset_id or name)
+    if normalized_preset_id is None:
+      raise ValueError("Preset ID is required.")
+    if self._presets.get_preset(normalized_preset_id) is not None:
+      raise ValueError(f"Preset already exists: {normalized_preset_id}")
+    normalized_strategy_id = _normalize_experiment_filter_value(strategy_id)
+    if normalized_strategy_id is not None:
+      available_strategy_ids = {
+        strategy.strategy_id
+        for strategy in self._strategies.list_strategies()
+      }
+      if normalized_strategy_id not in available_strategy_ids:
+        raise ValueError(f"Strategy not found for preset: {normalized_strategy_id}")
+    normalized_timeframe = _normalize_experiment_filter_value(timeframe)
+    current_time = self._clock()
+    preset = ExperimentPreset(
+      preset_id=normalized_preset_id,
+      name=normalized_name,
+      description=description.strip(),
+      strategy_id=normalized_strategy_id,
+      timeframe=normalized_timeframe,
+      benchmark_family=_normalize_experiment_identifier(benchmark_family),
+      tags=_normalize_experiment_tags(tags),
+      created_at=current_time,
+      updated_at=current_time,
+    )
+    return self._presets.save_preset(preset)
 
   def list_runs(
     self,
@@ -14626,9 +14715,14 @@ class TradingApplication:
     benchmark_family: str | None = None,
   ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    preset = self._resolve_experiment_preset(
+      preset_id=preset_id,
+      strategy_id=metadata.strategy_id,
+      timeframe=timeframe,
+    )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
-      preset_id=preset_id,
+      preset=preset,
       benchmark_family=benchmark_family,
       strategy_metadata=metadata,
     )
@@ -14873,9 +14967,14 @@ class TradingApplication:
     self._ensure_guarded_live_worker_start_allowed()
     state = self._guarded_live_state.load_state()
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    preset = self._resolve_experiment_preset(
+      preset_id=preset_id,
+      strategy_id=metadata.strategy_id,
+      timeframe=timeframe,
+    )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
-      preset_id=preset_id,
+      preset=preset,
       benchmark_family=benchmark_family,
       strategy_metadata=metadata,
     )
@@ -15025,9 +15124,14 @@ class TradingApplication:
     benchmark_family: str | None = None,
   ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    preset = self._resolve_experiment_preset(
+      preset_id=preset_id,
+      strategy_id=metadata.strategy_id,
+      timeframe=timeframe,
+    )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
-      preset_id=preset_id,
+      preset=preset,
       benchmark_family=benchmark_family,
       strategy_metadata=metadata,
     )
@@ -21742,6 +21846,51 @@ class TradingApplication:
     )
     run.provenance.rerun_boundary_state = market_data.reproducibility_state
 
+  def _resolve_experiment_preset(
+    self,
+    *,
+    preset_id: str | None,
+    strategy_id: str,
+    timeframe: str,
+  ) -> ExperimentPreset | None:
+    normalized_preset_id = _normalize_experiment_identifier(preset_id)
+    if normalized_preset_id is None:
+      return None
+    preset = self._presets.get_preset(normalized_preset_id)
+    if preset is None:
+      raise ValueError(f"Preset not found: {normalized_preset_id}")
+    if preset.strategy_id is not None and preset.strategy_id != strategy_id:
+      raise ValueError(
+        f"Preset {normalized_preset_id} is pinned to strategy {preset.strategy_id}, not {strategy_id}."
+      )
+    if preset.timeframe is not None and preset.timeframe != timeframe:
+      raise ValueError(
+        f"Preset {normalized_preset_id} is pinned to timeframe {preset.timeframe}, not {timeframe}."
+      )
+    return preset
+
+  def _migrate_legacy_preset_from_run(self, run: RunRecord) -> ExperimentPreset | None:
+    preset_id = _normalize_experiment_identifier(run.provenance.experiment.preset_id)
+    if preset_id is None:
+      return None
+    existing = self._presets.get_preset(preset_id)
+    if existing is not None:
+      return existing
+    preset = ExperimentPreset(
+      preset_id=preset_id,
+      name=preset_id,
+      description="Migrated from legacy run metadata.",
+      strategy_id=run.config.strategy_id,
+      timeframe=run.config.timeframe,
+      benchmark_family=_normalize_experiment_identifier(
+        run.provenance.experiment.benchmark_family
+      ),
+      tags=_normalize_experiment_tags(run.provenance.experiment.tags),
+      created_at=run.started_at,
+      updated_at=run.started_at,
+    )
+    return self._presets.save_preset(preset)
+
   def _resolve_rerun_source(self, *, rerun_boundary_id: str) -> RunRecord:
     candidates = self._runs.list_runs(rerun_boundary_id=rerun_boundary_id)
     if not candidates:
@@ -21759,6 +21908,7 @@ class TradingApplication:
     source_run = self._resolve_rerun_source(rerun_boundary_id=rerun_boundary_id)
     if len(source_run.config.symbols) != 1:
       raise ValueError(f"Explicit rerun currently supports only single-symbol {requested_mode_label} runs.")
+    self._migrate_legacy_preset_from_run(source_run)
 
     rerun_start_at = self._resolve_rerun_start_at(source_run)
     rerun_end_at = self._resolve_rerun_end_at(source_run)
@@ -21955,18 +22105,23 @@ def _normalize_experiment_tags(tags: Iterable[str] | None) -> tuple[str, ...]:
 def _build_run_experiment_metadata(
   *,
   tags: Iterable[str] = (),
-  preset_id: str | None = None,
+  preset: ExperimentPreset | None = None,
   benchmark_family: str | None = None,
   strategy_metadata: StrategyMetadata,
 ) -> RunExperimentMetadata:
-  normalized_benchmark_family = _normalize_experiment_identifier(benchmark_family)
+  normalized_benchmark_family = _normalize_experiment_identifier(
+    benchmark_family or (preset.benchmark_family if preset is not None else None)
+  )
   if normalized_benchmark_family is None and strategy_metadata.runtime == "freqtrade_reference":
     normalized_benchmark_family = _normalize_experiment_identifier(
       f"reference:{strategy_metadata.reference_id or strategy_metadata.strategy_id}"
     )
+  merged_tags = tuple(tags)
+  if preset is not None:
+    merged_tags = (*preset.tags, *merged_tags)
   return RunExperimentMetadata(
-    tags=_normalize_experiment_tags(tags),
-    preset_id=_normalize_experiment_identifier(preset_id),
+    tags=_normalize_experiment_tags(merged_tags),
+    preset_id=preset.preset_id if preset is not None else None,
     benchmark_family=normalized_benchmark_family,
   )
 
@@ -21989,6 +22144,14 @@ def serialize_run(run: RunRecord) -> dict:
     )
     strategy_snapshot["supported_timeframes"] = list(run.provenance.strategy.supported_timeframes)
     strategy_snapshot["warmup"]["timeframes"] = list(run.provenance.strategy.warmup.timeframes)
+  return payload
+
+
+def serialize_preset(preset: ExperimentPreset) -> dict:
+  payload = asdict(preset)
+  payload["tags"] = list(preset.tags)
+  payload["created_at"] = preset.created_at.isoformat()
+  payload["updated_at"] = preset.updated_at.isoformat()
   return payload
 
 

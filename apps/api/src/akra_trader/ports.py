@@ -7,6 +7,7 @@ from typing import Protocol
 import pandas as pd
 
 from akra_trader.domain.models import Candle
+from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import GuardedLiveState
 from akra_trader.domain.models import GuardedLiveVenueOrderRequest
 from akra_trader.domain.models import GuardedLiveVenueOrderResult
@@ -108,6 +109,19 @@ class ReferenceCatalogPort(Protocol):
   def list_entries(self) -> list[ReferenceSource]: ...
 
   def get(self, reference_id: str) -> ReferenceSource: ...
+
+
+class ExperimentPresetCatalogPort(Protocol):
+  def list_presets(
+    self,
+    *,
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+  ) -> list[ExperimentPreset]: ...
+
+  def get_preset(self, preset_id: str) -> ExperimentPreset | None: ...
+
+  def save_preset(self, preset: ExperimentPreset) -> ExperimentPreset: ...
 
 
 class RunRepositoryPort(Protocol):

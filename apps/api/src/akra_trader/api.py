@@ -17,6 +17,7 @@ from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_strategy
+from akra_trader.application import serialize_preset
 from akra_trader.bootstrap import Container
 
 
@@ -24,6 +25,16 @@ class StrategyRegistrationRequest(BaseModel):
   strategy_id: str
   module_path: str
   class_name: str
+
+
+class ExperimentPresetRequest(BaseModel):
+  name: str
+  preset_id: str | None = None
+  description: str = ""
+  strategy_id: str | None = None
+  timeframe: str | None = None
+  tags: list[str] = Field(default_factory=list)
+  benchmark_family: str | None = None
 
 
 class BacktestRequest(BaseModel):
@@ -123,6 +134,36 @@ def create_router(container: Container) -> APIRouter:
   def list_references(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
     return [asdict(reference) for reference in app.list_references()]
 
+  @router.get("/presets")
+  def list_presets(
+    strategy_id: str | None = None,
+    timeframe: str | None = None,
+    app: TradingApplication = Depends(get_app),
+  ) -> list[dict[str, Any]]:
+    return [
+      serialize_preset(preset)
+      for preset in app.list_presets(strategy_id=strategy_id, timeframe=timeframe)
+    ]
+
+  @router.post("/presets")
+  def create_preset(
+    request: ExperimentPresetRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      preset = app.create_preset(
+        name=request.name,
+        preset_id=request.preset_id,
+        description=request.description,
+        strategy_id=request.strategy_id,
+        timeframe=request.timeframe,
+        tags=request.tags,
+        benchmark_family=request.benchmark_family,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_preset(preset)
+
   @router.post("/strategies/register")
   def register_strategy(
     request: StrategyRegistrationRequest,
@@ -177,20 +218,23 @@ def create_router(container: Container) -> APIRouter:
 
   @router.post("/runs/backtests")
   def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.run_backtest(
-      strategy_id=request.strategy_id,
-      symbol=request.symbol,
-      timeframe=request.timeframe,
-      initial_cash=request.initial_cash,
-      fee_rate=request.fee_rate,
-      slippage_bps=request.slippage_bps,
-      parameters=request.parameters,
-      start_at=request.start_at,
-      end_at=request.end_at,
-      tags=request.tags,
-      preset_id=request.preset_id,
-      benchmark_family=request.benchmark_family,
-    )
+    try:
+      run = app.run_backtest(
+        strategy_id=request.strategy_id,
+        symbol=request.symbol,
+        timeframe=request.timeframe,
+        initial_cash=request.initial_cash,
+        fee_rate=request.fee_rate,
+        slippage_bps=request.slippage_bps,
+        parameters=request.parameters,
+        start_at=request.start_at,
+        end_at=request.end_at,
+        tags=request.tags,
+        preset_id=request.preset_id,
+        benchmark_family=request.benchmark_family,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run(run)
 
   @router.get("/runs/backtests/{run_id}")

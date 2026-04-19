@@ -12,6 +12,7 @@ from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.operator_delivery import OperatorAlertDeliveryAdapter
 from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
+from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import BinanceVenueExecutionAdapter
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
@@ -462,6 +463,9 @@ def build_container(settings: Settings) -> Container:
   runs = SqlAlchemyRunRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
+  presets = SqlAlchemyExperimentPresetCatalog(
+    settings.runs_database_url or build_default_runs_database_url(repo_root)
+  )
   guarded_live_state = SqlAlchemyGuardedLiveStateRepository(
     settings.runs_database_url or build_default_runs_database_url(repo_root)
   )
@@ -472,6 +476,7 @@ def build_container(settings: Settings) -> Container:
     market_data=market_data,
     strategies=strategies,
     references=references,
+    presets=presets,
     runs=runs,
     guarded_live_state=guarded_live_state,
     venue_state=venue_state,

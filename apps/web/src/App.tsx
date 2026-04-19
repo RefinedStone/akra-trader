@@ -52,6 +52,18 @@ type ReferenceSource = {
   summary: string;
 };
 
+type ExperimentPreset = {
+  preset_id: string;
+  name: string;
+  description: string;
+  strategy_id?: string | null;
+  timeframe?: string | null;
+  benchmark_family?: string | null;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+};
+
 type BenchmarkArtifact = {
   kind: string;
   label: string;
@@ -2979,6 +2991,16 @@ const defaultRunForm = {
   benchmark_family: "",
 };
 
+const defaultPresetForm = {
+  name: "",
+  preset_id: "",
+  description: "",
+  strategy_id: "",
+  timeframe: "5m",
+  benchmark_family: "",
+  tags_text: "",
+};
+
 const defaultRunHistoryFilter: RunHistoryFilter = {
   strategy_id: ALL_FILTER_VALUE,
   strategy_version: ALL_FILTER_VALUE,
@@ -3024,9 +3046,31 @@ function buildRunSubmissionPayload(form: typeof defaultRunForm, extras: Record<s
   };
 }
 
+function normalizeRunFormPreset(
+  current: typeof defaultRunForm,
+  presets: ExperimentPreset[],
+) {
+  if (!current.preset_id) {
+    return current;
+  }
+  const matchingPreset = presets.find((preset) => preset.preset_id === current.preset_id);
+  if (
+    matchingPreset &&
+    (!matchingPreset.strategy_id || matchingPreset.strategy_id === current.strategy_id) &&
+    (!matchingPreset.timeframe || matchingPreset.timeframe === current.timeframe)
+  ) {
+    return current;
+  }
+  return {
+    ...current,
+    preset_id: "",
+  };
+}
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
+  const [presets, setPresets] = useState<ExperimentPreset[]>([]);
   const [backtests, setBacktests] = useState<Run[]>([]);
   const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
@@ -3039,6 +3083,7 @@ export default function App() {
   const [liveOrderReplacementDrafts, setLiveOrderReplacementDrafts] = useState<
     Record<string, LiveOrderReplacementDraft>
   >({});
+  const [presetForm, setPresetForm] = useState(defaultPresetForm);
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [liveForm, setLiveForm] = useState(defaultRunForm);
@@ -3061,6 +3106,7 @@ export default function App() {
       const [
         strategiesResponse,
         referencesResponse,
+        presetsResponse,
         backtestsResponse,
         sandboxResponse,
         paperResponse,
@@ -3071,6 +3117,7 @@ export default function App() {
       ] = await Promise.all([
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
+        fetchJson<ExperimentPreset[]>("/presets"),
         fetchJson<Run[]>(buildRunsPath("backtest", backtestRunFilter)),
         fetchJson<Run[]>(buildRunsPath("sandbox", sandboxRunFilter)),
         fetchJson<Run[]>(buildRunsPath("paper", paperRunFilter)),
@@ -3081,6 +3128,7 @@ export default function App() {
       ]);
       setStrategies(strategiesResponse);
       setReferences(referencesResponse);
+      setPresets(presetsResponse);
       setBacktests(backtestsResponse);
       setSandboxRuns(sandboxResponse);
       setPaperRuns(paperResponse);
@@ -3107,6 +3155,16 @@ export default function App() {
     setSandboxForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
     setLiveForm((current) => ({ ...current, strategy_id: preferredNative.strategy_id }));
   }, [strategies]);
+
+  useEffect(() => {
+    setBacktestForm((current) => normalizeRunFormPreset(current, presets));
+    setSandboxForm((current) => normalizeRunFormPreset(current, presets));
+    setLiveForm((current) => normalizeRunFormPreset(current, presets));
+    setBacktestRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
+    setSandboxRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
+    setPaperRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
+    setLiveRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
+  }, [presets]);
 
   useEffect(() => {
     if (!strategies.length) {
@@ -3291,6 +3349,33 @@ export default function App() {
   function resolveGuardedLiveReason(fallback: string) {
     const trimmed = guardedLiveReason.trim();
     return trimmed.length ? trimmed : fallback;
+  }
+
+  async function handlePresetSubmit(event: FormEvent) {
+    event.preventDefault();
+    setStatusText("Saving experiment preset...");
+    try {
+      await fetchJson<ExperimentPreset>("/presets", {
+        method: "POST",
+        body: JSON.stringify({
+          name: presetForm.name,
+          preset_id: presetForm.preset_id.trim() || null,
+          description: presetForm.description,
+          strategy_id: presetForm.strategy_id || null,
+          timeframe: presetForm.timeframe.trim() || null,
+          benchmark_family: presetForm.benchmark_family.trim() || null,
+          tags: parseExperimentTags(presetForm.tags_text),
+        }),
+      });
+      setPresetForm((current) => ({
+        ...defaultPresetForm,
+        strategy_id: current.strategy_id,
+        timeframe: current.timeframe,
+      }));
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Preset save failed: ${(error as Error).message}`);
+    }
   }
 
   async function handleBacktestSubmit(event: FormEvent) {
@@ -3694,13 +3779,25 @@ export default function App() {
         <section className="panel">
           <p className="kicker">Backtest</p>
           <h2>Launch a run</h2>
-          <RunForm form={backtestForm} setForm={setBacktestForm} strategies={strategies} onSubmit={handleBacktestSubmit} />
+          <RunForm
+            form={backtestForm}
+            setForm={setBacktestForm}
+            strategies={strategies}
+            presets={presets}
+            onSubmit={handleBacktestSubmit}
+          />
         </section>
 
         <section className="panel">
           <p className="kicker">Sandbox</p>
           <h2>Start sandbox worker</h2>
-          <RunForm form={sandboxForm} setForm={setSandboxForm} strategies={strategies.filter((strategy) => strategy.runtime === "native")} onSubmit={handleSandboxSubmit} />
+          <RunForm
+            form={sandboxForm}
+            setForm={setSandboxForm}
+            strategies={strategies.filter((strategy) => strategy.runtime === "native")}
+            presets={presets}
+            onSubmit={handleSandboxSubmit}
+          />
         </section>
 
         <section className="panel">
@@ -3710,7 +3807,20 @@ export default function App() {
             form={liveForm}
             setForm={setLiveForm}
             strategies={strategies.filter((strategy) => strategy.runtime === "native")}
+            presets={presets}
             onSubmit={handleLiveSubmit}
+          />
+        </section>
+
+        <section className="panel panel-wide">
+          <p className="kicker">Experiment OS</p>
+          <h2>Scenario presets</h2>
+          <PresetCatalogPanel
+            form={presetForm}
+            presets={presets}
+            setForm={setPresetForm}
+            strategies={strategies}
+            onSubmit={handlePresetSubmit}
           />
         </section>
 
@@ -5356,6 +5466,7 @@ export default function App() {
         <RunSection
           title="Recent backtests"
           runs={backtests}
+          presets={presets}
           strategies={strategies}
           filter={backtestRunFilter}
           setFilter={setBacktestRunFilter}
@@ -5388,6 +5499,7 @@ export default function App() {
         <RunSection
           title="Sandbox runs"
           runs={sandboxRuns}
+          presets={presets}
           strategies={strategies}
           filter={sandboxRunFilter}
           setFilter={setSandboxRunFilter}
@@ -5406,6 +5518,7 @@ export default function App() {
         <RunSection
           title="Paper runs"
           runs={paperRuns}
+          presets={presets}
           strategies={strategies}
           filter={paperRunFilter}
           setFilter={setPaperRunFilter}
@@ -5424,6 +5537,7 @@ export default function App() {
         <RunSection
           title="Guarded live runs"
           runs={liveRuns}
+          presets={presets}
           strategies={strategies}
           filter={liveRunFilter}
           setFilter={setLiveRunFilter}
@@ -5796,6 +5910,30 @@ function normalizeRunHistoryFilter(current: RunHistoryFilter, strategies: Strate
   return current;
 }
 
+function normalizeRunHistoryPresetFilter(
+  current: RunHistoryFilter,
+  presets: ExperimentPreset[],
+) {
+  if (!current.preset_id) {
+    return current;
+  }
+  const matchingPreset = presets.find((preset) => preset.preset_id === current.preset_id);
+  if (
+    matchingPreset &&
+    (
+      current.strategy_id === ALL_FILTER_VALUE ||
+      !matchingPreset.strategy_id ||
+      matchingPreset.strategy_id === current.strategy_id
+    )
+  ) {
+    return current;
+  }
+  return {
+    ...current,
+    preset_id: "",
+  };
+}
+
 function getStrategyVersionOptions(strategies: Strategy[], strategyId: string) {
   const scopedStrategies =
     strategyId === ALL_FILTER_VALUE
@@ -5915,17 +6053,141 @@ function ReferenceCatalog({ references }: { references: ReferenceSource[] }) {
   );
 }
 
+function PresetCatalogPanel({
+  form,
+  presets,
+  setForm,
+  strategies,
+  onSubmit,
+}: {
+  form: typeof defaultPresetForm;
+  presets: ExperimentPreset[];
+  setForm: (updater: (value: typeof defaultPresetForm) => typeof defaultPresetForm) => void;
+  strategies: Strategy[];
+  onSubmit: (event: FormEvent) => Promise<void> | void;
+}) {
+  return (
+    <>
+      <form className="run-form" onSubmit={onSubmit}>
+        <label>
+          Name
+          <input
+            placeholder="Core 5m"
+            value={form.name}
+            onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+          />
+        </label>
+        <label>
+          Preset ID
+          <input
+            placeholder="core_5m"
+            value={form.preset_id}
+            onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
+          />
+        </label>
+        <label>
+          Strategy
+          <select
+            value={form.strategy_id}
+            onChange={(event) => setForm((current) => ({ ...current, strategy_id: event.target.value }))}
+          >
+            <option value="">Any strategy</option>
+            {strategies.map((strategy) => (
+              <option key={strategy.strategy_id} value={strategy.strategy_id}>
+                {strategy.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Timeframe
+          <input
+            placeholder="5m"
+            value={form.timeframe}
+            onChange={(event) => setForm((current) => ({ ...current, timeframe: event.target.value }))}
+          />
+        </label>
+        <label>
+          Benchmark family
+          <input
+            placeholder="native_validation"
+            value={form.benchmark_family}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, benchmark_family: event.target.value }))
+            }
+          />
+        </label>
+        <label>
+          Tags
+          <input
+            placeholder="baseline, momentum"
+            value={form.tags_text}
+            onChange={(event) => setForm((current) => ({ ...current, tags_text: event.target.value }))}
+          />
+        </label>
+        <label>
+          Description
+          <input
+            placeholder="Reusable backtest baseline"
+            value={form.description}
+            onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
+          />
+        </label>
+        <button type="submit">Save preset</button>
+      </form>
+
+      {presets.length ? (
+        <div className="run-list">
+          {presets.map((preset) => (
+            <article className="run-card" key={preset.preset_id}>
+              <div className="run-card-head">
+                <div>
+                  <strong>{preset.name}</strong>
+                  <span>{preset.preset_id}</span>
+                </div>
+                <div className="run-status completed">catalog</div>
+              </div>
+              <div className="run-metrics">
+                <Metric label="Strategy" value={preset.strategy_id ?? "any"} />
+                <Metric label="Timeframe" value={preset.timeframe ?? "any"} />
+                <Metric label="Updated" value={formatTimestamp(preset.updated_at)} />
+              </div>
+              <ExperimentMetadataPills
+                benchmarkFamily={preset.benchmark_family}
+                presetId={preset.preset_id}
+                tags={preset.tags}
+              />
+              {preset.description ? <p className="run-note">{preset.description}</p> : null}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-state">No durable presets saved yet.</p>
+      )}
+    </>
+  );
+}
+
 function RunForm({
   form,
   setForm,
   strategies,
+  presets,
   onSubmit,
 }: {
   form: typeof defaultRunForm;
   setForm: (updater: (value: typeof defaultRunForm) => typeof defaultRunForm) => void;
   strategies: Strategy[];
+  presets: ExperimentPreset[];
   onSubmit: (event: FormEvent) => Promise<void> | void;
 }) {
+  const availablePresets = presets.filter(
+    (preset) =>
+      (!preset.strategy_id || preset.strategy_id === form.strategy_id) &&
+      (!preset.timeframe || preset.timeframe === form.timeframe),
+  );
+  const selectedPreset = availablePresets.find((preset) => preset.preset_id === form.preset_id) ?? null;
+
   return (
     <form className="run-form" onSubmit={onSubmit}>
       <label>
@@ -5981,17 +6243,23 @@ function RunForm({
         />
       </label>
       <label>
-        Preset ID
-        <input
-          placeholder="baseline_5m"
+        Preset
+        <select
           value={form.preset_id}
           onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
-        />
+        >
+          <option value="">No preset</option>
+          {availablePresets.map((preset) => (
+            <option key={preset.preset_id} value={preset.preset_id}>
+              {preset.name} ({preset.preset_id})
+            </option>
+          ))}
+        </select>
       </label>
       <label>
         Benchmark family
         <input
-          placeholder="native_vs_nfi"
+          placeholder={selectedPreset?.benchmark_family ?? "native_vs_nfi"}
           value={form.benchmark_family}
           onChange={(event) =>
             setForm((current) => ({ ...current, benchmark_family: event.target.value }))
@@ -6083,6 +6351,7 @@ type RunOrderControls = {
 function RunSection({
   title,
   runs,
+  presets,
   strategies,
   filter,
   setFilter,
@@ -6093,6 +6362,7 @@ function RunSection({
 }: {
   title: string;
   runs: Run[];
+  presets: ExperimentPreset[];
   strategies: Strategy[];
   filter: RunHistoryFilter;
   setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
@@ -6102,6 +6372,12 @@ function RunSection({
   getOrderControls?: (run: Run) => RunOrderControls | null;
 }) {
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
+  const presetOptions = presets.filter(
+    (preset) =>
+      !preset.strategy_id ||
+      filter.strategy_id === ALL_FILTER_VALUE ||
+      preset.strategy_id === filter.strategy_id,
+  );
 
   return (
     <section className="panel panel-wide">
@@ -6160,8 +6436,7 @@ function RunSection({
             </label>
             <label>
               Preset
-              <input
-                placeholder="All presets"
+              <select
                 value={filter.preset_id}
                 onChange={(event) =>
                   setFilter((current) => ({
@@ -6169,7 +6444,14 @@ function RunSection({
                     preset_id: event.target.value,
                   }))
                 }
-              />
+              >
+                <option value="">All presets</option>
+                {presetOptions.map((preset) => (
+                  <option key={preset.preset_id} value={preset.preset_id}>
+                    {preset.name}
+                  </option>
+                ))}
+              </select>
             </label>
             <label>
               Benchmark
