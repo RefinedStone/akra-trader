@@ -3005,6 +3005,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   showPinnedOnly: boolean;
   auditFilter: ComparisonHistorySyncAuditFilter;
   showResolvedAuditEntries: boolean;
+  activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
 
@@ -4789,6 +4790,9 @@ export default function App() {
   const [comparisonHistoryShowResolvedAuditEntries, setComparisonHistoryShowResolvedAuditEntries] = useState(
     () => initialComparisonHistoryPanelUiStateRef.current?.showResolvedAuditEntries ?? true,
   );
+  const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
+    () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
+  );
   const [comparisonHistorySharedSyncState, setComparisonHistorySharedSyncState] =
     useState<ComparisonHistoryPanelSyncState | null>(
       () => initialComparisonHistoryPanelUiStateRef.current?.sync ?? null,
@@ -5201,6 +5205,7 @@ export default function App() {
         showPinnedOnly: comparisonHistoryShowPinnedOnly,
         auditFilter: comparisonHistoryAuditFilter,
         showResolvedAuditEntries: comparisonHistoryShowResolvedAuditEntries,
+        activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
       expandedGapRows,
@@ -5214,6 +5219,7 @@ export default function App() {
     comparisonHistoryShowPinnedOnly,
     comparisonHistoryAuditFilter,
     comparisonHistoryShowResolvedAuditEntries,
+    activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
     comparisonSelection,
@@ -8151,6 +8157,7 @@ export default function App() {
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
             latestWorkspaceSyncState,
+            activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
             historySharedSync: comparisonHistorySharedSyncState,
@@ -8178,6 +8185,7 @@ export default function App() {
             onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
             onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
             onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
+            onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
             onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
@@ -9208,6 +9216,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     showPinnedOnly: false,
     auditFilter: "all",
     showResolvedAuditEntries: true,
+    activeWorkspaceOverviewRowId: null,
     sync: null,
   };
 }
@@ -9796,6 +9805,10 @@ function normalizeComparisonHistoryPanelUiState(
     showPinnedOnly: value?.showPinnedOnly === true,
     auditFilter: normalizeComparisonHistorySyncAuditFilter(value?.auditFilter),
     showResolvedAuditEntries: value?.showResolvedAuditEntries !== false,
+    activeWorkspaceOverviewRowId:
+      typeof value?.activeWorkspaceOverviewRowId === "string"
+        ? value.activeWorkspaceOverviewRowId.trim() || null
+        : null,
     sync: normalizeComparisonHistoryPanelSyncState(value?.sync),
   };
 }
@@ -12990,6 +13003,7 @@ type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
   latestWorkspaceSyncState: ComparisonHistorySyncWorkspaceState;
+  activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
   historySharedSync: ComparisonHistoryPanelSyncState | null;
@@ -13018,6 +13032,7 @@ type RunSectionComparisonControls = {
   onChangeShowPinnedHistoryOnly: (value: boolean) => void;
   onChangeHistoryAuditFilter: (value: ComparisonHistorySyncAuditFilter) => void;
   onChangeShowResolvedHistoryAudits: (value: boolean) => void;
+  onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
   onToggleHistoryEntryPinned: (entryId: string) => void;
@@ -13104,7 +13119,6 @@ function RunSection({
   const [expandedWorkspaceScoreDetailIds, setExpandedWorkspaceScoreDetailIds] = useState<
     Record<string, boolean>
   >({});
-  const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(null);
   const workspaceReviewRowRefs = useRef(new Map<string, HTMLDivElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
@@ -13174,14 +13188,16 @@ function RunSection({
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   ) => {
-    setActiveWorkspaceOverviewRowId(buildWorkspaceReviewRowSelectionId(auditId, fieldKey));
+    comparison?.onChangeActiveWorkspaceOverviewRowId(
+      buildWorkspaceReviewRowSelectionId(auditId, fieldKey),
+    );
   };
   const focusWorkspaceReviewRow = (
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   ) => {
     const scoreDetailKey = buildWorkspaceReviewRowSelectionId(auditId, fieldKey);
-    setActiveWorkspaceOverviewRowId(scoreDetailKey);
+    comparison?.onChangeActiveWorkspaceOverviewRowId(scoreDetailKey);
     setExpandedWorkspaceScoreDetailIds((current) => ({
       ...current,
       [scoreDetailKey]: true,
@@ -13501,7 +13517,7 @@ function RunSection({
                               ? workspaceRows.find(
                                   (row) =>
                                     buildWorkspaceReviewRowSelectionId(entry.auditId, row.fieldKey)
-                                      === activeWorkspaceOverviewRowId,
+                                      === comparison.activeWorkspaceOverviewRowId,
                                 ) ?? null
                               : null;
                             const strongestWorkspaceOverviewRowId =
@@ -13746,7 +13762,7 @@ function RunSection({
                                                     ? "is-interactive"
                                                     : ""
                                                 } ${
-                                                  strongestWorkspaceOverviewRowId === activeWorkspaceOverviewRowId
+                                                  strongestWorkspaceOverviewRowId === comparison.activeWorkspaceOverviewRowId
                                                     ? "is-active"
                                                     : ""
                                                 }`}
@@ -13793,7 +13809,7 @@ function RunSection({
                                                       return (
                                                         <button
                                                           className={`comparison-history-conflict-review-overview-chip is-local ${
-                                                            activeWorkspaceOverviewRowId === scoreDetailKey
+                                                            comparison.activeWorkspaceOverviewRowId === scoreDetailKey
                                                               ? "is-active"
                                                               : ""
                                                           }`}
@@ -13824,7 +13840,7 @@ function RunSection({
                                                       return (
                                                         <button
                                                           className={`comparison-history-conflict-review-overview-chip is-remote ${
-                                                            activeWorkspaceOverviewRowId === scoreDetailKey
+                                                            comparison.activeWorkspaceOverviewRowId === scoreDetailKey
                                                               ? "is-active"
                                                               : ""
                                                           }`}
@@ -13924,7 +13940,8 @@ function RunSection({
                                                   const scoreDetailsExpanded = Boolean(
                                                     expandedWorkspaceScoreDetailIds[scoreDetailKey],
                                                   );
-                                                  const rowActive = activeWorkspaceOverviewRowId === scoreDetailKey;
+                                                  const rowActive =
+                                                    comparison.activeWorkspaceOverviewRowId === scoreDetailKey;
                                                   return (
                                                     <div
                                                       className={`comparison-history-conflict-review-row ${
