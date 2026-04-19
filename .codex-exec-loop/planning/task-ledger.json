@@ -4035,19 +4035,55 @@
       "id": "planning-experiment-os-extend-run-surface-capabilities-into-shared-ui-and-schema-discovery-flows",
       "direction_id": "experiment-os",
       "title": "Extend run-surface capabilities into shared UI and schema discovery flows",
-      "description": "Build on the now-canonical `/api/capabilities/run-surfaces` contract by carrying `RunSurfaceCapabilities` into the remaining shared UI surfaces and any schema-discovery or capability-discovery flows that still infer eligibility semantics elsewhere, so eligibility gating and boundary labels stay centralized beyond run/list and compare alone.",
-      "status": "ready",
+      "description": "Build on the canonical `/api/capabilities/run-surfaces` contract by carrying `RunSurfaceCapabilities` discovery metadata into the remaining shared UI surfaces and schema-discovery flows, so strategy catalog, preset editing, and related capability panels read one source of truth for schema version, group order, title, and summary metadata instead of reconstructing the contract locally.",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply explicitly says the embedded-contract cleanup is finished and the remaining work is expanding the shared capability contract beyond run/list and compare into other shared UI surfaces and separate schema-discovery flows. That makes this the clearest immediate executable next task without requiring additional operator choice first.",
+      "priority_reason": "Completed in main session commit c141f95, which added discovery metadata to `RunSurfaceCapabilities`, wired strategy catalog and preset editor shared UI panels to the same capability source, verified with py_compile, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-remove-embedded-eligibility-contract-duplication-from-run-and-compare-payloads"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T13:40:00Z",
+      "updated_at": "2026-04-20T14:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os from a cleaned-up canonical run-surface capability endpoint into a broader shared discovery contract so future operator surfaces and schema-driven clients do not reintroduce eligibility-policy drift."
+    },
+    {
+      "id": "planning-experiment-os-expand-run-surface-capability-families-beyond-comparison-eligibility",
+      "direction_id": "experiment-os",
+      "title": "Expand run-surface capability families beyond comparison eligibility",
+      "description": "Extend the shared `RunSurfaceCapabilities` discovery model beyond the current comparison-eligibility contract so the same panel and schema-discovery flow can aggregate additional run-surface capability families as they appear, instead of treating eligibility as a one-off shape.",
+      "status": "done",
+      "base_priority": 92,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "Completed in main session commit 7484d60, which added `strategy_schema`, `provenance_semantics`, and `execution_controls` capability families alongside `comparison_eligibility`, expanded discovery metadata with `family_order` and schema version `v2`, reused the family descriptions across the web capability panel, strategy catalog, and preset editor, and verified the change with py_compile, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-extend-run-surface-capabilities-into-shared-ui-and-schema-discovery-flows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T21:42:28Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os from a single-family run-surface discovery contract into a reusable capability catalog shape that can keep future shared UI and schema-discovery clients aligned as new capability families land."
+    },
+    {
+      "id": "planning-experiment-os-add-machine-readable-policy-and-enforcement-metadata-to-capability-families",
+      "direction_id": "experiment-os",
+      "title": "Add machine-readable policy and enforcement metadata to capability families",
+      "description": "Build on the new multi-family `RunSurfaceCapabilities` catalog by attaching machine-readable policy fields and surface-specific enforcement metadata to each capability family, so discovery can progress from descriptive documentation into contracts that run, comparison, strategy, and preset surfaces can actually enforce.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is making the new capability families more executable, and it names machine-readable policy plus surface-specific enforcement metadata as the concrete next step. That is now the clearest immediate queued task.",
+      "depends_on": [
+        "planning-experiment-os-expand-run-surface-capability-families-beyond-comparison-eligibility"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T21:42:28Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from a descriptive run-surface capability catalog into an enforceable experiment contract whose policy semantics can be shared consistently across launch, preset, comparison, and provenance surfaces."
     }
   ]
 }
