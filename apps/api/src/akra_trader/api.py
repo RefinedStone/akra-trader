@@ -20,6 +20,7 @@ from akra_trader.application import serialize_strategy
 from akra_trader.application import serialize_preset
 from akra_trader.application import serialize_preset_revision
 from akra_trader.bootstrap import Container
+from akra_trader.application import serialize_run_surface_capabilities
 
 
 class StrategyRegistrationRequest(BaseModel):
@@ -138,6 +139,10 @@ def create_router(container: Container) -> APIRouter:
   @router.get("/health")
   def health() -> dict[str, str]:
     return {"status": "ok"}
+
+  @router.get("/capabilities/run-surfaces")
+  def get_run_surface_capabilities(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
+    return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
 
   @router.get("/strategies")
   def list_strategies(

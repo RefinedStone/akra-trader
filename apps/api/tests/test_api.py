@@ -346,6 +346,23 @@ def test_preset_update_endpoint_rejects_empty_patch(tmp_path: Path) -> None:
   assert response.json()["detail"] == "Preset update requires at least one field."
 
 
+def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  response = client.get("/api/capabilities/run-surfaces")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["comparison_eligibility_contract"]["scope"] == "run_list"
+  assert payload["comparison_eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
+  assert payload["comparison_eligibility_contract"]["groups"]["supporting_identity"]["surface_ids"] == [
+    "mode",
+    "lane",
+    "lifecycle",
+    "version",
+  ]
+
+
 def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   create_preset(

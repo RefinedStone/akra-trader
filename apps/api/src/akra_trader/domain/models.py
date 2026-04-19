@@ -613,6 +613,13 @@ def default_comparison_eligibility_contract() -> ComparisonEligibilityContract:
 
 
 @dataclass(frozen=True)
+class RunSurfaceCapabilities:
+  comparison_eligibility_contract: ComparisonEligibilityContract = field(
+    default_factory=default_comparison_eligibility_contract
+  )
+
+
+@dataclass(frozen=True)
 class RunComparisonNarrative:
   run_id: str
   baseline_run_id: str

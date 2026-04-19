@@ -421,6 +421,10 @@ type RunComparison = {
   }[];
 };
 
+type RunSurfaceCapabilities = {
+  comparison_eligibility_contract: RunListBoundaryContract;
+};
+
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
 type ProvenanceArtifactLineMicroView = "structure" | "signal" | "note";
@@ -4828,6 +4832,7 @@ export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
   const [presets, setPresets] = useState<ExperimentPreset[]>([]);
+  const [runSurfaceCapabilities, setRunSurfaceCapabilities] = useState<RunSurfaceCapabilities | null>(null);
   const [backtests, setBacktests] = useState<Run[]>([]);
   const [sandboxRuns, setSandboxRuns] = useState<Run[]>([]);
   const [paperRuns, setPaperRuns] = useState<Run[]>([]);
@@ -5086,6 +5091,7 @@ export default function App() {
     setStatusText("Refreshing data plane...");
     try {
       const [
+        runSurfaceCapabilitiesResponse,
         strategiesResponse,
         referencesResponse,
         presetsResponse,
@@ -5097,6 +5103,7 @@ export default function App() {
         operatorResponse,
         guardedLiveResponse,
       ] = await Promise.all([
+        fetchJson<RunSurfaceCapabilities>("/capabilities/run-surfaces"),
         fetchJson<Strategy[]>("/strategies"),
         fetchJson<ReferenceSource[]>("/references"),
         fetchJson<ExperimentPreset[]>("/presets"),
@@ -5108,6 +5115,7 @@ export default function App() {
         fetchJson<OperatorVisibility>("/operator/visibility"),
         fetchJson<GuardedLiveStatus>("/guarded-live"),
       ]);
+      setRunSurfaceCapabilities(runSurfaceCapabilitiesResponse);
       setStrategies(strategiesResponse);
       setReferences(referencesResponse);
       setPresets(presetsResponse);
@@ -8353,6 +8361,7 @@ export default function App() {
           title="Recent backtests"
           runs={backtests}
           presets={presets}
+          runSurfaceCapabilities={runSurfaceCapabilities}
           strategies={strategies}
           filter={backtestRunFilter}
           setFilter={setBacktestRunFilter}
@@ -8535,6 +8544,7 @@ export default function App() {
           title="Sandbox runs"
           runs={sandboxRuns}
           presets={presets}
+          runSurfaceCapabilities={runSurfaceCapabilities}
           strategies={strategies}
           filter={sandboxRunFilter}
           setFilter={setSandboxRunFilter}
@@ -8554,6 +8564,7 @@ export default function App() {
           title="Paper runs"
           runs={paperRuns}
           presets={presets}
+          runSurfaceCapabilities={runSurfaceCapabilities}
           strategies={strategies}
           filter={paperRunFilter}
           setFilter={setPaperRunFilter}
@@ -8573,6 +8584,7 @@ export default function App() {
           title="Guarded live runs"
           runs={liveRuns}
           presets={presets}
+          runSurfaceCapabilities={runSurfaceCapabilities}
           strategies={strategies}
           filter={liveRunFilter}
           setFilter={setLiveRunFilter}
@@ -14315,6 +14327,7 @@ function RunSection({
   title,
   runs,
   presets,
+  runSurfaceCapabilities,
   strategies,
   filter,
   setFilter,
@@ -14326,6 +14339,7 @@ function RunSection({
   title: string;
   runs: Run[];
   presets: ExperimentPreset[];
+  runSurfaceCapabilities: RunSurfaceCapabilities | null;
   strategies: Strategy[];
   filter: RunHistoryFilter;
   setFilter: (updater: (value: RunHistoryFilter) => RunHistoryFilter) => void;
@@ -14339,6 +14353,7 @@ function RunSection({
   const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
+  const sharedRunListBoundaryContract = runSurfaceCapabilities?.comparison_eligibility_contract ?? null;
   const comparisonBoundaryContract = comparison?.payload?.eligibility_contract ?? null;
   const presetOptions = presets.filter(
     (preset) =>
@@ -17392,7 +17407,10 @@ function RunSection({
         <div className="run-list">
           {runs.map((run) => {
             const orderControls = getOrderControls ? getOrderControls(run) : null;
-            const runListBoundaryContract = run.eligibility_contract ?? comparisonBoundaryContract;
+            const runListBoundaryContract =
+              sharedRunListBoundaryContract
+              ?? run.eligibility_contract
+              ?? comparisonBoundaryContract;
             const comparisonLinkedRunRole =
               comparison?.payload
                 ? getComparisonScoreLinkedRunRole(

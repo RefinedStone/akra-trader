@@ -20,6 +20,7 @@ from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import ComparisonEligibilityContract
 from akra_trader.domain.models import default_comparison_eligibility_contract
+from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
 from akra_trader.domain.models import ClosedTrade
 from akra_trader.domain.models import GuardedLiveInternalExposure
@@ -1145,6 +1146,9 @@ class TradingApplication:
       metric_rows=metric_rows,
       narratives=tuple(ranked_narratives),
     )
+
+  def get_run_surface_capabilities(self) -> RunSurfaceCapabilities:
+    return RunSurfaceCapabilities()
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
@@ -22693,6 +22697,14 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
     for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
   ]
   return payload
+
+
+def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> dict[str, Any]:
+  return {
+    "comparison_eligibility_contract": serialize_comparison_eligibility_contract(
+      capabilities.comparison_eligibility_contract
+    )
+  }
 
 
 def serialize_comparison_eligibility_contract(
