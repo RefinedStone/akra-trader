@@ -3357,6 +3357,49 @@ select {
   word-break: break-word;
 }
 
+.reference-artifact-line-note-card {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.reference-artifact-line-note-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reference-artifact-line-note-button {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.88);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.reference-artifact-line-note-button:hover,
+.reference-artifact-line-note-button:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.32);
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+}
+
+.reference-artifact-line-note-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.reference-artifact-line-note-indicator {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
 .run-strategy {
   margin: 14px 0;
   padding: 16px;

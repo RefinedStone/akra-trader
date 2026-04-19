@@ -402,6 +402,7 @@ type RunComparison = {
 
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
+type ProvenanceArtifactLineMicroView = "structure" | "signal" | "note";
 
 type ComparisonScoreLinkTarget = {
   narrativeRunId: string;
@@ -414,6 +415,8 @@ type ComparisonScoreLinkTarget = {
   artifactDetailExpanded: boolean | null;
   artifactLineDetailExpanded: boolean | null;
   artifactLineDetailView: ProvenanceArtifactLineDetailView | null;
+  artifactLineMicroView: ProvenanceArtifactLineMicroView | null;
+  artifactLineNotePage: number | null;
   tooltipKey: string | null;
   artifactHoverKey: string | null;
 };
@@ -431,6 +434,8 @@ type ComparisonScoreDrillBackOptions = {
   artifactDetailExpanded?: boolean | null;
   artifactLineDetailExpanded?: boolean | null;
   artifactLineDetailView?: ProvenanceArtifactLineDetailView | null;
+  artifactLineMicroView?: ProvenanceArtifactLineMicroView | null;
+  artifactLineNotePage?: number | null;
   artifactHoverKey?: string | null;
   historyMode?: ComparisonHistoryWriteMode;
 };
@@ -2841,6 +2846,8 @@ const COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM = "compare_focus_expanded";
 const COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM = "compare_focus_artifact_expanded";
 const COMPARISON_FOCUS_ARTIFACT_LINE_EXPANDED_SEARCH_PARAM = "compare_focus_artifact_line_expanded";
 const COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM = "compare_focus_artifact_line_view";
+const COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM = "compare_focus_artifact_line_micro_view";
+const COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM = "compare_focus_artifact_line_note_page";
 const COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM = "compare_focus_tooltip";
 const COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM = "compare_focus_artifact_hover";
 const ALL_FILTER_VALUE = "__all__";
@@ -9659,6 +9666,8 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
     COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM,
     COMPARISON_FOCUS_ARTIFACT_LINE_EXPANDED_SEARCH_PARAM,
     COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM,
+    COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM,
+    COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM,
     COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM,
     COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM,
   ].some((key) => params.has(key));
@@ -9691,6 +9700,12 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
   const focusArtifactLineView = normalizeComparisonScoreLinkArtifactLineDetailView(
     params.get(COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM),
   );
+  const focusArtifactLineMicroView = normalizeComparisonScoreLinkArtifactLineMicroView(
+    params.get(COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM),
+  );
+  const focusArtifactLineNotePage = normalizeComparisonScoreLinkArtifactLineNotePage(
+    params.get(COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM),
+  );
   const focusTooltipKey = normalizeComparisonScoreLinkTooltipKey(
     params.get(COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM),
   );
@@ -9708,6 +9723,8 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
             artifactDetailExpanded: focusArtifactExpanded,
             artifactLineDetailExpanded: focusArtifactLineExpanded,
             artifactLineDetailView: focusArtifactLineView,
+            artifactLineMicroView: focusArtifactLineMicroView,
+            artifactLineNotePage: focusArtifactLineNotePage,
             narrativeRunId: focusRunId,
             originRunId: focusOriginRunId || null,
             section: focusSection,
@@ -9742,6 +9759,8 @@ function buildComparisonSelectionHistoryUrl(
   params.delete(COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_ARTIFACT_LINE_EXPANDED_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM);
 
@@ -9783,6 +9802,18 @@ function buildComparisonSelectionHistoryUrl(
       params.set(
         COMPARISON_FOCUS_ARTIFACT_LINE_VIEW_SEARCH_PARAM,
         normalizedSelection.scoreLink.artifactLineDetailView,
+      );
+    }
+    if (normalizedSelection.scoreLink.artifactLineMicroView) {
+      params.set(
+        COMPARISON_FOCUS_ARTIFACT_LINE_MICRO_VIEW_SEARCH_PARAM,
+        normalizedSelection.scoreLink.artifactLineMicroView,
+      );
+    }
+    if (normalizedSelection.scoreLink.artifactLineNotePage !== null) {
+      params.set(
+        COMPARISON_FOCUS_ARTIFACT_LINE_NOTE_PAGE_SEARCH_PARAM,
+        String(normalizedSelection.scoreLink.artifactLineNotePage),
       );
     }
     if (normalizedSelection.scoreLink.tooltipKey) {
@@ -12316,6 +12347,8 @@ function normalizeControlRoomComparisonSelection(
             artifactDetailExpanded: scoreLink.artifactDetailExpanded,
             artifactLineDetailExpanded: scoreLink.artifactLineDetailExpanded,
             artifactLineDetailView: scoreLink.artifactLineDetailView,
+            artifactLineMicroView: scoreLink.artifactLineMicroView,
+            artifactLineNotePage: scoreLink.artifactLineNotePage,
             originRunId:
               scoreLink.originRunId && selectedRunIds.includes(scoreLink.originRunId)
                 ? scoreLink.originRunId
@@ -12353,6 +12386,8 @@ function isSameComparisonSelection(
         && normalizedLeft.scoreLink.artifactDetailExpanded === normalizedRight.scoreLink.artifactDetailExpanded
         && normalizedLeft.scoreLink.artifactLineDetailExpanded === normalizedRight.scoreLink.artifactLineDetailExpanded
         && normalizedLeft.scoreLink.artifactLineDetailView === normalizedRight.scoreLink.artifactLineDetailView
+        && normalizedLeft.scoreLink.artifactLineMicroView === normalizedRight.scoreLink.artifactLineMicroView
+        && normalizedLeft.scoreLink.artifactLineNotePage === normalizedRight.scoreLink.artifactLineNotePage
         && normalizedLeft.scoreLink.tooltipKey === normalizedRight.scoreLink.tooltipKey
         && normalizedLeft.scoreLink.artifactHoverKey === normalizedRight.scoreLink.artifactHoverKey
       )
@@ -12388,6 +12423,9 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
     const artifactLineViewLabel = formatComparisonScoreLinkArtifactLineDetailViewLabel(
       entry.selection.scoreLink.artifactLineDetailView,
     );
+    const artifactLineMicroViewLabel = formatComparisonScoreLinkArtifactLineMicroViewLabel(
+      entry.selection.scoreLink.artifactLineMicroView,
+    );
     if (artifactHoverLabel) {
       parts.push(artifactHoverLabel);
     }
@@ -12408,6 +12446,16 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
     }
     if (entry.selection.scoreLink.artifactLineDetailExpanded === true && artifactLineViewLabel) {
       parts.push(artifactLineViewLabel);
+    }
+    if (entry.selection.scoreLink.artifactLineDetailExpanded === true && artifactLineMicroViewLabel) {
+      parts.push(artifactLineMicroViewLabel);
+    }
+    if (
+      entry.selection.scoreLink.artifactLineDetailExpanded === true
+      && entry.selection.scoreLink.artifactLineMicroView === "note"
+      && entry.selection.scoreLink.artifactLineNotePage !== null
+    ) {
+      parts.push(`note ${entry.selection.scoreLink.artifactLineNotePage + 1}`);
     }
   }
   if (entry.pinned) {
@@ -12477,6 +12525,9 @@ function buildComparisonHistoryStepDescriptor(
     const artifactLineViewLabel = formatComparisonScoreLinkArtifactLineDetailViewLabel(
       normalizedSelection.scoreLink.artifactLineDetailView,
     );
+    const artifactLineMicroViewLabel = formatComparisonScoreLinkArtifactLineMicroViewLabel(
+      normalizedSelection.scoreLink.artifactLineMicroView,
+    );
     const focusRunLabel = resolveComparisonHistoryRunLabel(
       normalizedSelection.scoreLink.narrativeRunId,
       runs,
@@ -12510,6 +12561,14 @@ function buildComparisonHistoryStepDescriptor(
       normalizedSelection.scoreLink.artifactLineDetailExpanded === false ? "Line detail hidden." : null,
       normalizedSelection.scoreLink.artifactLineDetailExpanded === true && artifactLineViewLabel
         ? `${artifactLineViewLabel}.`
+        : null,
+      normalizedSelection.scoreLink.artifactLineDetailExpanded === true && artifactLineMicroViewLabel
+        ? `${artifactLineMicroViewLabel}.`
+        : null,
+      normalizedSelection.scoreLink.artifactLineDetailExpanded === true
+      && normalizedSelection.scoreLink.artifactLineMicroView === "note"
+      && normalizedSelection.scoreLink.artifactLineNotePage !== null
+        ? `Note ${normalizedSelection.scoreLink.artifactLineNotePage + 1}.`
         : null,
       originRunLabel && originRunLabel !== focusRunLabel
         ? `Origin run ${originRunLabel}.`
@@ -12658,6 +12717,23 @@ function normalizeComparisonScoreLinkArtifactLineDetailView(
   return value === "stats" || value === "context" ? value : null;
 }
 
+function normalizeComparisonScoreLinkArtifactLineMicroView(
+  value: unknown,
+): ProvenanceArtifactLineMicroView | null {
+  return value === "structure" || value === "signal" || value === "note" ? value : null;
+}
+
+function normalizeComparisonScoreLinkArtifactLineNotePage(value: unknown) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0) {
+    return value;
+  }
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isInteger(parsed) && parsed >= 0 ? parsed : null;
+  }
+  return null;
+}
+
 function normalizeComparisonScoreLinkArtifactHoverKey(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
@@ -12687,6 +12763,12 @@ function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLink
   const artifactLineDetailView = normalizeComparisonScoreLinkArtifactLineDetailView(
     candidate.artifactLineDetailView,
   );
+  const artifactLineMicroView = normalizeComparisonScoreLinkArtifactLineMicroView(
+    candidate.artifactLineMicroView,
+  );
+  const artifactLineNotePage = normalizeComparisonScoreLinkArtifactLineNotePage(
+    candidate.artifactLineNotePage,
+  );
   const tooltipKey = normalizeComparisonScoreLinkTooltipKey(candidate.tooltipKey);
   const artifactHoverKey = normalizeComparisonScoreLinkArtifactHoverKey(candidate.artifactHoverKey);
   if (!narrativeRunId || !componentKey || !section) {
@@ -12698,6 +12780,8 @@ function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLink
     artifactDetailExpanded,
     artifactLineDetailExpanded,
     artifactLineDetailView,
+    artifactLineMicroView,
+    artifactLineNotePage,
     narrativeRunId,
     originRunId,
     section,
@@ -17634,6 +17718,8 @@ function RunComparisonPanel({
       artifactDetailExpanded: options?.artifactDetailExpanded ?? null,
       artifactLineDetailExpanded: options?.artifactLineDetailExpanded ?? null,
       artifactLineDetailView: options?.artifactLineDetailView ?? null,
+      artifactLineMicroView: options?.artifactLineMicroView ?? null,
+      artifactLineNotePage: options?.artifactLineNotePage ?? null,
       originRunId: runId,
       source,
       subFocusKey: options?.subFocusKey ?? null,
@@ -18833,6 +18919,8 @@ function ComparisonNarrativeScoreBreakdown({
                             artifactDetailExpanded: null,
                             artifactLineDetailExpanded: null,
                             artifactLineDetailView: null,
+                            artifactLineMicroView: null,
+                            artifactLineNotePage: null,
                             narrativeRunId,
                             originRunId: null,
                             section: section.key,
@@ -18922,6 +19010,8 @@ function ComparisonNarrativeScoreBreakdown({
                                 artifactDetailExpanded: null,
                                 artifactLineDetailExpanded: null,
                                 artifactLineDetailView: null,
+                                artifactLineMicroView: null,
+                                artifactLineNotePage: null,
                                 narrativeRunId,
                                 originRunId: null,
                                 section: section.key,
@@ -20804,6 +20894,14 @@ function ReferenceRunProvenanceSummary({
     linkedScoreSelection?.source === "provenance"
       ? linkedScoreSelection.artifactLineDetailView
       : null;
+  const activeProvenanceArtifactLineMicroView =
+    linkedScoreSelection?.source === "provenance"
+      ? linkedScoreSelection.artifactLineMicroView
+      : null;
+  const activeProvenanceArtifactLineNotePage =
+    linkedScoreSelection?.source === "provenance"
+      ? linkedScoreSelection.artifactLineNotePage
+      : null;
   const renderProvenanceCopyLine = ({
     children,
     componentKey,
@@ -20846,6 +20944,8 @@ function ReferenceRunProvenanceSummary({
             artifactDetailExpanded: null,
             artifactLineDetailExpanded: null,
             artifactLineDetailView: null,
+            artifactLineMicroView: null,
+            artifactLineNotePage: null,
             artifactHoverKey: null,
             subFocusKey: subFocusKey ?? null,
           })
@@ -20859,6 +20959,8 @@ function ReferenceRunProvenanceSummary({
             artifactDetailExpanded: null,
             artifactLineDetailExpanded: null,
             artifactLineDetailView: null,
+            artifactLineMicroView: null,
+            artifactLineNotePage: null,
             artifactHoverKey: null,
             subFocusKey: subFocusKey ?? null,
           });
@@ -21031,6 +21133,8 @@ function ReferenceRunProvenanceSummary({
                               : true,
                             artifactLineDetailExpanded: null,
                             artifactLineDetailView: null,
+                            artifactLineMicroView: null,
+                            artifactLineNotePage: null,
                             artifactHoverKey: null,
                             subFocusKey: artifactSubFocusKey,
                           })
@@ -21049,6 +21153,8 @@ function ReferenceRunProvenanceSummary({
                               : true,
                             artifactLineDetailExpanded: null,
                             artifactLineDetailView: null,
+                            artifactLineMicroView: null,
+                            artifactLineNotePage: null,
                             artifactHoverKey: null,
                             subFocusKey: artifactSubFocusKey,
                           });
@@ -21074,6 +21180,8 @@ function ReferenceRunProvenanceSummary({
                               artifactDetailExpanded: !artifactDetailsExpanded,
                               artifactLineDetailExpanded: null,
                               artifactLineDetailView: null,
+                              artifactLineMicroView: null,
+                              artifactLineNotePage: null,
                               artifactHoverKey: null,
                               historyMode: "replace",
                               subFocusKey: artifactSubFocusKey,
@@ -21115,6 +21223,8 @@ function ReferenceRunProvenanceSummary({
                                 artifactDetailExpanded: true,
                                 artifactLineDetailExpanded: null,
                                 artifactLineDetailView: null,
+                                artifactLineMicroView: null,
+                                artifactLineNotePage: null,
                                 artifactHoverKey: null,
                                 historyMode: "replace",
                                 subFocusKey: artifactSubFocusKey,
@@ -21128,6 +21238,8 @@ function ReferenceRunProvenanceSummary({
                                 artifactDetailExpanded: true,
                                 artifactLineDetailExpanded: null,
                                 artifactLineDetailView: null,
+                                artifactLineMicroView: null,
+                                artifactLineNotePage: null,
                                 artifactHoverKey,
                                 historyMode: "replace",
                                 subFocusKey: artifactSubFocusKey,
@@ -21141,6 +21253,8 @@ function ReferenceRunProvenanceSummary({
                                 artifactDetailExpanded: true,
                                 artifactLineDetailExpanded: null,
                                 artifactLineDetailView: null,
+                                artifactLineMicroView: null,
+                                artifactLineNotePage: null,
                                 artifactHoverKey,
                                 historyMode: "replace",
                                 subFocusKey: artifactSubFocusKey,
@@ -21154,6 +21268,8 @@ function ReferenceRunProvenanceSummary({
                                 artifactDetailExpanded: true,
                                 artifactLineDetailExpanded: null,
                                 artifactLineDetailView: null,
+                                artifactLineMicroView: null,
+                                artifactLineNotePage: null,
                                 artifactHoverKey: null,
                                 historyMode: "replace",
                                 subFocusKey: artifactSubFocusKey,
@@ -21206,6 +21322,8 @@ function ReferenceRunProvenanceSummary({
                                     artifactDetailExpanded: true,
                                     artifactLineDetailExpanded: null,
                                     artifactLineDetailView: null,
+                                    artifactLineMicroView: null,
+                                    artifactLineNotePage: null,
                                     artifactHoverKey: null,
                                     subFocusKey: sectionSubFocusKey,
                                   });
@@ -21220,6 +21338,8 @@ function ReferenceRunProvenanceSummary({
                                     artifactDetailExpanded: true,
                                     artifactLineDetailExpanded: null,
                                     artifactLineDetailView: null,
+                                    artifactLineMicroView: null,
+                                    artifactLineNotePage: null,
                                     artifactHoverKey: null,
                                     subFocusKey: sectionSubFocusKey,
                                   });
@@ -21244,19 +21364,45 @@ function ReferenceRunProvenanceSummary({
                               const lineDetailExpanded =
                                 isLineFocused && activeProvenanceArtifactLineDetailExpanded === true;
                               const lineDetailView = activeProvenanceArtifactLineDetailView ?? "stats";
+                              const lineMicroView = activeProvenanceArtifactLineMicroView ?? "structure";
                               const trimmedLine = line.trim();
                               const lineWordCount = trimmedLine ? trimmedLine.split(/\s+/).length : 0;
+                              const lineDensity = line.length ? (lineWordCount / Math.max(line.length, 1)) * 100 : 0;
                               const previousLine = lineIndex > 0 ? lines[lineIndex - 1] : null;
                               const nextLine = lineIndex < lines.length - 1 ? lines[lineIndex + 1] : null;
+                              const detailNotes =
+                                lineDetailView === "stats"
+                                  ? [
+                                      `Line ${lineIndex + 1} sits at ${Math.round(((lineIndex + 1) / Math.max(lines.length, 1)) * 100)}% through this section.`,
+                                      trimmedLine
+                                        ? `The line carries ${lineWordCount} words across ${line.length} characters.`
+                                        : "The line is blank and only keeps structural spacing.",
+                                      trimmedLine
+                                        ? `Lead token preview: ${trimmedLine.slice(0, 48)}${trimmedLine.length > 48 ? "..." : ""}`
+                                        : "No visible token preview is available for this blank line.",
+                                    ]
+                                  : [
+                                      `Previous sibling: ${previousLine ?? "none"}`,
+                                      `Next sibling: ${nextLine ?? "none"}`,
+                                      `Section context: ${formatBenchmarkArtifactSectionLabel(key)} in ${shortenIdentifier(artifact.path)}`,
+                                    ];
+                              const lineNotePage = Math.min(
+                                activeProvenanceArtifactLineNotePage ?? 0,
+                                Math.max(detailNotes.length - 1, 0),
+                              );
                               const preserveLineDetailState = isLineFocused
                                 ? {
                                     artifactLineDetailExpanded:
                                       activeProvenanceArtifactLineDetailExpanded,
                                     artifactLineDetailView: activeProvenanceArtifactLineDetailView,
+                                    artifactLineMicroView: activeProvenanceArtifactLineMicroView,
+                                    artifactLineNotePage: activeProvenanceArtifactLineNotePage,
                                   }
                                 : {
                                     artifactLineDetailExpanded: null,
                                     artifactLineDetailView: null,
+                                    artifactLineMicroView: null,
+                                    artifactLineNotePage: null,
                                   };
                               return (
                                 <div
@@ -21280,6 +21426,8 @@ function ReferenceRunProvenanceSummary({
                                       artifactLineDetailExpanded:
                                         activeProvenanceArtifactLineDetailExpanded,
                                       artifactLineDetailView: activeProvenanceArtifactLineDetailView,
+                                      artifactLineMicroView: activeProvenanceArtifactLineMicroView,
+                                      artifactLineNotePage: activeProvenanceArtifactLineNotePage,
                                       artifactHoverKey: null,
                                       historyMode: "replace",
                                       subFocusKey: sectionSubFocusKey,
@@ -21321,6 +21469,8 @@ function ReferenceRunProvenanceSummary({
                                       artifactLineDetailExpanded:
                                         activeProvenanceArtifactLineDetailExpanded,
                                       artifactLineDetailView: activeProvenanceArtifactLineDetailView,
+                                      artifactLineMicroView: activeProvenanceArtifactLineMicroView,
+                                      artifactLineNotePage: activeProvenanceArtifactLineNotePage,
                                       artifactHoverKey: null,
                                       historyMode: "replace",
                                       subFocusKey: sectionSubFocusKey,
@@ -21350,6 +21500,12 @@ function ReferenceRunProvenanceSummary({
                                             artifactLineDetailView: lineDetailExpanded
                                               ? lineDetailView
                                               : (activeProvenanceArtifactLineDetailView ?? "stats"),
+                                            artifactLineMicroView: lineDetailExpanded
+                                              ? lineMicroView
+                                              : (activeProvenanceArtifactLineMicroView ?? "structure"),
+                                            artifactLineNotePage: lineDetailExpanded
+                                              ? lineNotePage
+                                              : (activeProvenanceArtifactLineNotePage ?? 0),
                                             artifactHoverKey,
                                             historyMode: "replace",
                                             subFocusKey: sectionSubFocusKey,
@@ -21376,6 +21532,8 @@ function ReferenceRunProvenanceSummary({
                                                     artifactDetailExpanded: true,
                                                     artifactLineDetailExpanded: true,
                                                     artifactLineDetailView: view,
+                                                    artifactLineMicroView: activeProvenanceArtifactLineMicroView ?? "structure",
+                                                    artifactLineNotePage: activeProvenanceArtifactLineNotePage ?? 0,
                                                     artifactHoverKey,
                                                     historyMode: "replace",
                                                     subFocusKey: sectionSubFocusKey,
@@ -21387,12 +21545,114 @@ function ReferenceRunProvenanceSummary({
                                               </button>
                                             ))}
                                           </div>
+                                          <div className="reference-artifact-line-view-switch">
+                                            {(["structure", "signal", "note"] as const).map((view) => (
+                                              <button
+                                                aria-pressed={lineMicroView === view}
+                                                className={`reference-artifact-line-view-chip ${
+                                                  lineMicroView === view ? "is-active" : ""
+                                                }`.trim()}
+                                                key={view}
+                                                onClick={(event) => {
+                                                  event.preventDefault();
+                                                  event.stopPropagation();
+                                                  onDrillBackScoreLink?.("context", artifactComponentKey, {
+                                                    artifactDetailExpanded: true,
+                                                    artifactLineDetailExpanded: true,
+                                                    artifactLineDetailView: lineDetailView,
+                                                    artifactLineMicroView: view,
+                                                    artifactLineNotePage: view === "note" ? lineNotePage : lineNotePage,
+                                                    artifactHoverKey,
+                                                    historyMode: "replace",
+                                                    subFocusKey: sectionSubFocusKey,
+                                                  });
+                                                }}
+                                                type="button"
+                                              >
+                                                {view === "structure"
+                                                  ? "Structure"
+                                                  : view === "signal"
+                                                    ? "Signal"
+                                                    : "Note"}
+                                              </button>
+                                            ))}
+                                          </div>
                                           <div className="reference-artifact-line-detail">
-                                            {lineDetailView === "stats" ? (
+                                            {lineMicroView === "note" ? (
+                                              <>
+                                                <div className="reference-artifact-line-note-card">
+                                                  <span>{detailNotes[lineNotePage]}</span>
+                                                </div>
+                                                {detailNotes.length > 1 ? (
+                                                  <div className="reference-artifact-line-note-pager">
+                                                    <button
+                                                      className="reference-artifact-line-note-button"
+                                                      disabled={lineNotePage === 0}
+                                                      onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        onDrillBackScoreLink?.("context", artifactComponentKey, {
+                                                          artifactDetailExpanded: true,
+                                                          artifactLineDetailExpanded: true,
+                                                          artifactLineDetailView: lineDetailView,
+                                                          artifactLineMicroView: "note",
+                                                          artifactLineNotePage: Math.max(0, lineNotePage - 1),
+                                                          artifactHoverKey,
+                                                          historyMode: "replace",
+                                                          subFocusKey: sectionSubFocusKey,
+                                                        });
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Prev note
+                                                    </button>
+                                                    <span className="reference-artifact-line-note-indicator">
+                                                      {`Note ${lineNotePage + 1} / ${detailNotes.length}`}
+                                                    </span>
+                                                    <button
+                                                      className="reference-artifact-line-note-button"
+                                                      disabled={lineNotePage >= detailNotes.length - 1}
+                                                      onClick={(event) => {
+                                                        event.preventDefault();
+                                                        event.stopPropagation();
+                                                        onDrillBackScoreLink?.("context", artifactComponentKey, {
+                                                          artifactDetailExpanded: true,
+                                                          artifactLineDetailExpanded: true,
+                                                          artifactLineDetailView: lineDetailView,
+                                                          artifactLineMicroView: "note",
+                                                          artifactLineNotePage: Math.min(
+                                                            detailNotes.length - 1,
+                                                            lineNotePage + 1,
+                                                          ),
+                                                          artifactHoverKey,
+                                                          historyMode: "replace",
+                                                          subFocusKey: sectionSubFocusKey,
+                                                        });
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Next note
+                                                    </button>
+                                                  </div>
+                                                ) : null}
+                                              </>
+                                            ) : lineDetailView === "stats" && lineMicroView === "signal" ? (
+                                              <>
+                                                <span>{`Line density ${lineDensity.toFixed(1)} words / 100 chars`}</span>
+                                                <span>{`Trimmed length ${trimmedLine.length} / raw ${line.length}`}</span>
+                                                <span>{trimmedLine ? "content-bearing line" : "spacing-only line"}</span>
+                                              </>
+                                            ) : lineDetailView === "stats" ? (
                                               <>
                                                 <span>{`Line ${lineIndex + 1} of ${lines.length}`}</span>
                                                 <span>{`${line.length} chars / ${lineWordCount} words`}</span>
                                                 <span>{trimmedLine ? "non-empty content" : "blank content"}</span>
+                                              </>
+                                            ) : lineMicroView === "signal" ? (
+                                              <>
+                                                <span>{`Prev sibling present: ${previousLine ? "yes" : "no"}`}</span>
+                                                <span>{`Next sibling present: ${nextLine ? "yes" : "no"}`}</span>
+                                                <span>{`Path anchor ${shortenIdentifier(artifact.path)}`}</span>
                                               </>
                                             ) : (
                                               <>
@@ -21958,6 +22218,21 @@ function formatComparisonScoreLinkArtifactLineDetailViewLabel(
   return null;
 }
 
+function formatComparisonScoreLinkArtifactLineMicroViewLabel(
+  artifactLineMicroView: ProvenanceArtifactLineMicroView | null,
+) {
+  if (artifactLineMicroView === "structure") {
+    return "structure micro-view";
+  }
+  if (artifactLineMicroView === "signal") {
+    return "signal micro-view";
+  }
+  if (artifactLineMicroView === "note") {
+    return "note micro-view";
+  }
+  return null;
+}
+
 function formatComparisonScoreComponentDetail(
   section: "metrics" | "semantics" | "context",
   key: string,
@@ -22103,6 +22378,8 @@ function isSameComparisonScoreLinkTarget(
     && left.artifactDetailExpanded === right.artifactDetailExpanded
     && left.artifactLineDetailExpanded === right.artifactLineDetailExpanded
     && left.artifactLineDetailView === right.artifactLineDetailView
+    && left.artifactLineMicroView === right.artifactLineMicroView
+    && left.artifactLineNotePage === right.artifactLineNotePage
     && left.narrativeRunId === right.narrativeRunId
     && left.section === right.section
     && left.componentKey === right.componentKey
@@ -22155,6 +22432,8 @@ function resolveComparisonScoreDrillBackTarget(
           artifactDetailExpanded: null,
           artifactLineDetailExpanded: null,
           artifactLineDetailView: null,
+          artifactLineMicroView: null,
+          artifactLineNotePage: null,
           narrativeRunId: directNarrative.run_id,
           originRunId: null,
           section,
@@ -22187,6 +22466,8 @@ function resolveComparisonScoreDrillBackTarget(
         artifactDetailExpanded: null,
         artifactLineDetailExpanded: null,
         artifactLineDetailView: null,
+        artifactLineMicroView: null,
+        artifactLineNotePage: null,
         narrativeRunId: resolvedNarrative.run_id,
         originRunId: null,
         section,
