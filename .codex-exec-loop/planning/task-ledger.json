@@ -3532,18 +3532,36 @@
       "direction_id": "experiment-os",
       "title": "Persist workspace conflict score detail signal-level focus state",
       "description": "Extend the newly persisted workspace conflict score breakdown focus model beyond the current local-or-remote cluster level so the last-viewed semantic signal and any collapsed or expanded subgroup state inside that cluster are restored per row after reload and when the containing audit row is temporarily filtered out and back in, instead of resetting to only the cluster shell.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 27,
-      "priority_reason": "The latest main-session reply says cluster-level score detail focus persistence shipped in commit 2eeb39f and explicitly identifies signal-level persistence as the remaining gap, because the UI still forgets the last-viewed semantic signal and folded subgroup state inside each local or remote cluster. That makes signal-level restoration the clearest executable next task for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit 8eaddd3, which lifted signal-level focus into persisted workspace review state, restored the last-viewed `local` or `remote` signal per row after reload and audit refilter, defaulted overview-card row opens to a recommended first signal when needed, added focused styling for score-breakdown signal rows, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-workspace-conflict-score-detail-focus-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:46:00Z",
+      "updated_at": "2026-04-20T22:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace conflict persistence from cluster-level evidence restoration into preserving the exact semantic signal and subgroup context operators were inspecting inside each score breakdown."
+    },
+    {
+      "id": "planning-experiment-os-persist-workspace-conflict-signal-detail-deeper-view-state",
+      "direction_id": "experiment-os",
+      "title": "Persist deeper signal detail view state inside workspace conflict score details",
+      "description": "Build on the shipped signal-level focus persistence so any deeper signal detail state, such as per-signal explanation or tooltip visibility and grouped semantic cluster expansion beneath the selected signal, is also restored per row after reload and when audit filtering temporarily hides and re-shows the containing row.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 28,
+      "priority_reason": "The latest main-session reply says signal row focus persistence shipped in commit 8eaddd3, but explicitly calls out the remaining gap that deeper signal detail state still is not remembered, including extra explanation or tooltip visibility and grouped semantic cluster expansion under the selected signal. That makes deeper signal-detail persistence the clearest executable next task for builtin queue continuation.",
+      "depends_on": [
+        "planning-experiment-os-persist-workspace-conflict-score-detail-signal-focus-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from remembering which signal is focused into restoring the deeper explanation and grouped semantic context operators inspect underneath that signal."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
