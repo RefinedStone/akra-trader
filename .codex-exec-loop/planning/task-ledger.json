@@ -4288,36 +4288,54 @@
       "direction_id": "experiment-os",
       "title": "Extend standalone runtime bindings to general non-run read surfaces",
       "description": "Continue the `StandaloneSurfaceRuntimeBinding` rollout by onboarding general non-run read endpoints such as health, operator, and market-data surfaces onto the same binding-list and serializer-dispatch path, so standalone GET-style APIs stop keeping a separate registration and response-shaping family after capability and discovery endpoints have already been unified.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 29,
-      "priority_reason": "The latest main-session reply says capability-backed non-run discovery surfaces are now finished and explicitly calls out health, operator, and market-data standalone endpoints as the next wider application area before mutation routes. That makes the general non-run read-surface pass the clearest executable follow-up for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 824a5bf, which extended standalone runtime bindings across `health`, `market_data_status`, `operator_visibility`, and `guarded_live_status`, routed queryless non-run read surfaces through the shared binding dispatcher, kept `/api/market-data/status` on the same standalone binding path, and verified with `python -m py_compile`, targeted `pytest` coverage, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-standalone-runtime-binding-abstraction-to-non-run-capability-and-discovery-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:36:00Z",
+      "updated_at": "2026-04-20T23:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from shared binding coverage for run subresources plus non-run capability and discovery endpoints into the broader standalone read surface family, reducing the remaining application-specific wiring around health, operator, and market-data APIs."
     },
     {
       "id": "planning-experiment-os-decide-how-far-standalone-runtime-bindings-should-absorb-mutation-endpoints",
       "direction_id": "experiment-os",
-      "title": "Decide how far standalone runtime bindings should absorb mutation endpoints",
-      "description": "After the read-side standalone surfaces are unified, determine whether and how the same runtime binding family should cover mutation endpoints with request parsing, action semantics, and error handling, so the abstraction can expand deliberately without collapsing read and write concerns into an under-specified contract.",
-      "status": "proposed",
+      "title": "Extend standalone runtime bindings beyond read surfaces into mutation and non-read routes",
+      "description": "Build on the completed non-run read-surface rollout by applying the standalone runtime binding abstraction to the next remaining standalone scope: mutation endpoints and any broader non-read surfaces that still bypass the shared dispatcher, while defining the request parsing, action semantics, and error handling needed to keep read and write concerns explicit rather than bespoke.",
+      "status": "done",
       "base_priority": 88,
-      "dynamic_priority_delta": 28,
-      "priority_reason": "The latest main-session reply names mutation endpoints as a remaining expansion area, but it also separates them from health, operator, and market-data read surfaces. Keeping mutations as a proposal preserves the likely next step while leaving room to validate whether the current read-focused binding contract should be generalized or split before execution.",
+      "dynamic_priority_delta": 31,
+      "priority_reason": "Completed in main session commit ff047ca, which extended `StandaloneSurfaceRuntimeBinding` with method, payload, path-param, and header metadata, routed non-read standalone mutations such as preset create, strategy register, external incident sync, and guarded-live control actions through `execute_standalone_surface_binding(...)`, kept typed API request models thin, and verified the change with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-standalone-runtime-bindings-to-general-non-run-read-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:36:00Z",
+      "updated_at": "2026-04-20T23:59:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os runtime-binding generalization aimed at a possible mutation-family unification without prematurely committing to a read and write abstraction shape that may need stronger boundaries."
+      "direction_relation_note": "Carries experiment-os runtime-binding generalization past standalone read APIs into the remaining mutation and non-read routes so application wiring keeps converging on one explicit contract-driven surface model without silently blurring read versus action semantics."
+    },
+    {
+      "id": "planning-experiment-os-extend-standalone-runtime-bindings-to-run-scoped-mutations-and-resource-item-crud",
+      "direction_id": "experiment-os",
+      "title": "Extend standalone runtime bindings to run-scoped mutations and resource-item CRUD routes",
+      "description": "Build on the completed non-run mutation rollout by applying the same standalone runtime binding abstraction to the remaining explicit route families the main session called out, especially preset item update or lifecycle or revision-restore actions and run-scoped live-order or adjacent resource-item mutations, so request parsing, capability dispatch, and response shaping converge on one contract-driven path across the rest of the mutable API surface.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 32,
+      "priority_reason": "The latest main-session reply says standalone mutation and non-read routes are now complete in commit ff047ca and explicitly identifies the remaining gap as preset update or lifecycle or revision-restore flows plus run-scoped live-order mutation and resource-item CRUD routes that still use explicit route handlers. That makes this the clearest executable next queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-decide-how-far-standalone-runtime-bindings-should-absorb-mutation-endpoints"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:59:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Carries experiment-os runtime-binding generalization from standalone read and non-run mutation coverage into the remaining run-scoped and item-level mutable routes, reducing the last pockets of bespoke API wiring around mutable experiment and runtime resources."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
