@@ -4108,18 +4108,54 @@
       "direction_id": "experiment-os",
       "title": "Expose declarative route binding metadata through run-surface discovery",
       "description": "Finish the run-subresource discovery publication pass by extending the shipped serializer-registry metadata with declarative route path and route name binding details, so clients can inspect the available standalone run subresources, their body keys, response schema hints, and concrete API bindings without reading backend code.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 19,
-      "priority_reason": "Main-session commit 85c6a7e lifted run-surface discovery to schema version `run-surface-capabilities.v5`, published serializer-registry metadata to the API and capability panel, and explicitly called out the remaining gap as declarative route path and route name binding metadata. That keeps this task as the clearest next executable queue head, but with a narrower scope than the prior generic discovery publication pass.",
+      "priority_reason": "Completed in main session commit d95ccdf, which lifted run-surface discovery to schema version `run-surface-capabilities.v6`, published declarative route binding metadata for `orders`, `positions`, and `metrics` alongside the run-subresource registry metadata, surfaced the new section in the web capability panel, verified with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-type-run-subresource-registry-schema-and-route-bindings"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:40:00Z",
+      "updated_at": "2026-04-20T21:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os run-surface discovery from published standalone subresource serializer metadata into the remaining concrete API binding contract, so schema-driven clients and operator surfaces can stay aligned as new run-adjacent APIs are registered."
+    },
+    {
+      "id": "planning-experiment-os-promote-run-subresource-binding-and-serializer-coupling-into-shared-contract",
+      "direction_id": "experiment-os",
+      "title": "Promote run-subresource binding and serializer coupling into a shared contract object",
+      "description": "Build on the shipped `run-surface-capabilities.v6` discovery output by lifting the current route-binding plus serializer-spec pairing into a first-class shared contract object, so backend registration, discovery publication, and schema-driven consumers all resolve the same reusable run-subresource capability shape instead of stitching related metadata together ad hoc.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "Completed in main session commit b08abeb, which replaced separate serializer and route registries with a shared `RunSubresourceContract`, switched discovery to publish only `run_subresource_contracts`, bumped the schema to `run-surface-capabilities.v7`, updated capability-panel consumers, and verified the change with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, `git diff --check`, then pushed to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-add-consumer-capability-negotiation-to-run-surface-discovery"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from exposing run-subresource serializer and route metadata in discovery to defining one reusable shared contract object that backend registration, API publication, and future schema-driven consumers can all share."
+    },
+    {
+      "id": "planning-experiment-os-extend-shared-binding-contract-pattern-to-other-capability-families",
+      "direction_id": "experiment-os",
+      "title": "Generalize shared run-surface contracts across capability families and schema metadata",
+      "description": "Build on the shipped `RunSubresourceContract` by extending the same declarative contract pattern to the next run-surface capability families and any remaining standalone subresource schema metadata, so discovery, registration, and consumer rendering evolve around one reusable contract abstraction instead of a run-subresource-only special case.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is to widen the new shared contract abstraction beyond run-subresource binding and serializer coupling into other standalone capability families or subresource schema metadata. That is now the clearest executable next task, and it should be queued as the new head instead of repeating the just-finished shared-contract extraction.",
+      "depends_on": [
+        "planning-experiment-os-promote-run-subresource-binding-and-serializer-coupling-into-shared-contract"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os run-surface discovery extensible by turning the newly proven `RunSubresourceContract` into a broader contract pattern that can absorb adjacent capability families and schema metadata before drift reappears."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
