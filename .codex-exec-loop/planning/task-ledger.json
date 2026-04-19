@@ -2830,18 +2830,54 @@
       "direction_id": "experiment-os",
       "title": "Enable reverse score-component drill-back from metric cells and provenance panels",
       "description": "Extend the newly linked comparison analysis UI so operators can start from a metric cell, comparison row, or provenance or artifact panel and select the corresponding score component back into the score detail state, completing the interaction loop instead of keeping score-component tracing one-way from narrative cards only.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is interaction expansion: score detail rows can now drive cross-surface highlights, but metric cells and provenance panels still cannot drill back to select the score component. That is the clearest immediate executable follow-up for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 6d5c665, which let comparison metric cells and provenance semantic or source or command or artifact items drill back into the corresponding score component narrative, preserved baseline narrative fallback behavior, auto-scrolled externally selected narratives into view, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-link-score-components-across-comparison-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:56:37Z",
+      "updated_at": "2026-04-19T11:05:40Z",
       "source_turn_id": null,
       "direction_relation_note": "Completes the experiment-os comparison explainability interaction loop by making linked evidence surfaces bidirectional, so operators can enter the analysis from metrics or provenance just as easily as from score narrative details."
+    },
+    {
+      "id": "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state",
+      "direction_id": "experiment-os",
+      "title": "Persist comparison selection context in URL or durable UI state",
+      "description": "Carry the newly bidirectional comparison selection state across reloads, deep links, and adjacent navigation by persisting the active narrative or score component context in the URL or another durable view-state layer, so operators do not lose their analysis entry point after refresh or share it only through local memory.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 19,
+      "priority_reason": "The latest main-session reply explicitly says the last remaining interaction hardening is that bidirectional metric or provenance drill-back still does not preserve selection context in the URL or persisted UI state. That is the clearest next executable task for builtin queue progression because the core drill-back loop is now complete and persisted context is the first unfinished gap called out.",
+      "depends_on": [
+        "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:05:40Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison explainability from transient linked interactions into durable operator workflow state, which makes score-based analysis resumable and shareable instead of session-local."
+    },
+    {
+      "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
+      "direction_id": "experiment-os",
+      "title": "Extend reverse drill-back to non-provenance semantic lines in run cards",
+      "description": "Broaden the new reverse drill-back interaction so run-card semantic lines outside the current provenance panels can also select the matching score breakdown row or narrative, closing the remaining scope gap where only metric cells and provenance-linked surfaces participate in bidirectional analysis.",
+      "status": "proposed",
+      "base_priority": 91,
+      "dynamic_priority_delta": 2,
+      "priority_reason": "Main session explicitly called out one remaining scope extension after the shipped reverse drill-back: non-provenance semantic lines in run cards still are not selectable back into score breakdown state. This is executable follow-up work, but it is a narrower expansion after the more workflow-critical persistence gap.",
+      "depends_on": [
+        "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:05:40Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Further deepens experiment-os comparison traceability by widening bidirectional score-component selection beyond provenance panels into the remaining semantic explanation lines operators read during comparison review."
     }
   ]
 }
