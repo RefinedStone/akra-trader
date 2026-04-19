@@ -1001,6 +1001,11 @@ select {
   color: inherit;
 }
 
+.comparison-dev-conflict-preview-hint {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.75rem;
+}
+
 .comparison-dev-conflict-delta {
   display: inline-flex;
   width: fit-content;

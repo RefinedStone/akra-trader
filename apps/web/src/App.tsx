@@ -112,6 +112,7 @@ type PresetStructuredDiffRow = {
   incoming_value: string;
   key: string;
   label: string;
+  semantic_hint?: string;
 };
 
 type PresetStructuredDiffGroup = {
@@ -3147,17 +3148,166 @@ function isPresetStructuredDiffScalar(value: unknown) {
   return value === null || ["boolean", "number", "string"].includes(typeof value);
 }
 
+function arePresetStructuredDiffValuesEquivalent(left: unknown, right: unknown) {
+  if (left === right) {
+    return true;
+  }
+  if (
+    typeof left === "number" &&
+    Number.isNaN(left) &&
+    typeof right === "number" &&
+    Number.isNaN(right)
+  ) {
+    return true;
+  }
+  if (
+    (Array.isArray(left) || isPresetStructuredDiffObject(left)) &&
+    (Array.isArray(right) || isPresetStructuredDiffObject(right))
+  ) {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+  return false;
+}
+
+function matchesPresetParameterSchemaType(value: unknown, expectedType?: string) {
+  if (value === undefined || !expectedType) {
+    return true;
+  }
+  switch (expectedType) {
+    case "integer":
+      return typeof value === "number" && Number.isInteger(value);
+    case "number":
+      return typeof value === "number" && Number.isFinite(value);
+    case "boolean":
+      return typeof value === "boolean";
+    case "string":
+      return typeof value === "string";
+    case "array":
+      return Array.isArray(value);
+    case "object":
+      return isPresetStructuredDiffObject(value);
+    default:
+      return true;
+  }
+}
+
+function formatPresetParameterSchemaHint(schemaEntry?: ParameterSchema[string]) {
+  if (!schemaEntry) {
+    return undefined;
+  }
+  const parts: string[] = [];
+  if (schemaEntry.type) {
+    parts.push(schemaEntry.type);
+  }
+  if (schemaEntry.default !== undefined) {
+    parts.push(`default ${formatParameterValue(schemaEntry.default)}`);
+  }
+  if (typeof schemaEntry.minimum === "number") {
+    parts.push(`min ${formatComparisonTooltipTuningValue(schemaEntry.minimum)}`);
+  }
+  if (!parts.length) {
+    return undefined;
+  }
+  return `Schema: ${parts.join(" · ")}`;
+}
+
+function getPresetParameterSchemaEntry(
+  parameterSchema: ParameterSchema | undefined,
+  pathSegments: string[],
+) {
+  const rootSegment = pathSegments.find((segment) => !segment.startsWith("["));
+  if (!rootSegment) {
+    return undefined;
+  }
+  return parameterSchema?.[rootSegment];
+}
+
 function buildPresetStructuredDiffDelta(
   existingValue: string,
   incomingValue: string,
   existingRaw: unknown = existingValue,
   incomingRaw: unknown = incomingValue,
+  schemaEntry?: ParameterSchema[string],
 ) {
   if (existingValue === incomingValue) {
     return {
       direction: "same" as const,
       label: "match",
     };
+  }
+  if (schemaEntry?.type) {
+    const existingMatchesType = matchesPresetParameterSchemaType(existingRaw, schemaEntry.type);
+    const incomingMatchesType = matchesPresetParameterSchemaType(incomingRaw, schemaEntry.type);
+    if (incomingRaw !== undefined && !incomingMatchesType) {
+      return {
+        direction: "lower" as const,
+        label: `expected ${schemaEntry.type}`,
+      };
+    }
+    if (existingRaw !== undefined && !existingMatchesType && incomingMatchesType) {
+      return {
+        direction: "higher" as const,
+        label: `matches ${schemaEntry.type}`,
+      };
+    }
+  }
+  if (schemaEntry?.default !== undefined) {
+    const existingIsDefault = arePresetStructuredDiffValuesEquivalent(existingRaw, schemaEntry.default);
+    const incomingIsDefault = arePresetStructuredDiffValuesEquivalent(incomingRaw, schemaEntry.default);
+    if (existingRaw === undefined && incomingIsDefault) {
+      return {
+        direction: "same" as const,
+        label: `explicit default ${formatParameterValue(schemaEntry.default)}`,
+      };
+    }
+    if (!existingIsDefault && incomingIsDefault) {
+      return {
+        direction: "same" as const,
+        label: `back to default ${formatParameterValue(schemaEntry.default)}`,
+      };
+    }
+    if (existingIsDefault && !incomingIsDefault) {
+      return {
+        direction:
+          typeof incomingRaw === "number" &&
+          typeof schemaEntry.default === "number" &&
+          Number.isFinite(incomingRaw) &&
+          Number.isFinite(schemaEntry.default)
+            ? incomingRaw >= schemaEntry.default
+              ? ("higher" as const)
+              : ("lower" as const)
+            : ("higher" as const),
+        label: `override default ${formatParameterValue(schemaEntry.default)}`,
+      };
+    }
+    if (incomingRaw === undefined && !existingIsDefault) {
+      return {
+        direction: "lower" as const,
+        label: "cleared override",
+      };
+    }
+  }
+  if (
+    typeof schemaEntry?.minimum === "number" &&
+    typeof incomingRaw === "number" &&
+    Number.isFinite(incomingRaw)
+  ) {
+    const existingMeetsMinimum =
+      typeof existingRaw === "number" &&
+      Number.isFinite(existingRaw) &&
+      existingRaw >= schemaEntry.minimum;
+    if (incomingRaw < schemaEntry.minimum) {
+      return {
+        direction: "lower" as const,
+        label: `below min ${formatComparisonTooltipTuningValue(schemaEntry.minimum)}`,
+      };
+    }
+    if (!existingMeetsMinimum && incomingRaw >= schemaEntry.minimum) {
+      return {
+        direction: "higher" as const,
+        label: `meets min ${formatComparisonTooltipTuningValue(schemaEntry.minimum)}`,
+      };
+    }
   }
   if (!existingValue && incomingValue) {
     return {
@@ -3289,6 +3439,7 @@ function groupPresetStructuredDiffRows(rows: PresetStructuredDiffRow[]) {
 function buildPresetStructuredDiffRows(
   existing: ExperimentPresetRevision,
   incoming: ExperimentPresetRevision,
+  parameterSchema?: ParameterSchema,
 ) {
   const rows: PresetStructuredDiffRow[] = [];
   const pushRow = (
@@ -3301,8 +3452,16 @@ function buildPresetStructuredDiffRows(
     groupOrder: number,
     existingRaw: unknown = existingValue,
     incomingRaw: unknown = incomingValue,
+    semanticHint?: string,
+    schemaEntry?: ParameterSchema[string],
   ) => {
-    const delta = buildPresetStructuredDiffDelta(existingValue, incomingValue, existingRaw, incomingRaw);
+    const delta = buildPresetStructuredDiffDelta(
+      existingValue,
+      incomingValue,
+      existingRaw,
+      incomingRaw,
+      schemaEntry,
+    );
     rows.push({
       changed: existingValue !== incomingValue,
       delta_direction: delta.direction,
@@ -3314,6 +3473,7 @@ function buildPresetStructuredDiffRows(
       incoming_value: formatPresetStructuredDiffDisplayValue(incomingValue),
       key,
       label,
+      semantic_hint: semanticHint,
     });
   };
   const formatParameterPathLabel = (segments: string[]) =>
@@ -3334,6 +3494,7 @@ function buildPresetStructuredDiffRows(
     const label = formatParameterPathLabel(pathSegments) || "Parameter bundle";
     const existingValue = existingParameter === undefined ? "" : formatParameterValue(existingParameter);
     const incomingValue = incomingParameter === undefined ? "" : formatParameterValue(incomingParameter);
+    const schemaEntry = getPresetParameterSchemaEntry(parameterSchema, pathSegments);
     pushRow(
       `parameter:${label}`,
       label,
@@ -3344,6 +3505,8 @@ function buildPresetStructuredDiffRows(
       3,
       existingParameter,
       incomingParameter,
+      formatPresetParameterSchemaHint(schemaEntry),
+      schemaEntry,
     );
   };
   const appendParameterRows = (
@@ -3471,12 +3634,18 @@ function describePresetRevisionDiff(
   revision: ExperimentPresetRevision,
   reference: ExperimentPresetRevision | null,
   basisLabel: string,
+  parameterSchema?: ParameterSchema,
 ): PresetRevisionDiff {
-  const rows = buildPresetStructuredDiffRows(reference ?? buildEmptyPresetRevisionSnapshot(), revision);
+  const rows = buildPresetStructuredDiffRows(
+    reference ?? buildEmptyPresetRevisionSnapshot(),
+    revision,
+    parameterSchema,
+  );
   const changedGroups = groupPresetStructuredDiffRows(rows.filter((row) => row.changed));
   const unchangedGroups = groupPresetStructuredDiffRows(rows.filter((row) => !row.changed));
   const searchTexts = rows.map(
-    (row) => `${row.label} ${row.existing_value} ${row.incoming_value} ${row.delta_label}`,
+    (row) =>
+      `${row.label} ${row.semantic_hint ?? ""} ${row.existing_value} ${row.incoming_value} ${row.delta_label}`,
   );
   const changeCount = changedGroups.reduce((total, group) => total + group.changed_count, 0);
 
@@ -3495,6 +3664,7 @@ function describePresetRevisionDiff(
 function describePresetDraftConflict(
   preset: ExperimentPreset,
   form: typeof defaultPresetForm,
+  parameterSchema?: ParameterSchema,
 ): PresetDraftConflict {
   const savedForm = buildPresetFormFromPreset(preset);
   let normalizedDraftParameters = form.parameters_text.trim();
@@ -3593,6 +3763,7 @@ function describePresetDraftConflict(
         tags: parseExperimentTags(form.tags_text),
         parameters: parsedDraftParameters,
       },
+      parameterSchema,
     );
     rows.push(...revisionRows.filter((row) => row.group_key === "parameters"));
   }
@@ -6858,6 +7029,9 @@ function PresetStructuredDiffPreview({
       >
         <span className="comparison-dev-conflict-preview-label-group">
           <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+          {row.semantic_hint ? (
+            <span className="comparison-dev-conflict-preview-hint">{row.semantic_hint}</span>
+          ) : null}
           <span className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}>
             {row.delta_label}
           </span>
@@ -6956,6 +7130,8 @@ function PresetCatalogPanel({
   onToggleRevisions: (presetId: string) => void;
 }) {
   const isEditing = editingPresetId !== null;
+  const findStrategyParameterSchema = (strategyId?: string | null) =>
+    strategies.find((strategy) => strategy.strategy_id === strategyId)?.parameter_schema;
   const [revisionFiltersByPreset, setRevisionFiltersByPreset] = useState<
     Record<string, PresetRevisionFilterState>
   >({});
@@ -7085,7 +7261,13 @@ function PresetCatalogPanel({
                 const revisionsExpanded = Boolean(expandedPresetRevisionIds[preset.preset_id]);
                 const revisionFilter = revisionFiltersByPreset[preset.preset_id] ?? defaultPresetRevisionFilter;
                 const draftConflict =
-                  editingPresetId === preset.preset_id ? describePresetDraftConflict(preset, form) : null;
+                  editingPresetId === preset.preset_id
+                    ? describePresetDraftConflict(
+                        preset,
+                        form,
+                        findStrategyParameterSchema(form.strategy_id || preset.strategy_id),
+                      )
+                    : null;
                 const visibleRevisionEntries = revisions
                   .map((revision, index) => {
                     const diffReference =
@@ -7098,7 +7280,12 @@ function PresetCatalogPanel({
                           ? "previous snapshot"
                           : "initial revision"
                         : "current bundle";
-                    const diff = describePresetRevisionDiff(revision, diffReference, diffBasisLabel);
+                    const diff = describePresetRevisionDiff(
+                      revision,
+                      diffReference,
+                      diffBasisLabel,
+                      findStrategyParameterSchema(revision.strategy_id ?? preset.strategy_id),
+                    );
                     return { diff, revision };
                   })
                   .filter(({ diff, revision }) => matchesPresetRevisionFilter(revision, diff, revisionFilter));
