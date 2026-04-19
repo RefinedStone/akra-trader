@@ -3783,19 +3783,37 @@
       "id": "planning-experiment-os-persist-line-transient-state-inside-provenance-artifact-deep-links",
       "direction_id": "experiment-os",
       "title": "Persist line-level transient state inside provenance artifact deep-link surfaces",
-      "description": "Build on the shipped section-body line hover and focus restoration by carrying the finer transient state that still lives inside each selected line interaction, such as line-specific tooltip visibility, inline collapse toggles, or multi-line trace expansion context, so reopening a comparison deep link restores the exact evidence micro-state inside the selected section body instead of stopping at the active line shell.",
-      "status": "ready",
+      "description": "Build on the shipped section-body line hover and focus restoration by carrying the finer transient state that still lives inside each selected line interaction, such as line-specific tooltip visibility, inline collapse toggles, or multi-line trace expansion context, so reopening a comparison deep link restores the exact evidence micro-state inside the selected section body instead of stopping at the active line shell. This task is now completed for line detail open or closed state plus active `stats` or `context` lens restoration; a narrower line-detail micro-state follow-up remains.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 36,
-      "priority_reason": "The latest main-session reply says commit 30d63e5 finished section-body line hover and focus persistence, and directly identifies line tooltip, inline collapse, and multi-line trace state as the remaining executable deep-link restoration gap. That makes this the next automatic queue head.",
+      "priority_reason": "Completed in main session commit 59ef4e6, which persisted line detail open or closed state and active `stats` or `context` lens selection into provenance artifact deep links, URL or history restoration, and local selection state, kept line focus stable while toggling detail controls, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-section-body-microstate-inside-provenance-artifact-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:15:00Z",
+      "updated_at": "2026-04-21T00:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison deep links moving from restored section-body active lines into the last line-level transient interactions operators use while inspecting nested provenance evidence."
+    },
+    {
+      "id": "planning-experiment-os-persist-fine-grained-line-detail-microstate-inside-provenance-artifact-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Persist fine-grained line detail micro-state inside provenance artifact deep-link surfaces",
+      "description": "Build on the shipped line-level detail open or closed and active lens restoration by carrying the smaller transient state that still lives inside each opened line detail view, such as nested tooltip visibility, trace-step selection, nested expansion rows, or similar detail-local micro-interactions, so reopening a comparison deep link restores the exact evidence state inside the selected line detail instead of stopping at the detail shell and current lens.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 37,
+      "priority_reason": "The latest main-session reply says commit 59ef4e6 finished line detail open or closed plus active lens persistence, and explicitly identifies tooltip, trace-step, and nested expansion state inside line detail as the remaining executable deep-link restoration gap. That makes this the next automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-line-transient-state-inside-provenance-artifact-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison deep links progressing from restored line-level shells and lenses into the last detail-local micro-state operators use while inspecting nested provenance evidence inside a selected line."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
