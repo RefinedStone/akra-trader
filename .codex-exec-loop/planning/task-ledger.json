@@ -3838,18 +3838,36 @@
       "direction_id": "experiment-os",
       "title": "Extend reverse drill-back to non-provenance semantic lines in run cards",
       "description": "Broaden the new reverse drill-back interaction so run-card semantic lines outside the current provenance panels can also select the matching score breakdown row or narrative, closing the remaining scope gap where only metric cells and provenance-linked surfaces participate in bidirectional analysis.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 1,
-      "priority_reason": "Now that the provenance artifact deep-link line-detail persistence chain is complete through commit 1141b01, the clearest adjacent executable comparison-navigation gap is extending reverse drill-back beyond provenance-linked surfaces into the remaining run-card semantic lines, so this becomes the next automatic queue head.",
+      "priority_reason": "Completed in main session commit f196603, which added `run_card` deep-link sources for comparison-card semantic kind, execution model, parameter contract, semantic source, operator notes, and run-card origin lines, restored those selections through URL or history reload, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T20:19:31Z",
+      "updated_at": "2026-04-20T10:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Further deepens experiment-os comparison traceability by widening bidirectional score-component selection beyond provenance panels into the remaining semantic explanation lines operators read during comparison review."
+    },
+    {
+      "id": "planning-experiment-os-extend-comparison-deep-links-to-run-list-semantic-summaries",
+      "direction_id": "experiment-os",
+      "title": "Extend comparison deep-link surfaces to run-list semantic summaries",
+      "description": "Carry the new comparison deep-link and reverse drill-back contract beyond comparison run cards into general run-list summary surfaces such as `RunStrategySnapshot`, so non-comparison semantic summaries can still jump into the matching comparison evidence instead of leaving operators to manually re-find the same strategy semantics.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 2,
+      "priority_reason": "The latest main-session reply says comparison-card semantic lines now drill back correctly, and directly identifies run-list semantic summaries like `RunStrategySnapshot` as the remaining executable gap. That makes this the clearest immediate next task for automatic queue progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison traceability from comparison-card-local semantics into the broader run-history summary surfaces operators browse before opening a detailed comparison, tightening the experiment OS navigation contract across list and detail views."
     }
   ]
 }
