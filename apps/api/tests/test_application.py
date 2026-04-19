@@ -14498,6 +14498,22 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.narratives[0].rank == 1
   assert comparison.narratives[0].is_primary is True
   assert comparison.narratives[0].insight_score > 0
+  assert comparison.narratives[0].score_breakdown["total"] == comparison.narratives[0].insight_score
+  assert comparison.narratives[0].score_breakdown["metrics"]["total"] == 0.0
+  assert comparison.narratives[0].score_breakdown["semantics"]["total"] > 0
+  assert comparison.narratives[0].score_breakdown["context"]["total"] > 0
+  assert comparison.narratives[0].score_breakdown["context"]["components"]["native_reference_bonus"][
+    "score"
+  ] > 0
+  assert comparison.narratives[0].score_breakdown["semantics"]["components"]["strategy_kind"][
+    "applied"
+  ] is True
+  assert comparison.narratives[0].score_breakdown["semantics"]["components"]["vocabulary"]["score"] > 0
+  assert (
+    comparison.narratives[0].score_breakdown["semantics"]["components"]["provenance_richness"][
+      "score"
+    ] > 0
+  )
   assert comparison.narratives[0].title.startswith("Benchmark validation")
   assert comparison.narratives[0].summary.startswith(
     "Benchmark validation falls back to persisted reference provenance because direct metric "
@@ -14970,6 +14986,14 @@ def test_compare_runs_uses_provenance_richness_to_rank_reference_peers(tmp_path:
     > narrative_by_run[sparse_reference_run.config.run_id].insight_score
   )
   assert narrative_by_run[rich_reference_run.config.run_id].comparison_type == "native_vs_reference"
+  assert (
+    narrative_by_run[rich_reference_run.config.run_id].score_breakdown["semantics"]["components"][
+      "provenance_richness"
+    ]["score"]
+    > narrative_by_run[sparse_reference_run.config.run_id].score_breakdown["semantics"][
+      "components"
+    ]["provenance_richness"]["score"]
+  )
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

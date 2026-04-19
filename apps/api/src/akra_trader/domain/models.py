@@ -486,6 +486,7 @@ class RunComparisonNarrative:
   title: str
   summary: str
   bullets: tuple[str, ...] = ()
+  score_breakdown: dict[str, Any] = field(default_factory=dict)
   rank: int = 0
   insight_score: float = 0.0
   is_primary: bool = False

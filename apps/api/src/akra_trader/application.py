@@ -22923,7 +22923,7 @@ def _build_comparison_narrative(
   if not title and not summary and not bullets:
     return None
 
-  insight_score = _score_comparison_narrative(
+  insight_score, score_breakdown = _score_comparison_narrative(
     intent=intent,
     comparison_type=comparison_type,
     baseline_run=baseline_run,
@@ -22941,6 +22941,7 @@ def _build_comparison_narrative(
     title=title or f"{target_subject} diverged from {baseline_label}.",
     summary=summary or f"{target_label} is being compared against {baseline_label}.",
     bullets=tuple(bullets),
+    score_breakdown=score_breakdown,
     insight_score=insight_score,
   )
 
@@ -22972,70 +22973,159 @@ def _score_comparison_narrative(
   max_drawdown_delta: float | int | None,
   win_rate_delta: float | int | None,
   trade_count_delta: float | int | None,
-) -> float:
+) -> tuple[float, dict[str, Any]]:
   weights = COMPARISON_INTENT_WEIGHTS[intent]
-  score = 0.0
-  score += abs(float(total_return_delta or 0.0)) * weights["return"]
-  score += abs(float(max_drawdown_delta or 0.0)) * weights["drawdown"]
-  score += abs(float(win_rate_delta or 0.0)) * weights["win_rate"]
-  score += min(abs(float(trade_count_delta or 0.0)), 50.0) * weights["trade_count"]
-  score += _score_comparison_semantic_delta(
+  metric_components = {
+    "total_return_pct": _build_metric_score_component(
+      delta=total_return_delta,
+      weight=weights["return"],
+    ),
+    "max_drawdown_pct": _build_metric_score_component(
+      delta=max_drawdown_delta,
+      weight=weights["drawdown"],
+    ),
+    "win_rate_pct": _build_metric_score_component(
+      delta=win_rate_delta,
+      weight=weights["win_rate"],
+    ),
+    "trade_count": _build_metric_score_component(
+      delta=trade_count_delta,
+      weight=weights["trade_count"],
+      cap=50.0,
+    ),
+  }
+  semantic_components = _build_comparison_semantic_delta_breakdown(
     baseline_run=baseline_run,
     run=run,
     weights=weights,
   )
-  score += _score_comparison_semantic_vocabulary(
+  semantic_components["vocabulary"] = _build_comparison_semantic_vocabulary_breakdown(
     baseline_run=baseline_run,
     run=run,
     weights=weights,
   )
-  score += _score_comparison_provenance_richness(
+  semantic_components["provenance_richness"] = _build_comparison_provenance_richness_breakdown(
+    baseline_run=baseline_run,
+    run=run,
+    weights=weights,
+  )
+  context_components = _build_comparison_context_score_breakdown(
+    comparison_type=comparison_type,
     baseline_run=baseline_run,
     run=run,
     weights=weights,
   )
 
-  if comparison_type == "native_vs_reference":
-    score += weights["native_reference_bonus"]
-  elif comparison_type == "reference_vs_reference":
-    score += weights["reference_bonus"]
+  metric_total = round(
+    sum(component["score"] for component in metric_components.values()),
+    2,
+  )
+  semantic_total = round(
+    sum(component["score"] for component in semantic_components.values()),
+    2,
+  )
+  context_total = _context_subtotal(context_components)
+  if metric_total + semantic_total + context_total == 0.0 and _has_reference_context(run, baseline_run):
+    context_components["reference_floor"] = {
+      "applied": True,
+      "score": weights["reference_floor"],
+    }
+    context_total = _context_subtotal(context_components)
+  score = round(metric_total + semantic_total + context_total, 2)
 
-  if run.status != baseline_run.status:
-    score += weights["status_bonus"]
-  if _extract_benchmark_story(run) or _extract_benchmark_story(baseline_run):
-    score += weights["benchmark_story_bonus"]
-  if score == 0.0 and _has_reference_context(run, baseline_run):
-    score = weights["reference_floor"]
-  return round(score, 2)
+  breakdown = {
+    "metrics": {
+      "total": metric_total,
+      "components": metric_components,
+    },
+    "semantics": {
+      "total": semantic_total,
+      "components": semantic_components,
+    },
+    "context": {
+      "total": context_total,
+      "components": context_components,
+    },
+    "total": score,
+  }
+  return score, breakdown
 
 
-def _score_comparison_semantic_delta(
+def _build_metric_score_component(
+  *,
+  delta: float | int | None,
+  weight: float,
+  cap: float | None = None,
+) -> dict[str, Any]:
+  raw_delta = abs(float(delta or 0.0))
+  effective_delta = min(raw_delta, cap) if cap is not None else raw_delta
+  score = round(effective_delta * weight, 2)
+  return {
+    "delta": 0.0 if delta is None else float(delta),
+    "effective_delta": effective_delta,
+    "weight": weight,
+    "score": score,
+  }
+
+
+def _build_comparison_semantic_delta_breakdown(
   *,
   baseline_run: RunRecord,
   run: RunRecord,
   weights: dict[str, float],
-) -> float:
+) -> dict[str, dict[str, Any]]:
   baseline_semantics = _strategy_semantics(baseline_run)
   run_semantics = _strategy_semantics(run)
-  score = 0.0
-  if baseline_semantics.strategy_kind != run_semantics.strategy_kind:
-    score += weights["semantic_kind_bonus"]
-  if _normalized_semantic_text(baseline_semantics.execution_model) != _normalized_semantic_text(
+  strategy_kind_applied = baseline_semantics.strategy_kind != run_semantics.strategy_kind
+  execution_applied = _normalized_semantic_text(
+    baseline_semantics.execution_model
+  ) != _normalized_semantic_text(run_semantics.execution_model) and _normalized_semantic_text(
     run_semantics.execution_model
-  ):
-    if _normalized_semantic_text(run_semantics.execution_model) is not None:
-      score += weights["semantic_execution_bonus"]
-  if _normalized_semantic_text(baseline_semantics.source_descriptor) != _normalized_semantic_text(
+  ) is not None
+  source_applied = _normalized_semantic_text(
+    baseline_semantics.source_descriptor
+  ) != _normalized_semantic_text(run_semantics.source_descriptor) and _normalized_semantic_text(
     run_semantics.source_descriptor
-  ):
-    if _normalized_semantic_text(run_semantics.source_descriptor) is not None:
-      score += weights["semantic_source_bonus"]
-  if _normalized_semantic_text(
+  ) is not None
+  parameter_contract_applied = _normalized_semantic_text(
     baseline_semantics.parameter_contract
-  ) != _normalized_semantic_text(run_semantics.parameter_contract):
-    if _normalized_semantic_text(run_semantics.parameter_contract) is not None:
-      score += weights["semantic_parameter_contract_bonus"]
-  return score
+  ) != _normalized_semantic_text(run_semantics.parameter_contract) and _normalized_semantic_text(
+    run_semantics.parameter_contract
+  ) is not None
+  return {
+    "strategy_kind": {
+      "applied": strategy_kind_applied,
+      "baseline": baseline_semantics.strategy_kind,
+      "target": run_semantics.strategy_kind,
+      "weight": weights["semantic_kind_bonus"],
+      "score": weights["semantic_kind_bonus"] if strategy_kind_applied else 0.0,
+    },
+    "execution_model": {
+      "applied": execution_applied,
+      "baseline": _normalized_semantic_text(baseline_semantics.execution_model),
+      "target": _normalized_semantic_text(run_semantics.execution_model),
+      "weight": weights["semantic_execution_bonus"],
+      "score": weights["semantic_execution_bonus"] if execution_applied else 0.0,
+    },
+    "source_descriptor": {
+      "applied": source_applied,
+      "baseline": _normalized_semantic_text(baseline_semantics.source_descriptor),
+      "target": _normalized_semantic_text(run_semantics.source_descriptor),
+      "weight": weights["semantic_source_bonus"],
+      "score": weights["semantic_source_bonus"] if source_applied else 0.0,
+    },
+    "parameter_contract": {
+      "applied": parameter_contract_applied,
+      "baseline": _normalized_semantic_text(baseline_semantics.parameter_contract),
+      "target": _normalized_semantic_text(run_semantics.parameter_contract),
+      "weight": weights["semantic_parameter_contract_bonus"],
+      "score": (
+        weights["semantic_parameter_contract_bonus"]
+        if parameter_contract_applied
+        else 0.0
+      ),
+    },
+  }
 
 
 def _normalized_semantic_text(value: str | None) -> str | None:
@@ -23045,12 +23135,12 @@ def _normalized_semantic_text(value: str | None) -> str | None:
   return normalized or None
 
 
-def _score_comparison_semantic_vocabulary(
+def _build_comparison_semantic_vocabulary_breakdown(
   *,
   baseline_run: RunRecord,
   run: RunRecord,
   weights: dict[str, float],
-) -> float:
+) -> dict[str, Any]:
   baseline_schema = _strategy_parameter_schema(baseline_run)
   run_schema = _strategy_parameter_schema(run)
   baseline_parameters = _strategy_parameter_values(baseline_run)
@@ -23074,20 +23164,77 @@ def _score_comparison_semantic_vocabulary(
     0.0,
   )
   richness_units += min(schema_richness_delta, 4.0) * 0.35
-  return min(richness_units, 8.0) * weights["semantic_vocabulary_unit_bonus"]
+  capped_units = min(richness_units, 8.0)
+  score = round(capped_units * weights["semantic_vocabulary_unit_bonus"], 2)
+  return {
+    "changed_keys": changed_keys,
+    "schema_richness_delta": round(schema_richness_delta, 2),
+    "units": round(richness_units, 2),
+    "capped_units": round(capped_units, 2),
+    "weight": weights["semantic_vocabulary_unit_bonus"],
+    "score": score,
+  }
 
 
-def _score_comparison_provenance_richness(
+def _build_comparison_provenance_richness_breakdown(
   *,
   baseline_run: RunRecord,
   run: RunRecord,
   weights: dict[str, float],
-) -> float:
-  richness_delta = max(
-    _benchmark_provenance_richness(run) - _benchmark_provenance_richness(baseline_run),
-    0.0,
-  )
-  return min(richness_delta, 10.0) * weights["provenance_richness_unit_bonus"]
+) -> dict[str, Any]:
+  baseline_richness = _benchmark_provenance_richness(baseline_run)
+  target_richness = _benchmark_provenance_richness(run)
+  richness_delta = max(target_richness - baseline_richness, 0.0)
+  capped_units = min(richness_delta, 10.0)
+  score = round(capped_units * weights["provenance_richness_unit_bonus"], 2)
+  return {
+    "baseline_units": round(baseline_richness, 2),
+    "target_units": round(target_richness, 2),
+    "units": round(richness_delta, 2),
+    "capped_units": round(capped_units, 2),
+    "weight": weights["provenance_richness_unit_bonus"],
+    "score": score,
+  }
+
+
+def _build_comparison_context_score_breakdown(
+  *,
+  comparison_type: str,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  weights: dict[str, float],
+) -> dict[str, dict[str, Any]]:
+  native_reference_applied = comparison_type == "native_vs_reference"
+  reference_applied = comparison_type == "reference_vs_reference"
+  status_applied = run.status != baseline_run.status
+  benchmark_story_applied = bool(_extract_benchmark_story(run) or _extract_benchmark_story(baseline_run))
+  context_components = {
+    "native_reference_bonus": {
+      "applied": native_reference_applied,
+      "score": weights["native_reference_bonus"] if native_reference_applied else 0.0,
+    },
+    "reference_bonus": {
+      "applied": reference_applied,
+      "score": weights["reference_bonus"] if reference_applied else 0.0,
+    },
+    "status_bonus": {
+      "applied": status_applied,
+      "score": weights["status_bonus"] if status_applied else 0.0,
+    },
+    "benchmark_story_bonus": {
+      "applied": benchmark_story_applied,
+      "score": weights["benchmark_story_bonus"] if benchmark_story_applied else 0.0,
+    },
+    "reference_floor": {
+      "applied": False,
+      "score": 0.0,
+    },
+  }
+  return context_components
+
+
+def _context_subtotal(components: dict[str, dict[str, Any]]) -> float:
+  return round(sum(float(component["score"]) for component in components.values()), 2)
 
 
 def _strategy_parameter_schema(run: RunRecord) -> dict[str, Any]:

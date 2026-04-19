@@ -3562,6 +3562,16 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["narratives"][0]["rank"] == 1
   assert payload["narratives"][0]["is_primary"] is True
   assert payload["narratives"][0]["insight_score"] > 0
+  assert payload["narratives"][0]["score_breakdown"]["total"] == payload["narratives"][0]["insight_score"]
+  assert payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["strategy_kind"][
+    "applied"
+  ] is True
+  assert payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["vocabulary"]["score"] > 0
+  assert (
+    payload["narratives"][0]["score_breakdown"]["semantics"]["components"]["provenance_richness"][
+      "score"
+    ] > 0
+  )
   assert payload["narratives"][0]["title"].startswith("Strategy tuning")
   assert "reference delegate via external_runtime" in payload["narratives"][0]["summary"]
   artifact_kinds = {artifact["kind"] for artifact in payload["runs"][1]["benchmark_artifacts"]}
