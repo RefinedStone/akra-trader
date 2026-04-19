@@ -2938,36 +2938,90 @@
       "direction_id": "experiment-os",
       "title": "Add history management controls to the comparison browser panel",
       "description": "Deepen the new comparison history browser panel with operator-facing history management UX such as step search, explicit timestamps, and pinning or bookmarking affordances so longer compare sessions stay navigable without relying on raw chronological scanning.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply says the browser panel itself is complete and explicitly lists step search, timestamps, and pinning as the remaining history-management UX gap. That is the clearest directly executable next task after the panel shipped.",
+      "priority_reason": "Completed in main session commit 3125e55, which added step search, `Pinned only` filtering, pin or unpin controls for current and entry items, recorded timestamps, clear-unpinned cleanup, durable `stepIndex` navigation, and pinned-first auto-prune behavior for the comparison history browser panel before typecheck, diff-check, and push.",
       "depends_on": [
         "planning-experiment-os-add-comparison-history-browser-panel"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:30:00Z",
+      "updated_at": "2026-04-20T00:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os comparison navigation from a basic browsable timeline into an operator-manageable session history, which matters once comparison reviews span enough steps that simple back or forward and raw lists stop scaling."
     },
     {
       "id": "planning-experiment-os-persist-comparison-history-snapshots-across-reload",
       "direction_id": "experiment-os",
-      "title": "Persist comparison history snapshots across reloads",
-      "description": "Decide and implement the next durability model for the comparison history browser so reload can recover a useful compare-step timeline from persisted snapshots or view state, while staying honest about what the real browser history stack can and cannot be reconstructed exactly.",
-      "status": "proposed",
+      "title": "Persist comparison history panel state across reloads",
+      "description": "Persist the comparison history browser's document-session inventory and management state across reload so operators recover the useful compare-step timeline, pin set, and search or filter context after refresh, while keeping the contract clear that exact browser back-stack reconstruction is not guaranteed.",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply explicitly calls out reload recovery as an unresolved gap, but closing it requires a product-facing decision about acceptable approximation versus strict browser-history fidelity. Keep it queued behind the more direct history-management controls task.",
+      "dynamic_priority_delta": 19,
+      "priority_reason": "Completed in main session commit 0bc4459, which bumped control-room UI state to v3, persisted comparison history inventory plus active entry, open state, search query, and pinned-only filter in localStorage, restored matching entries on reload and `popstate`, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-comparison-history-browser-panel"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:30:00Z",
+      "updated_at": "2026-04-20T01:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os comparison-state durability beyond same-session shadow history, but it needs an explicit contract for persisted timeline recovery so operators are not misled about exact browser-stack reconstruction after reload."
+      "direction_relation_note": "Extends experiment-os comparison-state durability beyond same-document memory so comparison review survives refresh with enough preserved panel context to remain operator-usable without overstating browser-history fidelity."
+    },
+    {
+      "id": "planning-experiment-os-coordinate-persisted-comparison-history-across-tabs",
+      "direction_id": "experiment-os",
+      "title": "Coordinate persisted comparison history state across browser tabs",
+      "description": "Build on the shipped localStorage-backed comparison history persistence by reconciling inventory, active entry, and management-state updates across concurrent tabs or windows, so pinned items, search or filter state, and timeline cleanup do not silently diverge when operators review the same control room in more than one session.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply says reload persistence is complete in commit 0bc4459 and explicitly calls out the remaining lack of cross-tab concurrent-edit coordination. That makes multi-tab reconciliation the clearest directly executable next task for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os comparison-state durability from single-tab reload recovery into coherent multi-session operator behavior, which matters once the history browser is durable enough to be opened in parallel control-room tabs."
+    },
+    {
+      "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
+      "direction_id": "experiment-os",
+      "title": "Add export/import or profile-scoped sync for comparison history state",
+      "description": "Extend the durable comparison history panel beyond device-local browser storage by supporting either explicit export or import of history state, profile-scoped sync, or another portable state contract, so operators can carry curated comparison timelines across browser contexts without relying on one localStorage bucket.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply explicitly says panel-state export or import and profile-scoped sync are still absent, but that next step still needs a product-shape choice between portable transfer and account-level syncing. Keep it proposed behind the clearly executable multi-tab coordination pass.",
+      "depends_on": [
+        "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison-history durability from one browser's local recovery model into a portable or account-scoped operator artifact, which helps comparison review survive beyond one device or profile."
+    },
+    {
+      "id": "planning-experiment-os-decide-whether-to-reconstruct-browser-history-from-persisted-comparison-timeline",
+      "direction_id": "experiment-os",
+      "title": "Decide whether persisted comparison timelines should synthesize browser history",
+      "description": "Evaluate whether the restored comparison shadow timeline should remain an internal session model or also synthesize browser back-stack entries after reload, including the UX and correctness tradeoffs of recreating browser history from persisted panel state rather than leaving full history-stack reconstruction out of scope.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 3,
+      "priority_reason": "The latest main-session reply explicitly says reload now restores the shadow timeline but does not rebuild the browser's full history stack. That gap is real, but it is a product and navigation-contract decision rather than the next automatic executable queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Captures the remaining browser-navigation contract question left after reload persistence shipped, so experiment-os comparison durability can explicitly choose whether to stop at shadow-timeline recovery or model full history reconstruction."
     },
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
