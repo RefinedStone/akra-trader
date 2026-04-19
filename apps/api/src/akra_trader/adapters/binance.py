@@ -1104,11 +1104,17 @@ class CcxtMarketDataAdapter(MarketDataPort):
     for previous, current in zip(timestamps, timestamps[1:]):
       gap_size = int((current - previous).total_seconds() // timeframe_delta.total_seconds()) - 1
       if gap_size > 0:
+        start_at = previous + timeframe_delta
+        end_at = current - timeframe_delta
+        occurrence_index = len(windows)
         windows.append(
           GapWindow(
-            start_at=previous + timeframe_delta,
-            end_at=current - timeframe_delta,
+            start_at=start_at,
+            end_at=end_at,
             missing_candles=gap_size,
+            gap_window_id=(
+              f"gw|{occurrence_index}|{start_at.isoformat()}|{end_at.isoformat()}|{gap_size}"
+            ),
           )
         )
     return tuple(windows)

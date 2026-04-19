@@ -227,6 +227,7 @@ def test_binance_adapter_reports_gap_issues_in_sync_status(tmp_path: Path) -> No
   assert status.instruments[0].backfill_gap_windows[0].start_at == now - timedelta(minutes=15)
   assert status.instruments[0].backfill_gap_windows[0].end_at == now - timedelta(minutes=15)
   assert status.instruments[0].backfill_gap_windows[0].missing_candles == 1
+  assert status.instruments[0].backfill_gap_windows[0].gap_window_id.startswith("gw|0|")
   assert "missing_candles:1" in status.instruments[0].issues
   assert "contiguous_backfill_incomplete:1" in status.instruments[0].issues
   assert "gap_windows:1" in status.instruments[0].issues

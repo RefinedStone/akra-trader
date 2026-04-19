@@ -439,6 +439,7 @@ type MarketDataStatus = {
     backfill_contiguous_complete: boolean | null;
     backfill_contiguous_missing_candles: number | null;
     backfill_gap_windows: {
+      gap_window_id: string;
       start_at: string;
       end_at: string;
       missing_candles: number;
@@ -8282,32 +8283,52 @@ function summarizeGapWindows(
 function formatGapWindows(
   gapWindows: MarketDataStatus["instruments"][number]["backfill_gap_windows"],
 ) {
-  return gapWindows.map((gap, index) => ({
-    key: `${gap.start_at}-${gap.end_at}-${index}`,
+  return gapWindows.map((gap) => ({
+    key: gap.gap_window_id,
     kind: "exact" as const,
     label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
   }));
 }
 
-function buildGapWindowKey(
+function buildLegacyGapWindowKey(
   gapWindow: MarketDataStatus["instruments"][number]["backfill_gap_windows"][number],
 ) {
   return `${gapWindow.start_at}|${gapWindow.end_at}|${gapWindow.missing_candles}`;
 }
 
+function buildGapWindowKey(
+  gapWindow: MarketDataStatus["instruments"][number]["backfill_gap_windows"][number],
+) {
+  return gapWindow.gap_window_id || buildLegacyGapWindowKey(gapWindow);
+}
+
 function parseGapWindowKey(key: string) {
+  if (key.startsWith("gw|")) {
+    const [, occurrenceIndexRaw, startAt, endAt, missingCandlesRaw] = key.split("|");
+    const occurrenceIndex = Number(occurrenceIndexRaw);
+    const missingCandles = Number(missingCandlesRaw);
+    return {
+      startAt: startAt || null,
+      endAt: endAt || null,
+      missingCandles: Number.isFinite(missingCandles) ? missingCandles : null,
+      occurrenceIndex: Number.isFinite(occurrenceIndex) ? occurrenceIndex : null,
+    };
+  }
   const [startAt, endAt, missingCandlesRaw] = key.split("|");
   const missingCandles = Number(missingCandlesRaw);
   return {
     startAt: startAt || null,
     endAt: endAt || null,
     missingCandles: Number.isFinite(missingCandles) ? missingCandles : null,
+    occurrenceIndex: null,
   };
 }
 
 function formatGapWindowKeyLabel(key: string) {
   const parsed = parseGapWindowKey(key);
-  return `${formatRange(parsed.startAt, parsed.endAt)} (${parsed.missingCandles ?? "n/a"})`;
+  return `${formatRange(parsed.startAt, parsed.endAt)} (${parsed.missingCandles ?? "n/a"})${
+    parsed.occurrenceIndex !== null ? ` · slot ${parsed.occurrenceIndex + 1}` : ""
+  }`;
 }
 
 function normalizeExpandedGapWindowSelectionList(value: unknown) {
@@ -8332,9 +8353,18 @@ function buildGapWindowSelectionLookup(marketStatus: MarketDataStatus) {
   return Object.fromEntries(
     marketStatus.instruments.map((instrument) => [
       instrumentGapRowKey(instrument),
-      instrument.backfill_gap_windows.map((gapWindow) => buildGapWindowKey(gapWindow)),
+      Object.fromEntries(
+        instrument.backfill_gap_windows.flatMap((gapWindow) => {
+          const stableKey = buildGapWindowKey(gapWindow);
+          const legacyKey = buildLegacyGapWindowKey(gapWindow);
+          return [
+            [stableKey, stableKey],
+            [legacyKey, stableKey],
+          ];
+        }),
+      ),
     ]),
-  ) as Record<string, string[]>;
+  ) as Record<string, Record<string, string>>;
 }
 
 function instrumentGapRowKey(instrument: MarketDataStatus["instruments"][number]) {
@@ -8380,11 +8410,16 @@ function pruneExpandedGapWindowSelections(
   const activeSelections = buildGapWindowSelectionLookup(marketStatus);
   const next = Object.fromEntries(
     Object.entries(filterExpandedGapWindowSelections(current)).flatMap(([rowKey, selectedWindows]) => {
-      const activeWindows = new Set(activeSelections[rowKey] ?? []);
-      if (!activeWindows.size) {
+      const activeWindowAliases = activeSelections[rowKey] ?? {};
+      const activeWindows = new Set(Object.values(activeWindowAliases));
+      if (!Object.keys(activeWindowAliases).length) {
         return [];
       }
-      const nextSelectedWindows = selectedWindows.filter((windowKey) => activeWindows.has(windowKey));
+      const nextSelectedWindows = [...new Set(
+        selectedWindows
+          .map((windowKey) => activeWindowAliases[windowKey] ?? "")
+          .filter((windowKey) => activeWindows.has(windowKey)),
+      )].sort();
       return nextSelectedWindows.length ? [[rowKey, nextSelectedWindows]] : [];
     }),
   );

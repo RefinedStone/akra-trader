@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from datetime import UTC
 from datetime import datetime
 from enum import Enum
+import hashlib
 from typing import Any
 from uuid import uuid4
 
@@ -2430,6 +2431,22 @@ class GapWindow:
   start_at: datetime
   end_at: datetime
   missing_candles: int
+  gap_window_id: str = ""
+
+  def __post_init__(self) -> None:
+    if self.gap_window_id:
+      return
+    payload = "|".join([
+      self.start_at.isoformat(),
+      self.end_at.isoformat(),
+      str(self.missing_candles),
+    ])
+    digest = hashlib.sha1(payload.encode("utf-8")).hexdigest()[:12]
+    object.__setattr__(
+      self,
+      "gap_window_id",
+      f"gw|0|{self.start_at.isoformat()}|{self.end_at.isoformat()}|{self.missing_candles}|{digest}",
+    )
 
 
 @dataclass(frozen=True)

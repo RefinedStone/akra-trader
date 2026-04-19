@@ -563,6 +563,47 @@ def test_market_data_status_endpoint_returns_status_payload(tmp_path: Path) -> N
   assert payload["instruments"][0]["backfill_gap_windows"] == []
 
 
+def test_market_data_status_endpoint_includes_gap_window_ids(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    market_data = StatusOverrideSeededMarketDataAdapter()
+    market_data.set_status(
+      timeframe="5m",
+      status=MarketDataStatus(
+        provider="binance",
+        venue="binance",
+        instruments=[
+          InstrumentStatus(
+            instrument_id="binance:ETH/USDT",
+            timeframe="5m",
+            candle_count=120,
+            first_timestamp=datetime(2025, 1, 3, 0, 0, tzinfo=UTC),
+            last_timestamp=datetime(2025, 1, 3, 9, 55, tzinfo=UTC),
+            sync_status="lagging",
+            lag_seconds=300,
+            last_sync_at=datetime(2025, 1, 3, 10, 0, tzinfo=UTC),
+            backfill_contiguous_missing_candles=2,
+            backfill_gap_windows=(
+              GapWindow(
+                start_at=datetime(2025, 1, 3, 8, 0, tzinfo=UTC),
+                end_at=datetime(2025, 1, 3, 8, 5, tzinfo=UTC),
+                missing_candles=2,
+                gap_window_id="gw|0|2025-01-03T08:00:00+00:00|2025-01-03T08:05:00+00:00|2",
+              ),
+            ),
+          ),
+        ],
+      ),
+    )
+    app._market_data = market_data
+
+    response = client.get("/api/market-data/status")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["instruments"][0]["backfill_gap_windows"][0]["gap_window_id"].startswith("gw|0|")
+
+
 def test_operator_visibility_endpoint_reports_stale_runtime_alerts(tmp_path: Path) -> None:
   with build_client(tmp_path / "runs.sqlite3") as client:
     app = client.app.state.container.app
