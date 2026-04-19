@@ -4234,18 +4234,90 @@
       "direction_id": "experiment-os",
       "title": "Generalize run-subresource runtime binding beyond application-layer registries",
       "description": "Now that domain `shared_contracts` owns the canonical run-subresource metadata, lift the remaining body serializer registry and FastAPI route handler factory out of application-local wiring into a reusable contract-driven runtime binding layer so new standalone run subresources can be registered from one contract path instead of parallel registry and route definitions.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 26,
-      "priority_reason": "The latest main-session reply explicitly says the remaining follow-up is further generalization of the body serializer registry and FastAPI route handler factory, which still live in the application/API layer after the domain shared-contract promotion. That is the clearest executable next task and should become the new queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 3ea50f2, which unified run-subresource runtime binding from metadata contract through runtime binding and route registration, replaced the application-local serializer and route coupling with `RunSubresourceRuntimeBinding`, switched API route registration to binding-driven wiring, and verified with `python -m py_compile`, three targeted `pytest` cases, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-promote-run-subresource-contract-assembly-into-domain-shared-contracts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:50:00Z",
+      "updated_at": "2026-04-20T23:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from canonical domain-level run-subresource metadata to a fully contract-driven runtime binding model where standalone serializer and route execution wiring no longer remain as application-specific registries."
+    },
+    {
+      "id": "planning-experiment-os-generalize-runtime-binding-abstraction-to-capability-backed-standalone-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Generalize runtime binding abstractions beyond run subresources to capability-backed standalone surfaces",
+      "description": "Build on the shipped `RunSubresourceRuntimeBinding` flow by extracting the same metadata-contract to runtime-binding to route-handler pattern for other capability-backed standalone surfaces, so future standalone APIs can plug into one common runtime binding abstraction instead of reintroducing application-specific registration and serialization wiring outside the run-subresource family.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 27,
+      "priority_reason": "Completed in main session commit 5c16d2a, which introduced `StandaloneSurfaceRuntimeBinding`, moved `/api/capabilities/run-surfaces` plus `/api/runs/{run_id}/orders|positions|metrics` onto the same standalone binding list and serializer dispatch path, switched API route registration to iterate the standalone binding registry, and verified with `python -m py_compile`, four targeted `pytest` cases, and `git diff --check` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-generalize-run-subresource-runtime-binding-beyond-application-registries"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from a run-subresource-specific runtime binding implementation to a broader contract-driven registration model that can keep other capability-backed standalone surfaces aligned with the same execution and serialization abstraction."
+    },
+    {
+      "id": "planning-experiment-os-extend-standalone-runtime-binding-abstraction-to-non-run-capability-and-discovery-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Extend standalone runtime bindings to non-run capability and discovery surfaces",
+      "description": "Build on the shipped `StandaloneSurfaceRuntimeBinding` abstraction by onboarding the remaining standalone discovery or capability endpoints and non-run-scoped standalone surfaces onto the same binding-list and serializer-dispatch model, so route registration and response shaping stop treating run-surface capability endpoints as the only standalone family covered by the shared runtime binding path.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 28,
+      "priority_reason": "Completed in main session commit 4992d60, which added `strategy_catalog_discovery`, `reference_catalog_discovery`, and `preset_catalog_discovery` to the shared `StandaloneSurfaceRuntimeBinding` list, unified capability and discovery dispatch through `serialize_standalone_surface_response(...)`, kept queryless and query-backed discovery routes on the same binding path, and verified with `python -m py_compile`, six targeted `pytest` cases, and `git diff --check` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-generalize-runtime-binding-abstraction-to-capability-backed-standalone-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from a standalone binding abstraction proven on run-surface capabilities and run subresources to a broader contract-driven registration model that can absorb non-run capability and discovery surfaces without reintroducing bespoke application wiring."
+    },
+    {
+      "id": "planning-experiment-os-extend-standalone-runtime-bindings-to-general-non-run-read-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Extend standalone runtime bindings to general non-run read surfaces",
+      "description": "Continue the `StandaloneSurfaceRuntimeBinding` rollout by onboarding general non-run read endpoints such as health, operator, and market-data surfaces onto the same binding-list and serializer-dispatch path, so standalone GET-style APIs stop keeping a separate registration and response-shaping family after capability and discovery endpoints have already been unified.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 29,
+      "priority_reason": "The latest main-session reply says capability-backed non-run discovery surfaces are now finished and explicitly calls out health, operator, and market-data standalone endpoints as the next wider application area before mutation routes. That makes the general non-run read-surface pass the clearest executable follow-up for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-standalone-runtime-binding-abstraction-to-non-run-capability-and-discovery-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:36:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from shared binding coverage for run subresources plus non-run capability and discovery endpoints into the broader standalone read surface family, reducing the remaining application-specific wiring around health, operator, and market-data APIs."
+    },
+    {
+      "id": "planning-experiment-os-decide-how-far-standalone-runtime-bindings-should-absorb-mutation-endpoints",
+      "direction_id": "experiment-os",
+      "title": "Decide how far standalone runtime bindings should absorb mutation endpoints",
+      "description": "After the read-side standalone surfaces are unified, determine whether and how the same runtime binding family should cover mutation endpoints with request parsing, action semantics, and error handling, so the abstraction can expand deliberately without collapsing read and write concerns into an under-specified contract.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 28,
+      "priority_reason": "The latest main-session reply names mutation endpoints as a remaining expansion area, but it also separates them from health, operator, and market-data read surfaces. Keeping mutations as a proposal preserves the likely next step while leaving room to validate whether the current read-focused binding contract should be generalized or split before execution.",
+      "depends_on": [
+        "planning-experiment-os-extend-standalone-runtime-bindings-to-general-non-run-read-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:36:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os runtime-binding generalization aimed at a possible mutation-family unification without prematurely committing to a read and write abstraction shape that may need stronger boundaries."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
