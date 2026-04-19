@@ -15,6 +15,7 @@ from pydantic import Field
 
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_comparison
+from akra_trader.application import serialize_run_orders_response
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_strategy
 from akra_trader.application import serialize_preset
@@ -562,11 +563,14 @@ def create_router(container: Container) -> APIRouter:
     return serialize_run_response(run, app)
 
   @router.get("/runs/{run_id}/orders")
-  def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
+  def get_run_orders(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
     run = app.get_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return [asdict(order) for order in run.orders]
+    return serialize_run_orders_response(
+      run,
+      capabilities=app.get_run_surface_capabilities(),
+    )
 
   @router.get("/runs/{run_id}/positions")
   def get_run_positions(run_id: str, app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:

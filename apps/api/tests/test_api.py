@@ -3312,6 +3312,128 @@ def test_live_order_replace_endpoint_appends_repriced_limit_order(tmp_path: Path
   assert payload["orders"][1]["quantity"] == 0.3
 
 
+def test_run_orders_endpoint_returns_surface_rule_metadata(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 20, 50, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "order_list_surface_metadata_test",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+
+    orders_response = client.get(f"/api/runs/{run_id}/orders")
+
+  assert orders_response.status_code == 200
+  payload = orders_response.json()
+  assert payload["run_id"] == run_id
+  assert payload["run_mode"] == "live"
+  assert payload["run_status"] == "running"
+  assert payload["surface_enforcement"]["order_replace_cancel_actions"]["enabled"] is True
+  assert payload["action_availability"]["stop_run"]["allowed"] is True
+  assert len(payload["orders"]) == 1
+  assert payload["orders"][0]["order_id"] == "venue-open-order-1"
+  assert payload["orders"][0]["action_availability"]["cancel"]["allowed"] is True
+  assert payload["orders"][0]["action_availability"]["replace"]["allowed"] is True
+
+
+def test_run_orders_endpoint_applies_surface_rule_contract_to_order_actions(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
+    app = client.app.state.container.app
+    app._venue_state = StaticVenueStateAdapter(
+      GuardedLiveVenueStateSnapshot(
+        provider="seeded",
+        venue="binance",
+        verification_state="verified",
+        captured_at=datetime(2025, 1, 3, 20, 55, tzinfo=UTC),
+        balances=(
+          GuardedLiveVenueBalance(asset="USDT", total=10_000.0, free=9_000.0, used=1_000.0),
+        ),
+        open_orders=(
+          GuardedLiveVenueOpenOrder(
+            order_id="venue-open-order-1",
+            symbol="ETH/USDT",
+            side="buy",
+            amount=0.5,
+            status="open",
+            price=2_000.0,
+          ),
+        ),
+      )
+    )
+
+    client.post("/api/guarded-live/reconciliation", json={"actor": "operator", "reason": "pre_live_check"})
+    client.post("/api/guarded-live/recovery", json={"actor": "operator", "reason": "pre_live_recovery"})
+    live_response = client.post(
+      "/api/runs/live",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "ETH/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+        "replay_bars": 24,
+        "operator_reason": "order_list_surface_rule_override_test",
+      },
+    )
+    run_id = live_response.json()["config"]["run_id"]
+    base_capabilities = app.get_run_surface_capabilities()
+    app.get_run_surface_capabilities = lambda: without_surface_rule(
+      base_capabilities,
+      family_key="execution_controls",
+      surface_key="order_replace_cancel_actions",
+    )
+
+    orders_response = client.get(f"/api/runs/{run_id}/orders")
+
+  assert orders_response.status_code == 200
+  payload = orders_response.json()
+  assert payload["surface_enforcement"]["order_replace_cancel_actions"]["enabled"] is False
+  assert payload["surface_enforcement"]["order_replace_cancel_actions"]["reason"] == (
+    "Surface rule order_replace_cancel_actions is disabled by the run-surface capability contract."
+  )
+  assert payload["orders"][0]["action_availability"]["cancel"]["allowed"] is False
+  assert payload["orders"][0]["action_availability"]["replace"]["allowed"] is False
+  assert payload["orders"][0]["action_availability"]["cancel"]["reason"] == (
+    "Surface rule order_replace_cancel_actions is disabled by the run-surface capability contract."
+  )
+
+
 def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path: Path) -> None:
   database_path = tmp_path / "runs.sqlite3"
 
