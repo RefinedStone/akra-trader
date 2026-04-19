@@ -2875,6 +2875,9 @@ type ComparisonHistorySyncWorkspaceFieldKey =
   | "comparisonSelection.selectedRunIds"
   | "comparisonSelection.scoreLink"
   | "expandedGapRows";
+type ComparisonHistorySyncWorkspaceReviewSelectionKey =
+  | ComparisonHistorySyncWorkspaceFieldKey
+  | `expandedGapRows:${string}`;
 type ComparisonHistorySyncAuditFilter =
   | "all"
   | "conflicts"
@@ -2927,7 +2930,7 @@ type ComparisonHistorySyncWorkspaceReview = {
   localState: ComparisonHistorySyncWorkspaceState;
   remoteState: ComparisonHistorySyncWorkspaceState;
   selectedSources: Partial<
-    Record<ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource>
+    Record<ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource>
   >;
   resolvedAt?: string | null;
   resolutionSummary?: string | null;
@@ -2993,7 +2996,7 @@ type ComparisonHistorySyncPreferenceReviewRow = {
 };
 
 type ComparisonHistorySyncWorkspaceReviewRow = {
-  fieldKey: ComparisonHistorySyncWorkspaceFieldKey;
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey;
   label: string;
   localValue: string;
   remoteValue: string;
@@ -5500,7 +5503,7 @@ export default function App() {
 
   const handleSetComparisonHistoryWorkspaceFieldSource = (
     auditId: string,
-    fieldKey: ComparisonHistorySyncWorkspaceFieldKey,
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
     source: ComparisonHistorySyncConflictFieldSource,
   ) => {
     setComparisonHistorySyncAuditTrail((current) =>
@@ -5536,9 +5539,9 @@ export default function App() {
           entry.workspaceReview.remoteState,
         );
         const nextSelectedSources = Object.keys(selectedSources).reduce<
-          Partial<Record<ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource>>
+          Partial<Record<ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource>>
         >((accumulator, key) => {
-          accumulator[key as ComparisonHistorySyncWorkspaceFieldKey] = source;
+          accumulator[key as ComparisonHistorySyncWorkspaceReviewSelectionKey] = source;
           return accumulator;
         }, {});
         return {
@@ -9143,12 +9146,12 @@ function normalizeComparisonHistorySyncPreferenceSelectedSources(
 
 function normalizeComparisonHistorySyncWorkspaceSelectedSources(
   value: unknown,
-): Partial<Record<ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource>> {
+): Partial<Record<ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource>> {
   if (!value || typeof value !== "object") {
     return {};
   }
-  return COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.reduce<
-    Partial<Record<ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  const selectedSources = COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource>>
   >((accumulator, definition) => {
     const candidate = (value as Record<string, unknown>)[definition.fieldKey];
     if (candidate === "local" || candidate === "remote") {
@@ -9156,6 +9159,15 @@ function normalizeComparisonHistorySyncWorkspaceSelectedSources(
     }
     return accumulator;
   }, {});
+  Object.entries(value as Record<string, unknown>).forEach(([key, candidate]) => {
+    if (!key.startsWith("expandedGapRows:")) {
+      return;
+    }
+    if (candidate === "local" || candidate === "remote") {
+      selectedSources[key as ComparisonHistorySyncWorkspaceReviewSelectionKey] = candidate;
+    }
+  });
+  return selectedSources;
 }
 
 function limitComparisonHistorySyncAuditEntries(entries: ComparisonHistorySyncAuditEntry[]) {
@@ -9757,6 +9769,31 @@ function listComparisonHistoryExpandedGapRowKeys(expandedGapRows: Record<string,
   return Object.keys(filterExpandedGapRows(expandedGapRows)).sort();
 }
 
+function listComparisonHistoryExpandedGapRowDiffKeys(
+  localExpandedGapRows: Record<string, boolean>,
+  remoteExpandedGapRows: Record<string, boolean>,
+) {
+  const keys = new Set([
+    ...listComparisonHistoryExpandedGapRowKeys(localExpandedGapRows),
+    ...listComparisonHistoryExpandedGapRowKeys(remoteExpandedGapRows),
+  ]);
+  return [...keys].sort().filter(
+    (key) => Boolean(localExpandedGapRows[key]) !== Boolean(remoteExpandedGapRows[key]),
+  );
+}
+
+function buildComparisonHistoryExpandedGapRowSelectionKey(
+  key: string,
+): ComparisonHistorySyncWorkspaceReviewSelectionKey {
+  return `expandedGapRows:${key}`;
+}
+
+function parseComparisonHistoryExpandedGapRowSelectionKey(
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+) {
+  return fieldKey.startsWith("expandedGapRows:") ? fieldKey.slice("expandedGapRows:".length) : null;
+}
+
 function isSameComparisonHistoryExpandedGapRows(
   left: Record<string, boolean>,
   right: Record<string, boolean>,
@@ -9789,6 +9826,38 @@ function formatComparisonHistoryExpandedGapRowsValue(expandedGapRows: Record<str
   return keys.length > 2
     ? `${keys.length} expanded · ${sample} +${keys.length - 2}`
     : `${keys.length} expanded · ${sample}`;
+}
+
+function formatComparisonHistoryExpandedGapRowsDiffValue(
+  localExpandedGapRows: Record<string, boolean>,
+  remoteExpandedGapRows: Record<string, boolean>,
+) {
+  const diffKeys = listComparisonHistoryExpandedGapRowDiffKeys(
+    localExpandedGapRows,
+    remoteExpandedGapRows,
+  );
+  if (!diffKeys.length) {
+    return "No changed gap windows";
+  }
+  const sample = diffKeys
+    .slice(0, 2)
+    .map((key) => formatComparisonHistoryExpandedGapRowKey(key))
+    .join(", ");
+  return diffKeys.length > 2
+    ? `${diffKeys.length} changed · ${sample} +${diffKeys.length - 2}`
+    : `${diffKeys.length} changed · ${sample}`;
+}
+
+function formatComparisonHistorySyncWorkspaceSelectionKeyLabel(
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+) {
+  const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
+  if (expandedGapRowKey) {
+    return `Expanded gap row · ${formatComparisonHistoryExpandedGapRowKey(expandedGapRowKey)}`;
+  }
+  return COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.find(
+    (definition) => definition.fieldKey === fieldKey,
+  )?.label ?? fieldKey;
 }
 
 function summarizeComparisonHistorySyncWorkspaceChanges(state: {
@@ -9829,7 +9898,12 @@ function summarizeComparisonHistorySyncWorkspaceChanges(state: {
     );
   }
   if (!isSameComparisonHistoryExpandedGapRows(state.localExpandedGapRows, state.remoteExpandedGapRows)) {
-    changes.push(`gaps ${formatComparisonHistoryExpandedGapRowsValue(state.remoteExpandedGapRows)}`);
+    changes.push(
+      `gap rows ${formatComparisonHistoryExpandedGapRowsDiffValue(
+        state.localExpandedGapRows,
+        state.remoteExpandedGapRows,
+      )}`,
+    );
   }
   return changes;
 }
@@ -9845,9 +9919,13 @@ function buildComparisonHistorySyncWorkspaceState(state: {
 }
 
 function formatComparisonHistorySyncWorkspaceFieldValue(
-  fieldKey: ComparisonHistorySyncWorkspaceFieldKey,
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   state: ComparisonHistorySyncWorkspaceState,
 ) {
+  const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
+  if (expandedGapRowKey) {
+    return state.expandedGapRows[expandedGapRowKey] ? "Expanded" : "Collapsed";
+  }
   switch (fieldKey) {
     case "comparisonSelection.intent":
       return formatComparisonIntentLabel(state.comparisonSelection.intent);
@@ -9863,10 +9941,15 @@ function formatComparisonHistorySyncWorkspaceFieldValue(
 }
 
 function hasComparisonHistorySyncWorkspaceFieldDifference(
-  fieldKey: ComparisonHistorySyncWorkspaceFieldKey,
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   localState: ComparisonHistorySyncWorkspaceState,
   remoteState: ComparisonHistorySyncWorkspaceState,
 ) {
+  const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
+  if (expandedGapRowKey) {
+    return Boolean(localState.expandedGapRows[expandedGapRowKey])
+      !== Boolean(remoteState.expandedGapRows[expandedGapRowKey]);
+  }
   switch (fieldKey) {
     case "comparisonSelection.intent":
       return localState.comparisonSelection.intent !== remoteState.comparisonSelection.intent;
@@ -9901,14 +9984,23 @@ function buildDefaultComparisonHistorySyncWorkspaceSelectedSources(
   localState: ComparisonHistorySyncWorkspaceState,
   remoteState: ComparisonHistorySyncWorkspaceState,
 ) {
-  return COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.reduce<
-    Partial<Record<ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  const selectedSources = COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource>>
   >((accumulator, definition) => {
     if (hasComparisonHistorySyncWorkspaceFieldDifference(definition.fieldKey, localState, remoteState)) {
-      accumulator[definition.fieldKey] = "remote";
+      if (definition.fieldKey !== "expandedGapRows") {
+        accumulator[definition.fieldKey] = "remote";
+      }
     }
     return accumulator;
   }, {});
+  listComparisonHistoryExpandedGapRowDiffKeys(
+    localState.expandedGapRows,
+    remoteState.expandedGapRows,
+  ).forEach((key) => {
+    selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(key)] = "remote";
+  });
+  return selectedSources;
 }
 
 function buildComparisonHistorySyncWorkspaceReview(state: {
@@ -9937,9 +10029,11 @@ function buildComparisonHistorySyncWorkspaceReview(state: {
 function buildComparisonHistorySyncWorkspaceReviewRows(
   review: ComparisonHistorySyncWorkspaceReview,
 ): ComparisonHistorySyncWorkspaceReviewRow[] {
-  return COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.flatMap((definition) => {
+  const rows: ComparisonHistorySyncWorkspaceReviewRow[] =
+    COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.flatMap((definition) => {
     if (
-      !hasComparisonHistorySyncWorkspaceFieldDifference(
+      definition.fieldKey === "expandedGapRows"
+      || !hasComparisonHistorySyncWorkspaceFieldDifference(
         definition.fieldKey,
         review.localState,
         review.remoteState,
@@ -9954,32 +10048,42 @@ function buildComparisonHistorySyncWorkspaceReviewRows(
       remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(definition.fieldKey, review.remoteState),
       selectedSource: review.selectedSources[definition.fieldKey] ?? "remote",
     }];
-  });
+    });
+  return rows.concat(
+    listComparisonHistoryExpandedGapRowDiffKeys(
+      review.localState.expandedGapRows,
+      review.remoteState.expandedGapRows,
+    ).map((key) => {
+      const fieldKey = buildComparisonHistoryExpandedGapRowSelectionKey(key);
+      return {
+        fieldKey,
+        label: formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey),
+        localValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.localState),
+        remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
+        selectedSource:
+          review.selectedSources[fieldKey]
+          ?? review.selectedSources.expandedGapRows
+          ?? "remote",
+      };
+    }),
+  );
 }
 
 function formatComparisonHistorySyncWorkspaceResolutionSummary(
   review: ComparisonHistorySyncWorkspaceReview,
 ) {
   const selectedFields = Object.entries(review.selectedSources) as Array<
-    [ComparisonHistorySyncWorkspaceFieldKey, ComparisonHistorySyncConflictFieldSource]
+    [ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource]
   >;
   if (!selectedFields.length) {
     return "Kept remote workspace values for all fields.";
   }
   const localFields = selectedFields
     .filter(([, source]) => source === "local")
-    .map(([fieldKey]) =>
-      COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.find(
-        (definition) => definition.fieldKey === fieldKey,
-      )?.label ?? fieldKey,
-    );
+    .map(([fieldKey]) => formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
   const remoteFields = selectedFields
     .filter(([, source]) => source === "remote")
-    .map(([fieldKey]) =>
-      COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.find(
-        (definition) => definition.fieldKey === fieldKey,
-      )?.label ?? fieldKey,
-    );
+    .map(([fieldKey]) => formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
   const parts: string[] = [];
   if (localFields.length) {
     parts.push(`Local: ${localFields.join(", ")}`);
@@ -10005,12 +10109,32 @@ function resolveComparisonHistorySyncWorkspaceReview(
       ? { ...review.localState.comparisonSelection.scoreLink }
       : null;
   }
+  const localExpandedGapRows = filterExpandedGapRows(review.localState.expandedGapRows);
+  const remoteExpandedGapRows = filterExpandedGapRows(review.remoteState.expandedGapRows);
+  const aggregateExpandedGapRowsSource = review.selectedSources.expandedGapRows;
+  const resolvedExpandedGapRows =
+    aggregateExpandedGapRowsSource === "local"
+      ? { ...localExpandedGapRows }
+      : { ...remoteExpandedGapRows };
+  listComparisonHistoryExpandedGapRowDiffKeys(
+    localExpandedGapRows,
+    remoteExpandedGapRows,
+  ).forEach((key) => {
+    const fieldKey = buildComparisonHistoryExpandedGapRowSelectionKey(key);
+    const source =
+      review.selectedSources[fieldKey]
+      ?? aggregateExpandedGapRowsSource
+      ?? "remote";
+    const sourceRows = source === "local" ? localExpandedGapRows : remoteExpandedGapRows;
+    if (sourceRows[key]) {
+      resolvedExpandedGapRows[key] = true;
+      return;
+    }
+    delete resolvedExpandedGapRows[key];
+  });
   return {
     comparisonSelection: normalizeControlRoomComparisonSelection(resolvedSelection),
-    expandedGapRows:
-      review.selectedSources.expandedGapRows === "local"
-        ? filterExpandedGapRows(review.localState.expandedGapRows)
-        : filterExpandedGapRows(review.remoteState.expandedGapRows),
+    expandedGapRows: resolvedExpandedGapRows,
   };
 }
 
@@ -11465,7 +11589,7 @@ type RunSectionComparisonControls = {
   onApplyHistoryPreferenceResolution: (auditId: string) => void;
   onSetHistoryWorkspaceFieldSource: (
     auditId: string,
-    fieldKey: ComparisonHistorySyncWorkspaceFieldKey,
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
     source: ComparisonHistorySyncConflictFieldSource,
   ) => void;
   onSetHistoryWorkspaceFieldSourceAll: (
