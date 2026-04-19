@@ -2783,6 +2783,8 @@ type GuardedLiveStatus = {
 
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
+const TOUCH_GAP_WINDOW_SWEEP_HOLD_MS = 220;
+const TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX = 14;
 const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
@@ -2813,6 +2815,15 @@ type GapWindowDragSelectionState = {
   baselineSelectedGapWindowKeys: string[];
   latestGapWindowKey: string;
   pointerId: number;
+  targetSelected: boolean;
+};
+type PendingTouchGapWindowSweepState = {
+  anchorGapWindowKey: string;
+  baselineSelectedGapWindowKeys: string[];
+  latestGapWindowKey: string;
+  pointerId: number;
+  startClientX: number;
+  startClientY: number;
   targetSelected: boolean;
 };
 
@@ -8236,9 +8247,18 @@ function BackfillQualityStatus({
 }) {
   const [rangeAnchorGapWindowKey, setRangeAnchorGapWindowKey] = useState<string | null>(null);
   const [dragSelectionState, setDragSelectionState] = useState<GapWindowDragSelectionState | null>(null);
+  const gapWindowPickerListRef = useRef<HTMLDivElement | null>(null);
+  const pendingTouchSweepStateRef = useRef<PendingTouchGapWindowSweepState | null>(null);
+  const touchSweepHoldTimeoutRef = useRef<number | null>(null);
   const orderedGapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
     buildGapWindowKey(gapWindow),
   );
+  const clearTouchSweepHoldTimeout = () => {
+    if (touchSweepHoldTimeoutRef.current !== null) {
+      window.clearTimeout(touchSweepHoldTimeoutRef.current);
+      touchSweepHoldTimeoutRef.current = null;
+    }
+  };
   useEffect(() => {
     if (!rangeAnchorGapWindowKey) {
       return;
@@ -8264,6 +8284,13 @@ function BackfillQualityStatus({
     }
   }, [dragSelectionState, gapWindowPickerOpen]);
   useEffect(() => {
+    if (gapWindowPickerOpen) {
+      return;
+    }
+    clearTouchSweepHoldTimeout();
+    pendingTouchSweepStateRef.current = null;
+  }, [gapWindowPickerOpen]);
+  useEffect(() => {
     if (!dragSelectionState) {
       return;
     }
@@ -8278,6 +8305,9 @@ function BackfillQualityStatus({
       window.removeEventListener("pointercancel", finishDragSelection);
     };
   }, [dragSelectionState]);
+  useEffect(() => () => {
+    clearTouchSweepHoldTimeout();
+  }, []);
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
@@ -8329,12 +8359,75 @@ function BackfillQualityStatus({
     onChangeGapWindowSelections?.(nextSelectedGapWindowKeys);
     return nextSelectedGapWindowKeys;
   };
+  const updateActiveGapWindowSweepTarget = ({
+    anchorGapWindowKey,
+    baselineSelectedGapWindowKeys,
+    latestGapWindowKey,
+    pointerId,
+    targetSelected,
+  }: GapWindowDragSelectionState) => {
+    applyGapWindowSelectionChange({
+      anchorGapWindowKey,
+      selectedGapWindowKeys: baselineSelectedGapWindowKeys,
+      targetGapWindowKey: latestGapWindowKey,
+      targetSelected,
+    });
+    setDragSelectionState({
+      anchorGapWindowKey,
+      baselineSelectedGapWindowKeys,
+      latestGapWindowKey,
+      pointerId,
+      targetSelected,
+    });
+  };
+  const resolveGapWindowKeyFromPointerPoint = (clientX: number, clientY: number) => {
+    const pointerTarget = document.elementFromPoint(clientX, clientY);
+    if (!(pointerTarget instanceof HTMLElement)) {
+      return null;
+    }
+    const option = pointerTarget.closest<HTMLElement>("[data-gap-window-key]");
+    if (!option || !gapWindowPickerListRef.current?.contains(option)) {
+      return null;
+    }
+    return option.dataset.gapWindowKey ?? null;
+  };
   const handleGapWindowPointerDown = (
     event: PointerEvent<HTMLLabelElement>,
     gapWindowKey: string,
     checked: boolean,
   ) => {
     if (event.button !== 0) {
+      return;
+    }
+    if (event.pointerType === "touch") {
+      clearTouchSweepHoldTimeout();
+      pendingTouchSweepStateRef.current = {
+        anchorGapWindowKey: gapWindowKey,
+        baselineSelectedGapWindowKeys: resolvedSelectedGapWindowKeys,
+        latestGapWindowKey: gapWindowKey,
+        pointerId: event.pointerId,
+        startClientX: event.clientX,
+        startClientY: event.clientY,
+        targetSelected: !checked,
+      };
+      event.currentTarget.setPointerCapture(event.pointerId);
+      touchSweepHoldTimeoutRef.current = window.setTimeout(() => {
+        const pendingTouchSweepState = pendingTouchSweepStateRef.current;
+        if (
+          !pendingTouchSweepState
+          || pendingTouchSweepState.pointerId !== event.pointerId
+        ) {
+          return;
+        }
+        setRangeAnchorGapWindowKey(pendingTouchSweepState.anchorGapWindowKey);
+        updateActiveGapWindowSweepTarget({
+          anchorGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
+          baselineSelectedGapWindowKeys: pendingTouchSweepState.baselineSelectedGapWindowKeys,
+          latestGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
+          pointerId: pendingTouchSweepState.pointerId,
+          targetSelected: pendingTouchSweepState.targetSelected,
+        });
+      }, TOUCH_GAP_WINDOW_SWEEP_HOLD_MS);
       return;
     }
     event.preventDefault();
@@ -8364,20 +8457,81 @@ function BackfillQualityStatus({
     ) {
       return;
     }
-    applyGapWindowSelectionChange({
-      anchorGapWindowKey: dragSelectionState.anchorGapWindowKey,
-      selectedGapWindowKeys: dragSelectionState.baselineSelectedGapWindowKeys,
-      targetGapWindowKey: gapWindowKey,
-      targetSelected: dragSelectionState.targetSelected,
+    updateActiveGapWindowSweepTarget({
+      ...dragSelectionState,
+      latestGapWindowKey: gapWindowKey,
     });
-    setDragSelectionState((current) =>
-      current
-        ? {
-            ...current,
-            latestGapWindowKey: gapWindowKey,
-          }
-        : current,
-    );
+  };
+  const handleTouchGapWindowPointerMove = (
+    event: PointerEvent<HTMLLabelElement>,
+  ) => {
+    const pendingTouchSweepState = pendingTouchSweepStateRef.current;
+    if (
+      event.pointerType !== "touch"
+      || !pendingTouchSweepState
+      || pendingTouchSweepState.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+    const deltaX = event.clientX - pendingTouchSweepState.startClientX;
+    const deltaY = event.clientY - pendingTouchSweepState.startClientY;
+    const pointerTravel = Math.hypot(deltaX, deltaY);
+    if (!dragSelectionState) {
+      if (pointerTravel > TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX) {
+        clearTouchSweepHoldTimeout();
+        pendingTouchSweepStateRef.current = null;
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId);
+        }
+      }
+      return;
+    }
+    event.preventDefault();
+    const hoveredGapWindowKey =
+      resolveGapWindowKeyFromPointerPoint(event.clientX, event.clientY)
+      ?? pendingTouchSweepState.anchorGapWindowKey;
+    if (hoveredGapWindowKey === dragSelectionState.latestGapWindowKey) {
+      return;
+    }
+    pendingTouchSweepStateRef.current = {
+      ...pendingTouchSweepState,
+      latestGapWindowKey: hoveredGapWindowKey,
+    };
+    updateActiveGapWindowSweepTarget({
+      anchorGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
+      baselineSelectedGapWindowKeys: pendingTouchSweepState.baselineSelectedGapWindowKeys,
+      latestGapWindowKey: hoveredGapWindowKey,
+      pointerId: pendingTouchSweepState.pointerId,
+      targetSelected: pendingTouchSweepState.targetSelected,
+    });
+  };
+  const handleTouchGapWindowPointerEnd = (
+    event: PointerEvent<HTMLLabelElement>,
+  ) => {
+    const pendingTouchSweepState = pendingTouchSweepStateRef.current;
+    if (
+      event.pointerType !== "touch"
+      || !pendingTouchSweepState
+      || pendingTouchSweepState.pointerId !== event.pointerId
+    ) {
+      return;
+    }
+    clearTouchSweepHoldTimeout();
+    if (!dragSelectionState) {
+      applyGapWindowSelectionChange({
+        selectedGapWindowKeys: pendingTouchSweepState.baselineSelectedGapWindowKeys,
+        targetGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
+        targetSelected: pendingTouchSweepState.targetSelected,
+      });
+      setRangeAnchorGapWindowKey(pendingTouchSweepState.anchorGapWindowKey);
+    } else {
+      setRangeAnchorGapWindowKey(dragSelectionState.latestGapWindowKey);
+      setDragSelectionState(null);
+    }
+    pendingTouchSweepStateRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
   };
   const handleGapWindowKeyboardToggle = (
     event: KeyboardEvent<HTMLInputElement>,
@@ -8477,7 +8631,10 @@ function BackfillQualityStatus({
                 ? `Range anchor: ${rangeAnchorLabel}. Shift-click another gap to apply the full range.`
                 : "Tip: click a gap to set the range anchor, then shift-click or drag across gaps to apply a range."}
           </span>
-          <div className="gap-window-picker-list">
+          <div
+            className="gap-window-picker-list"
+            ref={gapWindowPickerListRef}
+          >
             {instrument.backfill_gap_windows.map((gapWindow) => {
               const gapWindowKey = buildGapWindowKey(gapWindow);
               const checked = visibleGapWindowKeys.has(gapWindowKey);
@@ -8488,6 +8645,7 @@ function BackfillQualityStatus({
                   } ${
                     dragSelectionState?.latestGapWindowKey === gapWindowKey ? "is-sweep-target" : ""
                   }`}
+                  data-gap-window-key={gapWindowKey}
                   key={gapWindowKey}
                   onPointerDown={(event) =>
                     handleGapWindowPointerDown(event, gapWindowKey, checked)
@@ -8495,6 +8653,9 @@ function BackfillQualityStatus({
                   onPointerEnter={(event) =>
                     handleGapWindowPointerEnter(event, gapWindowKey)
                   }
+                  onPointerMove={handleTouchGapWindowPointerMove}
+                  onPointerUp={handleTouchGapWindowPointerEnd}
+                  onPointerCancel={handleTouchGapWindowPointerEnd}
                 >
                   <input
                     checked={checked}
