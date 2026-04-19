@@ -18,6 +18,8 @@ from akra_trader.domain.models import RunComparison
 from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
+from akra_trader.domain.models import ComparisonEligibilityContract
+from akra_trader.domain.models import default_comparison_eligibility_contract
 from akra_trader.domain.models import GuardedLiveKillSwitch
 from akra_trader.domain.models import ClosedTrade
 from akra_trader.domain.models import GuardedLiveInternalExposure
@@ -22617,6 +22619,7 @@ def serialize_preset_revision(revision: ExperimentPreset.Revision) -> dict[str, 
 
 def serialize_run(run: RunRecord) -> dict:
   payload = asdict(run)
+  payload["eligibility_contract"] = serialize_comparison_eligibility_contract()
   payload["config"]["mode"] = run.config.mode.value
   payload["status"] = run.status.value
   payload["provenance"]["external_command"] = list(run.provenance.external_command)
@@ -22667,6 +22670,9 @@ def serialize_strategy(strategy: StrategyMetadata) -> dict:
 def serialize_run_comparison(comparison: RunComparison) -> dict:
   payload = asdict(comparison)
   payload["requested_run_ids"] = list(comparison.requested_run_ids)
+  payload["eligibility_contract"] = serialize_comparison_eligibility_contract(
+    comparison.eligibility_contract
+  )
   payload["runs"] = [
     {
       **run_payload,
@@ -22686,6 +22692,21 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
     }
     for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
   ]
+  return payload
+
+
+def serialize_comparison_eligibility_contract(
+  contract: ComparisonEligibilityContract | None = None,
+) -> dict[str, Any]:
+  resolved_contract = contract or default_comparison_eligibility_contract()
+  payload = asdict(resolved_contract)
+  payload["groups"] = {
+    key: {
+      **group_payload,
+      "surface_ids": list(resolved_contract.groups[key].surface_ids),
+    }
+    for key, group_payload in payload["groups"].items()
+  }
   return payload
 
 

@@ -183,6 +183,7 @@ type BenchmarkArtifact = {
 };
 
 type Run = {
+  eligibility_contract: RunComparison["eligibility_contract"];
   config: {
     run_id: string;
     mode: string;
@@ -14026,7 +14027,7 @@ type RunListBoundaryGroupContract = {
   title: string;
 };
 
-type RunListBoundaryContract = RunComparison["eligibility_contract"];
+type RunListBoundaryContract = Run["eligibility_contract"];
 
 const RUN_LIST_BOUNDARY_CONTRACT: RunListBoundaryContract = {
   scope: "run_list",
@@ -14338,7 +14339,7 @@ function RunSection({
   const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
-  const runListBoundaryContract = comparison?.payload?.eligibility_contract ?? null;
+  const comparisonBoundaryContract = comparison?.payload?.eligibility_contract ?? null;
   const presetOptions = presets.filter(
     (preset) =>
       !preset.strategy_id ||
@@ -17391,6 +17392,7 @@ function RunSection({
         <div className="run-list">
           {runs.map((run) => {
             const orderControls = getOrderControls ? getOrderControls(run) : null;
+            const runListBoundaryContract = run.eligibility_contract ?? comparisonBoundaryContract;
             const comparisonLinkedRunRole =
               comparison?.payload
                 ? getComparisonScoreLinkedRunRole(

@@ -397,6 +397,13 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["rerun_boundary_id"].startswith("rerun-v1:")
   assert payload["provenance"]["rerun_boundary_state"] == "pinned"
+  assert payload["eligibility_contract"]["scope"] == "run_list"
+  assert payload["eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
+  assert payload["eligibility_contract"]["groups"]["operational_workflow"]["surface_ids"] == [
+    "compare_toggle",
+    "rerun",
+    "stop",
+  ]
   assert payload["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
   assert payload["provenance"]["experiment"]["preset_id"] == "core_5m"
   assert payload["provenance"]["experiment"]["benchmark_family"] == "native_validation"
@@ -3238,6 +3245,8 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   assert len(payload) == 1
   assert payload[0]["config"]["strategy_id"] == "ma_cross_v1"
   assert payload[0]["config"]["strategy_version"] == "1.0.0"
+  assert payload[0]["eligibility_contract"]["scope"] == "run_list"
+  assert payload[0]["eligibility_contract"]["surfaces"]["lane"]["eligibility"] == "supporting"
 
 
 def test_runs_endpoint_can_filter_by_experiment_metadata(tmp_path: Path) -> None:
