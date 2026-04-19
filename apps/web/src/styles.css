@@ -2498,10 +2498,46 @@ select {
 .comparison-score-breakdown-card {
   display: grid;
   gap: 8px;
+  width: 100%;
   padding: 12px;
   border-radius: 14px;
   border: 1px solid rgba(var(--comparison-accent-rgb), 0.12);
   background: rgba(255, 255, 255, 0.03);
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.comparison-score-breakdown-card.is-interactive {
+  cursor: pointer;
+}
+
+.comparison-score-breakdown-card.is-interactive:hover,
+.comparison-score-breakdown-card.is-interactive:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.32);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.1), rgba(var(--comparison-accent-rgb), 0.03)),
+    rgba(255, 255, 255, 0.03);
+}
+
+.comparison-score-breakdown-card.is-linked {
+  border-color: rgba(var(--comparison-accent-rgb), 0.36);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.14), rgba(var(--comparison-accent-rgb), 0.04)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.12);
+}
+
+.comparison-score-breakdown-card.is-origin {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.24),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.comparison-score-breakdown-card:disabled {
+  cursor: default;
+  opacity: 0.8;
 }
 
 .comparison-score-breakdown-card-head {
@@ -2530,6 +2566,14 @@ select {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
   line-height: 1.45;
+}
+
+.comparison-score-breakdown-hint {
+  color: rgba(var(--comparison-accent-rgb), 0.84);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .comparison-score-link-copy {
@@ -2616,6 +2660,12 @@ select {
   box-shadow:
     inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.18),
     0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.comparison-score-detail-row.is-origin {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.24),
+    0 10px 22px rgba(0, 0, 0, 0.22);
 }
 
 .comparison-score-detail-row-head {
@@ -2819,6 +2869,15 @@ select {
   box-shadow: 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16);
 }
 
+.comparison-linked-metric-cell-origin::after {
+  inset: 2px;
+  border-width: 2px;
+  border-color: rgba(var(--comparison-accent-rgb), 0.72);
+  box-shadow:
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.22),
+    0 10px 18px rgba(0, 0, 0, 0.18);
+}
+
 .comparison-table td.comparison-drillback-target {
   cursor: pointer;
 }
@@ -2919,6 +2978,12 @@ select {
 
 .comparison-linked-panel-baseline {
   border-style: solid;
+}
+
+.comparison-linked-panel-origin {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.22),
+    0 14px 26px rgba(0, 0, 0, 0.18);
 }
 
 .reference-provenance-head {
