@@ -410,7 +410,9 @@ type ComparisonScoreLinkTarget = {
   originRunId: string | null;
   subFocusKey: string | null;
   detailExpanded: boolean | null;
+  artifactDetailExpanded: boolean | null;
   tooltipKey: string | null;
+  artifactHoverKey: string | null;
 };
 
 type ComparisonScoreLinkedRunRole = "baseline" | "target";
@@ -418,6 +420,15 @@ type ComparisonScoreLinkedRunRole = "baseline" | "target";
 type ComparisonScoreLinkSource = "metric" | "drillback" | "overview" | "provenance";
 
 type ComparisonHistoryWriteMode = "push" | "replace" | "skip";
+
+type ComparisonScoreDrillBackOptions = {
+  subFocusKey?: string | null;
+  tooltipKey?: string | null;
+  detailExpanded?: boolean | null;
+  artifactDetailExpanded?: boolean | null;
+  artifactHoverKey?: string | null;
+  historyMode?: ComparisonHistoryWriteMode;
+};
 
 type MarketDataStatus = {
   provider: string;
@@ -2822,7 +2833,9 @@ const COMPARISON_FOCUS_SOURCE_SEARCH_PARAM = "compare_focus_source";
 const COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM = "compare_focus_origin_run_id";
 const COMPARISON_FOCUS_DETAIL_SEARCH_PARAM = "compare_focus_detail";
 const COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM = "compare_focus_expanded";
+const COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM = "compare_focus_artifact_expanded";
 const COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM = "compare_focus_tooltip";
+const COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM = "compare_focus_artifact_hover";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
@@ -9636,7 +9649,9 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
     COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM,
     COMPARISON_FOCUS_DETAIL_SEARCH_PARAM,
     COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM,
+    COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM,
     COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM,
+    COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM,
   ].some((key) => params.has(key));
   if (!hasComparisonParams) {
     return null;
@@ -9658,8 +9673,14 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
   const focusExpanded = normalizeComparisonScoreLinkExpandedState(
     params.get(COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM),
   );
+  const focusArtifactExpanded = normalizeComparisonScoreLinkExpandedState(
+    params.get(COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM),
+  );
   const focusTooltipKey = normalizeComparisonScoreLinkTooltipKey(
     params.get(COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM),
+  );
+  const focusArtifactHoverKey = normalizeComparisonScoreLinkArtifactHoverKey(
+    params.get(COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM),
   );
 
   return {
@@ -9669,12 +9690,14 @@ function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState |
         ? {
             componentKey: focusComponent,
             detailExpanded: focusExpanded,
+            artifactDetailExpanded: focusArtifactExpanded,
             narrativeRunId: focusRunId,
             originRunId: focusOriginRunId || null,
             section: focusSection,
             source: focusSource,
             subFocusKey: focusDetail,
             tooltipKey: focusTooltipKey,
+            artifactHoverKey: focusArtifactHoverKey,
           }
         : null,
     selectedRunIds,
@@ -9699,7 +9722,9 @@ function buildComparisonSelectionHistoryUrl(
   params.delete(COMPARISON_FOCUS_ORIGIN_RUN_ID_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_DETAIL_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_EXPANDED_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM);
   params.delete(COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM);
 
   const normalizedSelection = normalizeControlRoomComparisonSelection(selection);
   normalizedSelection.selectedRunIds.forEach((runId) => params.append(COMPARISON_RUN_ID_SEARCH_PARAM, runId));
@@ -9723,8 +9748,20 @@ function buildComparisonSelectionHistoryUrl(
         normalizedSelection.scoreLink.detailExpanded ? "1" : "0",
       );
     }
+    if (normalizedSelection.scoreLink.artifactDetailExpanded !== null) {
+      params.set(
+        COMPARISON_FOCUS_ARTIFACT_EXPANDED_SEARCH_PARAM,
+        normalizedSelection.scoreLink.artifactDetailExpanded ? "1" : "0",
+      );
+    }
     if (normalizedSelection.scoreLink.tooltipKey) {
       params.set(COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM, normalizedSelection.scoreLink.tooltipKey);
+    }
+    if (normalizedSelection.scoreLink.artifactHoverKey) {
+      params.set(
+        COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM,
+        normalizedSelection.scoreLink.artifactHoverKey,
+      );
     }
   }
   const nextSearch = params.toString();
@@ -12245,12 +12282,14 @@ function normalizeControlRoomComparisonSelection(
         ? {
             ...scoreLink,
             detailExpanded: scoreLink.detailExpanded,
+            artifactDetailExpanded: scoreLink.artifactDetailExpanded,
             originRunId:
               scoreLink.originRunId && selectedRunIds.includes(scoreLink.originRunId)
                 ? scoreLink.originRunId
                 : null,
             subFocusKey: scoreLink.subFocusKey,
             tooltipKey: scoreLink.tooltipKey,
+            artifactHoverKey: scoreLink.artifactHoverKey,
           }
         : null,
   };
@@ -12278,7 +12317,9 @@ function isSameComparisonSelection(
         && normalizedLeft.scoreLink.originRunId === normalizedRight.scoreLink.originRunId
         && normalizedLeft.scoreLink.subFocusKey === normalizedRight.scoreLink.subFocusKey
         && normalizedLeft.scoreLink.detailExpanded === normalizedRight.scoreLink.detailExpanded
+        && normalizedLeft.scoreLink.artifactDetailExpanded === normalizedRight.scoreLink.artifactDetailExpanded
         && normalizedLeft.scoreLink.tooltipKey === normalizedRight.scoreLink.tooltipKey
+        && normalizedLeft.scoreLink.artifactHoverKey === normalizedRight.scoreLink.artifactHoverKey
       )
     )
   );
@@ -12306,8 +12347,21 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
     if (tooltipLabel) {
       parts.push(tooltipLabel);
     }
+    const artifactHoverLabel = formatComparisonScoreLinkArtifactHoverLabel(
+      entry.selection.scoreLink.artifactHoverKey,
+    );
+    if (artifactHoverLabel) {
+      parts.push(artifactHoverLabel);
+    }
     if (entry.selection.scoreLink.detailExpanded === true) {
       parts.push("details open");
+    } else if (entry.selection.scoreLink.detailExpanded === false) {
+      parts.push("details hidden");
+    }
+    if (entry.selection.scoreLink.artifactDetailExpanded === true) {
+      parts.push("artifact details open");
+    } else if (entry.selection.scoreLink.artifactDetailExpanded === false) {
+      parts.push("artifact details hidden");
     }
   }
   if (entry.pinned) {
@@ -12371,6 +12425,9 @@ function buildComparisonHistoryStepDescriptor(
     const sourceLabel = formatComparisonScoreLinkSourceLabel(normalizedSelection.scoreLink.source);
     const subFocusLabel = formatComparisonScoreLinkSubFocusLabel(normalizedSelection.scoreLink.subFocusKey);
     const tooltipLabel = formatComparisonScoreLinkTooltipLabel(normalizedSelection.scoreLink.tooltipKey);
+    const artifactHoverLabel = formatComparisonScoreLinkArtifactHoverLabel(
+      normalizedSelection.scoreLink.artifactHoverKey,
+    );
     const focusRunLabel = resolveComparisonHistoryRunLabel(
       normalizedSelection.scoreLink.narrativeRunId,
       runs,
@@ -12395,7 +12452,11 @@ function buildComparisonHistoryStepDescriptor(
         : `${intentLabel} with one staged run.`,
       subFocusLabel ? `Detail ${subFocusLabel}.` : null,
       tooltipLabel ? `Tooltip ${tooltipLabel}.` : null,
+      artifactHoverLabel ? `Inspecting ${artifactHoverLabel}.` : null,
       normalizedSelection.scoreLink.detailExpanded === true ? "Score details open." : null,
+      normalizedSelection.scoreLink.detailExpanded === false ? "Score details hidden." : null,
+      normalizedSelection.scoreLink.artifactDetailExpanded === true ? "Artifact details open." : null,
+      normalizedSelection.scoreLink.artifactDetailExpanded === false ? "Artifact details hidden." : null,
       originRunLabel && originRunLabel !== focusRunLabel
         ? `Origin run ${originRunLabel}.`
         : null,
@@ -12537,6 +12598,10 @@ function normalizeComparisonScoreLinkTooltipKey(value: unknown) {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
 
+function normalizeComparisonScoreLinkArtifactHoverKey(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLinkTarget | null {
   if (!value || typeof value !== "object") {
     return null;
@@ -12553,19 +12618,25 @@ function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLink
       : null;
   const subFocusKey = normalizeComparisonScoreLinkSubFocusKey(candidate.subFocusKey);
   const detailExpanded = normalizeComparisonScoreLinkExpandedState(candidate.detailExpanded);
+  const artifactDetailExpanded = normalizeComparisonScoreLinkExpandedState(
+    candidate.artifactDetailExpanded,
+  );
   const tooltipKey = normalizeComparisonScoreLinkTooltipKey(candidate.tooltipKey);
+  const artifactHoverKey = normalizeComparisonScoreLinkArtifactHoverKey(candidate.artifactHoverKey);
   if (!narrativeRunId || !componentKey || !section) {
     return null;
   }
   return {
     componentKey,
     detailExpanded,
+    artifactDetailExpanded,
     narrativeRunId,
     originRunId,
     section,
     source,
     subFocusKey,
     tooltipKey,
+    artifactHoverKey,
   };
 }
 
@@ -16868,6 +16939,7 @@ function RunComparisonPanel({
   const metricCellRefs = useRef(new Map<string, HTMLElement>());
   const provenancePanelRefs = useRef(new Map<string, HTMLElement>());
   const provenanceSubFocusRefs = useRef(new Map<string, HTMLElement>());
+  const provenanceArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
@@ -17380,6 +17452,10 @@ function RunComparisonPanel({
   const buildComparisonMetricCellRefKey = (runId: string, componentKey: string) => `${runId}:${componentKey}`;
   const buildComparisonProvenanceSubFocusRefKey = (runId: string, subFocusKey: string) =>
     `${runId}:${subFocusKey}`;
+  const buildComparisonProvenanceArtifactHoverRefKey = (
+    runId: string,
+    artifactHoverKey: string,
+  ) => `${runId}:${artifactHoverKey}`;
 
   const registerComparisonOverviewCardRef =
     (narrativeRunId: string, section: ComparisonScoreSection) =>
@@ -17431,6 +17507,16 @@ function RunComparisonPanel({
       provenanceSubFocusRefs.current.delete(key);
     };
 
+  const registerComparisonProvenanceArtifactHoverRef =
+    (runId: string, artifactHoverKey: string) => (node: HTMLElement | null) => {
+      const key = buildComparisonProvenanceArtifactHoverRefKey(runId, artifactHoverKey);
+      if (node) {
+        provenanceArtifactHoverRefs.current.set(key, node);
+        return;
+      }
+      provenanceArtifactHoverRefs.current.delete(key);
+    };
+
   const updateSelectedScoreLink = (
     nextSelection: ComparisonScoreLinkTarget | null,
     historyMode: ComparisonHistoryWriteMode = nextSelection ? "push" : "replace",
@@ -17457,8 +17543,7 @@ function RunComparisonPanel({
     section: ComparisonScoreSection,
     componentKey: string,
     source: ComparisonScoreLinkSource,
-    subFocusKey: string | null = null,
-    tooltipKey: string | null = null,
+    options?: ComparisonScoreDrillBackOptions,
   ) => {
     const nextSelection = resolveComparisonScoreDrillBackTarget(
       comparison,
@@ -17473,18 +17558,23 @@ function RunComparisonPanel({
     const resolvedSelection = {
       ...nextSelection,
       detailExpanded:
-        source === "drillback"
-          ? true
-          : (expandedNarrativeScoreBreakdowns[nextSelection.narrativeRunId] ?? null),
+        options?.detailExpanded !== undefined
+          ? options.detailExpanded
+          : source === "drillback"
+            ? true
+            : (expandedNarrativeScoreBreakdowns[nextSelection.narrativeRunId] ?? null),
+      artifactDetailExpanded: options?.artifactDetailExpanded ?? null,
       originRunId: runId,
       source,
-      subFocusKey,
-      tooltipKey,
+      subFocusKey: options?.subFocusKey ?? null,
+      tooltipKey: options?.tooltipKey ?? null,
+      artifactHoverKey: options?.artifactHoverKey ?? null,
     } satisfies ComparisonScoreLinkTarget;
     updateSelectedScoreLink(
       isSameComparisonScoreLinkSurface(selectedScoreLink, resolvedSelection)
         ? null
         : resolvedSelection,
+      options?.historyMode,
     );
   };
 
@@ -17884,6 +17974,18 @@ function RunComparisonPanel({
       }
     }
     if (selectedScoreLink.source === "provenance") {
+      if (selectedScoreLink.artifactHoverKey) {
+        const provenanceArtifactHover = provenanceArtifactHoverRefs.current.get(
+          buildComparisonProvenanceArtifactHoverRefKey(
+            selectedScoreLink.originRunId ?? selectedScoreLink.narrativeRunId,
+            selectedScoreLink.artifactHoverKey,
+          ),
+        );
+        if (provenanceArtifactHover) {
+          provenanceArtifactHover.scrollIntoView(scrollOptions);
+          return;
+        }
+      }
       if (selectedScoreLink.subFocusKey) {
         const provenanceSubFocus = provenanceSubFocusRefs.current.get(
           buildComparisonProvenanceSubFocusRefKey(
@@ -18172,15 +18274,16 @@ function RunComparisonPanel({
                         }
                       : null
                   }
-                  onDrillBackScoreLink={(section, componentKey, subFocusKey) =>
+                  onDrillBackScoreLink={(section, componentKey, options) =>
                     handleComparisonScoreDrillBack(
                       run.run_id,
                       section,
                       componentKey,
                       "provenance",
-                      subFocusKey,
+                      options,
                     )
                   }
+                  registerArtifactHoverRef={registerComparisonProvenanceArtifactHoverRef}
                   panelRef={registerComparisonProvenancePanelRef(run.run_id)}
                   panelRunId={run.run_id}
                   registerSubFocusRef={registerComparisonProvenanceSubFocusRef}
@@ -18378,8 +18481,7 @@ function RunComparisonPanel({
                                   "metrics",
                                   metricRow.key,
                                   "metric",
-                                  null,
-                                  metricTooltipKey,
+                                  metricTooltipKey ? { tooltipKey: metricTooltipKey } : undefined,
                                 )
                             : undefined
                         }
@@ -18398,8 +18500,7 @@ function RunComparisonPanel({
                             "metrics",
                             metricRow.key,
                             "metric",
-                            null,
-                            metricTooltipKey,
+                            metricTooltipKey ? { tooltipKey: metricTooltipKey } : undefined,
                           );
                         }}
                         ref={setMetricCellRef}
@@ -18659,12 +18760,14 @@ function ComparisonNarrativeScoreBreakdown({
                         : {
                             componentKey: overviewTarget.key,
                             detailExpanded: expanded,
+                            artifactDetailExpanded: null,
                             narrativeRunId,
                             originRunId: null,
                             section: section.key,
                             source: "overview",
                             subFocusKey: null,
                             tooltipKey: null,
+                            artifactHoverKey: null,
                           },
                     )
                   : undefined
@@ -18744,12 +18847,14 @@ function ComparisonNarrativeScoreBreakdown({
                             : {
                                 componentKey: row.key,
                                 detailExpanded: true,
+                                artifactDetailExpanded: null,
                                 narrativeRunId,
                                 originRunId: null,
                                 section: section.key,
                                 source: "drillback",
                                 subFocusKey: null,
                                 tooltipKey: null,
+                                artifactHoverKey: null,
                               },
                           "push",
                         )
@@ -20516,6 +20621,7 @@ function ReferenceRunProvenanceSummary({
   onDrillBackScoreLink,
   panelRef,
   panelRunId,
+  registerArtifactHoverRef,
   registerSubFocusRef,
   reference,
   referenceVersion,
@@ -20529,10 +20635,14 @@ function ReferenceRunProvenanceSummary({
   onDrillBackScoreLink?: (
     section: ComparisonScoreSection,
     componentKey: string,
-    subFocusKey?: string | null,
+    options?: ComparisonScoreDrillBackOptions,
   ) => void;
   panelRef?: (node: HTMLElement | null) => void;
   panelRunId: string;
+  registerArtifactHoverRef?: (
+    runId: string,
+    artifactHoverKey: string,
+  ) => (node: HTMLElement | null) => void;
   registerSubFocusRef?: (
     runId: string,
     subFocusKey: string,
@@ -20608,6 +20718,10 @@ function ReferenceRunProvenanceSummary({
     linkedScoreSelection?.source === "provenance"
       ? linkedScoreSelection.subFocusKey
       : null;
+  const activeProvenanceArtifactHoverKey =
+    linkedScoreSelection?.source === "provenance"
+      ? linkedScoreSelection.artifactHoverKey
+      : null;
   const renderProvenanceCopyLine = ({
     children,
     componentKey,
@@ -20645,13 +20759,23 @@ function ReferenceRunProvenanceSummary({
         aria-label={`Trace ${formatComparisonScoreComponentLabel(section, componentKey)}`}
         aria-pressed={isPressed}
         className={className}
-        onClick={() => onDrillBackScoreLink(section, componentKey, subFocusKey ?? null)}
+        onClick={() =>
+          onDrillBackScoreLink(section, componentKey, {
+            artifactDetailExpanded: null,
+            artifactHoverKey: null,
+            subFocusKey: subFocusKey ?? null,
+          })
+        }
         onKeyDown={(event) => {
           if (event.key !== "Enter" && event.key !== " ") {
             return;
           }
           event.preventDefault();
-          onDrillBackScoreLink(section, componentKey, subFocusKey ?? null);
+          onDrillBackScoreLink(section, componentKey, {
+            artifactDetailExpanded: null,
+            artifactHoverKey: null,
+            subFocusKey: subFocusKey ?? null,
+          });
         }}
         ref={subFocusKey ? registerSubFocusRef?.(panelRunId, subFocusKey) : undefined}
         type="button"
@@ -20768,25 +20892,41 @@ function ReferenceRunProvenanceSummary({
               const artifactComponentKey =
                 summaryEntries.length || sectionEntries.length ? "benchmark_story_bonus" : "provenance_richness";
               const artifactSubFocusKey = buildComparisonProvenanceArtifactSubFocusKey(artifact.path);
+              const artifactSummaryHoverPrefix = `provenance-artifact-summary:${encodeComparisonScoreLinkToken(
+                artifact.path,
+              )}:`;
               const artifactSectionSubFocusPrefix = `provenance-artifact-section:${encodeComparisonScoreLinkToken(
                 artifact.path,
               )}:`;
+              const artifactIsLinked =
+                linkedScoreSelection?.source === "provenance"
+                && linkedScoreSelection.section === "context"
+                && linkedScoreSelection.componentKey === artifactComponentKey;
               const artifactIsPressed =
-                linkedScoreSelection?.section === "context"
-                && linkedScoreSelection.componentKey === artifactComponentKey
+                artifactIsLinked
                 && (
                   !activeProvenanceSubFocusKey
                   || activeProvenanceSubFocusKey === artifactSubFocusKey
                   || activeProvenanceSubFocusKey.startsWith(artifactSectionSubFocusPrefix)
                 );
+              const artifactHasSelectedSubFocus =
+                activeProvenanceSubFocusKey === artifactSubFocusKey
+                || activeProvenanceSubFocusKey?.startsWith(artifactSectionSubFocusPrefix);
+              const artifactDetailsExpanded =
+                artifactHasSelectedSubFocus
+                  ? linkedScoreSelection?.artifactDetailExpanded !== false
+                  : true;
               return (
                 <article
                   aria-label={`Trace ${formatComparisonScoreComponentLabel("context", artifactComponentKey)}`}
                   aria-pressed={onDrillBackScoreLink ? artifactIsPressed : undefined}
                   className={`reference-artifact-card ${highlightArtifacts ? "is-linked" : ""} ${
-                    activeProvenanceSubFocusKey === artifactSubFocusKey
-                    || activeProvenanceSubFocusKey?.startsWith(artifactSectionSubFocusPrefix)
+                    artifactHasSelectedSubFocus
                       ? "is-subfocus"
+                      : ""
+                  } ${!artifactDetailsExpanded ? "is-collapsed" : ""} ${
+                    activeProvenanceArtifactHoverKey?.startsWith(artifactSummaryHoverPrefix)
+                      ? "has-hover-focus"
                       : ""
                   } ${
                     onDrillBackScoreLink ? "is-drillback comparison-drillback-target" : ""
@@ -20794,7 +20934,14 @@ function ReferenceRunProvenanceSummary({
                   key={`${artifact.kind}-${artifact.path}`}
                   onClick={
                     onDrillBackScoreLink
-                      ? () => onDrillBackScoreLink("context", artifactComponentKey, artifactSubFocusKey)
+                      ? () =>
+                          onDrillBackScoreLink("context", artifactComponentKey, {
+                            artifactDetailExpanded: artifactHasSelectedSubFocus
+                              ? artifactDetailsExpanded
+                              : true,
+                            artifactHoverKey: null,
+                            subFocusKey: artifactSubFocusKey,
+                          })
                       : undefined
                   }
                   onKeyDown={
@@ -20804,7 +20951,13 @@ function ReferenceRunProvenanceSummary({
                             return;
                           }
                           event.preventDefault();
-                          onDrillBackScoreLink("context", artifactComponentKey, artifactSubFocusKey);
+                          onDrillBackScoreLink("context", artifactComponentKey, {
+                            artifactDetailExpanded: artifactHasSelectedSubFocus
+                              ? artifactDetailsExpanded
+                              : true,
+                            artifactHoverKey: null,
+                            subFocusKey: artifactSubFocusKey,
+                          });
                         }
                       : undefined
                   }
@@ -20814,7 +20967,28 @@ function ReferenceRunProvenanceSummary({
                 >
                   <div className="reference-artifact-head">
                     <strong>{artifact.label}</strong>
-                    <span>{artifact.kind}</span>
+                    <div className="reference-artifact-head-meta">
+                      <span>{artifact.kind}</span>
+                      {onDrillBackScoreLink && artifactHasSelectedSubFocus && (summaryEntries.length || sectionEntries.length) ? (
+                        <button
+                          aria-expanded={artifactDetailsExpanded}
+                          className="reference-artifact-toggle"
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            onDrillBackScoreLink("context", artifactComponentKey, {
+                              artifactDetailExpanded: !artifactDetailsExpanded,
+                              artifactHoverKey: null,
+                              historyMode: "replace",
+                              subFocusKey: artifactSubFocusKey,
+                            });
+                          }}
+                          type="button"
+                        >
+                          {artifactDetailsExpanded ? "Hide details" : "Show details"}
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   <p>{artifact.path}</p>
                   <p>
@@ -20825,17 +20999,73 @@ function ReferenceRunProvenanceSummary({
                   {artifact.summary_source_path && artifact.summary_source_path !== artifact.path ? (
                     <p>Summary source: {artifact.summary_source_path}</p>
                   ) : null}
-                  {summaryEntries.length ? (
+                  {artifactDetailsExpanded && summaryEntries.length ? (
                     <dl className="reference-artifact-summary">
-                      {summaryEntries.map(([key, value]) => (
-                        <div className="reference-artifact-summary-row" key={`${artifact.path}-${key}`}>
-                          <dt>{formatBenchmarkArtifactSummaryLabel(key)}</dt>
-                          <dd>{value}</dd>
-                        </div>
-                      ))}
+                      {summaryEntries.map(([key, value]) => {
+                        const artifactHoverKey = buildComparisonProvenanceArtifactSummaryHoverKey(
+                          artifact.path,
+                          key,
+                        );
+                        const isHovered = activeProvenanceArtifactHoverKey === artifactHoverKey;
+                        return (
+                          <div
+                            className={`reference-artifact-summary-row ${isHovered ? "is-hovered" : ""}`.trim()}
+                            key={`${artifact.path}-${key}`}
+                            onBlur={() => {
+                              if (!onDrillBackScoreLink || activeProvenanceArtifactHoverKey !== artifactHoverKey) {
+                                return;
+                              }
+                              onDrillBackScoreLink("context", artifactComponentKey, {
+                                artifactDetailExpanded: true,
+                                artifactHoverKey: null,
+                                historyMode: "replace",
+                                subFocusKey: artifactSubFocusKey,
+                              });
+                            }}
+                            onFocus={() => {
+                              if (!onDrillBackScoreLink || !artifactHasSelectedSubFocus) {
+                                return;
+                              }
+                              onDrillBackScoreLink("context", artifactComponentKey, {
+                                artifactDetailExpanded: true,
+                                artifactHoverKey,
+                                historyMode: "replace",
+                                subFocusKey: artifactSubFocusKey,
+                              });
+                            }}
+                            onMouseEnter={() => {
+                              if (!onDrillBackScoreLink || !artifactHasSelectedSubFocus) {
+                                return;
+                              }
+                              onDrillBackScoreLink("context", artifactComponentKey, {
+                                artifactDetailExpanded: true,
+                                artifactHoverKey,
+                                historyMode: "replace",
+                                subFocusKey: artifactSubFocusKey,
+                              });
+                            }}
+                            onMouseLeave={() => {
+                              if (!onDrillBackScoreLink || activeProvenanceArtifactHoverKey !== artifactHoverKey) {
+                                return;
+                              }
+                              onDrillBackScoreLink("context", artifactComponentKey, {
+                                artifactDetailExpanded: true,
+                                artifactHoverKey: null,
+                                historyMode: "replace",
+                                subFocusKey: artifactSubFocusKey,
+                              });
+                            }}
+                            ref={registerArtifactHoverRef?.(panelRunId, artifactHoverKey)}
+                            tabIndex={artifactHasSelectedSubFocus ? 0 : undefined}
+                          >
+                            <dt>{formatBenchmarkArtifactSummaryLabel(key)}</dt>
+                            <dd>{value}</dd>
+                          </div>
+                        );
+                      })}
                     </dl>
                   ) : null}
-                  {sectionEntries.length ? (
+                  {artifactDetailsExpanded && sectionEntries.length ? (
                     <div className="reference-artifact-sections">
                       {sectionEntries.map(([key, lines]) => {
                         const sectionSubFocusKey = buildComparisonProvenanceArtifactSectionSubFocusKey(
@@ -20861,7 +21091,11 @@ function ReferenceRunProvenanceSummary({
                                 className="reference-artifact-section-link"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  onDrillBackScoreLink("context", artifactComponentKey, sectionSubFocusKey);
+                                  onDrillBackScoreLink("context", artifactComponentKey, {
+                                    artifactDetailExpanded: true,
+                                    artifactHoverKey: null,
+                                    subFocusKey: sectionSubFocusKey,
+                                  });
                                 }}
                                 onKeyDown={(event) => {
                                   if (event.key !== "Enter" && event.key !== " ") {
@@ -20869,7 +21103,11 @@ function ReferenceRunProvenanceSummary({
                                   }
                                   event.preventDefault();
                                   event.stopPropagation();
-                                  onDrillBackScoreLink("context", artifactComponentKey, sectionSubFocusKey);
+                                  onDrillBackScoreLink("context", artifactComponentKey, {
+                                    artifactDetailExpanded: true,
+                                    artifactHoverKey: null,
+                                    subFocusKey: sectionSubFocusKey,
+                                  });
                                 }}
                                 ref={registerSubFocusRef?.(panelRunId, sectionSubFocusKey)}
                                 type="button"
@@ -21334,6 +21572,10 @@ function buildComparisonProvenanceArtifactSectionSubFocusKey(path: string, secti
   return `provenance-artifact-section:${encodeComparisonScoreLinkToken(path)}:${encodeComparisonScoreLinkToken(sectionKey)}`;
 }
 
+function buildComparisonProvenanceArtifactSummaryHoverKey(path: string, summaryKey: string) {
+  return `provenance-artifact-summary:${encodeComparisonScoreLinkToken(path)}:${encodeComparisonScoreLinkToken(summaryKey)}`;
+}
+
 function buildComparisonMetricTooltipKey(metricKey: string, runId: string) {
   return `metric-tooltip:${encodeComparisonScoreLinkToken(metricKey)}:${encodeComparisonScoreLinkToken(runId)}`;
 }
@@ -21383,6 +21625,19 @@ function formatComparisonScoreLinkTooltipLabel(tooltipKey: string | null) {
     )}`;
   }
   return tooltipKey;
+}
+
+function formatComparisonScoreLinkArtifactHoverLabel(artifactHoverKey: string | null) {
+  if (!artifactHoverKey) {
+    return null;
+  }
+  if (artifactHoverKey.startsWith("provenance-artifact-summary:")) {
+    const [, encodedPath = "", encodedSummary = ""] = artifactHoverKey.split(":");
+    const path = decodeComparisonScoreLinkToken(encodedPath);
+    const summaryKey = decodeComparisonScoreLinkToken(encodedSummary);
+    return `${shortenIdentifier(path)} / ${formatBenchmarkArtifactSummaryLabel(summaryKey)}`;
+  }
+  return artifactHoverKey;
 }
 
 function formatComparisonScoreComponentDetail(
@@ -21527,6 +21782,7 @@ function isSameComparisonScoreLinkTarget(
   }
   return (
     left.detailExpanded === right.detailExpanded
+    && left.artifactDetailExpanded === right.artifactDetailExpanded
     && left.narrativeRunId === right.narrativeRunId
     && left.section === right.section
     && left.componentKey === right.componentKey
@@ -21534,6 +21790,7 @@ function isSameComparisonScoreLinkTarget(
     && left.originRunId === right.originRunId
     && left.subFocusKey === right.subFocusKey
     && left.tooltipKey === right.tooltipKey
+    && left.artifactHoverKey === right.artifactHoverKey
   );
 }
 
@@ -21575,12 +21832,14 @@ function resolveComparisonScoreDrillBackTarget(
       ? {
           componentKey,
           detailExpanded: null,
+          artifactDetailExpanded: null,
           narrativeRunId: directNarrative.run_id,
           originRunId: null,
           section,
           source: "drillback",
           subFocusKey: null,
           tooltipKey: null,
+          artifactHoverKey: null,
         }
       : null;
   }
@@ -21603,12 +21862,14 @@ function resolveComparisonScoreDrillBackTarget(
     ? {
         componentKey,
         detailExpanded: null,
+        artifactDetailExpanded: null,
         narrativeRunId: resolvedNarrative.run_id,
         originRunId: null,
         section,
         source: "drillback",
         subFocusKey: null,
         tooltipKey: null,
+        artifactHoverKey: null,
       }
     : null;
 }

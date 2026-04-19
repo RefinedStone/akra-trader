@@ -3071,6 +3071,18 @@ select {
   box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.14);
 }
 
+.reference-artifact-card.is-collapsed {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01)),
+    rgba(4, 10, 17, 0.44);
+}
+
+.reference-artifact-card.has-hover-focus {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16),
+    0 12px 20px rgba(0, 0, 0, 0.16);
+}
+
 .reference-artifact-card.is-subfocus {
   border-color: rgba(var(--comparison-accent-rgb), 0.5);
   background:
@@ -3088,6 +3100,12 @@ select {
   align-items: baseline;
 }
 
+.reference-artifact-head-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .reference-artifact-head strong {
   font-size: 0.92rem;
 }
@@ -3097,6 +3115,25 @@ select {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.72rem;
   text-transform: uppercase;
+}
+
+.reference-artifact-toggle {
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(88, 217, 255, 0.24);
+  background: rgba(88, 217, 255, 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.reference-artifact-toggle:hover,
+.reference-artifact-toggle:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.4);
+  background: rgba(var(--comparison-accent-rgb), 0.12);
 }
 
 .reference-artifact-card p {
@@ -3118,6 +3155,19 @@ select {
   display: grid;
   grid-template-columns: 120px minmax(0, 1fr);
   gap: 12px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  outline: none;
+}
+
+.reference-artifact-summary-row.is-hovered {
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.18);
+}
+
+.reference-artifact-summary-row:focus-visible {
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.24);
 }
 
 .reference-artifact-summary dt {
