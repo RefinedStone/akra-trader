@@ -3567,19 +3567,37 @@
       "id": "planning-experiment-os-structure-persisted-workspace-conflict-signal-detail-subviews",
       "direction_id": "experiment-os",
       "title": "Persist structured signal detail subviews inside workspace conflict score details",
-      "description": "Evolve the newly persisted focused-signal single-card detail view into a structured signal detail model that can remember nested semantic group expansion and any per-signal note or tooltip stack visibility beneath the selected signal, so deeper evidence context survives reload and audit refilter instead of stopping at one restored summary card.",
-      "status": "ready",
+      "description": "Evolve the newly persisted focused-signal single-card detail view into a structured signal detail model that can remember nested semantic group expansion and any per-signal note or tooltip stack visibility beneath the selected signal, so deeper evidence context survives reload and audit refilter instead of stopping at one restored summary card. This task is now completed for the section-level structured subviews; finer-grained drill-down rows and nested note-stack expansion persistence continue in a follow-up task.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 29,
-      "priority_reason": "The latest main-session reply says commit 4a75f5d now restores a single-card focused-signal detail view, but explicitly calls out the remaining gap that semantic group expansion and signal-specific note or tooltip stack state still are not remembered. That is the clearest executable next task for builtin queue continuation after the just-completed detail-panel persistence pass.",
+      "priority_reason": "Completed in main session commit c40c568, which refactored the focused signal detail panel into persisted `Interpretation`, `Lane position`, and `Recommendation context` subviews keyed by row, restored each section's collapse state across reload and audit refilter, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-workspace-conflict-signal-detail-deeper-view-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:20:00Z",
+      "updated_at": "2026-04-20T22:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os workspace conflict persistence from restoring one focused-signal detail card into preserving the structured nested evidence and annotation state operators may open under that signal."
+    },
+    {
+      "id": "planning-experiment-os-persist-nested-workspace-conflict-signal-subview-expansion-state",
+      "direction_id": "experiment-os",
+      "title": "Persist nested expansion state inside workspace conflict signal subviews",
+      "description": "Build on the shipped section-level signal detail subview persistence so any deeper drill-down row expansion and nested note-stack visibility inside `Interpretation`, `Lane position`, and `Recommendation context` are also restored per row after reload and audit refilter, instead of resetting once operators open additional evidence layers inside a structured subview.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 30,
+      "priority_reason": "The latest main-session reply says commit c40c568 completed section-level subview persistence, but explicitly leaves the remaining gap that deeper drill-down rows and nested note-stack expansion inside each subview still are not remembered. That is the clearest executable next task for builtin queue continuation.",
+      "depends_on": [
+        "planning-experiment-os-structure-persisted-workspace-conflict-signal-detail-subviews"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring structured signal-detail sections into preserving the deeper evidence expansion state operators may open within each persisted subview."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
