@@ -3946,18 +3946,36 @@
       "direction_id": "experiment-os",
       "title": "Promote run-list comparison boundaries into a formal eligibility contract",
       "description": "Lift the newly defined weak-signal run-list boundaries out of UI-only labeling and component wiring into a durable comparison eligibility contract, such as schema-backed comparison-surface metadata or explicit server payload fields, so `supporting`, `comparison-eligible`, and `operational-only` distinctions become enforceable policy rather than presentation-only guidance.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says the remaining work is to lift the new weak-signal or supporting or operational boundary out of UI code and into a formal comparison-eligibility schema or server-payload contract. That is the clearest executable next step for builtin next-task progression because the policy boundary is already decided and now needs durable backend or shared-contract enforcement.",
+      "priority_reason": "Completed in main session commit 3de4e2f, which centralized weak-signal or eligible or operational run-list boundaries behind `RUN_LIST_BOUNDARY_SURFACE_CONTRACT` and `RUN_LIST_BOUNDARY_GROUP_CONTRACT`, rendered boundary notes directly from the contract, routed label and drill-back eligibility through shared helpers, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-define-boundaries-for-weak-comparison-run-list-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:20:00Z",
+      "updated_at": "2026-04-20T12:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from UI-stated comparison discipline to a durable experiment contract where run-list evidence surfaces carry explicit eligibility semantics across backend payloads, client wiring, and future comparison policy work."
+    },
+    {
+      "id": "planning-experiment-os-promote-comparison-eligibility-contract-into-shared-domain-and-api-schema",
+      "direction_id": "experiment-os",
+      "title": "Promote comparison eligibility contract into shared domain and API schema",
+      "description": "Extend the newly centralized run-list eligibility contract beyond frontend rendering helpers into shared domain types and comparison payload or API schema boundaries so `supporting`, `comparison-eligible`, and `operational-only` semantics become a cross-surface contract enforced consistently between backend, payload construction, and UI consumers.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply says the formal contract now governs frontend run-list rendering and drill-back gating, but has not yet been promoted into comparison payload or API schema and shared domain model layers. That is the clearest executable next task because it directly continues the shipped contract work and turns the policy into a cross-surface backend-enforced experiment model.",
+      "depends_on": [
+        "planning-experiment-os-promote-run-list-comparison-boundaries-into-formal-contract"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os from a frontend-local comparison eligibility contract into a durable shared experiment interface where backend payloads, schema validation, and UI surfaces all speak the same boundary policy."
     }
   ]
 }
