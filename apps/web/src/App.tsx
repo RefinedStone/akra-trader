@@ -12,6 +12,13 @@ import {
   useRef,
   useState,
 } from "react";
+import {
+  AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION,
+  AKRA_TOUCH_FEEDBACK_EVENT_NAME,
+  AkraTouchFeedbackDetail,
+  AkraTouchFeedbackEnvelope,
+  triggerAkraTouchFeedbackBridge,
+} from "./touchFeedback";
 
 type ParameterSchema = Record<
   string,
@@ -2785,9 +2792,6 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const TOUCH_GAP_WINDOW_SWEEP_HOLD_MS = 220;
 const TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX = 14;
-const AKRA_TOUCH_FEEDBACK_EVENT_NAME = "akra-trader:haptic-feedback";
-const AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION = 1;
-const AKRA_TOUCH_FEEDBACK_WEBKIT_HANDLER = "akraTouchFeedback";
 const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
@@ -2836,37 +2840,6 @@ type TouchGapWindowHoldProgressState = {
 type TouchGapWindowActivationFeedbackState = {
   activationId: number;
   anchorGapWindowKey: string;
-};
-type AkraTouchFeedbackDetail = {
-  anchorGapWindowKey: string;
-  effect: "impact";
-  impactStyle: "light";
-  source: "gap-window-picker-sweep-activation";
-  trigger: "touch-hold";
-};
-type AkraTouchFeedbackEnvelope = {
-  detail: AkraTouchFeedbackDetail;
-  type: typeof AKRA_TOUCH_FEEDBACK_EVENT_NAME;
-  version: typeof AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION;
-};
-type PlatformTouchFeedbackBridge = {
-  ReactNativeWebView?: {
-    postMessage?: (message: string) => void;
-  };
-  Telegram?: {
-    WebApp?: {
-      HapticFeedback?: {
-        impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
-      };
-    };
-  };
-  webkit?: {
-    messageHandlers?: {
-      akraTouchFeedback?: {
-        postMessage?: (payload: AkraTouchFeedbackEnvelope) => void;
-      };
-    };
-  };
 };
 
 type ControlRoomUiStateV1 = {
@@ -8423,60 +8396,7 @@ function BackfillQualityStatus({
       type: AKRA_TOUCH_FEEDBACK_EVENT_NAME,
       version: AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION,
     };
-    const platformBridge = window as Window & typeof globalThis & PlatformTouchFeedbackBridge;
-    let usedPlatformFeedbackBridge = false;
-    const telegramHaptics = platformBridge.Telegram?.WebApp?.HapticFeedback;
-    if (typeof telegramHaptics?.impactOccurred === "function") {
-      try {
-        telegramHaptics.impactOccurred("light");
-        usedPlatformFeedbackBridge = true;
-      } catch {
-        // Ignore Telegram bridge failures and continue through fallbacks.
-      }
-    }
-    if (!usedPlatformFeedbackBridge) {
-      const handler =
-        platformBridge.webkit?.messageHandlers?.[AKRA_TOUCH_FEEDBACK_WEBKIT_HANDLER];
-      if (typeof handler?.postMessage === "function") {
-        try {
-          handler.postMessage(touchFeedbackEnvelope);
-          usedPlatformFeedbackBridge = true;
-        } catch {
-          // Ignore failing handlers and keep probing fallbacks.
-        }
-      }
-    }
-    if (
-      !usedPlatformFeedbackBridge
-      && typeof platformBridge.ReactNativeWebView?.postMessage === "function"
-    ) {
-      try {
-        platformBridge.ReactNativeWebView.postMessage(
-          JSON.stringify(touchFeedbackEnvelope),
-        );
-        usedPlatformFeedbackBridge = true;
-      } catch {
-        // Ignore React Native host bridge failures and continue through fallbacks.
-      }
-    }
-    if (!usedPlatformFeedbackBridge) {
-      try {
-        window.dispatchEvent(
-          new CustomEvent<AkraTouchFeedbackEnvelope>(AKRA_TOUCH_FEEDBACK_EVENT_NAME, {
-            detail: touchFeedbackEnvelope,
-          }),
-        );
-      } catch {
-        // Ignore custom-event bridge failures and continue through fallbacks.
-      }
-    }
-    if (!usedPlatformFeedbackBridge && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
-      try {
-        navigator.vibrate?.(18);
-      } catch {
-        // Ignore unsupported or blocked vibration calls.
-      }
-    }
+    triggerAkraTouchFeedbackBridge(touchFeedbackEnvelope);
     const nextActivationId = touchSweepActivationFeedbackIdRef.current + 1;
     touchSweepActivationFeedbackIdRef.current = nextActivationId;
     clearTouchSweepActivationFeedbackTimeout();
