@@ -165,18 +165,72 @@
       "direction_id": "experiment-os",
       "title": "Make preset revision parameter diffs semantic-aware inside structured comparisons",
       "description": "Deepen the new structured preset revision and restore diff UI so parameter bundle changes are compared semantically instead of only by coarse field or group buckets, with stable nested paths and added, removed, or changed value rendering that makes large parameter revisions reviewable before restore.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly says the new structured diff stops at field or group comparison and still lacks semantic-aware parameter diffing. That is the clearest direct continuation of the just-finished restore UX work and is ready for implementation without additional operator judgment.",
+      "priority_reason": "Completed in main session commit 3fc5635, which made preset parameter diffs semantic-aware across revision comparison, restore confirmation, and draft-conflict preview by rendering numeric higher or lower deltas, boolean enabled or disabled state, primitive array added or removed summaries, and flattened nested leaf-path comparisons, then passed `cd apps/web && npx tsc --noEmit`.",
       "depends_on": [
         "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:35:00Z",
+      "updated_at": "2026-04-19T09:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os preset trust by turning revision and restore comparisons into operator-usable semantic parameter reviews rather than coarse structural summaries."
+    },
+    {
+      "id": "planning-experiment-os-preset-schema-aware-parameter-meaning",
+      "direction_id": "experiment-os",
+      "title": "Teach preset semantic diffs schema-aware parameter meaning",
+      "description": "Extend the new semantic preset diff layer so parameter values can be rendered with domain-aware meaning derived from preset schema or field metadata, such as percentages, timeframe units, and enum labels, instead of remaining generic higher or lower primitive comparisons.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says the deepest remaining semantic gap is that parameter meaning is still not schema-aware, explicitly calling out percent, timeframe, and enum interpretation. That is the clearest direct continuation now that generic semantic diffing is complete, and it is executable without additional operator judgment.",
+      "depends_on": [
+        "planning-experiment-os-preset-semantic-parameter-diff"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os preset review trust by turning semantic diffs from generic value changes into domain-meaningful operator comparisons that better support promotion and restore decisions."
+    },
+    {
+      "id": "planning-experiment-os-preset-array-diff-fidelity",
+      "direction_id": "experiment-os",
+      "title": "Deepen preset semantic diffs for array reorder and duplicate tracking",
+      "description": "Build beyond the current primitive-list added or removed summary so preset semantic diffs can distinguish reorder-only changes, duplicate count drift, and other array-shape changes that currently collapse into coarse list summaries.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly notes that array diffs still stop at primitive-list summaries and do not yet track reorder or duplicate semantics. This is concrete follow-up work, but schema-aware field meaning is the more important next queue head because it improves every diff review rather than a narrower subset of array-heavy presets.",
+      "depends_on": [
+        "planning-experiment-os-preset-semantic-parameter-diff"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Improves experiment-os preset change review fidelity by making list-like parameter edits distinguish structural churn from real value additions or removals."
+    },
+    {
+      "id": "planning-experiment-os-preset-object-level-diff-summary",
+      "direction_id": "experiment-os",
+      "title": "Add object-level summary cards on top of leaf-path preset diffs",
+      "description": "Complement the new leaf-path semantic comparison output with object-level summary cards for nested parameter additions, removals, and grouped edits so large preset diffs stay scannable before operators drill into individual leaves.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says nested object changes are now expanded to leaf paths but still lack object-level summary cards. That is valid executable follow-up, but it should stay behind schema-aware meaning and richer array semantics because those gaps affect correctness before summary polish.",
+      "depends_on": [
+        "planning-experiment-os-preset-semantic-parameter-diff"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os preset comparisons readable at scale by layering grouped object summaries over the now-correct leaf-path semantic diff output."
     },
     {
       "id": "planning-experiment-os-preset-draft-persistence-and-cross-session-restore-guard",
