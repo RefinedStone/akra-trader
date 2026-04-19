@@ -14765,6 +14765,86 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
   assert strategy_tuning.narratives[0].insight_score > strategy_tuning.narratives[1].insight_score
 
 
+def test_compare_runs_uses_strategy_semantics_to_break_close_ranking_ties(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  strategies = LocalStrategyCatalog()
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=strategies,
+    references=build_references(),
+    runs=runs,
+  )
+
+  baseline_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  alternate_native_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+  app.register_strategy(
+    strategy_id="ma_cross_v1",
+    module_path="akra_trader.strategies.examples",
+    class_name="MovingAverageCrossStrategy",
+  )
+  imported_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="SOL/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+  )
+
+  for run in (baseline_run, alternate_native_run, imported_run):
+    run.metrics.update({
+      "total_return_pct": 10.0,
+      "max_drawdown_pct": 5.0,
+      "win_rate_pct": 60.0,
+      "trade_count": 20,
+    })
+    runs.save_run(run)
+
+  comparison = app.compare_runs(
+    run_ids=[
+      baseline_run.config.run_id,
+      alternate_native_run.config.run_id,
+      imported_run.config.run_id,
+    ],
+    intent="strategy_tuning",
+  )
+
+  assert [narrative.run_id for narrative in comparison.narratives] == [
+    imported_run.config.run_id,
+    alternate_native_run.config.run_id,
+  ]
+  narrative_by_run = {
+    narrative.run_id: narrative
+    for narrative in comparison.narratives
+  }
+  assert imported_run.provenance.strategy is not None
+  assert imported_run.provenance.strategy.catalog_semantics.strategy_kind == "imported_module"
+  assert narrative_by_run[imported_run.config.run_id].comparison_type == "native_vs_native"
+  assert narrative_by_run[imported_run.config.run_id].insight_score > 0
+  assert (
+    narrative_by_run[imported_run.config.run_id].insight_score
+    > narrative_by_run[alternate_native_run.config.run_id].insight_score
+  )
+  assert narrative_by_run[alternate_native_run.config.run_id].insight_score == 0.0
+
+
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(

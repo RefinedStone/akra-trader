@@ -207,6 +207,10 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "drawdown": 1.5,
     "win_rate": 0.7,
     "trade_count": 0.12,
+    "semantic_kind_bonus": 1.2,
+    "semantic_execution_bonus": 0.8,
+    "semantic_source_bonus": 0.8,
+    "semantic_parameter_contract_bonus": 0.4,
     "native_reference_bonus": 8.0,
     "reference_bonus": 3.0,
     "status_bonus": 1.5,
@@ -218,6 +222,10 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "drawdown": 1.9,
     "win_rate": 1.0,
     "trade_count": 0.4,
+    "semantic_kind_bonus": 0.8,
+    "semantic_execution_bonus": 0.6,
+    "semantic_source_bonus": 0.4,
+    "semantic_parameter_contract_bonus": 0.3,
     "native_reference_bonus": 3.0,
     "reference_bonus": 1.0,
     "status_bonus": 3.0,
@@ -229,6 +237,10 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "drawdown": 0.7,
     "win_rate": 1.3,
     "trade_count": 0.35,
+    "semantic_kind_bonus": 1.0,
+    "semantic_execution_bonus": 0.7,
+    "semantic_source_bonus": 0.6,
+    "semantic_parameter_contract_bonus": 0.5,
     "native_reference_bonus": 1.5,
     "reference_bonus": 0.5,
     "status_bonus": 0.8,
@@ -22961,6 +22973,11 @@ def _score_comparison_narrative(
   score += abs(float(max_drawdown_delta or 0.0)) * weights["drawdown"]
   score += abs(float(win_rate_delta or 0.0)) * weights["win_rate"]
   score += min(abs(float(trade_count_delta or 0.0)), 50.0) * weights["trade_count"]
+  score += _score_comparison_semantic_delta(
+    baseline_run=baseline_run,
+    run=run,
+    weights=weights,
+  )
 
   if comparison_type == "native_vs_reference":
     score += weights["native_reference_bonus"]
@@ -22974,6 +22991,42 @@ def _score_comparison_narrative(
   if score == 0.0 and _has_reference_context(run, baseline_run):
     score = weights["reference_floor"]
   return round(score, 2)
+
+
+def _score_comparison_semantic_delta(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  weights: dict[str, float],
+) -> float:
+  baseline_semantics = _strategy_semantics(baseline_run)
+  run_semantics = _strategy_semantics(run)
+  score = 0.0
+  if baseline_semantics.strategy_kind != run_semantics.strategy_kind:
+    score += weights["semantic_kind_bonus"]
+  if _normalized_semantic_text(baseline_semantics.execution_model) != _normalized_semantic_text(
+    run_semantics.execution_model
+  ):
+    if _normalized_semantic_text(run_semantics.execution_model) is not None:
+      score += weights["semantic_execution_bonus"]
+  if _normalized_semantic_text(baseline_semantics.source_descriptor) != _normalized_semantic_text(
+    run_semantics.source_descriptor
+  ):
+    if _normalized_semantic_text(run_semantics.source_descriptor) is not None:
+      score += weights["semantic_source_bonus"]
+  if _normalized_semantic_text(
+    baseline_semantics.parameter_contract
+  ) != _normalized_semantic_text(run_semantics.parameter_contract):
+    if _normalized_semantic_text(run_semantics.parameter_contract) is not None:
+      score += weights["semantic_parameter_contract_bonus"]
+  return score
+
+
+def _normalized_semantic_text(value: str | None) -> str | None:
+  if value is None:
+    return None
+  normalized = value.strip()
+  return normalized or None
 
 
 def _normalize_comparison_intent(intent: str | None) -> str:
