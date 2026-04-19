@@ -3460,18 +3460,54 @@
       "direction_id": "experiment-os",
       "title": "Persist workspace conflict active selection across reload and audit refilter",
       "description": "Extend the newly shared workspace conflict active-selection model so the selected overview card or conflict row can be restored after reload and retained when the audit list is refiltered or rebuilt, instead of dropping back to purely review-panel-local UI state whenever the view remounts or the visible row set changes.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 23,
-      "priority_reason": "The latest main-session reply says bidirectional overview selection is now complete in commit 4dd8fc4 and explicitly names the remaining gap as selection persistence scope, because the active review selection is still local UI state that does not survive reload or audit-list refilter. That is the clearest executable next task for the queue head.",
+      "priority_reason": "Completed in main session commit bba7d27, which moved the workspace conflict active selection into persisted App-level comparison history UI state so the selected overview row restores after reload and survives audit search or filter changes, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-bidirectional-overview-selection-state-for-workspace-conflict-review"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:55:00Z",
+      "updated_at": "2026-04-20T21:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace conflict review from an in-panel shared selection affordance into a durable operator context that remains stable across reload and list-shape changes while the audit is still under review."
+    },
+    {
+      "id": "planning-experiment-os-persist-workspace-conflict-review-expansion-state-alongside-active-selection",
+      "direction_id": "experiment-os",
+      "title": "Persist workspace conflict review expansion state alongside active selection",
+      "description": "Extend the newly persisted workspace conflict active-selection model so the matching audit's field-review expansion state is restored with the selected row, preventing reload or temporary refilter from hiding the active selection behind a collapsed review section until the operator manually reopens it again.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "Completed in main session commit faf0d25, which moved workspace conflict review expansion state into the same persisted comparison history panel UI state as the active selection, restored expanded audits after reload and temporary audit refilter, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-persist-workspace-conflict-active-selection-across-reload-and-refilter"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from remembering which row is active into restoring the surrounding review visibility needed to make that active context immediately visible after reload and refilter."
+    },
+    {
+      "id": "planning-experiment-os-persist-workspace-conflict-score-detail-expansion-state",
+      "direction_id": "experiment-os",
+      "title": "Persist workspace conflict score detail expansion state",
+      "description": "Extend the newly persisted workspace conflict review visibility model so the selected row's `Show score details` drill-down expansion state is also restored after reload and when audits are temporarily hidden by search or filter changes, instead of preserving only the active row and audit-level review expansion.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 25,
+      "priority_reason": "The latest main-session reply says review expansion persistence shipped in commit faf0d25, and explicitly calls out score detail expansion persistence as the remaining gap. That makes persisting each row's `Show score details` state the clearest executable next task for the queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-workspace-conflict-review-expansion-state-alongside-active-selection"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring which audit and row are visible into restoring the deeper score-evidence drill-down operators use to inspect why local versus remote recommendations differ."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
