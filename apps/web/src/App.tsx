@@ -2870,6 +2870,7 @@ type ComparisonHistorySyncConflictFieldKey =
   | "selection.intent"
   | "selection.selectedRunIds"
   | "selection.scoreLink";
+type ComparisonHistorySyncPreferenceFieldKey = "open" | "searchQuery" | "showPinnedOnly";
 
 type ComparisonHistorySyncConflictReview = {
   entryId: string;
@@ -2878,6 +2879,22 @@ type ComparisonHistorySyncConflictReview = {
   remoteEntry: ComparisonHistoryPanelEntry;
   selectedSources: Partial<
     Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>
+  >;
+  resolvedAt?: string | null;
+  resolutionSummary?: string | null;
+};
+
+type ComparisonHistorySyncPreferenceState = {
+  open: boolean;
+  searchQuery: string;
+  showPinnedOnly: boolean;
+};
+
+type ComparisonHistorySyncPreferenceReview = {
+  localState: ComparisonHistorySyncPreferenceState;
+  remoteState: ComparisonHistorySyncPreferenceState;
+  selectedSources: Partial<
+    Record<ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource>
   >;
   resolvedAt?: string | null;
   resolutionSummary?: string | null;
@@ -2892,6 +2909,7 @@ type ComparisonHistorySyncAuditEntry = {
   sourceTabId: string;
   sourceTabLabel: string;
   conflictReview?: ComparisonHistorySyncConflictReview | null;
+  preferenceReview?: ComparisonHistorySyncPreferenceReview | null;
 };
 
 type ComparisonHistorySyncAuditTrailState = {
@@ -2928,6 +2946,14 @@ type ComparisonHistorySyncConflictReviewGroup = {
   label: string;
   rows: ComparisonHistorySyncConflictReviewRow[];
   summaryLabel: string;
+};
+
+type ComparisonHistorySyncPreferenceReviewRow = {
+  fieldKey: ComparisonHistorySyncPreferenceFieldKey;
+  label: string;
+  localValue: string;
+  remoteValue: string;
+  selectedSource: ComparisonHistorySyncConflictFieldSource;
 };
 
 type ControlRoomUiStateV2 = {
@@ -2969,6 +2995,15 @@ const COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS: Array<{
     groupLabel: "Selection",
     label: "Focused score component",
   },
+];
+
+const COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS: Array<{
+  fieldKey: ComparisonHistorySyncPreferenceFieldKey;
+  label: string;
+}> = [
+  { fieldKey: "open", label: "Browser visibility" },
+  { fieldKey: "searchQuery", label: "Search filter" },
+  { fieldKey: "showPinnedOnly", label: "Pinned-only mode" },
 ];
 
 type RunHistoryFilter = {
@@ -4906,29 +4941,13 @@ export default function App() {
       });
       const hasRemoteUiChange =
         !isSameComparisonHistoryPanelState(comparisonHistoryPanel, mergedPanel)
-        || comparisonHistoryPanelOpen !== remoteState.comparisonHistoryPanel.open
-        || comparisonHistorySearchQuery !== remoteState.comparisonHistoryPanel.searchQuery
-        || comparisonHistoryShowPinnedOnly !== remoteState.comparisonHistoryPanel.showPinnedOnly;
+        || !isSameComparisonHistoryPanelSyncState(comparisonHistorySharedSyncState, remoteSyncState)
+        || nextAuditEntries.length > 0;
       if (hasRemoteUiChange) {
         skipNextControlRoomUiPersistRef.current = true;
       }
       setComparisonHistoryPanel((current) =>
         isSameComparisonHistoryPanelState(current, mergedPanel) ? current : mergedPanel,
-      );
-      setComparisonHistoryPanelOpen((current) =>
-        current === remoteState.comparisonHistoryPanel.open
-          ? current
-          : remoteState.comparisonHistoryPanel.open,
-      );
-      setComparisonHistorySearchQuery((current) =>
-        current === remoteState.comparisonHistoryPanel.searchQuery
-          ? current
-          : remoteState.comparisonHistoryPanel.searchQuery,
-      );
-      setComparisonHistoryShowPinnedOnly((current) =>
-        current === remoteState.comparisonHistoryPanel.showPinnedOnly
-          ? current
-          : remoteState.comparisonHistoryPanel.showPinnedOnly,
       );
       if (remoteSyncState) {
         setComparisonHistorySharedSyncState((current) =>
@@ -4946,6 +4965,7 @@ export default function App() {
     return () => window.removeEventListener("storage", handleStorage);
   }, [
     comparisonHistoryPanel,
+    comparisonHistorySharedSyncState,
     comparisonHistoryPanelOpen,
     comparisonHistorySearchQuery,
     comparisonHistoryShowPinnedOnly,
@@ -5301,6 +5321,90 @@ export default function App() {
           ...entry,
           conflictReview: {
             ...entry.conflictReview,
+            resolvedAt: new Date().toISOString(),
+            resolutionSummary,
+          },
+        };
+      }),
+    );
+  };
+
+  const handleSetComparisonHistoryPreferenceFieldSource = (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncPreferenceFieldKey,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => {
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.preferenceReview) {
+          return entry;
+        }
+        return {
+          ...entry,
+          preferenceReview: {
+            ...entry.preferenceReview,
+            selectedSources: {
+              ...entry.preferenceReview.selectedSources,
+              [fieldKey]: source,
+            },
+          },
+        };
+      }),
+    );
+  };
+
+  const handleSetComparisonHistoryPreferenceFieldSourceAll = (
+    auditId: string,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => {
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.preferenceReview) {
+          return entry;
+        }
+        const selectedSources = buildDefaultComparisonHistorySyncPreferenceSelectedSources(
+          entry.preferenceReview.localState,
+          entry.preferenceReview.remoteState,
+        );
+        const nextSelectedSources = Object.keys(selectedSources).reduce<
+          Partial<Record<ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource>>
+        >((accumulator, key) => {
+          accumulator[key as ComparisonHistorySyncPreferenceFieldKey] = source;
+          return accumulator;
+        }, {});
+        return {
+          ...entry,
+          preferenceReview: {
+            ...entry.preferenceReview,
+            selectedSources: nextSelectedSources,
+          },
+        };
+      }),
+    );
+  };
+
+  const handleApplyComparisonHistoryPreferenceResolution = (auditId: string) => {
+    const targetAudit = comparisonHistorySyncAuditTrail.find((entry) => entry.auditId === auditId);
+    if (!targetAudit?.preferenceReview) {
+      return;
+    }
+    const resolvedState = resolveComparisonHistorySyncPreferenceReview(targetAudit.preferenceReview);
+    const resolutionSummary = formatComparisonHistorySyncPreferenceResolutionSummary(
+      targetAudit.preferenceReview,
+    );
+    setComparisonHistoryPanelOpen(resolvedState.open);
+    setComparisonHistorySearchQuery(resolvedState.searchQuery);
+    setComparisonHistoryShowPinnedOnly(resolvedState.showPinnedOnly);
+    setComparisonHistorySharedSyncState(buildComparisonHistoryPanelSyncState(comparisonHistoryTabIdentity));
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.preferenceReview) {
+          return entry;
+        }
+        return {
+          ...entry,
+          preferenceReview: {
+            ...entry.preferenceReview,
             resolvedAt: new Date().toISOString(),
             resolutionSummary,
           },
@@ -7686,6 +7790,9 @@ export default function App() {
             onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
             onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
             onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
+            onSetHistoryPreferenceFieldSource: handleSetComparisonHistoryPreferenceFieldSource,
+            onSetHistoryPreferenceFieldSourceAll: handleSetComparisonHistoryPreferenceFieldSourceAll,
+            onApplyHistoryPreferenceResolution: handleApplyComparisonHistoryPreferenceResolution,
             onToggleRunSelection: toggleComparisonRun,
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
@@ -8695,6 +8802,7 @@ function normalizeComparisonHistorySyncAuditEntry(
     sourceTabId,
     sourceTabLabel,
     conflictReview: normalizeComparisonHistorySyncConflictReview(candidate.conflictReview),
+    preferenceReview: normalizeComparisonHistorySyncPreferenceReview(candidate.preferenceReview),
   };
 }
 
@@ -8733,6 +8841,59 @@ function normalizeComparisonHistorySyncConflictSelectedSources(
   }
   return COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.reduce<
     Partial<Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  >((accumulator, definition) => {
+    const candidate = (value as Record<string, unknown>)[definition.fieldKey];
+    if (candidate === "local" || candidate === "remote") {
+      accumulator[definition.fieldKey] = candidate;
+    }
+    return accumulator;
+  }, {});
+}
+
+function normalizeComparisonHistorySyncPreferenceReview(
+  value: unknown,
+): ComparisonHistorySyncPreferenceReview | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonHistorySyncPreferenceReview>;
+  const localState = normalizeComparisonHistorySyncPreferenceState(candidate.localState);
+  const remoteState = normalizeComparisonHistorySyncPreferenceState(candidate.remoteState);
+  if (!localState || !remoteState) {
+    return null;
+  }
+  return {
+    localState,
+    remoteState,
+    selectedSources: normalizeComparisonHistorySyncPreferenceSelectedSources(candidate.selectedSources),
+    resolvedAt: typeof candidate.resolvedAt === "string" ? candidate.resolvedAt : null,
+    resolutionSummary:
+      typeof candidate.resolutionSummary === "string" ? candidate.resolutionSummary : null,
+  };
+}
+
+function normalizeComparisonHistorySyncPreferenceState(
+  value: unknown,
+): ComparisonHistorySyncPreferenceState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonHistorySyncPreferenceState>;
+  return {
+    open: candidate.open === true,
+    searchQuery: typeof candidate.searchQuery === "string" ? candidate.searchQuery : "",
+    showPinnedOnly: candidate.showPinnedOnly === true,
+  };
+}
+
+function normalizeComparisonHistorySyncPreferenceSelectedSources(
+  value: unknown,
+): Partial<Record<ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource>> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource>>
   >((accumulator, definition) => {
     const candidate = (value as Record<string, unknown>)[definition.fieldKey];
     if (candidate === "local" || candidate === "remote") {
@@ -9139,6 +9300,164 @@ function summarizeComparisonHistorySyncPreferenceChanges(state: {
   return changes;
 }
 
+function buildComparisonHistorySyncPreferenceState(state: {
+  open: boolean;
+  searchQuery: string;
+  showPinnedOnly: boolean;
+}): ComparisonHistorySyncPreferenceState {
+  return {
+    open: state.open,
+    searchQuery: state.searchQuery,
+    showPinnedOnly: state.showPinnedOnly,
+  };
+}
+
+function formatComparisonHistorySyncPreferenceFieldValue(
+  fieldKey: ComparisonHistorySyncPreferenceFieldKey,
+  state: ComparisonHistorySyncPreferenceState,
+) {
+  switch (fieldKey) {
+    case "open":
+      return state.open ? "Browser open" : "Browser closed";
+    case "searchQuery":
+      return state.searchQuery.trim() ? `Search '${state.searchQuery.trim()}'` : "No search";
+    case "showPinnedOnly":
+      return state.showPinnedOnly ? "Pinned only" : "All steps";
+    default:
+      return "n/a";
+  }
+}
+
+function hasComparisonHistorySyncPreferenceFieldDifference(
+  fieldKey: ComparisonHistorySyncPreferenceFieldKey,
+  localState: ComparisonHistorySyncPreferenceState,
+  remoteState: ComparisonHistorySyncPreferenceState,
+) {
+  switch (fieldKey) {
+    case "open":
+      return localState.open !== remoteState.open;
+    case "searchQuery":
+      return localState.searchQuery !== remoteState.searchQuery;
+    case "showPinnedOnly":
+      return localState.showPinnedOnly !== remoteState.showPinnedOnly;
+    default:
+      return false;
+  }
+}
+
+function buildDefaultComparisonHistorySyncPreferenceSelectedSources(
+  localState: ComparisonHistorySyncPreferenceState,
+  remoteState: ComparisonHistorySyncPreferenceState,
+) {
+  return COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  >((accumulator, definition) => {
+    if (hasComparisonHistorySyncPreferenceFieldDifference(definition.fieldKey, localState, remoteState)) {
+      accumulator[definition.fieldKey] = "remote";
+    }
+    return accumulator;
+  }, {});
+}
+
+function buildComparisonHistorySyncPreferenceReview(state: {
+  localOpen: boolean;
+  remoteOpen: boolean;
+  localSearchQuery: string;
+  remoteSearchQuery: string;
+  localShowPinnedOnly: boolean;
+  remoteShowPinnedOnly: boolean;
+}): ComparisonHistorySyncPreferenceReview {
+  const localState = buildComparisonHistorySyncPreferenceState({
+    open: state.localOpen,
+    searchQuery: state.localSearchQuery,
+    showPinnedOnly: state.localShowPinnedOnly,
+  });
+  const remoteState = buildComparisonHistorySyncPreferenceState({
+    open: state.remoteOpen,
+    searchQuery: state.remoteSearchQuery,
+    showPinnedOnly: state.remoteShowPinnedOnly,
+  });
+  return {
+    localState,
+    remoteState,
+    selectedSources: buildDefaultComparisonHistorySyncPreferenceSelectedSources(localState, remoteState),
+    resolvedAt: null,
+    resolutionSummary: null,
+  };
+}
+
+function buildComparisonHistorySyncPreferenceReviewRows(
+  review: ComparisonHistorySyncPreferenceReview,
+): ComparisonHistorySyncPreferenceReviewRow[] {
+  return COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS.flatMap((definition) => {
+    if (
+      !hasComparisonHistorySyncPreferenceFieldDifference(
+        definition.fieldKey,
+        review.localState,
+        review.remoteState,
+      )
+    ) {
+      return [];
+    }
+    return [{
+      fieldKey: definition.fieldKey,
+      label: definition.label,
+      localValue: formatComparisonHistorySyncPreferenceFieldValue(definition.fieldKey, review.localState),
+      remoteValue: formatComparisonHistorySyncPreferenceFieldValue(definition.fieldKey, review.remoteState),
+      selectedSource: review.selectedSources[definition.fieldKey] ?? "remote",
+    }];
+  });
+}
+
+function formatComparisonHistorySyncPreferenceResolutionSummary(
+  review: ComparisonHistorySyncPreferenceReview,
+) {
+  const selectedFields = Object.entries(review.selectedSources) as Array<
+    [ComparisonHistorySyncPreferenceFieldKey, ComparisonHistorySyncConflictFieldSource]
+  >;
+  if (!selectedFields.length) {
+    return "Kept remote browser values for all fields.";
+  }
+  const localFields = selectedFields
+    .filter(([, source]) => source === "local")
+    .map(([fieldKey]) =>
+      COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS.find(
+        (definition) => definition.fieldKey === fieldKey,
+      )?.label ?? fieldKey,
+    );
+  const remoteFields = selectedFields
+    .filter(([, source]) => source === "remote")
+    .map(([fieldKey]) =>
+      COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS.find(
+        (definition) => definition.fieldKey === fieldKey,
+      )?.label ?? fieldKey,
+    );
+  const parts: string[] = [];
+  if (localFields.length) {
+    parts.push(`Local: ${localFields.join(", ")}`);
+  }
+  if (remoteFields.length) {
+    parts.push(`Remote: ${remoteFields.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
+function resolveComparisonHistorySyncPreferenceReview(
+  review: ComparisonHistorySyncPreferenceReview,
+): ComparisonHistorySyncPreferenceState {
+  return {
+    open: review.selectedSources.open === "local" ? review.localState.open : review.remoteState.open,
+    searchQuery:
+      review.selectedSources.searchQuery === "local"
+        ? review.localState.searchQuery
+        : review.remoteState.searchQuery,
+    showPinnedOnly:
+      review.selectedSources.showPinnedOnly === "local"
+        ? review.localState.showPinnedOnly
+        : review.remoteState.showPinnedOnly,
+  };
+}
+
 function buildComparisonHistorySyncAuditEntries(state: {
   localPanel: ComparisonHistoryPanelState;
   remotePanel: ComparisonHistoryPanelState;
@@ -9208,11 +9527,19 @@ function buildComparisonHistorySyncAuditEntries(state: {
     nextEntries.push({
       auditId: buildComparisonHistorySyncAuditId(),
       kind: "preferences",
-      summary: `Synced browser state from ${sourceTabLabel}`,
+      summary: `Review browser state from ${sourceTabLabel}`,
       detail: preferenceChanges.join(" · "),
       recordedAt,
       sourceTabId,
       sourceTabLabel,
+      preferenceReview: buildComparisonHistorySyncPreferenceReview({
+        localOpen: state.localOpen,
+        remoteOpen: state.remoteOpen,
+        localSearchQuery: state.localSearchQuery,
+        remoteSearchQuery: state.remoteSearchQuery,
+        localShowPinnedOnly: state.localShowPinnedOnly,
+        remoteShowPinnedOnly: state.remoteShowPinnedOnly,
+      }),
     });
   }
   return nextEntries;
@@ -10525,6 +10852,16 @@ type RunSectionComparisonControls = {
     source: ComparisonHistorySyncConflictFieldSource,
   ) => void;
   onApplyHistoryConflictResolution: (auditId: string) => void;
+  onSetHistoryPreferenceFieldSource: (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncPreferenceFieldKey,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => void;
+  onSetHistoryPreferenceFieldSourceAll: (
+    auditId: string,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => void;
+  onApplyHistoryPreferenceResolution: (auditId: string) => void;
   onToggleRunSelection: (runId: string) => void;
   onClearSelection: () => void;
   onSelectBenchmarkPair: () => void;
@@ -10857,24 +11194,33 @@ function RunSection({
                           .reverse()
                           .map((entry) => {
                             const conflictReview = entry.conflictReview;
+                            const preferenceReview = entry.preferenceReview;
                             const conflictGroups = conflictReview
                               ? buildComparisonHistorySyncConflictReviewGroups(conflictReview)
                               : [];
-                            const conflictingFieldCount = conflictGroups.reduce(
-                              (total, group) => total + group.rows.length,
-                              0,
-                            );
-                            const localChoiceCount = conflictGroups.reduce(
-                              (total, group) =>
-                                total + group.rows.filter((row) => row.selectedSource === "local").length,
-                              0,
-                            );
-                            const remoteChoiceCount = conflictingFieldCount - localChoiceCount;
+                            const preferenceRows = preferenceReview
+                              ? buildComparisonHistorySyncPreferenceReviewRows(preferenceReview)
+                              : [];
+                            const reviewFieldCount = conflictReview
+                              ? conflictGroups.reduce((total, group) => total + group.rows.length, 0)
+                              : preferenceRows.length;
+                            const localChoiceCount = conflictReview
+                              ? conflictGroups.reduce(
+                                  (total, group) =>
+                                    total + group.rows.filter((row) => row.selectedSource === "local").length,
+                                  0,
+                                )
+                              : preferenceRows.filter((row) => row.selectedSource === "local").length;
+                            const remoteChoiceCount = reviewFieldCount - localChoiceCount;
                             const reviewExpanded = Boolean(expandedHistoryConflictReviewIds[entry.auditId]);
+                            const reviewResolvedAt =
+                              conflictReview?.resolvedAt ?? preferenceReview?.resolvedAt ?? null;
+                            const reviewResolutionSummary =
+                              conflictReview?.resolutionSummary ?? preferenceReview?.resolutionSummary ?? null;
                             return (
                               <article
                                 className={`comparison-history-browser-audit ${
-                                  conflictReview?.resolvedAt ? "is-resolved" : ""
+                                  reviewResolvedAt ? "is-resolved" : ""
                                 }`}
                                 key={entry.auditId}
                               >
@@ -10890,7 +11236,7 @@ function RunSection({
                                 <p className="comparison-history-browser-entry-meta">
                                   {entry.sourceTabLabel} · {formatRelativeTimestampLabel(entry.recordedAt)}
                                 </p>
-                                {conflictReview ? (
+                                {conflictReview || preferenceReview ? (
                                   <>
                                     <div className="comparison-history-browser-audit-actions">
                                       <button
@@ -10900,23 +11246,21 @@ function RunSection({
                                       >
                                         {reviewExpanded
                                           ? "Hide field review"
-                                          : `Review ${conflictingFieldCount} field${
-                                              conflictingFieldCount === 1 ? "" : "s"
-                                            }`}
+                                          : `Review ${reviewFieldCount} field${reviewFieldCount === 1 ? "" : "s"}`}
                                       </button>
                                       <span
                                         className={`comparison-history-browser-audit-status ${
-                                          conflictReview.resolvedAt ? "is-resolved" : "is-pending"
+                                          reviewResolvedAt ? "is-resolved" : "is-pending"
                                         }`}
                                       >
-                                        {conflictReview.resolvedAt
-                                          ? `Resolved ${formatRelativeTimestampLabel(conflictReview.resolvedAt)}`
+                                        {reviewResolvedAt
+                                          ? `Resolved ${formatRelativeTimestampLabel(reviewResolvedAt)}`
                                           : "Pending manual review"}
                                       </span>
                                     </div>
-                                    {conflictReview.resolutionSummary ? (
+                                    {reviewResolutionSummary ? (
                                       <p className="comparison-history-browser-entry-meta">
-                                        {conflictReview.resolutionSummary}
+                                        {reviewResolutionSummary}
                                       </p>
                                     ) : null}
                                     {reviewExpanded ? (
@@ -10926,52 +11270,141 @@ function RunSection({
                                             {localChoiceCount} local / {remoteChoiceCount} remote selections
                                           </p>
                                           <div className="comparison-history-browser-entry-actions">
-                                            <button
-                                              className="ghost-button"
-                                              onClick={() =>
-                                                comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "local")
-                                              }
-                                              type="button"
-                                            >
-                                              Use local all
-                                            </button>
-                                            <button
-                                              className="ghost-button"
-                                              onClick={() =>
-                                                comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "remote")
-                                              }
-                                              type="button"
-                                            >
-                                              Use remote all
-                                            </button>
-                                            <button
-                                              className="ghost-button"
-                                              onClick={() =>
-                                                comparison.onApplyHistoryConflictResolution(entry.auditId)
-                                              }
-                                              type="button"
-                                            >
-                                              {conflictReview.resolvedAt ? "Apply updated resolution" : "Apply resolution"}
-                                            </button>
+                                            {conflictReview ? (
+                                              <>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "local")
+                                                  }
+                                                  type="button"
+                                                >
+                                                  Use local all
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "remote")
+                                                  }
+                                                  type="button"
+                                                >
+                                                  Use remote all
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onApplyHistoryConflictResolution(entry.auditId)
+                                                  }
+                                                  type="button"
+                                                >
+                                                  {conflictReview.resolvedAt ? "Apply updated resolution" : "Apply resolution"}
+                                                </button>
+                                              </>
+                                            ) : preferenceReview ? (
+                                              <>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onSetHistoryPreferenceFieldSourceAll(entry.auditId, "local")
+                                                  }
+                                                  type="button"
+                                                >
+                                                  Use local all
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onSetHistoryPreferenceFieldSourceAll(entry.auditId, "remote")
+                                                  }
+                                                  type="button"
+                                                >
+                                                  Use remote all
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    comparison.onApplyHistoryPreferenceResolution(entry.auditId)
+                                                  }
+                                                  type="button"
+                                                >
+                                                  {preferenceReview.resolvedAt ? "Apply updated resolution" : "Apply resolution"}
+                                                </button>
+                                              </>
+                                            ) : null}
                                           </div>
                                         </div>
                                         <div className="comparison-dev-conflict-preview comparison-history-conflict-review">
                                           <div className="comparison-dev-conflict-preview-row comparison-dev-conflict-preview-head">
-                                            <span>Field</span>
+                                            <span>{conflictReview ? "Field" : "Preference"}</span>
                                             <span>Keep local</span>
                                             <span>Keep remote</span>
                                           </div>
-                                          {conflictGroups.map((group) => (
-                                            <div className="comparison-dev-conflict-preview-group" key={group.key}>
-                                              <div className="comparison-dev-conflict-preview-group-title">
-                                                <span>{group.label}</span>
-                                                <span className="comparison-dev-conflict-preview-group-meta">
-                                                  <span className="comparison-dev-conflict-preview-group-summary">
-                                                    {group.summaryLabel}
-                                                  </span>
-                                                </span>
-                                              </div>
-                                              {group.rows.map((row) => (
+                                          {conflictReview
+                                            ? conflictGroups.map((group) => (
+                                                <div className="comparison-dev-conflict-preview-group" key={group.key}>
+                                                  <div className="comparison-dev-conflict-preview-group-title">
+                                                    <span>{group.label}</span>
+                                                    <span className="comparison-dev-conflict-preview-group-meta">
+                                                      <span className="comparison-dev-conflict-preview-group-summary">
+                                                        {group.summaryLabel}
+                                                      </span>
+                                                    </span>
+                                                  </div>
+                                                  {group.rows.map((row) => (
+                                                    <div
+                                                      className="comparison-history-conflict-review-row"
+                                                      key={`${entry.auditId}:${row.fieldKey}`}
+                                                    >
+                                                      <span className="comparison-dev-conflict-preview-label-group">
+                                                        <span className="comparison-dev-conflict-preview-label">
+                                                          {row.label}
+                                                        </span>
+                                                      </span>
+                                                      <button
+                                                        className={`comparison-history-conflict-review-choice ${
+                                                          row.selectedSource === "local" ? "is-selected" : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          comparison.onSetHistoryConflictFieldSource(
+                                                            entry.auditId,
+                                                            row.fieldKey,
+                                                            "local",
+                                                          )
+                                                        }
+                                                        type="button"
+                                                      >
+                                                        <span className="comparison-history-conflict-review-choice-label">
+                                                          Local
+                                                        </span>
+                                                        <span className="comparison-history-conflict-review-choice-value">
+                                                          {row.localValue}
+                                                        </span>
+                                                      </button>
+                                                      <button
+                                                        className={`comparison-history-conflict-review-choice ${
+                                                          row.selectedSource === "remote" ? "is-selected" : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          comparison.onSetHistoryConflictFieldSource(
+                                                            entry.auditId,
+                                                            row.fieldKey,
+                                                            "remote",
+                                                          )
+                                                        }
+                                                        type="button"
+                                                      >
+                                                        <span className="comparison-history-conflict-review-choice-label">
+                                                          Remote
+                                                        </span>
+                                                        <span className="comparison-history-conflict-review-choice-value">
+                                                          {row.remoteValue}
+                                                        </span>
+                                                      </button>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ))
+                                            : preferenceRows.map((row) => (
                                                 <div
                                                   className="comparison-history-conflict-review-row"
                                                   key={`${entry.auditId}:${row.fieldKey}`}
@@ -10986,7 +11419,7 @@ function RunSection({
                                                       row.selectedSource === "local" ? "is-selected" : ""
                                                     }`}
                                                     onClick={() =>
-                                                      comparison.onSetHistoryConflictFieldSource(
+                                                      comparison.onSetHistoryPreferenceFieldSource(
                                                         entry.auditId,
                                                         row.fieldKey,
                                                         "local",
@@ -11006,7 +11439,7 @@ function RunSection({
                                                       row.selectedSource === "remote" ? "is-selected" : ""
                                                     }`}
                                                     onClick={() =>
-                                                      comparison.onSetHistoryConflictFieldSource(
+                                                      comparison.onSetHistoryPreferenceFieldSource(
                                                         entry.auditId,
                                                         row.fieldKey,
                                                         "remote",
@@ -11023,8 +11456,6 @@ function RunSection({
                                                   </button>
                                                 </div>
                                               ))}
-                                            </div>
-                                          ))}
                                         </div>
                                       </div>
                                     ) : null}
