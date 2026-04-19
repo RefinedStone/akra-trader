@@ -22,6 +22,8 @@ from akra_trader.application import get_run_subresource_contract
 from akra_trader.application import get_run_subresource_runtime_binding
 from akra_trader.application import list_run_subresource_contracts
 from akra_trader.application import list_run_subresource_runtime_bindings
+from akra_trader.application import list_standalone_surface_runtime_bindings
+from akra_trader.application import serialize_standalone_surface_response
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_surface_capabilities
 from akra_trader.application import serialize_run_subresource_response
@@ -13892,6 +13894,54 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     "route_path": "/runs/{run_id}/orders",
     "route_name": "get_run_orders",
   }
+
+
+def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresources(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+  )
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  bindings = list_standalone_surface_runtime_bindings(app.get_run_surface_capabilities())
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in bindings
+  }
+
+  assert set(bindings_by_key) == {
+    "run_surface_capabilities",
+    "run_subresource:orders",
+    "run_subresource:positions",
+    "run_subresource:metrics",
+  }
+  assert bindings_by_key["run_surface_capabilities"].scope == "app"
+  assert bindings_by_key["run_surface_capabilities"].route_path == "/capabilities/run-surfaces"
+  assert bindings_by_key["run_subresource:orders"].scope == "run"
+  assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
+
+  capabilities_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["run_surface_capabilities"],
+    app=app,
+  )
+  orders_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["run_subresource:orders"],
+    app=app,
+    run_id=run.config.run_id,
+  )
+
+  assert capabilities_payload["discovery"]["shared_contracts"]
+  assert orders_payload["run_id"] == run.config.run_id
+  assert "orders" in orders_payload
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

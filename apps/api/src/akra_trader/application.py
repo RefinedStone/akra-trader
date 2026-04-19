@@ -22976,6 +22976,17 @@ class RunSubresourceRuntimeBinding:
   body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
 
 
+@dataclass(frozen=True)
+class StandaloneSurfaceRuntimeBinding:
+  surface_key: str
+  route_path: str
+  route_name: str
+  response_title: str
+  scope: str
+  binding_kind: str
+  subresource_key: str | None = None
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -23105,6 +23116,57 @@ def get_run_subresource_runtime_binding(
     if binding.contract.subresource_key == subresource_key:
       return binding
   raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+
+
+def list_standalone_surface_runtime_bindings(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> tuple[StandaloneSurfaceRuntimeBinding, ...]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  capability_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_surface_capabilities",
+    route_path="/capabilities/run-surfaces",
+    route_name="get_run_surface_capabilities",
+    response_title="Run surface capabilities",
+    scope="app",
+    binding_kind="run_surface_capabilities",
+  )
+  run_subresource_bindings = tuple(
+    StandaloneSurfaceRuntimeBinding(
+      surface_key=f"run_subresource:{binding.contract.subresource_key}",
+      route_path=binding.contract.route_path,
+      route_name=binding.contract.route_name,
+      response_title=binding.contract.response_title,
+      scope="run",
+      binding_kind="run_subresource",
+      subresource_key=binding.contract.subresource_key,
+    )
+    for binding in list_run_subresource_runtime_bindings(resolved_capabilities)
+  )
+  return (capability_binding, *run_subresource_bindings)
+
+
+def serialize_standalone_surface_response(
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
+  app: TradingApplication,
+  run_id: str | None = None,
+) -> dict[str, Any]:
+  if binding.binding_kind == "run_surface_capabilities":
+    return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_subresource":
+    if binding.subresource_key is None:
+      raise ValueError(f"Standalone surface binding is missing subresource metadata: {binding.surface_key}")
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.get_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    return serialize_run_subresource_response(
+      run,
+      subresource_key=binding.subresource_key,
+      capabilities=app.get_run_surface_capabilities(),
+    )
+  raise ValueError(f"Unsupported standalone surface binding: {binding.binding_kind}")
 
 
 def list_run_surface_shared_contracts(

@@ -13,17 +13,16 @@ from fastapi import Query
 from pydantic import BaseModel
 from pydantic import Field
 
+from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import TradingApplication
-from akra_trader.application import list_run_subresource_runtime_bindings
-from akra_trader.application import RunSubresourceRuntimeBinding
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
-from akra_trader.application import serialize_run_subresource_response
+from akra_trader.application import serialize_standalone_surface_response
 from akra_trader.application import serialize_strategy
 from akra_trader.application import serialize_preset
 from akra_trader.application import serialize_preset_revision
+from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.bootstrap import Container
-from akra_trader.application import serialize_run_surface_capabilities
 
 
 class StrategyRegistrationRequest(BaseModel):
@@ -150,30 +149,36 @@ def create_router(container: Container) -> APIRouter:
       capabilities=app.get_run_surface_capabilities(),
     )
 
-  def build_run_subresource_route_handler(binding: RunSubresourceRuntimeBinding):
-    def get_run_subresource(
+  def build_standalone_surface_route_handler(binding: StandaloneSurfaceRuntimeBinding):
+    if binding.scope == "app":
+      def get_app_surface(
+        app: TradingApplication = Depends(get_app),
+      ) -> dict[str, Any]:
+        try:
+          return serialize_standalone_surface_response(binding=binding, app=app)
+        except (ValueError, RuntimeError) as exc:
+          raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+      get_app_surface.__name__ = binding.route_name
+      return get_app_surface
+
+    def get_run_surface(
       run_id: str,
       app: TradingApplication = Depends(get_app),
     ) -> dict[str, Any]:
-      run = app.get_run(run_id)
-      if run is None:
-        raise HTTPException(status_code=404, detail="Run not found")
-      return serialize_run_subresource_response(
-        run,
-        subresource_key=binding.contract.subresource_key,
-        capabilities=app.get_run_surface_capabilities(),
-      )
+      try:
+        return serialize_standalone_surface_response(binding=binding, app=app, run_id=run_id)
+      except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+      except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    get_run_subresource.__name__ = binding.contract.route_name
-    return get_run_subresource
+    get_run_surface.__name__ = binding.route_name
+    return get_run_surface
 
   @router.get("/health")
   def health() -> dict[str, str]:
     return {"status": "ok"}
-
-  @router.get("/capabilities/run-surfaces")
-  def get_run_surface_capabilities(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
 
   @router.get("/strategies")
   def list_strategies(
@@ -580,13 +585,13 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run_response(run, app)
 
-  for binding in list_run_subresource_runtime_bindings(get_app().get_run_surface_capabilities()):
+  for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
     router.add_api_route(
-      binding.contract.route_path,
-      build_run_subresource_route_handler(binding),
+      binding.route_path,
+      build_standalone_surface_route_handler(binding),
       methods=["GET"],
-      name=binding.contract.route_name,
-      summary=binding.contract.response_title,
+      name=binding.route_name,
+      summary=binding.response_title,
     )
 
   @router.get("/market-data/status")
