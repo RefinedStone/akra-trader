@@ -101,10 +101,43 @@ type PresetRevisionFilterState = {
   query: string;
 };
 
+type PresetStructuredDiffRow = {
+  changed: boolean;
+  delta_direction: "higher" | "lower" | "same";
+  delta_label: string;
+  existing_value: string;
+  group_key: string;
+  group_label: string;
+  group_order: number;
+  incoming_value: string;
+  key: string;
+  label: string;
+};
+
+type PresetStructuredDiffGroup = {
+  changed_count: number;
+  higher_count: number;
+  key: string;
+  label: string;
+  lower_count: number;
+  rows: PresetStructuredDiffRow[];
+  same_count: number;
+  summary_label: string;
+};
+
 type PresetRevisionDiff = {
   basisLabel: string;
   changeCount: number;
-  lines: string[];
+  changedGroups: PresetStructuredDiffGroup[];
+  unchangedGroups: PresetStructuredDiffGroup[];
+  searchTexts: string[];
+  summary: string;
+};
+
+type PresetDraftConflict = {
+  changeCount: number;
+  groups: PresetStructuredDiffGroup[];
+  hasInvalidParameters: boolean;
   summary: string;
 };
 
@@ -3084,81 +3117,331 @@ function buildCurrentPresetRevisionSnapshot(preset: ExperimentPreset): Experimen
   };
 }
 
+function buildEmptyPresetRevisionSnapshot(): ExperimentPresetRevision {
+  return {
+    revision_id: "empty",
+    actor: "",
+    reason: "",
+    created_at: "",
+    action: "empty",
+    source_revision_id: null,
+    name: "",
+    description: "",
+    strategy_id: null,
+    timeframe: null,
+    benchmark_family: null,
+    tags: [],
+    parameters: {},
+  };
+}
+
+function formatPresetStructuredDiffDisplayValue(value: string) {
+  return value || "none";
+}
+
+function buildPresetStructuredDiffDelta(existingValue: string, incomingValue: string) {
+  if (existingValue === incomingValue) {
+    return {
+      direction: "same" as const,
+      label: "match",
+    };
+  }
+  if (!existingValue && incomingValue) {
+    return {
+      direction: "higher" as const,
+      label: "added",
+    };
+  }
+  if (existingValue && !incomingValue) {
+    return {
+      direction: "lower" as const,
+      label: "removed",
+    };
+  }
+  return {
+    direction: "higher" as const,
+    label: "changed",
+  };
+}
+
+function summarizePresetStructuredDiffGroup(group: PresetStructuredDiffGroup) {
+  if (!group.changed_count) {
+    return `${group.same_count} unchanged`;
+  }
+  const parts = [`${group.changed_count} changed`];
+  if (group.higher_count) {
+    parts.push(`${group.higher_count} added/updated`);
+  }
+  if (group.lower_count) {
+    parts.push(`${group.lower_count} removed`);
+  }
+  if (group.same_count) {
+    parts.push(`${group.same_count} unchanged`);
+  }
+  return parts.join(" · ");
+}
+
+function groupPresetStructuredDiffRows(rows: PresetStructuredDiffRow[]) {
+  const groups = rows.reduce<Record<string, PresetStructuredDiffGroup>>((accumulator, row) => {
+    const existing = accumulator[row.group_key] ?? {
+      changed_count: 0,
+      higher_count: 0,
+      key: row.group_key,
+      label: row.group_label,
+      lower_count: 0,
+      rows: [],
+      same_count: 0,
+      summary_label: "",
+    };
+    existing.rows.push(row);
+    if (row.changed) {
+      existing.changed_count += 1;
+      if (row.delta_direction === "higher") {
+        existing.higher_count += 1;
+      } else if (row.delta_direction === "lower") {
+        existing.lower_count += 1;
+      }
+    } else {
+      existing.same_count += 1;
+    }
+    accumulator[row.group_key] = existing;
+    return accumulator;
+  }, {});
+  return Object.values(groups)
+    .map((group) => ({
+      ...group,
+      rows: group.rows.sort((left, right) => left.label.localeCompare(right.label)),
+      summary_label: summarizePresetStructuredDiffGroup(group),
+    }))
+    .sort((left, right) => {
+      const leftOrder = left.rows[0]?.group_order ?? Number.MAX_SAFE_INTEGER;
+      const rightOrder = right.rows[0]?.group_order ?? Number.MAX_SAFE_INTEGER;
+      return leftOrder - rightOrder || left.label.localeCompare(right.label);
+    });
+}
+
+function buildPresetStructuredDiffRows(
+  existing: ExperimentPresetRevision,
+  incoming: ExperimentPresetRevision,
+) {
+  const rows: PresetStructuredDiffRow[] = [];
+  const pushRow = (
+    key: string,
+    label: string,
+    existingValue: string,
+    incomingValue: string,
+    groupKey: string,
+    groupLabel: string,
+    groupOrder: number,
+  ) => {
+    const delta = buildPresetStructuredDiffDelta(existingValue, incomingValue);
+    rows.push({
+      changed: existingValue !== incomingValue,
+      delta_direction: delta.direction,
+      delta_label: delta.label,
+      existing_value: formatPresetStructuredDiffDisplayValue(existingValue),
+      group_key: groupKey,
+      group_label: groupLabel,
+      group_order: groupOrder,
+      incoming_value: formatPresetStructuredDiffDisplayValue(incomingValue),
+      key,
+      label,
+    });
+  };
+
+  pushRow("name", "Name", existing.name, incoming.name, "identity", "Identity", 0);
+  pushRow(
+    "description",
+    "Description",
+    existing.description,
+    incoming.description,
+    "identity",
+    "Identity",
+    0,
+  );
+  pushRow(
+    "strategy",
+    "Strategy",
+    existing.strategy_id ?? "",
+    incoming.strategy_id ?? "",
+    "scope",
+    "Scope",
+    1,
+  );
+  pushRow(
+    "timeframe",
+    "Timeframe",
+    existing.timeframe ?? "",
+    incoming.timeframe ?? "",
+    "scope",
+    "Scope",
+    1,
+  );
+  pushRow(
+    "benchmark_family",
+    "Benchmark family",
+    existing.benchmark_family ?? "",
+    incoming.benchmark_family ?? "",
+    "scope",
+    "Scope",
+    1,
+  );
+  pushRow(
+    "tags",
+    "Tags",
+    existing.tags.join(", "),
+    incoming.tags.join(", "),
+    "metadata",
+    "Metadata",
+    2,
+  );
+
+  const parameterKeys = Array.from(
+    new Set([...Object.keys(existing.parameters), ...Object.keys(incoming.parameters)]),
+  ).sort();
+  if (!parameterKeys.length) {
+    pushRow("parameters", "Parameter bundle", "", "", "parameters", "Parameters", 3);
+  } else {
+    parameterKeys.forEach((key) => {
+      const existingValue = Object.prototype.hasOwnProperty.call(existing.parameters, key)
+        ? formatParameterValue(existing.parameters[key])
+        : "";
+      const incomingValue = Object.prototype.hasOwnProperty.call(incoming.parameters, key)
+        ? formatParameterValue(incoming.parameters[key])
+        : "";
+      pushRow(
+        `parameter:${key}`,
+        key,
+        existingValue,
+        incomingValue,
+        "parameters",
+        "Parameters",
+        3,
+      );
+    });
+  }
+  return rows;
+}
+
 function describePresetRevisionDiff(
   revision: ExperimentPresetRevision,
   reference: ExperimentPresetRevision | null,
   basisLabel: string,
 ): PresetRevisionDiff {
-  if (!reference) {
-    return {
-      basisLabel,
-      changeCount: 0,
-      lines: [],
-      summary: "Initial revision in the catalog. No earlier snapshot is available for comparison.",
-    };
-  }
-
-  const lines: string[] = [];
-  if (revision.name !== reference.name) {
-    lines.push(`Name: ${reference.name || "none"} -> ${revision.name || "none"}`);
-  }
-  if (revision.description !== reference.description) {
-    lines.push(`Description: ${reference.description || "none"} -> ${revision.description || "none"}`);
-  }
-  if ((revision.strategy_id ?? null) !== (reference.strategy_id ?? null)) {
-    lines.push(`Strategy: ${reference.strategy_id ?? "any"} -> ${revision.strategy_id ?? "any"}`);
-  }
-  if ((revision.timeframe ?? null) !== (reference.timeframe ?? null)) {
-    lines.push(`Timeframe: ${reference.timeframe ?? "any"} -> ${revision.timeframe ?? "any"}`);
-  }
-  if ((revision.benchmark_family ?? null) !== (reference.benchmark_family ?? null)) {
-    lines.push(
-      `Benchmark family: ${reference.benchmark_family ?? "none"} -> ${revision.benchmark_family ?? "none"}`,
-    );
-  }
-
-  const tagsAdded = revision.tags.filter((tag) => !reference.tags.includes(tag));
-  const tagsRemoved = reference.tags.filter((tag) => !revision.tags.includes(tag));
-  if (tagsAdded.length || tagsRemoved.length) {
-    lines.push(
-      `Tags: ${tagsAdded.length ? `+${tagsAdded.join(", ")}` : "no additions"} / ${
-        tagsRemoved.length ? `-${tagsRemoved.join(", ")}` : "no removals"
-      }`,
-    );
-  }
-
-  const parameterKeys = Array.from(
-    new Set([...Object.keys(reference.parameters), ...Object.keys(revision.parameters)]),
-  ).sort();
-  parameterKeys.forEach((key) => {
-    const referenceHasKey = Object.prototype.hasOwnProperty.call(reference.parameters, key);
-    const revisionHasKey = Object.prototype.hasOwnProperty.call(revision.parameters, key);
-    if (!referenceHasKey && revisionHasKey) {
-      lines.push(`Parameter added: ${key}=${formatParameterValue(revision.parameters[key])}`);
-      return;
-    }
-    if (referenceHasKey && !revisionHasKey) {
-      lines.push(`Parameter removed: ${key} (was ${formatParameterValue(reference.parameters[key])})`);
-      return;
-    }
-    const referenceValue = JSON.stringify(reference.parameters[key]);
-    const revisionValue = JSON.stringify(revision.parameters[key]);
-    if (referenceValue !== revisionValue) {
-      lines.push(
-        `Parameter ${key}: ${formatParameterValue(reference.parameters[key])} -> ${formatParameterValue(
-          revision.parameters[key],
-        )}`,
-      );
-    }
-  });
+  const rows = buildPresetStructuredDiffRows(reference ?? buildEmptyPresetRevisionSnapshot(), revision);
+  const changedGroups = groupPresetStructuredDiffRows(rows.filter((row) => row.changed));
+  const unchangedGroups = groupPresetStructuredDiffRows(rows.filter((row) => !row.changed));
+  const searchTexts = rows.map(
+    (row) => `${row.label} ${row.existing_value} ${row.incoming_value} ${row.delta_label}`,
+  );
+  const changeCount = changedGroups.reduce((total, group) => total + group.changed_count, 0);
 
   return {
     basisLabel,
-    changeCount: lines.length,
-    lines,
-    summary: lines.length
-      ? `${lines.length} change${lines.length === 1 ? "" : "s"} vs ${basisLabel}.`
+    changeCount,
+    changedGroups,
+    unchangedGroups,
+    searchTexts,
+    summary: changeCount
+      ? `${changeCount} change${changeCount === 1 ? "" : "s"} vs ${basisLabel}.`
       : `Matches ${basisLabel}.`,
+  };
+}
+
+function describePresetDraftConflict(
+  preset: ExperimentPreset,
+  form: typeof defaultPresetForm,
+): PresetDraftConflict {
+  const savedForm = buildPresetFormFromPreset(preset);
+  let normalizedDraftParameters = form.parameters_text.trim();
+  let hasInvalidParameters = false;
+  if (normalizedDraftParameters) {
+    try {
+      normalizedDraftParameters = JSON.stringify(parseJsonObjectInput(form.parameters_text), null, 2);
+    } catch {
+      hasInvalidParameters = true;
+    }
+  }
+  const rows: PresetStructuredDiffRow[] = [];
+  const pushRow = (
+    key: string,
+    label: string,
+    existingValue: string,
+    incomingValue: string,
+    groupKey: string,
+    groupLabel: string,
+    groupOrder: number,
+  ) => {
+    const delta = buildPresetStructuredDiffDelta(existingValue, incomingValue);
+    rows.push({
+      changed: existingValue !== incomingValue,
+      delta_direction: delta.direction,
+      delta_label: delta.label,
+      existing_value: formatPresetStructuredDiffDisplayValue(existingValue),
+      group_key: groupKey,
+      group_label: groupLabel,
+      group_order: groupOrder,
+      incoming_value: formatPresetStructuredDiffDisplayValue(incomingValue),
+      key,
+      label,
+    });
+  };
+  pushRow("name", "Name", savedForm.name, form.name, "identity", "Draft fields", 0);
+  pushRow(
+    "description",
+    "Description",
+    savedForm.description,
+    form.description,
+    "identity",
+    "Draft fields",
+    0,
+  );
+  pushRow("strategy", "Strategy", savedForm.strategy_id, form.strategy_id, "scope", "Scope", 1);
+  pushRow(
+    "timeframe",
+    "Timeframe",
+    savedForm.timeframe.trim(),
+    form.timeframe.trim(),
+    "scope",
+    "Scope",
+    1,
+  );
+  pushRow(
+    "benchmark_family",
+    "Benchmark family",
+    savedForm.benchmark_family.trim(),
+    form.benchmark_family.trim(),
+    "scope",
+    "Scope",
+    1,
+  );
+  pushRow(
+    "tags",
+    "Tags",
+    parseExperimentTags(savedForm.tags_text).join(", "),
+    parseExperimentTags(form.tags_text).join(", "),
+    "metadata",
+    "Metadata",
+    2,
+  );
+  pushRow(
+    "parameters_json",
+    hasInvalidParameters ? "Parameters JSON (invalid draft)" : "Parameters JSON",
+    savedForm.parameters_text.trim(),
+    normalizedDraftParameters,
+    "parameters",
+    "Parameters",
+    3,
+  );
+  const groups = groupPresetStructuredDiffRows(rows.filter((row) => row.changed));
+  const changeCount = groups.reduce((total, group) => total + group.changed_count, 0);
+  return {
+    changeCount,
+    groups,
+    hasInvalidParameters,
+    summary: changeCount
+      ? `${changeCount} unsaved draft field${changeCount === 1 ? "" : "s"} differ from the saved bundle.`
+      : "Current draft matches the saved bundle.",
   };
 }
 
@@ -3187,7 +3470,7 @@ function matchesPresetRevisionFilter(
     revision.tags.join(" "),
     Object.keys(revision.parameters).join(" "),
     diff.summary,
-    ...diff.lines,
+    ...diff.searchTexts,
   ]
     .join(" ")
     .toLowerCase();
@@ -6387,6 +6670,101 @@ function ReferenceCatalog({ references }: { references: ReferenceSource[] }) {
   );
 }
 
+function PresetStructuredDiffPreview({
+  changedGroups,
+  emptyMessage,
+  leftColumnLabel,
+  rightColumnLabel,
+  title,
+  unchangedGroups,
+}: {
+  changedGroups: PresetStructuredDiffGroup[];
+  emptyMessage: string;
+  leftColumnLabel: string;
+  rightColumnLabel: string;
+  title: string;
+  unchangedGroups: PresetStructuredDiffGroup[];
+}) {
+  const [showUnchangedGroups, setShowUnchangedGroups] = useState(false);
+  const unchangedRowCount = unchangedGroups.reduce((total, group) => total + group.rows.length, 0);
+  const renderGroupRows = (group: PresetStructuredDiffGroup) =>
+    group.rows.map((row) => (
+      <div
+        className={`comparison-dev-conflict-preview-row ${row.changed ? "is-changed" : ""}`}
+        key={row.key}
+      >
+        <span className="comparison-dev-conflict-preview-label-group">
+          <span className="comparison-dev-conflict-preview-label">{row.label}</span>
+          <span className={`comparison-dev-conflict-delta comparison-dev-conflict-delta-${row.delta_direction}`}>
+            {row.delta_label}
+          </span>
+        </span>
+        <span className="comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-existing">
+          {row.existing_value}
+        </span>
+        <span
+          className={`comparison-dev-conflict-preview-value comparison-dev-conflict-preview-value-incoming comparison-dev-conflict-preview-value-${
+            row.changed ? row.delta_direction : "same"
+          }`}
+        >
+          {row.incoming_value}
+        </span>
+      </div>
+    ));
+
+  return (
+    <div className="comparison-dev-session-summary">
+      <p className="comparison-dev-session-summary-title">{title}</p>
+      <div className="comparison-dev-conflict-preview">
+        <div className="comparison-dev-conflict-preview-row comparison-dev-conflict-preview-head">
+          <span>Field</span>
+          <span>{leftColumnLabel}</span>
+          <span>{rightColumnLabel}</span>
+        </div>
+        {changedGroups.length ? (
+          changedGroups.map((group) => (
+            <div className="comparison-dev-conflict-preview-group" key={group.key}>
+              <div className="comparison-dev-conflict-preview-group-title">
+                <span>{group.label}</span>
+                <span className="comparison-dev-conflict-preview-group-meta">
+                  <span className="comparison-dev-conflict-preview-group-summary">{group.summary_label}</span>
+                </span>
+              </div>
+              {renderGroupRows(group)}
+            </div>
+          ))
+        ) : (
+          <p className="empty-state">{emptyMessage}</p>
+        )}
+        {unchangedRowCount ? (
+          <button
+            className="comparison-dev-conflict-toggle"
+            onClick={() => setShowUnchangedGroups((current) => !current)}
+            type="button"
+          >
+            {showUnchangedGroups
+              ? `Hide ${unchangedRowCount} unchanged field${unchangedRowCount === 1 ? "" : "s"}`
+              : `Show ${unchangedRowCount} unchanged field${unchangedRowCount === 1 ? "" : "s"}`}
+          </button>
+        ) : null}
+        {showUnchangedGroups
+          ? unchangedGroups.map((group) => (
+              <div className="comparison-dev-conflict-preview-group" key={group.key}>
+                <div className="comparison-dev-conflict-preview-group-title">
+                  <span>{group.label}</span>
+                  <span className="comparison-dev-conflict-preview-group-meta">
+                    <span className="comparison-dev-conflict-preview-group-summary">{group.summary_label}</span>
+                  </span>
+                </div>
+                {renderGroupRows(group)}
+              </div>
+            ))
+          : null}
+      </div>
+    </div>
+  );
+}
+
 function PresetCatalogPanel({
   form,
   presets,
@@ -6419,6 +6797,9 @@ function PresetCatalogPanel({
     Record<string, PresetRevisionFilterState>
   >({});
   const [expandedRevisionDiffIds, setExpandedRevisionDiffIds] = useState<Record<string, boolean>>({});
+  const [restoreDraftConflictAcknowledgements, setRestoreDraftConflictAcknowledgements] = useState<
+    Record<string, boolean>
+  >({});
   const [pendingRestoreTarget, setPendingRestoreTarget] = useState<{
     presetId: string;
     revisionId: string;
@@ -6426,6 +6807,11 @@ function PresetCatalogPanel({
 
   async function confirmRevisionRestore(presetId: string, revisionId: string) {
     await onRestoreRevision(presetId, revisionId);
+    setRestoreDraftConflictAcknowledgements((current) => {
+      const next = { ...current };
+      delete next[`${presetId}:${revisionId}`];
+      return next;
+    });
     setPendingRestoreTarget((current) =>
       current?.presetId === presetId && current?.revisionId === revisionId ? null : current,
     );
@@ -6535,6 +6921,8 @@ function PresetCatalogPanel({
                 const latestRevisionId = revisions[0]?.revision_id;
                 const revisionsExpanded = Boolean(expandedPresetRevisionIds[preset.preset_id]);
                 const revisionFilter = revisionFiltersByPreset[preset.preset_id] ?? defaultPresetRevisionFilter;
+                const draftConflict =
+                  editingPresetId === preset.preset_id ? describePresetDraftConflict(preset, form) : null;
                 const visibleRevisionEntries = revisions
                   .map((revision, index) => {
                     const diffReference =
@@ -6672,6 +7060,11 @@ function PresetCatalogPanel({
                               const confirmingRestore =
                                 pendingRestoreTarget?.presetId === preset.preset_id &&
                                 pendingRestoreTarget?.revisionId === revision.revision_id;
+                              const acknowledgementKey = `${preset.preset_id}:${revision.revision_id}`;
+                              const hasDraftConflict = Boolean(draftConflict && draftConflict.changeCount);
+                              const draftConflictAcknowledged = Boolean(
+                                restoreDraftConflictAcknowledgements[acknowledgementKey],
+                              );
                               return (
                                 <article className="run-card" key={revision.revision_id}>
                                   <div className="run-card-head">
@@ -6718,12 +7111,16 @@ function PresetCatalogPanel({
                                     {revision.revision_id !== latestRevisionId ? (
                                       <button
                                         className="ghost-button"
-                                        onClick={() =>
+                                        onClick={() => {
                                           setPendingRestoreTarget({
                                             presetId: preset.preset_id,
                                             revisionId: revision.revision_id,
-                                          })
-                                        }
+                                          });
+                                          setRestoreDraftConflictAcknowledgements((current) => ({
+                                            ...current,
+                                            [acknowledgementKey]: false,
+                                          }));
+                                        }}
                                         type="button"
                                       >
                                         Restore bundle
@@ -6731,27 +7128,14 @@ function PresetCatalogPanel({
                                     ) : null}
                                   </div>
                                   {diffExpanded ? (
-                                    <div className="comparison-dev-session-summary">
-                                      <p className="comparison-dev-session-summary-title">
-                                        Diff vs {diff.basisLabel}
-                                      </p>
-                                      {diff.lines.length ? (
-                                        <ul className="comparison-dev-session-summary-list">
-                                          {diff.lines.map((line) => (
-                                            <li
-                                              className="comparison-dev-session-summary-item"
-                                              key={`${revision.revision_id}:${line}`}
-                                            >
-                                              <div className="comparison-dev-session-summary-item-copy">
-                                                <span>{line}</span>
-                                              </div>
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      ) : (
-                                        <p className="empty-state">{diff.summary}</p>
-                                      )}
-                                    </div>
+                                    <PresetStructuredDiffPreview
+                                      changedGroups={diff.changedGroups}
+                                      emptyMessage={diff.summary}
+                                      leftColumnLabel={diff.basisLabel}
+                                      rightColumnLabel="Revision snapshot"
+                                      title={`Diff vs ${diff.basisLabel}`}
+                                      unchangedGroups={diff.unchangedGroups}
+                                    />
                                   ) : null}
                                   {confirmingRestore ? (
                                     <div className="comparison-dev-confirm-card">
@@ -6760,17 +7144,65 @@ function PresetCatalogPanel({
                                         current revision from the selected snapshot.
                                       </p>
                                       <p className="run-note">{diff.summary}</p>
+                                      <PresetStructuredDiffPreview
+                                        changedGroups={diff.changedGroups}
+                                        emptyMessage={diff.summary}
+                                        leftColumnLabel="Current bundle"
+                                        rightColumnLabel="Restore target"
+                                        title="Restore impact"
+                                        unchangedGroups={diff.unchangedGroups}
+                                      />
+                                      {hasDraftConflict && draftConflict ? (
+                                        <>
+                                          <p className="comparison-dev-feedback">
+                                            {draftConflict.summary}
+                                            {draftConflict.hasInvalidParameters
+                                              ? " The current draft also contains invalid parameter JSON."
+                                              : ""}
+                                          </p>
+                                          <PresetStructuredDiffPreview
+                                            changedGroups={draftConflict.groups}
+                                            emptyMessage={draftConflict.summary}
+                                            leftColumnLabel="Saved bundle"
+                                            rightColumnLabel="Current draft"
+                                            title="Unsaved draft conflict"
+                                            unchangedGroups={[]}
+                                          />
+                                          <label className="run-note">
+                                            <input
+                                              checked={draftConflictAcknowledged}
+                                              onChange={(event) =>
+                                                setRestoreDraftConflictAcknowledgements((current) => ({
+                                                  ...current,
+                                                  [acknowledgementKey]: event.target.checked,
+                                                }))
+                                              }
+                                              type="checkbox"
+                                            />{" "}
+                                            I understand this restore will discard the unsaved draft for{" "}
+                                            {preset.preset_id}.
+                                          </label>
+                                        </>
+                                      ) : null}
                                       <div className="comparison-dev-actions comparison-dev-actions-inline">
                                         <button
                                           className="ghost-button comparison-dev-reset"
+                                          disabled={hasDraftConflict && !draftConflictAcknowledged}
                                           onClick={() => void confirmRevisionRestore(preset.preset_id, revision.revision_id)}
                                           type="button"
                                         >
-                                          Confirm restore
+                                          {hasDraftConflict ? "Discard draft and restore" : "Confirm restore"}
                                         </button>
                                         <button
                                           className="ghost-button comparison-dev-reset"
-                                          onClick={() => setPendingRestoreTarget(null)}
+                                          onClick={() => {
+                                            setPendingRestoreTarget(null);
+                                            setRestoreDraftConflictAcknowledgements((current) => {
+                                              const next = { ...current };
+                                              delete next[acknowledgementKey];
+                                              return next;
+                                            });
+                                          }}
                                           type="button"
                                         >
                                           Cancel
