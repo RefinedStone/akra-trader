@@ -22700,6 +22700,14 @@ def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> 
     "families": [
       {
         **asdict(family),
+        "policy": {
+          **asdict(family.policy),
+          "applies_to": list(family.policy.applies_to),
+        },
+        "enforcement": {
+          **asdict(family.enforcement),
+          "enforcement_points": list(family.enforcement.enforcement_points),
+        },
         "ui_surfaces": list(family.ui_surfaces),
         "schema_sources": list(family.schema_sources),
       }

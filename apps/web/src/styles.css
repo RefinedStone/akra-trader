@@ -194,6 +194,26 @@ select {
   margin-top: 10px;
 }
 
+.run-surface-family-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.run-surface-family-policy-copy {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-surface-family-policy-copy strong {
+  font-size: 0.88rem;
+}
+
 .run-surface-family-section > span {
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
@@ -3887,6 +3907,7 @@ select {
   .hero,
   .grid,
   .strategy-columns,
+  .run-surface-family-policy-grid,
   .run-surface-family-grid,
   .run-surface-capability-grid,
   .run-list,

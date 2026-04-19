@@ -430,6 +430,18 @@ type RunSurfaceCapabilities = {
     ui_surfaces: string[];
     schema_sources: string[];
     discovery_flow: string;
+    policy: {
+      applies_to: string[];
+      policy_key: string;
+      policy_mode: string;
+      source_of_truth: string;
+    };
+    enforcement: {
+      enforcement_points: string[];
+      fallback_behavior: string;
+      level: string;
+      source_of_truth: string;
+    };
   }[];
   discovery: {
     comparison_eligibility_group_order: RunListBoundaryGroupKey[];
@@ -14170,9 +14182,10 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
     "provenance_semantics",
     "execution_controls",
   ],
-  schema_summary: "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, and operational run controls.",
+  schema_summary:
+    "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, and machine-readable policy enforcement.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v2",
+  schema_version: "run-surface-capabilities.v3",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14187,6 +14200,18 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"
       "Run-list boundary notes",
     ],
     discovery_flow: "Shared UI contract panel and run-list boundary notes.",
+    policy: {
+      applies_to: ["metrics", "supporting_identity", "workflow_controls", "order_actions"],
+      policy_key: "comparison_surface_allowlist",
+      policy_mode: "allowlist",
+      source_of_truth: "comparison_eligibility_contract",
+    },
+    enforcement: {
+      enforcement_points: ["run_list_metric_gating", "drill_back_selection", "boundary_note_rendering"],
+      fallback_behavior: "non_eligible_surfaces_remain_descriptive_only",
+      level: "hard_gate",
+      source_of_truth: "run_surface_capability_endpoint",
+    },
   },
   {
     family_key: "strategy_schema",
@@ -14199,6 +14224,18 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"
       "Supported timeframe metadata",
     ],
     discovery_flow: "Strategy catalog and preset editor schema hints.",
+    policy: {
+      applies_to: ["strategy_catalog", "preset_editor", "preset_revision_diff"],
+      policy_key: "typed_strategy_schema_advertisement",
+      policy_mode: "schema_contract",
+      source_of_truth: "strategy_catalog",
+    },
+    enforcement: {
+      enforcement_points: ["schema_hint_rendering", "preset_diff_semantics", "parameter_editor_defaults"],
+      fallback_behavior: "fallback_to_freeform_parameter_entry_when_schema_missing",
+      level: "advisory",
+      source_of_truth: "strategy_metadata.parameter_schema",
+    },
   },
   {
     family_key: "provenance_semantics",
@@ -14211,6 +14248,18 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"
       "Catalog semantics snapshots",
     ],
     discovery_flow: "Run cards, provenance panels, and comparison deep-link restoration.",
+    policy: {
+      applies_to: ["run_snapshot", "artifact_summary", "comparison_deep_link"],
+      policy_key: "provenance_semantic_snapshot",
+      policy_mode: "snapshot_contract",
+      source_of_truth: "run_provenance_snapshot",
+    },
+    enforcement: {
+      enforcement_points: ["snapshot_serialization", "provenance_panel_rendering", "deep_link_restore"],
+      fallback_behavior: "render_basic_provenance_without_semantic_focus_when_snapshot_missing",
+      level: "snapshot_required",
+      source_of_truth: "run_provenance.strategy",
+    },
   },
   {
     family_key: "execution_controls",
@@ -14223,6 +14272,18 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"
       "Runtime state transitions",
     ],
     discovery_flow: "Shared UI control gating and operational-only boundary notes.",
+    policy: {
+      applies_to: ["rerun_controls", "stop_controls", "order_replace_cancel"],
+      policy_key: "operational_control_exclusion",
+      policy_mode: "mutation_gate",
+      source_of_truth: "run_surface_capability_endpoint",
+    },
+    enforcement: {
+      enforcement_points: ["button_visibility", "order_action_boundary_notes", "comparison_selection_exclusion"],
+      fallback_behavior: "controls_remain_operational_only_and_do_not_bind_score_links",
+      level: "hard_gate",
+      source_of_truth: "run_surface_capability_endpoint",
+    },
   },
 ];
 
@@ -14350,6 +14411,43 @@ function RunSurfaceCapabilityDiscoveryPanel({
                     {source}
                   </span>
                 ))}
+              </div>
+            </div>
+            <div className="run-surface-family-policy-grid">
+              <div className="run-surface-family-section">
+                <span>Policy</span>
+                <div className="run-surface-family-policy-copy">
+                  <strong>{family.policy.policy_key}</strong>
+                  <p className="run-note">
+                    Mode: {family.policy.policy_mode} · Source: {family.policy.source_of_truth}
+                  </p>
+                </div>
+                <div className="run-surface-family-chip-row">
+                  {family.policy.applies_to.map((target) => (
+                    <span className="run-surface-family-chip" key={target}>
+                      {target}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <div className="run-surface-family-section">
+                <span>Enforcement</span>
+                <div className="run-surface-family-policy-copy">
+                  <strong>{family.enforcement.level}</strong>
+                  <p className="run-note">
+                    Source: {family.enforcement.source_of_truth}
+                  </p>
+                  <p className="run-note">
+                    Fallback: {family.enforcement.fallback_behavior}
+                  </p>
+                </div>
+                <div className="run-surface-family-chip-row">
+                  {family.enforcement.enforcement_points.map((point) => (
+                    <span className="run-surface-family-chip" key={point}>
+                      {point}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
           </article>
