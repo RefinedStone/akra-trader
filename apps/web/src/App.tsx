@@ -462,6 +462,12 @@ type RunSurfaceCapabilities = {
   };
 };
 
+type RunSurfaceCapabilityFamilyKey = RunSurfaceCapabilities["families"][number]["family_key"];
+type RunSurfaceCapabilitySurfaceKey =
+  RunSurfaceCapabilities["families"][number]["surface_rules"][number]["surface_key"];
+type RunSurfaceCapabilityFamily = RunSurfaceCapabilities["families"][number];
+type RunSurfaceCapabilitySurfaceRule = RunSurfaceCapabilityFamily["surface_rules"][number];
+
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
 type ProvenanceArtifactLineMicroView = "structure" | "signal" | "note";
@@ -6625,9 +6631,24 @@ export default function App() {
           <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} />
 
           <div className="strategy-columns">
-            <StrategyColumn title="Native" strategies={strategyGroups.native} accent="amber" />
-            <StrategyColumn title="NFI References" strategies={strategyGroups.reference} accent="cyan" />
-            <StrategyColumn title="Future LLM" strategies={strategyGroups.future} accent="ember" />
+            <StrategyColumn
+              title="Native"
+              strategies={strategyGroups.native}
+              accent="amber"
+              runSurfaceCapabilities={runSurfaceCapabilities}
+            />
+            <StrategyColumn
+              title="NFI References"
+              strategies={strategyGroups.reference}
+              accent="cyan"
+              runSurfaceCapabilities={runSurfaceCapabilities}
+            />
+            <StrategyColumn
+              title="Future LLM"
+              strategies={strategyGroups.future}
+              accent="ember"
+              runSurfaceCapabilities={runSurfaceCapabilities}
+            />
           </div>
         </section>
 
@@ -13111,11 +13132,14 @@ function StrategyColumn({
   title,
   strategies,
   accent,
+  runSurfaceCapabilities,
 }: {
   title: string;
   strategies: Strategy[];
   accent: string;
+  runSurfaceCapabilities: RunSurfaceCapabilities | null;
 }) {
+  const schemaHintsEnabled = shouldEnableStrategyCatalogSchemaHints(runSurfaceCapabilities);
   return (
     <div className={`strategy-column ${accent}`}>
       <h3>{title}</h3>
@@ -13134,7 +13158,7 @@ function StrategyColumn({
               <span>{formatVersionLineage(strategy.version_lineage, strategy.version)}</span>
             </div>
             <p>{strategy.description}</p>
-            {strategy.catalog_semantics.execution_model ? (
+            {schemaHintsEnabled && strategy.catalog_semantics.execution_model ? (
               <p className="run-note">{strategy.catalog_semantics.execution_model}</p>
             ) : null}
             <dl>
@@ -13150,17 +13174,19 @@ function StrategyColumn({
                 <dt>Assets</dt>
                 <dd>{strategy.asset_types.join(", ")}</dd>
               </div>
-              <div>
-                <dt>Defaults</dt>
-                <dd>{formatParameterMap(extractDefaultParameters(strategy.parameter_schema))}</dd>
-              </div>
-              {strategy.catalog_semantics.parameter_contract ? (
+              {schemaHintsEnabled ? (
+                <div>
+                  <dt>Defaults</dt>
+                  <dd>{formatParameterMap(extractDefaultParameters(strategy.parameter_schema))}</dd>
+                </div>
+              ) : null}
+              {schemaHintsEnabled && strategy.catalog_semantics.parameter_contract ? (
                 <div>
                   <dt>Parameter contract</dt>
                   <dd>{strategy.catalog_semantics.parameter_contract}</dd>
                 </div>
               ) : null}
-              {strategy.catalog_semantics.source_descriptor ? (
+              {schemaHintsEnabled && strategy.catalog_semantics.source_descriptor ? (
                 <div>
                   <dt>Source</dt>
                   <dd>{strategy.catalog_semantics.source_descriptor}</dd>
@@ -13184,7 +13210,7 @@ function StrategyColumn({
                   <dd>{formatTimestamp(strategy.lifecycle.registered_at)}</dd>
                 </div>
               ) : null}
-              {strategy.catalog_semantics.operator_notes.length ? (
+              {schemaHintsEnabled && strategy.catalog_semantics.operator_notes.length ? (
                 <div>
                   <dt>Operator notes</dt>
                   <dd>{strategy.catalog_semantics.operator_notes.join(" | ")}</dd>
@@ -13355,6 +13381,14 @@ function PresetCatalogPanel({
   const isEditing = editingPresetId !== null;
   const findStrategyParameterSchema = (strategyId?: string | null) =>
     strategies.find((strategy) => strategy.strategy_id === strategyId)?.parameter_schema;
+  const presetParameterDefaultsEnabled = shouldHydratePresetParameterDefaults(runSurfaceCapabilities);
+  const selectedStrategyParameterSchema = findStrategyParameterSchema(form.strategy_id);
+  const selectedStrategyDefaultParameters = selectedStrategyParameterSchema
+    ? extractDefaultParameters(selectedStrategyParameterSchema)
+    : {};
+  const selectedStrategyDefaultParametersJson = Object.keys(selectedStrategyDefaultParameters).length
+    ? JSON.stringify(selectedStrategyDefaultParameters, null, 2)
+    : "";
   const [revisionFiltersByPreset, setRevisionFiltersByPreset] = useState<
     Record<string, PresetRevisionFilterState>
   >({});
@@ -13366,6 +13400,37 @@ function PresetCatalogPanel({
     presetId: string;
     revisionId: string;
   } | null>(null);
+  const lastAutoHydratedStrategyId = useRef<string | null>(null);
+
+  useEffect(() => {
+    const strategyId = form.strategy_id || null;
+    const strategyChanged = lastAutoHydratedStrategyId.current !== strategyId;
+    lastAutoHydratedStrategyId.current = strategyId;
+    if (!strategyChanged || !presetParameterDefaultsEnabled || !strategyId) {
+      return;
+    }
+    if (!selectedStrategyDefaultParametersJson) {
+      return;
+    }
+    if (form.parameters_text.trim()) {
+      return;
+    }
+    setForm((current) => {
+      if ((current.strategy_id || null) !== strategyId || current.parameters_text.trim()) {
+        return current;
+      }
+      return {
+        ...current,
+        parameters_text: selectedStrategyDefaultParametersJson,
+      };
+    });
+  }, [
+    form.parameters_text,
+    form.strategy_id,
+    presetParameterDefaultsEnabled,
+    selectedStrategyDefaultParametersJson,
+    setForm,
+  ]);
 
   async function confirmRevisionRestore(presetId: string, revisionId: string) {
     await onRestoreRevision(presetId, revisionId);
@@ -13451,7 +13516,7 @@ function PresetCatalogPanel({
         <label>
           Parameters JSON
           <textarea
-            placeholder='{"short_window": 5, "long_window": 13}'
+            placeholder={selectedStrategyDefaultParametersJson || '{"short_window": 5, "long_window": 13}'}
             rows={4}
             value={form.parameters_text}
             onChange={(event) =>
@@ -13459,6 +13524,11 @@ function PresetCatalogPanel({
             }
           />
         </label>
+        {presetParameterDefaultsEnabled && selectedStrategyDefaultParametersJson ? (
+          <p className="run-note">
+            Empty parameter bundles auto-hydrate from the selected strategy schema contract.
+          </p>
+        ) : null}
         {isEditing ? (
           <p className="run-note">
             Editing {editingPresetId}. Preset IDs are immutable, so this form updates the current bundle and records a
@@ -14438,6 +14508,116 @@ function getRunSurfaceCapabilityDiscovery(capabilities?: RunSurfaceCapabilities 
 
 function getRunSurfaceCapabilityFamilies(capabilities?: RunSurfaceCapabilities | null) {
   return capabilities?.families?.length ? capabilities.families : DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES;
+}
+
+function getRunSurfaceCapabilityFamily(
+  capabilities: RunSurfaceCapabilities | null | undefined,
+  familyKey: RunSurfaceCapabilityFamilyKey,
+) {
+  return getRunSurfaceCapabilityFamilies(capabilities).find((family) => family.family_key === familyKey) ?? null;
+}
+
+function getRunSurfaceCapabilitySurfaceRule(
+  capabilities: RunSurfaceCapabilities | null | undefined,
+  familyKey: RunSurfaceCapabilityFamilyKey,
+  surfaceKey: RunSurfaceCapabilitySurfaceKey,
+) {
+  return (
+    getRunSurfaceCapabilityFamily(capabilities, familyKey)?.surface_rules.find(
+      (rule) => rule.surface_key === surfaceKey,
+    ) ?? null
+  );
+}
+
+function hasRunSurfaceCapabilitySurfaceRule(
+  capabilities: RunSurfaceCapabilities | null | undefined,
+  familyKey: RunSurfaceCapabilityFamilyKey,
+  surfaceKey: RunSurfaceCapabilitySurfaceKey,
+  enforcementPoint?: string,
+) {
+  const rule = getRunSurfaceCapabilitySurfaceRule(capabilities, familyKey, surfaceKey);
+  if (!rule) {
+    return false;
+  }
+  return !enforcementPoint || rule.enforcement_point === enforcementPoint;
+}
+
+function shouldEnableRunListMetricDrillBack(
+  surfaceId: RunListBoundarySurfaceId,
+  capabilities: RunSurfaceCapabilities | null | undefined,
+  contract?: RunListBoundaryContract | null,
+) {
+  return (
+    hasRunSurfaceCapabilitySurfaceRule(
+      capabilities,
+      "comparison_eligibility",
+      "run_list_metric_tiles",
+      "run_list_metric_gating",
+    )
+    && isRunListComparisonEligibleSurface(surfaceId, contract)
+  );
+}
+
+function shouldEnableStrategyCatalogSchemaHints(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return hasRunSurfaceCapabilitySurfaceRule(
+    capabilities,
+    "strategy_schema",
+    "strategy_catalog_cards",
+    "schema_hint_rendering",
+  );
+}
+
+function shouldHydratePresetParameterDefaults(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return hasRunSurfaceCapabilitySurfaceRule(
+    capabilities,
+    "strategy_schema",
+    "preset_parameter_editor",
+    "parameter_editor_defaults",
+  );
+}
+
+function shouldEnableRunSnapshotSemantics(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return hasRunSurfaceCapabilitySurfaceRule(
+    capabilities,
+    "provenance_semantics",
+    "run_strategy_snapshot",
+    "snapshot_serialization",
+  );
+}
+
+function shouldEnableReferenceProvenanceSemantics(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return hasRunSurfaceCapabilitySurfaceRule(
+    capabilities,
+    "provenance_semantics",
+    "reference_provenance_panels",
+    "provenance_panel_rendering",
+  );
+}
+
+function shouldRenderWorkflowControlBoundaryNote(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return (
+    hasRunSurfaceCapabilitySurfaceRule(
+      capabilities,
+      "execution_controls",
+      "compare_selection_workflow",
+      "comparison_selection_exclusion",
+    )
+    || hasRunSurfaceCapabilitySurfaceRule(
+      capabilities,
+      "execution_controls",
+      "rerun_and_stop_controls",
+      "button_visibility",
+    )
+  );
+}
+
+function shouldRenderOrderActionBoundaryNote(capabilities: RunSurfaceCapabilities | null | undefined) {
+  return hasRunSurfaceCapabilitySurfaceRule(
+    capabilities,
+    "execution_controls",
+    "order_replace_cancel_actions",
+    "order_action_boundary_notes",
+  );
 }
 
 function getRunListBoundaryGroupContract(
@@ -17848,6 +18028,19 @@ function RunSection({
                     run.config.run_id,
                   )
                 : null;
+            const runListMetricDrillBackEnabled = (surfaceId: RunListBoundarySurfaceId) =>
+              Boolean(comparisonLinkedRunRole)
+              && shouldEnableRunListMetricDrillBack(
+                surfaceId,
+                runSurfaceCapabilities,
+                runListBoundaryContract,
+              );
+            const runSnapshotSemanticsEnabled = shouldEnableRunSnapshotSemantics(runSurfaceCapabilities);
+            const referenceProvenanceSemanticsEnabled = shouldEnableReferenceProvenanceSemantics(
+              runSurfaceCapabilities,
+            );
+            const workflowBoundaryEnabled = shouldRenderWorkflowControlBoundaryNote(runSurfaceCapabilities);
+            const orderActionBoundaryEnabled = shouldRenderOrderActionBoundaryNote(runSurfaceCapabilities);
             const linkedRunListSelection =
               comparisonLinkedRunRole && comparison?.selectedScoreLink
                 ? {
@@ -17967,8 +18160,7 @@ function RunSection({
                     <div className="run-metrics">
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("return", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("return")
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, totalReturnSubFocusKey)(node)
                             : undefined
                         }
@@ -17976,8 +18168,7 @@ function RunSection({
                         interactivePressed={isRunListSubFocusOrigin(totalReturnSubFocusKey)}
                         label={getRunListBoundarySurfaceLabel("return", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("return", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("return")
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -17993,8 +18184,7 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("drawdown", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("drawdown")
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, drawdownSubFocusKey)(node)
                             : undefined
                         }
@@ -18002,8 +18192,7 @@ function RunSection({
                         interactivePressed={isRunListSubFocusOrigin(drawdownSubFocusKey)}
                         label={getRunListBoundarySurfaceLabel("drawdown", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("drawdown", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("drawdown")
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -18019,8 +18208,7 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("win_rate", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("win_rate")
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, winRateSubFocusKey)(node)
                             : undefined
                         }
@@ -18028,8 +18216,7 @@ function RunSection({
                         interactivePressed={isRunListSubFocusOrigin(winRateSubFocusKey)}
                         label={getRunListBoundarySurfaceLabel("win_rate", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("win_rate", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("win_rate")
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -18045,8 +18232,7 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("trades", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("trades")
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, tradeCountSubFocusKey)(node)
                             : undefined
                         }
@@ -18054,8 +18240,7 @@ function RunSection({
                         interactivePressed={isRunListSubFocusOrigin(tradeCountSubFocusKey)}
                         label={getRunListBoundarySurfaceLabel("trades", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole
-                          && isRunListComparisonEligibleSurface("trades", runListBoundaryContract)
+                          runListMetricDrillBackEnabled("trades")
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -18109,11 +18294,11 @@ function RunSection({
               />
               {run.provenance.strategy ? (
                 <RunStrategySnapshot
-                  linkedScore={linkedRunListSelection && linkedRunListSelection.section === "semantics"
+                  linkedScore={runSnapshotSemanticsEnabled && linkedRunListSelection && linkedRunListSelection.section === "semantics"
                     ? linkedRunListSelection
                     : null}
                   onDrillBackScoreLink={
-                    comparisonLinkedRunRole
+                    comparisonLinkedRunRole && runSnapshotSemanticsEnabled
                       ? (section, componentKey, options) =>
                           handleRunListScoreLinkSelection(
                             run.config.run_id,
@@ -18123,8 +18308,9 @@ function RunSection({
                           )
                       : undefined
                   }
-                  panelRunId={run.config.run_id}
-                  registerSubFocusRef={registerRunListSubFocusRef}
+                  panelRunId={runSnapshotSemanticsEnabled ? run.config.run_id : undefined}
+                  registerSubFocusRef={runSnapshotSemanticsEnabled ? registerRunListSubFocusRef : undefined}
+                  showSemanticCatalogContext={runSnapshotSemanticsEnabled}
                   strategy={run.provenance.strategy}
                 />
               ) : null}
@@ -18166,11 +18352,11 @@ function RunSection({
                   benchmarkArtifacts={run.provenance.benchmark_artifacts}
                   externalCommand={run.provenance.external_command}
                   interactionSource="run_list"
-                  linkedScore={linkedRunListSelection && linkedRunListSelection.section !== "metrics"
+                  linkedScore={referenceProvenanceSemanticsEnabled && linkedRunListSelection && linkedRunListSelection.section !== "metrics"
                     ? linkedRunListSelection
                     : null}
                   onDrillBackScoreLink={
-                    comparisonLinkedRunRole
+                    comparisonLinkedRunRole && referenceProvenanceSemanticsEnabled
                       ? (section, componentKey, options) =>
                           handleRunListScoreLinkSelection(
                             run.config.run_id,
@@ -18181,11 +18367,11 @@ function RunSection({
                       : undefined
                   }
                   panelRunId={run.config.run_id}
-                  registerArtifactHoverRef={registerRunListArtifactHoverRef}
-                  registerSubFocusRef={registerRunListSubFocusRef}
+                  registerArtifactHoverRef={referenceProvenanceSemanticsEnabled ? registerRunListArtifactHoverRef : undefined}
+                  registerSubFocusRef={referenceProvenanceSemanticsEnabled ? registerRunListSubFocusRef : undefined}
                   reference={run.provenance.reference}
                   referenceVersion={run.provenance.reference_version}
-                  strategySemantics={run.provenance.strategy?.catalog_semantics}
+                  strategySemantics={referenceProvenanceSemanticsEnabled ? run.provenance.strategy?.catalog_semantics : null}
                   workingDirectory={run.provenance.working_directory}
                 />
               ) : null}
@@ -18226,6 +18412,7 @@ function RunSection({
                       : undefined
                   }
                   orderControls={orderControls}
+                  orderActionBoundaryEnabled={orderActionBoundaryEnabled}
                   orders={run.orders}
                   panelRunId={run.config.run_id}
                   registerSubFocusRef={registerRunListSubFocusRef}
@@ -18288,7 +18475,7 @@ function RunSection({
                   </button>
                 ) : null}
               </div>
-              {comparison ? (
+              {comparison && workflowBoundaryEnabled ? (
                 <RunListComparisonBoundaryNote
                   contract={runListBoundaryContract}
                   groupKey="operational_workflow"
@@ -23532,6 +23719,7 @@ function RunStrategySnapshot({
   onDrillBackScoreLink,
   panelRunId,
   registerSubFocusRef,
+  showSemanticCatalogContext = true,
   strategy,
 }: {
   linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
@@ -23542,6 +23730,7 @@ function RunStrategySnapshot({
   ) => void;
   panelRunId?: string;
   registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
+  showSemanticCatalogContext?: boolean;
   strategy: NonNullable<Run["provenance"]["strategy"]>;
 }) {
   const strategyKindSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_kind");
@@ -23672,13 +23861,15 @@ function RunStrategySnapshot({
       <div className="run-strategy-grid">
         <Metric label="Version" value={strategy.version} />
         <Metric label="Lifecycle" value={strategy.lifecycle.stage} />
-        {renderSemanticTile(
-          "Semantic kind",
-          strategy.catalog_semantics.strategy_kind,
-          "strategy_kind",
-          highlightStrategyKind,
-          strategyKindSubFocusKey,
-        )}
+        {showSemanticCatalogContext
+          ? renderSemanticTile(
+              "Semantic kind",
+              strategy.catalog_semantics.strategy_kind,
+              "strategy_kind",
+              highlightStrategyKind,
+              strategyKindSubFocusKey,
+            )
+          : null}
         <Metric label="Warmup" value={`${strategy.warmup.required_bars} bars`} />
         <Metric label="TFs" value={strategy.warmup.timeframes.join(", ")} />
       </div>
@@ -23695,7 +23886,7 @@ function RunStrategySnapshot({
           highlightVocabulary,
           versionLineageSubFocusKey,
         )}
-        {strategy.catalog_semantics.execution_model ? (
+        {showSemanticCatalogContext && strategy.catalog_semantics.execution_model ? (
           renderSemanticLine(
             `Execution model: ${strategy.catalog_semantics.execution_model}`,
             "execution_model",
@@ -23703,7 +23894,7 @@ function RunStrategySnapshot({
             executionModelSubFocusKey,
           )
         ) : null}
-        {strategy.catalog_semantics.parameter_contract ? (
+        {showSemanticCatalogContext && strategy.catalog_semantics.parameter_contract ? (
           renderSemanticLine(
             `Parameter contract: ${strategy.catalog_semantics.parameter_contract}`,
             "parameter_contract",
@@ -23711,7 +23902,7 @@ function RunStrategySnapshot({
             parameterContractSubFocusKey,
           )
         ) : null}
-        {strategy.catalog_semantics.source_descriptor ? (
+        {showSemanticCatalogContext && strategy.catalog_semantics.source_descriptor ? (
           renderSemanticLine(
             `Source: ${strategy.catalog_semantics.source_descriptor}`,
             "source_descriptor",
@@ -23747,7 +23938,7 @@ function RunStrategySnapshot({
             strategyRegisteredSubFocusKey,
           )
         ) : null}
-        {strategy.catalog_semantics.operator_notes.length ? (
+        {showSemanticCatalogContext && strategy.catalog_semantics.operator_notes.length ? (
           renderSemanticLine(
             `Operator notes: ${strategy.catalog_semantics.operator_notes.join(" | ")}`,
             "vocabulary",
@@ -23897,6 +24088,7 @@ function RunOrderLifecycleSummary({
   linkedScore,
   onDrillBackScoreLink,
   orders,
+  orderActionBoundaryEnabled = false,
   orderControls,
   panelRunId,
   registerSubFocusRef,
@@ -23909,6 +24101,7 @@ function RunOrderLifecycleSummary({
     options?: ComparisonScoreDrillBackOptions,
   ) => void;
   orders: Run["orders"];
+  orderActionBoundaryEnabled?: boolean;
   orderControls?: RunOrderControls | null;
   panelRunId?: string;
   registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
@@ -24073,7 +24266,7 @@ function RunOrderLifecycleSummary({
       <div className="run-lineage-copy">
         {renderOrderCopyLine(`Last order sync: ${formatTimestamp(latestSyncAt)}`, orderSyncSubFocusKey)}
       </div>
-      {onDrillBackScoreLink && orderControls ? (
+      {onDrillBackScoreLink && orderControls && orderActionBoundaryEnabled ? (
         <RunListComparisonBoundaryNote
           contract={eligibilityContract}
           groupKey="operational_order_actions"
@@ -24118,7 +24311,10 @@ function RunOrderLifecycleSummary({
               "synced",
             )}
             {orderControls && (order.status === "open" || order.status === "partially_filled") ? (
-              <RunOrderActionControls order={order} orderControls={orderControls} />
+              <RunOrderActionControls
+                order={order}
+                orderControls={orderControls}
+              />
             ) : null}
           </article>
         ))}
