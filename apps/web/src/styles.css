@@ -497,6 +497,14 @@ select {
   outline-offset: 2px;
 }
 
+.comparison-history-conflict-review-row.is-active {
+  border-top-color: transparent;
+  background: rgba(120, 180, 255, 0.08);
+  box-shadow:
+    inset 3px 0 0 rgba(120, 180, 255, 0.72),
+    0 0 0 1px rgba(120, 180, 255, 0.18);
+}
+
 .comparison-history-conflict-review-choice {
   display: grid;
   gap: 4px;
@@ -662,6 +670,11 @@ select {
   background: rgba(120, 180, 255, 0.08);
 }
 
+.comparison-history-conflict-review-overview-card.is-active {
+  border-color: rgba(120, 180, 255, 0.42);
+  background: rgba(120, 180, 255, 0.12);
+}
+
 .comparison-history-conflict-review-overview-card:disabled {
   cursor: default;
 }
@@ -719,6 +732,11 @@ select {
 .comparison-history-conflict-review-overview-chip:hover,
 .comparison-history-conflict-review-overview-chip:focus-visible {
   outline: none;
+  filter: brightness(1.08);
+}
+
+.comparison-history-conflict-review-overview-chip.is-active {
+  box-shadow: 0 0 0 1px rgba(120, 180, 255, 0.42);
   filter: brightness(1.08);
 }
 

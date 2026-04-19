@@ -13104,6 +13104,7 @@ function RunSection({
   const [expandedWorkspaceScoreDetailIds, setExpandedWorkspaceScoreDetailIds] = useState<
     Record<string, boolean>
   >({});
+  const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(null);
   const workspaceReviewRowRefs = useRef(new Map<string, HTMLDivElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
@@ -13165,11 +13166,22 @@ function RunSection({
       ...current,
       [auditId]: !current[auditId],
     }));
+  const buildWorkspaceReviewRowSelectionId = (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+  ) => `${auditId}:${fieldKey}`;
+  const activateWorkspaceReviewRow = (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+  ) => {
+    setActiveWorkspaceOverviewRowId(buildWorkspaceReviewRowSelectionId(auditId, fieldKey));
+  };
   const focusWorkspaceReviewRow = (
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   ) => {
-    const scoreDetailKey = `${auditId}:${fieldKey}`;
+    const scoreDetailKey = buildWorkspaceReviewRowSelectionId(auditId, fieldKey);
+    setActiveWorkspaceOverviewRowId(scoreDetailKey);
     setExpandedWorkspaceScoreDetailIds((current) => ({
       ...current,
       [scoreDetailKey]: true,
@@ -13485,6 +13497,20 @@ function RunSection({
                             const workspaceOverview = workspaceReview
                               ? buildComparisonHistorySyncWorkspaceRecommendationOverview(workspaceRows)
                               : null;
+                            const activeWorkspaceOverviewRow = workspaceOverview
+                              ? workspaceRows.find(
+                                  (row) =>
+                                    buildWorkspaceReviewRowSelectionId(entry.auditId, row.fieldKey)
+                                      === activeWorkspaceOverviewRowId,
+                                ) ?? null
+                              : null;
+                            const strongestWorkspaceOverviewRowId =
+                              workspaceOverview?.strongest
+                                ? buildWorkspaceReviewRowSelectionId(
+                                    entry.auditId,
+                                    workspaceOverview.strongest.fieldKey,
+                                  )
+                                : null;
                             const flatReviewRows = preferenceReview ? preferenceRows : workspaceRows;
                             const reviewFieldCount = conflictReview
                               ? conflictGroups.reduce((total, group) => total + group.rows.length, 0)
@@ -13666,6 +13692,28 @@ function RunSection({
                                         <div className="comparison-dev-conflict-preview comparison-history-conflict-review">
                                           {workspaceOverview ? (
                                             <div className="comparison-history-conflict-review-overview">
+                                              {activeWorkspaceOverviewRow ? (
+                                                <button
+                                                  className="comparison-history-conflict-review-overview-card is-active is-interactive"
+                                                  onClick={() =>
+                                                    focusWorkspaceReviewRow(
+                                                      entry.auditId,
+                                                      activeWorkspaceOverviewRow.fieldKey,
+                                                    )
+                                                  }
+                                                  type="button"
+                                                >
+                                                  <span className="comparison-history-conflict-review-overview-label">
+                                                    Active row
+                                                  </span>
+                                                  <strong>{activeWorkspaceOverviewRow.label}</strong>
+                                                  <span className="comparison-history-conflict-review-overview-copy">
+                                                    {activeWorkspaceOverviewRow.recommendedSource === "local"
+                                                      ? "Local latest"
+                                                      : "Remote audit"} selected · {formatComparisonScoreValue(activeWorkspaceOverviewRow.recommendationStrength)} point recommendation gap
+                                                  </span>
+                                                </button>
+                                              ) : null}
                                               <div className="comparison-history-conflict-review-overview-card">
                                                 <span className="comparison-history-conflict-review-overview-label">
                                                   Ranked split
@@ -13696,6 +13744,10 @@ function RunSection({
                                                 className={`comparison-history-conflict-review-overview-card is-strongest ${
                                                   workspaceOverview.strongest
                                                     ? "is-interactive"
+                                                    : ""
+                                                } ${
+                                                  strongestWorkspaceOverviewRowId === activeWorkspaceOverviewRowId
+                                                    ? "is-active"
                                                     : ""
                                                 }`}
                                                 disabled={!workspaceOverview.strongest}
@@ -13733,18 +13785,28 @@ function RunSection({
                                                     Top local latest picks
                                                   </span>
                                                   <div className="comparison-history-conflict-review-overview-chip-list">
-                                                    {workspaceOverview.topLocal.map((row) => (
-                                                      <button
-                                                        className="comparison-history-conflict-review-overview-chip is-local"
-                                                        onClick={() =>
-                                                          focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
-                                                        }
-                                                        key={`overview-local:${entry.auditId}:${row.fieldKey}`}
-                                                        type="button"
-                                                      >
-                                                        {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
-                                                      </button>
-                                                    ))}
+                                                    {workspaceOverview.topLocal.map((row) => {
+                                                      const scoreDetailKey = buildWorkspaceReviewRowSelectionId(
+                                                        entry.auditId,
+                                                        row.fieldKey,
+                                                      );
+                                                      return (
+                                                        <button
+                                                          className={`comparison-history-conflict-review-overview-chip is-local ${
+                                                            activeWorkspaceOverviewRowId === scoreDetailKey
+                                                              ? "is-active"
+                                                              : ""
+                                                          }`}
+                                                          onClick={() =>
+                                                            focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
+                                                          }
+                                                          key={`overview-local:${entry.auditId}:${row.fieldKey}`}
+                                                          type="button"
+                                                        >
+                                                          {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
+                                                        </button>
+                                                      );
+                                                    })}
                                                   </div>
                                                 </div>
                                               ) : null}
@@ -13754,18 +13816,28 @@ function RunSection({
                                                     Top remote audit picks
                                                   </span>
                                                   <div className="comparison-history-conflict-review-overview-chip-list">
-                                                    {workspaceOverview.topRemote.map((row) => (
-                                                      <button
-                                                        className="comparison-history-conflict-review-overview-chip is-remote"
-                                                        onClick={() =>
-                                                          focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
-                                                        }
-                                                        key={`overview-remote:${entry.auditId}:${row.fieldKey}`}
-                                                        type="button"
-                                                      >
-                                                        {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
-                                                      </button>
-                                                    ))}
+                                                    {workspaceOverview.topRemote.map((row) => {
+                                                      const scoreDetailKey = buildWorkspaceReviewRowSelectionId(
+                                                        entry.auditId,
+                                                        row.fieldKey,
+                                                      );
+                                                      return (
+                                                        <button
+                                                          className={`comparison-history-conflict-review-overview-chip is-remote ${
+                                                            activeWorkspaceOverviewRowId === scoreDetailKey
+                                                              ? "is-active"
+                                                              : ""
+                                                          }`}
+                                                          onClick={() =>
+                                                            focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
+                                                          }
+                                                          key={`overview-remote:${entry.auditId}:${row.fieldKey}`}
+                                                          type="button"
+                                                        >
+                                                          {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
+                                                        </button>
+                                                      );
+                                                    })}
                                                   </div>
                                                 </div>
                                               ) : null}
@@ -13845,13 +13917,19 @@ function RunSection({
                                               ))
                                             : workspaceReview
                                               ? workspaceRows.map((row) => {
-                                                  const scoreDetailKey = `${entry.auditId}:${row.fieldKey}`;
+                                                  const scoreDetailKey = buildWorkspaceReviewRowSelectionId(
+                                                    entry.auditId,
+                                                    row.fieldKey,
+                                                  );
                                                   const scoreDetailsExpanded = Boolean(
                                                     expandedWorkspaceScoreDetailIds[scoreDetailKey],
                                                   );
+                                                  const rowActive = activeWorkspaceOverviewRowId === scoreDetailKey;
                                                   return (
                                                     <div
-                                                      className="comparison-history-conflict-review-row"
+                                                      className={`comparison-history-conflict-review-row ${
+                                                        rowActive ? "is-active" : ""
+                                                      }`}
                                                       key={scoreDetailKey}
                                                       ref={(node) => {
                                                         if (node) {
@@ -13860,6 +13938,10 @@ function RunSection({
                                                         }
                                                         workspaceReviewRowRefs.current.delete(scoreDetailKey);
                                                       }}
+                                                      onClick={() => activateWorkspaceReviewRow(entry.auditId, row.fieldKey)}
+                                                      onFocusCapture={() =>
+                                                        activateWorkspaceReviewRow(entry.auditId, row.fieldKey)
+                                                      }
                                                       tabIndex={-1}
                                                     >
                                                       <span className="comparison-dev-conflict-preview-label-group">
@@ -13871,12 +13953,13 @@ function RunSection({
                                                         </span>
                                                         <button
                                                           className="comparison-history-conflict-review-toggle"
-                                                          onClick={() =>
+                                                          onClick={() => {
+                                                            activateWorkspaceReviewRow(entry.auditId, row.fieldKey);
                                                             setExpandedWorkspaceScoreDetailIds((current) => ({
                                                               ...current,
                                                               [scoreDetailKey]: !current[scoreDetailKey],
-                                                            }))
-                                                          }
+                                                            }));
+                                                          }}
                                                           type="button"
                                                         >
                                                           {scoreDetailsExpanded ? "Hide score details" : "Show score details"}
@@ -13894,11 +13977,14 @@ function RunSection({
                                                           row.recommendedSource === "local" ? "is-recommended" : ""
                                                         }`}
                                                         onClick={() =>
-                                                          comparison.onSetHistoryWorkspaceFieldSource(
-                                                            entry.auditId,
-                                                            row.fieldKey,
-                                                            "local",
-                                                          )
+                                                          {
+                                                            activateWorkspaceReviewRow(entry.auditId, row.fieldKey);
+                                                            comparison.onSetHistoryWorkspaceFieldSource(
+                                                              entry.auditId,
+                                                              row.fieldKey,
+                                                              "local",
+                                                            );
+                                                          }
                                                         }
                                                         type="button"
                                                       >
@@ -13921,11 +14007,14 @@ function RunSection({
                                                           row.recommendedSource === "remote" ? "is-recommended" : ""
                                                         }`}
                                                         onClick={() =>
-                                                          comparison.onSetHistoryWorkspaceFieldSource(
-                                                            entry.auditId,
-                                                            row.fieldKey,
-                                                            "remote",
-                                                          )
+                                                          {
+                                                            activateWorkspaceReviewRow(entry.auditId, row.fieldKey);
+                                                            comparison.onSetHistoryWorkspaceFieldSource(
+                                                              entry.auditId,
+                                                              row.fieldKey,
+                                                              "remote",
+                                                            );
+                                                          }
                                                         }
                                                         type="button"
                                                       >
