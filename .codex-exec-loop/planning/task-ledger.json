@@ -4072,18 +4072,72 @@
       "direction_id": "experiment-os",
       "title": "Add machine-readable policy and enforcement metadata to capability families",
       "description": "Build on the new multi-family `RunSurfaceCapabilities` catalog by attaching machine-readable policy fields and surface-specific enforcement metadata to each capability family, so discovery can progress from descriptive documentation into contracts that run, comparison, strategy, and preset surfaces can actually enforce.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is making the new capability families more executable, and it names machine-readable policy plus surface-specific enforcement metadata as the concrete next step. That is now the clearest immediate queued task.",
+      "priority_reason": "Completed in main session commit 2746ba2, which added family-level `policy` and `enforcement` metadata to `RunSurfaceCapabilities`, lifted the schema version to `run-surface-capabilities.v3`, surfaced the metadata through `/api/capabilities/run-surfaces` and the web discovery panel, verified the change with `python -m py_compile`, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-expand-run-surface-capability-families-beyond-comparison-eligibility"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T21:42:28Z",
+      "updated_at": "2026-04-19T21:49:29Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from a descriptive run-surface capability catalog into an enforceable experiment contract whose policy semantics can be shared consistently across launch, preset, comparison, and provenance surfaces."
+    },
+    {
+      "id": "planning-experiment-os-add-surface-level-enforcement-rules-to-run-surface-capabilities",
+      "direction_id": "experiment-os",
+      "title": "Add surface-level enforcement rules to run-surface capabilities",
+      "description": "Build on the new family-level `policy` and `enforcement` metadata by attaching machine-readable per-surface enforcement rules, so each consumer surface can resolve allowed, blocked, fallback, and explanation behavior from the shared capability contract instead of handwritten branching.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply says the family-level contract is complete and explicitly names surface-specific enforcement rules as the immediate remaining step. That makes this the clearest executable next task for builtin queue progression.",
+      "depends_on": [
+        "planning-experiment-os-add-machine-readable-policy-and-enforcement-metadata-to-capability-families"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T21:49:29Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os from family-level capability policy descriptors into concrete per-surface enforcement contracts that launch, comparison, preset, and provenance consumers can apply directly."
+    },
+    {
+      "id": "planning-experiment-os-add-consumer-capability-negotiation-to-run-surface-discovery",
+      "direction_id": "experiment-os",
+      "title": "Add consumer capability negotiation to run-surface discovery",
+      "description": "Extend `RunSurfaceCapabilities` beyond one-way discovery by letting consumer surfaces negotiate supported policy and enforcement features, version expectations, or fallback semantics, so clients can adapt explicitly when backend capability contracts evolve.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply names consumer capability negotiation as a remaining gap, but the exact negotiation shape still needs a product and API choice between feature flags, version handshakes, or profile-based contracts, so keep it proposed behind the more direct enforcement-rule follow-up.",
+      "depends_on": [
+        "planning-experiment-os-add-machine-readable-policy-and-enforcement-metadata-to-capability-families"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T21:49:29Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os capability discovery toward explicit client and server negotiation so evolving enforcement contracts remain compatible across shared UI surfaces."
+    },
+    {
+      "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
+      "direction_id": "experiment-os",
+      "title": "Add runtime policy evaluation from run-surface capability contracts",
+      "description": "Carry the new machine-readable capability policy model into runtime-side evaluation so worker or orchestration paths can make consistent allow, block, and fallback decisions from the shared contract instead of relying only on UI or API-level discovery metadata.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply names runtime-side policy evaluation as a remaining layer, but the boundary between experiment-os discovery contracts and runtime-ops enforcement still needs a clear ownership decision, so keep it proposed rather than auto-queueing it ahead of the simpler surface-rule task.",
+      "depends_on": [
+        "planning-experiment-os-add-surface-level-enforcement-rules-to-run-surface-capabilities"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T21:49:29Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Connects experiment-os capability metadata to runtime enforcement so shared policy semantics can eventually govern real execution paths instead of remaining a discovery-only contract."
     }
   ]
 }
