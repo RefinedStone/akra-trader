@@ -3514,18 +3514,36 @@
       "direction_id": "experiment-os",
       "title": "Persist workspace conflict score detail focus state",
       "description": "Extend the newly persisted workspace conflict score breakdown visibility model so the last-focused local or remote signal cluster inside an expanded score detail view is restored after reload and when the containing audit row is temporarily hidden and shown again, instead of remembering only whether the score detail panel itself was open.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 26,
-      "priority_reason": "The latest main-session reply says score detail expansion persistence shipped in commit 1fa10ae and explicitly calls out detail-level focus persistence as the remaining gap, specifically remembering the last local or remote signal cluster viewed inside the score breakdown. That makes focus restoration the clearest executable next task for the queue head.",
+      "priority_reason": "Completed in main session commit 2eeb39f, which lifted workspace conflict score detail focus into persisted UI state, restored the last viewed `Local latest` or `Remote audit` cluster per row after reload and audit refilter, refreshed focus source from overview-card, score-column, and local or remote button interactions, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-workspace-conflict-score-detail-expansion-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:30:00Z",
+      "updated_at": "2026-04-20T21:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring whether score evidence is expanded into restoring the precise evidence focus operators were using inside the local-versus-remote score breakdown."
+    },
+    {
+      "id": "planning-experiment-os-persist-workspace-conflict-score-detail-signal-focus-state",
+      "direction_id": "experiment-os",
+      "title": "Persist workspace conflict score detail signal-level focus state",
+      "description": "Extend the newly persisted workspace conflict score breakdown focus model beyond the current local-or-remote cluster level so the last-viewed semantic signal and any collapsed or expanded subgroup state inside that cluster are restored per row after reload and when the containing audit row is temporarily filtered out and back in, instead of resetting to only the cluster shell.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 27,
+      "priority_reason": "The latest main-session reply says cluster-level score detail focus persistence shipped in commit 2eeb39f and explicitly identifies signal-level persistence as the remaining gap, because the UI still forgets the last-viewed semantic signal and folded subgroup state inside each local or remote cluster. That makes signal-level restoration the clearest executable next task for builtin queue continuation.",
+      "depends_on": [
+        "planning-experiment-os-persist-workspace-conflict-score-detail-focus-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:46:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from cluster-level evidence restoration into preserving the exact semantic signal and subgroup context operators were inspecting inside each score breakdown."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
