@@ -3046,18 +3046,36 @@
       "direction_id": "experiment-os",
       "title": "Expand browser preference conflict review beyond basic history filters",
       "description": "Build on the newly shipped browser preference conflict workflow by extending field-level review beyond `open`, `searchQuery`, and `showPinnedOnly` to the rest of the meaningful comparison history browser state, so browser-state sync does not fall back to coarse event-level overwrite behavior for newer preference fields that operators may expect to review explicitly.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says the remaining preference-conflict work is to deepen coverage because only `open/search/pinned-only` are reviewable at field level today. That is the clearest next executable follow-up, and it stays in the just-shipped browser preference conflict path without introducing the heavier stale-event reconciliation semantics of three-way merge.",
+      "priority_reason": "Completed in main session commit e700650, which expanded browser preference conflict review beyond `open`, `searchQuery`, and `showPinnedOnly` to cover audit list filter and resolved-audit visibility preferences, added field-level local or remote pickers plus bulk local or remote actions and apply-resolution flow, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-manual-conflict-resolution-to-history-browser-preferences"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:40:00Z",
+      "updated_at": "2026-04-20T01:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison-state trust by pushing browser preference sync from a partial field-reviewed contract into a broader operator-reviewed state model, reducing the remaining surface where concurrent tabs can still overwrite preference intent too coarsely."
+    },
+    {
+      "id": "planning-experiment-os-extend-manual-conflict-review-beyond-comparison-history-panel-preferences",
+      "direction_id": "experiment-os",
+      "title": "Extend manual conflict review beyond comparison history panel preferences",
+      "description": "Build on the now-expanded browser preference conflict workflow by identifying the remaining comparison-history sync surfaces that still bypass explicit operator review outside panel preference fields, then bring those state changes into the same local-or-remote or merge resolution model so manual review is not limited to comparison history panel preferences alone.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply says the remaining gap after commit e700650 is that manual review still only covers comparison history panel preferences. That is the clearest next executable follow-up because it extends the just-shipped review contract outward before the heavier latest-state three-way reconciliation work.",
+      "depends_on": [
+        "planning-experiment-os-expand-browser-preference-conflict-review-beyond-basic-history-filters"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison-state trust by moving manual conflict handling beyond one audited preference subset toward a broader operator-reviewed sync contract across the remaining comparison-history state surfaces."
     },
     {
       "id": "planning-experiment-os-add-latest-state-three-way-merge-for-comparison-history-conflicts",
@@ -3067,13 +3085,13 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says browser preference conflict cards are still scoped to the captured sync event and do not reconcile against newer browser-state events. That remains a valid follow-up, but it introduces stale-event guards and merge-policy semantics that are still less immediate than first broadening field-level browser preference review coverage.",
+      "priority_reason": "The latest main-session reply says conflict resolution is still scoped to the captured sync event and does not reconcile against newer browser-state changes. That remains a valid follow-up after commit e700650, but it introduces stale-event guards and merge-policy semantics that are still less immediate than first extending manual review beyond panel preference fields.",
       "depends_on": [
         "planning-experiment-os-extend-manual-conflict-resolution-to-history-browser-preferences"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:40:00Z",
+      "updated_at": "2026-04-20T01:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os comparison-history conflict handling from deliberate snapshot review into state-aware reconciliation, which matters once concurrent edits can continue after an initial conflict has already been captured for review."
     },
