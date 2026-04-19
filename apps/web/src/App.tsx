@@ -16,8 +16,11 @@ type ParameterSchema = Record<
   string,
   {
     default?: unknown;
+    enum?: unknown[];
     minimum?: number;
+    maximum?: number;
     type?: string;
+    unit?: string;
   }
 >;
 
@@ -124,6 +127,11 @@ type PresetStructuredDiffGroup = {
   rows: PresetStructuredDiffRow[];
   same_count: number;
   summary_label: string;
+};
+
+type PresetStructuredDiffDeltaValue = {
+  direction: "higher" | "lower" | "same";
+  label: string;
 };
 
 type PresetRevisionDiff = {
@@ -2906,6 +2914,37 @@ const SHOW_COMPARISON_TOOLTIP_TUNING_PANEL = import.meta.env.DEV;
 const DEFAULT_COMPARISON_TOOLTIP_PRESET_IMPORT_CONFLICT_POLICY: ComparisonTooltipPresetImportConflictPolicy =
   "rename";
 const COMPARISON_TOOLTIP_UNCHANGED_GROUP_COLLAPSE_THRESHOLD = 3;
+const PRESET_TIMEFRAME_UNIT_TO_MINUTES: Record<string, number> = {
+  d: 1440,
+  h: 60,
+  m: 1,
+  w: 10080,
+};
+const PRESET_PROFILE_AGGRESSIVENESS_RANKS: Record<string, number> = {
+  aggressive: 4,
+  assertive: 3,
+  balanced: 2,
+  cautious: 1,
+  conservative: 1,
+  normal: 2,
+  safe: 0,
+  standard: 2,
+};
+const PRESET_PROFILE_SPEED_RANKS: Record<string, number> = {
+  balanced: 1,
+  fast: 2,
+  medium: 1,
+  normal: 1,
+  slow: 0,
+  steady: 0,
+  turbo: 3,
+};
+const PRESET_PROFILE_CONFIDENCE_RANKS: Record<string, number> = {
+  balanced: 1,
+  high: 2,
+  low: 0,
+  medium: 1,
+};
 const COMPARISON_TOOLTIP_TUNING_LABELS: Record<keyof ComparisonTooltipTuning, string> = {
   column_down_sweep_close_ms: "Col down close",
   column_down_sweep_hold_ms: "Col down hold",
@@ -3191,6 +3230,247 @@ function matchesPresetParameterSchemaType(value: unknown, expectedType?: string)
   }
 }
 
+function joinPresetStructuredDiffHints(...parts: Array<string | undefined>) {
+  return parts.filter((part): part is string => Boolean(part)).join(" · ") || undefined;
+}
+
+function tokenizePresetParameterPath(pathSegments: string[]) {
+  return pathSegments
+    .flatMap((segment) => segment.toLowerCase().match(/[a-z0-9]+/g) ?? [])
+    .filter((token) => !/^\d+$/.test(token));
+}
+
+function parsePresetTimeframeToMinutes(value: unknown) {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const match = value.trim().match(/^(\d+)([mhdw])$/i);
+  if (!match) {
+    return null;
+  }
+  const amount = Number(match[1]);
+  const unit = PRESET_TIMEFRAME_UNIT_TO_MINUTES[match[2].toLowerCase()];
+  if (!Number.isFinite(amount) || !unit) {
+    return null;
+  }
+  return amount * unit;
+}
+
+function buildPresetRankedStringDelta(
+  existingRaw: unknown,
+  incomingRaw: unknown,
+  ranks: Record<string, number>,
+  higherLabel: string,
+  lowerLabel: string,
+): PresetStructuredDiffDeltaValue | undefined {
+  if (typeof existingRaw !== "string" || typeof incomingRaw !== "string") {
+    return undefined;
+  }
+  const existingRank = ranks[existingRaw.trim().toLowerCase()];
+  const incomingRank = ranks[incomingRaw.trim().toLowerCase()];
+  if (existingRank === undefined || incomingRank === undefined || existingRank === incomingRank) {
+    return undefined;
+  }
+  return {
+    direction: incomingRank > existingRank ? "higher" : "lower",
+    label: incomingRank > existingRank ? higherLabel : lowerLabel,
+  };
+}
+
+function buildPresetParameterDomainContext(
+  pathSegments: string[],
+  existingRaw: unknown,
+  incomingRaw: unknown,
+  schemaEntry?: ParameterSchema[string],
+): {
+  delta?: PresetStructuredDiffDeltaValue;
+  hint?: string;
+} {
+  const tokens = tokenizePresetParameterPath(pathSegments);
+  const tokenSet = new Set(tokens);
+  const timeframeExisting = parsePresetTimeframeToMinutes(existingRaw);
+  const timeframeIncoming = parsePresetTimeframeToMinutes(incomingRaw);
+  const existingNumeric = typeof existingRaw === "number" && Number.isFinite(existingRaw);
+  const incomingNumeric = typeof incomingRaw === "number" && Number.isFinite(incomingRaw);
+  const hasNumericPair = existingNumeric && incomingNumeric;
+  const hasTimeframeCue =
+    schemaEntry?.unit === "timeframe" ||
+    tokenSet.has("timeframe") ||
+    tokenSet.has("interval") ||
+    tokenSet.has("cadence") ||
+    timeframeExisting !== null ||
+    timeframeIncoming !== null;
+  if (hasTimeframeCue) {
+    return {
+      delta:
+        timeframeExisting !== null &&
+        timeframeIncoming !== null &&
+        timeframeExisting !== timeframeIncoming
+          ? {
+              direction: timeframeIncoming > timeframeExisting ? ("higher" as const) : ("lower" as const),
+              label: timeframeIncoming > timeframeExisting ? "slower cadence" : "faster cadence",
+            }
+          : undefined,
+      hint: "Domain: timeframe cadence",
+    };
+  }
+
+  if (tokenSet.has("stop") && tokenSet.has("loss")) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "wider stop" : "tighter stop",
+          }
+        : undefined,
+      hint: "Domain: stop-loss guardrail",
+    };
+  }
+  if ((tokenSet.has("take") && tokenSet.has("profit")) || tokenSet.has("target") || tokenSet.has("tp")) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "farther target" : "closer target",
+          }
+        : undefined,
+      hint: "Domain: profit target",
+    };
+  }
+  if (
+    tokenSet.has("window") ||
+    tokenSet.has("lookback") ||
+    tokenSet.has("period") ||
+    tokenSet.has("bars") ||
+    tokenSet.has("bar") ||
+    tokenSet.has("length")
+  ) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "longer lookback" : "shorter lookback",
+          }
+        : undefined,
+      hint: "Domain: lookback window",
+    };
+  }
+  if (tokenSet.has("threshold") || tokenSet.has("trigger")) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "stricter threshold" : "looser threshold",
+          }
+        : undefined,
+      hint: "Domain: decision threshold",
+    };
+  }
+  if (tokenSet.has("confidence")) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "higher confidence gate" : "lower confidence gate",
+          }
+        : undefined,
+      hint: "Domain: confidence gate",
+    };
+  }
+  if (
+    tokenSet.has("position") ||
+    tokenSet.has("allocation") ||
+    tokenSet.has("exposure") ||
+    tokenSet.has("leverage") ||
+    tokenSet.has("size") ||
+    tokenSet.has("notional")
+  ) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "higher exposure cap" : "lower exposure cap",
+          }
+        : undefined,
+      hint: "Domain: sizing / exposure",
+    };
+  }
+  if (
+    tokenSet.has("risk") ||
+    tokenSet.has("drawdown") ||
+    tokenSet.has("loss") ||
+    tokenSet.has("fraction") ||
+    tokenSet.has("ratio") ||
+    tokenSet.has("pct") ||
+    tokenSet.has("percent")
+  ) {
+    return {
+      delta: hasNumericPair
+        ? {
+            direction: incomingRaw > existingRaw ? "higher" : "lower",
+            label: incomingRaw > existingRaw ? "larger risk budget" : "smaller risk budget",
+          }
+        : undefined,
+      hint: "Domain: risk / ratio budget",
+    };
+  }
+
+  if (tokenSet.has("profile") || tokenSet.has("mode") || tokenSet.has("style") || tokenSet.has("regime")) {
+    return {
+      delta:
+        typeof existingRaw === "string" && typeof incomingRaw === "string"
+          ? buildPresetRankedStringDelta(
+              existingRaw,
+              incomingRaw,
+              PRESET_PROFILE_AGGRESSIVENESS_RANKS,
+              "more aggressive profile",
+              "more conservative profile",
+            ) ??
+            buildPresetRankedStringDelta(
+              existingRaw,
+              incomingRaw,
+              PRESET_PROFILE_SPEED_RANKS,
+              "faster profile",
+              "slower profile",
+            ) ??
+            buildPresetRankedStringDelta(
+              existingRaw,
+              incomingRaw,
+              PRESET_PROFILE_CONFIDENCE_RANKS,
+              "higher confidence profile",
+              "lower confidence profile",
+            )
+          : undefined,
+      hint: "Domain: categorical profile",
+    };
+  }
+
+  if (Array.isArray(schemaEntry?.enum) && schemaEntry.enum.length) {
+    return {
+      delta: undefined,
+      hint: "Domain: categorical selection",
+    };
+  }
+
+  if (
+    tokenSet.has("allow") ||
+    tokenSet.has("enable") ||
+    tokenSet.has("disable") ||
+    tokenSet.has("reduce") ||
+    tokenSet.has("exit")
+  ) {
+    return {
+      delta: undefined,
+      hint: "Domain: execution guardrail",
+    };
+  }
+
+  return {
+    delta: undefined,
+    hint: undefined,
+  };
+}
+
 function formatPresetParameterSchemaHint(schemaEntry?: ParameterSchema[string]) {
   if (!schemaEntry) {
     return undefined;
@@ -3202,8 +3482,17 @@ function formatPresetParameterSchemaHint(schemaEntry?: ParameterSchema[string]) 
   if (schemaEntry.default !== undefined) {
     parts.push(`default ${formatParameterValue(schemaEntry.default)}`);
   }
+  if (Array.isArray(schemaEntry.enum) && schemaEntry.enum.length) {
+    parts.push(`options ${schemaEntry.enum.map((value) => formatParameterValue(value)).join("/")}`);
+  }
   if (typeof schemaEntry.minimum === "number") {
     parts.push(`min ${formatComparisonTooltipTuningValue(schemaEntry.minimum)}`);
+  }
+  if (typeof schemaEntry.maximum === "number") {
+    parts.push(`max ${formatComparisonTooltipTuningValue(schemaEntry.maximum)}`);
+  }
+  if (schemaEntry.unit) {
+    parts.push(`unit ${schemaEntry.unit}`);
   }
   if (!parts.length) {
     return undefined;
@@ -3228,6 +3517,7 @@ function buildPresetStructuredDiffDelta(
   existingRaw: unknown = existingValue,
   incomingRaw: unknown = incomingValue,
   schemaEntry?: ParameterSchema[string],
+  domainDelta?: PresetStructuredDiffDeltaValue,
 ) {
   if (existingValue === incomingValue) {
     return {
@@ -3269,15 +3559,18 @@ function buildPresetStructuredDiffDelta(
     if (existingIsDefault && !incomingIsDefault) {
       return {
         direction:
-          typeof incomingRaw === "number" &&
+          domainDelta?.direction ??
+          (typeof incomingRaw === "number" &&
           typeof schemaEntry.default === "number" &&
           Number.isFinite(incomingRaw) &&
           Number.isFinite(schemaEntry.default)
             ? incomingRaw >= schemaEntry.default
               ? ("higher" as const)
               : ("lower" as const)
-            : ("higher" as const),
-        label: `override default ${formatParameterValue(schemaEntry.default)}`,
+            : ("higher" as const)),
+        label: domainDelta
+          ? `${domainDelta.label} vs default ${formatParameterValue(schemaEntry.default)}`
+          : `override default ${formatParameterValue(schemaEntry.default)}`,
       };
     }
     if (incomingRaw === undefined && !existingIsDefault) {
@@ -3320,6 +3613,9 @@ function buildPresetStructuredDiffDelta(
       direction: "lower" as const,
       label: "removed",
     };
+  }
+  if (domainDelta) {
+    return domainDelta;
   }
   if (
     typeof existingRaw === "number" &&
@@ -3454,6 +3750,7 @@ function buildPresetStructuredDiffRows(
     incomingRaw: unknown = incomingValue,
     semanticHint?: string,
     schemaEntry?: ParameterSchema[string],
+    domainDelta?: PresetStructuredDiffDeltaValue,
   ) => {
     const delta = buildPresetStructuredDiffDelta(
       existingValue,
@@ -3461,6 +3758,7 @@ function buildPresetStructuredDiffRows(
       existingRaw,
       incomingRaw,
       schemaEntry,
+      domainDelta,
     );
     rows.push({
       changed: existingValue !== incomingValue,
@@ -3495,6 +3793,12 @@ function buildPresetStructuredDiffRows(
     const existingValue = existingParameter === undefined ? "" : formatParameterValue(existingParameter);
     const incomingValue = incomingParameter === undefined ? "" : formatParameterValue(incomingParameter);
     const schemaEntry = getPresetParameterSchemaEntry(parameterSchema, pathSegments);
+    const domainContext = buildPresetParameterDomainContext(
+      pathSegments,
+      existingParameter,
+      incomingParameter,
+      schemaEntry,
+    );
     pushRow(
       `parameter:${label}`,
       label,
@@ -3505,8 +3809,12 @@ function buildPresetStructuredDiffRows(
       3,
       existingParameter,
       incomingParameter,
-      formatPresetParameterSchemaHint(schemaEntry),
+      joinPresetStructuredDiffHints(
+        formatPresetParameterSchemaHint(schemaEntry),
+        domainContext.hint,
+      ),
       schemaEntry,
+      domainContext.delta,
     );
   };
   const appendParameterRows = (
