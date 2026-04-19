@@ -3442,18 +3442,36 @@
       "direction_id": "experiment-os",
       "title": "Add bidirectional overview selection state for workspace conflict review",
       "description": "Finish the remaining workspace conflict overview interaction polish by keeping an active overview selection state after overview-to-row navigation, and by reflecting row focus or expansion back into the overview card so the strongest recommendation and top-pick chips can highlight the currently inspected conflict instead of staying one-way jump targets only.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 22,
-      "priority_reason": "The latest main-session reply says overview chips now jump into the correct row and open score drill-downs in commit 71307d5, and explicitly identifies the remaining gap as bidirectional linking plus active overview selection state. That is a concrete executable follow-up and should become the next queue head.",
+      "priority_reason": "Completed in main session commit 4dd8fc4, which synchronized workspace conflict overview chips, cards, row click or focus, local or remote pick buttons, and score detail toggles through one active selection model, added an `Active row` overview card plus shared highlighting, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-link-workspace-conflict-overview-chips-to-row-drill-down"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:45:00Z",
+      "updated_at": "2026-04-20T20:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os workspace conflict explainability by turning overview chips from one-shot navigation affordances into a maintained shared selection model between audit summary and row-level evidence."
+    },
+    {
+      "id": "planning-experiment-os-persist-workspace-conflict-active-selection-across-reload-and-refilter",
+      "direction_id": "experiment-os",
+      "title": "Persist workspace conflict active selection across reload and audit refilter",
+      "description": "Extend the newly shared workspace conflict active-selection model so the selected overview card or conflict row can be restored after reload and retained when the audit list is refiltered or rebuilt, instead of dropping back to purely review-panel-local UI state whenever the view remounts or the visible row set changes.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 23,
+      "priority_reason": "The latest main-session reply says bidirectional overview selection is now complete in commit 4dd8fc4 and explicitly names the remaining gap as selection persistence scope, because the active review selection is still local UI state that does not survive reload or audit-list refilter. That is the clearest executable next task for the queue head.",
+      "depends_on": [
+        "planning-experiment-os-add-bidirectional-overview-selection-state-for-workspace-conflict-review"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict review from an in-panel shared selection affordance into a durable operator context that remains stable across reload and list-shape changes while the audit is still under review."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
