@@ -3964,18 +3964,36 @@
       "direction_id": "experiment-os",
       "title": "Promote comparison eligibility contract into shared domain and API schema",
       "description": "Extend the newly centralized run-list eligibility contract beyond frontend rendering helpers into shared domain types and comparison payload or API schema boundaries so `supporting`, `comparison-eligible`, and `operational-only` semantics become a cross-surface contract enforced consistently between backend, payload construction, and UI consumers.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply says the formal contract now governs frontend run-list rendering and drill-back gating, but has not yet been promoted into comparison payload or API schema and shared domain model layers. That is the clearest executable next task because it directly continues the shipped contract work and turns the policy into a cross-surface backend-enforced experiment model.",
+      "priority_reason": "Completed in main session commit fead80d, which promoted the comparison eligibility contract into the shared backend domain model and `/api/runs/compare` payload schema, updated web consumers to use the payload contract directly with fallback-only legacy helpers, verified with `python -m py_compile`, targeted pytest coverage, `cd apps/web && npx tsc --noEmit`, `git diff --check`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-promote-run-list-comparison-boundaries-into-formal-contract"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:35:00Z",
+      "updated_at": "2026-04-20T12:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os from a frontend-local comparison eligibility contract into a durable shared experiment interface where backend payloads, schema validation, and UI surfaces all speak the same boundary policy."
+    },
+    {
+      "id": "planning-experiment-os-extend-eligibility-contract-across-run-list-and-shared-run-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Extend eligibility contract across run/list and shared run surfaces",
+      "description": "Carry the newly shared comparison eligibility contract beyond `/api/runs/compare` into general run/list APIs and other run-facing surfaces so boundary notes, labels, and eligibility gating come from one backend contract everywhere operators inspect runs, instead of compare-only payload enrichment plus UI fallback logic.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly says the shared domain plus compare API schema work is complete and that the remaining follow-up is to widen the same eligibility contract into normal run/list APIs and other surfaces. That is now the clearest executable next task because it directly continues the shipped contract rollout and removes the remaining compare-only boundary from the experiment model.",
+      "depends_on": [
+        "planning-experiment-os-promote-comparison-eligibility-contract-into-shared-domain-and-api-schema"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os from a compare-surface eligibility contract into a fully shared run interface so list, detail, and comparison experiences all consume the same backend-enforced boundary policy."
     }
   ]
 }
