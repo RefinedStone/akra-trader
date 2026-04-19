@@ -3064,18 +3064,54 @@
       "direction_id": "experiment-os",
       "title": "Extend manual conflict review beyond comparison history panel preferences",
       "description": "Build on the now-expanded browser preference conflict workflow by identifying the remaining comparison-history sync surfaces that still bypass explicit operator review outside panel preference fields, then bring those state changes into the same local-or-remote or merge resolution model so manual review is not limited to comparison history panel preferences alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply says the remaining gap after commit e700650 is that manual review still only covers comparison history panel preferences. That is the clearest next executable follow-up because it extends the just-shipped review contract outward before the heavier latest-state three-way reconciliation work.",
+      "priority_reason": "Completed in main session commit a188540, which extended comparison history sync audit to workspace-scoped state including top-level `comparisonSelection` and `expandedGapRows`, added `Workspace state` audit filtering plus field-level local-or-remote resolution and bulk apply actions, included gap-row changes in the sync signature, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-expand-browser-preference-conflict-review-beyond-basic-history-filters"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:55:00Z",
+      "updated_at": "2026-04-20T02:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison-state trust by moving manual conflict handling beyond one audited preference subset toward a broader operator-reviewed sync contract across the remaining comparison-history state surfaces."
+    },
+    {
+      "id": "planning-experiment-os-add-instrument-level-merge-for-expanded-gap-row-conflicts",
+      "direction_id": "experiment-os",
+      "title": "Add instrument-level merge for expanded gap row conflict resolution",
+      "description": "Build on the shipped workspace-state conflict audit by replacing aggregate `expandedGapRows` review with instrument-aware diff and merge controls, so operators can keep local or remote expansion intent per instrument and resolve mixed gap-row conflicts without treating the whole expanded set as one field.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply after commit a188540 says `expandedGapRows` still resolves only as one aggregate field. That is the clearest next executable follow-up because it closes the explicit remaining gap inside the newly shipped workspace-state review flow without needing a broader product-scope decision first.",
+      "depends_on": [
+        "planning-experiment-os-extend-manual-conflict-review-beyond-comparison-history-panel-preferences"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T02:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison-state trust by making workspace conflict resolution granular enough for per-instrument gap review, reducing the remaining cases where concurrent tabs still force coarse all-or-nothing reconciliation."
+    },
+    {
+      "id": "planning-experiment-os-expand-workspace-conflict-audit-beyond-control-room-browser-state",
+      "direction_id": "experiment-os",
+      "title": "Extend workspace conflict audit beyond control-room browser state",
+      "description": "Expand the new workspace-state audit and resolution pattern beyond the control-room comparison surfaces to other meaningful local browser state that should participate in shared sync metadata, so browser context outside the control room no longer remains entirely outside the manual review contract.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply says browser state outside the control room still does not enter the new audit and resolution flow. That follow-up is valid, but it still needs an operator or product choice about which non-control-room browser state belongs in shared sync and which should stay local-only, so keep it proposed.",
+      "depends_on": [
+        "planning-experiment-os-extend-manual-conflict-review-beyond-comparison-history-panel-preferences"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T02:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os operator trust from one control-room workspace-state sync contract into a clearer product boundary for what browser context should be shared, audited, and manually reconciled across tabs."
     },
     {
       "id": "planning-experiment-os-add-latest-state-three-way-merge-for-comparison-history-conflicts",
