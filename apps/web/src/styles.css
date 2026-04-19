@@ -848,6 +848,35 @@ select {
   color: rgba(221, 239, 255, 0.96);
 }
 
+.comparison-history-conflict-review-score-detail-inline-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.comparison-history-conflict-review-score-detail-inline-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.015);
+  color: rgba(255, 255, 255, 0.68);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.63rem;
+  cursor: pointer;
+}
+
+.comparison-history-conflict-review-score-detail-inline-chip.is-active {
+  border-color: rgba(255, 196, 92, 0.26);
+  background: rgba(255, 196, 92, 0.1);
+  color: rgba(255, 242, 214, 0.96);
+}
+
+.comparison-history-conflict-review-score-detail-inline-copy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.72rem;
+}
+
 .comparison-history-conflict-review-score-detail-chip-row {
   display: flex;
   flex-wrap: wrap;

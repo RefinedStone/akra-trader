@@ -2939,6 +2939,21 @@ type ComparisonHistorySyncWorkspaceSignalMicroViewKey =
   | "lane"
   | "gap"
   | "reason";
+type ComparisonHistorySyncWorkspaceSignalMicroInteractionKey =
+  | "lane"
+  | "polarity"
+  | "signal"
+  | "source"
+  | "support"
+  | "tradeoff"
+  | "rank"
+  | "score"
+  | "share"
+  | "impact"
+  | "selected"
+  | "focusedLane"
+  | "gap"
+  | "reason";
 type ComparisonHistorySyncAuditFilter =
   | "all"
   | "conflicts"
@@ -3037,6 +3052,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
   focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
+  focusedWorkspaceScoreSignalMicroInteractions: Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4861,6 +4877,10 @@ export default function App() {
   >(
     () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreSignalMicroViews ?? {},
   );
+  const [focusedWorkspaceScoreSignalMicroInteractions, setFocusedWorkspaceScoreSignalMicroInteractions] =
+    useState<Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>>(
+      () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreSignalMicroInteractions ?? {},
+    );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5284,6 +5304,7 @@ export default function App() {
         collapsedWorkspaceScoreSignalSubviewIds,
         collapsedWorkspaceScoreSignalNestedSubviewIds,
         focusedWorkspaceScoreSignalMicroViews,
+        focusedWorkspaceScoreSignalMicroInteractions,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5306,6 +5327,7 @@ export default function App() {
     collapsedWorkspaceScoreSignalSubviewIds,
     collapsedWorkspaceScoreSignalNestedSubviewIds,
     focusedWorkspaceScoreSignalMicroViews,
+    focusedWorkspaceScoreSignalMicroInteractions,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8252,6 +8274,7 @@ export default function App() {
             collapsedWorkspaceScoreSignalSubviewIds,
             collapsedWorkspaceScoreSignalNestedSubviewIds,
             focusedWorkspaceScoreSignalMicroViews,
+            focusedWorkspaceScoreSignalMicroInteractions,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8339,6 +8362,15 @@ export default function App() {
                   : {
                       ...current,
                       [subviewId]: value,
+                    }
+              ),
+            onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
+              setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
+                current[interactionId] === value
+                  ? current
+                  : {
+                      ...current,
+                      [interactionId]: value,
                     }
               ),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
@@ -9380,6 +9412,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     collapsedWorkspaceScoreSignalSubviewIds: {},
     collapsedWorkspaceScoreSignalNestedSubviewIds: {},
     focusedWorkspaceScoreSignalMicroViews: {},
+    focusedWorkspaceScoreSignalMicroInteractions: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -10074,6 +10107,33 @@ function normalizeComparisonHistoryPanelUiState(
               || candidate === "impact"
               || candidate === "selection"
               || candidate === "lane"
+              || candidate === "gap"
+              || candidate === "reason"
+            ) {
+              accumulator[key] = candidate;
+            }
+            return accumulator;
+          }, {})
+        : {},
+    focusedWorkspaceScoreSignalMicroInteractions:
+      value?.focusedWorkspaceScoreSignalMicroInteractions
+      && typeof value.focusedWorkspaceScoreSignalMicroInteractions === "object"
+        ? Object.entries(value.focusedWorkspaceScoreSignalMicroInteractions).reduce<
+            Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>
+          >((accumulator, [key, candidate]) => {
+            if (
+              candidate === "lane"
+              || candidate === "polarity"
+              || candidate === "signal"
+              || candidate === "source"
+              || candidate === "support"
+              || candidate === "tradeoff"
+              || candidate === "rank"
+              || candidate === "score"
+              || candidate === "share"
+              || candidate === "impact"
+              || candidate === "selected"
+              || candidate === "focusedLane"
               || candidate === "gap"
               || candidate === "reason"
             ) {
@@ -13288,6 +13348,7 @@ type RunSectionComparisonControls = {
   collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
   focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
+  focusedWorkspaceScoreSignalMicroInteractions: Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13333,6 +13394,10 @@ type RunSectionComparisonControls = {
   onChangeWorkspaceScoreSignalMicroView: (
     subviewId: string,
     value: ComparisonHistorySyncWorkspaceSignalMicroViewKey,
+  ) => void;
+  onChangeWorkspaceScoreSignalMicroInteraction: (
+    interactionId: string,
+    value: ComparisonHistorySyncWorkspaceSignalMicroInteractionKey,
   ) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
@@ -13489,11 +13554,25 @@ function RunSection({
     subviewKey: ComparisonHistorySyncWorkspaceSignalDetailSubviewKey,
     nestedKey: ComparisonHistorySyncWorkspaceSignalDetailNestedKey,
   ) => `${scoreDetailKey}:${subviewKey}:${nestedKey}`;
+  const buildWorkspaceReviewSignalMicroInteractionSelectionId = (
+    nestedSubviewId: string,
+    microViewKey: ComparisonHistorySyncWorkspaceSignalMicroViewKey,
+  ) => `${nestedSubviewId}:${microViewKey}`;
   const resolveWorkspaceReviewSignalMicroView = (
     nestedSubviewId: string,
     options: ComparisonHistorySyncWorkspaceSignalMicroViewKey[],
   ) => {
     const persistedValue = comparison?.focusedWorkspaceScoreSignalMicroViews[nestedSubviewId];
+    if (persistedValue && options.includes(persistedValue)) {
+      return persistedValue;
+    }
+    return options[0];
+  };
+  const resolveWorkspaceReviewSignalMicroInteraction = (
+    interactionId: string,
+    options: ComparisonHistorySyncWorkspaceSignalMicroInteractionKey[],
+  ) => {
+    const persistedValue = comparison?.focusedWorkspaceScoreSignalMicroInteractions[interactionId];
     if (persistedValue && options.includes(persistedValue)) {
       return persistedValue;
     }
@@ -14539,6 +14618,66 @@ function RunSection({
                                                       recommendationResolutionBasisNestedId,
                                                       ["gap", "reason"],
                                                     );
+                                                  const interpretationLaneSemanticsInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      interpretationLaneSemanticsNestedId,
+                                                      interpretationLaneSemanticsMicroView,
+                                                    );
+                                                  const interpretationRecommendationEffectInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      interpretationRecommendationEffectNestedId,
+                                                      interpretationRecommendationEffectMicroView,
+                                                    );
+                                                  const lanePositionRankContextInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      lanePositionRankContextNestedId,
+                                                      lanePositionRankContextMicroView,
+                                                    );
+                                                  const lanePositionWeightShareInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      lanePositionWeightShareNestedId,
+                                                      lanePositionWeightShareMicroView,
+                                                    );
+                                                  const recommendationSelectionAlignmentInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      recommendationSelectionAlignmentNestedId,
+                                                      recommendationSelectionAlignmentMicroView,
+                                                    );
+                                                  const recommendationResolutionBasisInteractionId =
+                                                    buildWorkspaceReviewSignalMicroInteractionSelectionId(
+                                                      recommendationResolutionBasisNestedId,
+                                                      recommendationResolutionBasisMicroView,
+                                                    );
+                                                  const interpretationLaneSemanticsInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      interpretationLaneSemanticsInteractionId,
+                                                      ["lane", "polarity"],
+                                                    );
+                                                  const interpretationRecommendationEffectInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      interpretationRecommendationEffectInteractionId,
+                                                      ["support", "tradeoff"],
+                                                    );
+                                                  const lanePositionRankContextInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      lanePositionRankContextInteractionId,
+                                                      ["rank", "score"],
+                                                    );
+                                                  const lanePositionWeightShareInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      lanePositionWeightShareInteractionId,
+                                                      ["share", "impact"],
+                                                    );
+                                                  const recommendationSelectionAlignmentInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      recommendationSelectionAlignmentInteractionId,
+                                                      ["selected", "focusedLane"],
+                                                    );
+                                                  const recommendationResolutionBasisInteraction =
+                                                    resolveWorkspaceReviewSignalMicroInteraction(
+                                                      recommendationResolutionBasisInteractionId,
+                                                      ["gap", "reason"],
+                                                    );
                                                   const focusScoreDetailSource = (
                                                     source: ComparisonHistorySyncConflictFieldSource,
                                                   ) => {
@@ -15000,17 +15139,53 @@ function RunSection({
                                                                                   </p>
                                                                                 </>
                                                                               ) : (
-                                                                                <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                    <span>Focused signal</span>
-                                                                                    <strong>{focusedSignalDetail.signal.label}</strong>
+                                                                                  <div className="comparison-history-conflict-review-score-detail-grid">
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Focused signal</span>
+                                                                                      <strong>{focusedSignalDetail.signal.label}</strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Lane label</span>
+                                                                                      <strong>{focusedSignalDetail.sourceLabel}</strong>
+                                                                                    </div>
                                                                                   </div>
-                                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                    <span>Lane label</span>
-                                                                                    <strong>{focusedSignalDetail.sourceLabel}</strong>
-                                                                                  </div>
-                                                                                </div>
                                                                               )}
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["lane", "Lane lens"],
+                                                                                  ["polarity", "Polarity lens"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      interpretationLaneSemanticsInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      interpretationLaneSemanticsInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        interpretationLaneSemanticsInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {interpretationLaneSemanticsInteraction === "lane"
+                                                                                  ? `${focusedSignalDetail.sourceLabel} currently owns this signal inside the active semantic lane.`
+                                                                                  : focusedSignalDetail.signal.weight >= 0
+                                                                                    ? "The focused signal is adding confidence to the lane rather than draining it."
+                                                                                    : "The focused signal is subtracting confidence from the lane rather than supporting it."}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15079,6 +15254,42 @@ function RunSection({
                                                                                     : "This signal currently sits on the alternate lane, showing what the non-ranked branch is still preserving."}
                                                                                 </p>
                                                                               )}
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["support", "Support"],
+                                                                                  ["tradeoff", "Trade-off"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      interpretationRecommendationEffectInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      interpretationRecommendationEffectInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        interpretationRecommendationEffectInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {interpretationRecommendationEffectInteraction === "support"
+                                                                                  ? focusedSignalDetail.recommendationRelationship
+                                                                                  : focusedSignalDetail.source === row.recommendedSource
+                                                                                    ? "Changing away from the ranked lane would drop this specific semantic support."
+                                                                                    : "Keeping the alternate lane preserves this signal even though the overall ranking prefers the other branch."}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15206,6 +15417,42 @@ function RunSection({
                                                                                   </>
                                                                                 )}
                                                                               </div>
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["rank", "Rank lens"],
+                                                                                  ["score", "Score lens"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      lanePositionRankContextInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      lanePositionRankContextInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        lanePositionRankContextInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {lanePositionRankContextInteraction === "rank"
+                                                                                  ? `This signal currently ranks ${focusedSignalDetail.rank} out of ${focusedSignalDetail.signalCount} visible signals in its lane.`
+                                                                                  : `The lane score ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.laneScore,
+                                                                                    )} is the broader context around this signal's own impact.`}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15310,6 +15557,45 @@ function RunSection({
                                                                                   </>
                                                                                 )}
                                                                               </div>
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["share", "Share lens"],
+                                                                                  ["impact", "Impact lens"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      lanePositionWeightShareInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      lanePositionWeightShareInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        lanePositionWeightShareInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {lanePositionWeightShareInteraction === "share"
+                                                                                  ? `This signal covers ${Math.round(
+                                                                                      focusedSignalDetail.shareOfVisibleWeight
+                                                                                        * 100,
+                                                                                    )}% of the currently visible signal weight in the lane.`
+                                                                                  : `Its direct signed impact is ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.signal.weight,
+                                                                                    )} on the lane.`}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15444,6 +15730,40 @@ function RunSection({
                                                                                   </>
                                                                                 )}
                                                                               </div>
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["selected", "Selection lens"],
+                                                                                  ["focusedLane", "Focused lane lens"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      recommendationSelectionAlignmentInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      recommendationSelectionAlignmentInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        recommendationSelectionAlignmentInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {recommendationSelectionAlignmentInteraction === "selected"
+                                                                                  ? "This lens follows the operator's currently chosen source for the row."
+                                                                                  : "This lens follows the lane that currently owns the focused signal, even if it is not the chosen row source."}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15535,6 +15855,42 @@ function RunSection({
                                                                                   </>
                                                                                 )}
                                                                               </div>
+                                                                              <div className="comparison-history-conflict-review-score-detail-inline-row">
+                                                                                {([
+                                                                                  ["gap", "Gap lens"],
+                                                                                  ["reason", "Reason lens"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      recommendationResolutionBasisInteraction
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-inline-chip ${
+                                                                                      recommendationResolutionBasisInteraction
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroInteraction(
+                                                                                        recommendationResolutionBasisInteractionId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              <p className="comparison-history-conflict-review-score-detail-inline-copy">
+                                                                                {recommendationResolutionBasisInteraction === "gap"
+                                                                                  ? `The ranked gap currently stands at +${formatComparisonScoreValue(
+                                                                                      row.recommendationStrength,
+                                                                                    )} points between the two lanes.`
+                                                                                  : `The current recommendation reason is: ${row.recommendationReason}.`}
+                                                                              </p>
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
