@@ -2920,18 +2920,54 @@
       "direction_id": "experiment-os",
       "title": "Add a comparison history browser panel for direct step navigation",
       "description": "Build the next comparison-history UX pass by exposing the stored compare-step metadata as a visible history or timeline panel that can list prior comparison entries and let operators jump directly to a selected step instead of relying only on browser back or forward plus the current-step summary.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is a separate history-browser UI: labels and summaries now exist on each history entry and the current toolbar, but operators still cannot expand compare steps into a list or jump directly through a timeline panel. That is the clearest executable next task after the completed history-labeling pass.",
+      "priority_reason": "Completed in main session commit 0b48b3b, which added a comparison history browser panel backed by shadow timeline state, direct step selection, Back step and Forward step controls, `push` or `replace` or `popstate` synchronization, manual URL-entry recovery, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-label-and-summarize-comparison-history-steps"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:25:00Z",
+      "updated_at": "2026-04-20T00:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os comparison navigation from a readable current-step model into a full operator-browsable history surface, so multi-step comparison review supports direct timeline inspection and recovery instead of browser-only stepping."
+    },
+    {
+      "id": "planning-experiment-os-add-history-management-controls-to-comparison-browser-panel",
+      "direction_id": "experiment-os",
+      "title": "Add history management controls to the comparison browser panel",
+      "description": "Deepen the new comparison history browser panel with operator-facing history management UX such as step search, explicit timestamps, and pinning or bookmarking affordances so longer compare sessions stay navigable without relying on raw chronological scanning.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply says the browser panel itself is complete and explicitly lists step search, timestamps, and pinning as the remaining history-management UX gap. That is the clearest directly executable next task after the panel shipped.",
+      "depends_on": [
+        "planning-experiment-os-add-comparison-history-browser-panel"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T00:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os comparison navigation from a basic browsable timeline into an operator-manageable session history, which matters once comparison reviews span enough steps that simple back or forward and raw lists stop scaling."
+    },
+    {
+      "id": "planning-experiment-os-persist-comparison-history-snapshots-across-reload",
+      "direction_id": "experiment-os",
+      "title": "Persist comparison history snapshots across reloads",
+      "description": "Decide and implement the next durability model for the comparison history browser so reload can recover a useful compare-step timeline from persisted snapshots or view state, while staying honest about what the real browser history stack can and cannot be reconstructed exactly.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply explicitly calls out reload recovery as an unresolved gap, but closing it requires a product-facing decision about acceptable approximation versus strict browser-history fidelity. Keep it queued behind the more direct history-management controls task.",
+      "depends_on": [
+        "planning-experiment-os-add-comparison-history-browser-panel"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T00:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison-state durability beyond same-session shadow history, but it needs an explicit contract for persisted timeline recovery so operators are not misled about exact browser-stack reconstruction after reload."
     },
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
