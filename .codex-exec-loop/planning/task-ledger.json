@@ -4198,18 +4198,36 @@
       "direction_id": "experiment-os",
       "title": "Extract standalone run-subresource capability envelopes into a shared serializer",
       "description": "Now that standalone `orders`, `positions`, and `metrics` all return the same capability envelope shape, consolidate that response contract into a shared backend serializer or helper so future run subresources inherit `run_id`, `run_mode`, `run_status`, `surface_enforcement`, and `action_availability` consistently without copy-paste drift.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply says the standalone `orders`, `positions`, and `metrics` envelopes are now aligned in commit `d7dbcac` and explicitly calls out common-serializer generalization as the remaining follow-up for future run subresources. That makes serializer extraction the clearest executable next queue head, while consumer capability negotiation still needs a separate contract decision.",
+      "priority_reason": "Completed in main session commit e5be9fd, which extracted standalone `orders`, `positions`, and `metrics` envelopes into the shared `_serialize_run_subresource_envelope(...)` helper, split order item serialization for reusable order-specific availability injection, preserved the response shape, and verified the change with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-surface-rule-enforcement-to-standalone-position-and-metric-responses"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T14:15:00Z",
+      "updated_at": "2026-04-20T19:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Hardens experiment-os run-surface enforcement by turning the newly aligned standalone subresource envelopes into one reusable serializer contract, reducing drift risk as additional run-adjacent read surfaces are added."
+    },
+    {
+      "id": "planning-experiment-os-generalize-run-subresource-envelope-serialization-with-body-serializer-registry",
+      "direction_id": "experiment-os",
+      "title": "Generalize run subresource envelope serialization with a body-serializer registry",
+      "description": "Build on the new shared standalone run-subresource envelope helper by lifting body serialization behind a reusable registry or typed envelope factory, so future standalone run subresources can register their payload serializer once and inherit the common envelope contract without adding another bespoke wrapper path in `application.py`.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says the remaining follow-up is to generalize the new envelope layer further, potentially into a body serializer registry or typed envelope factory for future standalone run subresources. That makes this the clearest executable next queue head now that the shared envelope helper itself shipped in commit e5be9fd.",
+      "depends_on": [
+        "planning-experiment-os-extract-standalone-run-subresource-capability-envelopes-into-shared-serializer"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os run-surface serializer discipline from one shared envelope helper into a reusable registration model, reducing future drift and keeping new standalone run subresources aligned with the common capability contract."
     }
   ]
 }
