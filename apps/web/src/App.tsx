@@ -3035,9 +3035,12 @@ type ComparisonHistorySyncPreferenceReviewRow = {
 
 type ComparisonHistorySyncWorkspaceReviewRow = {
   fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey;
+  hasLatestLocalDrift: boolean;
   label: string;
+  localHint?: string | null;
   localValue: string;
   remoteValue: string;
+  semanticRank: number;
   selectedSource: ComparisonHistorySyncConflictFieldSource;
 };
 
@@ -4843,6 +4846,14 @@ export default function App() {
       comparisonSelection,
     ],
   );
+  const latestWorkspaceSyncState = useMemo(
+    () => buildComparisonHistorySyncWorkspaceState({
+      comparisonSelection,
+      expandedGapRows,
+      expandedGapWindowSelections,
+    }),
+    [comparisonSelection, expandedGapRows, expandedGapWindowSelections],
+  );
   const lastComparisonHistorySyncSignatureRef = useRef(comparisonHistorySyncSignature);
   const applyComparisonSelectionState = (
     value: ControlRoomComparisonSelectionState,
@@ -5617,9 +5628,13 @@ export default function App() {
     if (!targetAudit?.workspaceReview) {
       return;
     }
-    const resolvedState = resolveComparisonHistorySyncWorkspaceReview(targetAudit.workspaceReview);
+    const resolvedState = resolveComparisonHistorySyncWorkspaceReview(
+      targetAudit.workspaceReview,
+      latestWorkspaceSyncState,
+    );
     const resolutionSummary = formatComparisonHistorySyncWorkspaceResolutionSummary(
       targetAudit.workspaceReview,
+      latestWorkspaceSyncState,
     );
     const nextComparisonSelection = normalizeControlRoomComparisonSelection(resolvedState.comparisonSelection);
     const nextExpandedGapRows = marketStatus
@@ -8096,6 +8111,7 @@ export default function App() {
           comparison={{
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
+            latestWorkspaceSyncState,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
             historySharedSync: comparisonHistorySharedSyncState,
@@ -10784,6 +10800,90 @@ function formatComparisonHistorySyncWorkspaceSelectionKeyLabel(
   )?.label ?? fieldKey;
 }
 
+function rankComparisonHistorySyncWorkspaceSelectionKey(
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+) {
+  if (fieldKey === "comparisonSelection.selectedRunIds") {
+    return 500;
+  }
+  if (fieldKey === "comparisonSelection.scoreLink") {
+    return 450;
+  }
+  if (fieldKey === "comparisonSelection.intent") {
+    return 400;
+  }
+  if (fieldKey.startsWith("expandedGapRows:")) {
+    return 300;
+  }
+  if (fieldKey === "expandedGapRows") {
+    return 280;
+  }
+  if (fieldKey.startsWith("expandedGapWindows|")) {
+    return 200;
+  }
+  return 100;
+}
+
+function resolveComparisonHistorySyncWorkspaceFieldSource(
+  review: ComparisonHistorySyncWorkspaceReview,
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+): ComparisonHistorySyncConflictFieldSource {
+  const expandedGapWindowSelection = parseComparisonHistoryExpandedGapWindowSelectionKey(fieldKey);
+  if (expandedGapWindowSelection) {
+    return (
+      review.selectedSources[fieldKey]
+      ?? review.selectedSources[
+        buildComparisonHistoryExpandedGapRowSelectionKey(expandedGapWindowSelection.rowKey)
+      ]
+      ?? review.selectedSources.expandedGapRows
+      ?? "remote"
+    );
+  }
+  const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
+  if (expandedGapRowKey) {
+    return (
+      review.selectedSources[fieldKey]
+      ?? review.selectedSources.expandedGapRows
+      ?? "remote"
+    );
+  }
+  return review.selectedSources[fieldKey] ?? "remote";
+}
+
+function listComparisonHistorySyncWorkspaceConflictSelectionKeys(
+  review: ComparisonHistorySyncWorkspaceReview,
+) {
+  const fieldKeys: ComparisonHistorySyncWorkspaceReviewSelectionKey[] =
+    COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.flatMap((definition) => {
+      if (
+        definition.fieldKey === "expandedGapRows"
+        || !hasComparisonHistorySyncWorkspaceFieldDifference(
+          definition.fieldKey,
+          review.localState,
+          review.remoteState,
+        )
+      ) {
+        return [];
+      }
+      return [definition.fieldKey];
+    });
+  const expandedGapRowKeys = listComparisonHistoryExpandedGapRowDiffKeys(
+    review.localState.expandedGapRows,
+    review.remoteState.expandedGapRows,
+  ).map((key) => buildComparisonHistoryExpandedGapRowSelectionKey(key));
+  const expandedGapWindowKeys = [...new Set([
+    ...Object.keys(review.localState.expandedGapWindowSelections),
+    ...Object.keys(review.remoteState.expandedGapWindowSelections),
+  ])].flatMap((rowKey) =>
+    listComparisonHistoryExpandedGapWindowDiffKeys(
+      review.localState.expandedGapWindowSelections,
+      review.remoteState.expandedGapWindowSelections,
+      rowKey,
+    ).map((windowKey) => buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey)),
+  );
+  return fieldKeys.concat(expandedGapRowKeys, expandedGapWindowKeys);
+}
+
 function summarizeComparisonHistorySyncWorkspaceChanges(state: {
   localComparisonSelection: ControlRoomComparisonSelectionState;
   remoteComparisonSelection: ControlRoomComparisonSelectionState;
@@ -11007,9 +11107,31 @@ function buildComparisonHistorySyncWorkspaceReview(state: {
 
 function buildComparisonHistorySyncWorkspaceReviewRows(
   review: ComparisonHistorySyncWorkspaceReview,
+  latestLocalState?: ComparisonHistorySyncWorkspaceState,
 ): ComparisonHistorySyncWorkspaceReviewRow[] {
-  const rows: ComparisonHistorySyncWorkspaceReviewRow[] =
-    COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.flatMap((definition) => {
+  const effectiveLocalState = latestLocalState ?? review.localState;
+  const rows: ComparisonHistorySyncWorkspaceReviewRow[] = [];
+  const pushWorkspaceRow = (
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+    label: string,
+  ) => {
+    const localSnapshotValue = formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.localState);
+    const localValue = formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, effectiveLocalState);
+    const hasLatestLocalDrift =
+      Boolean(latestLocalState)
+      && hasComparisonHistorySyncWorkspaceFieldDifference(fieldKey, review.localState, effectiveLocalState);
+    rows.push({
+      fieldKey,
+      hasLatestLocalDrift,
+      label,
+      localHint: hasLatestLocalDrift ? `Audit snapshot: ${localSnapshotValue}` : null,
+      localValue,
+      remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
+      semanticRank: rankComparisonHistorySyncWorkspaceSelectionKey(fieldKey),
+      selectedSource: resolveComparisonHistorySyncWorkspaceFieldSource(review, fieldKey),
+    });
+  };
+  COMPARISON_HISTORY_SYNC_WORKSPACE_FIELD_DEFINITIONS.forEach((definition) => {
     if (
       definition.fieldKey === "expandedGapRows"
       || !hasComparisonHistorySyncWorkspaceFieldDifference(
@@ -11018,68 +11140,44 @@ function buildComparisonHistorySyncWorkspaceReviewRows(
         review.remoteState,
       )
     ) {
-      return [];
+      return;
     }
-    return [{
-      fieldKey: definition.fieldKey,
-      label: definition.label,
-      localValue: formatComparisonHistorySyncWorkspaceFieldValue(definition.fieldKey, review.localState),
-      remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(definition.fieldKey, review.remoteState),
-      selectedSource: review.selectedSources[definition.fieldKey] ?? "remote",
-    }];
+    pushWorkspaceRow(definition.fieldKey, definition.label);
+  });
+  listComparisonHistoryExpandedGapRowDiffKeys(
+    review.localState.expandedGapRows,
+    review.remoteState.expandedGapRows,
+  ).forEach((key) => {
+    const fieldKey = buildComparisonHistoryExpandedGapRowSelectionKey(key);
+    pushWorkspaceRow(fieldKey, formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
+  });
+  [...new Set([
+    ...Object.keys(review.localState.expandedGapWindowSelections),
+    ...Object.keys(review.remoteState.expandedGapWindowSelections),
+  ])].forEach((rowKey) => {
+    listComparisonHistoryExpandedGapWindowDiffKeys(
+      review.localState.expandedGapWindowSelections,
+      review.remoteState.expandedGapWindowSelections,
+      rowKey,
+    ).forEach((windowKey) => {
+      const fieldKey = buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey);
+      pushWorkspaceRow(fieldKey, formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
     });
-  return rows.concat(
-    listComparisonHistoryExpandedGapRowDiffKeys(
-      review.localState.expandedGapRows,
-      review.remoteState.expandedGapRows,
-    ).map((key) => {
-      const fieldKey = buildComparisonHistoryExpandedGapRowSelectionKey(key);
-      return {
-        fieldKey,
-        label: formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey),
-        localValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.localState),
-        remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
-        selectedSource:
-          review.selectedSources[fieldKey]
-          ?? review.selectedSources.expandedGapRows
-          ?? "remote",
-      };
-    }),
-    ...[...new Set([
-      ...Object.keys(review.localState.expandedGapWindowSelections),
-      ...Object.keys(review.remoteState.expandedGapWindowSelections),
-    ])].flatMap((rowKey) =>
-      listComparisonHistoryExpandedGapWindowDiffKeys(
-        review.localState.expandedGapWindowSelections,
-        review.remoteState.expandedGapWindowSelections,
-        rowKey,
-      ).map((windowKey) => {
-        const fieldKey = buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey);
-        return {
-          fieldKey,
-          label: formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey),
-          localValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.localState),
-          remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
-          selectedSource:
-            review.selectedSources[fieldKey]
-            ?? review.selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(rowKey)]
-            ?? review.selectedSources.expandedGapRows
-            ?? "remote",
-        };
-      }),
-    ),
-  );
+  });
+  return rows.sort((left, right) => (
+    Number(right.hasLatestLocalDrift) - Number(left.hasLatestLocalDrift)
+    || right.semanticRank - left.semanticRank
+    || left.label.localeCompare(right.label)
+  ));
 }
 
 function formatComparisonHistorySyncWorkspaceResolutionSummary(
   review: ComparisonHistorySyncWorkspaceReview,
+  latestLocalState?: ComparisonHistorySyncWorkspaceState,
 ) {
   const selectedFields = Object.entries(review.selectedSources) as Array<
     [ComparisonHistorySyncWorkspaceReviewSelectionKey, ComparisonHistorySyncConflictFieldSource]
   >;
-  if (!selectedFields.length) {
-    return "Kept remote workspace values for all fields.";
-  }
   const localFields = selectedFields
     .filter(([, source]) => source === "local")
     .map(([fieldKey]) => formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
@@ -11087,99 +11185,103 @@ function formatComparisonHistorySyncWorkspaceResolutionSummary(
     .filter(([, source]) => source === "remote")
     .map(([fieldKey]) => formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey));
   const parts: string[] = [];
+  if (!selectedFields.length) {
+    parts.push("Kept remote workspace values for all fields.");
+  }
   if (localFields.length) {
     parts.push(`Local: ${localFields.join(", ")}`);
   }
   if (remoteFields.length) {
     parts.push(`Remote: ${remoteFields.join(", ")}`);
   }
+  if (latestLocalState) {
+    const latestLocalDriftCount = listComparisonHistorySyncWorkspaceConflictSelectionKeys(review)
+      .filter((fieldKey) =>
+        resolveComparisonHistorySyncWorkspaceFieldSource(review, fieldKey) === "local"
+        && hasComparisonHistorySyncWorkspaceFieldDifference(fieldKey, review.localState, latestLocalState),
+      ).length;
+    if (latestLocalDriftCount > 0) {
+      parts.push(
+        `Latest local drift kept for ${latestLocalDriftCount} field${latestLocalDriftCount === 1 ? "" : "s"}`,
+      );
+    }
+    parts.push("3-way merge keeps current local workspace outside remote-selected fields");
+  }
   return parts.join(" · ");
 }
 
 function resolveComparisonHistorySyncWorkspaceReview(
   review: ComparisonHistorySyncWorkspaceReview,
+  latestLocalState?: ComparisonHistorySyncWorkspaceState,
 ): ComparisonHistorySyncWorkspaceState {
-  const resolvedSelection = normalizeControlRoomComparisonSelection(review.remoteState.comparisonSelection);
-  if (review.selectedSources["comparisonSelection.intent"] === "local") {
-    resolvedSelection.intent = review.localState.comparisonSelection.intent;
+  const effectiveLocalState = latestLocalState ?? review.localState;
+  const resolvedSelection = normalizeControlRoomComparisonSelection(effectiveLocalState.comparisonSelection);
+  if (resolveComparisonHistorySyncWorkspaceFieldSource(review, "comparisonSelection.intent") === "remote") {
+    resolvedSelection.intent = review.remoteState.comparisonSelection.intent;
   }
-  if (review.selectedSources["comparisonSelection.selectedRunIds"] === "local") {
-    resolvedSelection.selectedRunIds = [...review.localState.comparisonSelection.selectedRunIds];
+  if (
+    resolveComparisonHistorySyncWorkspaceFieldSource(review, "comparisonSelection.selectedRunIds")
+    === "remote"
+  ) {
+    resolvedSelection.selectedRunIds = [...review.remoteState.comparisonSelection.selectedRunIds];
   }
-  if (review.selectedSources["comparisonSelection.scoreLink"] === "local") {
-    resolvedSelection.scoreLink = review.localState.comparisonSelection.scoreLink
-      ? { ...review.localState.comparisonSelection.scoreLink }
+  if (resolveComparisonHistorySyncWorkspaceFieldSource(review, "comparisonSelection.scoreLink") === "remote") {
+    resolvedSelection.scoreLink = review.remoteState.comparisonSelection.scoreLink
+      ? { ...review.remoteState.comparisonSelection.scoreLink }
       : null;
   }
-  const localExpandedGapRows = filterExpandedGapRows(review.localState.expandedGapRows);
+  const auditLocalExpandedGapRows = filterExpandedGapRows(review.localState.expandedGapRows);
+  const localExpandedGapRows = filterExpandedGapRows(effectiveLocalState.expandedGapRows);
   const remoteExpandedGapRows = filterExpandedGapRows(review.remoteState.expandedGapRows);
-  const localExpandedGapWindowSelections = filterExpandedGapWindowSelections(
+  const auditLocalExpandedGapWindowSelections = filterExpandedGapWindowSelections(
     review.localState.expandedGapWindowSelections,
+  );
+  const localExpandedGapWindowSelections = filterExpandedGapWindowSelections(
+    effectiveLocalState.expandedGapWindowSelections,
   );
   const remoteExpandedGapWindowSelections = filterExpandedGapWindowSelections(
     review.remoteState.expandedGapWindowSelections,
   );
-  const aggregateExpandedGapRowsSource = review.selectedSources.expandedGapRows;
-  const resolvedExpandedGapRows =
-    aggregateExpandedGapRowsSource === "local"
-      ? { ...localExpandedGapRows }
-      : { ...remoteExpandedGapRows };
-  const resolvedExpandedGapWindowSelections =
-    aggregateExpandedGapRowsSource === "local"
-      ? { ...localExpandedGapWindowSelections }
-      : { ...remoteExpandedGapWindowSelections };
+  const resolvedExpandedGapRows = { ...localExpandedGapRows };
+  const resolvedExpandedGapWindowSelections = { ...localExpandedGapWindowSelections };
   listComparisonHistoryExpandedGapRowDiffKeys(
-    localExpandedGapRows,
+    auditLocalExpandedGapRows,
     remoteExpandedGapRows,
   ).forEach((key) => {
     const fieldKey = buildComparisonHistoryExpandedGapRowSelectionKey(key);
-    const source =
-      review.selectedSources[fieldKey]
-      ?? aggregateExpandedGapRowsSource
-      ?? "remote";
-    const sourceRows = source === "local" ? localExpandedGapRows : remoteExpandedGapRows;
-    if (sourceRows[key]) {
+    if (resolveComparisonHistorySyncWorkspaceFieldSource(review, fieldKey) !== "remote") {
+      return;
+    }
+    if (remoteExpandedGapRows[key]) {
       resolvedExpandedGapRows[key] = true;
       return;
     }
     delete resolvedExpandedGapRows[key];
   });
   new Set([
-    ...Object.keys(localExpandedGapWindowSelections),
+    ...Object.keys(auditLocalExpandedGapWindowSelections),
     ...Object.keys(remoteExpandedGapWindowSelections),
   ]).forEach((rowKey) => {
-    const aggregateRowSource =
-      review.selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(rowKey)]
-      ?? aggregateExpandedGapRowsSource
-      ?? "remote";
-    const defaultWindowSelections =
-      aggregateRowSource === "local"
-        ? localExpandedGapWindowSelections[rowKey] ?? []
-        : remoteExpandedGapWindowSelections[rowKey] ?? [];
-    resolvedExpandedGapWindowSelections[rowKey] = [...defaultWindowSelections];
     listComparisonHistoryExpandedGapWindowDiffKeys(
-      localExpandedGapWindowSelections,
+      auditLocalExpandedGapWindowSelections,
       remoteExpandedGapWindowSelections,
       rowKey,
     ).forEach((windowKey) => {
       const fieldKey = buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey);
-      const source =
-        review.selectedSources[fieldKey]
-        ?? aggregateRowSource
-        ?? "remote";
-      const sourceSelections =
-        source === "local"
-          ? localExpandedGapWindowSelections[rowKey] ?? []
-          : remoteExpandedGapWindowSelections[rowKey] ?? [];
-      if (sourceSelections.includes(windowKey)) {
-        resolvedExpandedGapWindowSelections[rowKey] = [
-          ...new Set([...resolvedExpandedGapWindowSelections[rowKey], windowKey]),
-        ].sort();
+      if (resolveComparisonHistorySyncWorkspaceFieldSource(review, fieldKey) !== "remote") {
         return;
       }
-      resolvedExpandedGapWindowSelections[rowKey] = resolvedExpandedGapWindowSelections[rowKey].filter(
-        (candidate) => candidate !== windowKey,
-      );
+      const nextSelections = new Set(resolvedExpandedGapWindowSelections[rowKey] ?? []);
+      if ((remoteExpandedGapWindowSelections[rowKey] ?? []).includes(windowKey)) {
+        nextSelections.add(windowKey);
+      } else {
+        nextSelections.delete(windowKey);
+      }
+      if (nextSelections.size) {
+        resolvedExpandedGapWindowSelections[rowKey] = [...nextSelections].sort();
+        return;
+      }
+      delete resolvedExpandedGapWindowSelections[rowKey];
     });
     if (!resolvedExpandedGapWindowSelections[rowKey]?.length) {
       delete resolvedExpandedGapWindowSelections[rowKey];
@@ -12609,6 +12711,7 @@ function ExperimentMetadataPills({
 type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
+  latestWorkspaceSyncState: ComparisonHistorySyncWorkspaceState;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
   historySharedSync: ComparisonHistoryPanelSyncState | null;
@@ -13066,7 +13169,10 @@ function RunSection({
                               ? buildComparisonHistorySyncPreferenceReviewRows(preferenceReview)
                               : [];
                             const workspaceRows = workspaceReview
-                              ? buildComparisonHistorySyncWorkspaceReviewRows(workspaceReview)
+                              ? buildComparisonHistorySyncWorkspaceReviewRows(
+                                  workspaceReview,
+                                  comparison.latestWorkspaceSyncState,
+                                )
                               : [];
                             const flatReviewRows = preferenceReview ? preferenceRows : workspaceRows;
                             const reviewFieldCount = conflictReview
@@ -13320,6 +13426,11 @@ function RunSection({
                                                       <span className="comparison-dev-conflict-preview-label">
                                                         {row.label}
                                                       </span>
+                                                      {row.hasLatestLocalDrift ? (
+                                                        <span className="comparison-dev-conflict-preview-hint">
+                                                          Current local drift from audit snapshot
+                                                        </span>
+                                                      ) : null}
                                                     </span>
                                                     <button
                                                       className={`comparison-history-conflict-review-choice ${
@@ -13335,11 +13446,16 @@ function RunSection({
                                                       type="button"
                                                     >
                                                       <span className="comparison-history-conflict-review-choice-label">
-                                                        Local
+                                                        {row.hasLatestLocalDrift ? "Local latest" : "Local"}
                                                       </span>
                                                       <span className="comparison-history-conflict-review-choice-value">
                                                         {row.localValue}
                                                       </span>
+                                                      {row.localHint ? (
+                                                        <span className="comparison-history-conflict-review-choice-hint">
+                                                          {row.localHint}
+                                                        </span>
+                                                      ) : null}
                                                     </button>
                                                     <button
                                                       className={`comparison-history-conflict-review-choice ${
@@ -13355,7 +13471,7 @@ function RunSection({
                                                       type="button"
                                                     >
                                                       <span className="comparison-history-conflict-review-choice-label">
-                                                        Remote
+                                                        {row.hasLatestLocalDrift ? "Remote audit" : "Remote"}
                                                       </span>
                                                       <span className="comparison-history-conflict-review-choice-value">
                                                         {row.remoteValue}

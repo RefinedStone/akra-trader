@@ -530,6 +530,12 @@ select {
   word-break: break-word;
 }
 
+.comparison-history-conflict-review-choice-hint {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.58rem;
+  line-height: 1.4;
+}
+
 .comparison-history-browser-search {
   display: grid;
   gap: 6px;
