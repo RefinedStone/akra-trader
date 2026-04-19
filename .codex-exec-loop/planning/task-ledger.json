@@ -147,18 +147,72 @@
       "direction_id": "experiment-os",
       "title": "Upgrade preset revision restore UX with structured diffs and draft-conflict guards",
       "description": "Replace the current summary-plus-change-list revision diff with a more structured side-by-side comparison, and extend restore confirmation to warn when the selected snapshot conflicts with unsaved preset form draft edits so operators can safely review and restore revisions without accidental draft loss.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply says the just-shipped revision UX still lacks a structured side-by-side diff and does not warn about conflicts with in-progress form drafts during restore confirmation. Those are concrete safety and readability gaps in the active preset workflow, so this is the clearest next executable task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit df94d65, which replaced revision change lists with structured field or group diffs, added restore-time draft-conflict previews and invalid-draft warnings, required explicit confirmation before draft-destructive restore, and passed `cd apps/web && npx tsc --noEmit`.",
       "depends_on": [
         "planning-experiment-os-preset-revision-diff-model"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:20:00Z",
+      "updated_at": "2026-04-19T09:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Strengthens experiment-os operator trust around mutable presets by making revision deltas reviewable in a richer format and by preventing restore actions from silently stomping in-progress edits."
+    },
+    {
+      "id": "planning-experiment-os-preset-semantic-parameter-diff",
+      "direction_id": "experiment-os",
+      "title": "Make preset revision parameter diffs semantic-aware inside structured comparisons",
+      "description": "Deepen the new structured preset revision and restore diff UI so parameter bundle changes are compared semantically instead of only by coarse field or group buckets, with stable nested paths and added, removed, or changed value rendering that makes large parameter revisions reviewable before restore.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly says the new structured diff stops at field or group comparison and still lacks semantic-aware parameter diffing. That is the clearest direct continuation of the just-finished restore UX work and is ready for implementation without additional operator judgment.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os preset trust by turning revision and restore comparisons into operator-usable semantic parameter reviews rather than coarse structural summaries."
+    },
+    {
+      "id": "planning-experiment-os-preset-draft-persistence-and-cross-session-restore-guard",
+      "direction_id": "experiment-os",
+      "title": "Persist preset drafts across sessions and extend restore guards beyond the active form",
+      "description": "Build on the new restore conflict preview by persisting preset edit drafts per preset across reloads or sessions, then surface restore-conflict guards against those durable draft snapshots so unsaved work is not only protected when the current form state happens to still be mounted.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says draft conflict handling currently covers only the active preset form and does not persist drafts across sessions. That is a concrete follow-up, but semantic-aware diffing is the more immediate continuation of the just-shipped structured comparison work.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends preset restore safety from the mounted control-room form into durable operator workflows where draft work may survive page reloads or session breaks."
+    },
+    {
+      "id": "planning-experiment-os-preset-restore-post-action-polish",
+      "direction_id": "experiment-os",
+      "title": "Polish preset restore completion with focus and scroll handoff",
+      "description": "Finish the preset restore workflow with post-restore focus, scroll, or equivalent completion cues that carry the operator directly to the fields or sections affected by the restored revision, reducing disorientation after confirmation succeeds.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly calls out missing auto focus or scroll behavior after restore. This is valid executable polish, but it should stay behind semantic-aware diffing and durable draft protection because those gaps are more important to safe review.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Improves operator trust in mutable preset workflows by making restore completion states legible and navigable immediately after a revision is applied."
     },
     {
       "id": "planning-experiment-os-preset-revision-filter-persistence",
@@ -168,13 +222,13 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says revision filtering now exists but is still local UI state with no URL or durable persistence. That is a valid follow-up, but it is less immediate than improving structured diff readability and restore-safety warnings in the active workflow.",
+      "priority_reason": "Revision filter persistence remains a useful preset-history follow-up, but the latest main-session reply points to more immediate restore-polish work first: semantic-aware parameter diffs, broader draft protection, and post-restore navigation cues.",
       "depends_on": [
         "planning-experiment-os-preset-revision-diff-model"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:20:00Z",
+      "updated_at": "2026-04-19T09:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the preset revision control-room workflow from session-local convenience into a durable operator navigation surface that supports revisit and sharing."
     },
