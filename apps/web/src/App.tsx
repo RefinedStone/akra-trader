@@ -371,6 +371,21 @@ type RunComparison = {
     title: string;
     summary: string;
     bullets: string[];
+    score_breakdown: {
+      metrics: {
+        total: number;
+        components: Record<string, { score: number; [key: string]: unknown }>;
+      };
+      semantics: {
+        total: number;
+        components: Record<string, { score: number; [key: string]: unknown }>;
+      };
+      context: {
+        total: number;
+        components: Record<string, { score: number; [key: string]: unknown }>;
+      };
+      total: number;
+    };
     rank: number;
     insight_score: number;
     is_primary: boolean;
@@ -9745,8 +9760,9 @@ function ComparisonNarrativeCard({
       </div>
       <div className="comparison-story-meta">
         <span>#{narrative.rank}</span>
-        <span>Score {narrative.insight_score}</span>
+        <span>Score {formatComparisonScoreValue(narrative.insight_score)}</span>
       </div>
+      <ComparisonNarrativeScoreBreakdown breakdown={narrative.score_breakdown} />
       <p className="comparison-story-title">{narrative.title}</p>
       <p className="comparison-story-summary">{narrative.summary}</p>
       {narrative.bullets.length ? (
@@ -9765,6 +9781,60 @@ function ComparisonNarrativeCard({
         />
       ) : null}
     </article>
+  );
+}
+
+function ComparisonNarrativeScoreBreakdown({
+  breakdown,
+}: {
+  breakdown: RunComparison["narratives"][number]["score_breakdown"];
+}) {
+  const sections: Array<{
+    key: "metrics" | "semantics" | "context";
+    label: string;
+    total: number;
+    highlights: string[];
+  }> = [
+    {
+      key: "metrics",
+      label: "Metrics",
+      total: breakdown.metrics.total,
+      highlights: buildComparisonScoreHighlights("metrics", breakdown.metrics.components),
+    },
+    {
+      key: "semantics",
+      label: "Semantics",
+      total: breakdown.semantics.total,
+      highlights: buildComparisonScoreHighlights("semantics", breakdown.semantics.components),
+    },
+    {
+      key: "context",
+      label: "Context",
+      total: breakdown.context.total,
+      highlights: buildComparisonScoreHighlights("context", breakdown.context.components),
+    },
+  ];
+
+  return (
+    <section className="comparison-score-breakdown" aria-label="Narrative score breakdown">
+      <div className="comparison-score-breakdown-head">
+        <span>Score breakdown</span>
+        <strong>{formatComparisonScoreValue(breakdown.total)}</strong>
+      </div>
+      <div className="comparison-score-breakdown-grid">
+        {sections.map((section) => (
+          <article className="comparison-score-breakdown-card" key={section.key}>
+            <div className="comparison-score-breakdown-card-head">
+              <span>{section.label}</span>
+              <strong>{formatComparisonScoreValue(section.total)}</strong>
+            </div>
+            <p className="comparison-score-breakdown-copy">
+              {section.highlights.length ? section.highlights.join(" / ") : "No active contribution"}
+            </p>
+          </article>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -11930,6 +12000,88 @@ function formatMetric(value?: number, suffix = "") {
     return "n/a";
   }
   return `${value}${suffix}`;
+}
+
+function formatComparisonScoreValue(value: number) {
+  return value.toFixed(2).replace(/\.?0+$/, "");
+}
+
+function buildComparisonScoreHighlights(
+  section: "metrics" | "semantics" | "context",
+  components: Record<string, { score: number; [key: string]: unknown }>,
+) {
+  return Object.entries(components)
+    .filter(([, component]) => component.score > 0)
+    .sort((left, right) => right[1].score - left[1].score)
+    .slice(0, 3)
+    .map(([key, component]) => formatComparisonScoreHighlight(section, key, component));
+}
+
+function formatComparisonScoreHighlight(
+  section: "metrics" | "semantics" | "context",
+  key: string,
+  component: { score: number; [key: string]: unknown },
+) {
+  const label = formatComparisonScoreComponentLabel(section, key);
+  const detail = formatComparisonScoreComponentDetail(section, key, component);
+  const score = formatComparisonScoreValue(component.score);
+  return detail ? `${label} ${score} (${detail})` : `${label} ${score}`;
+}
+
+function formatComparisonScoreComponentLabel(
+  section: "metrics" | "semantics" | "context",
+  key: string,
+) {
+  const labels: Record<string, string> = {
+    total_return_pct: "Return delta",
+    max_drawdown_pct: "Drawdown delta",
+    win_rate_pct: "Win-rate delta",
+    trade_count: "Trade-flow delta",
+    strategy_kind: "Strategy kind",
+    execution_model: "Execution model",
+    source_descriptor: "Source descriptor",
+    parameter_contract: "Parameter contract",
+    vocabulary: "Vocabulary richness",
+    provenance_richness: "Provenance richness",
+    native_reference_bonus: "Native/reference bonus",
+    reference_bonus: "Reference bonus",
+    status_bonus: "Status split",
+    benchmark_story_bonus: "Benchmark story",
+    reference_floor: "Reference floor",
+  };
+  return labels[key] ?? `${section} ${key.replace(/_/g, " ")}`;
+}
+
+function formatComparisonScoreComponentDetail(
+  section: "metrics" | "semantics" | "context",
+  key: string,
+  component: { score: number; [key: string]: unknown },
+) {
+  if (section === "metrics" && typeof component.delta === "number") {
+    return `delta ${formatComparisonScoreSignedValue(component.delta)}`;
+  }
+  if (section === "semantics" && key === "vocabulary") {
+    const changedKeys = Array.isArray(component.changed_keys) ? component.changed_keys.length : 0;
+    if (changedKeys > 0) {
+      return `${changedKeys} changed key${changedKeys === 1 ? "" : "s"}`;
+    }
+  }
+  if (
+    section === "semantics"
+    && key === "provenance_richness"
+    && typeof component.units === "number"
+  ) {
+    return `${formatComparisonScoreValue(component.units)} units`;
+  }
+  if (typeof component.applied === "boolean") {
+    return component.applied ? "applied" : "inactive";
+  }
+  return "";
+}
+
+function formatComparisonScoreSignedValue(value: number) {
+  const prefix = value > 0 ? "+" : "";
+  return `${prefix}${formatComparisonScoreValue(value)}`;
 }
 
 function formatEditableNumber(value: number) {
