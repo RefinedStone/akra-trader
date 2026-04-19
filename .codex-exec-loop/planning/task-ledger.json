@@ -255,18 +255,18 @@
       "direction_id": "experiment-os",
       "title": "Propagate strategy catalog semantics into run snapshot and provenance views",
       "description": "Extend the newly shipped `catalog_semantics` payload beyond the strategy catalog so run snapshot, run provenance, and adjacent operator surfaces expose the same execution model, parameter contract, source, and operator note context for the strategy version attached to each run.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly says catalog semantics have not yet been propagated into run snapshot or provenance screens. This is the clearest executable next step because it carries the just-shipped metadata into the operator surfaces where run review and promotion decisions happen.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 7c5df48, which propagated strategy catalog semantics into run-level strategy snapshots and provenance views across the backend model, run API serialization, and control-room UI, then verified the change with targeted pytest, py_compile, web typecheck, diff checks, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:35:00Z",
+      "updated_at": "2026-04-19T10:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os strategy semantics from catalog discovery into the durable run-review surfaces that operators use to understand what executed, how it was parameterized, and where it came from."
+      "direction_relation_note": "Closed the immediate gap between durable strategy catalog semantics and operator-visible run review by carrying semantic kind, execution model, parameter contract, source descriptor, and operator notes into run snapshot and provenance surfaces."
     },
     {
       "id": "planning-experiment-os-reference-strategy-typed-override-semantics",
@@ -307,18 +307,18 @@
     {
       "id": "planning-experiment-os-launch-form-strategy-semantic-help",
       "direction_id": "experiment-os",
-      "title": "Surface strategy semantic metadata in launch-form parameter help",
-      "description": "Reuse the shipped strategy-specific semantic metadata in the launch form parameter editor so operators see strategy-aware helper copy and intent cues while editing bundles, not only later inside preset diff, restore, and draft preview surfaces.",
+      "title": "Surface strategy semantics and provenance history in launch and preset selection flows",
+      "description": "Reuse shipped strategy semantic metadata and run provenance history inside the launch form and preset picker so operators can see strategy-aware helper copy while editing bundles and can reverse-reference prior run semantic context when deciding what to launch next.",
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply shows `catalog_semantics` now exists for built-in, reference, and imported strategies, but that richer metadata is still not surfaced in the launch-form parameter editor. This remains concrete follow-up, though propagating the same semantics into run snapshot and provenance review is the stronger immediate queue head.",
+      "priority_reason": "The latest main-session reply says launch form and preset picker flows still do not reverse-reference run provenance semantic history. This remains concrete follow-up work, but extending the just-shipped run semantics into comparison and artifact review surfaces is the stronger immediate queue head.",
       "depends_on": [
         "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:35:00Z",
+      "updated_at": "2026-04-19T10:51:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Improves experiment-os operator guidance by moving strategy-aware parameter meaning earlier in the workflow, where preset bundles are authored rather than only reviewed after revisions."
     },
@@ -2679,6 +2679,24 @@
       "updated_at": "2026-04-16T19:20:10Z",
       "source_turn_id": null,
       "direction_relation_note": "Matches the intelligence-research-lane success criteria that every intelligence run be traceable and blocked from promotion without fallback or review."
+    },
+    {
+      "id": "planning-experiment-os-expose-strategy-semantics-in-comparison-and-artifact-views",
+      "direction_id": "experiment-os",
+      "title": "Expose strategy semantics in run comparison and artifact views",
+      "description": "Extend the newly shipped run-level strategy semantics beyond single-run provenance panels so run comparison rows or cards and benchmark or reference artifact views also surface semantic kind, execution model, parameter contract, source descriptor, and operator notes wherever operators review multiple runs side by side.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly says run comparison rows or cards and benchmark or reference artifact views still do not expose the new strategy semantics. This is the clearest executable next step because it is a direct continuation of the completed provenance work and keeps multi-run review surfaces aligned with the run snapshot semantics already shipped.",
+      "depends_on": [
+        "planning-experiment-os-propagate-catalog-semantics-into-run-provenance-views"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:52:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os strategy provenance from single-run inspection into the multi-run comparison and benchmark review surfaces operators use for promotion and benchmark decisions."
     }
   ]
 }
