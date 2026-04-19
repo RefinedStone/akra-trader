@@ -14,8 +14,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from akra_trader.application import TradingApplication
-from akra_trader.application import list_run_subresource_contracts
-from akra_trader.application import RunSubresourceContract
+from akra_trader.application import list_run_subresource_runtime_bindings
+from akra_trader.application import RunSubresourceRuntimeBinding
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_run_subresource_response
@@ -150,7 +150,7 @@ def create_router(container: Container) -> APIRouter:
       capabilities=app.get_run_surface_capabilities(),
     )
 
-  def build_run_subresource_route_handler(contract: RunSubresourceContract):
+  def build_run_subresource_route_handler(binding: RunSubresourceRuntimeBinding):
     def get_run_subresource(
       run_id: str,
       app: TradingApplication = Depends(get_app),
@@ -160,11 +160,11 @@ def create_router(container: Container) -> APIRouter:
         raise HTTPException(status_code=404, detail="Run not found")
       return serialize_run_subresource_response(
         run,
-        subresource_key=contract.subresource_key,
+        subresource_key=binding.contract.subresource_key,
         capabilities=app.get_run_surface_capabilities(),
       )
 
-    get_run_subresource.__name__ = contract.route_name
+    get_run_subresource.__name__ = binding.contract.route_name
     return get_run_subresource
 
   @router.get("/health")
@@ -580,13 +580,13 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run_response(run, app)
 
-  for contract in list_run_subresource_contracts():
+  for binding in list_run_subresource_runtime_bindings(get_app().get_run_surface_capabilities()):
     router.add_api_route(
-      contract.route_path,
-      build_run_subresource_route_handler(contract),
+      binding.contract.route_path,
+      build_run_subresource_route_handler(binding),
       methods=["GET"],
-      name=contract.route_name,
-      summary=contract.response_title,
+      name=binding.contract.route_name,
+      summary=binding.contract.response_title,
     )
 
   @router.get("/market-data/status")

@@ -19,7 +19,9 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import get_run_subresource_contract
+from akra_trader.application import get_run_subresource_runtime_binding
 from akra_trader.application import list_run_subresource_contracts
+from akra_trader.application import list_run_subresource_runtime_bindings
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_surface_capabilities
 from akra_trader.application import serialize_run_subresource_response
@@ -13789,7 +13791,9 @@ def test_run_subresource_serializer_registry_rejects_unknown_key(tmp_path: Path)
 
 def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   contracts = list_run_subresource_contracts()
+  bindings = list_run_subresource_runtime_bindings()
   orders_contract = get_run_subresource_contract("orders")
+  orders_binding = get_run_subresource_runtime_binding("orders")
   positions_contract = get_run_subresource_contract("positions")
   metrics_contract = get_run_subresource_contract("metrics")
   capabilities = RunSurfaceCapabilities()
@@ -13799,6 +13803,8 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   }
 
   assert [contract.subresource_key for contract in contracts] == ["orders", "positions", "metrics"]
+  assert [binding.contract.subresource_key for binding in bindings] == ["orders", "positions", "metrics"]
+  assert orders_binding.contract == orders_contract
   assert orders_contract.body_key == "orders"
   assert orders_contract.response_title == "Run order list"
   assert orders_contract.route_path == "/runs/{run_id}/orders"

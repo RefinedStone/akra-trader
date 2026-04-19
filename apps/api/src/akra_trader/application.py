@@ -22968,6 +22968,11 @@ class RunSubresourceContract:
   response_title: str
   route_path: str
   route_name: str
+
+
+@dataclass(frozen=True)
+class RunSubresourceRuntimeBinding:
+  contract: RunSubresourceContract
   body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
 
 
@@ -23023,59 +23028,82 @@ def _serialize_run_metrics_subresource_body(
   return deepcopy(run.metrics)
 
 
-RUN_SUBRESOURCE_BODY_SERIALIZERS: dict[str, Callable[[RunRecord, RunSurfaceCapabilities], Any]] = {
-  "orders": lambda run, capabilities: _serialize_run_orders_subresource_body(
-    run,
-    capabilities=capabilities,
-  ),
-  "positions": lambda run, capabilities: _serialize_run_positions_subresource_body(
-    run,
-    capabilities=capabilities,
-  ),
-  "metrics": lambda run, capabilities: _serialize_run_metrics_subresource_body(
-    run,
-    capabilities=capabilities,
-  ),
-}
+def _resolve_run_subresource_body_serializer(
+  body_key: str,
+) -> Callable[[RunRecord, RunSurfaceCapabilities], Any]:
+  if body_key == "orders":
+    return lambda run, capabilities: _serialize_run_orders_subresource_body(
+      run,
+      capabilities=capabilities,
+    )
+  if body_key == "positions":
+    return lambda run, capabilities: _serialize_run_positions_subresource_body(
+      run,
+      capabilities=capabilities,
+    )
+  if body_key == "metrics":
+    return lambda run, capabilities: _serialize_run_metrics_subresource_body(
+      run,
+      capabilities=capabilities,
+    )
+  raise ValueError(f"Unsupported run subresource serializer body: {body_key}")
 
 
-def list_run_subresource_contracts(
+def list_run_subresource_runtime_bindings(
   capabilities: RunSurfaceCapabilities | None = None,
-) -> tuple[RunSubresourceContract, ...]:
+) -> tuple[RunSubresourceRuntimeBinding, ...]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  contracts: list[RunSubresourceContract] = []
+  bindings: list[RunSubresourceRuntimeBinding] = []
   for shared_contract in resolved_capabilities.shared_contracts:
     if shared_contract.contract_kind != "run_subresource":
       continue
     subresource_key = shared_contract.contract_key.removeprefix("subresource:")
-    body_serializer = RUN_SUBRESOURCE_BODY_SERIALIZERS.get(subresource_key)
-    if body_serializer is None:
-      raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
     body_key = shared_contract.schema_detail.get("body_key")
     route_path = shared_contract.schema_detail.get("route_path")
     route_name = shared_contract.schema_detail.get("route_name")
     if not all(isinstance(value, str) and value for value in (body_key, route_path, route_name)):
       raise ValueError(f"Invalid run subresource contract metadata: {shared_contract.contract_key}")
-    contracts.append(
-      RunSubresourceContract(
-        subresource_key=subresource_key,
-        body_key=body_key,
-        response_title=shared_contract.title,
-        route_path=route_path,
-        route_name=route_name,
-        body_serializer=body_serializer,
+    bindings.append(
+      RunSubresourceRuntimeBinding(
+        contract=RunSubresourceContract(
+          subresource_key=subresource_key,
+          body_key=body_key,
+          response_title=shared_contract.title,
+          route_path=route_path,
+          route_name=route_name,
+        ),
+        body_serializer=_resolve_run_subresource_body_serializer(body_key),
       )
     )
-  return tuple(contracts)
+  return tuple(bindings)
+
+
+def list_run_subresource_contracts(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> tuple[RunSubresourceContract, ...]:
+  return tuple(
+    binding.contract
+    for binding in list_run_subresource_runtime_bindings(capabilities)
+  )
 
 
 def get_run_subresource_contract(
   subresource_key: str,
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> RunSubresourceContract:
-  for contract in list_run_subresource_contracts(capabilities):
-    if contract.subresource_key == subresource_key:
-      return contract
+  for binding in list_run_subresource_runtime_bindings(capabilities):
+    if binding.contract.subresource_key == subresource_key:
+      return binding.contract
+  raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+
+
+def get_run_subresource_runtime_binding(
+  subresource_key: str,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> RunSubresourceRuntimeBinding:
+  for binding in list_run_subresource_runtime_bindings(capabilities):
+    if binding.contract.subresource_key == subresource_key:
+      return binding
   raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
 
 
@@ -23147,12 +23175,12 @@ def serialize_run_subresource_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  contract = get_run_subresource_contract(subresource_key, resolved_capabilities)
+  binding = get_run_subresource_runtime_binding(subresource_key, resolved_capabilities)
   return _serialize_run_subresource_envelope(
     run,
     capabilities=resolved_capabilities,
-    body_key=contract.body_key,
-    body_value=contract.body_serializer(run, resolved_capabilities),
+    body_key=binding.contract.body_key,
+    body_value=binding.body_serializer(run, resolved_capabilities),
   )
 
 
