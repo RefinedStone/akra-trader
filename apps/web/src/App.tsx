@@ -20895,6 +20895,9 @@ function ReferenceRunProvenanceSummary({
               const artifactSummaryHoverPrefix = `provenance-artifact-summary:${encodeComparisonScoreLinkToken(
                 artifact.path,
               )}:`;
+              const artifactSectionLineHoverPrefix = `provenance-artifact-section-line:${encodeComparisonScoreLinkToken(
+                artifact.path,
+              )}:`;
               const artifactSectionSubFocusPrefix = `provenance-artifact-section:${encodeComparisonScoreLinkToken(
                 artifact.path,
               )}:`;
@@ -20926,6 +20929,7 @@ function ReferenceRunProvenanceSummary({
                       : ""
                   } ${!artifactDetailsExpanded ? "is-collapsed" : ""} ${
                     activeProvenanceArtifactHoverKey?.startsWith(artifactSummaryHoverPrefix)
+                    || activeProvenanceArtifactHoverKey?.startsWith(artifactSectionLineHoverPrefix)
                       ? "has-hover-focus"
                       : ""
                   } ${
@@ -21072,6 +21076,9 @@ function ReferenceRunProvenanceSummary({
                           artifact.path,
                           key,
                         );
+                        const sectionLineHoverPrefix = `provenance-artifact-section-line:${encodeComparisonScoreLinkToken(
+                          artifact.path,
+                        )}:${encodeComparisonScoreLinkToken(key)}:`;
                         const sectionIsPressed =
                           linkedScoreSelection?.section === "context"
                           && linkedScoreSelection.componentKey === artifactComponentKey
@@ -21080,6 +21087,10 @@ function ReferenceRunProvenanceSummary({
                         <article
                           className={`reference-artifact-section-card ${
                             activeProvenanceSubFocusKey === sectionSubFocusKey ? "is-subfocus" : ""
+                          } ${
+                            activeProvenanceArtifactHoverKey?.startsWith(sectionLineHoverPrefix)
+                              ? "has-line-focus"
+                              : ""
                           }`.trim()}
                           key={`${artifact.path}-${key}`}
                         >
@@ -21119,9 +21130,76 @@ function ReferenceRunProvenanceSummary({
                             )}
                           </div>
                           <div className="reference-artifact-section-body">
-                            {lines.map((line) => (
-                              <p key={`${artifact.path}-${key}-${line}`}>{line}</p>
-                            ))}
+                            {lines.map((line, lineIndex) => {
+                              const artifactHoverKey = buildComparisonProvenanceArtifactSectionLineHoverKey(
+                                artifact.path,
+                                key,
+                                lineIndex,
+                              );
+                              const isLineFocused = activeProvenanceArtifactHoverKey === artifactHoverKey;
+                              return (
+                                <p
+                                  className={`reference-artifact-section-line ${
+                                    isLineFocused ? "is-hovered" : ""
+                                  }`.trim()}
+                                  key={`${artifact.path}-${key}-${lineIndex}-${line}`}
+                                  onBlur={() => {
+                                    if (
+                                      !onDrillBackScoreLink
+                                      || activeProvenanceArtifactHoverKey !== artifactHoverKey
+                                    ) {
+                                      return;
+                                    }
+                                    onDrillBackScoreLink("context", artifactComponentKey, {
+                                      artifactDetailExpanded: true,
+                                      artifactHoverKey: null,
+                                      historyMode: "replace",
+                                      subFocusKey: sectionSubFocusKey,
+                                    });
+                                  }}
+                                  onFocus={() => {
+                                    if (!onDrillBackScoreLink || activeProvenanceSubFocusKey !== sectionSubFocusKey) {
+                                      return;
+                                    }
+                                    onDrillBackScoreLink("context", artifactComponentKey, {
+                                      artifactDetailExpanded: true,
+                                      artifactHoverKey,
+                                      historyMode: "replace",
+                                      subFocusKey: sectionSubFocusKey,
+                                    });
+                                  }}
+                                  onMouseEnter={() => {
+                                    if (!onDrillBackScoreLink || activeProvenanceSubFocusKey !== sectionSubFocusKey) {
+                                      return;
+                                    }
+                                    onDrillBackScoreLink("context", artifactComponentKey, {
+                                      artifactDetailExpanded: true,
+                                      artifactHoverKey,
+                                      historyMode: "replace",
+                                      subFocusKey: sectionSubFocusKey,
+                                    });
+                                  }}
+                                  onMouseLeave={() => {
+                                    if (
+                                      !onDrillBackScoreLink
+                                      || activeProvenanceArtifactHoverKey !== artifactHoverKey
+                                    ) {
+                                      return;
+                                    }
+                                    onDrillBackScoreLink("context", artifactComponentKey, {
+                                      artifactDetailExpanded: true,
+                                      artifactHoverKey: null,
+                                      historyMode: "replace",
+                                      subFocusKey: sectionSubFocusKey,
+                                    });
+                                  }}
+                                  ref={registerArtifactHoverRef?.(panelRunId, artifactHoverKey)}
+                                  tabIndex={activeProvenanceSubFocusKey === sectionSubFocusKey ? 0 : undefined}
+                                >
+                                  {line}
+                                </p>
+                              );
+                            })}
                           </div>
                         </article>
                       );})}
@@ -21576,6 +21654,16 @@ function buildComparisonProvenanceArtifactSummaryHoverKey(path: string, summaryK
   return `provenance-artifact-summary:${encodeComparisonScoreLinkToken(path)}:${encodeComparisonScoreLinkToken(summaryKey)}`;
 }
 
+function buildComparisonProvenanceArtifactSectionLineHoverKey(
+  path: string,
+  sectionKey: string,
+  lineIndex: number,
+) {
+  return `provenance-artifact-section-line:${encodeComparisonScoreLinkToken(path)}:${encodeComparisonScoreLinkToken(
+    sectionKey,
+  )}:${lineIndex}`;
+}
+
 function buildComparisonMetricTooltipKey(metricKey: string, runId: string) {
   return `metric-tooltip:${encodeComparisonScoreLinkToken(metricKey)}:${encodeComparisonScoreLinkToken(runId)}`;
 }
@@ -21636,6 +21724,15 @@ function formatComparisonScoreLinkArtifactHoverLabel(artifactHoverKey: string | 
     const path = decodeComparisonScoreLinkToken(encodedPath);
     const summaryKey = decodeComparisonScoreLinkToken(encodedSummary);
     return `${shortenIdentifier(path)} / ${formatBenchmarkArtifactSummaryLabel(summaryKey)}`;
+  }
+  if (artifactHoverKey.startsWith("provenance-artifact-section-line:")) {
+    const [, encodedPath = "", encodedSection = "", lineIndex = "0"] = artifactHoverKey.split(":");
+    const path = decodeComparisonScoreLinkToken(encodedPath);
+    const sectionKey = decodeComparisonScoreLinkToken(encodedSection);
+    const numericLineIndex = Number.parseInt(lineIndex, 10);
+    return `${shortenIdentifier(path)} / ${formatBenchmarkArtifactSectionLabel(sectionKey)} / line ${
+      Number.isFinite(numericLineIndex) ? numericLineIndex + 1 : "?"
+    }`;
   }
   return artifactHoverKey;
 }
