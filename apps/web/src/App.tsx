@@ -2780,20 +2780,37 @@ type GuardedLiveStatus = {
 const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api";
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
-const CONTROL_ROOM_UI_STATE_VERSION = 1;
+const CONTROL_ROOM_UI_STATE_VERSION = 2;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
 const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY = "akra-trader-comparison-tooltip-conflict-ui";
 const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
+const COMPARISON_RUN_ID_SEARCH_PARAM = "compare_run_id";
+const COMPARISON_INTENT_SEARCH_PARAM = "compare_intent";
+const COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM = "compare_focus_run_id";
+const COMPARISON_FOCUS_SECTION_SEARCH_PARAM = "compare_focus_section";
+const COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM = "compare_focus_component";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
 
 type ControlRoomUiStateV1 = {
+  version: 1;
+  expandedGapRows: Record<string, boolean>;
+};
+
+type ControlRoomComparisonSelectionState = {
+  selectedRunIds: string[];
+  intent: ComparisonIntent;
+  scoreLink: ComparisonScoreLinkTarget | null;
+};
+
+type ControlRoomUiStateV2 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
   expandedGapRows: Record<string, boolean>;
+  comparisonSelection: ControlRoomComparisonSelectionState;
 };
 
 type RunHistoryFilter = {
@@ -4392,8 +4409,20 @@ export default function App() {
   const [sandboxRunFilter, setSandboxRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [paperRunFilter, setPaperRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [liveRunFilter, setLiveRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
-  const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>([]);
-  const [comparisonIntent, setComparisonIntent] = useState<ComparisonIntent>(DEFAULT_COMPARISON_INTENT);
+  const initialComparisonSelectionRef = useRef<ControlRoomComparisonSelectionState | null>(null);
+  if (!initialComparisonSelectionRef.current) {
+    initialComparisonSelectionRef.current = loadPersistedComparisonSelection();
+  }
+  const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>(
+    () => initialComparisonSelectionRef.current?.selectedRunIds ?? [],
+  );
+  const [comparisonIntent, setComparisonIntent] = useState<ComparisonIntent>(
+    () => initialComparisonSelectionRef.current?.intent ?? DEFAULT_COMPARISON_INTENT,
+  );
+  const [selectedComparisonScoreLink, setSelectedComparisonScoreLink] =
+    useState<ComparisonScoreLinkTarget | null>(
+      () => initialComparisonSelectionRef.current?.scoreLink ?? null,
+    );
   const [runComparison, setRunComparison] = useState<RunComparison | null>(null);
   const [runComparisonLoading, setRunComparisonLoading] = useState(false);
   const [runComparisonError, setRunComparisonError] = useState<string | null>(null);
@@ -4503,6 +4532,16 @@ export default function App() {
   }, [backtests]);
 
   useEffect(() => {
+    if (!selectedComparisonScoreLink) {
+      return;
+    }
+    if (selectedComparisonRunIds.includes(selectedComparisonScoreLink.narrativeRunId)) {
+      return;
+    }
+    setSelectedComparisonScoreLink(null);
+  }, [selectedComparisonRunIds, selectedComparisonScoreLink]);
+
+  useEffect(() => {
     if (selectedComparisonRunIds.length < 2) {
       setRunComparison(null);
       setRunComparisonError(null);
@@ -4540,8 +4579,17 @@ export default function App() {
   }, [selectedComparisonRunIds, comparisonIntent]);
 
   useEffect(() => {
-    persistExpandedGapRows(expandedGapRows);
-  }, [expandedGapRows]);
+    const comparisonSelection = normalizeControlRoomComparisonSelection({
+      intent: comparisonIntent,
+      scoreLink: selectedComparisonScoreLink,
+      selectedRunIds: selectedComparisonRunIds,
+    });
+    persistControlRoomUiState({
+      comparisonSelection,
+      expandedGapRows,
+    });
+    persistComparisonSelectionToUrl(comparisonSelection);
+  }, [comparisonIntent, expandedGapRows, selectedComparisonRunIds, selectedComparisonScoreLink]);
 
   useEffect(() => {
     if (!marketStatus) {
@@ -5126,6 +5174,7 @@ export default function App() {
   }
 
   function clearComparisonRuns() {
+    setSelectedComparisonScoreLink(null);
     setSelectedComparisonRunIds([]);
   }
 
@@ -5139,6 +5188,7 @@ export default function App() {
     }
 
     setComparisonIntent(DEFAULT_COMPARISON_INTENT);
+    setSelectedComparisonScoreLink(null);
     setSelectedComparisonRunIds([nativeRun.config.run_id, referenceRun.config.run_id]);
   }
 
@@ -6884,10 +6934,12 @@ export default function App() {
           comparison={{
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
+            selectedScoreLink: selectedComparisonScoreLink,
             payload: runComparison,
             loading: runComparisonLoading,
             error: runComparisonError,
             onChangeComparisonIntent: setComparisonIntent,
+            onChangeSelectedScoreLink: setSelectedComparisonScoreLink,
             onToggleRunSelection: toggleComparisonRun,
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
@@ -7187,7 +7239,23 @@ function loadExpandedGapRows() {
   return loadLegacyExpandedGapRows();
 }
 
-function loadControlRoomUiState() {
+function defaultControlRoomComparisonSelectionState(): ControlRoomComparisonSelectionState {
+  return {
+    selectedRunIds: [],
+    intent: DEFAULT_COMPARISON_INTENT,
+    scoreLink: null,
+  };
+}
+
+function loadPersistedComparisonSelection(): ControlRoomComparisonSelectionState {
+  const urlSelection = loadComparisonSelectionFromUrl();
+  if (urlSelection) {
+    return urlSelection;
+  }
+  return loadControlRoomUiState()?.comparisonSelection ?? defaultControlRoomComparisonSelectionState();
+}
+
+function loadControlRoomUiState(): ControlRoomUiStateV2 | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -7197,26 +7265,38 @@ function loadControlRoomUiState() {
       return null;
     }
     const parsed = JSON.parse(raw);
+    if (isControlRoomUiStateV2(parsed)) {
+      return {
+        version: parsed.version,
+        expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+        comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
+      };
+    }
     if (!isControlRoomUiStateV1(parsed)) {
       return null;
     }
     return {
-      version: parsed.version,
+      version: CONTROL_ROOM_UI_STATE_VERSION,
       expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+      comparisonSelection: defaultControlRoomComparisonSelectionState(),
     };
   } catch {
     return null;
   }
 }
 
-function persistExpandedGapRows(value: Record<string, boolean>) {
+function persistControlRoomUiState(state: {
+  comparisonSelection: ControlRoomComparisonSelectionState;
+  expandedGapRows: Record<string, boolean>;
+}) {
   if (typeof window === "undefined") {
     return;
   }
   try {
-    const nextState: ControlRoomUiStateV1 = {
+    const nextState: ControlRoomUiStateV2 = {
       version: CONTROL_ROOM_UI_STATE_VERSION,
-      expandedGapRows: filterExpandedGapRows(value),
+      comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
+      expandedGapRows: filterExpandedGapRows(state.expandedGapRows),
     };
     window.localStorage.setItem(
       CONTROL_ROOM_UI_STATE_STORAGE_KEY,
@@ -7226,6 +7306,70 @@ function persistExpandedGapRows(value: Record<string, boolean>) {
   } catch {
     return;
   }
+}
+
+function loadComparisonSelectionFromUrl(): ControlRoomComparisonSelectionState | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const params = new URLSearchParams(window.location.search);
+  const hasComparisonParams = [
+    COMPARISON_RUN_ID_SEARCH_PARAM,
+    COMPARISON_INTENT_SEARCH_PARAM,
+    COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM,
+    COMPARISON_FOCUS_SECTION_SEARCH_PARAM,
+    COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM,
+  ].some((key) => params.has(key));
+  if (!hasComparisonParams) {
+    return null;
+  }
+  const selectedRunIds = normalizeComparisonRunIdList(params.getAll(COMPARISON_RUN_ID_SEARCH_PARAM));
+  const intent = normalizeComparisonIntent(params.get(COMPARISON_INTENT_SEARCH_PARAM));
+  const focusRunId = params.get(COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM)?.trim() ?? "";
+  const focusSection = normalizeComparisonScoreSection(
+    params.get(COMPARISON_FOCUS_SECTION_SEARCH_PARAM),
+  );
+  const focusComponent = params.get(COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM)?.trim() ?? "";
+
+  return {
+    intent,
+    scoreLink:
+      focusRunId && focusSection && focusComponent
+        ? {
+            componentKey: focusComponent,
+            narrativeRunId: focusRunId,
+            section: focusSection,
+          }
+        : null,
+    selectedRunIds,
+  };
+}
+
+function persistComparisonSelectionToUrl(selection: ControlRoomComparisonSelectionState) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  const params = url.searchParams;
+  params.delete(COMPARISON_RUN_ID_SEARCH_PARAM);
+  params.delete(COMPARISON_INTENT_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_SECTION_SEARCH_PARAM);
+  params.delete(COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM);
+
+  const normalizedSelection = normalizeControlRoomComparisonSelection(selection);
+  normalizedSelection.selectedRunIds.forEach((runId) => params.append(COMPARISON_RUN_ID_SEARCH_PARAM, runId));
+  if (normalizedSelection.intent !== DEFAULT_COMPARISON_INTENT || normalizedSelection.selectedRunIds.length) {
+    params.set(COMPARISON_INTENT_SEARCH_PARAM, normalizedSelection.intent);
+  }
+  if (normalizedSelection.scoreLink && normalizedSelection.selectedRunIds.length) {
+    params.set(COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM, normalizedSelection.scoreLink.narrativeRunId);
+    params.set(COMPARISON_FOCUS_SECTION_SEARCH_PARAM, normalizedSelection.scoreLink.section);
+    params.set(COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM, normalizedSelection.scoreLink.componentKey);
+  }
+  const nextSearch = params.toString();
+  const nextUrl = `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
+  window.history.replaceState(window.history.state, "", nextUrl);
 }
 
 function loadLegacyExpandedGapRows() {
@@ -7256,14 +7400,80 @@ function filterExpandedGapRows(value: unknown) {
   );
 }
 
+function normalizeControlRoomComparisonSelection(
+  value: Partial<ControlRoomComparisonSelectionState> | null | undefined,
+): ControlRoomComparisonSelectionState {
+  return {
+    intent: normalizeComparisonIntent(value?.intent),
+    scoreLink: normalizeComparisonScoreLinkTarget(value?.scoreLink),
+    selectedRunIds: normalizeComparisonRunIdList(value?.selectedRunIds),
+  };
+}
+
+function normalizeComparisonRunIdList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return Array.from(
+    new Set(
+      value
+        .map((item) => String(item).trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, MAX_COMPARISON_RUNS);
+}
+
+function normalizeComparisonIntent(value: unknown): ComparisonIntent {
+  return comparisonIntentOptions.includes(value as ComparisonIntent)
+    ? (value as ComparisonIntent)
+    : DEFAULT_COMPARISON_INTENT;
+}
+
+function normalizeComparisonScoreSection(value: unknown): ComparisonScoreSection | null {
+  return value === "metrics" || value === "semantics" || value === "context"
+    ? value
+    : null;
+}
+
+function normalizeComparisonScoreLinkTarget(value: unknown): ComparisonScoreLinkTarget | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonScoreLinkTarget>;
+  const narrativeRunId =
+    typeof candidate.narrativeRunId === "string" ? candidate.narrativeRunId.trim() : "";
+  const componentKey = typeof candidate.componentKey === "string" ? candidate.componentKey.trim() : "";
+  const section = normalizeComparisonScoreSection(candidate.section);
+  if (!narrativeRunId || !componentKey || !section) {
+    return null;
+  }
+  return {
+    componentKey,
+    narrativeRunId,
+    section,
+  };
+}
+
 function isControlRoomUiStateV1(value: unknown): value is ControlRoomUiStateV1 {
   if (!value || typeof value !== "object") {
     return false;
   }
   const candidate = value as Partial<ControlRoomUiStateV1>;
   return (
-    candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
+    candidate.version === 1 &&
     candidate.expandedGapRows !== undefined
+  );
+}
+
+function isControlRoomUiStateV2(value: unknown): value is ControlRoomUiStateV2 {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ControlRoomUiStateV2>;
+  return (
+    candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
+    candidate.expandedGapRows !== undefined &&
+    candidate.comparisonSelection !== undefined
   );
 }
 
@@ -8224,10 +8434,12 @@ function ExperimentMetadataPills({
 type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
+  selectedScoreLink: ComparisonScoreLinkTarget | null;
   payload: RunComparison | null;
   loading: boolean;
   error: string | null;
   onChangeComparisonIntent: (intent: ComparisonIntent) => void;
+  onChangeSelectedScoreLink: (value: ComparisonScoreLinkTarget | null) => void;
   onToggleRunSelection: (runId: string) => void;
   onClearSelection: () => void;
   onSelectBenchmarkPair: () => void;
@@ -8540,6 +8752,8 @@ function RunSection({
           comparison={comparison.payload}
           error={comparison.error}
           loading={comparison.loading}
+          onChangeScoreLink={comparison.onChangeSelectedScoreLink}
+          selectedScoreLink={comparison.selectedScoreLink}
           selectedRunIds={comparison.selectedRunIds}
         />
       ) : null}
@@ -8551,11 +8765,15 @@ function RunComparisonPanel({
   comparison,
   error,
   loading,
+  onChangeScoreLink,
+  selectedScoreLink,
   selectedRunIds,
 }: {
   comparison: RunComparison | null;
   error: string | null;
   loading: boolean;
+  onChangeScoreLink: (value: ComparisonScoreLinkTarget | null) => void;
+  selectedScoreLink: ComparisonScoreLinkTarget | null;
   selectedRunIds: string[];
 }) {
   if (!selectedRunIds.length) {
@@ -8629,9 +8847,6 @@ function RunComparisonPanel({
   const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
   const [pendingTooltipPresetImportConflict, setPendingTooltipPresetImportConflict] =
     useState<ComparisonTooltipPendingPresetImportConflict | null>(null);
-  const [selectedScoreLink, setSelectedScoreLink] = useState<ComparisonScoreLinkTarget | null>(
-    null,
-  );
   const [selectedScoreLinkSource, setSelectedScoreLinkSource] =
     useState<ComparisonScoreLinkSource | null>(null);
   const [tooltipShareDraft, setTooltipShareDraft] = useState("");
@@ -9067,7 +9282,7 @@ function RunComparisonPanel({
     nextSelection: ComparisonScoreLinkTarget | null,
     source: ComparisonScoreLinkSource | null,
   ) => {
-    setSelectedScoreLink(nextSelection);
+    onChangeScoreLink(nextSelection);
     setSelectedScoreLinkSource(nextSelection ? source : null);
   };
 
@@ -9422,7 +9637,7 @@ function RunComparisonPanel({
       (candidate) => candidate.run_id === selectedScoreLink.narrativeRunId,
     );
     if (!narrative) {
-      setSelectedScoreLink(null);
+      updateSelectedScoreLink(null, null);
       return;
     }
 
