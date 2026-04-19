@@ -39,18 +39,90 @@
       "direction_id": "experiment-os",
       "title": "Add durable experiment metadata for tags, presets, and comparison filters",
       "description": "Move beyond payload-centric run lookup by adding durable run metadata and query paths for dataset identity, tags, preset selection, benchmark family, and richer comparison or export support so experiment retrieval matches Program Phase 1 expectations.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply says the documentation and queue-priority basis are now reconciled and that implementation should resume from the Research Core stream first. This is the clearest executable follow-up because it advances Program 1's durable experiment workflow baseline and unlocks later lifecycle, filter, and comparison work.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 0fb0d34, which persisted durable run metadata for tags, preset_id, and benchmark_family, added SQL query columns and tag storage, wired metadata through launch and rerun flows, and surfaced the fields in control-room launch, history filters, and comparison cards with API, typecheck, and pytest coverage.",
       "depends_on": [
         "planning-data-trust-dataset-identity-hardening"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T03:35:00Z",
+      "updated_at": "2026-04-19T04:19:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Covers the experiment-os requirement that runs be filterable by dataset, preset, tag, benchmark family, and version through durable metadata."
+    },
+    {
+      "id": "planning-experiment-os-durable-preset-catalog",
+      "direction_id": "experiment-os",
+      "title": "Make presets a durable catalog instead of freeform run metadata",
+      "description": "Introduce a first-class preset catalog with durable records, stable identifiers, and launch or history integration so preset selection is operator-discoverable and reusable across runs rather than only a string copied into run metadata.",
+      "status": "done",
+      "base_priority": 93,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit e9b060b, which added a durable ExperimentPreset catalog, SQL persistence and legacy backfill, preset create/list APIs, and control-room preset selection instead of freeform preset IDs.",
+      "depends_on": [
+        "planning-experiment-os-queryable-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances the experiment-os requirement that presets be durable, queryable experiment objects rather than ad hoc metadata attached only at run time."
+    },
+    {
+      "id": "planning-experiment-os-preset-bundle-management",
+      "direction_id": "experiment-os",
+      "title": "Make preset catalog entries carry durable parameter bundles and lifecycle actions",
+      "description": "Extend the new preset catalog so each preset stores the reusable parameter bundle itself and supports operator-facing update or retire flows, closing the remaining gap where presets are durable names only and cannot yet serve as full reusable experiment templates.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply explicitly says the next unfinished layer inside the new preset catalog is parameter bundle storage plus preset edit or delete behavior. That is the clearest executable continuation because it deepens the just-shipped preset entity before opening separate benchmark-pack modeling work.",
+      "depends_on": [
+        "planning-experiment-os-durable-preset-catalog"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Builds the experiment-os preset model from discoverable catalog records into durable reusable experiment templates with operator-manageable lifecycle semantics."
+    },
+    {
+      "id": "planning-experiment-os-benchmark-pack-model",
+      "direction_id": "experiment-os",
+      "title": "Promote benchmark family metadata into a durable benchmark pack model",
+      "description": "Replace the current run-level benchmark_family string with durable benchmark pack records and selection semantics so benchmark lanes, comparison defaults, and promotion decisions use a first-class experiment model instead of loosely coupled metadata.",
+      "status": "proposed",
+      "base_priority": 91,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly says benchmark packs are still missing as durable entities, but the more immediate auto-executable follow-up is to finish the newly added preset catalog by storing parameter bundles and lifecycle actions before widening the model surface again.",
+      "depends_on": [
+        "planning-experiment-os-queryable-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os beyond filterable metadata by making benchmark configuration a durable object that can anchor comparison and promotion workflows."
+    },
+    {
+      "id": "planning-experiment-os-metadata-facet-discovery-api",
+      "direction_id": "experiment-os",
+      "title": "Add facet and discovery APIs for experiment metadata filters",
+      "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, and tags so control-room filters can query durable metadata options directly instead of relying on freeform input fields over stored run metadata.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Preset selection now has a catalog-backed surface, but a general facet or discovery API should still wait until the newly added preset entity carries full parameter-bundle semantics and the benchmark-pack model exists for it to expose cleanly.",
+      "depends_on": [
+        "planning-experiment-os-queryable-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs into discoverable product surfaces."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
