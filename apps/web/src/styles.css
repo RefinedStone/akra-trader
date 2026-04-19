@@ -3559,6 +3559,25 @@ select {
   gap: 10px;
 }
 
+.comparison-run-summary-metric {
+  text-align: left;
+}
+
+.comparison-run-summary-metric-button {
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+
+.comparison-run-summary-metric-button:hover,
+.comparison-run-summary-metric-button:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.28);
+  background: rgba(var(--comparison-accent-rgb), 0.08);
+}
+
 .run-lineage-copy {
   display: grid;
   gap: 6px;
@@ -3581,6 +3600,15 @@ select {
 }
 
 .run-strategy-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.run-strategy-copy-link {
   margin: 0;
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;

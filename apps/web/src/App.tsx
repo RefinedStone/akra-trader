@@ -425,7 +425,13 @@ type ComparisonScoreLinkTarget = {
 
 type ComparisonScoreLinkedRunRole = "baseline" | "target";
 
-type ComparisonScoreLinkSource = "metric" | "drillback" | "overview" | "provenance" | "run_card";
+type ComparisonScoreLinkSource =
+  | "metric"
+  | "drillback"
+  | "overview"
+  | "provenance"
+  | "run_card"
+  | "run_list";
 
 type ComparisonHistoryWriteMode = "push" | "replace" | "skip";
 
@@ -12743,6 +12749,7 @@ function normalizeComparisonScoreLinkSource(value: unknown): ComparisonScoreLink
     || value === "overview"
     || value === "provenance"
     || value === "run_card"
+    || value === "run_list"
   ) {
     return value;
   }
@@ -14032,6 +14039,8 @@ function RunSection({
   getOrderControls?: (run: Run) => RunOrderControls | null;
 }) {
   const workspaceReviewRowRefs = useRef(new Map<string, HTMLDivElement>());
+  const runListCardRefs = useRef(new Map<string, HTMLElement>());
+  const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
     (preset) =>
@@ -14158,6 +14167,81 @@ function RunSection({
       return Math.max(0, Math.min(noteCount - 1, persistedValue));
     }
     return 0;
+  };
+  const registerRunListCardRef = (runId: string) => (node: HTMLElement | null) => {
+    if (node) {
+      runListCardRefs.current.set(runId, node);
+      return;
+    }
+    runListCardRefs.current.delete(runId);
+  };
+  const registerRunListSubFocusRef = (runId: string, subFocusKey: string) => (node: HTMLElement | null) => {
+    const key = `${runId}:${subFocusKey}`;
+    if (node) {
+      runListSubFocusRefs.current.set(key, node);
+      return;
+    }
+    runListSubFocusRefs.current.delete(key);
+  };
+  useEffect(() => {
+    const selectedRunListScoreLink =
+      comparison?.selectedScoreLink?.source === "run_list"
+        ? comparison.selectedScoreLink
+        : null;
+    if (!selectedRunListScoreLink) {
+      return;
+    }
+    const scrollOptions: ScrollIntoViewOptions = {
+      behavior: "smooth",
+      block: "nearest",
+    };
+    if (selectedRunListScoreLink.subFocusKey) {
+      const subFocusTarget = runListSubFocusRefs.current.get(
+        `${selectedRunListScoreLink.originRunId ?? selectedRunListScoreLink.narrativeRunId}:${selectedRunListScoreLink.subFocusKey}`,
+      );
+      if (subFocusTarget) {
+        subFocusTarget.scrollIntoView(scrollOptions);
+        return;
+      }
+    }
+    const cardTarget = runListCardRefs.current.get(
+      selectedRunListScoreLink.originRunId ?? selectedRunListScoreLink.narrativeRunId,
+    );
+    cardTarget?.scrollIntoView(scrollOptions);
+  }, [comparison?.selectedScoreLink]);
+  const handleRunListScoreLinkSelection = (
+    runId: string,
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => {
+    if (!comparison) {
+      return;
+    }
+    const nextSelection = {
+      artifactDetailExpanded: null,
+      artifactHoverKey: null,
+      artifactLineDetailExpanded: null,
+      artifactLineDetailHoverKey: null,
+      artifactLineDetailScrubStep: null,
+      artifactLineDetailView: null,
+      artifactLineMicroView: null,
+      artifactLineNotePage: null,
+      componentKey,
+      detailExpanded: options?.detailExpanded ?? null,
+      narrativeRunId: runId,
+      originRunId: runId,
+      section,
+      source: "run_list" as const,
+      subFocusKey: options?.subFocusKey ?? null,
+      tooltipKey: null,
+    } satisfies ComparisonScoreLinkTarget;
+    comparison.onChangeSelectedScoreLink(
+      isSameComparisonScoreLinkSurface(comparison.selectedScoreLink, nextSelection)
+        ? null
+        : nextSelection,
+      options?.historyMode,
+    );
   };
   const renderWorkspaceReviewSignalMicroState = (params: {
     interactionId: string;
@@ -16993,8 +17077,23 @@ function RunSection({
         <div className="run-list">
           {runs.map((run) => {
             const orderControls = getOrderControls ? getOrderControls(run) : null;
+            const comparisonLinkedRunRole =
+              comparison?.payload
+                ? getComparisonScoreLinkedRunRole(
+                    comparison.selectedScoreLink,
+                    comparison.payload.baseline_run_id,
+                    run.config.run_id,
+                  )
+                : null;
+            const linkedRunListSelection =
+              comparisonLinkedRunRole && comparison?.selectedScoreLink
+                ? {
+                    ...comparison.selectedScoreLink,
+                    role: comparisonLinkedRunRole,
+                  }
+                : null;
             return (
-              <article className="run-card" key={run.config.run_id}>
+              <article className="run-card" key={run.config.run_id} ref={registerRunListCardRef(run.config.run_id)}>
               <div className="run-card-head">
                 <div>
                   <strong>{run.config.strategy_id}</strong>
@@ -17024,7 +17123,25 @@ function RunSection({
                 tags={run.provenance.experiment.tags}
               />
               {run.provenance.strategy ? (
-                <RunStrategySnapshot strategy={run.provenance.strategy} />
+                <RunStrategySnapshot
+                  linkedScore={linkedRunListSelection && linkedRunListSelection.section === "semantics"
+                    ? linkedRunListSelection
+                    : null}
+                  onDrillBackScoreLink={
+                    comparisonLinkedRunRole
+                      ? (section, componentKey, options) =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            section,
+                            componentKey,
+                            options,
+                          )
+                      : undefined
+                  }
+                  panelRunId={run.config.run_id}
+                  registerSubFocusRef={registerRunListSubFocusRef}
+                  strategy={run.provenance.strategy}
+                />
               ) : null}
               <p className="run-note">
                 {run.provenance.reference_id
@@ -22321,12 +22438,136 @@ function ReferenceRunProvenanceSummary({
 }
 
 function RunStrategySnapshot({
+  linkedScore,
+  onDrillBackScoreLink,
+  panelRunId,
+  registerSubFocusRef,
   strategy,
 }: {
+  linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => void;
+  panelRunId?: string;
+  registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
   strategy: NonNullable<Run["provenance"]["strategy"]>;
 }) {
+  const strategyKindSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_kind");
+  const executionModelSubFocusKey = buildComparisonRunListLineSubFocusKey("execution_model");
+  const parameterContractSubFocusKey = buildComparisonRunListLineSubFocusKey("parameter_contract");
+  const semanticSourceSubFocusKey = buildComparisonRunListLineSubFocusKey("semantic_source");
+  const operatorNotesSubFocusKey = buildComparisonRunListLineSubFocusKey("operator_notes");
+  const activeRunListSubFocusKey =
+    linkedScore?.source === "run_list"
+      ? linkedScore.subFocusKey
+      : null;
+  const highlightStrategyKind =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["strategy_kind", "vocabulary"], "semantics");
+  const highlightExecutionModel =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["execution_model", "vocabulary"], "semantics");
+  const highlightParameterContract =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["parameter_contract", "vocabulary"], "semantics");
+  const highlightSourceDescriptor =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["source_descriptor", "vocabulary"], "semantics");
+  const highlightOperatorNotes =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["vocabulary"], "semantics");
+  const highlightPanel =
+    highlightStrategyKind
+    || highlightExecutionModel
+    || highlightParameterContract
+    || highlightSourceDescriptor
+    || highlightOperatorNotes;
+  const highlightOrigin =
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId;
+  const renderSemanticTile = (
+    label: string,
+    value: string,
+    componentKey: string,
+    highlighted: boolean,
+    subFocusKey: string,
+  ) => {
+    const isPressed =
+      linkedScore?.section === "semantics"
+      && linkedScore.componentKey === componentKey
+      && activeRunListSubFocusKey === subFocusKey;
+    const className = `metric-tile comparison-run-summary-metric ${
+      highlighted ? "comparison-linked-panel" : ""
+    } ${isPressed ? "comparison-linked-panel-origin comparison-linked-subfocus is-active" : ""}`.trim();
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return (
+        <div className={className}>
+          <span>{label}</span>
+          <strong>{value}</strong>
+        </div>
+      );
+    }
+    return (
+      <button
+        aria-pressed={isPressed}
+        className={`${className} comparison-run-summary-metric-button`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("semantics", componentKey, {
+            subFocusKey,
+          })
+        }
+        ref={registerSubFocusRef?.(panelRunId, subFocusKey)}
+        type="button"
+      >
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </button>
+    );
+  };
+  const renderSemanticLine = (
+    children: string,
+    componentKey: string,
+    highlighted: boolean,
+    subFocusKey: string,
+  ) => {
+    const isPressed =
+      linkedScore?.section === "semantics"
+      && linkedScore.componentKey === componentKey
+      && activeRunListSubFocusKey === subFocusKey;
+    const className = `run-strategy-copy-link ${
+      highlighted ? "comparison-linked-copy" : ""
+    } ${
+      isPressed ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""
+    }`.trim();
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className={className}>{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={isPressed}
+        className={`${className} comparison-run-card-link comparison-drillback-target`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("semantics", componentKey, {
+            subFocusKey,
+          })
+        }
+        ref={registerSubFocusRef?.(panelRunId, subFocusKey)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
   return (
-    <section className="run-strategy">
+    <section
+      className={`run-strategy ${highlightPanel ? "comparison-linked-panel" : ""} ${
+        linkedScore?.role === "target" ? "comparison-linked-panel-target" : ""
+      } ${linkedScore?.role === "baseline" ? "comparison-linked-panel-baseline" : ""} ${
+        highlightOrigin ? "comparison-linked-panel-origin" : ""
+      }`.trim()}
+    >
       <div className="run-strategy-head">
         <span>Strategy snapshot</span>
         <strong>{formatLaneLabel(strategy.runtime)}</strong>
@@ -22334,7 +22575,13 @@ function RunStrategySnapshot({
       <div className="run-strategy-grid">
         <Metric label="Version" value={strategy.version} />
         <Metric label="Lifecycle" value={strategy.lifecycle.stage} />
-        <Metric label="Semantic kind" value={strategy.catalog_semantics.strategy_kind} />
+        {renderSemanticTile(
+          "Semantic kind",
+          strategy.catalog_semantics.strategy_kind,
+          "strategy_kind",
+          highlightStrategyKind,
+          strategyKindSubFocusKey,
+        )}
         <Metric label="Warmup" value={`${strategy.warmup.required_bars} bars`} />
         <Metric label="TFs" value={strategy.warmup.timeframes.join(", ")} />
       </div>
@@ -22342,13 +22589,28 @@ function RunStrategySnapshot({
         <p>Supported timeframes: {strategy.supported_timeframes.join(", ") || "n/a"}</p>
         <p>Version lineage: {formatVersionLineage(strategy.version_lineage, strategy.version)}</p>
         {strategy.catalog_semantics.execution_model ? (
-          <p>Execution model: {strategy.catalog_semantics.execution_model}</p>
+          renderSemanticLine(
+            `Execution model: ${strategy.catalog_semantics.execution_model}`,
+            "execution_model",
+            highlightExecutionModel,
+            executionModelSubFocusKey,
+          )
         ) : null}
         {strategy.catalog_semantics.parameter_contract ? (
-          <p>Parameter contract: {strategy.catalog_semantics.parameter_contract}</p>
+          renderSemanticLine(
+            `Parameter contract: ${strategy.catalog_semantics.parameter_contract}`,
+            "parameter_contract",
+            highlightParameterContract,
+            parameterContractSubFocusKey,
+          )
         ) : null}
         {strategy.catalog_semantics.source_descriptor ? (
-          <p>Source: {strategy.catalog_semantics.source_descriptor}</p>
+          renderSemanticLine(
+            `Source: ${strategy.catalog_semantics.source_descriptor}`,
+            "source_descriptor",
+            highlightSourceDescriptor,
+            semanticSourceSubFocusKey,
+          )
         ) : null}
         <p>Resolved params: {formatParameterMap(strategy.parameter_snapshot.resolved)}</p>
         <p>Requested params: {formatParameterMap(strategy.parameter_snapshot.requested)}</p>
@@ -22357,7 +22619,12 @@ function RunStrategySnapshot({
           <p>Registered: {formatTimestamp(strategy.lifecycle.registered_at)}</p>
         ) : null}
         {strategy.catalog_semantics.operator_notes.length ? (
-          <p>Operator notes: {strategy.catalog_semantics.operator_notes.join(" | ")}</p>
+          renderSemanticLine(
+            `Operator notes: ${strategy.catalog_semantics.operator_notes.join(" | ")}`,
+            "vocabulary",
+            highlightOperatorNotes,
+            operatorNotesSubFocusKey,
+          )
         ) : null}
       </div>
     </section>
@@ -22719,6 +22986,8 @@ function formatComparisonScoreLinkSourceLabel(source: ComparisonScoreLinkSource)
       return "provenance panel";
     case "run_card":
       return "run card";
+    case "run_list":
+      return "run list";
     case "drillback":
     default:
       return "drill-back";
@@ -22743,6 +23012,10 @@ function buildComparisonProvenanceLineSubFocusKey(key: string) {
 
 function buildComparisonRunCardLineSubFocusKey(key: string) {
   return `run-card-line:${encodeComparisonScoreLinkToken(key)}`;
+}
+
+function buildComparisonRunListLineSubFocusKey(key: string) {
+  return `run-list-line:${encodeComparisonScoreLinkToken(key)}`;
 }
 
 function buildComparisonProvenanceArtifactSubFocusKey(path: string) {
@@ -22809,6 +23082,10 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
   }
   if (subFocusKey.startsWith("run-card-line:")) {
     const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("run-card-line:".length));
+    return semanticLineLabels[lineKey] ?? lineKey.replace(/_/g, " ");
+  }
+  if (subFocusKey.startsWith("run-list-line:")) {
+    const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("run-list-line:".length));
     return semanticLineLabels[lineKey] ?? lineKey.replace(/_/g, " ");
   }
   if (subFocusKey.startsWith("provenance-artifact-section:")) {
