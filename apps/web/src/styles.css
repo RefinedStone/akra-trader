@@ -2948,7 +2948,49 @@ select {
     0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
 }
 
+.comparison-linked-badge-origin {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.34),
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
 .comparison-linked-copy {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.comparison-linked-copy-origin {
+  text-shadow: 0 0 12px rgba(var(--comparison-accent-rgb), 0.16);
+}
+
+.comparison-run-card-pill-button {
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+}
+
+.comparison-run-card-link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.comparison-run-card-link:hover,
+.comparison-run-card-link:focus-visible {
+  color: rgba(255, 255, 255, 0.96);
+}
+
+.comparison-run-card-pill-button:hover,
+.comparison-run-card-pill-button:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.42);
+  background: rgba(var(--comparison-accent-rgb), 0.1);
   color: rgba(255, 255, 255, 0.94);
 }
 

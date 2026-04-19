@@ -425,7 +425,7 @@ type ComparisonScoreLinkTarget = {
 
 type ComparisonScoreLinkedRunRole = "baseline" | "target";
 
-type ComparisonScoreLinkSource = "metric" | "drillback" | "overview" | "provenance";
+type ComparisonScoreLinkSource = "metric" | "drillback" | "overview" | "provenance" | "run_card";
 
 type ComparisonHistoryWriteMode = "push" | "replace" | "skip";
 
@@ -12737,7 +12737,13 @@ function normalizeComparisonScoreSection(value: unknown): ComparisonScoreSection
 }
 
 function normalizeComparisonScoreLinkSource(value: unknown): ComparisonScoreLinkSource | null {
-  if (value === "metric" || value === "drillback" || value === "overview" || value === "provenance") {
+  if (
+    value === "metric"
+    || value === "drillback"
+    || value === "overview"
+    || value === "provenance"
+    || value === "run_card"
+  ) {
     return value;
   }
   if (value === "narrative") {
@@ -17168,6 +17174,8 @@ function RunComparisonPanel({
   const overviewCardRefs = useRef(new Map<string, HTMLButtonElement>());
   const scoreDetailRowRefs = useRef(new Map<string, HTMLButtonElement>());
   const metricCellRefs = useRef(new Map<string, HTMLElement>());
+  const runCardRefs = useRef(new Map<string, HTMLElement>());
+  const runCardSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const provenancePanelRefs = useRef(new Map<string, HTMLElement>());
   const provenanceSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const provenanceArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
@@ -17681,6 +17689,8 @@ function RunComparisonPanel({
     componentKey: string,
   ) => `${narrativeRunId}:${section}:${componentKey}`;
   const buildComparisonMetricCellRefKey = (runId: string, componentKey: string) => `${runId}:${componentKey}`;
+  const buildComparisonRunCardSubFocusRefKey = (runId: string, subFocusKey: string) =>
+    `${runId}:${subFocusKey}`;
   const buildComparisonProvenanceSubFocusRefKey = (runId: string, subFocusKey: string) =>
     `${runId}:${subFocusKey}`;
   const buildComparisonProvenanceArtifactHoverRefKey = (
@@ -17718,6 +17728,24 @@ function RunComparisonPanel({
         return;
       }
       metricCellRefs.current.delete(key);
+    };
+
+  const registerComparisonRunCardRef = (runId: string) => (node: HTMLElement | null) => {
+    if (node) {
+      runCardRefs.current.set(runId, node);
+      return;
+    }
+    runCardRefs.current.delete(runId);
+  };
+
+  const registerComparisonRunCardSubFocusRef =
+    (runId: string, subFocusKey: string) => (node: HTMLElement | null) => {
+      const key = buildComparisonRunCardSubFocusRefKey(runId, subFocusKey);
+      if (node) {
+        runCardSubFocusRefs.current.set(key, node);
+        return;
+      }
+      runCardSubFocusRefs.current.delete(key);
     };
 
   const registerComparisonProvenancePanelRef = (runId: string) => (node: HTMLElement | null) => {
@@ -18243,6 +18271,27 @@ function RunComparisonPanel({
         return;
       }
     }
+    if (selectedScoreLink.source === "run_card") {
+      if (selectedScoreLink.subFocusKey) {
+        const runCardSubFocus = runCardSubFocusRefs.current.get(
+          buildComparisonRunCardSubFocusRefKey(
+            selectedScoreLink.originRunId ?? selectedScoreLink.narrativeRunId,
+            selectedScoreLink.subFocusKey,
+          ),
+        );
+        if (runCardSubFocus) {
+          runCardSubFocus.scrollIntoView(scrollOptions);
+          return;
+        }
+      }
+      const runCard = runCardRefs.current.get(
+        selectedScoreLink.originRunId ?? selectedScoreLink.narrativeRunId,
+      );
+      if (runCard) {
+        runCard.scrollIntoView(scrollOptions);
+        return;
+      }
+    }
     const narrativeCard = narrativeCardRefs.current.get(selectedScoreLink.narrativeRunId);
     narrativeCard?.scrollIntoView(scrollOptions);
   }, [selectedScoreLink]);
@@ -18420,6 +18469,20 @@ function RunComparisonPanel({
               "reference_floor",
               "benchmark_story_bonus",
             ]);
+          const semanticKindSubFocusKey = buildComparisonRunCardLineSubFocusKey("strategy_kind");
+          const executionModelSubFocusKey = buildComparisonRunCardLineSubFocusKey("execution_model");
+          const parameterContractSubFocusKey = buildComparisonRunCardLineSubFocusKey("parameter_contract");
+          const semanticSourceSubFocusKey = buildComparisonRunCardLineSubFocusKey("semantic_source");
+          const operatorNotesSubFocusKey = buildComparisonRunCardLineSubFocusKey("operator_notes");
+          const isRunCardSubFocusOrigin = (subFocusKey: string) =>
+            linkedSelection?.source === "run_card"
+            && linkedSelection.originRunId === run.run_id
+            && linkedSelection.subFocusKey === subFocusKey;
+          const baselineTooltipTargetRef =
+            run.run_id === comparison.baseline_run_id
+              ? registerComparisonTooltipTargetRef(baselineRunTooltipId)
+              : undefined;
+          const runCardRef = registerComparisonRunCardRef(run.run_id);
 
           return (
             <article
@@ -18431,11 +18494,10 @@ function RunComparisonPanel({
                 linkedRunRole === "target" ? "is-linked-target" : ""
               } ${linkedRunRole === "baseline" ? "is-linked-baseline" : ""}`.trim()}
               key={run.run_id}
-              ref={
-                run.run_id === comparison.baseline_run_id
-                  ? registerComparisonTooltipTargetRef(baselineRunTooltipId)
-                  : undefined
-              }
+              ref={(node) => {
+                runCardRef(node);
+                baselineTooltipTargetRef?.(node);
+              }}
               tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
               {...(run.run_id === comparison.baseline_run_id
                 ? getComparisonTooltipTargetProps(baselineRunTooltipId)
@@ -18451,11 +18513,31 @@ function RunComparisonPanel({
                 <span className="meta-pill">{run.lane}</span>
                 <span className="meta-pill subtle">{run.strategy_version}</span>
                 {run.catalog_semantics.strategy_kind ? (
-                  <span
-                    className={`meta-pill subtle ${highlightStrategyKind ? "comparison-linked-badge" : ""}`}
+                  <button
+                    aria-pressed={isRunCardSubFocusOrigin(semanticKindSubFocusKey)}
+                    className={`meta-pill subtle comparison-run-card-pill-button ${
+                      highlightStrategyKind ? "comparison-linked-badge" : ""
+                    } ${
+                      isRunCardSubFocusOrigin(semanticKindSubFocusKey)
+                        ? "comparison-linked-badge-origin comparison-linked-subfocus"
+                        : ""
+                    }`.trim()}
+                    onClick={() =>
+                      handleComparisonScoreDrillBack(
+                        run.run_id,
+                        "semantics",
+                        "strategy_kind",
+                        "run_card",
+                        {
+                          subFocusKey: semanticKindSubFocusKey,
+                        },
+                      )
+                    }
+                    ref={registerComparisonRunCardSubFocusRef(run.run_id, semanticKindSubFocusKey)}
+                    type="button"
                   >
                     {run.catalog_semantics.strategy_kind}
-                  </span>
+                  </button>
                 ) : null}
                 {run.reference_id ? (
                   <span
@@ -18469,24 +18551,112 @@ function RunComparisonPanel({
                 {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
               </p>
               {run.catalog_semantics.execution_model ? (
-                <p className={`run-note ${highlightExecutionModel ? "comparison-linked-copy" : ""}`}>
+                <button
+                  aria-pressed={isRunCardSubFocusOrigin(executionModelSubFocusKey)}
+                  className={`run-note comparison-run-card-link ${
+                    highlightExecutionModel ? "comparison-linked-copy" : ""
+                  } ${
+                    isRunCardSubFocusOrigin(executionModelSubFocusKey)
+                      ? "comparison-linked-copy-origin comparison-linked-subfocus"
+                      : ""
+                  }`.trim()}
+                  onClick={() =>
+                    handleComparisonScoreDrillBack(
+                      run.run_id,
+                      "semantics",
+                      "execution_model",
+                      "run_card",
+                      {
+                        subFocusKey: executionModelSubFocusKey,
+                      },
+                    )
+                  }
+                  ref={registerComparisonRunCardSubFocusRef(run.run_id, executionModelSubFocusKey)}
+                  type="button"
+                >
                   Execution model: {run.catalog_semantics.execution_model}
-                </p>
+                </button>
               ) : null}
               {run.catalog_semantics.parameter_contract ? (
-                <p className={`run-note ${highlightParameterContract ? "comparison-linked-copy" : ""}`}>
+                <button
+                  aria-pressed={isRunCardSubFocusOrigin(parameterContractSubFocusKey)}
+                  className={`run-note comparison-run-card-link ${
+                    highlightParameterContract ? "comparison-linked-copy" : ""
+                  } ${
+                    isRunCardSubFocusOrigin(parameterContractSubFocusKey)
+                      ? "comparison-linked-copy-origin comparison-linked-subfocus"
+                      : ""
+                  }`.trim()}
+                  onClick={() =>
+                    handleComparisonScoreDrillBack(
+                      run.run_id,
+                      "semantics",
+                      "parameter_contract",
+                      "run_card",
+                      {
+                        subFocusKey: parameterContractSubFocusKey,
+                      },
+                    )
+                  }
+                  ref={registerComparisonRunCardSubFocusRef(run.run_id, parameterContractSubFocusKey)}
+                  type="button"
+                >
                   Parameter contract: {run.catalog_semantics.parameter_contract}
-                </p>
+                </button>
               ) : null}
               {run.catalog_semantics.source_descriptor ? (
-                <p className={`run-note ${highlightSourceDescriptor ? "comparison-linked-copy" : ""}`}>
+                <button
+                  aria-pressed={isRunCardSubFocusOrigin(semanticSourceSubFocusKey)}
+                  className={`run-note comparison-run-card-link ${
+                    highlightSourceDescriptor ? "comparison-linked-copy" : ""
+                  } ${
+                    isRunCardSubFocusOrigin(semanticSourceSubFocusKey)
+                      ? "comparison-linked-copy-origin comparison-linked-subfocus"
+                      : ""
+                  }`.trim()}
+                  onClick={() =>
+                    handleComparisonScoreDrillBack(
+                      run.run_id,
+                      "semantics",
+                      "source_descriptor",
+                      "run_card",
+                      {
+                        subFocusKey: semanticSourceSubFocusKey,
+                      },
+                    )
+                  }
+                  ref={registerComparisonRunCardSubFocusRef(run.run_id, semanticSourceSubFocusKey)}
+                  type="button"
+                >
                   Semantic source: {run.catalog_semantics.source_descriptor}
-                </p>
+                </button>
               ) : null}
               {run.catalog_semantics.operator_notes.length ? (
-                <p className={`run-note ${highlightOperatorNotes ? "comparison-linked-copy" : ""}`}>
+                <button
+                  aria-pressed={isRunCardSubFocusOrigin(operatorNotesSubFocusKey)}
+                  className={`run-note comparison-run-card-link ${
+                    highlightOperatorNotes ? "comparison-linked-copy" : ""
+                  } ${
+                    isRunCardSubFocusOrigin(operatorNotesSubFocusKey)
+                      ? "comparison-linked-copy-origin comparison-linked-subfocus"
+                      : ""
+                  }`.trim()}
+                  onClick={() =>
+                    handleComparisonScoreDrillBack(
+                      run.run_id,
+                      "semantics",
+                      "vocabulary",
+                      "run_card",
+                      {
+                        subFocusKey: operatorNotesSubFocusKey,
+                      },
+                    )
+                  }
+                  ref={registerComparisonRunCardSubFocusRef(run.run_id, operatorNotesSubFocusKey)}
+                  type="button"
+                >
                   Operator notes: {run.catalog_semantics.operator_notes.join(" | ")}
-                </p>
+                </button>
               ) : null}
               <ExperimentMetadataPills
                 benchmarkFamily={run.experiment.benchmark_family}
@@ -22547,6 +22717,8 @@ function formatComparisonScoreLinkSourceLabel(source: ComparisonScoreLinkSource)
       return "overview card";
     case "provenance":
       return "provenance panel";
+    case "run_card":
+      return "run card";
     case "drillback":
     default:
       return "drill-back";
@@ -22567,6 +22739,10 @@ function decodeComparisonScoreLinkToken(value: string) {
 
 function buildComparisonProvenanceLineSubFocusKey(key: string) {
   return `provenance-line:${encodeComparisonScoreLinkToken(key)}`;
+}
+
+function buildComparisonRunCardLineSubFocusKey(key: string) {
+  return `run-card-line:${encodeComparisonScoreLinkToken(key)}`;
 }
 
 function buildComparisonProvenanceArtifactSubFocusKey(path: string) {
@@ -22610,22 +22786,30 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
   if (!subFocusKey) {
     return null;
   }
+  const semanticLineLabels: Record<string, string> = {
+    execution_model: "Execution model",
+    operator_notes: "Operator notes",
+    parameter_contract: "Parameter contract",
+    provenance_richness: "Artifact inventory",
+    semantic_source: "Semantic source",
+    source_descriptor: "Source descriptor",
+    strategy_kind: "Semantic kind",
+    vocabulary: "Vocabulary",
+    working_directory: "Working dir",
+  };
   if (subFocusKey.startsWith("provenance-line:")) {
     const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("provenance-line:".length));
     const labels: Record<string, string> = {
+      ...semanticLineLabels,
       command: "Command",
-      execution_model: "Execution model",
       homepage: "Homepage",
-      operator_notes: "Operator notes",
-      parameter_contract: "Parameter contract",
-      provenance_richness: "Artifact inventory",
       reference_id: "Reference ID",
-      semantic_source: "Semantic source",
-      strategy_kind: "Semantic kind",
-      vocabulary: "Vocabulary",
-      working_directory: "Working dir",
     };
     return labels[lineKey] ?? lineKey.replace(/_/g, " ");
+  }
+  if (subFocusKey.startsWith("run-card-line:")) {
+    const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("run-card-line:".length));
+    return semanticLineLabels[lineKey] ?? lineKey.replace(/_/g, " ");
   }
   if (subFocusKey.startsWith("provenance-artifact-section:")) {
     const [, encodedPath = "", encodedSection = ""] = subFocusKey.split(":");
