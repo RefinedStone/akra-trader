@@ -2776,18 +2776,54 @@
       "direction_id": "experiment-os",
       "title": "Render semantic score breakdown in control-room comparison UI",
       "description": "Use the newly shipped comparison `score_breakdown` payload in the control room so comparison cards or rows show metrics, semantics, context, total, and the semantic feature-level contributors instead of only an opaque `insight_score` total.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply says the remaining work is consumer-side exposure: `score_breakdown` now exists in the API and application model, but the control room still renders only the total `insight_score`. That makes the UI integration the clearest executable next task and the new queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 71c0d84, which rendered `score_breakdown` totals plus metrics, semantics, and context section contributors in the control-room comparison narrative cards, verified with `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-expose-semantic-score-breakdown-in-comparison-payloads"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T12:37:00Z",
+      "updated_at": "2026-04-19T12:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Completes the experiment-os comparison explainability loop by turning backend score-breakdown evidence into operator-visible UI context where run ranking decisions are actually reviewed."
+    },
+    {
+      "id": "planning-experiment-os-add-score-breakdown-drill-down-ui-in-control-room-comparison",
+      "direction_id": "experiment-os",
+      "title": "Add score breakdown drill-down UI in control-room comparison cards",
+      "description": "Extend the newly shipped compact `score_breakdown` summary so operators can expand a comparison card and inspect component-level raw units plus baseline-versus-target semantic values for metrics, semantics, and context contributors without leaving the control room.",
+      "status": "done",
+      "base_priority": 92,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "Completed in main session commit 5bab922, which added `Show score details` drill-down rows for metrics, semantics, and context contributors inside comparison narrative cards, exposed raw delta, effective and capped units, weight, changed keys, semantic baseline and target values, plus applied or inactive state, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-render-semantic-score-breakdown-in-control-room-comparison-ui"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T13:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison explainability from compact score summaries into inspectable operator evidence, so ranking decisions can be audited at the raw feature and semantic-value level from the control room."
+    },
+    {
+      "id": "planning-experiment-os-link-score-components-across-comparison-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Link score components across comparison cards, metric cells, and provenance panels",
+      "description": "Extend the new score drill-down from a card-local expansion into a connected analysis UI where selecting a score component can cross-highlight the related metric table cell, semantic annotation, or run provenance evidence panel, so operators can trace why a score changed across adjacent comparison surfaces without manual scanning.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply says the remaining work is deeper analysis UX: the new drill-down stays inside the comparison card, but score components still do not connect to metric table cells or run provenance panels. That makes cross-surface highlighting the clearest immediate executable follow-up for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-add-score-breakdown-drill-down-ui-in-control-room-comparison"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T13:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os comparison explainability beyond local drill-downs into linked operator evidence, which better supports promotion decisions when score changes must be traced across metrics, semantics, and provenance surfaces."
     }
   ]
 }
