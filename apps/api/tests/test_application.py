@@ -13852,6 +13852,64 @@ def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
   assert filtered[0].config.strategy_version == "1.0.0"
 
 
+def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  baseline = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    tags=("baseline", "momentum"),
+    preset_id="core_5m",
+    benchmark_family="native_validation",
+  )
+  app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"short_window": 13},
+    tags=("alternate",),
+    preset_id="tuned_5m",
+    benchmark_family="native_tuning",
+  )
+
+  assert baseline.provenance.market_data is not None
+
+  filtered = app.list_runs(
+    mode="backtest",
+    preset_id="core_5m",
+    benchmark_family="native_validation",
+    dataset_identity=baseline.provenance.market_data.dataset_identity,
+    tags=("baseline", "momentum"),
+  )
+
+  assert [run.config.run_id for run in filtered] == [baseline.config.run_id]
+
+  reloaded = build_runs_repository(tmp_path).get_run(baseline.config.run_id)
+
+  assert reloaded is not None
+  assert reloaded.provenance.experiment.preset_id == "core_5m"
+  assert reloaded.provenance.experiment.benchmark_family == "native_validation"
+  assert reloaded.provenance.experiment.tags == ("baseline", "momentum")
+
+  rerun = app.rerun_backtest_from_boundary(rerun_boundary_id=baseline.provenance.rerun_boundary_id)
+
+  assert rerun.provenance.experiment == baseline.provenance.experiment
+
+
 def test_list_runs_can_filter_paper_history_separately_from_sandbox(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
   app = TradingApplication(

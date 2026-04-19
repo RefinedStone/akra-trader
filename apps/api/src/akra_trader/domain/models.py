@@ -327,6 +327,13 @@ class BenchmarkArtifact:
   summary_source_path: str | None = None
 
 
+@dataclass(frozen=True)
+class RunExperimentMetadata:
+  tags: tuple[str, ...] = ()
+  preset_id: str | None = None
+  benchmark_family: str | None = None
+
+
 @dataclass
 class RunProvenance:
   lane: str = "native"
@@ -347,6 +354,7 @@ class RunProvenance:
   market_data: MarketDataLineage | None = None
   market_data_by_symbol: dict[str, MarketDataLineage] = field(default_factory=dict)
   runtime_session: RuntimeSessionState | None = None
+  experiment: RunExperimentMetadata = field(default_factory=RunExperimentMetadata)
 
 
 @dataclass
@@ -385,6 +393,8 @@ class RunComparisonRun:
   working_directory: str | None = None
   rerun_boundary_id: str | None = None
   rerun_boundary_state: str = "range_only"
+  dataset_identity: str | None = None
+  experiment: RunExperimentMetadata = field(default_factory=RunExperimentMetadata)
   external_command: tuple[str, ...] = ()
   artifact_paths: tuple[str, ...] = ()
   benchmark_artifacts: tuple[BenchmarkArtifact, ...] = ()

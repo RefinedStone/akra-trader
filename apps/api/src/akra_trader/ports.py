@@ -124,6 +124,10 @@ class RunRepositoryPort(Protocol):
     strategy_id: str | None = None,
     strategy_version: str | None = None,
     rerun_boundary_id: str | None = None,
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
+    dataset_identity: str | None = None,
+    tags: tuple[str, ...] = (),
   ) -> list[RunRecord]: ...
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None: ...

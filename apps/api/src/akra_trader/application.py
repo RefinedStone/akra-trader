@@ -8,8 +8,10 @@ from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 from numbers import Number
+import re
 from typing import Any
 from typing import Callable
+from typing import Iterable
 from uuid import uuid4
 
 from akra_trader.domain.models import RunComparison
@@ -156,6 +158,7 @@ from akra_trader.domain.models import OperatorVisibility
 from akra_trader.domain.models import Position
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
+from akra_trader.domain.models import RunExperimentMetadata
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
@@ -663,12 +666,20 @@ class TradingApplication:
     strategy_id: str | None = None,
     strategy_version: str | None = None,
     rerun_boundary_id: str | None = None,
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
+    dataset_identity: str | None = None,
+    tags: Iterable[str] = (),
   ) -> list[RunRecord]:
     return self._runs.list_runs(
       mode=self._mode_service.normalize(mode),
       strategy_id=strategy_id,
       strategy_version=strategy_version,
       rerun_boundary_id=rerun_boundary_id,
+      preset_id=_normalize_experiment_identifier(preset_id),
+      benchmark_family=_normalize_experiment_identifier(benchmark_family),
+      dataset_identity=_normalize_experiment_filter_value(dataset_identity),
+      tags=_normalize_experiment_tags(tags),
     )
 
   def get_run(self, run_id: str) -> RunRecord | None:
@@ -14610,8 +14621,17 @@ class TradingApplication:
     parameters: dict,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    experiment_metadata = _build_run_experiment_metadata(
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
+      strategy_metadata=metadata,
+    )
     config = RunConfig(
       run_id=str(uuid4()),
       mode=RunMode.BACKTEST,
@@ -14631,7 +14651,11 @@ class TradingApplication:
       run = RunRecord(
         config=config,
         status=RunStatus.PENDING,
-        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+        provenance=RunProvenance(
+          lane="reference",
+          strategy=strategy_snapshot,
+          experiment=experiment_metadata,
+        ),
       )
       if self._freqtrade_reference is None:
         run.status = RunStatus.FAILED
@@ -14646,6 +14670,7 @@ class TradingApplication:
       strategy_snapshot=strategy_snapshot,
       active_bars=None,
     )
+    run.provenance.experiment = experiment_metadata
     if run.status != RunStatus.FAILED:
       self._run_supervisor.complete(run)
     return self._runs.save_run(run)
@@ -14663,6 +14688,9 @@ class TradingApplication:
     replay_bars: int | None = 96,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     return self._start_sandbox_session(
       strategy_id=strategy_id,
@@ -14675,6 +14703,9 @@ class TradingApplication:
       replay_bars=replay_bars,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
 
   def start_paper_run(
@@ -14690,6 +14721,9 @@ class TradingApplication:
     replay_bars: int | None = 96,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     return self._start_paper_session(
       strategy_id=strategy_id,
@@ -14702,6 +14736,9 @@ class TradingApplication:
       replay_bars=replay_bars,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
 
   def start_live_run(
@@ -14718,6 +14755,9 @@ class TradingApplication:
     operator_reason: str = "guarded_live_launch",
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     return self._start_live_session(
       strategy_id=strategy_id,
@@ -14731,6 +14771,9 @@ class TradingApplication:
       operator_reason=operator_reason,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
 
   def _start_sandbox_session(
@@ -14746,6 +14789,9 @@ class TradingApplication:
     replay_bars: int | None = 96,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     return self._start_native_session(
       target_mode=RunMode.SANDBOX,
@@ -14763,6 +14809,9 @@ class TradingApplication:
       replay_bars=replay_bars,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
 
   def _start_paper_session(
@@ -14778,6 +14827,9 @@ class TradingApplication:
     replay_bars: int | None = 96,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     return self._start_native_session(
       target_mode=RunMode.PAPER,
@@ -14795,6 +14847,9 @@ class TradingApplication:
       replay_bars=replay_bars,
       start_at=start_at,
       end_at=end_at,
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
     )
 
   def _start_live_session(
@@ -14811,10 +14866,19 @@ class TradingApplication:
     operator_reason: str,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     self._ensure_guarded_live_worker_start_allowed()
     state = self._guarded_live_state.load_state()
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    experiment_metadata = _build_run_experiment_metadata(
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
+      strategy_metadata=metadata,
+    )
     config = RunConfig(
       run_id=str(uuid4()),
       mode=RunMode.LIVE,
@@ -14834,7 +14898,11 @@ class TradingApplication:
       run = RunRecord(
         config=config,
         status=RunStatus.FAILED,
-        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+        provenance=RunProvenance(
+          lane="reference",
+          strategy=strategy_snapshot,
+          experiment=experiment_metadata,
+        ),
       )
       run.notes.append(
         "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
@@ -14844,6 +14912,7 @@ class TradingApplication:
 
     loaded = self._data_engine.load_frame(config=config, active_bars=replay_bars)
     run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
+    run.provenance.experiment = experiment_metadata
     run.provenance.market_data = loaded.lineage
     run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
     self._attach_rerun_boundary(run)
@@ -14951,8 +15020,17 @@ class TradingApplication:
     replay_bars: int | None = 96,
     start_at: datetime | None = None,
     end_at: datetime | None = None,
+    tags: Iterable[str] = (),
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
   ) -> RunRecord:
     strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
+    experiment_metadata = _build_run_experiment_metadata(
+      tags=tags,
+      preset_id=preset_id,
+      benchmark_family=benchmark_family,
+      strategy_metadata=metadata,
+    )
     config = RunConfig(
       run_id=str(uuid4()),
       mode=target_mode,
@@ -14973,7 +15051,11 @@ class TradingApplication:
       run = RunRecord(
         config=config,
         status=RunStatus.FAILED,
-        provenance=RunProvenance(lane="reference", strategy=strategy_snapshot),
+        provenance=RunProvenance(
+          lane="reference",
+          strategy=strategy_snapshot,
+          experiment=experiment_metadata,
+        ),
       )
       run.notes.append(
         "Reference Freqtrade strategies are exposed for cataloging and backtest delegation. "
@@ -14983,6 +15065,7 @@ class TradingApplication:
 
     loaded = self._data_engine.load_frame(config=config, active_bars=replay_bars)
     run = self._run_supervisor.create_native_run(config=config, strategy=strategy_snapshot)
+    run.provenance.experiment = experiment_metadata
     run.provenance.market_data = loaded.lineage
     run.provenance.market_data_by_symbol = loaded.lineage_by_symbol
     self._attach_rerun_boundary(run)
@@ -21694,6 +21777,9 @@ class TradingApplication:
         parameters=rerun_parameters,
         start_at=rerun_start_at,
         end_at=rerun_end_at,
+        tags=source_run.provenance.experiment.tags,
+        preset_id=source_run.provenance.experiment.preset_id,
+        benchmark_family=source_run.provenance.experiment.benchmark_family,
       )
     elif target_mode in {RunMode.SANDBOX, RunMode.PAPER}:
       preview_start_at, preview_end_at, preview_replay_bars = self._resolve_preview_rerun_window(source_run)
@@ -21717,6 +21803,9 @@ class TradingApplication:
           replay_bars=preview_replay_bars,
           start_at=preview_start_at,
           end_at=preview_end_at,
+          tags=source_run.provenance.experiment.tags,
+          preset_id=source_run.provenance.experiment.preset_id,
+          benchmark_family=source_run.provenance.experiment.benchmark_family,
         )
       else:
         if preview_replay_bars is None:
@@ -21734,6 +21823,9 @@ class TradingApplication:
           replay_bars=preview_replay_bars,
           start_at=preview_start_at,
           end_at=preview_end_at,
+          tags=source_run.provenance.experiment.tags,
+          preset_id=source_run.provenance.experiment.preset_id,
+          benchmark_family=source_run.provenance.experiment.benchmark_family,
         )
     else:
       raise ValueError(f"Unsupported rerun target mode: {target_mode.value}")
@@ -21830,12 +21922,62 @@ class TradingApplication:
     )
 
 
+def _normalize_experiment_filter_value(value: str | None) -> str | None:
+  if value is None:
+    return None
+  candidate = value.strip()
+  return candidate or None
+
+
+def _normalize_experiment_identifier(value: str | None) -> str | None:
+  candidate = _normalize_experiment_filter_value(value)
+  if candidate is None:
+    return None
+  normalized = re.sub(r"[^a-z0-9._:-]+", "_", candidate.lower())
+  normalized = re.sub(r"_+", "_", normalized).strip("_")
+  return normalized or None
+
+
+def _normalize_experiment_tags(tags: Iterable[str] | None) -> tuple[str, ...]:
+  if tags is None:
+    return ()
+  normalized: list[str] = []
+  seen: set[str] = set()
+  for tag in tags:
+    normalized_tag = _normalize_experiment_identifier(tag)
+    if normalized_tag is None or normalized_tag in seen:
+      continue
+    seen.add(normalized_tag)
+    normalized.append(normalized_tag)
+  return tuple(normalized)
+
+
+def _build_run_experiment_metadata(
+  *,
+  tags: Iterable[str] = (),
+  preset_id: str | None = None,
+  benchmark_family: str | None = None,
+  strategy_metadata: StrategyMetadata,
+) -> RunExperimentMetadata:
+  normalized_benchmark_family = _normalize_experiment_identifier(benchmark_family)
+  if normalized_benchmark_family is None and strategy_metadata.runtime == "freqtrade_reference":
+    normalized_benchmark_family = _normalize_experiment_identifier(
+      f"reference:{strategy_metadata.reference_id or strategy_metadata.strategy_id}"
+    )
+  return RunExperimentMetadata(
+    tags=_normalize_experiment_tags(tags),
+    preset_id=_normalize_experiment_identifier(preset_id),
+    benchmark_family=normalized_benchmark_family,
+  )
+
+
 def serialize_run(run: RunRecord) -> dict:
   payload = asdict(run)
   payload["config"]["mode"] = run.config.mode.value
   payload["status"] = run.status.value
   payload["provenance"]["external_command"] = list(run.provenance.external_command)
   payload["provenance"]["artifact_paths"] = list(run.provenance.artifact_paths)
+  payload["provenance"]["experiment"]["tags"] = list(run.provenance.experiment.tags)
   payload["provenance"]["benchmark_artifacts"] = [
     asdict(artifact)
     for artifact in run.provenance.benchmark_artifacts
@@ -21864,6 +22006,10 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
   payload["runs"] = [
     {
       **run_payload,
+      "experiment": {
+        **run_payload["experiment"],
+        "tags": list(run.experiment.tags),
+      },
       "symbols": list(run.symbols),
       "external_command": list(run.external_command),
       "artifact_paths": list(run.artifact_paths),
@@ -21906,6 +22052,12 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     working_directory=run.provenance.working_directory,
     rerun_boundary_id=run.provenance.rerun_boundary_id,
     rerun_boundary_state=run.provenance.rerun_boundary_state,
+    dataset_identity=(
+      run.provenance.market_data.dataset_identity
+      if run.provenance.market_data is not None
+      else None
+    ),
+    experiment=deepcopy(run.provenance.experiment),
     external_command=tuple(run.provenance.external_command),
     artifact_paths=tuple(run.provenance.artifact_paths),
     benchmark_artifacts=tuple(run.provenance.benchmark_artifacts),

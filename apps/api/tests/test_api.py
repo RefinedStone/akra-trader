@@ -149,6 +149,9 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
       "fee_rate": 0.001,
       "slippage_bps": 3,
       "parameters": {},
+      "tags": ["baseline", "momentum"],
+      "preset_id": "core_5m",
+      "benchmark_family": "native_validation",
     },
   )
   assert response.status_code == 200
@@ -171,6 +174,9 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["rerun_boundary_id"].startswith("rerun-v1:")
   assert payload["provenance"]["rerun_boundary_state"] == "pinned"
+  assert payload["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
+  assert payload["provenance"]["experiment"]["preset_id"] == "core_5m"
+  assert payload["provenance"]["experiment"]["benchmark_family"] == "native_validation"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["provider"] == "seeded"
   assert payload["provenance"]["market_data_by_symbol"]["BTC/USDT"]["dataset_identity"].startswith(
     "candles-v1:"
@@ -2950,6 +2956,57 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   assert payload[0]["config"]["strategy_version"] == "1.0.0"
 
 
+def test_runs_endpoint_can_filter_by_experiment_metadata(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  baseline_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {},
+      "tags": ["baseline", "momentum"],
+      "preset_id": "core_5m",
+      "benchmark_family": "native_validation",
+    },
+  )
+  assert baseline_response.status_code == 200
+  baseline_payload = baseline_response.json()
+  dataset_identity = baseline_payload["provenance"]["market_data"]["dataset_identity"]
+
+  alternate_response = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "initial_cash": 10000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {"short_window": 13},
+      "tags": ["alternate"],
+      "preset_id": "tuned_5m",
+      "benchmark_family": "native_tuning",
+    },
+  )
+  assert alternate_response.status_code == 200
+
+  filtered = client.get(
+    f"/api/runs?mode=backtest&preset_id=core_5m&benchmark_family=native_validation&tag=baseline&tag=momentum&dataset_identity={dataset_identity}"
+  )
+
+  assert filtered.status_code == 200
+  payload = filtered.json()
+  assert len(payload) == 1
+  assert payload[0]["config"]["run_id"] == baseline_payload["config"]["run_id"]
+  assert payload[0]["provenance"]["experiment"]["preset_id"] == "core_5m"
+  assert payload[0]["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
+
+
 def test_runs_endpoint_can_filter_by_rerun_boundary_id(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
 
@@ -3178,6 +3235,8 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
       "fee_rate": 0.001,
       "slippage_bps": 3,
       "parameters": {},
+      "tags": ["baseline"],
+      "preset_id": "core_5m",
     },
   )
   assert native_response.status_code == 200
@@ -3193,6 +3252,8 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
       "fee_rate": 0.001,
       "slippage_bps": 3,
       "parameters": {},
+      "tags": ["reference"],
+      "preset_id": "nfi_baseline",
     },
   )
   assert reference_response.status_code == 200
@@ -3207,6 +3268,11 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["intent"] == "strategy_tuning"
   assert payload["baseline_run_id"] == native_run_id
   assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
+  assert payload["runs"][0]["experiment"]["preset_id"] == "core_5m"
+  assert payload["runs"][0]["experiment"]["tags"] == ["baseline"]
+  assert payload["runs"][0]["dataset_identity"].startswith("dataset-v1:")
+  assert payload["runs"][1]["experiment"]["preset_id"] == "nfi_baseline"
+  assert payload["runs"][1]["experiment"]["benchmark_family"] == "reference:nostalgia-for-infinity"
   assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"
   assert payload["runs"][1]["integration_mode"] == "external_runtime"
   assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"

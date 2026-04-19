@@ -92,6 +92,11 @@ type Run = {
     external_command: string[];
     artifact_paths: string[];
     benchmark_artifacts: BenchmarkArtifact[];
+    experiment: {
+      tags: string[];
+      preset_id?: string | null;
+      benchmark_family?: string | null;
+    };
     strategy?: {
       strategy_id: string;
       name: string;
@@ -212,6 +217,12 @@ type RunComparison = {
     integration_mode?: string | null;
     reference?: ReferenceSource | null;
     working_directory?: string | null;
+    dataset_identity?: string | null;
+    experiment: {
+      tags: string[];
+      preset_id?: string | null;
+      benchmark_family?: string | null;
+    };
     external_command: string[];
     artifact_paths: string[];
     benchmark_artifacts: BenchmarkArtifact[];
@@ -2637,6 +2648,10 @@ type ControlRoomUiStateV1 = {
 type RunHistoryFilter = {
   strategy_id: string;
   strategy_version: string;
+  preset_id: string;
+  benchmark_family: string;
+  tag: string;
+  dataset_identity: string;
 };
 
 type ComparisonIntent = "benchmark_validation" | "execution_regression" | "strategy_tuning";
@@ -2959,11 +2974,18 @@ const defaultRunForm = {
   initial_cash: 10000,
   fee_rate: 0.001,
   slippage_bps: 3,
+  tags_text: "",
+  preset_id: "",
+  benchmark_family: "",
 };
 
 const defaultRunHistoryFilter: RunHistoryFilter = {
   strategy_id: ALL_FILTER_VALUE,
   strategy_version: ALL_FILTER_VALUE,
+  preset_id: "",
+  benchmark_family: "",
+  tag: "",
+  dataset_identity: "",
 };
 
 const DEFAULT_COMPARISON_INTENT: ComparisonIntent = "benchmark_validation";
@@ -2972,6 +2994,35 @@ const comparisonIntentOptions: ComparisonIntent[] = [
   "execution_regression",
   "strategy_tuning",
 ];
+
+function parseExperimentTags(value: string) {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function buildRunSubmissionPayload(form: typeof defaultRunForm, extras: Record<string, unknown> = {}) {
+  const presetId = form.preset_id.trim();
+  const benchmarkFamily = form.benchmark_family.trim();
+  return {
+    strategy_id: form.strategy_id,
+    symbol: form.symbol,
+    timeframe: form.timeframe,
+    initial_cash: form.initial_cash,
+    fee_rate: form.fee_rate,
+    slippage_bps: form.slippage_bps,
+    parameters: {},
+    tags: parseExperimentTags(form.tags_text),
+    preset_id: presetId || null,
+    benchmark_family: benchmarkFamily || null,
+    ...extras,
+  };
+}
 
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
@@ -3248,7 +3299,7 @@ export default function App() {
     try {
       await fetchJson<Run>("/runs/backtests", {
         method: "POST",
-        body: JSON.stringify({ ...backtestForm, parameters: {} }),
+        body: JSON.stringify(buildRunSubmissionPayload(backtestForm)),
       });
       await loadAll();
     } catch (error) {
@@ -3262,7 +3313,7 @@ export default function App() {
     try {
       await fetchJson<Run>("/runs/sandbox", {
         method: "POST",
-        body: JSON.stringify({ ...sandboxForm, parameters: {}, replay_bars: 96 }),
+        body: JSON.stringify(buildRunSubmissionPayload(sandboxForm, { replay_bars: 96 })),
       });
       await loadAll();
     } catch (error) {
@@ -3277,12 +3328,12 @@ export default function App() {
     try {
       await fetchJson<Run>("/runs/live", {
         method: "POST",
-        body: JSON.stringify({
-          ...liveForm,
-          parameters: {},
-          replay_bars: 96,
-          operator_reason: operatorReason,
-        }),
+        body: JSON.stringify(
+          buildRunSubmissionPayload(liveForm, {
+            replay_bars: 96,
+            operator_reason: operatorReason,
+          }),
+        ),
       });
       await loadAll();
     } catch (error) {
@@ -5699,6 +5750,18 @@ function buildRunsPath(mode: string, filter: RunHistoryFilter) {
   if (filter.strategy_version !== ALL_FILTER_VALUE) {
     params.set("strategy_version", filter.strategy_version);
   }
+  if (filter.preset_id.trim()) {
+    params.set("preset_id", filter.preset_id.trim());
+  }
+  if (filter.benchmark_family.trim()) {
+    params.set("benchmark_family", filter.benchmark_family.trim());
+  }
+  if (filter.tag.trim()) {
+    parseExperimentTags(filter.tag).forEach((tag) => params.append("tag", tag));
+  }
+  if (filter.dataset_identity.trim()) {
+    params.set("dataset_identity", filter.dataset_identity.trim());
+  }
   return `/runs?${params.toString()}`;
 }
 
@@ -5715,7 +5778,13 @@ function normalizeRunHistoryFilter(current: RunHistoryFilter, strategies: Strate
     current.strategy_id !== ALL_FILTER_VALUE &&
     !availableStrategyIds.has(current.strategy_id)
   ) {
-    return defaultRunHistoryFilter;
+    return {
+      ...defaultRunHistoryFilter,
+      preset_id: current.preset_id,
+      benchmark_family: current.benchmark_family,
+      tag: current.tag,
+      dataset_identity: current.dataset_identity,
+    };
   }
   const availableVersions = getStrategyVersionOptions(strategies, current.strategy_id);
   if (
@@ -5911,8 +5980,74 @@ function RunForm({
           onChange={(event) => setForm((current) => ({ ...current, slippage_bps: Number(event.target.value) }))}
         />
       </label>
+      <label>
+        Preset ID
+        <input
+          placeholder="baseline_5m"
+          value={form.preset_id}
+          onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
+        />
+      </label>
+      <label>
+        Benchmark family
+        <input
+          placeholder="native_vs_nfi"
+          value={form.benchmark_family}
+          onChange={(event) =>
+            setForm((current) => ({ ...current, benchmark_family: event.target.value }))
+          }
+        />
+      </label>
+      <label>
+        Tags
+        <input
+          placeholder="baseline, momentum"
+          value={form.tags_text}
+          onChange={(event) => setForm((current) => ({ ...current, tags_text: event.target.value }))}
+        />
+      </label>
       <button type="submit">Submit</button>
     </form>
+  );
+}
+
+function ExperimentMetadataPills({
+  benchmarkFamily,
+  datasetIdentity,
+  presetId,
+  tags,
+}: {
+  benchmarkFamily?: string | null;
+  datasetIdentity?: string | null;
+  presetId?: string | null;
+  tags: string[];
+}) {
+  if (!tags.length && !presetId && !benchmarkFamily && !datasetIdentity) {
+    return null;
+  }
+  return (
+    <div className="strategy-badges">
+      {presetId ? (
+        <span className="meta-pill subtle" title={presetId}>
+          preset {presetId}
+        </span>
+      ) : null}
+      {benchmarkFamily ? (
+        <span className="meta-pill subtle" title={benchmarkFamily}>
+          benchmark {benchmarkFamily}
+        </span>
+      ) : null}
+      {datasetIdentity ? (
+        <span className="meta-pill subtle" title={datasetIdentity}>
+          dataset {shortenIdentifier(datasetIdentity)}
+        </span>
+      ) : null}
+      {tags.map((tag) => (
+        <span className="meta-pill subtle" key={tag}>
+          #{tag}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -5989,6 +6124,7 @@ function RunSection({
                       ? current.strategy_version
                       : ALL_FILTER_VALUE;
                     return {
+                      ...current,
                       strategy_id: strategyId,
                       strategy_version: nextVersion,
                     };
@@ -6021,6 +6157,58 @@ function RunSection({
                   </option>
                 ))}
               </select>
+            </label>
+            <label>
+              Preset
+              <input
+                placeholder="All presets"
+                value={filter.preset_id}
+                onChange={(event) =>
+                  setFilter((current) => ({
+                    ...current,
+                    preset_id: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Benchmark
+              <input
+                placeholder="All families"
+                value={filter.benchmark_family}
+                onChange={(event) =>
+                  setFilter((current) => ({
+                    ...current,
+                    benchmark_family: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Tag
+              <input
+                placeholder="baseline"
+                value={filter.tag}
+                onChange={(event) =>
+                  setFilter((current) => ({
+                    ...current,
+                    tag: event.target.value,
+                  }))
+                }
+              />
+            </label>
+            <label>
+              Dataset
+              <input
+                placeholder="dataset-v1:..."
+                value={filter.dataset_identity}
+                onChange={(event) =>
+                  setFilter((current) => ({
+                    ...current,
+                    dataset_identity: event.target.value,
+                  }))
+                }
+              />
             </label>
           </div>
           {comparison ? (
@@ -6084,6 +6272,12 @@ function RunSection({
                 <Metric label="Win rate" value={formatMetric(run.metrics.win_rate_pct, "%")} />
                 <Metric label="Trades" value={formatMetric(run.metrics.trade_count)} />
               </div>
+              <ExperimentMetadataPills
+                benchmarkFamily={run.provenance.experiment.benchmark_family}
+                datasetIdentity={run.provenance.market_data?.dataset_identity}
+                presetId={run.provenance.experiment.preset_id}
+                tags={run.provenance.experiment.tags}
+              />
               {run.provenance.strategy ? (
                 <RunStrategySnapshot strategy={run.provenance.strategy} />
               ) : null}
@@ -7152,6 +7346,12 @@ function RunComparisonPanel({
             <p className="run-note">
               {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
             </p>
+            <ExperimentMetadataPills
+              benchmarkFamily={run.experiment.benchmark_family}
+              datasetIdentity={run.dataset_identity}
+              presetId={run.experiment.preset_id}
+              tags={run.experiment.tags}
+            />
             <p className="run-note">
               Started {formatTimestamp(run.started_at)}
               {run.ended_at ? ` / Ended ${formatTimestamp(run.ended_at)}` : ""}

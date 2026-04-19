@@ -36,6 +36,9 @@ class BacktestRequest(BaseModel):
   parameters: dict[str, Any] = Field(default_factory=dict)
   start_at: datetime | None = None
   end_at: datetime | None = None
+  tags: list[str] = Field(default_factory=list)
+  preset_id: str | None = None
+  benchmark_family: str | None = None
 
 
 class SandboxRunRequest(BaseModel):
@@ -47,6 +50,9 @@ class SandboxRunRequest(BaseModel):
   slippage_bps: float = 3
   replay_bars: int = 96
   parameters: dict[str, Any] = Field(default_factory=dict)
+  tags: list[str] = Field(default_factory=list)
+  preset_id: str | None = None
+  benchmark_family: str | None = None
 
 
 class LiveRunRequest(BaseModel):
@@ -59,6 +65,9 @@ class LiveRunRequest(BaseModel):
   replay_bars: int = 96
   operator_reason: str = "guarded_live_launch"
   parameters: dict[str, Any] = Field(default_factory=dict)
+  tags: list[str] = Field(default_factory=list)
+  preset_id: str | None = None
+  benchmark_family: str | None = None
 
 
 class GuardedLiveActionRequest(BaseModel):
@@ -132,6 +141,10 @@ def create_router(container: Container) -> APIRouter:
     strategy_id: str | None = None,
     strategy_version: str | None = None,
     rerun_boundary_id: str | None = None,
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
+    dataset_identity: str | None = None,
+    tag: list[str] = Query(default_factory=list),
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
     return [
@@ -141,6 +154,10 @@ def create_router(container: Container) -> APIRouter:
         strategy_id=strategy_id,
         strategy_version=strategy_version,
         rerun_boundary_id=rerun_boundary_id,
+        preset_id=preset_id,
+        benchmark_family=benchmark_family,
+        dataset_identity=dataset_identity,
+        tags=tag,
       )
     ]
 
@@ -170,6 +187,9 @@ def create_router(container: Container) -> APIRouter:
       parameters=request.parameters,
       start_at=request.start_at,
       end_at=request.end_at,
+      tags=request.tags,
+      preset_id=request.preset_id,
+      benchmark_family=request.benchmark_family,
     )
     return serialize_run(run)
 
@@ -234,6 +254,9 @@ def create_router(container: Container) -> APIRouter:
         slippage_bps=request.slippage_bps,
         parameters=request.parameters,
         replay_bars=request.replay_bars,
+        tags=request.tags,
+        preset_id=request.preset_id,
+        benchmark_family=request.benchmark_family,
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -261,6 +284,9 @@ def create_router(container: Container) -> APIRouter:
         slippage_bps=request.slippage_bps,
         parameters=request.parameters,
         replay_bars=request.replay_bars,
+        tags=request.tags,
+        preset_id=request.preset_id,
+        benchmark_family=request.benchmark_family,
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -286,10 +312,13 @@ def create_router(container: Container) -> APIRouter:
         initial_cash=request.initial_cash,
         fee_rate=request.fee_rate,
         slippage_bps=request.slippage_bps,
-        parameters=request.parameters,
-        replay_bars=request.replay_bars,
-        operator_reason=request.operator_reason,
-      )
+          parameters=request.parameters,
+          replay_bars=request.replay_bars,
+          operator_reason=request.operator_reason,
+          tags=request.tags,
+          preset_id=request.preset_id,
+          benchmark_family=request.benchmark_family,
+        )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run(run)

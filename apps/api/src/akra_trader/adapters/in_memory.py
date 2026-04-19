@@ -196,6 +196,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     strategy_id: str | None = None,
     strategy_version: str | None = None,
     rerun_boundary_id: str | None = None,
+    preset_id: str | None = None,
+    benchmark_family: str | None = None,
+    dataset_identity: str | None = None,
+    tags: tuple[str, ...] = (),
   ) -> list[RunRecord]:
     values = list(self._runs.values())
     runs = list(reversed(values))
@@ -207,6 +211,24 @@ class InMemoryRunRepository(RunRepositoryPort):
       runs = [run for run in runs if run.config.strategy_version == strategy_version]
     if rerun_boundary_id is not None:
       runs = [run for run in runs if run.provenance.rerun_boundary_id == rerun_boundary_id]
+    if preset_id is not None:
+      runs = [run for run in runs if run.provenance.experiment.preset_id == preset_id]
+    if benchmark_family is not None:
+      runs = [run for run in runs if run.provenance.experiment.benchmark_family == benchmark_family]
+    if dataset_identity is not None:
+      runs = [
+        run
+        for run in runs
+        if run.provenance.market_data is not None
+        and run.provenance.market_data.dataset_identity == dataset_identity
+      ]
+    if tags:
+      required_tags = set(tags)
+      runs = [
+        run
+        for run in runs
+        if required_tags.issubset(set(run.provenance.experiment.tags))
+      ]
     return runs
 
   def update_status(self, run_id: str, status: RunStatus) -> RunRecord | None:
