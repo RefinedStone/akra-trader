@@ -3082,18 +3082,72 @@
       "direction_id": "experiment-os",
       "title": "Add instrument-level merge for expanded gap row conflict resolution",
       "description": "Build on the shipped workspace-state conflict audit by replacing aggregate `expandedGapRows` review with instrument-aware diff and merge controls, so operators can keep local or remote expansion intent per instrument and resolve mixed gap-row conflicts without treating the whole expanded set as one field.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply after commit a188540 says `expandedGapRows` still resolves only as one aggregate field. That is the clearest next executable follow-up because it closes the explicit remaining gap inside the newly shipped workspace-state review flow without needing a broader product-scope decision first.",
+      "priority_reason": "Completed in main session commit 1abfb28, which replaced aggregate `expandedGapRows` resolution with row-scoped `expandedGapRows:<instrument/timeframe>` review keys, added per-row audit cards and summary counts, merged row selections back into the final expanded-gap set, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-manual-conflict-review-beyond-comparison-history-panel-preferences"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:15:00Z",
+      "updated_at": "2026-04-20T02:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison-state trust by making workspace conflict resolution granular enough for per-instrument gap review, reducing the remaining cases where concurrent tabs still force coarse all-or-nothing reconciliation."
+    },
+    {
+      "id": "planning-experiment-os-add-gap-window-level-merge-for-expanded-gap-row-conflicts",
+      "direction_id": "experiment-os",
+      "title": "Add gap-window-level merge for expanded gap row conflict resolution",
+      "description": "Extend the new row-scoped `expandedGapRows` conflict workflow beneath `instrument_id:timeframe` so operators can resolve multiple expanded gap windows within the same instrument and timeframe independently instead of still treating those windows as one row-level choice.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "Completed in main session commit 5b00a4e, which added durable `expandedGapWindowSelections`, introduced `expandedGapWindows|...` review rows for per-window local or remote picks, limited expanded-row rendering to the selected subset, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-add-instrument-level-merge-for-expanded-gap-row-conflicts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T03:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict trust by pushing expanded-gap reconciliation from instrument-scoped rows down to the actual gap-window units operators may want to preserve selectively across concurrent tabs."
+    },
+    {
+      "id": "planning-experiment-os-give-expanded-gap-windows-stable-identity-beyond-range-based-merge-keys",
+      "direction_id": "experiment-os",
+      "title": "Give expanded gap windows stable identity beyond range-based merge keys",
+      "description": "Replace the current `start/end/missing_candles`-derived gap-window merge key with a stable per-window identity model so conflict review and merged workspace state can distinguish duplicate windows that share the same range and candle count instead of collapsing them into one selection target.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply says the new gap-window merge still cannot distinguish duplicate windows with the same range and missing-candle count. This is the strongest immediate follow-up because it hardens correctness of the just-shipped per-window conflict workflow without needing any broader product decision first.",
+      "depends_on": [
+        "planning-experiment-os-add-gap-window-level-merge-for-expanded-gap-row-conflicts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T03:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict trust by ensuring per-window reconciliation keys map to real distinct gap records even when multiple windows share the same visible range summary."
+    },
+    {
+      "id": "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review",
+      "direction_id": "experiment-os",
+      "title": "Add a manual gap-window picker outside conflict review",
+      "description": "Extend the normal comparison UI with a manual gap-window picker so operators can curate the visible gap-window subset even when no sync conflict is active, instead of only seeing merged subsets that originated from conflict resolution state.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply explicitly says the ordinary UI still lacks a manual gap-window picker even though conflict review can now save a selected subset. This is concrete executable follow-up work, but it sits behind stable window identity because the picker should operate on the same unambiguous per-window model.",
+      "depends_on": [
+        "planning-experiment-os-give-expanded-gap-windows-stable-identity-beyond-range-based-merge-keys"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T03:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace control from conflict-only gap-window reconciliation into a general operator editing affordance, so curated gap subsets remain usable during ordinary comparison review rather than only during sync repair."
     },
     {
       "id": "planning-experiment-os-expand-workspace-conflict-audit-beyond-control-room-browser-state",
@@ -3116,20 +3170,20 @@
     {
       "id": "planning-experiment-os-add-latest-state-three-way-merge-for-comparison-history-conflicts",
       "direction_id": "experiment-os",
-      "title": "Add latest-state 3-way merge support for comparison history conflict resolution",
-      "description": "Evolve the new comparison history manual resolution flow beyond static conflict snapshots by detecting when the same entry changed again after the captured conflict, then offering a latest-state-aware three-way merge or stale-conflict guard so operators do not resolve against already superseded state blindly.",
+      "title": "Add latest-state 3-way merge or semantic ranking for workspace conflict resolution",
+      "description": "Evolve the new manual workspace conflict review beyond static local-versus-remote row selection by detecting when the same state changed again after the captured conflict and by offering latest-state-aware three-way merge guidance or semantic conflict ranking, so operators do not resolve against superseded state blindly and larger conflict sets can be triaged intelligently.",
       "status": "proposed",
       "base_priority": 89,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says conflict resolution is still scoped to the captured sync event and does not reconcile against newer browser-state changes. That remains a valid follow-up after commit e700650, but it introduces stale-event guards and merge-policy semantics that are still less immediate than first extending manual review beyond panel preference fields.",
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly lists automatic 3-way merge and semantic conflict ranking as the remaining broader gap after commit 1abfb28. Keep this proposed because it is still a meaningful next step, but it is less immediate than first finishing finer gap-window merge granularity inside the just-updated workspace review flow.",
       "depends_on": [
-        "planning-experiment-os-extend-manual-conflict-resolution-to-history-browser-preferences"
+        "planning-experiment-os-add-gap-window-level-merge-for-expanded-gap-row-conflicts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:55:00Z",
+      "updated_at": "2026-04-20T02:35:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os comparison-history conflict handling from deliberate snapshot review into state-aware reconciliation, which matters once concurrent edits can continue after an initial conflict has already been captured for review."
+      "direction_relation_note": "Pushes experiment-os workspace conflict handling from deliberate row-by-row manual review into state-aware reconciliation and operator triage guidance, which matters once concurrent edits can continue after a conflict snapshot has already been captured."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
