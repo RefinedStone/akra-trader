@@ -3244,18 +3244,36 @@
       "direction_id": "experiment-os",
       "title": "Extend manual gap-window picker touch feedback beyond `navigator.vibrate`",
       "description": "Finish the next platform-tuning pass for manual gap-window picker sweep activation by adding a clearer platform-specific haptic integration seam or fallback contract beyond best-effort `navigator.vibrate`, so iOS Safari and other non-vibration environments can deliver stronger activation feedback than the current visual pulse alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the shipped feedback is limited to best-effort `navigator.vibrate`, that iOS Safari lacks the vibration API, and that native bridge-based haptic integration is still missing. That makes broader platform-specific activation feedback the clearest executable next task after commit be8f10f.",
+      "priority_reason": "Completed in main session commit b6f45ff, which extended manual gap-window picker sweep activation feedback beyond `navigator.vibrate` by trying Telegram WebApp haptics, iOS or webview `webkit.messageHandlers`, and the React Native WebView bridge before falling back to `navigator.vibrate(18)`, then verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-haptic-or-platform-touch-feedback-to-manual-gap-window-picker-sweep-activation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:40:00Z",
+      "updated_at": "2026-04-20T19:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os mobile gesture trust moving from baseline web vibration support toward a platform-aware activation feedback contract that remains legible on iOS-class environments where web haptics are limited."
+      "direction_relation_note": "Closed the broad platform-bridge fallback gap for experiment-os touch feedback by giving sweep activation a best-effort host haptics chain across Telegram, iOS or webview bridges, React Native WebView shells, and browser vibration while preserving visual pulse fallback."
+    },
+    {
+      "id": "planning-experiment-os-align-manual-gap-window-picker-haptics-to-concrete-host-shell-contracts",
+      "direction_id": "experiment-os",
+      "title": "Align manual gap-window picker haptics with concrete host shell contracts",
+      "description": "Narrow the newly shipped best-effort host haptic bridge seam for manual gap-window picker sweep activation so Telegram, iOS or webview, and React Native shell integrations use the actual handler names and payload contracts expected by the host environments the app runs inside, instead of relying on broad candidate bridge guesses.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 19,
+      "priority_reason": "The latest main-session reply says the broad bridge fallback chain is now shipped, and explicitly calls out host integration concrete handler names and payloads as the remaining work. That makes shell-contract alignment the clearest executable next task after commit b6f45ff.",
+      "depends_on": [
+        "planning-experiment-os-extend-manual-gap-window-picker-touch-feedback-beyond-navigator-vibrate"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:00:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os touch gesture trust moving from a generic best-effort host bridge chain toward production-ready shell-specific haptic contracts, so activation feedback can be dependable inside the actual native containers operators use."
     },
     {
       "id": "planning-experiment-os-differentiate-touch-hold-feedback-by-cancellation-reason-in-manual-gap-window-picker",
