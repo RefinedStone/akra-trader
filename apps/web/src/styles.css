@@ -394,6 +394,56 @@ select {
   align-items: flex-end;
 }
 
+.comparison-history-browser-sync {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(120, 180, 255, 0.14);
+  background: rgba(9, 17, 30, 0.78);
+}
+
+.comparison-history-browser-sync-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.comparison-history-browser-sync-identity {
+  display: grid;
+  gap: 6px;
+}
+
+.comparison-history-browser-sync-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.comparison-history-browser-audit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-history-browser-audit {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(5, 11, 20, 0.72);
+}
+
+.comparison-history-browser-audit-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .comparison-history-browser-search {
   display: grid;
   gap: 6px;
@@ -465,6 +515,22 @@ select {
 }
 
 .comparison-history-browser-entry-badge.pinned {
+  background: rgba(255, 196, 92, 0.18);
+}
+
+.comparison-history-browser-entry-badge.sync {
+  background: rgba(94, 234, 212, 0.14);
+}
+
+.comparison-history-browser-entry-badge.sync-audit.merge {
+  background: rgba(120, 180, 255, 0.2);
+}
+
+.comparison-history-browser-entry-badge.sync-audit.conflict {
+  background: rgba(255, 122, 122, 0.2);
+}
+
+.comparison-history-browser-entry-badge.sync-audit.preferences {
   background: rgba(255, 196, 92, 0.18);
 }
 
@@ -2412,6 +2478,10 @@ select {
   }
 
   .comparison-history-browser-manage {
+    align-items: stretch;
+  }
+
+  .comparison-history-browser-sync-head {
     align-items: stretch;
   }
 

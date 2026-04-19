@@ -2783,10 +2783,14 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
+const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 3;
 const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
 const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
+const COMPARISON_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-comparison-history-tab-id";
+const COMPARISON_HISTORY_SYNC_AUDIT_SESSION_KEY = "akra-trader-comparison-history-sync-audit";
+const COMPARISON_HISTORY_SYNC_AUDIT_SESSION_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
 const COMPARISON_TOOLTIP_TUNING_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY = "akra-trader-comparison-tooltip-conflict-ui";
@@ -2842,6 +2846,35 @@ type ComparisonHistoryPanelEntry = {
   selection: ControlRoomComparisonSelectionState;
 };
 
+type ComparisonHistoryTabIdentity = {
+  tabId: string;
+  label: string;
+};
+
+type ComparisonHistoryPanelSyncState = {
+  tabId: string;
+  tabLabel: string;
+  updatedAt: string;
+};
+
+type ComparisonHistorySyncAuditKind = "merge" | "conflict" | "preferences";
+
+type ComparisonHistorySyncAuditEntry = {
+  auditId: string;
+  kind: ComparisonHistorySyncAuditKind;
+  summary: string;
+  detail: string;
+  recordedAt: string;
+  sourceTabId: string;
+  sourceTabLabel: string;
+};
+
+type ComparisonHistorySyncAuditTrailState = {
+  version: typeof COMPARISON_HISTORY_SYNC_AUDIT_SESSION_VERSION;
+  tabId: string;
+  entries: ComparisonHistorySyncAuditEntry[];
+};
+
 type ComparisonHistoryPanelState = {
   entries: ComparisonHistoryPanelEntry[];
   activeEntryId: string | null;
@@ -2852,6 +2885,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   open: boolean;
   searchQuery: string;
   showPinnedOnly: boolean;
+  sync: ComparisonHistoryPanelSyncState | null;
 };
 
 type ControlRoomUiStateV2 = {
@@ -4466,12 +4500,25 @@ export default function App() {
   const initialComparisonSelectionRef = useRef<ControlRoomComparisonSelectionState | null>(null);
   const initialComparisonHistoryPanelUiStateRef =
     useRef<ControlRoomComparisonHistoryPanelUiState | null>(null);
+  const comparisonHistoryTabIdentityRef = useRef<ComparisonHistoryTabIdentity | null>(null);
+  const initialComparisonHistorySyncAuditTrailRef =
+    useRef<ComparisonHistorySyncAuditEntry[] | null>(null);
   if (!initialComparisonSelectionRef.current) {
     initialComparisonSelectionRef.current = loadPersistedComparisonSelection();
   }
   if (!initialComparisonHistoryPanelUiStateRef.current) {
     initialComparisonHistoryPanelUiStateRef.current = loadPersistedComparisonHistoryPanelUiState();
   }
+  if (!comparisonHistoryTabIdentityRef.current) {
+    comparisonHistoryTabIdentityRef.current = loadComparisonHistoryTabIdentity();
+  }
+  if (!initialComparisonHistorySyncAuditTrailRef.current) {
+    initialComparisonHistorySyncAuditTrailRef.current = loadComparisonHistorySyncAuditTrail(
+      comparisonHistoryTabIdentityRef.current.tabId,
+    );
+  }
+  const comparisonHistoryTabIdentity =
+    comparisonHistoryTabIdentityRef.current ?? loadComparisonHistoryTabIdentity();
   const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>(
     () => initialComparisonSelectionRef.current?.selectedRunIds ?? [],
   );
@@ -4501,8 +4548,17 @@ export default function App() {
   const [comparisonHistoryShowPinnedOnly, setComparisonHistoryShowPinnedOnly] = useState(
     () => initialComparisonHistoryPanelUiStateRef.current?.showPinnedOnly ?? false,
   );
+  const [comparisonHistorySharedSyncState, setComparisonHistorySharedSyncState] =
+    useState<ComparisonHistoryPanelSyncState | null>(
+      () => initialComparisonHistoryPanelUiStateRef.current?.sync ?? null,
+    );
+  const [comparisonHistorySyncAuditTrail, setComparisonHistorySyncAuditTrail] =
+    useState<ComparisonHistorySyncAuditEntry[]>(
+      () => initialComparisonHistorySyncAuditTrailRef.current ?? [],
+    );
   const comparisonHistoryWriteModeRef = useRef<ComparisonHistoryWriteMode>("replace");
   const comparisonHistoryUrlRef = useRef<string | null>(null);
+  const skipNextControlRoomUiPersistRef = useRef(false);
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -4542,6 +4598,24 @@ export default function App() {
         : -1,
     [comparisonHistoryPanel.activeEntryId, visibleComparisonHistoryEntries],
   );
+  const comparisonHistorySyncSignature = useMemo(
+    () =>
+      buildComparisonHistorySyncSignature({
+        comparisonSelection,
+        comparisonHistoryPanel,
+        historyBrowserOpen: comparisonHistoryPanelOpen,
+        historySearchQuery: comparisonHistorySearchQuery,
+        showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
+      }),
+    [
+      comparisonHistoryPanel,
+      comparisonHistoryPanelOpen,
+      comparisonHistorySearchQuery,
+      comparisonHistoryShowPinnedOnly,
+      comparisonSelection,
+    ],
+  );
+  const lastComparisonHistorySyncSignatureRef = useRef(comparisonHistorySyncSignature);
   const applyComparisonSelectionState = (
     value: ControlRoomComparisonSelectionState,
   ) => {
@@ -4724,6 +4798,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    persistComparisonHistorySyncAuditTrail(
+      comparisonHistoryTabIdentity.tabId,
+      comparisonHistorySyncAuditTrail,
+    );
+  }, [comparisonHistorySyncAuditTrail, comparisonHistoryTabIdentity.tabId]);
+
+  useEffect(() => {
     if (typeof window === "undefined") {
       return;
     }
@@ -4736,11 +4817,31 @@ export default function App() {
       if (!remoteState) {
         return;
       }
+      const remoteSyncState = remoteState.comparisonHistoryPanel.sync;
       const mergedPanel = mergeComparisonHistoryPanelState(
         comparisonHistoryPanel,
         remoteState.comparisonHistoryPanel.panel,
         comparisonSelection,
       );
+      const nextAuditEntries = buildComparisonHistorySyncAuditEntries({
+        localPanel: comparisonHistoryPanel,
+        remotePanel: remoteState.comparisonHistoryPanel.panel,
+        localOpen: comparisonHistoryPanelOpen,
+        remoteOpen: remoteState.comparisonHistoryPanel.open,
+        localSearchQuery: comparisonHistorySearchQuery,
+        remoteSearchQuery: remoteState.comparisonHistoryPanel.searchQuery,
+        localShowPinnedOnly: comparisonHistoryShowPinnedOnly,
+        remoteShowPinnedOnly: remoteState.comparisonHistoryPanel.showPinnedOnly,
+        remoteSync: remoteSyncState,
+      });
+      const hasRemoteUiChange =
+        !isSameComparisonHistoryPanelState(comparisonHistoryPanel, mergedPanel)
+        || comparisonHistoryPanelOpen !== remoteState.comparisonHistoryPanel.open
+        || comparisonHistorySearchQuery !== remoteState.comparisonHistoryPanel.searchQuery
+        || comparisonHistoryShowPinnedOnly !== remoteState.comparisonHistoryPanel.showPinnedOnly;
+      if (hasRemoteUiChange) {
+        skipNextControlRoomUiPersistRef.current = true;
+      }
       setComparisonHistoryPanel((current) =>
         isSameComparisonHistoryPanelState(current, mergedPanel) ? current : mergedPanel,
       );
@@ -4759,6 +4860,16 @@ export default function App() {
           ? current
           : remoteState.comparisonHistoryPanel.showPinnedOnly,
       );
+      if (remoteSyncState) {
+        setComparisonHistorySharedSyncState((current) =>
+          isSameComparisonHistoryPanelSyncState(current, remoteSyncState) ? current : remoteSyncState,
+        );
+      }
+      if (nextAuditEntries.length) {
+        setComparisonHistorySyncAuditTrail((current) =>
+          appendComparisonHistorySyncAuditEntries(current, nextAuditEntries),
+        );
+      }
     };
 
     window.addEventListener("storage", handleStorage);
@@ -4809,6 +4920,22 @@ export default function App() {
   }, [selectedComparisonRunIds, comparisonIntent]);
 
   useEffect(() => {
+    if (skipNextControlRoomUiPersistRef.current) {
+      skipNextControlRoomUiPersistRef.current = false;
+      lastComparisonHistorySyncSignatureRef.current = comparisonHistorySyncSignature;
+      return;
+    }
+    const historySyncChanged = lastComparisonHistorySyncSignatureRef.current !== comparisonHistorySyncSignature;
+    const nextSharedSyncState = historySyncChanged
+      ? buildComparisonHistoryPanelSyncState(comparisonHistoryTabIdentity)
+      : comparisonHistorySharedSyncState;
+    if (
+      historySyncChanged
+      && !isSameComparisonHistoryPanelSyncState(comparisonHistorySharedSyncState, nextSharedSyncState)
+    ) {
+      setComparisonHistorySharedSyncState(nextSharedSyncState);
+    }
+    lastComparisonHistorySyncSignatureRef.current = comparisonHistorySyncSignature;
     persistControlRoomUiState({
       comparisonSelection,
       comparisonHistoryPanel: {
@@ -4816,14 +4943,18 @@ export default function App() {
         panel: comparisonHistoryPanel,
         searchQuery: comparisonHistorySearchQuery,
         showPinnedOnly: comparisonHistoryShowPinnedOnly,
+        sync: nextSharedSyncState,
       },
       expandedGapRows,
     });
   }, [
+    comparisonHistorySyncSignature,
     comparisonHistoryPanel,
     comparisonHistoryPanelOpen,
     comparisonHistorySearchQuery,
     comparisonHistoryShowPinnedOnly,
+    comparisonHistorySharedSyncState,
+    comparisonHistoryTabIdentity,
     comparisonSelection,
     expandedGapRows,
   ]);
@@ -7375,6 +7506,9 @@ export default function App() {
             selectedRunIds: selectedComparisonRunIds,
             comparisonIntent,
             historyStep: comparisonHistoryStep,
+            historyTabIdentity: comparisonHistoryTabIdentity,
+            historySharedSync: comparisonHistorySharedSyncState,
+            historySyncAuditTrail: comparisonHistorySyncAuditTrail,
             historyEntries: comparisonHistoryPanel.entries,
             visibleHistoryEntries: visibleComparisonHistoryEntries,
             activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
@@ -7726,6 +7860,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     panel: defaultComparisonHistoryPanelState(),
     searchQuery: "",
     showPinnedOnly: false,
+    sync: null,
   };
 }
 
@@ -7796,6 +7931,56 @@ function persistControlRoomUiState(state: {
       JSON.stringify(nextState),
     );
     window.localStorage.removeItem(LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
+function loadComparisonHistorySyncAuditTrail(
+  tabId: string,
+): ComparisonHistorySyncAuditEntry[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.sessionStorage.getItem(COMPARISON_HISTORY_SYNC_AUDIT_SESSION_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as Partial<ComparisonHistorySyncAuditTrailState> | null;
+    if (
+      !parsed
+      || parsed.version !== COMPARISON_HISTORY_SYNC_AUDIT_SESSION_VERSION
+      || typeof parsed.tabId !== "string"
+      || parsed.tabId !== tabId
+      || !Array.isArray(parsed.entries)
+    ) {
+      return [];
+    }
+    return limitComparisonHistorySyncAuditEntries(
+      parsed.entries
+        .map((entry) => normalizeComparisonHistorySyncAuditEntry(entry))
+        .filter((entry): entry is ComparisonHistorySyncAuditEntry => entry !== null),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function persistComparisonHistorySyncAuditTrail(
+  tabId: string,
+  entries: ComparisonHistorySyncAuditEntry[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const nextState: ComparisonHistorySyncAuditTrailState = {
+      version: COMPARISON_HISTORY_SYNC_AUDIT_SESSION_VERSION,
+      tabId,
+      entries: limitComparisonHistorySyncAuditEntries(entries),
+    };
+    window.sessionStorage.setItem(COMPARISON_HISTORY_SYNC_AUDIT_SESSION_KEY, JSON.stringify(nextState));
   } catch {
     return;
   }
@@ -7972,6 +8157,77 @@ function buildComparisonHistoryEntryId() {
     return crypto.randomUUID();
   }
   return `compare-step-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildComparisonHistoryTabId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `compare-tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatComparisonHistoryTabLabel(tabId: string) {
+  return `Tab ${tabId.replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase() || "SYNC"}`;
+}
+
+function loadComparisonHistoryTabIdentity(): ComparisonHistoryTabIdentity {
+  const fallbackTabId = buildComparisonHistoryTabId();
+  if (typeof window === "undefined") {
+    return {
+      tabId: fallbackTabId,
+      label: formatComparisonHistoryTabLabel(fallbackTabId),
+    };
+  }
+  try {
+    const existingTabId = window.sessionStorage.getItem(COMPARISON_HISTORY_TAB_ID_SESSION_KEY)?.trim();
+    const tabId = existingTabId || fallbackTabId;
+    if (!existingTabId) {
+      window.sessionStorage.setItem(COMPARISON_HISTORY_TAB_ID_SESSION_KEY, tabId);
+    }
+    return {
+      tabId,
+      label: formatComparisonHistoryTabLabel(tabId),
+    };
+  } catch {
+    return {
+      tabId: fallbackTabId,
+      label: formatComparisonHistoryTabLabel(fallbackTabId),
+    };
+  }
+}
+
+function buildComparisonHistoryPanelSyncState(
+  tabIdentity: ComparisonHistoryTabIdentity,
+  updatedAt = new Date().toISOString(),
+): ComparisonHistoryPanelSyncState {
+  return {
+    tabId: tabIdentity.tabId,
+    tabLabel: tabIdentity.label,
+    updatedAt,
+  };
+}
+
+function buildComparisonHistorySyncSignature(state: {
+  comparisonSelection: ControlRoomComparisonSelectionState;
+  comparisonHistoryPanel: ComparisonHistoryPanelState;
+  historyBrowserOpen: boolean;
+  historySearchQuery: string;
+  showPinnedHistoryOnly: boolean;
+}) {
+  return JSON.stringify({
+    comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
+    comparisonHistoryPanel: normalizeComparisonHistoryPanelState(state.comparisonHistoryPanel),
+    historyBrowserOpen: state.historyBrowserOpen,
+    historySearchQuery: state.historySearchQuery.trim(),
+    showPinnedHistoryOnly: state.showPinnedHistoryOnly,
+  });
+}
+
+function buildComparisonHistorySyncAuditId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `compare-sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function buildComparisonHistoryPanelEntry(
@@ -8168,6 +8424,26 @@ function normalizeComparisonHistoryPanelUiState(
     panel: normalizeComparisonHistoryPanelState(value?.panel),
     searchQuery: typeof value?.searchQuery === "string" ? value.searchQuery : "",
     showPinnedOnly: value?.showPinnedOnly === true,
+    sync: normalizeComparisonHistoryPanelSyncState(value?.sync),
+  };
+}
+
+function normalizeComparisonHistoryPanelSyncState(
+  value: Partial<ComparisonHistoryPanelSyncState> | null | undefined,
+): ComparisonHistoryPanelSyncState | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const tabId = typeof value.tabId === "string" ? value.tabId.trim() : "";
+  const tabLabel = typeof value.tabLabel === "string" ? value.tabLabel.trim() : "";
+  const updatedAt = typeof value.updatedAt === "string" ? value.updatedAt : "";
+  if (!tabId || !tabLabel || !updatedAt) {
+    return null;
+  }
+  return {
+    tabId,
+    tabLabel,
+    updatedAt,
   };
 }
 
@@ -8230,6 +8506,60 @@ function normalizeComparisonHistoryPanelEntry(value: unknown): ComparisonHistory
   };
 }
 
+function normalizeComparisonHistorySyncAuditEntry(
+  value: unknown,
+): ComparisonHistorySyncAuditEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonHistorySyncAuditEntry>;
+  const auditId = typeof candidate.auditId === "string" ? candidate.auditId.trim() : "";
+  const kind = candidate.kind;
+  const summary = typeof candidate.summary === "string" ? candidate.summary : "";
+  const detail = typeof candidate.detail === "string" ? candidate.detail : "";
+  const recordedAt = typeof candidate.recordedAt === "string" ? candidate.recordedAt : "";
+  const sourceTabId = typeof candidate.sourceTabId === "string" ? candidate.sourceTabId.trim() : "";
+  const sourceTabLabel =
+    typeof candidate.sourceTabLabel === "string" ? candidate.sourceTabLabel.trim() : "";
+  if (
+    !auditId
+    || (kind !== "merge" && kind !== "conflict" && kind !== "preferences")
+    || !summary
+    || !detail
+    || !recordedAt
+    || !sourceTabId
+    || !sourceTabLabel
+  ) {
+    return null;
+  }
+  return {
+    auditId,
+    kind,
+    summary,
+    detail,
+    recordedAt,
+    sourceTabId,
+    sourceTabLabel,
+  };
+}
+
+function limitComparisonHistorySyncAuditEntries(entries: ComparisonHistorySyncAuditEntry[]) {
+  return entries.slice(-MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES);
+}
+
+function appendComparisonHistorySyncAuditEntries(
+  currentEntries: ComparisonHistorySyncAuditEntry[],
+  nextEntries: ComparisonHistorySyncAuditEntry[],
+) {
+  if (!nextEntries.length) {
+    return currentEntries;
+  }
+  return limitComparisonHistorySyncAuditEntries([
+    ...currentEntries,
+    ...nextEntries,
+  ]);
+}
+
 function isSameComparisonHistoryPanelState(
   left: ComparisonHistoryPanelState,
   right: ComparisonHistoryPanelState,
@@ -8240,6 +8570,20 @@ function isSameComparisonHistoryPanelState(
     && left.entries.every((entry, index) =>
       isSameComparisonHistoryPanelEntry(entry, right.entries[index]),
     )
+  );
+}
+
+function isSameComparisonHistoryPanelSyncState(
+  left: ComparisonHistoryPanelSyncState | null,
+  right: ComparisonHistoryPanelSyncState | null,
+) {
+  if (!left || !right) {
+    return left === right;
+  }
+  return (
+    left.tabId === right.tabId
+    && left.tabLabel === right.tabLabel
+    && left.updatedAt === right.updatedAt
   );
 }
 
@@ -8262,6 +8606,153 @@ function isSameComparisonHistoryPanelEntry(
     && left.recordedAt === right.recordedAt
     && isSameComparisonSelection(left.selection, right.selection)
   );
+}
+
+function getComparisonHistoryPanelEntryChangedFields(
+  localEntry: ComparisonHistoryPanelEntry,
+  remoteEntry: ComparisonHistoryPanelEntry,
+) {
+  const fields: string[] = [];
+  if (localEntry.stepIndex !== remoteEntry.stepIndex) {
+    fields.push("step");
+  }
+  if (localEntry.label !== remoteEntry.label) {
+    fields.push("label");
+  }
+  if (localEntry.summary !== remoteEntry.summary) {
+    fields.push("summary");
+  }
+  if (localEntry.title !== remoteEntry.title) {
+    fields.push("title");
+  }
+  if (localEntry.url !== remoteEntry.url) {
+    fields.push("link");
+  }
+  if (localEntry.hidden !== remoteEntry.hidden) {
+    fields.push(remoteEntry.hidden ? "cleared" : "restored");
+  }
+  if (localEntry.pinned !== remoteEntry.pinned) {
+    fields.push(remoteEntry.pinned ? "pinned" : "unpinned");
+  }
+  if (!isSameComparisonSelection(localEntry.selection, remoteEntry.selection)) {
+    fields.push("selection");
+  }
+  return fields;
+}
+
+function summarizeComparisonHistoryPanelEntryConflict(
+  entry: ComparisonHistoryPanelEntry,
+  fields: string[],
+) {
+  return `${entry.label}: ${fields.join(", ")}`;
+}
+
+function summarizeComparisonHistorySyncPreferenceChanges(state: {
+  localOpen: boolean;
+  remoteOpen: boolean;
+  localSearchQuery: string;
+  remoteSearchQuery: string;
+  localShowPinnedOnly: boolean;
+  remoteShowPinnedOnly: boolean;
+}) {
+  const changes: string[] = [];
+  if (state.localOpen !== state.remoteOpen) {
+    changes.push(state.remoteOpen ? "opened history browser" : "closed history browser");
+  }
+  if (state.localSearchQuery !== state.remoteSearchQuery) {
+    changes.push(
+      state.remoteSearchQuery.trim()
+        ? `search '${state.remoteSearchQuery.trim()}'`
+        : "cleared search",
+    );
+  }
+  if (state.localShowPinnedOnly !== state.remoteShowPinnedOnly) {
+    changes.push(state.remoteShowPinnedOnly ? "enabled pinned-only" : "disabled pinned-only");
+  }
+  return changes;
+}
+
+function buildComparisonHistorySyncAuditEntries(state: {
+  localPanel: ComparisonHistoryPanelState;
+  remotePanel: ComparisonHistoryPanelState;
+  localOpen: boolean;
+  remoteOpen: boolean;
+  localSearchQuery: string;
+  remoteSearchQuery: string;
+  localShowPinnedOnly: boolean;
+  remoteShowPinnedOnly: boolean;
+  remoteSync: ComparisonHistoryPanelSyncState | null;
+}): ComparisonHistorySyncAuditEntry[] {
+  const sourceTabId = state.remoteSync?.tabId ?? "unknown";
+  const sourceTabLabel = state.remoteSync?.tabLabel ?? "Remote tab";
+  const recordedAt = new Date().toISOString();
+  const localEntriesById = new Map(
+    state.localPanel.entries.map((entry) => [entry.entryId, entry]),
+  );
+  const remoteAdditions = state.remotePanel.entries.filter(
+    (entry) => !entry.hidden && !localEntriesById.has(entry.entryId),
+  );
+  const conflictingEntries = state.remotePanel.entries.flatMap((remoteEntry) => {
+    const localEntry = localEntriesById.get(remoteEntry.entryId);
+    if (!localEntry) {
+      return [];
+    }
+    const fields = getComparisonHistoryPanelEntryChangedFields(localEntry, remoteEntry);
+    return fields.length ? [{ entry: remoteEntry, fields }] : [];
+  });
+  const preferenceChanges = summarizeComparisonHistorySyncPreferenceChanges({
+    localOpen: state.localOpen,
+    remoteOpen: state.remoteOpen,
+    localSearchQuery: state.localSearchQuery,
+    remoteSearchQuery: state.remoteSearchQuery,
+    localShowPinnedOnly: state.localShowPinnedOnly,
+    remoteShowPinnedOnly: state.remoteShowPinnedOnly,
+  });
+  const nextEntries: ComparisonHistorySyncAuditEntry[] = [];
+  if (remoteAdditions.length) {
+    const labels = remoteAdditions
+      .slice(0, 2)
+      .map((entry) => entry.label)
+      .join(" · ");
+    const remainderCount = Math.max(remoteAdditions.length - 2, 0);
+    nextEntries.push({
+      auditId: buildComparisonHistorySyncAuditId(),
+      kind: "merge",
+      summary: `Merged ${remoteAdditions.length} step${remoteAdditions.length === 1 ? "" : "s"} from ${sourceTabLabel}`,
+      detail: remainderCount > 0 ? `${labels} +${remainderCount} more` : labels,
+      recordedAt,
+      sourceTabId,
+      sourceTabLabel,
+    });
+  }
+  if (conflictingEntries.length) {
+    const detail = conflictingEntries
+      .slice(0, 2)
+      .map(({ entry, fields }) => summarizeComparisonHistoryPanelEntryConflict(entry, fields))
+      .join(" · ");
+    const remainderCount = Math.max(conflictingEntries.length - 2, 0);
+    nextEntries.push({
+      auditId: buildComparisonHistorySyncAuditId(),
+      kind: "conflict",
+      summary: `Resolved ${conflictingEntries.length} sync conflict${conflictingEntries.length === 1 ? "" : "s"} from ${sourceTabLabel}`,
+      detail: remainderCount > 0 ? `${detail} +${remainderCount} more` : detail,
+      recordedAt,
+      sourceTabId,
+      sourceTabLabel,
+    });
+  }
+  if (preferenceChanges.length) {
+    nextEntries.push({
+      auditId: buildComparisonHistorySyncAuditId(),
+      kind: "preferences",
+      summary: `Synced browser state from ${sourceTabLabel}`,
+      detail: preferenceChanges.join(" · "),
+      recordedAt,
+      sourceTabId,
+      sourceTabLabel,
+    });
+  }
+  return nextEntries;
 }
 
 function loadLegacyExpandedGapRows() {
@@ -8359,6 +8850,19 @@ function matchesComparisonHistoryPanelEntry(entry: ComparisonHistoryPanelEntry, 
     formatComparisonHistoryPanelEntryMeta(entry),
   ].join(" ").toLowerCase();
   return haystack.includes(query);
+}
+
+function formatComparisonHistorySyncAuditKindLabel(kind: ComparisonHistorySyncAuditKind) {
+  switch (kind) {
+    case "merge":
+      return "Merge";
+    case "conflict":
+      return "Conflict";
+    case "preferences":
+      return "Browser";
+    default:
+      return kind;
+  }
 }
 
 function buildComparisonHistoryStepDescriptor(
@@ -9521,6 +10025,9 @@ type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
   historyStep: ComparisonHistoryStepDescriptor;
+  historyTabIdentity: ComparisonHistoryTabIdentity;
+  historySharedSync: ComparisonHistoryPanelSyncState | null;
+  historySyncAuditTrail: ComparisonHistorySyncAuditEntry[];
   historyEntries: ComparisonHistoryPanelEntry[];
   visibleHistoryEntries: ComparisonHistoryPanelEntry[];
   activeHistoryEntryId: string | null;
@@ -9838,6 +10345,57 @@ function RunSection({
                         ? "Showing pinned only"
                         : `Pinned only (${pinnedHistoryCount})`}
                     </button>
+                  </div>
+                  <div className="comparison-history-browser-sync">
+                    <div className="comparison-history-browser-sync-head">
+                      <div className="comparison-history-browser-sync-identity">
+                        <span
+                          className="comparison-history-browser-entry-badge sync"
+                          title={comparison.historyTabIdentity.tabId}
+                        >
+                          {comparison.historyTabIdentity.label}
+                        </span>
+                        <p className="comparison-history-browser-copy">
+                          This tab owns a local conflict audit trail for cross-tab history sync.
+                        </p>
+                      </div>
+                      <p className="comparison-history-browser-sync-status">
+                        {comparison.historySharedSync
+                          ? `Last shared update: ${
+                              comparison.historySharedSync.tabId === comparison.historyTabIdentity.tabId
+                                ? "This tab"
+                                : comparison.historySharedSync.tabLabel
+                            } · ${formatRelativeTimestampLabel(comparison.historySharedSync.updatedAt)}`
+                          : "Last shared update: none yet"}
+                      </p>
+                    </div>
+                    {comparison.historySyncAuditTrail.length ? (
+                      <div className="comparison-history-browser-audit-list">
+                        {comparison.historySyncAuditTrail
+                          .slice()
+                          .reverse()
+                          .map((entry) => (
+                            <article className="comparison-history-browser-audit" key={entry.auditId}>
+                              <div className="comparison-history-browser-audit-head">
+                                <span
+                                  className={`comparison-history-browser-entry-badge sync-audit ${entry.kind}`}
+                                >
+                                  {formatComparisonHistorySyncAuditKindLabel(entry.kind)}
+                                </span>
+                                <strong>{entry.summary}</strong>
+                              </div>
+                              <p className="comparison-history-browser-entry-summary">{entry.detail}</p>
+                              <p className="comparison-history-browser-entry-meta">
+                                {entry.sourceTabLabel} · {formatRelativeTimestampLabel(entry.recordedAt)}
+                              </p>
+                            </article>
+                          ))}
+                      </div>
+                    ) : (
+                      <p className="comparison-history-browser-empty">
+                        No cross-tab merge or conflict events have been observed in this tab yet.
+                      </p>
+                    )}
                   </div>
                   {!comparison.visibleHistoryEntries.length ? (
                     <p className="comparison-history-browser-empty">
