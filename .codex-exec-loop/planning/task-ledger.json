@@ -4090,16 +4090,16 @@
       "direction_id": "experiment-os",
       "title": "Add surface-level enforcement rules to run-surface capabilities",
       "description": "Build on the new family-level `policy` and `enforcement` metadata by attaching machine-readable per-surface enforcement rules, so each consumer surface can resolve allowed, blocked, fallback, and explanation behavior from the shared capability contract instead of handwritten branching.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says the family-level contract is complete and explicitly names surface-specific enforcement rules as the immediate remaining step. That makes this the clearest executable next task for builtin queue progression.",
+      "priority_reason": "Completed in main session commit 61a5a0f, which added family-level `surface_rules` metadata under run-surface capabilities, lifted the schema version to `run-surface-capabilities.v4`, serialized the rules through the API, rendered surface rule cards in the control-room discovery panel, verified the change with `python -m py_compile`, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-machine-readable-policy-and-enforcement-metadata-to-capability-families"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T21:49:29Z",
+      "updated_at": "2026-04-20T09:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os from family-level capability policy descriptors into concrete per-surface enforcement contracts that launch, comparison, preset, and provenance consumers can apply directly."
     },
@@ -4124,20 +4124,20 @@
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
       "direction_id": "experiment-os",
-      "title": "Add runtime policy evaluation from run-surface capability contracts",
-      "description": "Carry the new machine-readable capability policy model into runtime-side evaluation so worker or orchestration paths can make consistent allow, block, and fallback decisions from the shared contract instead of relying only on UI or API-level discovery metadata.",
-      "status": "proposed",
+      "title": "Wire run-surface contracts into runtime gating and automatic enforcement",
+      "description": "Carry the shipped machine-readable capability policy and `surface_rules` model into actual runtime and consumer enforcement so worker or orchestration paths, plus surface-specific flows, make consistent allow, block, fallback, and auto-apply decisions from the shared contract instead of relying only on discovery metadata or handwritten branching.",
+      "status": "ready",
       "base_priority": 89,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply names runtime-side policy evaluation as a remaining layer, but the boundary between experiment-os discovery contracts and runtime-ops enforcement still needs a clear ownership decision, so keep it proposed rather than auto-queueing it ahead of the simpler surface-rule task.",
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply says the direct next stage is to connect the new `surface_rules` into actual runtime gating and surface-specific automatic enforcement. That is now the clearest executable follow-up for builtin queue progression, while consumer negotiation still remains a separate design-sensitive branch.",
       "depends_on": [
         "planning-experiment-os-add-surface-level-enforcement-rules-to-run-surface-capabilities"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T21:49:29Z",
+      "updated_at": "2026-04-20T09:00:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Connects experiment-os capability metadata to runtime enforcement so shared policy semantics can eventually govern real execution paths instead of remaining a discovery-only contract."
+      "direction_relation_note": "Connects experiment-os capability metadata to real runtime and surface enforcement so shared policy semantics stop being discovery-only and start governing actual launch, gating, and fallback behavior."
     }
   ]
 }
