@@ -47,12 +47,27 @@
 - LLM은 본선 실행 체계가 아니라 격리된 연구 레인으로 다룬다.
 - single operator가 shell 없이도 판단할 수 있는 운영 표면을 만든다.
 
-## 프로그램 축
+## 청사진 구조
 
-- Program 1: Data Trust
-- Program 2: Experiment OS
-- Program 3: Runtime Ops
-- Program 4: Guarded Execution
-- Program 5: Intelligence Research
+청사진 문서는 두 개의 이름 체계를 함께 사용합니다.
 
-각 프로그램의 세부 내용은 [Platform Program](platform-program.md)과 [Backlog Map](backlog-map.md)에서 다룹니다.
+- `Platform Program`과 `Metrics and Gates`는 기능 경계를 기준으로 한 workstream 이름을 사용합니다.
+- `Backlog Map`은 실행 순서와 의존 관계를 드러내기 위해 workstream을 더 큰 execution program으로 다시 묶습니다.
+
+### Workstreams
+
+- Workstream A: Data Trust
+- Workstream B: Experiment OS
+- Workstream C: Runtime Ops
+- Workstream D: Guarded Execution
+- Workstream E: Intelligence Research
+
+### Execution Programs
+
+- Program 1: Research Core (`Data Trust` + `Experiment OS`)
+- Program 2: Operations Core (`Runtime Ops` + control-room and operator-trust surfaces)
+- Program 3: Safe Execution (`Guarded Execution` + audit/reconciliation gates)
+- Program 4: Intelligence Research (`Intelligence Research`)
+- Program 5: Documentation and Operational Discipline (cross-cutting doc and runbook discipline)
+
+각 축의 세부 내용은 [Platform Program](platform-program.md)과 [Backlog Map](backlog-map.md)에서 다룹니다.

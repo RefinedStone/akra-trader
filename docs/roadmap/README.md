@@ -24,6 +24,16 @@ Primary gaps:
 - live execution guardrails
 - traceable LLM research infrastructure
 
+## Priority Basis
+
+- If `current-state`, `roadmap`, and `blueprint` drift on program names or remaining-work order, repair that documentation drift first.
+- Otherwise execute remaining work in this order:
+  1. Research Core: reproducibility, dataset lineage, experiment metadata, and lifecycle
+  2. Operations Core: worker/runtime stability, alerts, and operator-visible control-room surfaces
+  3. Safe Execution: guarded-live audit, reconciliation, and execution controls
+  4. Intelligence Research: isolated LLM trace, replay, evaluation, and fallback
+- Documentation and Operational Discipline runs across every wave and can temporarily take precedence when plan clarity itself is broken.
+
 ## Stage Read
 
 - Stage 0: complete

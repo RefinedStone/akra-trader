@@ -4,7 +4,15 @@
 
 현재 backlog를 프로그램 기준으로 재정렬해, 구현 순서와 의존 관계가 한눈에 보이도록 합니다.
 
-## Program 1: Research Core
+이 문서의 Program 번호는 `Platform Program`의 workstream을 실행 순서 관점에서 다시 묶은 번호입니다.
+
+- Program 1 = `Data Trust` + `Experiment OS`
+- Program 2 = `Runtime Ops` + operator trust surfaces
+- Program 3 = `Guarded Execution`
+- Program 4 = `Intelligence Research`
+- Program 5 = cross-cutting documentation and operational discipline
+
+## Program 1: Research Core (`Data Trust` + `Experiment OS`)
 
 목표:
 
@@ -28,7 +36,7 @@
 - preset/tag/filter model
 - strategy promotion state model
 
-## Program 2: Operations Core
+## Program 2: Operations Core (`Runtime Ops` + operator trust surfaces)
 
 목표:
 
@@ -53,7 +61,7 @@
 - alert/event model
 - operations UI
 
-## Program 3: Safe Execution
+## Program 3: Safe Execution (`Guarded Execution`)
 
 목표:
 
@@ -77,7 +85,7 @@
 - audit log
 - reconciliation drill
 
-## Program 4: Intelligence Research
+## Program 4: Intelligence Research (`Intelligence Research`)
 
 목표:
 
@@ -105,6 +113,7 @@
 목표:
 
 - 구현과 운영 판단을 문서 체계로 고정한다
+- 이 program은 다른 기능 program과 병행되는 cross-cutting discipline이다
 
 포함 epic:
 

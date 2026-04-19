@@ -184,10 +184,15 @@ Forward-looking planning lives under [Blueprint](../blueprint/README.md).
 - live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
 - prompt versioning, raw trace persistence, and replay harness for LLM decisions
 
+## Priority Basis
+
+- If `current-state`, `roadmap`, and `blueprint` disagree on program names or remaining-work order, fix that documentation drift first under Documentation and Operational Discipline.
+- Otherwise follow this execution order: Research Core, then Operations Core, then Safe Execution, then Intelligence Research.
+
 ## Immediate Next Priorities
 
-1. Harden reproducibility and dataset lineage so repeated runs can be proven equivalent.
-2. Finish Stage 2 experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Expand operator delivery from the current console/webhook/Slack/PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/OpsRamp/Zenduty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
-4. Expand guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
-5. Keep the LLM lane isolated until trace storage, fallback, and replay tooling exist.
+1. Complete Research Core reproducibility and dataset lineage so repeated runs can be proven equivalent.
+2. Complete Research Core experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
+3. Continue Operations Core operator delivery from the current console/webhook/Slack/PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/OpsRamp/Zenduty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
+4. Continue Safe Execution guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
+5. Keep the Intelligence Research lane isolated until trace storage, fallback, and replay tooling exist.
