@@ -3586,18 +3586,72 @@
       "direction_id": "experiment-os",
       "title": "Persist nested expansion state inside workspace conflict signal subviews",
       "description": "Build on the shipped section-level signal detail subview persistence so any deeper drill-down row expansion and nested note-stack visibility inside `Interpretation`, `Lane position`, and `Recommendation context` are also restored per row after reload and audit refilter, instead of resetting once operators open additional evidence layers inside a structured subview.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 30,
-      "priority_reason": "The latest main-session reply says commit c40c568 completed section-level subview persistence, but explicitly leaves the remaining gap that deeper drill-down rows and nested note-stack expansion inside each subview still are not remembered. That is the clearest executable next task for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit 4068131, which lifted nested row collapse state into persisted workspace review UI state, keyed restoration by row key plus subview plus nested key, preserved nested drill-down state inside `Interpretation`, `Lane position`, and `Recommendation context` across reload and audit refilter, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-structure-persisted-workspace-conflict-signal-detail-subviews"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:35:00Z",
+      "updated_at": "2026-04-20T22:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring structured signal-detail sections into preserving the deeper evidence expansion state operators may open within each persisted subview."
+    },
+    {
+      "id": "planning-experiment-os-persist-deeper-microview-state-inside-workspace-conflict-signal-nested-rows",
+      "direction_id": "experiment-os",
+      "title": "Persist deeper micro-view state inside workspace conflict signal nested rows",
+      "description": "Build on the newly persisted nested row collapse state so any deeper inline annotation focus, tooltip stack visibility, compare-to-alternate trace state, or similar micro-view state opened inside a nested signal detail row is also restored per row after reload and audit refilter, instead of resetting once operators drill below the nested row level.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 31,
+      "priority_reason": "Completed in main session commit ce293c0, which lifted nested-row micro-view chip selection into persisted workspace review UI state, keyed restoration by row plus subview plus nested key, restored the selected micro-view after reload and audit refilter, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-persist-nested-workspace-conflict-signal-subview-expansion-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring nested signal-detail rows into preserving the finer-grained micro-view state operators may open within those rows while reviewing signal evidence."
+    },
+    {
+      "id": "planning-experiment-os-persist-inline-micro-interaction-state-inside-workspace-conflict-microviews",
+      "direction_id": "experiment-os",
+      "title": "Persist inline micro-interaction state inside workspace conflict micro-views",
+      "description": "Build on the newly persisted nested-row micro-view selection so finer-grained interaction state inside each micro-view, such as inline tooltip stacks, compare-to-alternate trace scrubber position, annotation paging, or similar nested evidence controls, is also restored per row after reload and audit refilter instead of resetting once operators drill inside the selected micro-view. This task is now completed for the current inline lens selection layer; the remaining gap is the still-more-ephemeral hover-stack, scrub-step, and note-page state that lives inside each restored micro-interaction.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 32,
+      "priority_reason": "Completed in main session commit 17f5d5c, which lifted inline lens selection into persisted workspace review UI state for each nested row and micro-view, restored the selected inline chip after reload and audit refilter, added persisted annotation-note context alongside the chip row, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-persist-deeper-microview-state-inside-workspace-conflict-signal-nested-rows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from restoring which nested-row micro-view is selected into preserving the finer-grained evidence interaction state operators may use inside that restored micro-view."
+    },
+    {
+      "id": "planning-experiment-os-persist-ephemeral-hover-scrub-and-note-state-inside-workspace-conflict-microviews",
+      "direction_id": "experiment-os",
+      "title": "Persist ephemeral hover, scrub, and note state inside workspace conflict micro-views",
+      "description": "Build on the newly persisted inline lens selection so the smaller transient state inside each workspace conflict micro-view, such as tooltip hover stacks, trace scrub step or compare cursor position, note pagination, and similar ephemeral evidence controls, is also restored per nested row and micro-view after reload and audit refilter instead of resetting once operators drill inside the restored inline interaction.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 33,
+      "priority_reason": "Completed in main session commit 509aff8, which lifted hover, scrub, and note pagination state into persisted micro-view UI state, restored those per micro-view key after reload and audit refilter, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-persist-inline-micro-interaction-state-inside-workspace-conflict-microviews"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os workspace conflict persistence from remembering the selected inline micro-interaction lens into preserving the still-more-ephemeral evidence state operators use inside that restored lens while reviewing conflicts."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
@@ -3638,20 +3692,20 @@
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
       "direction_id": "experiment-os",
-      "title": "Coordinate control-room subviews with comparison deep-link state",
-      "description": "Extend the new comparison query-param and durable UI-state model so adjacent control-room subviews can preserve, honor, or intentionally clear comparison deep-link context instead of treating comparison selection as isolated state that can drift from the rest of the operator navigation model.",
-      "status": "proposed",
+      "title": "Coordinate comparison deep-link state across drill-back, overview, and provenance panels",
+      "description": "Extend the persisted comparison and workspace micro-state model so comparison score drill-back, workspace conflict overview chip focus, and provenance-side evidence panels can reuse and synchronize the same deep-link context instead of restoring state only inside one micro-view while adjacent control-room panels drift or reset.",
+      "status": "ready",
       "base_priority": 91,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "Cross-subview deep-link coordination remains valid follow-up, but the latest main-session reply now names a separate comparison history-browser or timeline panel as the immediate remaining gap after labels, summaries, and `popstate` restoration shipped. Keep this behind direct history browsing work.",
+      "dynamic_priority_delta": 31,
+      "priority_reason": "The latest main-session reply says commit 509aff8 finished restoring hover, scrub, and note state inside workspace conflict micro-views, and explicitly leaves the next gap that this micro-state is still isolated from external panels such as comparison score drill-back, overview chip focus, and provenance panels. That makes cross-panel deep-link and focus synchronization the clearest executable follow-up for builtin queue continuation.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T00:25:00Z",
+      "updated_at": "2026-04-20T23:30:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os comparison deep linking from one surface-local persistence feature into a control-room-wide navigation contract that keeps analysis context coherent as operators move across subviews."
+      "direction_relation_note": "Extends experiment-os comparison and workspace-state durability from micro-view-local restoration into a control-room-wide navigation contract that keeps drill-back focus, overview emphasis, and provenance evidence coherent as operators move across adjacent subviews."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
