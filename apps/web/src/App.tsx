@@ -13970,6 +13970,34 @@ function ExperimentMetadataPills({
   );
 }
 
+function RunListComparisonBoundaryNote({
+  copy,
+  surfaces,
+  title,
+  tone = "supporting",
+}: {
+  copy: string;
+  surfaces: string[];
+  title: string;
+  tone?: "eligible" | "operational" | "supporting";
+}) {
+  return (
+    <div className={`run-list-boundary-note ${tone}`.trim()}>
+      <div className="run-list-boundary-note-head">
+        <span>{title}</span>
+        <p>{copy}</p>
+      </div>
+      <div className="run-list-boundary-note-surfaces">
+        {surfaces.map((surface) => (
+          <span className="run-list-boundary-note-surface" key={surface}>
+            {surface}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 type RunSectionComparisonControls = {
   selectedRunIds: string[];
   comparisonIntent: ComparisonIntent;
@@ -17270,111 +17298,146 @@ function RunSection({
                   <div className={`run-status ${run.status}`}>{run.status}</div>
                 )}
               </div>
-              <div className="run-metrics">
-                <Metric label="Mode" value={run.config.mode} />
-                <Metric label="Lane" value={run.provenance.lane} />
-                <Metric
-                  label="Lifecycle"
-                  value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
-                />
-                <Metric label="Version" value={run.config.strategy_version} />
-                <Metric
-                  buttonRef={
-                    comparisonLinkedRunRole
-                      ? (node) => registerRunListSubFocusRef(run.config.run_id, totalReturnSubFocusKey)(node)
-                      : undefined
-                  }
-                  className={highlightReturn ? "comparison-linked-panel" : ""}
-                  interactivePressed={isRunListSubFocusOrigin(totalReturnSubFocusKey)}
-                  label="Return"
-                  onClick={
-                    comparisonLinkedRunRole
-                      ? () =>
-                          handleRunListScoreLinkSelection(
-                            run.config.run_id,
-                            "metrics",
-                            "total_return_pct",
-                            {
-                              subFocusKey: totalReturnSubFocusKey,
-                            },
-                          )
-                      : undefined
-                  }
-                  value={formatMetric(run.metrics.total_return_pct, "%")}
-                />
-                <Metric
-                  buttonRef={
-                    comparisonLinkedRunRole
-                      ? (node) => registerRunListSubFocusRef(run.config.run_id, drawdownSubFocusKey)(node)
-                      : undefined
-                  }
-                  className={highlightDrawdown ? "comparison-linked-panel" : ""}
-                  interactivePressed={isRunListSubFocusOrigin(drawdownSubFocusKey)}
-                  label="Drawdown"
-                  onClick={
-                    comparisonLinkedRunRole
-                      ? () =>
-                          handleRunListScoreLinkSelection(
-                            run.config.run_id,
-                            "metrics",
-                            "max_drawdown_pct",
-                            {
-                              subFocusKey: drawdownSubFocusKey,
-                            },
-                          )
-                      : undefined
-                  }
-                  value={formatMetric(run.metrics.max_drawdown_pct, "%")}
-                />
-                <Metric
-                  buttonRef={
-                    comparisonLinkedRunRole
-                      ? (node) => registerRunListSubFocusRef(run.config.run_id, winRateSubFocusKey)(node)
-                      : undefined
-                  }
-                  className={highlightWinRate ? "comparison-linked-panel" : ""}
-                  interactivePressed={isRunListSubFocusOrigin(winRateSubFocusKey)}
-                  label="Win rate"
-                  onClick={
-                    comparisonLinkedRunRole
-                      ? () =>
-                          handleRunListScoreLinkSelection(
-                            run.config.run_id,
-                            "metrics",
-                            "win_rate_pct",
-                            {
-                              subFocusKey: winRateSubFocusKey,
-                            },
-                          )
-                      : undefined
-                  }
-                  value={formatMetric(run.metrics.win_rate_pct, "%")}
-                />
-                <Metric
-                  buttonRef={
-                    comparisonLinkedRunRole
-                      ? (node) => registerRunListSubFocusRef(run.config.run_id, tradeCountSubFocusKey)(node)
-                      : undefined
-                  }
-                  className={highlightTradeCount ? "comparison-linked-panel" : ""}
-                  interactivePressed={isRunListSubFocusOrigin(tradeCountSubFocusKey)}
-                  label="Trades"
-                  onClick={
-                    comparisonLinkedRunRole
-                      ? () =>
-                          handleRunListScoreLinkSelection(
-                            run.config.run_id,
-                            "metrics",
-                            "trade_count",
-                            {
-                              subFocusKey: tradeCountSubFocusKey,
-                            },
-                          )
-                      : undefined
-                  }
-                  value={formatMetric(run.metrics.trade_count)}
-                />
-              </div>
+              {comparison ? (
+                <div className="run-list-metric-boundaries">
+                  <div className="run-list-metric-boundary">
+                    <RunListComparisonBoundaryNote
+                      copy="Weak-signal identity and routing context stay descriptive only and do not create comparison deep-links."
+                      surfaces={["Mode", "Lane", "Lifecycle", "Version"]}
+                      title="Supporting only"
+                    />
+                    <div className="run-metrics">
+                      <Metric label="Mode" value={run.config.mode} />
+                      <Metric label="Lane" value={run.provenance.lane} />
+                      <Metric
+                        label="Lifecycle"
+                        value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
+                      />
+                      <Metric label="Version" value={run.config.strategy_version} />
+                    </div>
+                  </div>
+                  <div className="run-list-metric-boundary">
+                    <RunListComparisonBoundaryNote
+                      copy="These surfaces participate in comparison scoring or drill-back, so they remain comparison-eligible."
+                      surfaces={["Return", "Drawdown", "Win rate", "Trades"]}
+                      title="Comparison-eligible"
+                      tone="eligible"
+                    />
+                    <div className="run-metrics">
+                      <Metric
+                        buttonRef={
+                          comparisonLinkedRunRole
+                            ? (node) => registerRunListSubFocusRef(run.config.run_id, totalReturnSubFocusKey)(node)
+                            : undefined
+                        }
+                        className={highlightReturn ? "comparison-linked-panel" : ""}
+                        interactivePressed={isRunListSubFocusOrigin(totalReturnSubFocusKey)}
+                        label="Return"
+                        onClick={
+                          comparisonLinkedRunRole
+                            ? () =>
+                                handleRunListScoreLinkSelection(
+                                  run.config.run_id,
+                                  "metrics",
+                                  "total_return_pct",
+                                  {
+                                    subFocusKey: totalReturnSubFocusKey,
+                                  },
+                                )
+                            : undefined
+                        }
+                        value={formatMetric(run.metrics.total_return_pct, "%")}
+                      />
+                      <Metric
+                        buttonRef={
+                          comparisonLinkedRunRole
+                            ? (node) => registerRunListSubFocusRef(run.config.run_id, drawdownSubFocusKey)(node)
+                            : undefined
+                        }
+                        className={highlightDrawdown ? "comparison-linked-panel" : ""}
+                        interactivePressed={isRunListSubFocusOrigin(drawdownSubFocusKey)}
+                        label="Drawdown"
+                        onClick={
+                          comparisonLinkedRunRole
+                            ? () =>
+                                handleRunListScoreLinkSelection(
+                                  run.config.run_id,
+                                  "metrics",
+                                  "max_drawdown_pct",
+                                  {
+                                    subFocusKey: drawdownSubFocusKey,
+                                  },
+                                )
+                            : undefined
+                        }
+                        value={formatMetric(run.metrics.max_drawdown_pct, "%")}
+                      />
+                      <Metric
+                        buttonRef={
+                          comparisonLinkedRunRole
+                            ? (node) => registerRunListSubFocusRef(run.config.run_id, winRateSubFocusKey)(node)
+                            : undefined
+                        }
+                        className={highlightWinRate ? "comparison-linked-panel" : ""}
+                        interactivePressed={isRunListSubFocusOrigin(winRateSubFocusKey)}
+                        label="Win rate"
+                        onClick={
+                          comparisonLinkedRunRole
+                            ? () =>
+                                handleRunListScoreLinkSelection(
+                                  run.config.run_id,
+                                  "metrics",
+                                  "win_rate_pct",
+                                  {
+                                    subFocusKey: winRateSubFocusKey,
+                                  },
+                                )
+                            : undefined
+                        }
+                        value={formatMetric(run.metrics.win_rate_pct, "%")}
+                      />
+                      <Metric
+                        buttonRef={
+                          comparisonLinkedRunRole
+                            ? (node) => registerRunListSubFocusRef(run.config.run_id, tradeCountSubFocusKey)(node)
+                            : undefined
+                        }
+                        className={highlightTradeCount ? "comparison-linked-panel" : ""}
+                        interactivePressed={isRunListSubFocusOrigin(tradeCountSubFocusKey)}
+                        label="Trades"
+                        onClick={
+                          comparisonLinkedRunRole
+                            ? () =>
+                                handleRunListScoreLinkSelection(
+                                  run.config.run_id,
+                                  "metrics",
+                                  "trade_count",
+                                  {
+                                    subFocusKey: tradeCountSubFocusKey,
+                                  },
+                                )
+                            : undefined
+                        }
+                        value={formatMetric(run.metrics.trade_count)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="run-metrics">
+                  <Metric label="Mode" value={run.config.mode} />
+                  <Metric label="Lane" value={run.provenance.lane} />
+                  <Metric
+                    label="Lifecycle"
+                    value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
+                  />
+                  <Metric label="Version" value={run.config.strategy_version} />
+                  <Metric label="Return" value={formatMetric(run.metrics.total_return_pct, "%")} />
+                  <Metric label="Drawdown" value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
+                  <Metric label="Win rate" value={formatMetric(run.metrics.win_rate_pct, "%")} />
+                  <Metric label="Trades" value={formatMetric(run.metrics.trade_count)} />
+                </div>
+              )}
               <ExperimentMetadataPills
                 benchmarkFamily={run.provenance.experiment.benchmark_family}
                 datasetIdentity={run.provenance.market_data?.dataset_identity}
@@ -17575,6 +17638,14 @@ function RunSection({
                   </button>
                 ) : null}
               </div>
+              {comparison ? (
+                <RunListComparisonBoundaryNote
+                  copy="Workflow controls change selection or execution state, so they remain outside comparison-eligible deep-link scope."
+                  surfaces={["Add/remove compare", "Rerun", "Stop"]}
+                  title="Operational only"
+                  tone="operational"
+                />
+              ) : null}
               </article>
             );
           })}
@@ -23352,6 +23423,14 @@ function RunOrderLifecycleSummary({
       <div className="run-lineage-copy">
         {renderOrderCopyLine(`Last order sync: ${formatTimestamp(latestSyncAt)}`, orderSyncSubFocusKey)}
       </div>
+      {onDrillBackScoreLink && orderControls ? (
+        <RunListComparisonBoundaryNote
+          copy="Replace and cancel actions mutate order state, so they stay outside comparison drill-back even when the preview rows are comparison-eligible."
+          surfaces={["Cancel order", "Replace order"]}
+          title="Operational only"
+          tone="operational"
+        />
+      ) : null}
       <div className="run-lineage-symbols">
         {previewOrders.map((order) => (
           <article className="run-lineage-symbol-card" key={order.order_id}>

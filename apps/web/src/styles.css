@@ -1556,6 +1556,79 @@ select {
   margin: 14px 0;
 }
 
+.run-list-metric-boundaries {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+}
+
+.run-list-metric-boundary {
+  display: grid;
+  gap: 10px;
+}
+
+.run-list-boundary-note {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 13, 22, 0.6);
+}
+
+.run-list-boundary-note.eligible {
+  border-color: rgba(88, 217, 255, 0.2);
+  background: rgba(6, 18, 28, 0.72);
+}
+
+.run-list-boundary-note.operational {
+  border-color: rgba(255, 145, 132, 0.2);
+  background: rgba(28, 12, 14, 0.44);
+}
+
+.run-list-boundary-note-head {
+  display: grid;
+  gap: 4px;
+}
+
+.run-list-boundary-note-head span,
+.run-list-boundary-note-head p {
+  margin: 0;
+}
+
+.run-list-boundary-note-head span {
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.run-list-boundary-note-head p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.run-list-boundary-note-surfaces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-list-boundary-note-surface {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
 .run-lineage {
   margin: 14px 0;
   padding: 16px;
@@ -3732,6 +3805,7 @@ select {
   .strategy-columns,
   .run-list,
   .run-form,
+  .run-list-metric-boundaries,
   .run-metrics,
   .reference-provenance-grid,
   .run-lineage-grid,
