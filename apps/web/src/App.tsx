@@ -402,6 +402,8 @@ type ComparisonScoreLinkTarget = {
 
 type ComparisonScoreLinkedRunRole = "baseline" | "target";
 
+type ComparisonScoreLinkSource = "metric" | "narrative" | "provenance";
+
 type MarketDataStatus = {
   provider: string;
   venue: string;
@@ -8595,6 +8597,7 @@ function RunComparisonPanel({
   const tooltipScopeId = sanitizeComparisonTooltipId(useId());
   const tooltipTargetRefs = useRef(new Map<string, HTMLElement>());
   const tooltipBubbleRefs = useRef(new Map<string, HTMLSpanElement>());
+  const narrativeCardRefs = useRef(new Map<string, HTMLElement>());
   const tooltipOpenTimerRef = useRef<number | null>(null);
   const tooltipCloseTimerRef = useRef<number | null>(null);
   const metricPointerSampleRef = useRef<{
@@ -8629,6 +8632,8 @@ function RunComparisonPanel({
   const [selectedScoreLink, setSelectedScoreLink] = useState<ComparisonScoreLinkTarget | null>(
     null,
   );
+  const [selectedScoreLinkSource, setSelectedScoreLinkSource] =
+    useState<ComparisonScoreLinkSource | null>(null);
   const [tooltipShareDraft, setTooltipShareDraft] = useState("");
   const [tooltipShareFeedback, setTooltipShareFeedback] = useState<string | null>(null);
   const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
@@ -9049,6 +9054,46 @@ function RunComparisonPanel({
       tooltipBubbleRefs.current.delete(tooltipId);
     };
 
+  const registerComparisonNarrativeCardRef =
+    (runId: string) => (node: HTMLElement | null) => {
+      if (node) {
+        narrativeCardRefs.current.set(runId, node);
+        return;
+      }
+      narrativeCardRefs.current.delete(runId);
+    };
+
+  const updateSelectedScoreLink = (
+    nextSelection: ComparisonScoreLinkTarget | null,
+    source: ComparisonScoreLinkSource | null,
+  ) => {
+    setSelectedScoreLink(nextSelection);
+    setSelectedScoreLinkSource(nextSelection ? source : null);
+  };
+
+  const handleComparisonScoreDrillBack = (
+    runId: string,
+    section: ComparisonScoreSection,
+    componentKey: string,
+    source: ComparisonScoreLinkSource,
+  ) => {
+    const nextSelection = resolveComparisonScoreDrillBackTarget(
+      comparison,
+      selectedScoreLink,
+      runId,
+      section,
+      componentKey,
+    );
+    if (!nextSelection) {
+      return;
+    }
+    const isSameSelection =
+      selectedScoreLink?.narrativeRunId === nextSelection.narrativeRunId
+      && selectedScoreLink.section === nextSelection.section
+      && selectedScoreLink.componentKey === nextSelection.componentKey;
+    updateSelectedScoreLink(isSameSelection ? null : nextSelection, isSameSelection ? null : source);
+  };
+
   const getComparisonTooltipTargetProps = (
     tooltipId?: string,
     options?: ComparisonTooltipInteractionOptions,
@@ -9383,9 +9428,23 @@ function RunComparisonPanel({
 
     const sectionBreakdown = narrative.score_breakdown[selectedScoreLink.section];
     if (!(selectedScoreLink.componentKey in sectionBreakdown.components)) {
-      setSelectedScoreLink(null);
+      updateSelectedScoreLink(null, null);
     }
   }, [comparison, selectedScoreLink]);
+
+  useEffect(() => {
+    if (!selectedScoreLink || selectedScoreLinkSource === "narrative") {
+      return;
+    }
+    const narrativeCard = narrativeCardRefs.current.get(selectedScoreLink.narrativeRunId);
+    if (!narrativeCard) {
+      return;
+    }
+    narrativeCard.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [selectedScoreLink, selectedScoreLinkSource]);
 
   return (
     <section className={`comparison-panel ${intentClassName}`}>
@@ -9651,6 +9710,14 @@ function RunComparisonPanel({
                         }
                       : null
                   }
+                  onDrillBackScoreLink={(section, componentKey) =>
+                    handleComparisonScoreDrillBack(
+                      run.run_id,
+                      section,
+                      componentKey,
+                      "provenance",
+                    )
+                  }
                   reference={run.reference}
                   referenceVersion={run.reference_version}
                   strategySemantics={run.catalog_semantics}
@@ -9697,7 +9764,8 @@ function RunComparisonPanel({
             comparison={comparison}
             featured
             narrative={primaryNarrative}
-            onSelectScoreLink={setSelectedScoreLink}
+            onSelectScoreLink={(value) => updateSelectedScoreLink(value, "narrative")}
+            registerCardRef={registerComparisonNarrativeCardRef}
             registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
             registerTooltipTargetRef={registerComparisonTooltipTargetRef}
             selectedScoreLink={selectedScoreLink}
@@ -9719,7 +9787,8 @@ function RunComparisonPanel({
               comparison={comparison}
               key={`${narrative.baseline_run_id}-${narrative.run_id}`}
               narrative={narrative}
-              onSelectScoreLink={setSelectedScoreLink}
+              onSelectScoreLink={(value) => updateSelectedScoreLink(value, "narrative")}
+              registerCardRef={registerComparisonNarrativeCardRef}
               registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
               registerTooltipTargetRef={registerComparisonTooltipTargetRef}
               selectedScoreLink={selectedScoreLink}
@@ -9754,6 +9823,13 @@ function RunComparisonPanel({
                     ) : null}
                   </th>
                   {comparison.runs.map((run) => {
+                    const metricDrillBackTarget = resolveComparisonScoreDrillBackTarget(
+                      comparison,
+                      selectedScoreLink,
+                      run.run_id,
+                      "metrics",
+                      metricRow.key,
+                    );
                     const cellTooltip =
                       buildComparisonCellTooltip(
                         comparison.intent,
@@ -9764,6 +9840,13 @@ function RunComparisonPanel({
                     const cellTooltipId = cellTooltip
                       ? buildComparisonTooltipId(tooltipScopeId, "metric", metricRow.key, run.run_id)
                       : undefined;
+                    const metricTooltipTargetProps = cellTooltipId
+                      ? getMetricComparisonTooltipTargetProps(
+                          cellTooltipId,
+                          metricRow.key,
+                          run.run_id,
+                        )
+                      : undefined;
                     const linkedRunRole = metricRowLinked
                       ? getComparisonScoreLinkedRunRole(
                           selectedScoreLink,
@@ -9771,11 +9854,17 @@ function RunComparisonPanel({
                           run.run_id,
                         )
                       : null;
+                    const metricCellPressed =
+                      Boolean(metricDrillBackTarget)
+                      && selectedScoreLink?.narrativeRunId === metricDrillBackTarget?.narrativeRunId
+                      && selectedScoreLink?.section === "metrics"
+                      && selectedScoreLink?.componentKey === metricRow.key;
                     const cellClassName =
                       [
                         metricRow.best_run_id === run.run_id ? "comparison-best" : "",
                         run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
                         cellTooltip ? "comparison-cue comparison-tooltip comparison-cell-cue" : "",
+                        metricDrillBackTarget ? "comparison-drillback-target" : "",
                         metricRowLinked ? "comparison-linked-metric-cell" : "",
                         linkedRunRole === "target" ? "comparison-linked-metric-cell-target" : "",
                         linkedRunRole === "baseline" ? "comparison-linked-metric-cell-baseline" : "",
@@ -9785,21 +9874,50 @@ function RunComparisonPanel({
 
                     return (
                       <td
+                        {...(metricTooltipTargetProps ?? {})}
+                        aria-label={
+                          metricDrillBackTarget
+                            ? `Trace ${metricRow.label} score component for ${run.strategy_name ?? run.strategy_id}`
+                            : undefined
+                        }
+                        aria-pressed={metricDrillBackTarget ? metricCellPressed : undefined}
                         className={cellClassName}
                         key={`${metricRow.key}-${run.run_id}`}
+                        onClick={
+                          metricDrillBackTarget
+                            ? () =>
+                                handleComparisonScoreDrillBack(
+                                  run.run_id,
+                                  "metrics",
+                                  metricRow.key,
+                                  "metric",
+                                )
+                            : undefined
+                        }
+                        onKeyDown={(event) => {
+                          metricTooltipTargetProps?.onKeyDown?.(event);
+                          if (
+                            event.defaultPrevented
+                            || !metricDrillBackTarget
+                            || (event.key !== "Enter" && event.key !== " ")
+                          ) {
+                            return;
+                          }
+                          event.preventDefault();
+                          handleComparisonScoreDrillBack(
+                            run.run_id,
+                            "metrics",
+                            metricRow.key,
+                            "metric",
+                          );
+                        }}
                         ref={
                           cellTooltipId
                             ? registerComparisonTooltipTargetRef(cellTooltipId)
                             : undefined
                         }
-                        tabIndex={cellTooltip ? 0 : undefined}
-                        {...(cellTooltipId
-                          ? getMetricComparisonTooltipTargetProps(
-                              cellTooltipId,
-                              metricRow.key,
-                              run.run_id,
-                            )
-                          : {})}
+                        role={metricDrillBackTarget ? "button" : undefined}
+                        tabIndex={metricDrillBackTarget || cellTooltip ? 0 : undefined}
                       >
                         <strong>
                           {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
@@ -9851,6 +9969,7 @@ function ComparisonNarrativeCard({
   narrative,
   featured = false,
   onSelectScoreLink,
+  registerCardRef,
   registerTooltipBubbleRef,
   registerTooltipTargetRef,
   selectedScoreLink,
@@ -9863,6 +9982,7 @@ function ComparisonNarrativeCard({
   narrative: RunComparison["narratives"][number];
   featured?: boolean;
   onSelectScoreLink: (value: ComparisonScoreLinkTarget | null) => void;
+  registerCardRef: (runId: string) => (node: HTMLElement | null) => void;
   registerTooltipBubbleRef: (tooltipId: string) => (node: HTMLSpanElement | null) => void;
   registerTooltipTargetRef: (tooltipId?: string) => (node: HTMLElement | null) => void;
   selectedScoreLink: ComparisonScoreLinkTarget | null;
@@ -9872,13 +9992,19 @@ function ComparisonNarrativeCard({
 }) {
   const run = comparison.runs.find((candidate) => candidate.run_id === narrative.run_id);
   const runLabel = run?.reference?.title ?? run?.strategy_name ?? run?.strategy_id ?? narrative.run_id;
+  const setCardRef = (node: HTMLElement | null) => {
+    registerCardRef(narrative.run_id)(node);
+    if (tooltipId) {
+      registerTooltipTargetRef(tooltipId)(node);
+    }
+  };
 
   return (
     <article
       className={`comparison-story-card ${
         featured ? "featured comparison-cue-card comparison-tooltip" : ""
       } ${selectedScoreLink?.narrativeRunId === narrative.run_id ? "is-linked" : ""}`.trim()}
-      ref={tooltipId ? registerTooltipTargetRef(tooltipId) : undefined}
+      ref={setCardRef}
       tabIndex={tooltip ? 0 : undefined}
       {...tooltipTargetProps}
     >
@@ -9963,6 +10089,12 @@ function ComparisonNarrativeScoreBreakdown({
   const activeSelectionLabel = activeSelection
     ? formatComparisonScoreComponentLabel(activeSelection.section, activeSelection.componentKey)
     : null;
+
+  useEffect(() => {
+    if (activeSelection) {
+      setExpanded(true);
+    }
+  }, [activeSelection]);
 
   return (
     <section className="comparison-score-breakdown" aria-label="Narrative score breakdown">
@@ -11786,6 +11918,7 @@ function ReferenceRunProvenanceSummary({
   benchmarkArtifacts,
   externalCommand,
   linkedScore,
+  onDrillBackScoreLink,
   reference,
   referenceVersion,
   strategySemantics,
@@ -11795,6 +11928,7 @@ function ReferenceRunProvenanceSummary({
   benchmarkArtifacts: BenchmarkArtifact[];
   externalCommand: string[];
   linkedScore?: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
+  onDrillBackScoreLink?: (section: ComparisonScoreSection, componentKey: string) => void;
   reference: ReferenceSource;
   referenceVersion?: string | null;
   strategySemantics?: {
@@ -11859,6 +11993,50 @@ function ReferenceRunProvenanceSummary({
     || highlightOperatorNotes
     || highlightExecutionContext
     || highlightArtifacts;
+  const renderProvenanceCopyLine = ({
+    children,
+    componentKey,
+    highlighted = false,
+    section,
+  }: {
+    children: string;
+    componentKey?: string;
+    highlighted?: boolean;
+    section?: ComparisonScoreSection;
+  }) => {
+    const className =
+      [
+        highlighted ? "comparison-linked-copy" : "",
+        section && componentKey && onDrillBackScoreLink
+          ? "reference-provenance-link comparison-drillback-target"
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ") || undefined;
+    if (!section || !componentKey || !onDrillBackScoreLink) {
+      return <p className={className}>{children}</p>;
+    }
+    const isPressed =
+      linkedScoreSelection?.section === section && linkedScoreSelection.componentKey === componentKey;
+    return (
+      <button
+        aria-label={`Trace ${formatComparisonScoreComponentLabel(section, componentKey)}`}
+        aria-pressed={isPressed}
+        className={className}
+        onClick={() => onDrillBackScoreLink(section, componentKey)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" && event.key !== " ") {
+            return;
+          }
+          event.preventDefault();
+          onDrillBackScoreLink(section, componentKey);
+        }}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
 
   return (
     <section
@@ -11877,58 +12055,112 @@ function ReferenceRunProvenanceSummary({
         <Metric label="Runtime" value={reference.runtime ?? "n/a"} />
       </div>
       <div className="reference-provenance-copy">
-        <p className={highlightReferenceIdentity ? "comparison-linked-copy" : undefined}>
-          ID: {reference.reference_id}
-        </p>
-        {reference.homepage ? (
-          <p className={highlightReferenceIdentity ? "comparison-linked-copy" : undefined}>
-            Homepage: {reference.homepage}
-          </p>
-        ) : null}
+        {renderProvenanceCopyLine({
+          children: `ID: ${reference.reference_id}`,
+          componentKey: "source_descriptor",
+          highlighted: highlightReferenceIdentity,
+          section: "semantics",
+        })}
+        {reference.homepage
+          ? renderProvenanceCopyLine({
+              children: `Homepage: ${reference.homepage}`,
+              componentKey: "source_descriptor",
+              highlighted: highlightReferenceIdentity,
+              section: "semantics",
+            })
+          : null}
         {strategySemantics?.strategy_kind ? (
-          <p className={highlightStrategyKind ? "comparison-linked-copy" : undefined}>
-            Semantic kind: {strategySemantics.strategy_kind}
-          </p>
+          renderProvenanceCopyLine({
+            children: `Semantic kind: ${strategySemantics.strategy_kind}`,
+            componentKey: "strategy_kind",
+            highlighted: highlightStrategyKind,
+            section: "semantics",
+          })
         ) : null}
         {strategySemantics?.execution_model ? (
-          <p className={highlightExecutionModel ? "comparison-linked-copy" : undefined}>
-            Execution model: {strategySemantics.execution_model}
-          </p>
+          renderProvenanceCopyLine({
+            children: `Execution model: ${strategySemantics.execution_model}`,
+            componentKey: "execution_model",
+            highlighted: highlightExecutionModel,
+            section: "semantics",
+          })
         ) : null}
         {strategySemantics?.parameter_contract ? (
-          <p className={highlightParameterContract ? "comparison-linked-copy" : undefined}>
-            Parameter contract: {strategySemantics.parameter_contract}
-          </p>
+          renderProvenanceCopyLine({
+            children: `Parameter contract: ${strategySemantics.parameter_contract}`,
+            componentKey: "parameter_contract",
+            highlighted: highlightParameterContract,
+            section: "semantics",
+          })
         ) : null}
         {strategySemantics?.source_descriptor ? (
-          <p className={highlightSourceDescriptor ? "comparison-linked-copy" : undefined}>
-            Semantic source: {strategySemantics.source_descriptor}
-          </p>
+          renderProvenanceCopyLine({
+            children: `Semantic source: ${strategySemantics.source_descriptor}`,
+            componentKey: "source_descriptor",
+            highlighted: highlightSourceDescriptor,
+            section: "semantics",
+          })
         ) : null}
         {strategySemantics?.operator_notes?.length ? (
-          <p className={highlightOperatorNotes ? "comparison-linked-copy" : undefined}>
-            Operator notes: {strategySemantics.operator_notes.join(" | ")}
-          </p>
+          renderProvenanceCopyLine({
+            children: `Operator notes: ${strategySemantics.operator_notes.join(" | ")}`,
+            componentKey: "vocabulary",
+            highlighted: highlightOperatorNotes,
+            section: "semantics",
+          })
         ) : null}
-        {workingDirectory ? (
-          <p className={highlightExecutionContext ? "comparison-linked-copy" : undefined}>
-            Working dir: {workingDirectory}
-          </p>
-        ) : null}
-        {externalCommand.length ? (
-          <p className={highlightExecutionContext ? "comparison-linked-copy" : undefined}>
-            Command: {externalCommand.join(" ")}
-          </p>
-        ) : null}
+        {workingDirectory
+          ? renderProvenanceCopyLine({
+              children: `Working dir: ${workingDirectory}`,
+              componentKey: "provenance_richness",
+              highlighted: highlightExecutionContext,
+              section: "context",
+            })
+          : null}
+        {externalCommand.length
+          ? renderProvenanceCopyLine({
+              children: `Command: ${externalCommand.join(" ")}`,
+              componentKey: "provenance_richness",
+              highlighted: highlightExecutionContext,
+              section: "context",
+            })
+          : null}
         {benchmarkArtifacts.length ? (
           <div className="reference-artifact-list">
             {benchmarkArtifacts.map((artifact) => {
               const summaryEntries = formatBenchmarkArtifactSummaryEntries(artifact.summary);
               const sectionEntries = formatBenchmarkArtifactSectionEntries(artifact.sections ?? {});
+              const artifactComponentKey =
+                summaryEntries.length || sectionEntries.length ? "benchmark_story_bonus" : "provenance_richness";
+              const artifactIsPressed =
+                linkedScoreSelection?.section === "context"
+                && linkedScoreSelection.componentKey === artifactComponentKey;
               return (
                 <article
-                  className={`reference-artifact-card ${highlightArtifacts ? "is-linked" : ""}`}
+                  aria-label={`Trace ${formatComparisonScoreComponentLabel("context", artifactComponentKey)}`}
+                  aria-pressed={onDrillBackScoreLink ? artifactIsPressed : undefined}
+                  className={`reference-artifact-card ${highlightArtifacts ? "is-linked" : ""} ${
+                    onDrillBackScoreLink ? "is-drillback comparison-drillback-target" : ""
+                  }`.trim()}
                   key={`${artifact.kind}-${artifact.path}`}
+                  onClick={
+                    onDrillBackScoreLink
+                      ? () => onDrillBackScoreLink("context", artifactComponentKey)
+                      : undefined
+                  }
+                  onKeyDown={
+                    onDrillBackScoreLink
+                      ? (event) => {
+                          if (event.key !== "Enter" && event.key !== " ") {
+                            return;
+                          }
+                          event.preventDefault();
+                          onDrillBackScoreLink("context", artifactComponentKey);
+                        }
+                      : undefined
+                  }
+                  role={onDrillBackScoreLink ? "button" : undefined}
+                  tabIndex={onDrillBackScoreLink ? 0 : undefined}
                 >
                   <div className="reference-artifact-head">
                     <strong>{artifact.label}</strong>
@@ -11974,7 +12206,12 @@ function ReferenceRunProvenanceSummary({
             })}
           </div>
         ) : (
-          <p>Artifacts: {artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}</p>
+          renderProvenanceCopyLine({
+            children: `Artifacts: ${artifactPaths.length ? artifactPaths.join(" | ") : "none recorded"}`,
+            componentKey: "provenance_richness",
+            highlighted: highlightArtifacts,
+            section: "context",
+          })
         )}
       </div>
     </section>
@@ -12498,6 +12735,52 @@ function getComparisonScoreLinkedRunRole(
     return "baseline";
   }
   return null;
+}
+
+function resolveComparisonScoreDrillBackTarget(
+  comparison: RunComparison,
+  selection: ComparisonScoreLinkTarget | null,
+  runId: string,
+  section: ComparisonScoreSection,
+  componentKey: string,
+): ComparisonScoreLinkTarget | null {
+  const narrativeSupportsComponent = (narrative: RunComparison["narratives"][number]) =>
+    Object.prototype.hasOwnProperty.call(narrative.score_breakdown[section].components, componentKey);
+
+  if (runId !== comparison.baseline_run_id) {
+    const directNarrative = comparison.narratives.find(
+      (narrative) => narrative.run_id === runId && narrativeSupportsComponent(narrative),
+    );
+    return directNarrative
+      ? {
+          componentKey,
+          narrativeRunId: directNarrative.run_id,
+          section,
+        }
+      : null;
+  }
+
+  const selectedNarrative =
+    selection
+      ? comparison.narratives.find(
+          (narrative) =>
+            narrative.run_id === selection.narrativeRunId && narrativeSupportsComponent(narrative),
+        ) ?? null
+      : null;
+  const primaryNarrative =
+    comparison.narratives.find(
+      (narrative) => narrative.is_primary && narrativeSupportsComponent(narrative),
+    ) ?? null;
+  const fallbackNarrative = comparison.narratives.find(narrativeSupportsComponent) ?? null;
+  const resolvedNarrative = selectedNarrative ?? primaryNarrative ?? fallbackNarrative;
+
+  return resolvedNarrative
+    ? {
+        componentKey,
+        narrativeRunId: resolvedNarrative.run_id,
+        section,
+      }
+    : null;
 }
 
 function isComparisonScoreLinkMatch(

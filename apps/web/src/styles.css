@@ -1773,6 +1773,18 @@ select {
   box-shadow: 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16);
 }
 
+.comparison-table td.comparison-drillback-target {
+  cursor: pointer;
+}
+
+.comparison-table td.comparison-drillback-target:hover,
+.comparison-table td.comparison-drillback-target:focus-visible {
+  background:
+    linear-gradient(90deg, rgba(var(--comparison-accent-rgb), 0.18), rgba(var(--comparison-accent-rgb), 0.05)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.18);
+}
+
 .comparison-baseline-cell {
   background: rgba(255, 255, 255, 0.03);
 }
@@ -1888,7 +1900,24 @@ select {
   margin-top: 12px;
 }
 
-.reference-provenance-copy p {
+.reference-provenance-link {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.reference-provenance-link:hover,
+.reference-provenance-link:focus-visible {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.reference-provenance-copy p,
+.reference-provenance-link {
   margin: 0;
   color: var(--muted);
   font-family: "IBM Plex Mono", monospace;
@@ -1914,6 +1943,16 @@ select {
   background:
     linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.1), rgba(var(--comparison-accent-rgb), 0.03)),
     rgba(4, 10, 17, 0.56);
+}
+
+.reference-artifact-card.is-drillback {
+  cursor: pointer;
+}
+
+.reference-artifact-card.is-drillback:hover,
+.reference-artifact-card.is-drillback:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.34);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.14);
 }
 
 .reference-artifact-head {
