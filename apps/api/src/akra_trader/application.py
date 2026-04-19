@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import field
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
@@ -22977,8 +22978,15 @@ class RunSurfaceSharedContract:
   summary: str
   source_of_truth: str
   version: str | None = None
+  discovery_flow: str | None = None
   related_family_keys: tuple[str, ...] = ()
   member_keys: tuple[str, ...] = ()
+  ui_surfaces: tuple[str, ...] = ()
+  schema_sources: tuple[str, ...] = ()
+  policy: RunSurfaceCapabilities.Policy | None = None
+  enforcement: RunSurfaceCapabilities.Enforcement | None = None
+  surface_rules: tuple[RunSurfaceCapabilities.SurfaceRule, ...] = ()
+  schema_detail: dict[str, Any] = field(default_factory=dict)
 
 
 def _serialize_run_order_subresource_item(
@@ -23124,6 +23132,22 @@ def list_run_surface_shared_contracts(
         if isinstance(group_key, str)
       ]
     ),
+    schema_detail={
+      "comparison_eligibility_group_order": tuple(
+        group_key
+        for group_key in discovery.get("comparison_eligibility_group_order", ())
+        if isinstance(group_key, str)
+      ),
+      "family_order": tuple(
+        family_key
+        for family_key in discovery.get("family_order", ())
+        if isinstance(family_key, str)
+      ),
+      "run_subresource_contract_keys": tuple(
+        f"subresource:{contract.subresource_key}"
+        for contract in list_run_subresource_contracts()
+      ),
+    },
   )
   family_contracts = tuple(
     RunSurfaceSharedContract(
@@ -23132,8 +23156,14 @@ def list_run_surface_shared_contracts(
       title=family.title,
       summary=family.summary,
       source_of_truth=family.policy.source_of_truth or "run_surface_capabilities.families",
+      discovery_flow=family.discovery_flow,
       related_family_keys=(family.family_key,),
       member_keys=tuple(rule.surface_key for rule in family.surface_rules),
+      ui_surfaces=family.ui_surfaces,
+      schema_sources=family.schema_sources,
+      policy=family.policy,
+      enforcement=family.enforcement,
+      surface_rules=family.surface_rules,
     )
     for family in resolved_capabilities.families
   )
@@ -23149,6 +23179,11 @@ def list_run_surface_shared_contracts(
       source_of_truth="run_subresource_contracts",
       related_family_keys=(),
       member_keys=(f"body:{contract.body_key}", f"route:{contract.route_name}"),
+      schema_detail={
+        "body_key": contract.body_key,
+        "route_path": contract.route_path,
+        "route_name": contract.route_name,
+      },
     )
     for contract in list_run_subresource_contracts()
   )
@@ -23158,11 +23193,52 @@ def list_run_surface_shared_contracts(
 def serialize_run_surface_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> list[dict[str, Any]]:
+  def normalize_schema_detail(value: Any) -> Any:
+    if isinstance(value, tuple):
+      return [
+        normalize_schema_detail(item)
+        for item in value
+      ]
+    if isinstance(value, list):
+      return [
+        normalize_schema_detail(item)
+        for item in value
+      ]
+    if isinstance(value, dict):
+      return {
+        key: normalize_schema_detail(item)
+        for key, item in value.items()
+      }
+    return value
+
   return [
     {
       **asdict(contract),
+      "ui_surfaces": list(contract.ui_surfaces),
+      "schema_sources": list(contract.schema_sources),
+      "policy": (
+        {
+          **asdict(contract.policy),
+          "applies_to": list(contract.policy.applies_to),
+        }
+        if contract.policy is not None
+        else None
+      ),
+      "enforcement": (
+        {
+          **asdict(contract.enforcement),
+          "enforcement_points": list(contract.enforcement.enforcement_points),
+        }
+        if contract.enforcement is not None
+        else None
+      ),
+      "surface_rules": [
+        asdict(rule)
+        for rule in contract.surface_rules
+      ],
       "related_family_keys": list(contract.related_family_keys),
       "member_keys": list(contract.member_keys),
+      "schema_detail": normalize_schema_detail(contract.schema_detail),
     }
     for contract in list_run_surface_shared_contracts(capabilities)
   ]

@@ -13837,20 +13837,64 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v8"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v9"
   assert shared_contracts["schema:run-surface-capabilities"]["related_family_keys"] == [
     "comparison_eligibility",
     "strategy_schema",
     "provenance_semantics",
     "execution_controls",
   ]
+  assert shared_contracts["schema:run-surface-capabilities"]["schema_detail"] == {
+    "comparison_eligibility_group_order": [
+      "eligible_metrics",
+      "supporting_identity",
+      "operational_workflow",
+      "operational_order_actions",
+    ],
+    "family_order": [
+      "comparison_eligibility",
+      "strategy_schema",
+      "provenance_semantics",
+      "execution_controls",
+    ],
+    "run_subresource_contract_keys": [
+      "subresource:orders",
+      "subresource:positions",
+      "subresource:metrics",
+    ],
+  }
   assert shared_contracts["family:comparison_eligibility"]["contract_kind"] == "capability_family"
+  assert shared_contracts["family:comparison_eligibility"]["discovery_flow"] == (
+    "Shared UI contract panel and run-list boundary notes."
+  )
+  assert shared_contracts["family:comparison_eligibility"]["ui_surfaces"] == [
+    "Run-list metric tiles",
+    "Boundary note panels",
+    "Order workflow gates",
+  ]
+  assert shared_contracts["family:comparison_eligibility"]["schema_sources"] == [
+    "Run-surface capability endpoint",
+    "Comparison score drill-back wiring",
+    "Run-list boundary notes",
+  ]
+  assert shared_contracts["family:comparison_eligibility"]["policy"]["policy_key"] == (
+    "comparison_surface_allowlist"
+  )
+  assert shared_contracts["family:comparison_eligibility"]["enforcement"]["level"] == "hard_gate"
+  assert shared_contracts["family:comparison_eligibility"]["surface_rules"][0]["surface_key"] == (
+    "run_list_metric_tiles"
+  )
   assert "run_list_metric_tiles" in shared_contracts["family:comparison_eligibility"]["member_keys"]
   assert shared_contracts["subresource:orders"]["contract_kind"] == "run_subresource"
   assert shared_contracts["subresource:orders"]["member_keys"] == [
     "body:orders",
     "route:get_run_orders",
   ]
+  assert shared_contracts["subresource:orders"]["schema_detail"] == {
+    "body_key": "orders",
+    "route_path": "/runs/{run_id}/orders",
+    "route_name": "get_run_orders",
+  }
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
@@ -14687,7 +14731,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v8"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v9"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",

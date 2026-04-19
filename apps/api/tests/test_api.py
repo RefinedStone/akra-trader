@@ -378,7 +378,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
 
   assert response.status_code == 200
   payload = response.json()
-  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v8"
+  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v9"
   assert payload["discovery"]["schema_title"] == "Run-surface capability contract"
   assert payload["discovery"]["family_order"] == [
     "comparison_eligibility",
@@ -420,14 +420,48 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v8"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v9"
+  assert shared_contracts["schema:run-surface-capabilities"]["schema_detail"] == {
+    "comparison_eligibility_group_order": [
+      "eligible_metrics",
+      "supporting_identity",
+      "operational_workflow",
+      "operational_order_actions",
+    ],
+    "family_order": [
+      "comparison_eligibility",
+      "strategy_schema",
+      "provenance_semantics",
+      "execution_controls",
+    ],
+    "run_subresource_contract_keys": [
+      "subresource:orders",
+      "subresource:positions",
+      "subresource:metrics",
+    ],
+  }
   assert shared_contracts["family:strategy_schema"]["contract_kind"] == "capability_family"
+  assert shared_contracts["family:strategy_schema"]["discovery_flow"] == (
+    "Strategy catalog and preset editor schema hints."
+  )
+  assert shared_contracts["family:strategy_schema"]["policy"]["policy_key"] == (
+    "typed_strategy_schema_advertisement"
+  )
+  assert shared_contracts["family:strategy_schema"]["enforcement"]["level"] == "advisory"
+  assert shared_contracts["family:strategy_schema"]["surface_rules"][1]["surface_key"] == (
+    "preset_parameter_editor"
+  )
   assert "preset_parameter_editor" in shared_contracts["family:strategy_schema"]["member_keys"]
   assert shared_contracts["subresource:metrics"]["contract_kind"] == "run_subresource"
   assert shared_contracts["subresource:metrics"]["member_keys"] == [
     "body:metrics",
     "route:get_run_metrics",
   ]
+  assert shared_contracts["subresource:metrics"]["schema_detail"] == {
+    "body_key": "metrics",
+    "route_path": "/runs/{run_id}/metrics",
+    "route_name": "get_run_metrics",
+  }
   assert payload["families"][0]["family_key"] == "comparison_eligibility"
   assert "Run-list metric tiles" in payload["families"][0]["ui_surfaces"]
   assert payload["families"][0]["policy"]["policy_key"] == "comparison_surface_allowlist"

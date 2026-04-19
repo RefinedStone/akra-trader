@@ -507,8 +507,34 @@ type RunSurfaceCapabilities = {
       summary: string;
       source_of_truth: string;
       version: string | null;
+      discovery_flow?: string | null;
       related_family_keys: string[];
       member_keys: string[];
+      ui_surfaces?: string[];
+      schema_sources?: string[];
+      policy?: {
+        applies_to: string[];
+        policy_key: string;
+        policy_mode: string;
+        source_of_truth: string;
+      } | null;
+      enforcement?: {
+        enforcement_points: string[];
+        fallback_behavior: string;
+        level: string;
+        source_of_truth: string;
+      } | null;
+      surface_rules?: {
+        rule_key: string;
+        surface_key: string;
+        surface_label: string;
+        enforcement_point: string;
+        enforcement_mode: string;
+        level: string;
+        fallback_behavior: string;
+        source_of_truth: string;
+      }[];
+      schema_detail?: Record<string, unknown>;
     }[];
     schema_summary: string;
     schema_title: string;
@@ -520,7 +546,17 @@ type RunSurfaceCapabilityFamilyKey = RunSurfaceCapabilities["families"][number][
 type RunSurfaceCapabilitySurfaceKey =
   RunSurfaceCapabilities["families"][number]["surface_rules"][number]["surface_key"];
 type RunSurfaceCapabilityFamily = RunSurfaceCapabilities["families"][number];
-type RunSurfaceCapabilitySurfaceRule = RunSurfaceCapabilityFamily["surface_rules"][number];
+type RunSurfaceSharedContract = RunSurfaceCapabilities["discovery"]["shared_contracts"][number];
+type RunSurfaceCapabilityFamilyContract = RunSurfaceSharedContract & {
+  discovery_flow: string | null;
+  ui_surfaces: string[];
+  schema_sources: string[];
+  policy: NonNullable<RunSurfaceSharedContract["policy"]>;
+  enforcement: NonNullable<RunSurfaceSharedContract["enforcement"]>;
+  surface_rules: NonNullable<RunSurfaceSharedContract["surface_rules"]>;
+  schema_detail: Record<string, unknown>;
+};
+type RunSurfaceCapabilitySurfaceRule = RunSurfaceCapabilityFamilyContract["surface_rules"][number];
 
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
@@ -14354,7 +14390,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       summary:
         "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
       source_of_truth: "run_surface_capabilities.discovery",
-      version: "run-surface-capabilities.v8",
+      version: "run-surface-capabilities.v9",
       related_family_keys: [
         "comparison_eligibility",
         "strategy_schema",
@@ -14458,7 +14494,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
   schema_summary:
     "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v8",
+  schema_version: "run-surface-capabilities.v9",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14703,11 +14739,112 @@ function getRunSurfaceCapabilityFamilies(capabilities?: RunSurfaceCapabilities |
   return capabilities?.families?.length ? capabilities.families : DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES;
 }
 
+function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | null) {
+  const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
+  const families = getRunSurfaceCapabilityFamilies(capabilities);
+  const sharedByKey = new Map(
+    (discovery.shared_contracts ?? []).map((contract) => [contract.contract_key, contract] as const),
+  );
+  const schemaContract = sharedByKey.get("schema:run-surface-capabilities");
+  const normalizedSchema: RunSurfaceSharedContract = {
+    contract_key: "schema:run-surface-capabilities",
+    contract_kind: "schema_metadata",
+    title: schemaContract?.title ?? discovery.schema_title,
+    summary: schemaContract?.summary ?? discovery.schema_summary,
+    source_of_truth: schemaContract?.source_of_truth ?? "run_surface_capabilities.discovery",
+    version: discovery.schema_version,
+    discovery_flow: schemaContract?.discovery_flow ?? null,
+    related_family_keys: schemaContract?.related_family_keys?.length
+      ? schemaContract.related_family_keys
+      : discovery.family_order,
+    member_keys: schemaContract?.member_keys?.length
+      ? schemaContract.member_keys
+      : [
+          ...discovery.family_order.map((familyKey) => `family:${familyKey}`),
+          ...discovery.comparison_eligibility_group_order.map((groupKey) => `group:${groupKey}`),
+        ],
+    ui_surfaces: schemaContract?.ui_surfaces ?? [],
+    schema_sources: schemaContract?.schema_sources ?? [],
+    policy: schemaContract?.policy ?? null,
+    enforcement: schemaContract?.enforcement ?? null,
+    surface_rules: schemaContract?.surface_rules ?? [],
+    schema_detail: {
+      ...(schemaContract?.schema_detail ?? {}),
+      comparison_eligibility_group_order: discovery.comparison_eligibility_group_order,
+      family_order: discovery.family_order,
+      run_subresource_contract_keys: discovery.run_subresource_contracts.map(
+        (contract) => `subresource:${contract.subresource_key}`,
+      ),
+    },
+  };
+  const familyContracts: RunSurfaceCapabilityFamilyContract[] = families.map((family) => {
+    const sharedContract = sharedByKey.get(`family:${family.family_key}`);
+    return {
+      contract_key: sharedContract?.contract_key ?? `family:${family.family_key}`,
+      contract_kind: "capability_family",
+      title: sharedContract?.title ?? family.title,
+      summary: sharedContract?.summary ?? family.summary,
+      source_of_truth: sharedContract?.source_of_truth ?? family.policy.source_of_truth,
+      version: sharedContract?.version ?? null,
+      discovery_flow: sharedContract?.discovery_flow ?? family.discovery_flow,
+      related_family_keys: sharedContract?.related_family_keys?.length
+        ? sharedContract.related_family_keys
+        : [family.family_key],
+      member_keys: sharedContract?.member_keys?.length
+        ? sharedContract.member_keys
+        : family.surface_rules.map((rule) => rule.surface_key),
+      ui_surfaces: sharedContract?.ui_surfaces?.length ? sharedContract.ui_surfaces : family.ui_surfaces,
+      schema_sources: sharedContract?.schema_sources?.length
+        ? sharedContract.schema_sources
+        : family.schema_sources,
+      policy: sharedContract?.policy ?? family.policy,
+      enforcement: sharedContract?.enforcement ?? family.enforcement,
+      surface_rules: sharedContract?.surface_rules?.length ? sharedContract.surface_rules : family.surface_rules,
+      schema_detail: sharedContract?.schema_detail ?? {},
+    };
+  });
+  const subresourceContracts: RunSurfaceSharedContract[] = discovery.run_subresource_contracts.map((contract) => {
+    const sharedContract = sharedByKey.get(`subresource:${contract.subresource_key}`);
+    return {
+      contract_key: sharedContract?.contract_key ?? `subresource:${contract.subresource_key}`,
+      contract_kind: "run_subresource",
+      title: sharedContract?.title ?? contract.response_title,
+      summary:
+        sharedContract?.summary
+        ?? `Declarative route binding and serializer contract for the standalone \`${contract.subresource_key}\` run subresource.`,
+      source_of_truth: sharedContract?.source_of_truth ?? "run_subresource_contracts",
+      version: sharedContract?.version ?? null,
+      discovery_flow: sharedContract?.discovery_flow ?? null,
+      related_family_keys: sharedContract?.related_family_keys ?? [],
+      member_keys: sharedContract?.member_keys?.length
+        ? sharedContract.member_keys
+        : [`body:${contract.body_key}`, `route:${contract.route_name}`],
+      ui_surfaces: sharedContract?.ui_surfaces ?? [],
+      schema_sources: sharedContract?.schema_sources ?? [],
+      policy: sharedContract?.policy ?? null,
+      enforcement: sharedContract?.enforcement ?? null,
+      surface_rules: sharedContract?.surface_rules ?? [],
+      schema_detail: {
+        body_key: contract.body_key,
+        route_path: contract.route_path,
+        route_name: contract.route_name,
+        ...(sharedContract?.schema_detail ?? {}),
+      },
+    };
+  });
+  return [normalizedSchema, ...familyContracts, ...subresourceContracts];
+}
+
 function getRunSurfaceCapabilityFamily(
   capabilities: RunSurfaceCapabilities | null | undefined,
   familyKey: RunSurfaceCapabilityFamilyKey,
 ) {
-  return getRunSurfaceCapabilityFamilies(capabilities).find((family) => family.family_key === familyKey) ?? null;
+  return (
+    getRunSurfaceSharedContracts(capabilities).find(
+      (contract): contract is RunSurfaceCapabilityFamilyContract =>
+        contract.contract_key === `family:${familyKey}` && contract.contract_kind === "capability_family",
+    ) ?? null
+  );
 }
 
 function getRunSurfaceCapabilitySurfaceRule(
@@ -14874,12 +15011,9 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
   const runSubresourceContracts = discovery.run_subresource_contracts ?? [];
-  const sharedContracts = discovery.shared_contracts ?? [];
-  const familyByKey = new Map(
-    getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
-  );
+  const sharedContracts = getRunSurfaceSharedContracts(capabilities);
   const orderedFamilies = discovery.family_order
-    .map((familyKey) => familyByKey.get(familyKey) ?? null)
+    .map((familyKey) => getRunSurfaceCapabilityFamily(capabilities, familyKey as RunSurfaceCapabilityFamilyKey))
     .filter((family): family is NonNullable<typeof family> => family !== null);
   const orderedGroups = discovery.comparison_eligibility_group_order.filter(
     (groupKey): groupKey is RunListBoundaryGroupKey => groupKey in contract.groups,
@@ -14909,10 +15043,49 @@ function RunSurfaceCapabilityDiscoveryPanel({
                 <p className="run-note">
                   Source: {sharedContract.source_of_truth}
                 </p>
+                {sharedContract.discovery_flow ? (
+                  <p className="run-note">
+                    Discovery flow: {sharedContract.discovery_flow}
+                  </p>
+                ) : null}
                 {sharedContract.version ? (
                   <p className="run-note">
                     Version: {sharedContract.version}
                   </p>
+                ) : null}
+                {sharedContract.policy ? (
+                  <p className="run-note">
+                    Policy: {sharedContract.policy.policy_key} · {sharedContract.policy.policy_mode}
+                  </p>
+                ) : null}
+                {sharedContract.enforcement ? (
+                  <p className="run-note">
+                    Enforcement: {sharedContract.enforcement.level}
+                  </p>
+                ) : null}
+                {sharedContract.ui_surfaces?.length ? (
+                  <div className="run-surface-family-chip-row">
+                    {sharedContract.ui_surfaces.map((surface) => (
+                      <span
+                        className="run-surface-family-chip"
+                        key={`${sharedContract.contract_key}:ui:${surface}`}
+                      >
+                        {surface}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {sharedContract.schema_sources?.length ? (
+                  <div className="run-surface-family-chip-row">
+                    {sharedContract.schema_sources.map((source) => (
+                      <span
+                        className="run-surface-family-chip"
+                        key={`${sharedContract.contract_key}:schema:${source}`}
+                      >
+                        {source}
+                      </span>
+                    ))}
+                  </div>
                 ) : null}
                 {sharedContract.related_family_keys.length ? (
                   <div className="run-surface-family-chip-row">
@@ -14928,6 +15101,18 @@ function RunSurfaceCapabilityDiscoveryPanel({
                     {sharedContract.member_keys.map((memberKey) => (
                       <span className="run-surface-family-chip" key={`${sharedContract.contract_key}:${memberKey}`}>
                         {memberKey}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {sharedContract.surface_rules?.length ? (
+                  <div className="run-surface-family-chip-row">
+                    {sharedContract.surface_rules.map((rule) => (
+                      <span
+                        className="run-surface-family-chip"
+                        key={`${sharedContract.contract_key}:rule:${rule.rule_key}`}
+                      >
+                        {rule.surface_key}
                       </span>
                     ))}
                   </div>
@@ -14960,10 +15145,10 @@ function RunSurfaceCapabilityDiscoveryPanel({
       ) : null}
       <div className="run-surface-family-grid">
         {orderedFamilies.map((family) => (
-          <article className="run-surface-family-card" key={family.family_key}>
+          <article className="run-surface-family-card" key={family.contract_key}>
             <div className="run-surface-family-head">
               <strong>{family.title}</strong>
-              <span className="meta-pill subtle">{family.family_key}</span>
+              <span className="meta-pill subtle">{family.related_family_keys[0] ?? family.contract_key}</span>
             </div>
             <p className="run-note">{family.summary}</p>
             <p className="run-note">
