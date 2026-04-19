@@ -4110,14 +4110,14 @@
       "description": "Extend `RunSurfaceCapabilities` beyond one-way discovery by letting consumer surfaces negotiate supported policy and enforcement features, version expectations, or fallback semantics, so clients can adapt explicitly when backend capability contracts evolve.",
       "status": "proposed",
       "base_priority": 90,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply names consumer capability negotiation as a remaining gap, but the exact negotiation shape still needs a product and API choice between feature flags, version handshakes, or profile-based contracts, so keep it proposed behind the more direct enforcement-rule follow-up.",
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply still names consumer-specific capability negotiation as unfinished, but it remains less immediately executable than widening the shipped enforcement metadata into standalone order-list responses because the negotiation shape still needs a concrete contract choice between feature flags, version handshakes, or profile-based capability profiles.",
       "depends_on": [
         "planning-experiment-os-add-machine-readable-policy-and-enforcement-metadata-to-capability-families"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T21:49:29Z",
+      "updated_at": "2026-04-19T22:22:27Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os capability discovery toward explicit client and server negotiation so evolving enforcement contracts remain compatible across shared UI surfaces."
     },
@@ -4144,18 +4144,36 @@
       "direction_id": "experiment-os",
       "title": "Apply surface-rule contracts in backend responses and action availability",
       "description": "Extend the shipped contract-driven UI enforcement into server-side evaluation so backend and consumer negotiation paths can use `surface_rules` directly to shape response payloads, omit unavailable actions, and expose consistent allow, block, or fallback semantics before UI rendering.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says frontend runtime gating and UI-side enforcement are done, and explicitly calls out backend or consumer-negotiation-side evaluation of surface rules to control response shape and action availability as the remaining deeper automation. That is now the clearest executable next task for queue progression.",
+      "priority_reason": "Completed in main session commit 2baef4f, which added `surface_enforcement` and `action_availability` to run payloads, attached cancel or replace availability to order payloads, enforced rerun or stop or cancel or replace actions from server-side surface rules, blanked semantic snapshots when the `run_strategy_snapshot` rule disables them, reused capability-aware serialization in the API layer, and verified the change with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T22:03:21Z",
+      "updated_at": "2026-04-19T22:22:27Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os capability contracts past UI gating into backend enforcement so shared run-surface policy can directly govern API response shape and action availability across consumers."
+    },
+    {
+      "id": "planning-experiment-os-extend-surface-rule-enforcement-to-standalone-order-list-responses",
+      "direction_id": "experiment-os",
+      "title": "Extend surface-rule enforcement metadata to standalone order-list responses",
+      "description": "Carry the newly shipped backend `surface_enforcement` and `action_availability` contract beyond full run payloads and action endpoints into standalone order-list and adjacent order-read APIs, so order-centric consumers receive the same cancel or replace gating semantics and explanation metadata without depending on embedded run responses.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply says the just-finished backend enforcement pass is committed and pushed in `2baef4f`, and explicitly calls out standalone order-list responses as the remaining executable scope expansion. That makes this the clearest next queued task while consumer-specific capability negotiation stays proposed pending contract-shape decisions.",
+      "depends_on": [
+        "planning-experiment-os-add-server-side-surface-rule-enforcement-to-runtime-responses"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T22:22:27Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os run-surface capability enforcement from run-scoped payloads into order-centric read surfaces so shared action-availability policy remains consistent across different API entry points."
     }
   ]
 }
