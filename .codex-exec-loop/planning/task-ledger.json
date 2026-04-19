@@ -3280,16 +3280,16 @@
       "direction_id": "experiment-os",
       "title": "Implement native host receivers for manual gap-picker haptic contracts",
       "description": "Carry the now-stable manual gap-window picker haptic contract into the actual host shells by wiring native-side receivers for the `akra-trader:haptic-feedback` envelope and `akraTouchFeedback` handler in each supported container, so the web app's activation feedback path is backed by concrete shell implementations instead of stopping at emitted bridge messages.",
-      "status": "ready",
+      "status": "blocked",
       "base_priority": 89,
-      "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says contract alignment is finished in commit 9810cf4 and explicitly names actual host shell implementation as the remaining step. That makes native receiver wiring the clearest executable next task for this queue refresh.",
+      "dynamic_priority_delta": 8,
+      "priority_reason": "Main session commit 38e4780 finished the in-repo host receiver shim by centralizing the `akra-trader:haptic-feedback` and `akraTouchFeedback` contract in `apps/web/src/touchFeedback.ts`, but the reply also says the actual iOS or Android native wrappers still live outside this repository. Keep the task blocked here until a real native shell project is available to consume the emitted contract.",
       "depends_on": [
         "planning-experiment-os-align-manual-gap-window-picker-haptics-to-concrete-host-shell-contracts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:15:00Z",
+      "updated_at": "2026-04-20T19:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os touch gesture trust from a web-side contract definition into end-to-end shell behavior, which is required before operators inside native containers can rely on the picker's haptic activation feedback."
     },
@@ -3352,16 +3352,16 @@
       "direction_id": "experiment-os",
       "title": "Add latest-state 3-way merge or semantic ranking for workspace conflict resolution",
       "description": "Evolve the new manual workspace conflict review beyond static local-versus-remote row selection by detecting when the same state changed again after the captured conflict and by offering latest-state-aware three-way merge guidance or semantic conflict ranking, so operators do not resolve against superseded state blindly and larger conflict sets can be triaged intelligently.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 89,
-      "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly lists automatic 3-way merge and semantic conflict ranking as the remaining broader gap after commit 1abfb28. Keep this proposed because it is still a meaningful next step, but it is less immediate than first finishing finer gap-window merge granularity inside the just-updated workspace review flow.",
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The native haptic follow-up is now blocked on shell projects outside this repository, so the clearest in-repo executable next task is the top existing workspace-conflict proposal: add latest-state-aware 3-way merge or semantic conflict ranking on top of the shipped row-level conflict review from commit 1abfb28.",
       "depends_on": [
         "planning-experiment-os-add-gap-window-level-merge-for-expanded-gap-row-conflicts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:35:00Z",
+      "updated_at": "2026-04-20T19:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os workspace conflict handling from deliberate row-by-row manual review into state-aware reconciliation and operator triage guidance, which matters once concurrent edits can continue after a conflict snapshot has already been captured."
     },
