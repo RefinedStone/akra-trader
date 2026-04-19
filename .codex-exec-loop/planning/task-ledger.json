@@ -3549,19 +3549,37 @@
       "id": "planning-experiment-os-persist-workspace-conflict-signal-detail-deeper-view-state",
       "direction_id": "experiment-os",
       "title": "Persist deeper signal detail view state inside workspace conflict score details",
-      "description": "Build on the shipped signal-level focus persistence so any deeper signal detail state, such as per-signal explanation or tooltip visibility and grouped semantic cluster expansion beneath the selected signal, is also restored per row after reload and when audit filtering temporarily hides and re-shows the containing row.",
-      "status": "ready",
+      "description": "Build on the shipped signal-level focus persistence so any deeper signal detail state, such as per-signal explanation or tooltip visibility and grouped semantic cluster expansion beneath the selected signal, is also restored per row after reload and when audit filtering temporarily hides and re-shows the containing row. This task is now completed for the current single-card focused-signal detail panel; more structured nested group and note-stack persistence continues in a follow-up task.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 28,
-      "priority_reason": "The latest main-session reply says signal row focus persistence shipped in commit 8eaddd3, but explicitly calls out the remaining gap that deeper signal detail state still is not remembered, including extra explanation or tooltip visibility and grouped semantic cluster expansion under the selected signal. That makes deeper signal-detail persistence the clearest executable next task for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit 4a75f5d, which lifted the focused signal's deeper detail panel into persisted workspace review UI state, restored the open detail card per row key after reload and audit refilter, surfaced lane or signed-impact or rank or visible-weight-share and ranked-versus-alternate lane context in the restored panel, added mobile single-column detail metrics, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-workspace-conflict-score-detail-signal-focus-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:05:00Z",
+      "updated_at": "2026-04-20T22:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace conflict persistence from remembering which signal is focused into restoring the deeper explanation and grouped semantic context operators inspect underneath that signal."
+    },
+    {
+      "id": "planning-experiment-os-structure-persisted-workspace-conflict-signal-detail-subviews",
+      "direction_id": "experiment-os",
+      "title": "Persist structured signal detail subviews inside workspace conflict score details",
+      "description": "Evolve the newly persisted focused-signal single-card detail view into a structured signal detail model that can remember nested semantic group expansion and any per-signal note or tooltip stack visibility beneath the selected signal, so deeper evidence context survives reload and audit refilter instead of stopping at one restored summary card.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 29,
+      "priority_reason": "The latest main-session reply says commit 4a75f5d now restores a single-card focused-signal detail view, but explicitly calls out the remaining gap that semantic group expansion and signal-specific note or tooltip stack state still are not remembered. That is the clearest executable next task for builtin queue continuation after the just-completed detail-panel persistence pass.",
+      "depends_on": [
+        "planning-experiment-os-persist-workspace-conflict-signal-detail-deeper-view-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict persistence from restoring one focused-signal detail card into preserving the structured nested evidence and annotation state operators may open under that signal."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
