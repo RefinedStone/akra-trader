@@ -75,34 +75,70 @@
       "direction_id": "experiment-os",
       "title": "Make preset catalog entries carry durable parameter bundles and lifecycle actions",
       "description": "Extend the new preset catalog so each preset stores the reusable parameter bundle itself and supports operator-facing update or retire flows, closing the remaining gap where presets are durable names only and cannot yet serve as full reusable experiment templates.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply explicitly says the next unfinished layer inside the new preset catalog is parameter bundle storage plus preset edit or delete behavior. That is the clearest executable continuation because it deepens the just-shipped preset entity before opening separate benchmark-pack modeling work.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 5a32a03, which made presets store durable parameter bundles, added lifecycle state and history plus promote/archive/restore actions, merged preset parameters into launch requests, blocked archived presets from launching, and surfaced the lifecycle data in the control room.",
       "depends_on": [
         "planning-experiment-os-durable-preset-catalog"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:30:00Z",
+      "updated_at": "2026-04-19T04:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Builds the experiment-os preset model from discoverable catalog records into durable reusable experiment templates with operator-manageable lifecycle semantics."
+    },
+    {
+      "id": "planning-experiment-os-preset-bundle-revision-api",
+      "direction_id": "experiment-os",
+      "title": "Add preset bundle edit and revision APIs",
+      "description": "Let operators update existing preset parameter bundles through explicit API and UI flows with revision history or version semantics, so reusable presets can evolve without losing the exact bundle lineage that prior runs depended on.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply lists preset parameter bundle modification and versioning as the first missing capability after commit 5a32a03. It is the clearest executable continuation for the newly expanded preset catalog, and it should be queued ahead of wider benchmark-pack modeling.",
+      "depends_on": [
+        "planning-experiment-os-preset-bundle-management"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends the experiment-os preset catalog from reusable templates into versioned experiment assets whose exact parameter lineage remains inspectable across launches and comparisons."
+    },
+    {
+      "id": "planning-experiment-os-preset-lifecycle-mode-gating",
+      "direction_id": "experiment-os",
+      "title": "Gate launch modes using preset lifecycle stage",
+      "description": "Turn preset lifecycle stages into enforceable launch policy so benchmark, sandbox, paper, or later live-adjacent modes can require the right preset stage instead of treating lifecycle as display-only metadata with only archived hard-blocked.",
+      "status": "proposed",
+      "base_priority": 91,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly says preset lifecycle stage does not yet gate run mode beyond archived blocking. That is a real follow-up, but bundle edit and revision support is the more immediate continuation of the preset-management surface shipped in commit 5a32a03.",
+      "depends_on": [
+        "planning-experiment-os-preset-bundle-management"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T04:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances the experiment-os goal that lifecycle and promotion state drive real operator decisions and execution boundaries rather than remaining informative metadata."
     },
     {
       "id": "planning-experiment-os-benchmark-pack-model",
       "direction_id": "experiment-os",
       "title": "Promote benchmark family metadata into a durable benchmark pack model",
-      "description": "Replace the current run-level benchmark_family string with durable benchmark pack records and selection semantics so benchmark lanes, comparison defaults, and promotion decisions use a first-class experiment model instead of loosely coupled metadata.",
+      "description": "Replace the current run-level benchmark_family string with durable benchmark pack records and selection semantics, and link presets or strategies to those packs and explicit strategy-version pins so benchmark lanes, comparison defaults, and promotion decisions use a first-class experiment model instead of loosely coupled metadata.",
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says benchmark packs are still missing as durable entities, but the more immediate auto-executable follow-up is to finish the newly added preset catalog by storing parameter bundles and lifecycle actions before widening the model surface again.",
+      "priority_reason": "The latest main-session reply explicitly says presets still lack strategy-version pinning and benchmark-pack entity linkage. That broadens this task's scope, but preset bundle revision support remains the clearer immediate queue head before widening into cross-entity experiment modeling.",
       "depends_on": [
         "planning-experiment-os-queryable-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:30:00Z",
+      "updated_at": "2026-04-19T04:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os beyond filterable metadata by making benchmark configuration a durable object that can anchor comparison and promotion workflows."
     },
