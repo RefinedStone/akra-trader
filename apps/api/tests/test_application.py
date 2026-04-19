@@ -14535,6 +14535,15 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert metric_rows["total_return_pct"].values[native_run.config.run_id] == native_run.metrics["total_return_pct"]
   assert reference_run.config.run_id in metric_rows["trade_count"].values
   assert comparison.runs[1].notes
+  assert comparison.eligibility_contract.scope == "run_list"
+  assert comparison.eligibility_contract.surfaces["return"].eligibility == "eligible"
+  assert comparison.eligibility_contract.surfaces["compare_toggle"].group == "operational_workflow"
+  assert comparison.eligibility_contract.groups["eligible_metrics"].surface_ids == (
+    "return",
+    "drawdown",
+    "win_rate",
+    "trades",
+  )
   assert any(
     "reference delegate via external_runtime benchmark" in bullet
     for bullet in comparison.narratives[0].bullets

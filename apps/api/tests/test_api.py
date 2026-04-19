@@ -3597,6 +3597,15 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["runs"][1]["catalog_semantics"]["operator_notes"]
   assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"
   assert payload["runs"][1]["artifact_paths"]
+  assert payload["eligibility_contract"]["scope"] == "run_list"
+  assert payload["eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
+  assert payload["eligibility_contract"]["surfaces"]["compare_toggle"]["group"] == "operational_workflow"
+  assert payload["eligibility_contract"]["groups"]["eligible_metrics"]["surface_ids"] == [
+    "return",
+    "drawdown",
+    "win_rate",
+    "trades",
+  ]
   assert len(payload["narratives"]) == 1
   assert payload["narratives"][0]["comparison_type"] == "native_vs_reference"
   assert payload["narratives"][0]["run_id"] == reference_run_id

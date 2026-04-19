@@ -480,6 +480,139 @@ class RunComparisonMetricRow:
 
 
 @dataclass(frozen=True)
+class ComparisonEligibilitySurfaceContract:
+  eligibility: str
+  group: str
+  label: str
+
+
+@dataclass(frozen=True)
+class ComparisonEligibilityGroupContract:
+  copy: str
+  eligibility: str
+  surface_ids: tuple[str, ...]
+  title: str
+
+
+@dataclass(frozen=True)
+class ComparisonEligibilityContract:
+  scope: str = "run_list"
+  surfaces: dict[str, ComparisonEligibilitySurfaceContract] = field(default_factory=dict)
+  groups: dict[str, ComparisonEligibilityGroupContract] = field(default_factory=dict)
+
+
+def default_comparison_eligibility_contract() -> ComparisonEligibilityContract:
+  return ComparisonEligibilityContract(
+    scope="run_list",
+    surfaces={
+      "cancel_order": ComparisonEligibilitySurfaceContract(
+        eligibility="operational",
+        group="operational_order_actions",
+        label="Cancel order",
+      ),
+      "compare_toggle": ComparisonEligibilitySurfaceContract(
+        eligibility="operational",
+        group="operational_workflow",
+        label="Add/remove compare",
+      ),
+      "drawdown": ComparisonEligibilitySurfaceContract(
+        eligibility="eligible",
+        group="eligible_metrics",
+        label="Drawdown",
+      ),
+      "lane": ComparisonEligibilitySurfaceContract(
+        eligibility="supporting",
+        group="supporting_identity",
+        label="Lane",
+      ),
+      "lifecycle": ComparisonEligibilitySurfaceContract(
+        eligibility="supporting",
+        group="supporting_identity",
+        label="Lifecycle",
+      ),
+      "mode": ComparisonEligibilitySurfaceContract(
+        eligibility="supporting",
+        group="supporting_identity",
+        label="Mode",
+      ),
+      "replace_order": ComparisonEligibilitySurfaceContract(
+        eligibility="operational",
+        group="operational_order_actions",
+        label="Replace order",
+      ),
+      "rerun": ComparisonEligibilitySurfaceContract(
+        eligibility="operational",
+        group="operational_workflow",
+        label="Rerun",
+      ),
+      "return": ComparisonEligibilitySurfaceContract(
+        eligibility="eligible",
+        group="eligible_metrics",
+        label="Return",
+      ),
+      "stop": ComparisonEligibilitySurfaceContract(
+        eligibility="operational",
+        group="operational_workflow",
+        label="Stop",
+      ),
+      "trades": ComparisonEligibilitySurfaceContract(
+        eligibility="eligible",
+        group="eligible_metrics",
+        label="Trades",
+      ),
+      "version": ComparisonEligibilitySurfaceContract(
+        eligibility="supporting",
+        group="supporting_identity",
+        label="Version",
+      ),
+      "win_rate": ComparisonEligibilitySurfaceContract(
+        eligibility="eligible",
+        group="eligible_metrics",
+        label="Win rate",
+      ),
+    },
+    groups={
+      "eligible_metrics": ComparisonEligibilityGroupContract(
+        copy=(
+          "These surfaces participate in comparison scoring or drill-back, so they remain "
+          "comparison-eligible."
+        ),
+        eligibility="eligible",
+        surface_ids=("return", "drawdown", "win_rate", "trades"),
+        title="Comparison-eligible",
+      ),
+      "operational_order_actions": ComparisonEligibilityGroupContract(
+        copy=(
+          "Replace and cancel actions mutate order state, so they stay outside comparison "
+          "drill-back even when the preview rows are comparison-eligible."
+        ),
+        eligibility="operational",
+        surface_ids=("cancel_order", "replace_order"),
+        title="Operational only",
+      ),
+      "operational_workflow": ComparisonEligibilityGroupContract(
+        copy=(
+          "Workflow controls change selection or execution state, so they remain outside "
+          "comparison-eligible deep-link scope."
+        ),
+        eligibility="operational",
+        surface_ids=("compare_toggle", "rerun", "stop"),
+        title="Operational only",
+      ),
+      "supporting_identity": ComparisonEligibilityGroupContract(
+        copy=(
+          "Weak-signal identity and routing context stay descriptive only and do not create "
+          "comparison deep-links."
+        ),
+        eligibility="supporting",
+        surface_ids=("mode", "lane", "lifecycle", "version"),
+        title="Supporting only",
+      ),
+    },
+  )
+
+
+@dataclass(frozen=True)
 class RunComparisonNarrative:
   run_id: str
   baseline_run_id: str
@@ -501,6 +634,9 @@ class RunComparison:
   metric_rows: tuple[RunComparisonMetricRow, ...]
   intent: str = "benchmark_validation"
   narratives: tuple[RunComparisonNarrative, ...] = ()
+  eligibility_contract: ComparisonEligibilityContract = field(
+    default_factory=default_comparison_eligibility_contract
+  )
 
 
 @dataclass(frozen=True)

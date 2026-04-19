@@ -325,6 +325,26 @@ type RunComparison = {
   requested_run_ids: string[];
   baseline_run_id: string;
   intent: ComparisonIntent;
+  eligibility_contract: {
+    scope: "run_list";
+    surfaces: Record<
+      RunListBoundarySurfaceId,
+      {
+        eligibility: RunListBoundaryEligibility;
+        group: RunListBoundaryGroupKey;
+        label: string;
+      }
+    >;
+    groups: Record<
+      RunListBoundaryGroupKey,
+      {
+        copy: string;
+        eligibility: RunListBoundaryEligibility;
+        surface_ids: RunListBoundarySurfaceId[];
+        title: string;
+      }
+    >;
+  };
   runs: {
     run_id: string;
     mode: string;
@@ -14002,135 +14022,158 @@ type RunListBoundarySurfaceContract = {
 type RunListBoundaryGroupContract = {
   copy: string;
   eligibility: RunListBoundaryEligibility;
-  surfaceIds: RunListBoundarySurfaceId[];
+  surface_ids: RunListBoundarySurfaceId[];
   title: string;
 };
 
-const RUN_LIST_BOUNDARY_SURFACE_CONTRACT = {
-  cancel_order: {
-    eligibility: "operational",
-    group: "operational_order_actions",
-    label: "Cancel order",
-  },
-  compare_toggle: {
-    eligibility: "operational",
-    group: "operational_workflow",
-    label: "Add/remove compare",
-  },
-  drawdown: {
-    eligibility: "eligible",
-    group: "eligible_metrics",
-    label: "Drawdown",
-  },
-  lane: {
-    eligibility: "supporting",
-    group: "supporting_identity",
-    label: "Lane",
-  },
-  lifecycle: {
-    eligibility: "supporting",
-    group: "supporting_identity",
-    label: "Lifecycle",
-  },
-  mode: {
-    eligibility: "supporting",
-    group: "supporting_identity",
-    label: "Mode",
-  },
-  replace_order: {
-    eligibility: "operational",
-    group: "operational_order_actions",
-    label: "Replace order",
-  },
-  rerun: {
-    eligibility: "operational",
-    group: "operational_workflow",
-    label: "Rerun",
-  },
-  return: {
-    eligibility: "eligible",
-    group: "eligible_metrics",
-    label: "Return",
-  },
-  stop: {
-    eligibility: "operational",
-    group: "operational_workflow",
-    label: "Stop",
-  },
-  trades: {
-    eligibility: "eligible",
-    group: "eligible_metrics",
-    label: "Trades",
-  },
-  version: {
-    eligibility: "supporting",
-    group: "supporting_identity",
-    label: "Version",
-  },
-  win_rate: {
-    eligibility: "eligible",
-    group: "eligible_metrics",
-    label: "Win rate",
-  },
-} satisfies Record<RunListBoundarySurfaceId, RunListBoundarySurfaceContract>;
+type RunListBoundaryContract = RunComparison["eligibility_contract"];
 
-const RUN_LIST_BOUNDARY_GROUP_CONTRACT = {
-  eligible_metrics: {
-    copy: "These surfaces participate in comparison scoring or drill-back, so they remain comparison-eligible.",
-    eligibility: "eligible",
-    surfaceIds: ["return", "drawdown", "win_rate", "trades"],
-    title: "Comparison-eligible",
-  },
-  operational_order_actions: {
-    copy: "Replace and cancel actions mutate order state, so they stay outside comparison drill-back even when the preview rows are comparison-eligible.",
-    eligibility: "operational",
-    surfaceIds: ["cancel_order", "replace_order"],
-    title: "Operational only",
-  },
-  operational_workflow: {
-    copy: "Workflow controls change selection or execution state, so they remain outside comparison-eligible deep-link scope.",
-    eligibility: "operational",
-    surfaceIds: ["compare_toggle", "rerun", "stop"],
-    title: "Operational only",
-  },
-  supporting_identity: {
-    copy: "Weak-signal identity and routing context stay descriptive only and do not create comparison deep-links.",
-    eligibility: "supporting",
-    surfaceIds: ["mode", "lane", "lifecycle", "version"],
-    title: "Supporting only",
-  },
-} satisfies Record<RunListBoundaryGroupKey, RunListBoundaryGroupContract>;
+const RUN_LIST_BOUNDARY_CONTRACT: RunListBoundaryContract = {
+  scope: "run_list",
+  surfaces: {
+    cancel_order: {
+      eligibility: "operational",
+      group: "operational_order_actions",
+      label: "Cancel order",
+    },
+    compare_toggle: {
+      eligibility: "operational",
+      group: "operational_workflow",
+      label: "Add/remove compare",
+    },
+    drawdown: {
+      eligibility: "eligible",
+      group: "eligible_metrics",
+      label: "Drawdown",
+    },
+    lane: {
+      eligibility: "supporting",
+      group: "supporting_identity",
+      label: "Lane",
+    },
+    lifecycle: {
+      eligibility: "supporting",
+      group: "supporting_identity",
+      label: "Lifecycle",
+    },
+    mode: {
+      eligibility: "supporting",
+      group: "supporting_identity",
+      label: "Mode",
+    },
+    replace_order: {
+      eligibility: "operational",
+      group: "operational_order_actions",
+      label: "Replace order",
+    },
+    rerun: {
+      eligibility: "operational",
+      group: "operational_workflow",
+      label: "Rerun",
+    },
+    return: {
+      eligibility: "eligible",
+      group: "eligible_metrics",
+      label: "Return",
+    },
+    stop: {
+      eligibility: "operational",
+      group: "operational_workflow",
+      label: "Stop",
+    },
+    trades: {
+      eligibility: "eligible",
+      group: "eligible_metrics",
+      label: "Trades",
+    },
+    version: {
+      eligibility: "supporting",
+      group: "supporting_identity",
+      label: "Version",
+    },
+    win_rate: {
+      eligibility: "eligible",
+      group: "eligible_metrics",
+      label: "Win rate",
+    },
+  } satisfies Record<RunListBoundarySurfaceId, RunListBoundarySurfaceContract>,
+  groups: {
+    eligible_metrics: {
+      copy: "These surfaces participate in comparison scoring or drill-back, so they remain comparison-eligible.",
+      eligibility: "eligible",
+      surface_ids: ["return", "drawdown", "win_rate", "trades"],
+      title: "Comparison-eligible",
+    },
+    operational_order_actions: {
+      copy: "Replace and cancel actions mutate order state, so they stay outside comparison drill-back even when the preview rows are comparison-eligible.",
+      eligibility: "operational",
+      surface_ids: ["cancel_order", "replace_order"],
+      title: "Operational only",
+    },
+    operational_workflow: {
+      copy: "Workflow controls change selection or execution state, so they remain outside comparison-eligible deep-link scope.",
+      eligibility: "operational",
+      surface_ids: ["compare_toggle", "rerun", "stop"],
+      title: "Operational only",
+    },
+    supporting_identity: {
+      copy: "Weak-signal identity and routing context stay descriptive only and do not create comparison deep-links.",
+      eligibility: "supporting",
+      surface_ids: ["mode", "lane", "lifecycle", "version"],
+      title: "Supporting only",
+    },
+  } satisfies Record<RunListBoundaryGroupKey, RunListBoundaryGroupContract>,
+};
 
-function getRunListBoundaryGroupContract(groupKey: RunListBoundaryGroupKey) {
-  const group = RUN_LIST_BOUNDARY_GROUP_CONTRACT[groupKey];
+function getRunListBoundaryContractSnapshot(contract?: RunListBoundaryContract | null) {
+  if (!contract || contract.scope !== "run_list") {
+    return RUN_LIST_BOUNDARY_CONTRACT;
+  }
+  return contract;
+}
+
+function getRunListBoundaryGroupContract(
+  groupKey: RunListBoundaryGroupKey,
+  contract?: RunListBoundaryContract | null,
+) {
+  const resolvedContract = getRunListBoundaryContractSnapshot(contract);
+  const group = resolvedContract.groups[groupKey];
   return {
     ...group,
-    surfaces: group.surfaceIds.map((surfaceId) => RUN_LIST_BOUNDARY_SURFACE_CONTRACT[surfaceId].label),
+    surfaces: group.surface_ids.map((surfaceId) => resolvedContract.surfaces[surfaceId].label),
   };
 }
 
-function getRunListBoundarySurfaceLabel(surfaceId: RunListBoundarySurfaceId) {
-  return RUN_LIST_BOUNDARY_SURFACE_CONTRACT[surfaceId].label;
+function getRunListBoundarySurfaceLabel(
+  surfaceId: RunListBoundarySurfaceId,
+  contract?: RunListBoundaryContract | null,
+) {
+  return getRunListBoundaryContractSnapshot(contract).surfaces[surfaceId].label;
 }
 
-function isRunListComparisonEligibleSurface(surfaceId: RunListBoundarySurfaceId) {
-  return RUN_LIST_BOUNDARY_SURFACE_CONTRACT[surfaceId].eligibility === "eligible";
+function isRunListComparisonEligibleSurface(
+  surfaceId: RunListBoundarySurfaceId,
+  contract?: RunListBoundaryContract | null,
+) {
+  return getRunListBoundaryContractSnapshot(contract).surfaces[surfaceId].eligibility === "eligible";
 }
 
 function RunListComparisonBoundaryNote({
   groupKey,
+  contract,
 }: {
   groupKey: RunListBoundaryGroupKey;
+  contract?: RunListBoundaryContract | null;
 }) {
-  const contract = getRunListBoundaryGroupContract(groupKey);
+  const resolvedContract = getRunListBoundaryGroupContract(groupKey, contract);
   return (
-    <div className={`run-list-boundary-note ${contract.eligibility}`.trim()}>
+    <div className={`run-list-boundary-note ${resolvedContract.eligibility}`.trim()}>
       <div className="run-list-boundary-note-head">
-        <span>{contract.title}</span>
-        <p>{contract.copy}</p>
+        <span>{resolvedContract.title}</span>
+        <p>{resolvedContract.copy}</p>
       </div>
       <div className="run-list-boundary-note-surfaces">
-        {contract.surfaces.map((surface) => (
+        {resolvedContract.surfaces.map((surface) => (
           <span className="run-list-boundary-note-surface" key={surface}>
             {surface}
           </span>
@@ -14295,6 +14338,7 @@ function RunSection({
   const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
+  const runListBoundaryContract = comparison?.payload?.eligibility_contract ?? null;
   const presetOptions = presets.filter(
     (preset) =>
       !preset.strategy_id ||
@@ -17443,31 +17487,48 @@ function RunSection({
               {comparison ? (
                 <div className="run-list-metric-boundaries">
                   <div className="run-list-metric-boundary">
-                    <RunListComparisonBoundaryNote groupKey="supporting_identity" />
+                    <RunListComparisonBoundaryNote
+                      contract={runListBoundaryContract}
+                      groupKey="supporting_identity"
+                    />
                     <div className="run-metrics">
-                      <Metric label={getRunListBoundarySurfaceLabel("mode")} value={run.config.mode} />
-                      <Metric label={getRunListBoundarySurfaceLabel("lane")} value={run.provenance.lane} />
                       <Metric
-                        label={getRunListBoundarySurfaceLabel("lifecycle")}
+                        label={getRunListBoundarySurfaceLabel("mode", runListBoundaryContract)}
+                        value={run.config.mode}
+                      />
+                      <Metric
+                        label={getRunListBoundarySurfaceLabel("lane", runListBoundaryContract)}
+                        value={run.provenance.lane}
+                      />
+                      <Metric
+                        label={getRunListBoundarySurfaceLabel("lifecycle", runListBoundaryContract)}
                         value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
                       />
-                      <Metric label={getRunListBoundarySurfaceLabel("version")} value={run.config.strategy_version} />
+                      <Metric
+                        label={getRunListBoundarySurfaceLabel("version", runListBoundaryContract)}
+                        value={run.config.strategy_version}
+                      />
                     </div>
                   </div>
                   <div className="run-list-metric-boundary">
-                    <RunListComparisonBoundaryNote groupKey="eligible_metrics" />
+                    <RunListComparisonBoundaryNote
+                      contract={runListBoundaryContract}
+                      groupKey="eligible_metrics"
+                    />
                     <div className="run-metrics">
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("return")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("return", runListBoundaryContract)
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, totalReturnSubFocusKey)(node)
                             : undefined
                         }
                         className={highlightReturn ? "comparison-linked-panel" : ""}
                         interactivePressed={isRunListSubFocusOrigin(totalReturnSubFocusKey)}
-                        label={getRunListBoundarySurfaceLabel("return")}
+                        label={getRunListBoundarySurfaceLabel("return", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("return")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("return", runListBoundaryContract)
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -17483,15 +17544,17 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("drawdown")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("drawdown", runListBoundaryContract)
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, drawdownSubFocusKey)(node)
                             : undefined
                         }
                         className={highlightDrawdown ? "comparison-linked-panel" : ""}
                         interactivePressed={isRunListSubFocusOrigin(drawdownSubFocusKey)}
-                        label={getRunListBoundarySurfaceLabel("drawdown")}
+                        label={getRunListBoundarySurfaceLabel("drawdown", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("drawdown")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("drawdown", runListBoundaryContract)
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -17507,15 +17570,17 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("win_rate")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("win_rate", runListBoundaryContract)
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, winRateSubFocusKey)(node)
                             : undefined
                         }
                         className={highlightWinRate ? "comparison-linked-panel" : ""}
                         interactivePressed={isRunListSubFocusOrigin(winRateSubFocusKey)}
-                        label={getRunListBoundarySurfaceLabel("win_rate")}
+                        label={getRunListBoundarySurfaceLabel("win_rate", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("win_rate")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("win_rate", runListBoundaryContract)
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -17531,15 +17596,17 @@ function RunSection({
                       />
                       <Metric
                         buttonRef={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("trades")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("trades", runListBoundaryContract)
                             ? (node) => registerRunListSubFocusRef(run.config.run_id, tradeCountSubFocusKey)(node)
                             : undefined
                         }
                         className={highlightTradeCount ? "comparison-linked-panel" : ""}
                         interactivePressed={isRunListSubFocusOrigin(tradeCountSubFocusKey)}
-                        label={getRunListBoundarySurfaceLabel("trades")}
+                        label={getRunListBoundarySurfaceLabel("trades", runListBoundaryContract)}
                         onClick={
-                          comparisonLinkedRunRole && isRunListComparisonEligibleSurface("trades")
+                          comparisonLinkedRunRole
+                          && isRunListComparisonEligibleSurface("trades", runListBoundaryContract)
                             ? () =>
                                 handleRunListScoreLinkSelection(
                                   run.config.run_id,
@@ -17558,17 +17625,17 @@ function RunSection({
                 </div>
               ) : (
                 <div className="run-metrics">
-                  <Metric label={getRunListBoundarySurfaceLabel("mode")} value={run.config.mode} />
-                  <Metric label={getRunListBoundarySurfaceLabel("lane")} value={run.provenance.lane} />
+                  <Metric label={getRunListBoundarySurfaceLabel("mode", runListBoundaryContract)} value={run.config.mode} />
+                  <Metric label={getRunListBoundarySurfaceLabel("lane", runListBoundaryContract)} value={run.provenance.lane} />
                   <Metric
-                    label={getRunListBoundarySurfaceLabel("lifecycle")}
+                    label={getRunListBoundarySurfaceLabel("lifecycle", runListBoundaryContract)}
                     value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
                   />
-                  <Metric label={getRunListBoundarySurfaceLabel("version")} value={run.config.strategy_version} />
-                  <Metric label={getRunListBoundarySurfaceLabel("return")} value={formatMetric(run.metrics.total_return_pct, "%")} />
-                  <Metric label={getRunListBoundarySurfaceLabel("drawdown")} value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
-                  <Metric label={getRunListBoundarySurfaceLabel("win_rate")} value={formatMetric(run.metrics.win_rate_pct, "%")} />
-                  <Metric label={getRunListBoundarySurfaceLabel("trades")} value={formatMetric(run.metrics.trade_count)} />
+                  <Metric label={getRunListBoundarySurfaceLabel("version", runListBoundaryContract)} value={run.config.strategy_version} />
+                  <Metric label={getRunListBoundarySurfaceLabel("return", runListBoundaryContract)} value={formatMetric(run.metrics.total_return_pct, "%")} />
+                  <Metric label={getRunListBoundarySurfaceLabel("drawdown", runListBoundaryContract)} value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
+                  <Metric label={getRunListBoundarySurfaceLabel("win_rate", runListBoundaryContract)} value={formatMetric(run.metrics.win_rate_pct, "%")} />
+                  <Metric label={getRunListBoundarySurfaceLabel("trades", runListBoundaryContract)} value={formatMetric(run.metrics.trade_count)} />
                 </div>
               )}
               <ExperimentMetadataPills
@@ -17696,6 +17763,7 @@ function RunSection({
               ) : null}
               {run.orders.length ? (
                 <RunOrderLifecycleSummary
+                  eligibilityContract={runListBoundaryContract}
                   linkedScore={linkedRunListMetricSelection}
                   onDrillBackScoreLink={
                     comparisonLinkedRunRole
@@ -17772,7 +17840,10 @@ function RunSection({
                 ) : null}
               </div>
               {comparison ? (
-                <RunListComparisonBoundaryNote groupKey="operational_workflow" />
+                <RunListComparisonBoundaryNote
+                  contract={runListBoundaryContract}
+                  groupKey="operational_workflow"
+                />
               ) : null}
               </article>
             );
@@ -23373,6 +23444,7 @@ function RunRuntimeSessionSummary({
 }
 
 function RunOrderLifecycleSummary({
+  eligibilityContract,
   linkedScore,
   onDrillBackScoreLink,
   orders,
@@ -23380,6 +23452,7 @@ function RunOrderLifecycleSummary({
   panelRunId,
   registerSubFocusRef,
 }: {
+  eligibilityContract?: RunListBoundaryContract | null;
   linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
   onDrillBackScoreLink?: (
     section: ComparisonScoreSection,
@@ -23552,7 +23625,10 @@ function RunOrderLifecycleSummary({
         {renderOrderCopyLine(`Last order sync: ${formatTimestamp(latestSyncAt)}`, orderSyncSubFocusKey)}
       </div>
       {onDrillBackScoreLink && orderControls ? (
-        <RunListComparisonBoundaryNote groupKey="operational_order_actions" />
+        <RunListComparisonBoundaryNote
+          contract={eligibilityContract}
+          groupKey="operational_order_actions"
+        />
       ) : null}
       <div className="run-lineage-symbols">
         {previewOrders.map((order) => (
