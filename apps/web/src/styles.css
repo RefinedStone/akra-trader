@@ -3599,6 +3599,15 @@ select {
   word-break: break-word;
 }
 
+.run-lineage-copy-link {
+  margin: 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-strategy-copy p {
   margin: 0;
   color: var(--muted);

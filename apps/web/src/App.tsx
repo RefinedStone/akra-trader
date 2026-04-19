@@ -14041,6 +14041,7 @@ function RunSection({
   const workspaceReviewRowRefs = useRef(new Map<string, HTMLDivElement>());
   const runListCardRefs = useRef(new Map<string, HTMLElement>());
   const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
+  const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
     (preset) =>
@@ -14183,6 +14184,14 @@ function RunSection({
     }
     runListSubFocusRefs.current.delete(key);
   };
+  const registerRunListArtifactHoverRef = (runId: string, artifactHoverKey: string) => (node: HTMLElement | null) => {
+    const key = `${runId}:${artifactHoverKey}`;
+    if (node) {
+      runListArtifactHoverRefs.current.set(key, node);
+      return;
+    }
+    runListArtifactHoverRefs.current.delete(key);
+  };
   useEffect(() => {
     const selectedRunListScoreLink =
       comparison?.selectedScoreLink?.source === "run_list"
@@ -14195,6 +14204,15 @@ function RunSection({
       behavior: "smooth",
       block: "nearest",
     };
+    if (selectedRunListScoreLink.artifactHoverKey) {
+      const artifactHoverTarget = runListArtifactHoverRefs.current.get(
+        `${selectedRunListScoreLink.originRunId ?? selectedRunListScoreLink.narrativeRunId}:${selectedRunListScoreLink.artifactHoverKey}`,
+      );
+      if (artifactHoverTarget) {
+        artifactHoverTarget.scrollIntoView(scrollOptions);
+        return;
+      }
+    }
     if (selectedRunListScoreLink.subFocusKey) {
       const subFocusTarget = runListSubFocusRefs.current.get(
         `${selectedRunListScoreLink.originRunId ?? selectedRunListScoreLink.narrativeRunId}:${selectedRunListScoreLink.subFocusKey}`,
@@ -14218,15 +14236,15 @@ function RunSection({
     if (!comparison) {
       return;
     }
-    const nextSelection = {
-      artifactDetailExpanded: null,
-      artifactHoverKey: null,
-      artifactLineDetailExpanded: null,
-      artifactLineDetailHoverKey: null,
-      artifactLineDetailScrubStep: null,
-      artifactLineDetailView: null,
-      artifactLineMicroView: null,
-      artifactLineNotePage: null,
+    const nextSelection: ComparisonScoreLinkTarget = {
+      artifactDetailExpanded: options?.artifactDetailExpanded ?? null,
+      artifactHoverKey: options?.artifactHoverKey ?? null,
+      artifactLineDetailExpanded: options?.artifactLineDetailExpanded ?? null,
+      artifactLineDetailHoverKey: options?.artifactLineDetailHoverKey ?? null,
+      artifactLineDetailScrubStep: options?.artifactLineDetailScrubStep ?? null,
+      artifactLineDetailView: options?.artifactLineDetailView ?? null,
+      artifactLineMicroView: options?.artifactLineMicroView ?? null,
+      artifactLineNotePage: options?.artifactLineNotePage ?? null,
       componentKey,
       detailExpanded: options?.detailExpanded ?? null,
       narrativeRunId: runId,
@@ -14234,10 +14252,10 @@ function RunSection({
       section,
       source: "run_list" as const,
       subFocusKey: options?.subFocusKey ?? null,
-      tooltipKey: null,
-    } satisfies ComparisonScoreLinkTarget;
+      tooltipKey: options?.tooltipKey ?? null,
+    };
     comparison.onChangeSelectedScoreLink(
-      isSameComparisonScoreLinkSurface(comparison.selectedScoreLink, nextSelection)
+      isSameComparisonScoreLinkTarget(comparison.selectedScoreLink, nextSelection)
         ? null
         : nextSelection,
       options?.historyMode,
@@ -17153,7 +17171,24 @@ function RunSection({
                   artifactPaths={run.provenance.artifact_paths}
                   benchmarkArtifacts={run.provenance.benchmark_artifacts}
                   externalCommand={run.provenance.external_command}
+                  interactionSource="run_list"
+                  linkedScore={linkedRunListSelection && linkedRunListSelection.section !== "metrics"
+                    ? linkedRunListSelection
+                    : null}
+                  onDrillBackScoreLink={
+                    comparisonLinkedRunRole
+                      ? (section, componentKey, options) =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            section,
+                            componentKey,
+                            options,
+                          )
+                      : undefined
+                  }
                   panelRunId={run.config.run_id}
+                  registerArtifactHoverRef={registerRunListArtifactHoverRef}
+                  registerSubFocusRef={registerRunListSubFocusRef}
                   reference={run.provenance.reference}
                   referenceVersion={run.provenance.reference_version}
                   strategySemantics={run.provenance.strategy?.catalog_semantics}
@@ -17161,15 +17196,49 @@ function RunSection({
                 />
               ) : null}
               {run.provenance.runtime_session ? (
-                <RunRuntimeSessionSummary runtimeSession={run.provenance.runtime_session} />
+                <RunRuntimeSessionSummary
+                  linkedScore={linkedRunListSelection && linkedRunListSelection.section === "context"
+                    ? linkedRunListSelection
+                    : null}
+                  onDrillBackScoreLink={
+                    comparisonLinkedRunRole
+                      ? (section, componentKey, options) =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            section,
+                            componentKey,
+                            options,
+                          )
+                      : undefined
+                  }
+                  panelRunId={run.config.run_id}
+                  registerSubFocusRef={registerRunListSubFocusRef}
+                  runtimeSession={run.provenance.runtime_session}
+                />
               ) : null}
               {run.orders.length ? (
                 <RunOrderLifecycleSummary orders={run.orders} orderControls={orderControls} />
               ) : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
+                  linkedScore={linkedRunListSelection && linkedRunListSelection.section === "context"
+                    ? linkedRunListSelection
+                    : null}
                   lineage={run.provenance.market_data}
                   lineageBySymbol={run.provenance.market_data_by_symbol}
+                  onDrillBackScoreLink={
+                    comparisonLinkedRunRole
+                      ? (section, componentKey, options) =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            section,
+                            componentKey,
+                            options,
+                          )
+                      : undefined
+                  }
+                  panelRunId={run.config.run_id}
+                  registerSubFocusRef={registerRunListSubFocusRef}
                   rerunBoundaryId={run.provenance.rerun_boundary_id}
                   rerunBoundaryState={run.provenance.rerun_boundary_state}
                   rerunMatchStatus={run.provenance.rerun_match_status}
@@ -21153,6 +21222,7 @@ function ReferenceRunProvenanceSummary({
   artifactPaths,
   benchmarkArtifacts,
   externalCommand,
+  interactionSource = "provenance",
   linkedScore,
   onDrillBackScoreLink,
   panelRef,
@@ -21167,6 +21237,7 @@ function ReferenceRunProvenanceSummary({
   artifactPaths: string[];
   benchmarkArtifacts: BenchmarkArtifact[];
   externalCommand: string[];
+  interactionSource?: ComparisonScoreLinkSource;
   linkedScore?: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
   onDrillBackScoreLink?: (
     section: ComparisonScoreSection,
@@ -21247,39 +21318,40 @@ function ReferenceRunProvenanceSummary({
     || highlightOperatorNotes
     || highlightExecutionContext
     || highlightArtifacts;
+  const isActiveInteractionSource = linkedScoreSelection?.source === interactionSource;
   const highlightOrigin =
-    linkedScoreSelection?.source === "provenance"
+    linkedScoreSelection?.source === interactionSource
     && linkedScoreSelection?.originRunId === panelRunId;
   const activeProvenanceSubFocusKey =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.subFocusKey
       : null;
   const activeProvenanceArtifactHoverKey =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactHoverKey
       : null;
   const activeProvenanceArtifactLineDetailExpanded =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineDetailExpanded
       : null;
   const activeProvenanceArtifactLineDetailView =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineDetailView
       : null;
   const activeProvenanceArtifactLineMicroView =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineMicroView
       : null;
   const activeProvenanceArtifactLineNotePage =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineNotePage
       : null;
   const activeProvenanceArtifactLineDetailHoverKey =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineDetailHoverKey
       : null;
   const activeProvenanceArtifactLineDetailScrubStep =
-    linkedScoreSelection?.source === "provenance"
+    isActiveInteractionSource
       ? linkedScoreSelection.artifactLineDetailScrubStep
       : null;
   const renderProvenanceCopyLine = ({
@@ -21474,7 +21546,7 @@ function ReferenceRunProvenanceSummary({
                 artifact.path,
               )}:`;
               const artifactIsLinked =
-                linkedScoreSelection?.source === "provenance"
+                linkedScoreSelection?.source === interactionSource
                 && linkedScoreSelection.section === "context"
                 && linkedScoreSelection.componentKey === artifactComponentKey;
               const artifactIsPressed =
@@ -22632,12 +22704,60 @@ function RunStrategySnapshot({
 }
 
 function RunRuntimeSessionSummary({
+  linkedScore,
+  onDrillBackScoreLink,
+  panelRunId,
+  registerSubFocusRef,
   runtimeSession,
 }: {
+  linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => void;
+  panelRunId?: string;
+  registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
   runtimeSession: NonNullable<Run["provenance"]["runtime_session"]>;
 }) {
+  const runtimeSessionSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_session");
+  const highlightPanel =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["provenance_richness"], "context");
+  const highlightOrigin =
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId
+    && linkedScore.subFocusKey === runtimeSessionSubFocusKey;
+  const renderRuntimeLine = (children: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className="run-lineage-copy-link">{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={highlightOrigin}
+        className={`run-lineage-copy-link comparison-run-card-link comparison-drillback-target ${
+          highlightPanel ? "comparison-linked-copy" : ""
+        } ${highlightOrigin ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey: runtimeSessionSubFocusKey,
+          })
+        }
+        ref={registerSubFocusRef?.(panelRunId, runtimeSessionSubFocusKey)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
   return (
-    <section className="run-lineage">
+    <section
+      className={`run-lineage ${highlightPanel ? "comparison-linked-panel" : ""} ${
+        linkedScore?.role === "target" ? "comparison-linked-panel-target" : ""
+      } ${linkedScore?.role === "baseline" ? "comparison-linked-panel-baseline" : ""} ${
+        highlightOrigin ? "comparison-linked-panel-origin" : ""
+      }`.trim()}
+    >
       <div className="run-lineage-head">
         <span>Runtime session</span>
         <strong>{runtimeSession.worker_kind}</strong>
@@ -22653,7 +22773,7 @@ function RunRuntimeSessionSummary({
         <Metric label="Primed bars" value={String(runtimeSession.primed_candle_count)} />
       </div>
       <div className="run-lineage-copy">
-        <p>Session: {runtimeSession.session_id}</p>
+        {renderRuntimeLine(`Session: ${runtimeSession.session_id}`)}
         <p>Started: {formatTimestamp(runtimeSession.started_at)}</p>
         <p>Last heartbeat: {formatTimestamp(runtimeSession.last_heartbeat_at)}</p>
         <p>Last processed candle: {formatTimestamp(runtimeSession.last_processed_candle_at)}</p>
@@ -22812,16 +22932,28 @@ function RunOrderActionControls({
 }
 
 function RunMarketDataLineage({
+  linkedScore,
   lineage,
   lineageBySymbol,
+  onDrillBackScoreLink,
+  panelRunId,
+  registerSubFocusRef,
   rerunBoundaryId,
   rerunBoundaryState,
   rerunMatchStatus,
   rerunSourceRunId,
   rerunTargetBoundaryId,
 }: {
+  linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
   lineage: NonNullable<Run["provenance"]["market_data"]>;
   lineageBySymbol?: NonNullable<Run["provenance"]["market_data_by_symbol"]>;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => void;
+  panelRunId?: string;
+  registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
   rerunBoundaryId?: string | null;
   rerunBoundaryState: string;
   rerunMatchStatus: string;
@@ -22829,9 +22961,45 @@ function RunMarketDataLineage({
   rerunTargetBoundaryId?: string | null;
 }) {
   const symbolEntries = Object.entries(lineageBySymbol ?? {});
+  const dataLineageSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage");
+  const highlightPanel =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["provenance_richness"], "context");
+  const highlightOrigin =
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId
+    && linkedScore.subFocusKey === dataLineageSubFocusKey;
+  const renderLineageLine = (children: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className="run-lineage-copy-link">{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={highlightOrigin}
+        className={`run-lineage-copy-link comparison-run-card-link comparison-drillback-target ${
+          highlightPanel ? "comparison-linked-copy" : ""
+        } ${highlightOrigin ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey: dataLineageSubFocusKey,
+          })
+        }
+        ref={registerSubFocusRef?.(panelRunId, dataLineageSubFocusKey)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
 
   return (
-    <section className="run-lineage">
+    <section
+      className={`run-lineage ${highlightPanel ? "comparison-linked-panel" : ""} ${
+        linkedScore?.role === "target" ? "comparison-linked-panel-target" : ""
+      } ${linkedScore?.role === "baseline" ? "comparison-linked-panel-baseline" : ""} ${
+        highlightOrigin ? "comparison-linked-panel-origin" : ""
+      }`.trim()}
+    >
       <div className="run-lineage-head">
         <span>Data lineage</span>
         <strong>{lineage.provider}</strong>
@@ -22845,9 +23013,7 @@ function RunMarketDataLineage({
         <Metric label="Timeframe" value={lineage.timeframe} />
       </div>
       <div className="run-lineage-copy">
-        <p>
-          {lineage.venue}:{lineage.symbols.join(", ")}
-        </p>
+        {renderLineageLine(`${lineage.venue}:${lineage.symbols.join(", ")}`)}
         <p>Requested window: {formatRange(lineage.requested_start_at, lineage.requested_end_at)}</p>
         <p>Effective window: {formatRange(lineage.effective_start_at, lineage.effective_end_at)}</p>
         <p>Dataset ID: {lineage.dataset_identity ?? "unavailable"}</p>
@@ -23060,10 +23226,12 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     return null;
   }
   const semanticLineLabels: Record<string, string> = {
+    data_lineage: "Data lineage",
     execution_model: "Execution model",
     operator_notes: "Operator notes",
     parameter_contract: "Parameter contract",
     provenance_richness: "Artifact inventory",
+    runtime_session: "Runtime session",
     semantic_source: "Semantic source",
     source_descriptor: "Source descriptor",
     strategy_kind: "Semantic kind",
