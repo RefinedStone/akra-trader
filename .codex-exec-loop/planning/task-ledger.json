@@ -4180,18 +4180,36 @@
       "direction_id": "experiment-os",
       "title": "Extend surface-rule enforcement metadata to standalone position and metric responses",
       "description": "Continue the standalone enforcement-envelope rollout by applying the same `surface_enforcement`, run context, and action availability contract to position, metric, and similar run subresource responses, so consumers can inspect gating state and actionable affordances without reloading the full run payload.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply says the order-list expansion is now complete in `6224d92` and explicitly names positions or metrics as the remaining standalone surfaces that still lack the shared enforcement envelope. That makes this the clearest executable next queued task, while consumer capability negotiation remains proposed because its contract shape is still undecided.",
+      "priority_reason": "Completed in main session commit d7dbcac, which converted standalone `GET /api/runs/{run_id}/positions` and `GET /api/runs/{run_id}/metrics` into capability envelopes carrying `run_id`, `run_mode`, `run_status`, `surface_enforcement`, `action_availability`, and the subresource body, then verified the change with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-surface-rule-enforcement-to-standalone-order-list-responses"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T22:26:09Z",
+      "updated_at": "2026-04-20T14:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os run-surface capability enforcement from order-centric standalone reads into the remaining position and metric subresource surfaces so server-side gating semantics stay consistent across run-adjacent API entry points."
+    },
+    {
+      "id": "planning-experiment-os-extract-standalone-run-subresource-capability-envelopes-into-shared-serializer",
+      "direction_id": "experiment-os",
+      "title": "Extract standalone run-subresource capability envelopes into a shared serializer",
+      "description": "Now that standalone `orders`, `positions`, and `metrics` all return the same capability envelope shape, consolidate that response contract into a shared backend serializer or helper so future run subresources inherit `run_id`, `run_mode`, `run_status`, `surface_enforcement`, and `action_availability` consistently without copy-paste drift.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply says the standalone `orders`, `positions`, and `metrics` envelopes are now aligned in commit `d7dbcac` and explicitly calls out common-serializer generalization as the remaining follow-up for future run subresources. That makes serializer extraction the clearest executable next queue head, while consumer capability negotiation still needs a separate contract decision.",
+      "depends_on": [
+        "planning-experiment-os-extend-surface-rule-enforcement-to-standalone-position-and-metric-responses"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T14:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Hardens experiment-os run-surface enforcement by turning the newly aligned standalone subresource envelopes into one reusable serializer contract, reducing drift risk as additional run-adjacent read surfaces are added."
     }
   ]
 }
