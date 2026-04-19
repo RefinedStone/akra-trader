@@ -219,18 +219,54 @@
       "direction_id": "experiment-os",
       "title": "Teach preset diffs strategy-specific semantic vocabulary",
       "description": "Build on the shipped domain-label heuristic layer by adding strategy-aware vocabulary and parameter-name interpretation for concrete strategy families, so preset revision, restore, and draft-conflict diffs can describe entry, exit, aggressiveness, and regime intent more precisely than the current generic token families.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply says the remaining work is more specific strategy-level meaning interpretation. That is the clearest direct continuation after the generic domain semantic labeling pass and is the best single queued task to hand back to the main session now.",
+      "priority_reason": "Completed in main session commit 1522c96, which taught preset diff, restore, and draft preview flows to prefer strategy-specific semantic vocabulary from strategy `parameter_schema` metadata, covered built-in strategy examples plus API tests, and pushed the change to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-preset-domain-semantic-labeling"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:10:00Z",
+      "updated_at": "2026-04-19T10:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os preset review from broad domain heuristics into strategy-literate operator guidance, making mutable preset diffs more trustworthy when different strategy families reuse similar parameter shapes with different intent."
+    },
+    {
+      "id": "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies",
+      "direction_id": "experiment-os",
+      "title": "Extend strategy catalog semantic metadata to reference and imported strategies",
+      "description": "Expand the strategy catalog and schema loading path so reference or imported strategies can publish the same strategy-specific semantic metadata that built-in strategies now expose, allowing preset diff, restore, and draft preview vocabulary to stay strategy-aware beyond hardcoded built-ins.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply says the remaining work is strategy catalog expansion and explicitly calls out that reference/imported strategies still cannot provide semantic metadata. This is the clearest executable next step because it extends the just-shipped strategy-specific vocabulary model to the broader catalog instead of leaving it limited to built-ins.",
+      "depends_on": [
+        "planning-experiment-os-preset-strategy-specific-semantic-vocabulary"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os toward a durable strategy catalog by making semantic parameter meaning a catalog capability shared by native and imported strategy definitions rather than a built-in-only shortcut."
+    },
+    {
+      "id": "planning-experiment-os-launch-form-strategy-semantic-help",
+      "direction_id": "experiment-os",
+      "title": "Surface strategy semantic metadata in launch-form parameter help",
+      "description": "Reuse the shipped strategy-specific semantic metadata in the launch form parameter editor so operators see strategy-aware helper copy and intent cues while editing bundles, not only later inside preset diff, restore, and draft preview surfaces.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply explicitly says strategy-specific vocabulary is wired into diff, restore, and draft preview but not yet into the launch-form parameter editor help. This is concrete executable follow-up, but broadening metadata coverage to reference/imported strategies is the stronger immediate queue head because it closes the catalog-level gap first.",
+      "depends_on": [
+        "planning-experiment-os-preset-strategy-specific-semantic-vocabulary"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Improves experiment-os operator guidance by moving strategy-aware parameter meaning earlier in the workflow, where preset bundles are authored rather than only reviewed after revisions."
     },
     {
       "id": "planning-experiment-os-preset-domain-value-formatting",
