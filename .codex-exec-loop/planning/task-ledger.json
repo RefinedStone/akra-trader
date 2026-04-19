@@ -3028,18 +3028,36 @@
       "direction_id": "experiment-os",
       "title": "Extend comparison history conflict resolution to browser preference sync",
       "description": "Build on the shipped field-level conflict resolver by covering browser-level comparison history preferences such as panel open state, search query, and pinned-only filtering with the same explicit review and keep-local or keep-remote resolution workflow, instead of continuing to auto-resolve those cross-tab preference conflicts silently.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 22,
-      "priority_reason": "The latest main-session reply says manual resolution now covers history entries only, while browser open or search or pinned-only preference sync still auto-resolves. That is the clearest next executable follow-up because it extends the just-shipped conflict review model to the remaining shared comparison-history state without requiring a new product decision first.",
+      "priority_reason": "Completed in main session commit 74447f1, which extended comparison history conflict review to browser preference sync for `open`, `searchQuery`, and `showPinnedOnly`, surfaced `Review browser state ...` audit entries in the remote tab, let operators choose local or remote values per field or via bulk actions, and persisted the applied resolution back into shared state after `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` passed.",
       "depends_on": [
         "planning-experiment-os-add-field-level-conflict-review-and-manual-resolution-for-comparison-history-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T16:08:25Z",
+      "updated_at": "2026-04-20T01:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison-state trust from entry-level conflict repair into the remaining shared history-browser preferences, so cross-tab review behavior stays operator-directed instead of partly automatic."
+    },
+    {
+      "id": "planning-experiment-os-expand-browser-preference-conflict-review-beyond-basic-history-filters",
+      "direction_id": "experiment-os",
+      "title": "Expand browser preference conflict review beyond basic history filters",
+      "description": "Build on the newly shipped browser preference conflict workflow by extending field-level review beyond `open`, `searchQuery`, and `showPinnedOnly` to the rest of the meaningful comparison history browser state, so browser-state sync does not fall back to coarse event-level overwrite behavior for newer preference fields that operators may expect to review explicitly.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply says the remaining preference-conflict work is to deepen coverage because only `open/search/pinned-only` are reviewable at field level today. That is the clearest next executable follow-up, and it stays in the just-shipped browser preference conflict path without introducing the heavier stale-event reconciliation semantics of three-way merge.",
+      "depends_on": [
+        "planning-experiment-os-extend-manual-conflict-resolution-to-history-browser-preferences"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison-state trust by pushing browser preference sync from a partial field-reviewed contract into a broader operator-reviewed state model, reducing the remaining surface where concurrent tabs can still overwrite preference intent too coarsely."
     },
     {
       "id": "planning-experiment-os-add-latest-state-three-way-merge-for-comparison-history-conflicts",
@@ -3049,13 +3067,13 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says conflict resolution currently works from the captured conflict snapshot only and does not attempt a latest-state three-way merge when the same entry changed again. That is a valid follow-up, but it introduces merge-policy and stale-resolution semantics that are less immediate than extending manual resolution to the remaining browser preference fields.",
+      "priority_reason": "The latest main-session reply says browser preference conflict cards are still scoped to the captured sync event and do not reconcile against newer browser-state events. That remains a valid follow-up, but it introduces stale-event guards and merge-policy semantics that are still less immediate than first broadening field-level browser preference review coverage.",
       "depends_on": [
-        "planning-experiment-os-add-field-level-conflict-review-and-manual-resolution-for-comparison-history-sync"
+        "planning-experiment-os-extend-manual-conflict-resolution-to-history-browser-preferences"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T16:08:25Z",
+      "updated_at": "2026-04-20T01:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os comparison-history conflict handling from deliberate snapshot review into state-aware reconciliation, which matters once concurrent edits can continue after an initial conflict has already been captured for review."
     },
