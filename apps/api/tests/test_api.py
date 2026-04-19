@@ -3563,6 +3563,7 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["narratives"][0]["is_primary"] is True
   assert payload["narratives"][0]["insight_score"] > 0
   assert payload["narratives"][0]["title"].startswith("Strategy tuning")
+  assert "reference delegate via external_runtime" in payload["narratives"][0]["summary"]
   artifact_kinds = {artifact["kind"] for artifact in payload["runs"][1]["benchmark_artifacts"]}
   assert "result_snapshot_root" in artifact_kinds
   assert "runtime_log_root" in artifact_kinds
@@ -3570,10 +3571,15 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert all("sections" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   assert all("summary_source_path" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   metric_rows = {row["key"]: row for row in payload["metric_rows"]}
-  assert metric_rows["total_return_pct"]["annotation"] == (
+  assert metric_rows["total_return_pct"]["annotation"].startswith(
     "Tuning read: return deltas show optimization edge versus the baseline."
   )
+  assert "reference delegate via external_runtime" in metric_rows["total_return_pct"]["annotation"]
   assert metric_rows["total_return_pct"]["delta_annotations"][native_run_id] == "tuning baseline"
   assert metric_rows["total_return_pct"]["values"][native_run_id] is not None
+  assert "tuning" in metric_rows["total_return_pct"]["delta_annotations"][reference_run_id]
+  assert "reference delegate via external_runtime" in metric_rows["total_return_pct"]["delta_annotations"][
+    reference_run_id
+  ]
   assert reference_run_id in metric_rows["trade_count"]["values"]
   assert payload["runs"][1]["notes"]

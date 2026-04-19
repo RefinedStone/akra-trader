@@ -14499,10 +14499,11 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.narratives[0].is_primary is True
   assert comparison.narratives[0].insight_score > 0
   assert comparison.narratives[0].title.startswith("Benchmark validation")
-  assert comparison.narratives[0].summary == (
+  assert comparison.narratives[0].summary.startswith(
     "Benchmark validation falls back to persisted reference provenance because direct metric "
     "deltas are partial."
   )
+  assert "reference delegate via external_runtime" in comparison.narratives[0].summary
   metric_rows = {row.key: row for row in comparison.metric_rows}
   assert set(metric_rows) == {
     "total_return_pct",
@@ -14510,13 +14511,18 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     "win_rate_pct",
     "trade_count",
   }
-  assert metric_rows["total_return_pct"].annotation == (
+  assert metric_rows["total_return_pct"].annotation.startswith(
     "Validation read: return drift versus the selected benchmark baseline."
   )
+  assert "reference delegate via external_runtime" in metric_rows["total_return_pct"].annotation
   assert metric_rows["total_return_pct"].delta_annotations[native_run.config.run_id] == "benchmark baseline"
   assert metric_rows["total_return_pct"].values[native_run.config.run_id] == native_run.metrics["total_return_pct"]
   assert reference_run.config.run_id in metric_rows["trade_count"].values
   assert comparison.runs[1].notes
+  assert any(
+    "reference delegate via external_runtime benchmark" in bullet
+    for bullet in comparison.narratives[0].bullets
+  )
 
 
 def test_compare_runs_uses_reference_artifact_summary_for_divergence_narratives(tmp_path: Path) -> None:
@@ -14704,6 +14710,7 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
   assert benchmark_validation.narratives[0].comparison_type == "native_vs_reference"
   assert benchmark_validation.narratives[0].title.startswith("Benchmark validation")
   assert "benchmark drift" in benchmark_validation.narratives[0].summary
+  assert "reference delegate via external_runtime" in benchmark_validation.narratives[0].summary
   assert any(
     bullet.startswith("Benchmark evidence:")
     for bullet in benchmark_validation.narratives[0].bullets
@@ -14734,16 +14741,24 @@ def test_compare_runs_reweights_multi_run_narratives_by_intent(tmp_path: Path) -
     bullet.startswith("Execution signal:")
     for bullet in execution_regression.narratives[0].bullets
   )
-  assert benchmark_metric_rows["total_return_pct"].annotation == (
+  assert benchmark_metric_rows["total_return_pct"].annotation.startswith(
     "Validation read: return drift versus the selected benchmark baseline."
   )
-  assert strategy_metric_rows["total_return_pct"].annotation == (
+  assert "reference delegate via external_runtime" in benchmark_metric_rows["total_return_pct"].annotation
+  assert strategy_metric_rows["total_return_pct"].annotation.startswith(
     "Tuning read: return deltas show optimization edge versus the baseline."
   )
-  assert execution_metric_rows["total_return_pct"].annotation == (
+  assert "reference delegate via external_runtime" in strategy_metric_rows["total_return_pct"].annotation
+  assert execution_metric_rows["total_return_pct"].annotation.startswith(
     "Regression read: return movement is treated as execution drift."
   )
-  assert benchmark_metric_rows["total_return_pct"].delta_annotations[reference_run.config.run_id] == "2 pts above benchmark"
+  assert "reference delegate via external_runtime" in execution_metric_rows["total_return_pct"].annotation
+  assert benchmark_metric_rows["total_return_pct"].delta_annotations[reference_run.config.run_id].startswith(
+    "2 pts above benchmark"
+  )
+  assert "reference delegate via external_runtime" in benchmark_metric_rows["total_return_pct"].delta_annotations[
+    reference_run.config.run_id
+  ]
   assert strategy_metric_rows["total_return_pct"].delta_annotations[alternate_native_run.config.run_id] == "5 pts tuning edge"
   assert execution_metric_rows["trade_count"].delta_annotations[alternate_native_run.config.run_id] == "10 extra activity"
   assert benchmark_validation.narratives[0].insight_score > benchmark_validation.narratives[1].insight_score

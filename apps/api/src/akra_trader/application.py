@@ -22746,11 +22746,13 @@ def _build_comparison_metric_row(
       key=key,
       unit=unit,
       is_baseline=run_id == baseline_run.config.run_id,
+      baseline_run=baseline_run,
+      run=run,
       higher_is_better=higher_is_better,
       delta=deltas_vs_baseline[run_id],
       value=values[run_id],
     )
-    for run_id in values
+    for run_id, run in ((candidate.config.run_id, candidate) for candidate in runs)
   }
   comparable_values = {
     run_id: value
@@ -22772,13 +22774,33 @@ def _build_comparison_metric_row(
     values=values,
     deltas_vs_baseline=deltas_vs_baseline,
     delta_annotations=delta_annotations,
-    annotation=_build_metric_annotation(intent=intent, key=key),
+    annotation=_build_metric_annotation(
+      intent=intent,
+      key=key,
+      baseline_run=baseline_run,
+      runs=runs,
+    ),
     best_run_id=best_run_id,
   )
 
 
-def _build_metric_annotation(*, intent: str, key: str) -> str | None:
-  return COMPARISON_METRIC_COPY.get(intent, {}).get(key, {}).get("annotation")
+def _build_metric_annotation(
+  *,
+  intent: str,
+  key: str,
+  baseline_run: RunRecord,
+  runs: list[RunRecord],
+) -> str | None:
+  annotation = COMPARISON_METRIC_COPY.get(intent, {}).get(key, {}).get("annotation")
+  semantic_suffix = _build_metric_semantic_annotation_suffix(
+    baseline_run=baseline_run,
+    runs=runs,
+  )
+  if annotation is None:
+    return f"Semantic context: {semantic_suffix}." if semantic_suffix else None
+  if semantic_suffix is None:
+    return annotation
+  return f"{annotation} Semantic context: {semantic_suffix}."
 
 
 def _build_metric_delta_annotation(
@@ -22787,17 +22809,24 @@ def _build_metric_delta_annotation(
   key: str,
   unit: str,
   is_baseline: bool,
+  baseline_run: RunRecord,
+  run: RunRecord,
   higher_is_better: bool,
   delta: float | int | None,
   value: float | int | None,
 ) -> str:
   copy = COMPARISON_METRIC_COPY.get(intent, {}).get(key, {})
+  semantic_suffix = _build_metric_delta_semantic_suffix(
+    baseline_run=baseline_run,
+    run=run,
+  )
   if is_baseline:
     return copy.get("baseline", "baseline")
   if value is None or delta is None:
-    return copy.get("missing", "delta unavailable")
+    missing = copy.get("missing", "delta unavailable")
+    return f"{missing} for {semantic_suffix}" if semantic_suffix else missing
   if delta == 0:
-    return "aligned with baseline"
+    return f"aligned with baseline for {semantic_suffix}" if semantic_suffix else "aligned with baseline"
 
   magnitude = _format_metric_delta_magnitude(delta=delta, unit=unit)
   positive_phrase = copy.get("positive_delta", "above baseline")
@@ -22807,7 +22836,8 @@ def _build_metric_delta_annotation(
     phrase = positive_phrase if delta > 0 else negative_phrase
   else:
     phrase = positive_phrase if delta > 0 else negative_phrase
-  return f"{magnitude} {phrase}"
+  annotation = f"{magnitude} {phrase}"
+  return f"{annotation} for {semantic_suffix}" if semantic_suffix else annotation
 
 
 def _format_metric_delta_magnitude(
@@ -23032,6 +23062,11 @@ def _build_comparison_narrative_summary(
   trade_count_delta: float | int | None,
 ) -> str | None:
   copy = COMPARISON_INTENT_COPY[intent]
+  semantic_context = _build_comparison_semantic_context_sentence(
+    baseline_run=baseline_run,
+    run=run,
+    comparison_type=comparison_type,
+  )
   metric_shifts: list[str] = []
   if total_return_delta is not None:
     metric_shifts.append(f"return {_format_metric_delta(total_return_delta, 'pct_points')}")
@@ -23043,16 +23078,33 @@ def _build_comparison_narrative_summary(
     metric_shifts.append(f"trades {_format_metric_delta(trade_count_delta, 'count')}")
   if metric_shifts:
     if intent == "benchmark_validation":
-      return f"{copy['summary_prefix']} treats these shifts as benchmark drift against {baseline_label}: {', '.join(metric_shifts)}."
+      summary = (
+        f"{copy['summary_prefix']} treats these shifts as benchmark drift against "
+        f"{baseline_label}: {', '.join(metric_shifts)}."
+      )
+      return f"{summary} {semantic_context}" if semantic_context else summary
     if intent == "execution_regression":
-      return f"{copy['summary_prefix']} interprets these changes as execution drift against {baseline_label}: {', '.join(metric_shifts)}."
-    return f"{copy['summary_prefix']} reads these changes as optimization tradeoffs against {baseline_label}: {', '.join(metric_shifts)}."
+      summary = (
+        f"{copy['summary_prefix']} interprets these changes as execution drift against "
+        f"{baseline_label}: {', '.join(metric_shifts)}."
+      )
+      return f"{summary} {semantic_context}" if semantic_context else summary
+    summary = (
+      f"{copy['summary_prefix']} reads these changes as optimization tradeoffs against "
+      f"{baseline_label}: {', '.join(metric_shifts)}."
+    )
+    return f"{summary} {semantic_context}" if semantic_context else summary
 
   if comparison_type == "native_vs_reference" and _has_reference_context(run, baseline_run):
-    return copy["partial_summary"]
+    summary = copy["partial_summary"]
+    return f"{summary} {semantic_context}" if semantic_context else summary
   if run.status != baseline_run.status:
-    return f"{copy['summary_prefix']} also notes a status split: {run.status} versus {baseline_run.status}."
-  return None
+    summary = (
+      f"{copy['summary_prefix']} also notes a status split: {run.status} versus "
+      f"{baseline_run.status}."
+    )
+    return f"{summary} {semantic_context}" if semantic_context else summary
+  return semantic_context
 
 
 def _build_comparison_narrative_bullets(
@@ -23108,10 +23160,13 @@ def _build_lane_context_bullet(
   reference_run = run if run.provenance.lane == "reference" else baseline_run
   native_run = baseline_run if reference_run is run else run
   reference_label = _comparison_run_label(reference_run)
-  integration_mode = reference_run.provenance.integration_mode or "external_runtime"
+  native_role = _format_comparison_semantic_role(native_run)
+  reference_role = _format_comparison_semantic_role(reference_run, include_execution=True)
+  reference_source = _strategy_semantics(reference_run).source_descriptor
+  source_suffix = f" / source {reference_source}" if reference_source else ""
   return (
-    f"{copy['lane_prefix']}: native engine {_comparison_run_label(native_run)} is being read against "
-    f"reference benchmark {reference_label} via {integration_mode}."
+    f"{copy['lane_prefix']}: {native_role} engine {_comparison_run_label(native_run)} is being "
+    f"read against {reference_role} benchmark {reference_label}{source_suffix}."
   )
 
 
@@ -23186,15 +23241,143 @@ def _comparison_run_label(run: RunRecord) -> str:
 
 def _comparison_subject_label(run: RunRecord) -> str:
   label = _comparison_run_label(run)
+  semantics = _strategy_semantics(run)
+  role = _format_comparison_semantic_role(run)
   if run.provenance.lane == "reference":
-    return f"Reference benchmark {label}"
+    return f"{role} benchmark {label}"
+  if semantics.strategy_kind == "imported_module":
+    return f"{role} strategy {label}"
   if run.provenance.lane == "native":
-    return f"Native run {label}"
+    return f"{role} run {label}"
   return label
 
 
 def _has_reference_context(run: RunRecord, baseline_run: RunRecord) -> bool:
   return any(candidate.provenance.lane == "reference" for candidate in (run, baseline_run))
+
+
+def _build_metric_semantic_annotation_suffix(
+  *,
+  baseline_run: RunRecord,
+  runs: list[RunRecord],
+) -> str | None:
+  baseline_role = _format_comparison_semantic_role(baseline_run, include_execution=True)
+  comparison_roles = [
+    role
+    for role in dict.fromkeys(
+      _build_metric_annotation_role_label(baseline_run=baseline_run, run=run)
+      for run in runs
+      if run.config.run_id != baseline_run.config.run_id
+    )
+    if role is not None
+  ]
+  if not comparison_roles:
+    return None
+  if len(comparison_roles) == 1:
+    return f"baseline {baseline_role}; compared against {comparison_roles[0]}"
+  listed_roles = ", ".join(comparison_roles[:2])
+  if len(comparison_roles) > 2:
+    listed_roles = f"{listed_roles}, +{len(comparison_roles) - 2} more"
+  return f"baseline {baseline_role}; compared against {listed_roles}"
+
+
+def _build_metric_annotation_role_label(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+) -> str | None:
+  baseline_role = _format_comparison_semantic_role(baseline_run, include_execution=True)
+  run_role = _format_comparison_semantic_role(run, include_execution=True)
+  if run_role == baseline_role:
+    return None
+  return run_role
+
+
+def _build_metric_delta_semantic_suffix(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+) -> str | None:
+  role = _build_metric_annotation_role_label(baseline_run=baseline_run, run=run)
+  if role is None:
+    return None
+  source_descriptor = _strategy_semantics(run).source_descriptor
+  if source_descriptor is None:
+    return role
+  return f"{role} ({source_descriptor})"
+
+
+def _build_comparison_semantic_context_sentence(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  comparison_type: str,
+) -> str | None:
+  if not _comparison_has_semantic_signal(baseline_run=baseline_run, run=run):
+    return None
+  baseline_role = _format_comparison_semantic_role(baseline_run, include_execution=True)
+  run_role = _format_comparison_semantic_role(run, include_execution=True)
+  run_source = _strategy_semantics(run).source_descriptor
+  if comparison_type == "native_vs_reference":
+    summary = f"Semantic context compares {baseline_role} execution to {run_role}"
+  else:
+    summary = f"Semantic context compares {run_role} against {baseline_role}"
+  if run_source:
+    summary = f"{summary} (source {run_source})"
+  return f"{summary}."
+
+
+def _comparison_has_semantic_signal(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+) -> bool:
+  baseline_semantics = _strategy_semantics(baseline_run)
+  run_semantics = _strategy_semantics(run)
+  return (
+    baseline_run.provenance.lane != run.provenance.lane
+    or baseline_semantics.strategy_kind != run_semantics.strategy_kind
+    or baseline_semantics.execution_model != run_semantics.execution_model
+    or baseline_semantics.source_descriptor != run_semantics.source_descriptor
+    or baseline_semantics.parameter_contract != run_semantics.parameter_contract
+  )
+
+
+def _strategy_semantics(run: RunRecord) -> StrategyCatalogSemantics:
+  if run.provenance.strategy is not None:
+    return run.provenance.strategy.catalog_semantics
+  return StrategyCatalogSemantics()
+
+
+def _format_comparison_semantic_role(
+  run: RunRecord,
+  *,
+  include_execution: bool = False,
+) -> str:
+  semantics = _strategy_semantics(run)
+  lane = run.provenance.lane or "run"
+  if semantics.strategy_kind == "reference_delegate":
+    role = "reference delegate"
+  elif semantics.strategy_kind == "imported_module":
+    role = "imported module"
+  elif semantics.strategy_kind in ("", "standard"):
+    role = f"{lane} standard"
+  else:
+    normalized_kind = semantics.strategy_kind.replace("_", " ")
+    role = normalized_kind if lane in normalized_kind else f"{lane} {normalized_kind}"
+  execution_label = _format_comparison_execution_label(run)
+  if include_execution and execution_label:
+    return f"{role} via {execution_label}"
+  return role
+
+
+def _format_comparison_execution_label(run: RunRecord) -> str | None:
+  if run.provenance.integration_mode:
+    return run.provenance.integration_mode
+  execution_model = _strategy_semantics(run).execution_model.strip()
+  if execution_model and len(execution_model) <= 40:
+    return execution_model
+  return None
 
 
 def _metric_row_delta(
