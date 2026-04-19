@@ -183,18 +183,54 @@
       "direction_id": "experiment-os",
       "title": "Teach preset semantic diffs schema-aware parameter meaning",
       "description": "Extend the new semantic preset diff layer so parameter values can be rendered with domain-aware meaning derived from preset schema or field metadata, such as percentages, timeframe units, and enum labels, instead of remaining generic higher or lower primitive comparisons.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says the deepest remaining semantic gap is that parameter meaning is still not schema-aware, explicitly calling out percent, timeframe, and enum interpretation. That is the clearest direct continuation now that generic semantic diffing is complete, and it is executable without additional operator judgment.",
+      "priority_reason": "Completed in main session commit c8c73ed, which taught preset revision, draft-conflict, and restore diffs to read strategy parameter_schema metadata and render schema-aware hints plus semantic delta labels for type, default, and minimum interpretation, then passed `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-preset-semantic-parameter-diff"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:40:00Z",
+      "updated_at": "2026-04-19T09:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os preset review trust by turning semantic diffs from generic value changes into domain-meaningful operator comparisons that better support promotion and restore decisions."
+    },
+    {
+      "id": "planning-experiment-os-preset-domain-semantic-labeling",
+      "direction_id": "experiment-os",
+      "title": "Extend preset diffs with domain semantic labels beyond type/default/minimum",
+      "description": "Build on the shipped schema-aware diff layer by interpreting richer domain-specific parameter meaning such as enum labels, percentage semantics, timeframe units, and risk-unit annotations so preset revision, restore, and draft-conflict reviews describe intent instead of stopping at generic type/default/minimum hints.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is deeper domain meaning interpretation and names enum, percentage, timeframe, and risk-unit labeling as the next missing semantic layer. That is the clearest executable continuation and should replace the completed schema-aware task as queue head.",
+      "depends_on": [
+        "planning-experiment-os-preset-schema-aware-parameter-meaning"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os preset review from schema-literate diffs into domain-literate operator guidance, which makes promotion and restore decisions easier when strategies encode business meaning in parameter metadata."
+    },
+    {
+      "id": "planning-experiment-os-preset-formal-nested-schema-interpretation",
+      "direction_id": "experiment-os",
+      "title": "Interpret nested preset parameter objects with formal schema traversal",
+      "description": "Replace the current top-level leaf-path schema attachment with formal nested schema traversal so object-valued preset parameters inherit the correct child schema meaning, validation context, and semantic labels throughout revision, restore, and draft-conflict diff rendering.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says nested parameter objects still do not receive formal schema interpretation and currently borrow only top-level parameter schema on leaf diffs. This is concrete follow-up work, but domain semantic labeling is the more immediate queue head because it improves operator meaning across the existing diff path before deeper schema traversal work.",
+      "depends_on": [
+        "planning-experiment-os-preset-domain-semantic-labeling"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closes the remaining experiment-os preset diff correctness gap for nested parameter shapes so semantic labels and schema-derived restore guidance stay accurate beyond flat top-level bundles."
     },
     {
       "id": "planning-experiment-os-preset-array-diff-fidelity",
