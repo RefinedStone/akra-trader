@@ -407,6 +407,7 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["strategy"]["catalog_semantics"]["parameter_contract"] == ""
   assert payload["provenance"]["strategy"]["warmup"]["required_bars"] == 21
   assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]
+  assert "eligibility_contract" not in payload
   assert payload["provenance"]["market_data"]["provider"] == "seeded"
   assert payload["provenance"]["market_data"]["dataset_identity"].startswith("dataset-v1:")
   assert payload["provenance"]["market_data"]["sync_checkpoint_id"] is None
@@ -414,13 +415,6 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["provenance"]["market_data"]["sync_status"] == "fixture"
   assert payload["provenance"]["rerun_boundary_id"].startswith("rerun-v1:")
   assert payload["provenance"]["rerun_boundary_state"] == "pinned"
-  assert payload["eligibility_contract"]["scope"] == "run_list"
-  assert payload["eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
-  assert payload["eligibility_contract"]["groups"]["operational_workflow"]["surface_ids"] == [
-    "compare_toggle",
-    "rerun",
-    "stop",
-  ]
   assert payload["provenance"]["experiment"]["tags"] == ["baseline", "momentum"]
   assert payload["provenance"]["experiment"]["preset_id"] == "core_5m"
   assert payload["provenance"]["experiment"]["benchmark_family"] == "native_validation"
@@ -3260,10 +3254,9 @@ def test_runs_endpoint_can_filter_by_strategy_version(tmp_path: Path) -> None:
   assert filtered.status_code == 200
   payload = filtered.json()
   assert len(payload) == 1
+  assert "eligibility_contract" not in payload[0]
   assert payload[0]["config"]["strategy_id"] == "ma_cross_v1"
   assert payload[0]["config"]["strategy_version"] == "1.0.0"
-  assert payload[0]["eligibility_contract"]["scope"] == "run_list"
-  assert payload[0]["eligibility_contract"]["surfaces"]["lane"]["eligibility"] == "supporting"
 
 
 def test_runs_endpoint_can_filter_by_experiment_metadata(tmp_path: Path) -> None:
@@ -3623,15 +3616,7 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert payload["runs"][1]["catalog_semantics"]["operator_notes"]
   assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"
   assert payload["runs"][1]["artifact_paths"]
-  assert payload["eligibility_contract"]["scope"] == "run_list"
-  assert payload["eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
-  assert payload["eligibility_contract"]["surfaces"]["compare_toggle"]["group"] == "operational_workflow"
-  assert payload["eligibility_contract"]["groups"]["eligible_metrics"]["surface_ids"] == [
-    "return",
-    "drawdown",
-    "win_rate",
-    "trades",
-  ]
+  assert "eligibility_contract" not in payload
   assert len(payload["narratives"]) == 1
   assert payload["narratives"][0]["comparison_type"] == "native_vs_reference"
   assert payload["narratives"][0]["run_id"] == reference_run_id

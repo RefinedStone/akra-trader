@@ -182,8 +182,28 @@ type BenchmarkArtifact = {
   summary_source_path?: string | null;
 };
 
+type RunListBoundaryContract = {
+  scope: "run_list";
+  surfaces: Record<
+    RunListBoundarySurfaceId,
+    {
+      eligibility: RunListBoundaryEligibility;
+      group: RunListBoundaryGroupKey;
+      label: string;
+    }
+  >;
+  groups: Record<
+    RunListBoundaryGroupKey,
+    {
+      copy: string;
+      eligibility: RunListBoundaryEligibility;
+      surface_ids: RunListBoundarySurfaceId[];
+      title: string;
+    }
+  >;
+};
+
 type Run = {
-  eligibility_contract: RunComparison["eligibility_contract"];
   config: {
     run_id: string;
     mode: string;
@@ -326,26 +346,6 @@ type RunComparison = {
   requested_run_ids: string[];
   baseline_run_id: string;
   intent: ComparisonIntent;
-  eligibility_contract: {
-    scope: "run_list";
-    surfaces: Record<
-      RunListBoundarySurfaceId,
-      {
-        eligibility: RunListBoundaryEligibility;
-        group: RunListBoundaryGroupKey;
-        label: string;
-      }
-    >;
-    groups: Record<
-      RunListBoundaryGroupKey,
-      {
-        copy: string;
-        eligibility: RunListBoundaryEligibility;
-        surface_ids: RunListBoundarySurfaceId[];
-        title: string;
-      }
-    >;
-  };
   runs: {
     run_id: string;
     mode: string;
@@ -14039,8 +14039,6 @@ type RunListBoundaryGroupContract = {
   title: string;
 };
 
-type RunListBoundaryContract = Run["eligibility_contract"];
-
 const RUN_LIST_BOUNDARY_CONTRACT: RunListBoundaryContract = {
   scope: "run_list",
   surfaces: {
@@ -14354,7 +14352,6 @@ function RunSection({
   const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const sharedRunListBoundaryContract = runSurfaceCapabilities?.comparison_eligibility_contract ?? null;
-  const comparisonBoundaryContract = comparison?.payload?.eligibility_contract ?? null;
   const presetOptions = presets.filter(
     (preset) =>
       !preset.strategy_id ||
@@ -17407,10 +17404,7 @@ function RunSection({
         <div className="run-list">
           {runs.map((run) => {
             const orderControls = getOrderControls ? getOrderControls(run) : null;
-            const runListBoundaryContract =
-              sharedRunListBoundaryContract
-              ?? run.eligibility_contract
-              ?? comparisonBoundaryContract;
+            const runListBoundaryContract = sharedRunListBoundaryContract;
             const comparisonLinkedRunRole =
               comparison?.payload
                 ? getComparisonScoreLinkedRunRole(

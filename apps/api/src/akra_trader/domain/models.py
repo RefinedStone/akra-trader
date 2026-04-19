@@ -641,9 +641,6 @@ class RunComparison:
   metric_rows: tuple[RunComparisonMetricRow, ...]
   intent: str = "benchmark_validation"
   narratives: tuple[RunComparisonNarrative, ...] = ()
-  eligibility_contract: ComparisonEligibilityContract = field(
-    default_factory=default_comparison_eligibility_contract
-  )
 
 
 @dataclass(frozen=True)

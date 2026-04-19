@@ -22623,7 +22623,6 @@ def serialize_preset_revision(revision: ExperimentPreset.Revision) -> dict[str, 
 
 def serialize_run(run: RunRecord) -> dict:
   payload = asdict(run)
-  payload["eligibility_contract"] = serialize_comparison_eligibility_contract()
   payload["config"]["mode"] = run.config.mode.value
   payload["status"] = run.status.value
   payload["provenance"]["external_command"] = list(run.provenance.external_command)
@@ -22674,9 +22673,6 @@ def serialize_strategy(strategy: StrategyMetadata) -> dict:
 def serialize_run_comparison(comparison: RunComparison) -> dict:
   payload = asdict(comparison)
   payload["requested_run_ids"] = list(comparison.requested_run_ids)
-  payload["eligibility_contract"] = serialize_comparison_eligibility_contract(
-    comparison.eligibility_contract
-  )
   payload["runs"] = [
     {
       **run_payload,
