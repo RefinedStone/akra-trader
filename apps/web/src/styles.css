@@ -275,6 +275,10 @@ select {
   opacity: 0.96;
 }
 
+.ghost-button.is-active {
+  background: rgba(120, 180, 255, 0.18);
+}
+
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
@@ -383,6 +387,31 @@ select {
   gap: 8px;
 }
 
+.comparison-history-browser-manage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.comparison-history-browser-search {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 280px);
+  flex: 1 1 320px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.comparison-history-browser-search input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
 .comparison-history-browser-list {
   display: grid;
   gap: 10px;
@@ -435,9 +464,19 @@ select {
   text-transform: uppercase;
 }
 
+.comparison-history-browser-entry-badge.pinned {
+  background: rgba(255, 196, 92, 0.18);
+}
+
 .comparison-history-browser-entry-meta {
   color: var(--muted);
   font-size: 0.78rem;
+}
+
+.comparison-history-browser-entry-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .comparison-intent-field {
@@ -2370,6 +2409,10 @@ select {
 
   .comparison-history-browser-actions {
     width: 100%;
+  }
+
+  .comparison-history-browser-manage {
+    align-items: stretch;
   }
 
   .shell {

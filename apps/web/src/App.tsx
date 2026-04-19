@@ -2822,6 +2822,7 @@ type ComparisonHistoryStepDescriptor = {
 type ComparisonHistoryBrowserState = {
   version: typeof COMPARISON_HISTORY_BROWSER_STATE_VERSION;
   entryId: string;
+  stepIndex: number;
   label: string;
   summary: string;
   title: string;
@@ -2830,10 +2831,13 @@ type ComparisonHistoryBrowserState = {
 
 type ComparisonHistoryPanelEntry = {
   entryId: string;
+  stepIndex: number;
   label: string;
   summary: string;
   title: string;
   url: string;
+  pinned: boolean;
+  recordedAt: string;
   selection: ControlRoomComparisonSelectionState;
 };
 
@@ -4493,6 +4497,10 @@ export default function App() {
         : -1,
     [comparisonHistoryPanel],
   );
+  const comparisonHistoryActiveStepIndex =
+    comparisonHistoryActiveIndex >= 0
+      ? comparisonHistoryPanel.entries[comparisonHistoryActiveIndex]?.stepIndex ?? -1
+      : -1;
   const applyComparisonSelectionState = (
     value: ControlRoomComparisonSelectionState,
   ) => {
@@ -4726,11 +4734,20 @@ export default function App() {
       comparisonHistoryWriteModeRef.current === "push"
         ? buildComparisonHistoryEntryId()
         : currentBrowserState?.entryId ?? buildComparisonHistoryEntryId();
+    const nextStepIndex =
+      comparisonHistoryWriteModeRef.current === "push"
+        ? (
+            currentBrowserState?.stepIndex
+            ?? (comparisonHistoryActiveStepIndex >= 0 ? comparisonHistoryActiveStepIndex : -1)
+          ) + 1
+        : currentBrowserState?.stepIndex
+          ?? (comparisonHistoryActiveStepIndex >= 0 ? comparisonHistoryActiveStepIndex : 0);
     const nextBrowserState = readComparisonHistoryBrowserState(buildComparisonHistoryBrowserState(
       window.history.state,
       comparisonSelection,
       comparisonHistoryStep,
       nextEntryId,
+      nextStepIndex,
     ));
     if (!nextBrowserState) {
       return;
@@ -4745,7 +4762,13 @@ export default function App() {
     if (comparisonHistoryUrlRef.current === null) {
       comparisonHistoryUrlRef.current = nextUrl;
       if (currentUrl !== nextUrl || metadataChanged) {
-        persistComparisonSelectionToUrl(comparisonSelection, comparisonHistoryStep, nextEntryId, "replace");
+        persistComparisonSelectionToUrl(
+          comparisonSelection,
+          comparisonHistoryStep,
+          nextEntryId,
+          nextStepIndex,
+          "replace",
+        );
       }
       setComparisonHistoryPanel((current) =>
         reconcileComparisonHistoryPanelState(
@@ -4783,6 +4806,7 @@ export default function App() {
           comparisonSelection,
           comparisonHistoryStep,
           nextEntryId,
+          nextStepIndex,
           "push",
         );
       } else if (metadataChanged) {
@@ -4790,6 +4814,7 @@ export default function App() {
           comparisonSelection,
           comparisonHistoryStep,
           nextEntryId,
+          nextStepIndex,
           "replace",
         );
       }
@@ -4809,6 +4834,7 @@ export default function App() {
         comparisonSelection,
         comparisonHistoryStep,
         nextEntryId,
+        nextStepIndex,
         "replace",
       );
     }
@@ -4833,11 +4859,11 @@ export default function App() {
     if (typeof window === "undefined") {
       return;
     }
-    const targetIndex = comparisonHistoryPanel.entries.findIndex((entry) => entry.entryId === entryId);
-    if (targetIndex < 0 || comparisonHistoryActiveIndex < 0) {
+    const targetEntry = comparisonHistoryPanel.entries.find((entry) => entry.entryId === entryId);
+    if (!targetEntry || comparisonHistoryActiveStepIndex < 0) {
       return;
     }
-    const delta = targetIndex - comparisonHistoryActiveIndex;
+    const delta = targetEntry.stepIndex - comparisonHistoryActiveStepIndex;
     if (delta === 0) {
       return;
     }
@@ -4852,7 +4878,36 @@ export default function App() {
     if (targetIndex < 0 || targetIndex >= comparisonHistoryPanel.entries.length) {
       return;
     }
-    window.history.go(delta);
+    const targetEntry = comparisonHistoryPanel.entries[targetIndex];
+    const historyDelta = targetEntry.stepIndex - comparisonHistoryActiveStepIndex;
+    if (historyDelta === 0) {
+      return;
+    }
+    window.history.go(historyDelta);
+  };
+
+  const handleToggleComparisonHistoryEntryPinned = (entryId: string) => {
+    setComparisonHistoryPanel((current) => ({
+      ...current,
+      entries: current.entries.map((entry) =>
+        entry.entryId === entryId ? { ...entry, pinned: !entry.pinned } : entry,
+      ),
+    }));
+  };
+
+  const handleTrimComparisonHistoryEntries = () => {
+    setComparisonHistoryPanel((current) => {
+      const nextEntries = current.entries.filter(
+        (entry) => entry.pinned || entry.entryId === current.activeEntryId,
+      );
+      return {
+        entries: nextEntries,
+        activeEntryId:
+          current.activeEntryId && nextEntries.some((entry) => entry.entryId === current.activeEntryId)
+            ? current.activeEntryId
+            : nextEntries[0]?.entryId ?? null,
+      };
+    });
   };
 
   useEffect(() => {
@@ -7219,6 +7274,8 @@ export default function App() {
             onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
+            onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
+            onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
             onToggleRunSelection: toggleComparisonRun,
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
@@ -7665,6 +7722,7 @@ function readComparisonHistoryBrowserState(value: unknown): ComparisonHistoryBro
   if (
     parsed.version !== COMPARISON_HISTORY_BROWSER_STATE_VERSION
     || typeof parsed.entryId !== "string"
+    || typeof parsed.stepIndex !== "number"
     || typeof parsed.label !== "string"
     || typeof parsed.summary !== "string"
     || typeof parsed.title !== "string"
@@ -7674,6 +7732,7 @@ function readComparisonHistoryBrowserState(value: unknown): ComparisonHistoryBro
   return {
     version: parsed.version,
     entryId: parsed.entryId,
+    stepIndex: parsed.stepIndex,
     label: parsed.label,
     summary: parsed.summary,
     title: parsed.title,
@@ -7686,6 +7745,7 @@ function buildComparisonHistoryBrowserState(
   selection: ControlRoomComparisonSelectionState,
   step: ComparisonHistoryStepDescriptor,
   entryId: string,
+  stepIndex: number,
 ) {
   const nextState =
     currentState && typeof currentState === "object" && !Array.isArray(currentState)
@@ -7694,6 +7754,7 @@ function buildComparisonHistoryBrowserState(
   nextState[COMPARISON_HISTORY_BROWSER_STATE_KEY] = {
     version: COMPARISON_HISTORY_BROWSER_STATE_VERSION,
     entryId,
+    stepIndex,
     label: step.label,
     summary: step.summary,
     title: step.title,
@@ -7716,6 +7777,7 @@ function isSameComparisonHistoryBrowserState(
     left.label === right.label
     && left.summary === right.summary
     && left.title === right.title
+    && left.stepIndex === right.stepIndex
     && isSameComparisonSelection(left.selection, right.selection)
   );
 }
@@ -7724,13 +7786,20 @@ function persistComparisonSelectionToUrl(
   selection: ControlRoomComparisonSelectionState,
   step: ComparisonHistoryStepDescriptor,
   entryId: string,
+  stepIndex: number,
   mode: Exclude<ComparisonHistoryWriteMode, "skip"> = "replace",
 ) {
   if (typeof window === "undefined") {
     return;
   }
   const nextUrl = buildComparisonSelectionHistoryUrl(selection);
-  const nextState = buildComparisonHistoryBrowserState(window.history.state, selection, step, entryId);
+  const nextState = buildComparisonHistoryBrowserState(
+    window.history.state,
+    selection,
+    step,
+    entryId,
+    stepIndex,
+  );
   if (typeof document !== "undefined") {
     document.title = step.title;
   }
@@ -7752,12 +7821,16 @@ function buildComparisonHistoryPanelEntry(
   browserState: ComparisonHistoryBrowserState,
   url: string,
 ): ComparisonHistoryPanelEntry {
+  const now = new Date().toISOString();
   return {
     entryId: browserState.entryId,
+    stepIndex: browserState.stepIndex,
     label: browserState.label,
     summary: browserState.summary,
     title: browserState.title,
     url,
+    pinned: false,
+    recordedAt: now,
     selection: normalizeControlRoomComparisonSelection(browserState.selection),
   };
 }
@@ -7768,36 +7841,50 @@ function reconcileComparisonHistoryPanelState(
   mode: "push" | "replace" | "activate",
 ): ComparisonHistoryPanelState {
   const existingIndex = current.entries.findIndex((candidate) => candidate.entryId === entry.entryId);
+  const existingEntry = existingIndex >= 0 ? current.entries[existingIndex] : null;
+  const mergedEntry = existingEntry
+    ? {
+        ...entry,
+        pinned: existingEntry.pinned,
+        recordedAt: existingEntry.recordedAt,
+      }
+    : entry;
 
   if (mode === "activate") {
     if (existingIndex >= 0) {
       return {
-        entries: current.entries.map((candidate, index) => (index === existingIndex ? entry : candidate)),
-        activeEntryId: entry.entryId,
+        entries: sortComparisonHistoryPanelEntries(
+          current.entries.map((candidate, index) => (index === existingIndex ? mergedEntry : candidate)),
+        ),
+        activeEntryId: mergedEntry.entryId,
       };
     }
     return {
-      entries: [entry],
-      activeEntryId: entry.entryId,
+      entries: limitComparisonHistoryPanelEntries(
+        sortComparisonHistoryPanelEntries([...current.entries, mergedEntry]),
+      ),
+      activeEntryId: mergedEntry.entryId,
     };
   }
 
   if (mode === "push") {
-    const activeIndex = current.activeEntryId
-      ? current.entries.findIndex((candidate) => candidate.entryId === current.activeEntryId)
-      : current.entries.length - 1;
-    const baseEntries = activeIndex >= 0 ? current.entries.slice(0, activeIndex + 1) : [];
-    const nextEntries = [...baseEntries.filter((candidate) => candidate.entryId !== entry.entryId), entry];
+    const activeStepIndex = current.activeEntryId
+      ? current.entries.find((candidate) => candidate.entryId === current.activeEntryId)?.stepIndex ?? -1
+      : -1;
+    const baseEntries = current.entries.filter((candidate) => candidate.stepIndex <= activeStepIndex);
+    const nextEntries = [...baseEntries.filter((candidate) => candidate.entryId !== mergedEntry.entryId), mergedEntry];
     return {
-      entries: nextEntries.slice(-MAX_COMPARISON_HISTORY_PANEL_ENTRIES),
-      activeEntryId: entry.entryId,
+      entries: limitComparisonHistoryPanelEntries(sortComparisonHistoryPanelEntries(nextEntries)),
+      activeEntryId: mergedEntry.entryId,
     };
   }
 
   if (existingIndex >= 0) {
     return {
-      entries: current.entries.map((candidate, index) => (index === existingIndex ? entry : candidate)),
-      activeEntryId: entry.entryId,
+      entries: sortComparisonHistoryPanelEntries(
+        current.entries.map((candidate, index) => (index === existingIndex ? mergedEntry : candidate)),
+      ),
+      activeEntryId: mergedEntry.entryId,
     };
   }
 
@@ -7806,15 +7893,38 @@ function reconcileComparisonHistoryPanelState(
     : -1;
   if (activeIndex >= 0) {
     return {
-      entries: current.entries.map((candidate, index) => (index === activeIndex ? entry : candidate)),
-      activeEntryId: entry.entryId,
+      entries: sortComparisonHistoryPanelEntries(
+        current.entries.map((candidate, index) => (index === activeIndex ? mergedEntry : candidate)),
+      ),
+      activeEntryId: mergedEntry.entryId,
     };
   }
 
   return {
-    entries: [entry],
-    activeEntryId: entry.entryId,
+    entries: [mergedEntry],
+    activeEntryId: mergedEntry.entryId,
   };
+}
+
+function sortComparisonHistoryPanelEntries(entries: ComparisonHistoryPanelEntry[]) {
+  return [...entries].sort((left, right) => left.stepIndex - right.stepIndex);
+}
+
+function limitComparisonHistoryPanelEntries(entries: ComparisonHistoryPanelEntry[]) {
+  if (entries.length <= MAX_COMPARISON_HISTORY_PANEL_ENTRIES) {
+    return entries;
+  }
+  const pinnedEntries = entries.filter((entry) => entry.pinned);
+  if (pinnedEntries.length >= MAX_COMPARISON_HISTORY_PANEL_ENTRIES) {
+    return sortComparisonHistoryPanelEntries(
+      pinnedEntries.slice(-MAX_COMPARISON_HISTORY_PANEL_ENTRIES),
+    );
+  }
+  const unpinnedEntries = entries.filter((entry) => !entry.pinned);
+  return sortComparisonHistoryPanelEntries([
+    ...pinnedEntries,
+    ...unpinnedEntries.slice(-(MAX_COMPARISON_HISTORY_PANEL_ENTRIES - pinnedEntries.length)),
+  ]);
 }
 
 function loadLegacyExpandedGapRows() {
@@ -7887,6 +7997,7 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
   const parts = [
     formatComparisonIntentLabel(entry.selection.intent),
     `${entry.selection.selectedRunIds.length} run${entry.selection.selectedRunIds.length === 1 ? "" : "s"}`,
+    `Saved ${formatTimestamp(entry.recordedAt)}`,
   ];
   if (entry.selection.scoreLink) {
     parts.push(
@@ -7896,7 +8007,21 @@ function formatComparisonHistoryPanelEntryMeta(entry: ComparisonHistoryPanelEntr
       ),
     );
   }
+  if (entry.pinned) {
+    parts.push("Pinned");
+  }
   return parts.join(" / ");
+}
+
+function matchesComparisonHistoryPanelEntry(entry: ComparisonHistoryPanelEntry, query: string) {
+  const haystack = [
+    entry.label,
+    entry.summary,
+    entry.title,
+    entry.url,
+    formatComparisonHistoryPanelEntryMeta(entry),
+  ].join(" ").toLowerCase();
+  return haystack.includes(query);
 }
 
 function buildComparisonHistoryStepDescriptor(
@@ -9063,6 +9188,8 @@ type RunSectionComparisonControls = {
   onToggleHistoryBrowser: () => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
+  onToggleHistoryEntryPinned: (entryId: string) => void;
+  onTrimHistoryEntries: () => void;
   onToggleRunSelection: (runId: string) => void;
   onClearSelection: () => void;
   onSelectBenchmarkPair: () => void;
@@ -9115,6 +9242,26 @@ function RunSection({
       filter.strategy_id === ALL_FILTER_VALUE ||
       preset.strategy_id === filter.strategy_id,
   );
+  const [historySearchQuery, setHistorySearchQuery] = useState("");
+  const [showPinnedHistoryOnly, setShowPinnedHistoryOnly] = useState(false);
+  const historySearchQueryNormalized = historySearchQuery.trim().toLowerCase();
+  const filteredHistoryEntries = comparison
+    ? comparison.historyEntries.filter((entry) => {
+        if (showPinnedHistoryOnly && !entry.pinned) {
+          return false;
+        }
+        if (!historySearchQueryNormalized) {
+          return true;
+        }
+        return matchesComparisonHistoryPanelEntry(entry, historySearchQueryNormalized);
+      })
+    : [];
+  const activeHistoryEntry = comparison
+    ? comparison.historyEntries.find((entry) => entry.entryId === comparison.activeHistoryEntryId) ?? null
+    : null;
+  const pinnedHistoryCount = comparison
+    ? comparison.historyEntries.filter((entry) => entry.pinned).length
+    : 0;
 
   return (
     <section className="panel panel-wide">
@@ -9294,29 +9441,77 @@ function RunSection({
                       >
                         Forward step
                       </button>
+                      <button
+                        className="ghost-button"
+                        disabled={!activeHistoryEntry}
+                        onClick={() =>
+                          activeHistoryEntry
+                            ? comparison.onToggleHistoryEntryPinned(activeHistoryEntry.entryId)
+                            : undefined
+                        }
+                        type="button"
+                      >
+                        {activeHistoryEntry?.pinned ? "Unpin current" : "Pin current"}
+                      </button>
+                      <button
+                        className="ghost-button"
+                        disabled={!comparison.historyEntries.some(
+                          (entry) => !entry.pinned && entry.entryId !== comparison.activeHistoryEntryId,
+                        )}
+                        onClick={comparison.onTrimHistoryEntries}
+                        type="button"
+                      >
+                        Clear unpinned
+                      </button>
                     </div>
                   </div>
-                  {comparison.historyEntries.length ? (
+                  <div className="comparison-history-browser-manage">
+                    <label className="comparison-history-browser-search">
+                      Search steps
+                      <input
+                        onChange={(event) => setHistorySearchQuery(event.target.value)}
+                        placeholder="intent, label, summary"
+                        value={historySearchQuery}
+                      />
+                    </label>
+                    <button
+                      className={`ghost-button ${showPinnedHistoryOnly ? "is-active" : ""}`}
+                      onClick={() => setShowPinnedHistoryOnly((current) => !current)}
+                      type="button"
+                    >
+                      {showPinnedHistoryOnly ? "Showing pinned only" : `Pinned only (${pinnedHistoryCount})`}
+                    </button>
+                  </div>
+                  {!comparison.historyEntries.length ? (
+                    <p className="comparison-history-browser-empty">
+                      The current document session has not recorded comparison steps yet.
+                    </p>
+                  ) : !filteredHistoryEntries.length ? (
+                    <p className="comparison-history-browser-empty">
+                      No comparison steps match the current search and filter settings.
+                    </p>
+                  ) : (
                     <div className="comparison-history-browser-list">
-                      {comparison.historyEntries.map((entry, index) => {
+                      {filteredHistoryEntries.map((entry) => {
                         const isActive = entry.entryId === comparison.activeHistoryEntryId;
                         return (
-                          <button
+                          <article
                             aria-current={isActive ? "step" : undefined}
-                            className={`comparison-history-browser-entry ${
-                              isActive ? "is-active" : ""
-                            }`}
+                            className={`comparison-history-browser-entry ${isActive ? "is-active" : ""}`}
                             key={entry.entryId}
-                            onClick={() => comparison.onNavigateHistoryEntry(entry.entryId)}
-                            type="button"
                           >
                             <div className="comparison-history-browser-entry-head">
                               <span className="comparison-history-browser-entry-order">
-                                Step {index + 1}
+                                Step {entry.stepIndex + 1}
                               </span>
                               <span className="comparison-history-browser-entry-label">
                                 {entry.label}
                               </span>
+                              {entry.pinned ? (
+                                <span className="comparison-history-browser-entry-badge pinned">
+                                  Pinned
+                                </span>
+                              ) : null}
                               {isActive ? (
                                 <span className="comparison-history-browser-entry-badge">
                                   Current
@@ -9329,14 +9524,27 @@ function RunSection({
                             <p className="comparison-history-browser-entry-summary">
                               {entry.summary}
                             </p>
-                          </button>
+                            <div className="comparison-history-browser-entry-actions">
+                              <button
+                                className="ghost-button"
+                                disabled={isActive}
+                                onClick={() => comparison.onNavigateHistoryEntry(entry.entryId)}
+                                type="button"
+                              >
+                                {isActive ? "Current step" : "Open step"}
+                              </button>
+                              <button
+                                className="ghost-button"
+                                onClick={() => comparison.onToggleHistoryEntryPinned(entry.entryId)}
+                                type="button"
+                              >
+                                {entry.pinned ? "Unpin" : "Pin"}
+                              </button>
+                            </div>
+                          </article>
                         );
                       })}
                     </div>
-                  ) : (
-                    <p className="comparison-history-browser-empty">
-                      The current document session has not recorded comparison steps yet.
-                    </p>
                   )}
                 </div>
               ) : null}
