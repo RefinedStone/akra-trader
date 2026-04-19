@@ -14654,7 +14654,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v5"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v6"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",

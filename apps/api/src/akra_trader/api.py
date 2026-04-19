@@ -140,6 +140,39 @@ class RunSubresourceRouteBinding:
   subresource_key: str
 
 
+RUN_SUBRESOURCE_ROUTE_BINDINGS = (
+  RunSubresourceRouteBinding(
+    path="/runs/{run_id}/orders",
+    route_name="get_run_orders",
+    subresource_key="orders",
+  ),
+  RunSubresourceRouteBinding(
+    path="/runs/{run_id}/positions",
+    route_name="get_run_positions",
+    subresource_key="positions",
+  ),
+  RunSubresourceRouteBinding(
+    path="/runs/{run_id}/metrics",
+    route_name="get_run_metrics",
+    subresource_key="metrics",
+  ),
+)
+
+
+def serialize_run_subresource_route_bindings() -> list[dict[str, str]]:
+  return [
+    {
+      "subresource_key": binding.subresource_key,
+      "route_name": binding.route_name,
+      "path": binding.path,
+      "body_key": spec.body_key,
+      "response_title": spec.response_title,
+    }
+    for binding in RUN_SUBRESOURCE_ROUTE_BINDINGS
+    for spec in (get_run_subresource_serializer_spec(binding.subresource_key),)
+  ]
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -181,7 +214,9 @@ def create_router(container: Container) -> APIRouter:
 
   @router.get("/capabilities/run-surfaces")
   def get_run_surface_capabilities(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+    payload = serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+    payload["discovery"]["run_subresource_routes"] = serialize_run_subresource_route_bindings()
+    return payload
 
   @router.get("/strategies")
   def list_strategies(
@@ -588,24 +623,7 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run_response(run, app)
 
-  run_subresource_route_bindings = (
-    RunSubresourceRouteBinding(
-      path="/runs/{run_id}/orders",
-      route_name="get_run_orders",
-      subresource_key="orders",
-    ),
-    RunSubresourceRouteBinding(
-      path="/runs/{run_id}/positions",
-      route_name="get_run_positions",
-      subresource_key="positions",
-    ),
-    RunSubresourceRouteBinding(
-      path="/runs/{run_id}/metrics",
-      route_name="get_run_metrics",
-      subresource_key="metrics",
-    ),
-  )
-  for binding in run_subresource_route_bindings:
+  for binding in RUN_SUBRESOURCE_ROUTE_BINDINGS:
     spec = get_run_subresource_serializer_spec(binding.subresource_key)
     router.add_api_route(
       binding.path,

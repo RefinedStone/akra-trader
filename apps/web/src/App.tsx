@@ -498,6 +498,13 @@ type RunSurfaceCapabilities = {
       body_key: string;
       response_title: string;
     }[];
+    run_subresource_routes: {
+      subresource_key: string;
+      route_name: string;
+      path: string;
+      body_key: string;
+      response_title: string;
+    }[];
     schema_summary: string;
     schema_title: string;
     schema_version: string;
@@ -14328,10 +14335,33 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       response_title: "Run metrics",
     },
   ],
+  run_subresource_routes: [
+    {
+      subresource_key: "orders",
+      route_name: "get_run_orders",
+      path: "/runs/{run_id}/orders",
+      body_key: "orders",
+      response_title: "Run order list",
+    },
+    {
+      subresource_key: "positions",
+      route_name: "get_run_positions",
+      path: "/runs/{run_id}/positions",
+      body_key: "positions",
+      response_title: "Run positions",
+    },
+    {
+      subresource_key: "metrics",
+      route_name: "get_run_metrics",
+      path: "/runs/{run_id}/metrics",
+      body_key: "metrics",
+      response_title: "Run metrics",
+    },
+  ],
   schema_summary:
     "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v5",
+  schema_version: "run-surface-capabilities.v6",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14747,6 +14777,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
   const runSubresources = discovery.run_subresources ?? [];
+  const runSubresourceRoutes = discovery.run_subresource_routes ?? [];
   const familyByKey = new Map(
     getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
   );
@@ -14782,6 +14813,30 @@ function RunSurfaceCapabilityDiscoveryPanel({
                 </p>
                 <p className="run-note">
                   Registry key: {subresource.subresource_key}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+      {runSubresourceRoutes.length ? (
+        <div className="run-surface-family-section">
+          <span>Route bindings</span>
+          <div className="run-surface-family-rule-grid">
+            {runSubresourceRoutes.map((route) => (
+              <div
+                className="run-surface-family-rule-card"
+                key={`${route.subresource_key}:${route.route_name}`}
+              >
+                <div className="run-surface-family-rule-head">
+                  <strong>{route.response_title}</strong>
+                  <span className="meta-pill subtle">{route.route_name}</span>
+                </div>
+                <p className="run-note">
+                  Path: {route.path}
+                </p>
+                <p className="run-note">
+                  Subresource: {route.subresource_key} · Body: {route.body_key}
                 </p>
               </div>
             ))}

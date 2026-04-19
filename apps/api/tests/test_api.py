@@ -378,7 +378,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
 
   assert response.status_code == 200
   payload = response.json()
-  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v5"
+  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v6"
   assert payload["discovery"]["schema_title"] == "Run-surface capability contract"
   assert payload["discovery"]["family_order"] == [
     "comparison_eligibility",
@@ -405,6 +405,29 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     },
     {
       "subresource_key": "metrics",
+      "body_key": "metrics",
+      "response_title": "Run metrics",
+    },
+  ]
+  assert payload["discovery"]["run_subresource_routes"] == [
+    {
+      "subresource_key": "orders",
+      "route_name": "get_run_orders",
+      "path": "/runs/{run_id}/orders",
+      "body_key": "orders",
+      "response_title": "Run order list",
+    },
+    {
+      "subresource_key": "positions",
+      "route_name": "get_run_positions",
+      "path": "/runs/{run_id}/positions",
+      "body_key": "positions",
+      "response_title": "Run positions",
+    },
+    {
+      "subresource_key": "metrics",
+      "route_name": "get_run_metrics",
+      "path": "/runs/{run_id}/metrics",
       "body_key": "metrics",
       "response_title": "Run metrics",
     },
