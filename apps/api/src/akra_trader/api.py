@@ -15,6 +15,7 @@ from pydantic import Field
 
 from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import TradingApplication
+from akra_trader.application import execute_standalone_surface_binding
 from akra_trader.application import get_standalone_surface_runtime_binding
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
@@ -151,14 +152,37 @@ def create_router(container: Container) -> APIRouter:
     )
 
   def build_standalone_surface_route_handler(binding: StandaloneSurfaceRuntimeBinding):
+    def dispatch_binding(
+      *,
+      app: TradingApplication,
+      run_id: str | None = None,
+      filters: dict[str, Any] | None = None,
+      request_payload: dict[str, Any] | None = None,
+      path_params: dict[str, Any] | None = None,
+      headers: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+      try:
+        return execute_standalone_surface_binding(
+          binding=binding,
+          app=app,
+          run_id=run_id,
+          filters=filters,
+          request_payload=request_payload,
+          path_params=path_params,
+          headers=headers,
+        )
+      except PermissionError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+      except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+      except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     if binding.scope == "app":
       def get_app_surface(
         app: TradingApplication = Depends(get_app),
       ) -> dict[str, Any]:
-        try:
-          return serialize_standalone_surface_response(binding=binding, app=app)
-        except (ValueError, RuntimeError) as exc:
-          raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return dispatch_binding(app=app)
 
       get_app_surface.__name__ = binding.route_name
       return get_app_surface
@@ -167,12 +191,7 @@ def create_router(container: Container) -> APIRouter:
       run_id: str,
       app: TradingApplication = Depends(get_app),
     ) -> dict[str, Any]:
-      try:
-        return serialize_standalone_surface_response(binding=binding, app=app, run_id=run_id)
-      except LookupError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-      except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+      return dispatch_binding(app=app, run_id=run_id)
 
     get_run_surface.__name__ = binding.route_name
     return get_run_surface
@@ -224,20 +243,18 @@ def create_router(container: Container) -> APIRouter:
     request: ExperimentPresetRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "preset_catalog_create",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      preset = app.create_preset(
-        name=request.name,
-        preset_id=request.preset_id,
-        description=request.description,
-        strategy_id=request.strategy_id,
-        timeframe=request.timeframe,
-        tags=request.tags,
-        parameters=request.parameters,
-        benchmark_family=request.benchmark_family,
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
       )
-    except ValueError as exc:
+    except (ValueError, RuntimeError) as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_preset(preset)
 
   @router.get("/presets/{preset_id}")
   def get_preset(
@@ -332,12 +349,18 @@ def create_router(container: Container) -> APIRouter:
     request: StrategyRegistrationRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    metadata = app.register_strategy(
-      strategy_id=request.strategy_id,
-      module_path=request.module_path,
-      class_name=request.class_name,
+    binding = get_standalone_surface_runtime_binding(
+      "strategy_catalog_register",
+      app.get_run_surface_capabilities(),
     )
-    return serialize_strategy(metadata)
+    try:
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+      )
+    except (ValueError, RuntimeError) as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
 
   @router.get("/runs")
   def list_runs(
@@ -589,12 +612,20 @@ def create_router(container: Container) -> APIRouter:
     return serialize_run_response(run, app)
 
   for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
-    if binding.scope == "app" and binding.filter_keys:
+    if (
+      binding.scope == "app"
+      and (
+        binding.filter_keys
+        or binding.request_payload_kind is not None
+        or binding.path_param_keys
+        or binding.header_keys
+      )
+    ):
       continue
     router.add_api_route(
       binding.route_path,
       build_standalone_surface_route_handler(binding),
-      methods=["GET"],
+      methods=list(binding.methods),
       name=binding.route_name,
       summary=binding.response_title,
     )
@@ -617,19 +648,16 @@ def create_router(container: Container) -> APIRouter:
     x_akra_incident_sync_token: str | None = Header(default=None, alias="X-Akra-Incident-Sync-Token"),
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "operator_incident_external_sync",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      app.require_operator_alert_external_sync_token(x_akra_incident_sync_token)
-      status = app.sync_guarded_live_incident_from_external(
-        provider=request.provider,
-        event_kind=request.event_kind,
-        actor=request.actor,
-        detail=request.detail,
-        alert_id=request.alert_id,
-        external_reference=request.external_reference,
-        workflow_reference=request.workflow_reference,
-        occurred_at=request.occurred_at,
-        escalation_level=request.escalation_level,
-        payload=request.payload,
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+        headers={"x_akra_incident_sync_token": x_akra_incident_sync_token},
       )
     except PermissionError as exc:
       raise HTTPException(status_code=403, detail=str(exc)) from exc
@@ -637,39 +665,66 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return asdict(status)
 
   @router.post("/guarded-live/kill-switch/engage")
   def engage_guarded_live_kill_switch(
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    status = app.engage_guarded_live_kill_switch(actor=request.actor, reason=request.reason)
-    return asdict(status)
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_kill_switch_engage",
+      app.get_run_surface_capabilities(),
+    )
+    return execute_standalone_surface_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/guarded-live/kill-switch/release")
   def release_guarded_live_kill_switch(
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    status = app.release_guarded_live_kill_switch(actor=request.actor, reason=request.reason)
-    return asdict(status)
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_kill_switch_release",
+      app.get_run_surface_capabilities(),
+    )
+    return execute_standalone_surface_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/guarded-live/reconciliation")
   def run_guarded_live_reconciliation(
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    status = app.run_guarded_live_reconciliation(actor=request.actor, reason=request.reason)
-    return asdict(status)
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_reconciliation",
+      app.get_run_surface_capabilities(),
+    )
+    return execute_standalone_surface_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/guarded-live/recovery")
   def recover_guarded_live_runtime_state(
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    status = app.recover_guarded_live_runtime_state(actor=request.actor, reason=request.reason)
-    return asdict(status)
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_recovery",
+      app.get_run_surface_capabilities(),
+    )
+    return execute_standalone_surface_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/guarded-live/incidents/{event_id}/acknowledge")
   def acknowledge_guarded_live_incident(
@@ -677,17 +732,21 @@ def create_router(container: Container) -> APIRouter:
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_incident_acknowledge",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      status = app.acknowledge_guarded_live_incident(
-        event_id=event_id,
-        actor=request.actor,
-        reason=request.reason,
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+        path_params={"event_id": event_id},
       )
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return asdict(status)
 
   @router.post("/guarded-live/incidents/{event_id}/remediate")
   def remediate_guarded_live_incident(
@@ -695,17 +754,21 @@ def create_router(container: Container) -> APIRouter:
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_incident_remediate",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      status = app.remediate_guarded_live_incident(
-        event_id=event_id,
-        actor=request.actor,
-        reason=request.reason,
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+        path_params={"event_id": event_id},
       )
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return asdict(status)
 
   @router.post("/guarded-live/incidents/{event_id}/escalate")
   def escalate_guarded_live_incident(
@@ -713,30 +776,41 @@ def create_router(container: Container) -> APIRouter:
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_incident_escalate",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      status = app.escalate_guarded_live_incident(
-        event_id=event_id,
-        actor=request.actor,
-        reason=request.reason,
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+        path_params={"event_id": event_id},
       )
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return asdict(status)
 
   @router.post("/guarded-live/resume")
   def resume_guarded_live_run(
     request: GuardedLiveActionRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
+    binding = get_standalone_surface_runtime_binding(
+      "guarded_live_resume",
+      app.get_run_surface_capabilities(),
+    )
     try:
-      run = app.resume_guarded_live_run(actor=request.actor, reason=request.reason)
+      return execute_standalone_surface_binding(
+        binding=binding,
+        app=app,
+        request_payload=request.model_dump(),
+      )
     except LookupError as exc:
       raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
 
   return router
 

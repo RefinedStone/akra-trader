@@ -22984,8 +22984,12 @@ class StandaloneSurfaceRuntimeBinding:
   response_title: str
   scope: str
   binding_kind: str
+  methods: tuple[str, ...] = ("GET",)
   subresource_key: str | None = None
   filter_keys: tuple[str, ...] = ()
+  path_param_keys: tuple[str, ...] = ()
+  header_keys: tuple[str, ...] = ()
+  request_payload_kind: str | None = None
 
 
 def _serialize_run_order_subresource_item(
@@ -23190,6 +23194,120 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="preset_catalog_discovery",
     filter_keys=("strategy_id", "timeframe", "lifecycle_stage"),
   )
+  preset_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_create",
+    route_path="/presets",
+    route_name="create_preset",
+    response_title="Create preset",
+    scope="app",
+    binding_kind="preset_catalog_create",
+    methods=("POST",),
+    request_payload_kind="preset_create",
+  )
+  strategy_register_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="strategy_catalog_register",
+    route_path="/strategies/register",
+    route_name="register_strategy",
+    response_title="Register strategy",
+    scope="app",
+    binding_kind="strategy_catalog_register",
+    methods=("POST",),
+    request_payload_kind="strategy_register",
+  )
+  operator_incident_external_sync_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_incident_external_sync",
+    route_path="/operator/incidents/external-sync",
+    route_name="sync_external_incident",
+    response_title="External incident sync",
+    scope="app",
+    binding_kind="operator_incident_external_sync",
+    methods=("POST",),
+    header_keys=("x_akra_incident_sync_token",),
+    request_payload_kind="external_incident_sync",
+  )
+  guarded_live_kill_switch_engage_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_kill_switch_engage",
+    route_path="/guarded-live/kill-switch/engage",
+    route_name="engage_guarded_live_kill_switch",
+    response_title="Engage guarded-live kill switch",
+    scope="app",
+    binding_kind="guarded_live_kill_switch_engage",
+    methods=("POST",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_kill_switch_release_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_kill_switch_release",
+    route_path="/guarded-live/kill-switch/release",
+    route_name="release_guarded_live_kill_switch",
+    response_title="Release guarded-live kill switch",
+    scope="app",
+    binding_kind="guarded_live_kill_switch_release",
+    methods=("POST",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_reconciliation_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_reconciliation",
+    route_path="/guarded-live/reconciliation",
+    route_name="run_guarded_live_reconciliation",
+    response_title="Run guarded-live reconciliation",
+    scope="app",
+    binding_kind="guarded_live_reconciliation",
+    methods=("POST",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_recovery_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_recovery",
+    route_path="/guarded-live/recovery",
+    route_name="recover_guarded_live_runtime_state",
+    response_title="Recover guarded-live runtime state",
+    scope="app",
+    binding_kind="guarded_live_recovery",
+    methods=("POST",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_incident_acknowledge_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_incident_acknowledge",
+    route_path="/guarded-live/incidents/{event_id}/acknowledge",
+    route_name="acknowledge_guarded_live_incident",
+    response_title="Acknowledge guarded-live incident",
+    scope="app",
+    binding_kind="guarded_live_incident_acknowledge",
+    methods=("POST",),
+    path_param_keys=("event_id",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_incident_remediate_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_incident_remediate",
+    route_path="/guarded-live/incidents/{event_id}/remediate",
+    route_name="remediate_guarded_live_incident",
+    response_title="Remediate guarded-live incident",
+    scope="app",
+    binding_kind="guarded_live_incident_remediate",
+    methods=("POST",),
+    path_param_keys=("event_id",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_incident_escalate_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_incident_escalate",
+    route_path="/guarded-live/incidents/{event_id}/escalate",
+    route_name="escalate_guarded_live_incident",
+    response_title="Escalate guarded-live incident",
+    scope="app",
+    binding_kind="guarded_live_incident_escalate",
+    methods=("POST",),
+    path_param_keys=("event_id",),
+    request_payload_kind="guarded_live_action",
+  )
+  guarded_live_resume_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="guarded_live_resume",
+    route_path="/guarded-live/resume",
+    route_name="resume_guarded_live_run",
+    response_title="Resume guarded-live run",
+    scope="app",
+    binding_kind="guarded_live_resume",
+    methods=("POST",),
+    request_payload_kind="guarded_live_action",
+  )
   run_subresource_bindings = tuple(
     StandaloneSurfaceRuntimeBinding(
       surface_key=f"run_subresource:{binding.contract.subresource_key}",
@@ -23211,6 +23329,17 @@ def list_standalone_surface_runtime_bindings(
     strategy_discovery_binding,
     reference_discovery_binding,
     preset_discovery_binding,
+    preset_create_binding,
+    strategy_register_binding,
+    operator_incident_external_sync_binding,
+    guarded_live_kill_switch_engage_binding,
+    guarded_live_kill_switch_release_binding,
+    guarded_live_reconciliation_binding,
+    guarded_live_recovery_binding,
+    guarded_live_incident_acknowledge_binding,
+    guarded_live_incident_remediate_binding,
+    guarded_live_incident_escalate_binding,
+    guarded_live_resume_binding,
     *run_subresource_bindings,
   )
 
@@ -23225,14 +23354,20 @@ def get_standalone_surface_runtime_binding(
   raise ValueError(f"Unsupported standalone surface binding: {surface_key}")
 
 
-def serialize_standalone_surface_response(
+def execute_standalone_surface_binding(
   *,
   binding: StandaloneSurfaceRuntimeBinding,
   app: TradingApplication,
   run_id: str | None = None,
   filters: dict[str, Any] | None = None,
+  request_payload: dict[str, Any] | None = None,
+  path_params: dict[str, Any] | None = None,
+  headers: dict[str, Any] | None = None,
 ) -> Any:
   resolved_filters = filters or {}
+  resolved_payload = request_payload or {}
+  resolved_path_params = path_params or {}
+  resolved_headers = headers or {}
   if binding.binding_kind == "health_status":
     return {"status": "ok"}
   if binding.binding_kind == "run_surface_capabilities":
@@ -23263,6 +23398,100 @@ def serialize_standalone_surface_response(
         lifecycle_stage=resolved_filters.get("lifecycle_stage"),
       )
     ]
+  if binding.binding_kind == "preset_catalog_create":
+    preset = app.create_preset(
+      name=resolved_payload["name"],
+      preset_id=resolved_payload.get("preset_id"),
+      description=resolved_payload.get("description") or "",
+      strategy_id=resolved_payload.get("strategy_id"),
+      timeframe=resolved_payload.get("timeframe"),
+      tags=resolved_payload.get("tags") or [],
+      parameters=resolved_payload.get("parameters") or {},
+      benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_preset(preset)
+  if binding.binding_kind == "strategy_catalog_register":
+    metadata = app.register_strategy(
+      strategy_id=resolved_payload["strategy_id"],
+      module_path=resolved_payload["module_path"],
+      class_name=resolved_payload["class_name"],
+    )
+    return serialize_strategy(metadata)
+  if binding.binding_kind == "operator_incident_external_sync":
+    app.require_operator_alert_external_sync_token(
+      resolved_headers.get("x_akra_incident_sync_token"),
+    )
+    status = app.sync_guarded_live_incident_from_external(
+      provider=resolved_payload["provider"],
+      event_kind=resolved_payload["event_kind"],
+      actor=resolved_payload["actor"],
+      detail=resolved_payload["detail"],
+      alert_id=resolved_payload.get("alert_id"),
+      external_reference=resolved_payload.get("external_reference"),
+      workflow_reference=resolved_payload.get("workflow_reference"),
+      occurred_at=resolved_payload.get("occurred_at"),
+      escalation_level=resolved_payload.get("escalation_level"),
+      payload=resolved_payload.get("payload"),
+    )
+    return asdict(status)
+  if binding.binding_kind == "guarded_live_kill_switch_engage":
+    return asdict(
+      app.engage_guarded_live_kill_switch(
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_kill_switch_release":
+    return asdict(
+      app.release_guarded_live_kill_switch(
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_reconciliation":
+    return asdict(
+      app.run_guarded_live_reconciliation(
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_recovery":
+    return asdict(
+      app.recover_guarded_live_runtime_state(
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_incident_acknowledge":
+    return asdict(
+      app.acknowledge_guarded_live_incident(
+        event_id=resolved_path_params["event_id"],
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_incident_remediate":
+    return asdict(
+      app.remediate_guarded_live_incident(
+        event_id=resolved_path_params["event_id"],
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_incident_escalate":
+    return asdict(
+      app.escalate_guarded_live_incident(
+        event_id=resolved_path_params["event_id"],
+        actor=resolved_payload["actor"],
+        reason=resolved_payload["reason"],
+      )
+    )
+  if binding.binding_kind == "guarded_live_resume":
+    run = app.resume_guarded_live_run(
+      actor=resolved_payload["actor"],
+      reason=resolved_payload["reason"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
   if binding.binding_kind == "run_subresource":
     if binding.subresource_key is None:
       raise ValueError(f"Standalone surface binding is missing subresource metadata: {binding.surface_key}")
@@ -23277,6 +23506,21 @@ def serialize_standalone_surface_response(
       capabilities=app.get_run_surface_capabilities(),
     )
   raise ValueError(f"Unsupported standalone surface binding: {binding.binding_kind}")
+
+
+def serialize_standalone_surface_response(
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
+  app: TradingApplication,
+  run_id: str | None = None,
+  filters: dict[str, Any] | None = None,
+) -> Any:
+  return execute_standalone_surface_binding(
+    binding=binding,
+    app=app,
+    run_id=run_id,
+    filters=filters,
+  )
 
 
 def list_run_surface_shared_contracts(

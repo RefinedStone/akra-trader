@@ -23,6 +23,7 @@ from akra_trader.application import get_run_subresource_runtime_binding
 from akra_trader.application import list_run_subresource_contracts
 from akra_trader.application import list_run_subresource_runtime_bindings
 from akra_trader.application import list_standalone_surface_runtime_bindings
+from akra_trader.application import execute_standalone_surface_binding
 from akra_trader.application import serialize_standalone_surface_response
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_surface_capabilities
@@ -13934,6 +13935,17 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
     "preset_catalog_discovery",
+    "preset_catalog_create",
+    "strategy_catalog_register",
+    "operator_incident_external_sync",
+    "guarded_live_kill_switch_engage",
+    "guarded_live_kill_switch_release",
+    "guarded_live_reconciliation",
+    "guarded_live_recovery",
+    "guarded_live_incident_acknowledge",
+    "guarded_live_incident_remediate",
+    "guarded_live_incident_escalate",
+    "guarded_live_resume",
     "run_subresource:orders",
     "run_subresource:positions",
     "run_subresource:metrics",
@@ -13948,9 +13960,27 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
+  assert bindings_by_key["preset_catalog_create"].methods == ("POST",)
+  assert bindings_by_key["strategy_catalog_register"].methods == ("POST",)
+  assert bindings_by_key["operator_incident_external_sync"].header_keys == ("x_akra_incident_sync_token",)
+  assert bindings_by_key["guarded_live_incident_acknowledge"].path_param_keys == ("event_id",)
   assert bindings_by_key["run_subresource:orders"].scope == "run"
   assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
 
+  created_preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_create"],
+    app=app,
+    request_payload={
+      "name": "Swing 1h",
+      "preset_id": "swing_1h",
+      "description": "runtime-created preset",
+      "strategy_id": "ma_cross_v1",
+      "timeframe": "1h",
+      "tags": ["swing"],
+      "parameters": {"short_window": 8, "long_window": 21},
+      "benchmark_family": "trend",
+    },
+  )
   health_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["health_status"],
     app=app,
@@ -13991,7 +14021,18 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     app=app,
     filters={"strategy_id": "ma_cross_v1"},
   )
+  kill_switch_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["guarded_live_kill_switch_engage"],
+    app=app,
+    request_payload={"actor": "operator", "reason": "manual_safety_drill"},
+  )
+  released_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["guarded_live_kill_switch_release"],
+    app=app,
+    request_payload={"actor": "operator", "reason": "drill_complete"},
+  )
 
+  assert created_preset_payload["preset_id"] == "swing_1h"
   assert health_payload == {"status": "ok"}
   assert capabilities_payload["discovery"]["shared_contracts"]
   assert market_data_payload["provider"] == "seeded"
@@ -14007,7 +14048,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert all(item["runtime"] == "native" for item in strategy_payload)
   assert reference_payload
   assert any(item["reference_id"] == "nautilus-trader" for item in reference_payload)
-  assert [item["preset_id"] for item in preset_payload] == ["core_5m"]
+  assert sorted(item["preset_id"] for item in preset_payload) == ["core_5m", "swing_1h"]
+  assert kill_switch_payload["kill_switch"]["state"] == "engaged"
+  assert released_payload["kill_switch"]["state"] == "released"
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
