@@ -20,6 +20,7 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
 from akra_trader.application import get_run_subresource_serializer_spec
+from akra_trader.application import serialize_run_surface_capabilities
 from akra_trader.application import serialize_run_subresource_response
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
@@ -13798,6 +13799,26 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   assert metrics_spec.body_key == "metrics"
   assert metrics_spec.response_title == "Run metrics"
 
+  payload = serialize_run_surface_capabilities(RunSurfaceCapabilities())
+
+  assert payload["discovery"]["run_subresources"] == [
+    {
+      "subresource_key": "orders",
+      "body_key": "orders",
+      "response_title": "Run order list",
+    },
+    {
+      "subresource_key": "positions",
+      "body_key": "positions",
+      "response_title": "Run positions",
+    },
+    {
+      "subresource_key": "metrics",
+      "body_key": "metrics",
+      "response_title": "Run metrics",
+    },
+  ]
+
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   repo_root = Path(__file__).resolve().parents[3]
@@ -14633,7 +14654,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v4"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v5"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",

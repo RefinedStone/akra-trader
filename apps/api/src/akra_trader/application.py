@@ -23057,6 +23057,17 @@ def get_run_subresource_serializer_spec(subresource_key: str) -> RunSubresourceS
   return spec
 
 
+def serialize_run_subresource_registry_metadata() -> list[dict[str, str]]:
+  return [
+    {
+      "subresource_key": spec.subresource_key,
+      "body_key": spec.body_key,
+      "response_title": spec.response_title,
+    }
+    for spec in RUN_SUBRESOURCE_SERIALIZER_SPECS.values()
+  ]
+
+
 def serialize_run_subresource_response(
   run: RunRecord,
   *,
@@ -23193,6 +23204,7 @@ def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> 
         capabilities.discovery.get("comparison_eligibility_group_order", ())
       ),
       "family_order": list(capabilities.discovery.get("family_order", ())),
+      "run_subresources": serialize_run_subresource_registry_metadata(),
     },
     "comparison_eligibility_contract": serialize_comparison_eligibility_contract(
       capabilities.comparison_eligibility_contract

@@ -918,7 +918,7 @@ class RunSurfaceCapabilities:
         "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
       ),
       "schema_title": "Run-surface capability contract",
-      "schema_version": "run-surface-capabilities.v4",
+      "schema_version": "run-surface-capabilities.v5",
     }
   )
 

@@ -493,6 +493,11 @@ type RunSurfaceCapabilities = {
   discovery: {
     comparison_eligibility_group_order: RunListBoundaryGroupKey[];
     family_order: string[];
+    run_subresources: {
+      subresource_key: string;
+      body_key: string;
+      response_title: string;
+    }[];
     schema_summary: string;
     schema_title: string;
     schema_version: string;
@@ -14306,10 +14311,27 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
     "provenance_semantics",
     "execution_controls",
   ],
+  run_subresources: [
+    {
+      subresource_key: "orders",
+      body_key: "orders",
+      response_title: "Run order list",
+    },
+    {
+      subresource_key: "positions",
+      body_key: "positions",
+      response_title: "Run positions",
+    },
+    {
+      subresource_key: "metrics",
+      body_key: "metrics",
+      response_title: "Run metrics",
+    },
+  ],
   schema_summary:
     "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v4",
+  schema_version: "run-surface-capabilities.v5",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14724,6 +14746,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
 }) {
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
+  const runSubresources = discovery.run_subresources ?? [];
   const familyByKey = new Map(
     getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
   );
@@ -14744,6 +14767,27 @@ function RunSurfaceCapabilityDiscoveryPanel({
         </div>
         <span className="meta-pill subtle">{discovery.schema_version}</span>
       </div>
+      {runSubresources.length ? (
+        <div className="run-surface-family-section">
+          <span>Run subresources</span>
+          <div className="run-surface-family-rule-grid">
+            {runSubresources.map((subresource) => (
+              <div className="run-surface-family-rule-card" key={subresource.subresource_key}>
+                <div className="run-surface-family-rule-head">
+                  <strong>{subresource.response_title}</strong>
+                  <span className="meta-pill subtle">{subresource.subresource_key}</span>
+                </div>
+                <p className="run-note">
+                  Envelope body: {subresource.body_key}
+                </p>
+                <p className="run-note">
+                  Registry key: {subresource.subresource_key}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       <div className="run-surface-family-grid">
         {orderedFamilies.map((family) => (
           <article className="run-surface-family-card" key={family.family_key}>
