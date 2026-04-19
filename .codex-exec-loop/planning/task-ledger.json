@@ -3873,19 +3873,37 @@
       "id": "planning-experiment-os-extend-run-list-deep-links-to-non-strategy-summary-surfaces",
       "direction_id": "experiment-os",
       "title": "Extend run-list comparison deep links to non-strategy summary surfaces",
-      "description": "Build on the shipped `RunStrategySnapshot` drill-back contract by wiring the remaining run-list summary blocks such as reference badges or notes, runtime session summaries, and market-lineage summaries into the same `run_list` deep-link model, so operators can jump from any meaningful run-list summary surface back to the matching comparison evidence instead of only from strategy-semantic rows.",
-      "status": "ready",
+      "description": "Build on the shipped `RunStrategySnapshot` drill-back contract by wiring the next run-list summary blocks such as reference badges or notes, runtime session summaries, and market-lineage summaries into the same `run_list` deep-link model, so operators can jump from those meaningful run-list summary surfaces back to the matching comparison evidence instead of only from strategy-semantic rows. This task is now completed for `ReferenceRunProvenanceSummary`, runtime session, and data-lineage surfaces; broader outer summary blocks continue in a dedicated follow-up task.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly says the remaining executable work is to extend `run_list` deep links beyond `RunStrategySnapshot` to other run-list summary blocks like reference badge or note, runtime session, and market lineage. That is a concrete immediate follow-up, so promote it to the ready queue head for automatic progression.",
+      "priority_reason": "Completed in main session commit b5b2e75, which extended `run_list` comparison deep links beyond `RunStrategySnapshot` into `ReferenceRunProvenanceSummary`, runtime session, and data-lineage surfaces, preserved provenance artifact hover and detail state plus scroll restoration across reload and history, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-comparison-deep-links-to-run-list-semantic-summaries"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:10:00Z",
+      "updated_at": "2026-04-20T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison traceability from strategy-semantic run-list summaries into the broader non-strategy run-history summary blocks operators scan first, keeping comparison drill-back coherent across the full run list rather than one summary component."
+    },
+    {
+      "id": "planning-experiment-os-extend-run-list-deep-links-to-outer-summary-blocks",
+      "direction_id": "experiment-os",
+      "title": "Extend run-list comparison deep links to remaining outer summary blocks",
+      "description": "Carry the now-shipped `run_list` deep-link contract beyond strategy, provenance, runtime-session, and data-lineage summaries into the remaining outer run-list summary blocks such as order lifecycle and any adjacent summary sections, so operators can enter comparison evidence directly from the broader top-level run summary layout instead of stopping at the currently wired blocks.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply explicitly says the remaining executable work is the outer run-list summary surface, with order lifecycle called out as an example of a summary block that still is not connected to comparison selection. That is a concrete immediate follow-up, so promote it to the ready queue head for automatic progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-run-list-deep-links-to-non-strategy-summary-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison traceability moving outward from inner run-list detail summaries into the remaining top-level run summary blocks operators scan before opening detailed comparison views."
     }
   ]
 }
