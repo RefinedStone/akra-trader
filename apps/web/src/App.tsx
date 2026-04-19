@@ -2836,6 +2836,7 @@ type ComparisonHistoryPanelEntry = {
   summary: string;
   title: string;
   url: string;
+  hidden: boolean;
   pinned: boolean;
   recordedAt: string;
   selection: ControlRoomComparisonSelectionState;
@@ -4528,6 +4529,19 @@ export default function App() {
     comparisonHistoryActiveIndex >= 0
       ? comparisonHistoryPanel.entries[comparisonHistoryActiveIndex]?.stepIndex ?? -1
       : -1;
+  const visibleComparisonHistoryEntries = useMemo(
+    () => comparisonHistoryPanel.entries.filter((entry) => !entry.hidden),
+    [comparisonHistoryPanel.entries],
+  );
+  const visibleComparisonHistoryActiveIndex = useMemo(
+    () =>
+      comparisonHistoryPanel.activeEntryId
+        ? visibleComparisonHistoryEntries.findIndex(
+            (entry) => entry.entryId === comparisonHistoryPanel.activeEntryId,
+          )
+        : -1,
+    [comparisonHistoryPanel.activeEntryId, visibleComparisonHistoryEntries],
+  );
   const applyComparisonSelectionState = (
     value: ControlRoomComparisonSelectionState,
   ) => {
@@ -4708,6 +4722,54 @@ export default function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== CONTROL_ROOM_UI_STATE_STORAGE_KEY) {
+        return;
+      }
+      const remoteState = readControlRoomUiStateValue(event.newValue);
+      if (!remoteState) {
+        return;
+      }
+      const mergedPanel = mergeComparisonHistoryPanelState(
+        comparisonHistoryPanel,
+        remoteState.comparisonHistoryPanel.panel,
+        comparisonSelection,
+      );
+      setComparisonHistoryPanel((current) =>
+        isSameComparisonHistoryPanelState(current, mergedPanel) ? current : mergedPanel,
+      );
+      setComparisonHistoryPanelOpen((current) =>
+        current === remoteState.comparisonHistoryPanel.open
+          ? current
+          : remoteState.comparisonHistoryPanel.open,
+      );
+      setComparisonHistorySearchQuery((current) =>
+        current === remoteState.comparisonHistoryPanel.searchQuery
+          ? current
+          : remoteState.comparisonHistoryPanel.searchQuery,
+      );
+      setComparisonHistoryShowPinnedOnly((current) =>
+        current === remoteState.comparisonHistoryPanel.showPinnedOnly
+          ? current
+          : remoteState.comparisonHistoryPanel.showPinnedOnly,
+      );
+    };
+
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [
+    comparisonHistoryPanel,
+    comparisonHistoryPanelOpen,
+    comparisonHistorySearchQuery,
+    comparisonHistoryShowPinnedOnly,
+    comparisonSelection,
+  ]);
 
   useEffect(() => {
     if (selectedComparisonRunIds.length < 2) {
@@ -4924,14 +4986,14 @@ export default function App() {
   };
 
   const handleNavigateComparisonHistoryRelative = (delta: number) => {
-    if (typeof window === "undefined" || delta === 0 || comparisonHistoryActiveIndex < 0) {
+    if (typeof window === "undefined" || delta === 0 || visibleComparisonHistoryActiveIndex < 0) {
       return;
     }
-    const targetIndex = comparisonHistoryActiveIndex + delta;
-    if (targetIndex < 0 || targetIndex >= comparisonHistoryPanel.entries.length) {
+    const targetIndex = visibleComparisonHistoryActiveIndex + delta;
+    if (targetIndex < 0 || targetIndex >= visibleComparisonHistoryEntries.length) {
       return;
     }
-    const targetEntry = comparisonHistoryPanel.entries[targetIndex];
+    const targetEntry = visibleComparisonHistoryEntries[targetIndex];
     const historyDelta = targetEntry.stepIndex - comparisonHistoryActiveStepIndex;
     if (historyDelta === 0) {
       return;
@@ -4950,11 +5012,13 @@ export default function App() {
 
   const handleTrimComparisonHistoryEntries = () => {
     setComparisonHistoryPanel((current) => {
-      const nextEntries = current.entries.filter(
-        (entry) => entry.pinned || entry.entryId === current.activeEntryId,
+      const nextEntries = current.entries.map((entry) =>
+        entry.pinned || entry.entryId === current.activeEntryId
+          ? { ...entry, hidden: false }
+          : { ...entry, hidden: true },
       );
       return {
-        entries: nextEntries,
+        entries: limitComparisonHistoryPanelEntries(sortComparisonHistoryPanelEntries(nextEntries)),
         activeEntryId:
           current.activeEntryId && nextEntries.some((entry) => entry.entryId === current.activeEntryId)
             ? current.activeEntryId
@@ -7312,14 +7376,15 @@ export default function App() {
             comparisonIntent,
             historyStep: comparisonHistoryStep,
             historyEntries: comparisonHistoryPanel.entries,
+            visibleHistoryEntries: visibleComparisonHistoryEntries,
             activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
             historyBrowserOpen: comparisonHistoryPanelOpen,
             historySearchQuery: comparisonHistorySearchQuery,
             showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
-            canNavigateHistoryBackward: comparisonHistoryActiveIndex > 0,
+            canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
             canNavigateHistoryForward:
-              comparisonHistoryActiveIndex >= 0
-              && comparisonHistoryActiveIndex < comparisonHistoryPanel.entries.length - 1,
+              visibleComparisonHistoryActiveIndex >= 0
+              && visibleComparisonHistoryActiveIndex < visibleComparisonHistoryEntries.length - 1,
             selectedScoreLink: selectedComparisonScoreLink,
             payload: runComparison,
             loading: runComparisonLoading,
@@ -7672,11 +7737,14 @@ function loadControlRoomUiState(): ControlRoomUiStateV3 | null {
   if (typeof window === "undefined") {
     return null;
   }
+  return readControlRoomUiStateValue(window.localStorage.getItem(CONTROL_ROOM_UI_STATE_STORAGE_KEY));
+}
+
+function readControlRoomUiStateValue(raw: string | null): ControlRoomUiStateV3 | null {
+  if (!raw) {
+    return null;
+  }
   try {
-    const raw = window.localStorage.getItem(CONTROL_ROOM_UI_STATE_STORAGE_KEY);
-    if (!raw) {
-      return null;
-    }
     const parsed = JSON.parse(raw);
     if (isControlRoomUiStateV3(parsed)) {
       return {
@@ -7918,6 +7986,7 @@ function buildComparisonHistoryPanelEntry(
     summary: browserState.summary,
     title: browserState.title,
     url,
+    hidden: false,
     pinned: false,
     recordedAt: now,
     selection: normalizeControlRoomComparisonSelection(browserState.selection),
@@ -7929,7 +7998,7 @@ function findComparisonHistoryPanelEntryForSelection(
   selection: ControlRoomComparisonSelectionState,
 ) {
   const matchingEntries = panel.entries.filter((entry) =>
-    isSameComparisonSelection(entry.selection, selection),
+    !entry.hidden && isSameComparisonSelection(entry.selection, selection),
   );
   if (!matchingEntries.length) {
     return null;
@@ -7941,6 +8010,59 @@ function findComparisonHistoryPanelEntryForSelection(
     }
   }
   return matchingEntries[matchingEntries.length - 1] ?? null;
+}
+
+function mergeComparisonHistoryPanelState(
+  local: ComparisonHistoryPanelState,
+  remote: ComparisonHistoryPanelState,
+  selection: ControlRoomComparisonSelectionState,
+): ComparisonHistoryPanelState {
+  const mergedEntries = mergeComparisonHistoryPanelEntries(local.entries, remote.entries);
+  const selectionMatch = findComparisonHistoryPanelEntryForSelection(
+    {
+      entries: mergedEntries,
+      activeEntryId: local.activeEntryId,
+    },
+    selection,
+  );
+  if (selectionMatch) {
+    return {
+      entries: mergedEntries,
+      activeEntryId: selectionMatch.entryId,
+    };
+  }
+  if (local.activeEntryId && mergedEntries.some((entry) => entry.entryId === local.activeEntryId)) {
+    return {
+      entries: mergedEntries,
+      activeEntryId: local.activeEntryId,
+    };
+  }
+  if (remote.activeEntryId && mergedEntries.some((entry) => entry.entryId === remote.activeEntryId)) {
+    return {
+      entries: mergedEntries,
+      activeEntryId: remote.activeEntryId,
+    };
+  }
+  return {
+    entries: mergedEntries,
+    activeEntryId: mergedEntries[mergedEntries.length - 1]?.entryId ?? null,
+  };
+}
+
+function mergeComparisonHistoryPanelEntries(
+  localEntries: ComparisonHistoryPanelEntry[],
+  remoteEntries: ComparisonHistoryPanelEntry[],
+) {
+  const mergedEntries = new Map<string, ComparisonHistoryPanelEntry>();
+  localEntries.forEach((entry) => {
+    mergedEntries.set(entry.entryId, entry);
+  });
+  remoteEntries.forEach((entry) => {
+    mergedEntries.set(entry.entryId, entry);
+  });
+  return limitComparisonHistoryPanelEntries(
+    sortComparisonHistoryPanelEntries([...mergedEntries.values()]),
+  );
 }
 
 function reconcileComparisonHistoryPanelState(
@@ -8022,17 +8144,20 @@ function limitComparisonHistoryPanelEntries(entries: ComparisonHistoryPanelEntry
   if (entries.length <= MAX_COMPARISON_HISTORY_PANEL_ENTRIES) {
     return entries;
   }
-  const pinnedEntries = entries.filter((entry) => entry.pinned);
+  const visibleEntries = entries.filter((entry) => !entry.hidden);
+  const hiddenEntries = entries.filter((entry) => entry.hidden);
+  const pinnedEntries = visibleEntries.filter((entry) => entry.pinned);
   if (pinnedEntries.length >= MAX_COMPARISON_HISTORY_PANEL_ENTRIES) {
     return sortComparisonHistoryPanelEntries(
       pinnedEntries.slice(-MAX_COMPARISON_HISTORY_PANEL_ENTRIES),
     );
   }
-  const unpinnedEntries = entries.filter((entry) => !entry.pinned);
+  const unpinnedEntries = visibleEntries.filter((entry) => !entry.pinned);
   return sortComparisonHistoryPanelEntries([
     ...pinnedEntries,
     ...unpinnedEntries.slice(-(MAX_COMPARISON_HISTORY_PANEL_ENTRIES - pinnedEntries.length)),
-  ]);
+    ...hiddenEntries.slice(-MAX_COMPARISON_HISTORY_PANEL_ENTRIES),
+  ]).slice(-MAX_COMPARISON_HISTORY_PANEL_ENTRIES);
 }
 
 function normalizeComparisonHistoryPanelUiState(
@@ -8098,10 +8223,45 @@ function normalizeComparisonHistoryPanelEntry(value: unknown): ComparisonHistory
     summary,
     title,
     url,
+    hidden: candidate.hidden === true,
     pinned: candidate.pinned === true,
     recordedAt,
     selection: normalizeControlRoomComparisonSelection(candidate.selection),
   };
+}
+
+function isSameComparisonHistoryPanelState(
+  left: ComparisonHistoryPanelState,
+  right: ComparisonHistoryPanelState,
+) {
+  return (
+    left.activeEntryId === right.activeEntryId
+    && left.entries.length === right.entries.length
+    && left.entries.every((entry, index) =>
+      isSameComparisonHistoryPanelEntry(entry, right.entries[index]),
+    )
+  );
+}
+
+function isSameComparisonHistoryPanelEntry(
+  left: ComparisonHistoryPanelEntry,
+  right: ComparisonHistoryPanelEntry | undefined,
+) {
+  if (!right) {
+    return false;
+  }
+  return (
+    left.entryId === right.entryId
+    && left.stepIndex === right.stepIndex
+    && left.label === right.label
+    && left.summary === right.summary
+    && left.title === right.title
+    && left.url === right.url
+    && left.hidden === right.hidden
+    && left.pinned === right.pinned
+    && left.recordedAt === right.recordedAt
+    && isSameComparisonSelection(left.selection, right.selection)
+  );
 }
 
 function loadLegacyExpandedGapRows() {
@@ -9362,6 +9522,7 @@ type RunSectionComparisonControls = {
   comparisonIntent: ComparisonIntent;
   historyStep: ComparisonHistoryStepDescriptor;
   historyEntries: ComparisonHistoryPanelEntry[];
+  visibleHistoryEntries: ComparisonHistoryPanelEntry[];
   activeHistoryEntryId: string | null;
   historyBrowserOpen: boolean;
   historySearchQuery: string;
@@ -9438,7 +9599,7 @@ function RunSection({
   );
   const historySearchQueryNormalized = comparison?.historySearchQuery.trim().toLowerCase() ?? "";
   const filteredHistoryEntries = comparison
-    ? comparison.historyEntries.filter((entry) => {
+    ? comparison.visibleHistoryEntries.filter((entry) => {
         if (comparison.showPinnedHistoryOnly && !entry.pinned) {
           return false;
         }
@@ -9449,10 +9610,10 @@ function RunSection({
       })
     : [];
   const activeHistoryEntry = comparison
-    ? comparison.historyEntries.find((entry) => entry.entryId === comparison.activeHistoryEntryId) ?? null
+    ? comparison.visibleHistoryEntries.find((entry) => entry.entryId === comparison.activeHistoryEntryId) ?? null
     : null;
   const pinnedHistoryCount = comparison
-    ? comparison.historyEntries.filter((entry) => entry.pinned).length
+    ? comparison.visibleHistoryEntries.filter((entry) => entry.pinned).length
     : 0;
 
   return (
@@ -9578,7 +9739,7 @@ function RunSection({
               <button className="ghost-button" onClick={comparison.onToggleHistoryBrowser} type="button">
                 {comparison.historyBrowserOpen
                   ? "Hide history browser"
-                  : `History browser (${comparison.historyEntries.length})`}
+                  : `History browser (${comparison.visibleHistoryEntries.length})`}
               </button>
               <span>
                 Compare {comparison.selectedRunIds.length} / {MAX_COMPARISON_RUNS}
@@ -9648,7 +9809,7 @@ function RunSection({
                       <button
                         className="ghost-button"
                         disabled={!comparison.historyEntries.some(
-                          (entry) => !entry.pinned && entry.entryId !== comparison.activeHistoryEntryId,
+                          (entry) => !entry.hidden && !entry.pinned && entry.entryId !== comparison.activeHistoryEntryId,
                         )}
                         onClick={comparison.onTrimHistoryEntries}
                         type="button"
@@ -9678,7 +9839,7 @@ function RunSection({
                         : `Pinned only (${pinnedHistoryCount})`}
                     </button>
                   </div>
-                  {!comparison.historyEntries.length ? (
+                  {!comparison.visibleHistoryEntries.length ? (
                     <p className="comparison-history-browser-empty">
                       The current document session has not recorded comparison steps yet.
                     </p>
