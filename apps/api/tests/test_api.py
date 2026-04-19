@@ -224,6 +224,74 @@ def test_preset_lifecycle_action_endpoint_updates_stage(tmp_path: Path) -> None:
   ]
 
 
+def test_preset_update_and_revision_endpoints_persist_bundle_history(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    parameters={"short_window": 5, "long_window": 13},
+  )
+
+  updated = client.patch(
+    "/api/presets/core_5m",
+    json={
+      "description": "Expanded validation bundle",
+      "benchmark_family": "native_validation",
+      "tags": ["baseline", "momentum"],
+      "parameters": {"short_window": 7, "long_window": 21},
+      "actor": "operator",
+      "reason": "tighten_signal_bundle",
+    },
+  )
+  revisions = client.get("/api/presets/core_5m/revisions")
+  restored = client.post(
+    "/api/presets/core_5m/revisions/core_5m:r0001/restore",
+    json={"actor": "operator", "reason": "revert_to_baseline"},
+  )
+  fetched = client.get("/api/presets/core_5m")
+
+  assert updated.status_code == 200
+  assert updated.json()["revisions"][-1]["revision_id"] == "core_5m:r0002"
+  assert updated.json()["revisions"][-1]["action"] == "updated"
+  assert updated.json()["parameters"] == {"short_window": 7, "long_window": 21}
+  assert revisions.status_code == 200
+  assert [item["revision_id"] for item in revisions.json()] == [
+    "core_5m:r0002",
+    "core_5m:r0001",
+  ]
+  assert revisions.json()[0]["reason"] == "tighten_signal_bundle"
+  assert restored.status_code == 200
+  assert restored.json()["parameters"] == {"short_window": 5, "long_window": 13}
+  assert restored.json()["revisions"][-1]["revision_id"] == "core_5m:r0003"
+  assert restored.json()["revisions"][-1]["source_revision_id"] == "core_5m:r0001"
+  assert fetched.status_code == 200
+  assert fetched.json()["parameters"] == {"short_window": 5, "long_window": 13}
+  assert [item["action"] for item in fetched.json()["revisions"]] == [
+    "created",
+    "updated",
+    "restored",
+  ]
+
+
+def test_preset_update_endpoint_rejects_empty_patch(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+  )
+
+  response = client.patch("/api/presets/core_5m", json={})
+
+  assert response.status_code == 400
+  assert response.json()["detail"] == "Preset update requires at least one field."
+
+
 def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   create_preset(

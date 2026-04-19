@@ -379,6 +379,31 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
               ),
             ),
           ),
+          revisions=(
+            _build_preset_revision(
+              preset_id=preset_id,
+              revision_number=1,
+              action="migrated",
+              actor="system",
+              reason="legacy_run_metadata_migration",
+              occurred_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
+              name=preset_id,
+              description="Migrated from legacy run metadata.",
+              strategy_id=row["strategy_id"] or config_payload.get("strategy_id"),
+              timeframe=config_payload.get("timeframe"),
+              benchmark_family=row["benchmark_family"] or experiment_payload.get("benchmark_family"),
+              tags=tuple(
+                tag
+                for tag in experiment_payload.get("tags", ())
+                if isinstance(tag, str) and tag
+              ),
+              parameters=(
+                deepcopy(config_payload.get("parameters"))
+                if isinstance(config_payload.get("parameters"), dict)
+                else {}
+              ),
+            ),
+          ),
           created_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
           updated_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
         )
@@ -405,15 +430,16 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
       ).mappings().all()
       for row in rows:
         payload = row["payload"] or {}
-        if "parameters" in payload and "lifecycle" in payload:
+        if "parameters" in payload and "lifecycle" in payload and "revisions" in payload:
           continue
         preset = self._adapter.validate_python(payload)
         updated_at = _coerce_datetime(payload.get("updated_at")) or _coerce_datetime(row["updated_at"]) or datetime.now(UTC)
         created_at = _coerce_datetime(payload.get("created_at")) or updated_at
-        upgraded = replace(
-          preset,
-          parameters=deepcopy(payload.get("parameters", preset.parameters)),
-          lifecycle=ExperimentPreset.Lifecycle(
+        parameters = deepcopy(payload.get("parameters", preset.parameters))
+        if "lifecycle" in payload:
+          lifecycle = preset.lifecycle
+        else:
+          lifecycle = ExperimentPreset.Lifecycle(
             stage="draft",
             updated_at=updated_at,
             updated_by="system",
@@ -428,7 +454,40 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
                 to_stage="draft",
               ),
             ),
-          ),
+          )
+        revisions = preset.revisions
+        if not revisions:
+          lifecycle_event = lifecycle.history[0] if lifecycle.history else None
+          revisions = (
+            _build_preset_revision(
+              preset_id=preset.preset_id,
+              revision_number=1,
+              action=(lifecycle_event.action if lifecycle_event is not None else "migrated"),
+              actor=(lifecycle_event.actor if lifecycle_event is not None else "system"),
+              reason=(
+                lifecycle_event.reason
+                if lifecycle_event is not None
+                else "preset_catalog_schema_upgrade"
+              ),
+              occurred_at=(
+                lifecycle_event.occurred_at
+                if lifecycle_event is not None
+                else created_at
+              ),
+              name=preset.name,
+              description=preset.description,
+              strategy_id=preset.strategy_id,
+              timeframe=preset.timeframe,
+              benchmark_family=preset.benchmark_family,
+              tags=preset.tags,
+              parameters=parameters,
+            ),
+          )
+        upgraded = replace(
+          preset,
+          parameters=parameters,
+          lifecycle=lifecycle,
+          revisions=revisions,
           created_at=created_at,
           updated_at=updated_at,
         )
@@ -452,3 +511,35 @@ def _coerce_datetime(value: str | None) -> datetime | None:
     return datetime.fromisoformat(value)
   except ValueError:
     return None
+
+
+def _build_preset_revision(
+  *,
+  preset_id: str,
+  revision_number: int,
+  action: str,
+  actor: str,
+  reason: str,
+  occurred_at: datetime,
+  name: str,
+  description: str,
+  strategy_id: str | None,
+  timeframe: str | None,
+  benchmark_family: str | None,
+  tags: tuple[str, ...],
+  parameters: dict,
+) -> ExperimentPreset.Revision:
+  return ExperimentPreset.Revision(
+    revision_id=f"{preset_id}:r{revision_number:04d}",
+    actor=(actor or "system").strip() or "system",
+    reason=(reason or action).strip() or action,
+    created_at=occurred_at,
+    action=action,
+    name=name,
+    description=description,
+    strategy_id=strategy_id,
+    timeframe=timeframe,
+    benchmark_family=benchmark_family,
+    tags=tuple(tags),
+    parameters=deepcopy(parameters),
+  )

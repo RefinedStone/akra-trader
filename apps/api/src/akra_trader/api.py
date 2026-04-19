@@ -18,6 +18,7 @@ from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_strategy
 from akra_trader.application import serialize_preset
+from akra_trader.application import serialize_preset_revision
 from akra_trader.bootstrap import Container
 
 
@@ -42,6 +43,23 @@ class ExperimentPresetLifecycleActionRequest(BaseModel):
   action: str
   actor: str = "operator"
   reason: str = "manual_preset_lifecycle_action"
+
+
+class ExperimentPresetUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  strategy_id: str | None = None
+  timeframe: str | None = None
+  tags: list[str] | None = None
+  parameters: dict[str, Any] | None = None
+  benchmark_family: str | None = None
+  actor: str = "operator"
+  reason: str = "manual_preset_edit"
+
+
+class ExperimentPresetRevisionRestoreRequest(BaseModel):
+  actor: str = "operator"
+  reason: str = "manual_preset_revision_restore"
 
 
 class BacktestRequest(BaseModel):
@@ -175,6 +193,75 @@ def create_router(container: Container) -> APIRouter:
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_preset(preset)
+
+  @router.get("/presets/{preset_id}")
+  def get_preset(
+    preset_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      preset = app.get_preset(preset_id=preset_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_preset(preset)
+
+  @router.patch("/presets/{preset_id}")
+  def update_preset(
+    preset_id: str,
+    request: ExperimentPresetUpdateRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    changes = request.model_dump(
+      exclude={"actor", "reason"},
+      exclude_unset=True,
+    )
+    try:
+      preset = app.update_preset(
+        preset_id=preset_id,
+        changes=changes,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return serialize_preset(preset)
+
+  @router.get("/presets/{preset_id}/revisions")
+  def list_preset_revisions(
+    preset_id: str,
+    app: TradingApplication = Depends(get_app),
+  ) -> list[dict[str, Any]]:
+    try:
+      revisions = app.list_preset_revisions(preset_id=preset_id)
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return [serialize_preset_revision(revision) for revision in revisions]
+
+  @router.post("/presets/{preset_id}/revisions/{revision_id}/restore")
+  def restore_preset_revision(
+    preset_id: str,
+    revision_id: str,
+    request: ExperimentPresetRevisionRestoreRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      preset = app.restore_preset_revision(
+        preset_id=preset_id,
+        revision_id=revision_id,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
     return serialize_preset(preset)
 
   @router.post("/presets/{preset_id}/lifecycle")

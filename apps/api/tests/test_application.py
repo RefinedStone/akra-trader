@@ -14020,6 +14020,105 @@ def test_preset_lifecycle_actions_are_durable(tmp_path: Path) -> None:
   ]
 
 
+def test_preset_update_creates_durable_revision_entries(tmp_path: Path) -> None:
+  presets = build_preset_catalog(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=presets,
+    runs=build_runs_repository(tmp_path),
+  )
+  created = app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    parameters={"short_window": 5, "long_window": 13},
+    tags=("baseline",),
+  )
+
+  updated = app.update_preset(
+    preset_id="core_5m",
+    changes={
+      "description": "Expanded validation bundle",
+      "benchmark_family": "native_validation",
+      "tags": ["baseline", "momentum"],
+      "parameters": {"short_window": 7, "long_window": 21},
+    },
+    actor="operator",
+    reason="tighten_signal_bundle",
+  )
+  revisions = app.list_preset_revisions(preset_id="core_5m")
+  reloaded = build_preset_catalog(tmp_path).get_preset("core_5m")
+
+  assert created.revisions[0].revision_id == "core_5m:r0001"
+  assert updated.revisions[-1].revision_id == "core_5m:r0002"
+  assert updated.description == "Expanded validation bundle"
+  assert updated.benchmark_family == "native_validation"
+  assert updated.tags == ("baseline", "momentum")
+  assert updated.parameters == {"short_window": 7, "long_window": 21}
+  assert revisions[0].revision_id == "core_5m:r0002"
+  assert revisions[0].action == "updated"
+  assert revisions[0].reason == "tighten_signal_bundle"
+  assert reloaded is not None
+  assert [revision.revision_id for revision in reloaded.revisions] == [
+    "core_5m:r0001",
+    "core_5m:r0002",
+  ]
+
+
+def test_preset_revision_restore_reinstates_prior_bundle(tmp_path: Path) -> None:
+  presets = build_preset_catalog(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=presets,
+    runs=build_runs_repository(tmp_path),
+  )
+  app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    parameters={"short_window": 5, "long_window": 13},
+    tags=("baseline",),
+  )
+  app.update_preset(
+    preset_id="core_5m",
+    changes={
+      "benchmark_family": "native_validation",
+      "tags": ["baseline", "momentum"],
+      "parameters": {"short_window": 7, "long_window": 21},
+    },
+    actor="operator",
+    reason="tighten_signal_bundle",
+  )
+
+  restored = app.restore_preset_revision(
+    preset_id="core_5m",
+    revision_id="core_5m:r0001",
+    actor="operator",
+    reason="revert_to_baseline",
+  )
+  reloaded = build_preset_catalog(tmp_path).get_preset("core_5m")
+
+  assert restored.parameters == {"short_window": 5, "long_window": 13}
+  assert restored.tags == ("baseline",)
+  assert restored.benchmark_family is None
+  assert restored.revisions[-1].revision_id == "core_5m:r0003"
+  assert restored.revisions[-1].action == "restored"
+  assert restored.revisions[-1].source_revision_id == "core_5m:r0001"
+  assert reloaded is not None
+  assert reloaded.parameters == {"short_window": 5, "long_window": 13}
+  assert [revision.action for revision in reloaded.revisions] == [
+    "created",
+    "updated",
+    "restored",
+  ]
+
+
 def test_archived_preset_cannot_launch_run(tmp_path: Path) -> None:
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
