@@ -3154,34 +3154,52 @@
       "direction_id": "experiment-os",
       "title": "Add drag or range selection to the manual gap-window picker",
       "description": "Build on the shipped checkbox-based gap-window subset picker by letting operators select visible gap windows through drag or contiguous range gestures in the ordinary control-room UI, so curating larger gap subsets does not remain a one-checkbox-at-a-time workflow.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply explicitly says the remaining picker UX step is drag or range selection in the general UI now that commit 1016ecd shipped the manual checkbox picker outside conflict review. This is the clearest executable next task because the subset model and persistence already exist, leaving interaction efficiency as the direct follow-up.",
+      "priority_reason": "Completed in main session commit 6b76052, which added contiguous range selection to the manual gap-window picker via click anchor plus `Shift+click`, surfaced anchor guidance and row highlighting in the picker UI, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T17:20:00Z",
+      "updated_at": "2026-04-20T17:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os operator control over curated gap subsets by moving the new general-purpose picker from functional checkbox editing to faster, more scalable range-oriented interaction."
     },
     {
+      "id": "planning-experiment-os-add-pointer-drag-sweep-selection-to-manual-gap-window-picker",
+      "direction_id": "experiment-os",
+      "title": "Add pointer drag sweep selection to the manual gap-window picker",
+      "description": "Finish the remaining high-volume picker gesture by letting operators press and drag across visible gap-window rows to sweep-select or sweep-deselect them in one motion, building on the newly shipped anchor plus `Shift+click` range model so large focused subsets are still editable without repeated discrete clicks.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply explicitly says drag remains the unfinished part after commit 6b76052 shipped range selection. This is now the clearest executable next task because the picker already has stable row identity, durable subset persistence, and contiguous anchor selection, leaving pointer drag as the direct UX gap.",
+      "depends_on": [
+        "planning-experiment-os-add-drag-range-selection-for-manual-gap-window-picker"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T17:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os manual gap subset editing by adding the remaining gesture-level efficiency path for dense window lists after checkbox and shift-range selection are already in place."
+    },
+    {
       "id": "planning-experiment-os-decide-whether-manual-gap-picker-open-state-should-restore-after-reload",
       "direction_id": "experiment-os",
-      "title": "Decide whether manual gap-picker open state should restore after reload",
-      "description": "Decide whether the ordinary control-room gap-window picker should restore its open or closed UI state after reload, or whether only the selected subset should remain durable, so picker persistence behavior is an explicit product contract instead of an incidental local-state detail.",
+      "title": "Decide whether manual gap-picker UI state should restore after reload",
+      "description": "Decide whether the ordinary control-room gap-window picker should restore transient UI state such as open or closed visibility and the local range anchor after reload, or whether only the selected subset should remain durable, so picker persistence behavior is an explicit product contract instead of an incidental local-state detail.",
       "status": "proposed",
       "base_priority": 84,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply notes that only the chosen subset persists today while the picker open state itself stays local and does not restore after reload. That gap is real, but it still needs a product decision about whether reopening transient panels is helpful operator continuity or unwanted UI stickiness, so keep it proposed.",
+      "priority_reason": "The latest main-session reply notes that the picker's range anchor remains local UI state and does not restore after reload, alongside the existing open-state question. That persistence gap is real, but it still needs a product decision about which transient picker UI state should survive reload versus stay intentionally ephemeral, so keep it proposed.",
       "depends_on": [
         "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T17:20:00Z",
+      "updated_at": "2026-04-20T17:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Captures the remaining persistence-contract question around the new manual gap picker so experiment-os workspace behavior stays intentional across reload and resume flows."
     },
