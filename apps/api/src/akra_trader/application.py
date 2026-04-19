@@ -22939,33 +22939,61 @@ def serialize_run(run: RunRecord, *, capabilities: RunSurfaceCapabilities | None
   return payload
 
 
+def _serialize_run_subresource_envelope(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities,
+  body_key: str,
+  body_value: Any,
+) -> dict[str, Any]:
+  return {
+    "run_id": run.config.run_id,
+    "run_mode": run.config.mode.value,
+    "run_status": run.status.value,
+    "surface_enforcement": _build_run_surface_enforcement(capabilities),
+    "action_availability": _build_run_action_availability(
+      run=run,
+      capabilities=capabilities,
+    ),
+    body_key: body_value,
+  }
+
+
+def _serialize_run_order_subresource_item(
+  run: RunRecord,
+  *,
+  order: Order,
+  capabilities: RunSurfaceCapabilities,
+) -> dict[str, Any]:
+  return {
+    **asdict(order),
+    "action_availability": _build_order_action_availability(
+      run=run,
+      order=order,
+      capabilities=capabilities,
+    ),
+  }
+
+
 def serialize_run_orders_response(
   run: RunRecord,
   *,
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return {
-    "run_id": run.config.run_id,
-    "run_mode": run.config.mode.value,
-    "run_status": run.status.value,
-    "surface_enforcement": _build_run_surface_enforcement(resolved_capabilities),
-    "action_availability": _build_run_action_availability(
-      run=run,
-      capabilities=resolved_capabilities,
-    ),
-    "orders": [
-      {
-        **asdict(order),
-        "action_availability": _build_order_action_availability(
-          run=run,
-          order=order,
-          capabilities=resolved_capabilities,
-        ),
-      }
+  return _serialize_run_subresource_envelope(
+    run,
+    capabilities=resolved_capabilities,
+    body_key="orders",
+    body_value=[
+      _serialize_run_order_subresource_item(
+        run,
+        order=order,
+        capabilities=resolved_capabilities,
+      )
       for order in run.orders
     ],
-  }
+  )
 
 
 def serialize_run_positions_response(
@@ -22974,20 +23002,15 @@ def serialize_run_positions_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return {
-    "run_id": run.config.run_id,
-    "run_mode": run.config.mode.value,
-    "run_status": run.status.value,
-    "surface_enforcement": _build_run_surface_enforcement(resolved_capabilities),
-    "action_availability": _build_run_action_availability(
-      run=run,
-      capabilities=resolved_capabilities,
-    ),
-    "positions": [
+  return _serialize_run_subresource_envelope(
+    run,
+    capabilities=resolved_capabilities,
+    body_key="positions",
+    body_value=[
       asdict(position)
       for position in run.positions.values()
     ],
-  }
+  )
 
 
 def serialize_run_metrics_response(
@@ -22996,17 +23019,12 @@ def serialize_run_metrics_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return {
-    "run_id": run.config.run_id,
-    "run_mode": run.config.mode.value,
-    "run_status": run.status.value,
-    "surface_enforcement": _build_run_surface_enforcement(resolved_capabilities),
-    "action_availability": _build_run_action_availability(
-      run=run,
-      capabilities=resolved_capabilities,
-    ),
-    "metrics": deepcopy(run.metrics),
-  }
+  return _serialize_run_subresource_envelope(
+    run,
+    capabilities=resolved_capabilities,
+    body_key="metrics",
+    body_value=deepcopy(run.metrics),
+  )
 
 
 def serialize_preset(preset: ExperimentPreset) -> dict:
