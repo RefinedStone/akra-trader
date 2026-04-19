@@ -3038,7 +3038,11 @@ type ComparisonHistorySyncWorkspaceReviewRow = {
   hasLatestLocalDrift: boolean;
   label: string;
   localHint?: string | null;
+  localScore: number;
+  localSignals: ComparisonHistorySyncWorkspaceSemanticSignal[];
   localValue: string;
+  remoteScore: number;
+  remoteSignals: ComparisonHistorySyncWorkspaceSemanticSignal[];
   remoteValue: string;
   recommendedSource: ComparisonHistorySyncConflictFieldSource;
   recommendationReason: string;
@@ -10856,7 +10860,9 @@ type ComparisonHistorySyncWorkspaceSemanticSignal = {
 
 type ComparisonHistorySyncWorkspaceSemanticRanking = {
   localScore: number;
+  localSignals: ComparisonHistorySyncWorkspaceSemanticSignal[];
   remoteScore: number;
+  remoteSignals: ComparisonHistorySyncWorkspaceSemanticSignal[];
   recommendedSource: ComparisonHistorySyncConflictFieldSource;
   recommendationReason: string;
   recommendationStrength: number;
@@ -11068,6 +11074,16 @@ function scoreComparisonHistorySyncWorkspaceCandidateSource(params: {
   };
 }
 
+function sortComparisonHistorySyncWorkspaceSemanticSignals(
+  signals: ComparisonHistorySyncWorkspaceSemanticSignal[],
+) {
+  return [...signals].sort((left, right) => (
+    Math.abs(right.weight) - Math.abs(left.weight)
+    || right.weight - left.weight
+    || left.label.localeCompare(right.label)
+  ));
+}
+
 function rankComparisonHistorySyncWorkspaceFieldSemantics(params: {
   fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey;
   auditLocalState: ComparisonHistorySyncWorkspaceState;
@@ -11093,7 +11109,9 @@ function rankComparisonHistorySyncWorkspaceFieldSemantics(params: {
       : "Keeps the latest shared sync snapshot";
   return {
     localScore: local.score,
+    localSignals: sortComparisonHistorySyncWorkspaceSemanticSignals(local.signals),
     remoteScore: remote.score,
+    remoteSignals: sortComparisonHistorySyncWorkspaceSemanticSignals(remote.signals),
     recommendedSource,
     recommendationReason,
     recommendationStrength: Math.abs(local.score - remote.score),
@@ -11338,7 +11356,11 @@ function buildComparisonHistorySyncWorkspaceReviewRows(
       hasLatestLocalDrift,
       label,
       localHint: hasLatestLocalDrift ? `Audit snapshot: ${localSnapshotValue}` : null,
+      localScore: semanticRanking.localScore,
+      localSignals: semanticRanking.localSignals,
       localValue,
+      remoteScore: semanticRanking.remoteScore,
+      remoteSignals: semanticRanking.remoteSignals,
       remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
       recommendedSource: semanticRanking.recommendedSource,
       recommendationReason: semanticRanking.recommendationReason,
@@ -13041,6 +13063,9 @@ function RunSection({
   const [expandedHistoryConflictReviewIds, setExpandedHistoryConflictReviewIds] = useState<
     Record<string, boolean>
   >({});
+  const [expandedWorkspaceScoreDetailIds, setExpandedWorkspaceScoreDetailIds] = useState<
+    Record<string, boolean>
+  >({});
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
     (preset) =>
@@ -13645,75 +13670,167 @@ function RunSection({
                                                 </div>
                                               ))
                                             : workspaceReview
-                                              ? workspaceRows.map((row) => (
-                                                  <div
-                                                    className="comparison-history-conflict-review-row"
-                                                    key={`${entry.auditId}:${row.fieldKey}`}
-                                                  >
-                                                    <span className="comparison-dev-conflict-preview-label-group">
-                                                      <span className="comparison-dev-conflict-preview-label">
-                                                        {row.label}
-                                                      </span>
-                                                      <span className="comparison-history-conflict-review-recommendation">
-                                                        Recommend {row.recommendedSource === "local" ? "local latest" : "remote audit"} · {row.recommendationReason}
-                                                      </span>
-                                                      {row.hasLatestLocalDrift ? (
-                                                        <span className="comparison-dev-conflict-preview-hint">
-                                                          Current local drift from audit snapshot
-                                                        </span>
-                                                      ) : null}
-                                                    </span>
-                                                    <button
-                                                      className={`comparison-history-conflict-review-choice ${
-                                                        row.selectedSource === "local" ? "is-selected" : ""
-                                                      } ${
-                                                        row.recommendedSource === "local" ? "is-recommended" : ""
-                                                      }`}
-                                                      onClick={() =>
-                                                        comparison.onSetHistoryWorkspaceFieldSource(
-                                                          entry.auditId,
-                                                          row.fieldKey,
-                                                          "local",
-                                                        )
-                                                      }
-                                                      type="button"
+                                              ? workspaceRows.map((row) => {
+                                                  const scoreDetailKey = `${entry.auditId}:${row.fieldKey}`;
+                                                  const scoreDetailsExpanded = Boolean(
+                                                    expandedWorkspaceScoreDetailIds[scoreDetailKey],
+                                                  );
+                                                  return (
+                                                    <div
+                                                      className="comparison-history-conflict-review-row"
+                                                      key={scoreDetailKey}
                                                     >
-                                                      <span className="comparison-history-conflict-review-choice-label">
-                                                        {row.hasLatestLocalDrift ? "Local latest" : "Local"}
-                                                      </span>
-                                                      <span className="comparison-history-conflict-review-choice-value">
-                                                        {row.localValue}
-                                                      </span>
-                                                      {row.localHint ? (
-                                                        <span className="comparison-history-conflict-review-choice-hint">
-                                                          {row.localHint}
+                                                      <span className="comparison-dev-conflict-preview-label-group">
+                                                        <span className="comparison-dev-conflict-preview-label">
+                                                          {row.label}
                                                         </span>
+                                                        <span className="comparison-history-conflict-review-recommendation">
+                                                          Recommend {row.recommendedSource === "local" ? "local latest" : "remote audit"} · {row.recommendationReason}
+                                                        </span>
+                                                        <button
+                                                          className="comparison-history-conflict-review-toggle"
+                                                          onClick={() =>
+                                                            setExpandedWorkspaceScoreDetailIds((current) => ({
+                                                              ...current,
+                                                              [scoreDetailKey]: !current[scoreDetailKey],
+                                                            }))
+                                                          }
+                                                          type="button"
+                                                        >
+                                                          {scoreDetailsExpanded ? "Hide score details" : "Show score details"}
+                                                        </button>
+                                                        {row.hasLatestLocalDrift ? (
+                                                          <span className="comparison-dev-conflict-preview-hint">
+                                                            Current local drift from audit snapshot
+                                                          </span>
+                                                        ) : null}
+                                                      </span>
+                                                      <button
+                                                        className={`comparison-history-conflict-review-choice ${
+                                                          row.selectedSource === "local" ? "is-selected" : ""
+                                                        } ${
+                                                          row.recommendedSource === "local" ? "is-recommended" : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          comparison.onSetHistoryWorkspaceFieldSource(
+                                                            entry.auditId,
+                                                            row.fieldKey,
+                                                            "local",
+                                                          )
+                                                        }
+                                                        type="button"
+                                                      >
+                                                        <span className="comparison-history-conflict-review-choice-label">
+                                                          {row.hasLatestLocalDrift ? "Local latest" : "Local"}
+                                                        </span>
+                                                        <span className="comparison-history-conflict-review-choice-value">
+                                                          {row.localValue}
+                                                        </span>
+                                                        {row.localHint ? (
+                                                          <span className="comparison-history-conflict-review-choice-hint">
+                                                            {row.localHint}
+                                                          </span>
+                                                        ) : null}
+                                                      </button>
+                                                      <button
+                                                        className={`comparison-history-conflict-review-choice ${
+                                                          row.selectedSource === "remote" ? "is-selected" : ""
+                                                        } ${
+                                                          row.recommendedSource === "remote" ? "is-recommended" : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          comparison.onSetHistoryWorkspaceFieldSource(
+                                                            entry.auditId,
+                                                            row.fieldKey,
+                                                            "remote",
+                                                          )
+                                                        }
+                                                        type="button"
+                                                      >
+                                                        <span className="comparison-history-conflict-review-choice-label">
+                                                          {row.hasLatestLocalDrift ? "Remote audit" : "Remote"}
+                                                        </span>
+                                                        <span className="comparison-history-conflict-review-choice-value">
+                                                          {row.remoteValue}
+                                                        </span>
+                                                      </button>
+                                                      {scoreDetailsExpanded ? (
+                                                        <div className="comparison-history-conflict-review-score-breakdown">
+                                                          <div
+                                                            className={`comparison-history-conflict-review-score-column ${
+                                                              row.recommendedSource === "local" ? "is-recommended" : ""
+                                                            }`}
+                                                          >
+                                                            <div className="comparison-history-conflict-review-score-head">
+                                                              <span>Local latest</span>
+                                                              <strong>
+                                                                {formatComparisonScoreSignedValue(row.localScore)}
+                                                              </strong>
+                                                            </div>
+                                                            {row.localSignals.length ? (
+                                                              <div className="comparison-history-conflict-review-score-signal-list">
+                                                                {row.localSignals.map((signal) => (
+                                                                  <div
+                                                                    className="comparison-history-conflict-review-score-signal"
+                                                                    key={`local:${scoreDetailKey}:${signal.label}`}
+                                                                  >
+                                                                    <span>{signal.label}</span>
+                                                                    <strong
+                                                                      className={`comparison-history-conflict-review-score-signal-weight ${
+                                                                        signal.weight >= 0 ? "is-positive" : "is-negative"
+                                                                      }`}
+                                                                    >
+                                                                      {formatComparisonScoreSignedValue(signal.weight)}
+                                                                    </strong>
+                                                                  </div>
+                                                                ))}
+                                                              </div>
+                                                            ) : (
+                                                              <span className="comparison-history-conflict-review-score-empty">
+                                                                No local semantic bonus fired.
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                          <div
+                                                            className={`comparison-history-conflict-review-score-column ${
+                                                              row.recommendedSource === "remote" ? "is-recommended" : ""
+                                                            }`}
+                                                          >
+                                                            <div className="comparison-history-conflict-review-score-head">
+                                                              <span>Remote audit</span>
+                                                              <strong>
+                                                                {formatComparisonScoreSignedValue(row.remoteScore)}
+                                                              </strong>
+                                                            </div>
+                                                            {row.remoteSignals.length ? (
+                                                              <div className="comparison-history-conflict-review-score-signal-list">
+                                                                {row.remoteSignals.map((signal) => (
+                                                                  <div
+                                                                    className="comparison-history-conflict-review-score-signal"
+                                                                    key={`remote:${scoreDetailKey}:${signal.label}`}
+                                                                  >
+                                                                    <span>{signal.label}</span>
+                                                                    <strong
+                                                                      className={`comparison-history-conflict-review-score-signal-weight ${
+                                                                        signal.weight >= 0 ? "is-positive" : "is-negative"
+                                                                      }`}
+                                                                    >
+                                                                      {formatComparisonScoreSignedValue(signal.weight)}
+                                                                    </strong>
+                                                                  </div>
+                                                                ))}
+                                                              </div>
+                                                            ) : (
+                                                              <span className="comparison-history-conflict-review-score-empty">
+                                                                No remote semantic bonus fired.
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        </div>
                                                       ) : null}
-                                                    </button>
-                                                    <button
-                                                      className={`comparison-history-conflict-review-choice ${
-                                                        row.selectedSource === "remote" ? "is-selected" : ""
-                                                      } ${
-                                                        row.recommendedSource === "remote" ? "is-recommended" : ""
-                                                      }`}
-                                                      onClick={() =>
-                                                        comparison.onSetHistoryWorkspaceFieldSource(
-                                                          entry.auditId,
-                                                          row.fieldKey,
-                                                          "remote",
-                                                        )
-                                                      }
-                                                      type="button"
-                                                    >
-                                                      <span className="comparison-history-conflict-review-choice-label">
-                                                        {row.hasLatestLocalDrift ? "Remote audit" : "Remote"}
-                                                      </span>
-                                                      <span className="comparison-history-conflict-review-choice-value">
-                                                        {row.remoteValue}
-                                                      </span>
-                                                    </button>
-                                                  </div>
-                                                ))
+                                                    </div>
+                                                  );
+                                                })
                                             : preferenceRows.map((row) => (
                                                 <div
                                                   className="comparison-history-conflict-review-row"

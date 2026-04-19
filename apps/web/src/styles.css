@@ -547,6 +547,90 @@ select {
   line-height: 1.45;
 }
 
+.comparison-history-conflict-review-toggle {
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(150, 210, 255, 0.96);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparison-history-conflict-review-toggle:hover,
+.comparison-history-conflict-review-toggle:focus-visible {
+  color: rgba(194, 232, 255, 1);
+}
+
+.comparison-history-conflict-review-score-breakdown {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.comparison-history-conflict-review-score-column {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 24, 0.74);
+}
+
+.comparison-history-conflict-review-score-column.is-recommended {
+  border-color: rgba(255, 207, 112, 0.28);
+  background: rgba(255, 207, 112, 0.08);
+}
+
+.comparison-history-conflict-review-score-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.comparison-history-conflict-review-score-head strong {
+  font-size: 0.78rem;
+}
+
+.comparison-history-conflict-review-score-signal-list {
+  display: grid;
+  gap: 6px;
+}
+
+.comparison-history-conflict-review-score-signal {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  color: rgba(255, 255, 255, 0.76);
+}
+
+.comparison-history-conflict-review-score-signal span {
+  flex: 1 1 auto;
+}
+
+.comparison-history-conflict-review-score-signal-weight {
+  flex: 0 0 auto;
+}
+
+.comparison-history-conflict-review-score-signal-weight.is-positive {
+  color: rgba(170, 243, 225, 0.98);
+}
+
+.comparison-history-conflict-review-score-signal-weight.is-negative {
+  color: rgba(255, 186, 186, 0.96);
+}
+
+.comparison-history-conflict-review-score-empty {
+  color: rgba(255, 255, 255, 0.58);
+}
+
 .comparison-history-browser-search {
   display: grid;
   gap: 6px;
@@ -2758,6 +2842,10 @@ select {
   }
 
   .comparison-history-conflict-review-row {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-history-conflict-review-score-breakdown {
     grid-template-columns: 1fr;
   }
 
