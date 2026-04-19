@@ -13104,6 +13104,7 @@ function RunSection({
   const [expandedWorkspaceScoreDetailIds, setExpandedWorkspaceScoreDetailIds] = useState<
     Record<string, boolean>
   >({});
+  const workspaceReviewRowRefs = useRef(new Map<string, HTMLDivElement>());
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
     (preset) =>
@@ -13164,6 +13165,31 @@ function RunSection({
       ...current,
       [auditId]: !current[auditId],
     }));
+  const focusWorkspaceReviewRow = (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+  ) => {
+    const scoreDetailKey = `${auditId}:${fieldKey}`;
+    setExpandedWorkspaceScoreDetailIds((current) => ({
+      ...current,
+      [scoreDetailKey]: true,
+    }));
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const row = workspaceReviewRowRefs.current.get(scoreDetailKey);
+        if (!row) {
+          return;
+        }
+        row.scrollIntoView({
+          block: "center",
+          behavior: "smooth",
+        });
+        row.focus({
+          preventScroll: true,
+        });
+      });
+    });
+  };
 
   return (
     <section className="panel panel-wide">
@@ -13666,7 +13692,23 @@ function RunSection({
                                                     : "No field drift since the audit snapshot"}
                                                 </span>
                                               </div>
-                                              <div className="comparison-history-conflict-review-overview-card is-strongest">
+                                              <button
+                                                className={`comparison-history-conflict-review-overview-card is-strongest ${
+                                                  workspaceOverview.strongest
+                                                    ? "is-interactive"
+                                                    : ""
+                                                }`}
+                                                disabled={!workspaceOverview.strongest}
+                                                onClick={() =>
+                                                  workspaceOverview.strongest
+                                                    ? focusWorkspaceReviewRow(
+                                                        entry.auditId,
+                                                        workspaceOverview.strongest.fieldKey,
+                                                      )
+                                                    : undefined
+                                                }
+                                                type="button"
+                                              >
                                                 <span className="comparison-history-conflict-review-overview-label">
                                                   Strongest recommendation
                                                 </span>
@@ -13684,7 +13726,7 @@ function RunSection({
                                                     No workspace conflicts to rank.
                                                   </span>
                                                 )}
-                                              </div>
+                                              </button>
                                               {workspaceOverview.topLocal.length ? (
                                                 <div className="comparison-history-conflict-review-overview-lane">
                                                   <span className="comparison-history-conflict-review-overview-lane-label">
@@ -13692,12 +13734,16 @@ function RunSection({
                                                   </span>
                                                   <div className="comparison-history-conflict-review-overview-chip-list">
                                                     {workspaceOverview.topLocal.map((row) => (
-                                                      <span
+                                                      <button
                                                         className="comparison-history-conflict-review-overview-chip is-local"
+                                                        onClick={() =>
+                                                          focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
+                                                        }
                                                         key={`overview-local:${entry.auditId}:${row.fieldKey}`}
+                                                        type="button"
                                                       >
                                                         {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
-                                                      </span>
+                                                      </button>
                                                     ))}
                                                   </div>
                                                 </div>
@@ -13709,12 +13755,16 @@ function RunSection({
                                                   </span>
                                                   <div className="comparison-history-conflict-review-overview-chip-list">
                                                     {workspaceOverview.topRemote.map((row) => (
-                                                      <span
+                                                      <button
                                                         className="comparison-history-conflict-review-overview-chip is-remote"
+                                                        onClick={() =>
+                                                          focusWorkspaceReviewRow(entry.auditId, row.fieldKey)
+                                                        }
                                                         key={`overview-remote:${entry.auditId}:${row.fieldKey}`}
+                                                        type="button"
                                                       >
                                                         {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
-                                                      </span>
+                                                      </button>
                                                     ))}
                                                   </div>
                                                 </div>
@@ -13803,6 +13853,14 @@ function RunSection({
                                                     <div
                                                       className="comparison-history-conflict-review-row"
                                                       key={scoreDetailKey}
+                                                      ref={(node) => {
+                                                        if (node) {
+                                                          workspaceReviewRowRefs.current.set(scoreDetailKey, node);
+                                                          return;
+                                                        }
+                                                        workspaceReviewRowRefs.current.delete(scoreDetailKey);
+                                                      }}
+                                                      tabIndex={-1}
                                                     >
                                                       <span className="comparison-dev-conflict-preview-label-group">
                                                         <span className="comparison-dev-conflict-preview-label">

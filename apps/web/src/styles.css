@@ -492,6 +492,11 @@ select {
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.comparison-history-conflict-review-row:focus {
+  outline: 2px solid rgba(150, 210, 255, 0.72);
+  outline-offset: 2px;
+}
+
 .comparison-history-conflict-review-choice {
   display: grid;
   gap: 4px;
@@ -645,6 +650,22 @@ select {
   background: rgba(8, 14, 24, 0.74);
 }
 
+.comparison-history-conflict-review-overview-card.is-interactive {
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.comparison-history-conflict-review-overview-card.is-interactive:hover,
+.comparison-history-conflict-review-overview-card.is-interactive:focus-visible {
+  border-color: rgba(150, 210, 255, 0.28);
+  background: rgba(120, 180, 255, 0.08);
+}
+
+.comparison-history-conflict-review-overview-card:disabled {
+  cursor: default;
+}
+
 .comparison-history-conflict-review-overview-card.is-strongest {
   border-color: rgba(255, 207, 112, 0.28);
   background: rgba(255, 207, 112, 0.08);
@@ -677,9 +698,13 @@ select {
   display: inline-flex;
   align-items: center;
   padding: 4px 8px;
+  border: 0;
   border-radius: 999px;
+  cursor: pointer;
   font-size: 0.66rem;
+  font: inherit;
   line-height: 1.4;
+  text-align: left;
   color: rgba(255, 255, 255, 0.88);
 }
 
@@ -689,6 +714,12 @@ select {
 
 .comparison-history-conflict-review-overview-chip.is-remote {
   background: rgba(255, 207, 112, 0.14);
+}
+
+.comparison-history-conflict-review-overview-chip:hover,
+.comparison-history-conflict-review-overview-chip:focus-visible {
+  outline: none;
+  filter: brightness(1.08);
 }
 
 .comparison-history-browser-search {
