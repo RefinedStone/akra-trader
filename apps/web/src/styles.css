@@ -594,9 +594,24 @@ select {
   background: rgba(8, 14, 24, 0.74);
 }
 
+.comparison-history-conflict-review-score-column[role="button"] {
+  cursor: pointer;
+}
+
 .comparison-history-conflict-review-score-column.is-recommended {
   border-color: rgba(255, 207, 112, 0.28);
   background: rgba(255, 207, 112, 0.08);
+}
+
+.comparison-history-conflict-review-score-column.is-focused {
+  border-color: rgba(120, 180, 255, 0.34);
+  background: rgba(120, 180, 255, 0.1);
+  box-shadow: 0 0 0 1px rgba(120, 180, 255, 0.16);
+}
+
+.comparison-history-conflict-review-score-column.is-focused:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.58);
+  outline-offset: 2px;
 }
 
 .comparison-history-conflict-review-score-head {
