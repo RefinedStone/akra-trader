@@ -25,7 +25,20 @@ class ExternalDecisionStrategy(Strategy):
       asset_types=(AssetType.CRYPTO, AssetType.STOCK),
       supported_timeframes=("5m", "1h", "1d"),
       parameter_schema={
-        "prompt_profile": {"type": "string", "default": "balanced"},
+        "prompt_profile": {
+          "type": "string",
+          "default": "balanced",
+          "semantic_hint": "Decision-engine prompt posture.",
+          "semantic_ranks": {
+            "safe": 0,
+            "cautious": 1,
+            "balanced": 2,
+            "assertive": 3,
+            "aggressive": 4,
+          },
+          "delta_higher_label": "more assertive prompt posture",
+          "delta_lower_label": "safer prompt posture",
+        },
       },
       description="Template strategy that delegates final trade selection to an external decision engine such as an LLM.",
       lifecycle=StrategyLifecycle(stage="experimental"),

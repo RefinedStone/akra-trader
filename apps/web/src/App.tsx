@@ -16,9 +16,14 @@ type ParameterSchema = Record<
   string,
   {
     default?: unknown;
+    delta_higher_label?: string;
+    delta_lower_label?: string;
+    description?: string;
     enum?: unknown[];
     minimum?: number;
     maximum?: number;
+    semantic_hint?: string;
+    semantic_ranks?: Record<string, number>;
     type?: string;
     unit?: string;
   }
@@ -3277,6 +3282,99 @@ function buildPresetRankedStringDelta(
   };
 }
 
+function buildPresetParameterStrategyContext(
+  existingRaw: unknown,
+  incomingRaw: unknown,
+  schemaEntry?: ParameterSchema[string],
+): {
+  delta?: PresetStructuredDiffDeltaValue;
+  hint?: string;
+} {
+  if (!schemaEntry) {
+    return {
+      delta: undefined,
+      hint: undefined,
+    };
+  }
+  const hint =
+    typeof schemaEntry.semantic_hint === "string" && schemaEntry.semantic_hint.trim()
+      ? `Strategy: ${schemaEntry.semantic_hint.trim()}`
+      : undefined;
+  const higherLabel =
+    typeof schemaEntry.delta_higher_label === "string" && schemaEntry.delta_higher_label.trim()
+      ? schemaEntry.delta_higher_label.trim()
+      : undefined;
+  const lowerLabel =
+    typeof schemaEntry.delta_lower_label === "string" && schemaEntry.delta_lower_label.trim()
+      ? schemaEntry.delta_lower_label.trim()
+      : undefined;
+  if (!higherLabel || !lowerLabel) {
+    return {
+      delta: undefined,
+      hint,
+    };
+  }
+  if (
+    typeof existingRaw === "number" &&
+    Number.isFinite(existingRaw) &&
+    typeof incomingRaw === "number" &&
+    Number.isFinite(incomingRaw) &&
+    existingRaw !== incomingRaw
+  ) {
+    return {
+      delta: {
+        direction: incomingRaw > existingRaw ? "higher" : "lower",
+        label: incomingRaw > existingRaw ? higherLabel : lowerLabel,
+      },
+      hint,
+    };
+  }
+  if (typeof existingRaw === "boolean" && typeof incomingRaw === "boolean" && existingRaw !== incomingRaw) {
+    return {
+      delta: {
+        direction: incomingRaw ? "higher" : "lower",
+        label: incomingRaw ? higherLabel : lowerLabel,
+      },
+      hint,
+    };
+  }
+  const existingTimeframe = parsePresetTimeframeToMinutes(existingRaw);
+  const incomingTimeframe = parsePresetTimeframeToMinutes(incomingRaw);
+  if (
+    existingTimeframe !== null &&
+    incomingTimeframe !== null &&
+    existingTimeframe !== incomingTimeframe
+  ) {
+    return {
+      delta: {
+        direction: incomingTimeframe > existingTimeframe ? "higher" : "lower",
+        label: incomingTimeframe > existingTimeframe ? higherLabel : lowerLabel,
+      },
+      hint,
+    };
+  }
+  if (
+    typeof existingRaw === "string" &&
+    typeof incomingRaw === "string" &&
+    schemaEntry.semantic_ranks
+  ) {
+    return {
+      delta: buildPresetRankedStringDelta(
+        existingRaw,
+        incomingRaw,
+        schemaEntry.semantic_ranks,
+        higherLabel,
+        lowerLabel,
+      ),
+      hint,
+    };
+  }
+  return {
+    delta: undefined,
+    hint,
+  };
+}
+
 function buildPresetParameterDomainContext(
   pathSegments: string[],
   existingRaw: unknown,
@@ -3793,6 +3891,11 @@ function buildPresetStructuredDiffRows(
     const existingValue = existingParameter === undefined ? "" : formatParameterValue(existingParameter);
     const incomingValue = incomingParameter === undefined ? "" : formatParameterValue(incomingParameter);
     const schemaEntry = getPresetParameterSchemaEntry(parameterSchema, pathSegments);
+    const strategyContext = buildPresetParameterStrategyContext(
+      existingParameter,
+      incomingParameter,
+      schemaEntry,
+    );
     const domainContext = buildPresetParameterDomainContext(
       pathSegments,
       existingParameter,
@@ -3811,10 +3914,11 @@ function buildPresetStructuredDiffRows(
       incomingParameter,
       joinPresetStructuredDiffHints(
         formatPresetParameterSchemaHint(schemaEntry),
+        strategyContext.hint,
         domainContext.hint,
       ),
       schemaEntry,
-      domainContext.delta,
+      strategyContext.delta ?? domainContext.delta,
     );
   };
   const appendParameterRows = (

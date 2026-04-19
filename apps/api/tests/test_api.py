@@ -28,9 +28,13 @@ from akra_trader.domain.models import OrderSide
 from akra_trader.domain.models import OrderStatus
 from akra_trader.domain.models import OrderType
 from akra_trader.domain.models import Position
+from akra_trader.domain.models import SignalAction
+from akra_trader.domain.models import SignalDecision
+from akra_trader.domain.models import StrategyDecisionEnvelope
 from akra_trader.domain.models import SyncFailure
 from akra_trader.main import create_app
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
+from akra_trader.strategies.llm import ExternalDecisionStrategy
 
 
 def build_client(
@@ -132,15 +136,35 @@ class StatusOverrideSeededMarketDataAdapter(SeededMarketDataAdapter):
     return super().remediate(kind=kind, symbol=symbol, timeframe=timeframe)
 
 
+class StubDecisionEngine:
+  def decide(self, context) -> StrategyDecisionEnvelope:
+    return StrategyDecisionEnvelope(
+      signal=SignalDecision(timestamp=context.timestamp, action=SignalAction.HOLD),
+      rationale="stub",
+      context=context,
+    )
+
+
 def test_list_strategies_returns_builtin_strategy(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   response = client.get("/api/strategies")
   assert response.status_code == 200
   payload = response.json()
-  assert payload[0]["strategy_id"] == "ma_cross_v1"
-  assert payload[0]["lifecycle"]["stage"] == "active"
-  assert payload[0]["version_lineage"] == ["1.0.0"]
-  assert payload[0]["supported_timeframes"] == ["5m", "1h"]
+  ma_cross = next(item for item in payload if item["strategy_id"] == "ma_cross_v1")
+  assert ma_cross["lifecycle"]["stage"] == "active"
+  assert ma_cross["version_lineage"] == ["1.0.0"]
+  assert ma_cross["supported_timeframes"] == ["5m", "1h"]
+  assert ma_cross["parameter_schema"]["short_window"]["semantic_hint"] == "Fast crossover trigger leg."
+  assert ma_cross["parameter_schema"]["short_window"]["delta_higher_label"] == "slower trigger leg"
+  assert ma_cross["parameter_schema"]["short_window"]["unit"] == "bars"
+
+
+def test_external_decision_strategy_exposes_semantic_prompt_profile_metadata() -> None:
+  metadata = ExternalDecisionStrategy(decision_engine=StubDecisionEngine()).describe()
+  prompt_profile = metadata.parameter_schema["prompt_profile"]
+  assert prompt_profile["semantic_hint"] == "Decision-engine prompt posture."
+  assert prompt_profile["semantic_ranks"]["aggressive"] == 4
+  assert prompt_profile["delta_lower_label"] == "safer prompt posture"
 
 
 def test_list_strategies_can_filter_by_lane_and_lifecycle_stage(tmp_path: Path) -> None:
