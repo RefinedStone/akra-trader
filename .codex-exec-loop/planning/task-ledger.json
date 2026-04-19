@@ -3424,18 +3424,36 @@
       "direction_id": "experiment-os",
       "title": "Link workspace conflict overview chips to row scroll and drill-down",
       "description": "Turn the newly shipped audit-level workspace conflict overview from a read-only summary into an interaction handoff by making strongest-recommendation and top-pick chips jump to the relevant conflict row, reveal the matching score drill-down automatically when useful, and preserve enough selection state that operators can move from audit summary into evidence without manual scanning.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply says the audit-level overview is now complete in commit 558b79a and explicitly names the remaining gap as interaction wiring so strongest and top-pick chips can scroll to the relevant row or open score drill-down automatically. That makes this the clearest executable next task for the queue head without additional operator decisions.",
+      "priority_reason": "Completed in main session commit 71307d5, which wired `Strongest recommendation`, `Top local/latest`, and `Top remote/audit` overview chips into smooth scroll targeting for the matching workspace conflict row, automatically opened the relevant score drill-down, added focus-visible row arrival state, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-audit-level-recommendation-overview-for-workspace-conflict-ranking"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:30:00Z",
+      "updated_at": "2026-04-20T20:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os workspace conflict explainability by connecting audit-level recommendation summaries directly to the row-level evidence operators need next, reducing manual search inside larger conflict reviews."
+    },
+    {
+      "id": "planning-experiment-os-add-bidirectional-overview-selection-state-for-workspace-conflict-review",
+      "direction_id": "experiment-os",
+      "title": "Add bidirectional overview selection state for workspace conflict review",
+      "description": "Finish the remaining workspace conflict overview interaction polish by keeping an active overview selection state after overview-to-row navigation, and by reflecting row focus or expansion back into the overview card so the strongest recommendation and top-pick chips can highlight the currently inspected conflict instead of staying one-way jump targets only.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 22,
+      "priority_reason": "The latest main-session reply says overview chips now jump into the correct row and open score drill-downs in commit 71307d5, and explicitly identifies the remaining gap as bidirectional linking plus active overview selection state. That is a concrete executable follow-up and should become the next queue head.",
+      "depends_on": [
+        "planning-experiment-os-link-workspace-conflict-overview-chips-to-row-drill-down"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict explainability by turning overview chips from one-shot navigation affordances into a maintained shared selection model between audit summary and row-level evidence."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
