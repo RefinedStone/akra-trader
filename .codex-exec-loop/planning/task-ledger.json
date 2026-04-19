@@ -2866,18 +2866,36 @@
       "direction_id": "experiment-os",
       "title": "Rehydrate comparison selection context on browser history navigation",
       "description": "Finish the new comparison selection persistence by wiring `popstate` or equivalent history-navigation handling so browser back or forward restores the comparison run IDs, intent, and focused score component from URL state instead of leaving the control-room UI stale until a full reload.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply says the remaining selection-persistence gap is missing `popstate` rehydrate for browser back or forward. This is the clearest immediate executable follow-up because the URL-backed state now exists and history navigation is the first explicit behavior still called out as unfinished.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit c2ba8d3, which added `popstate` comparison-state rehydrate in `apps/web/src/App.tsx`, restored `selectedRunIds`, `comparisonIntent`, and `scoreLink` from URL-backed history entries, reset comparison state when compare params are absent, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:13:44Z",
+      "updated_at": "2026-04-19T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os comparison-state durability by making URL-backed analysis context behave correctly across normal browser navigation, not only reload and copied deep links."
+    },
+    {
+      "id": "planning-experiment-os-push-comparison-state-transitions-into-history-timeline",
+      "direction_id": "experiment-os",
+      "title": "Push comparison state transitions into the browser history timeline",
+      "description": "Extend the new comparison URL and `popstate` model so meaningful comparison state changes create distinct browser history entries, letting back or forward step through compare selection and score-focus transitions as an analysis timeline instead of only restoring whatever URL was already present.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says the remaining history UX gap is that comparison state changes do not create their own history entries, so back or forward still cannot act like a compare-step timeline. With URL persistence and `popstate` rehydrate now done, this is the clearest next executable task.",
+      "depends_on": [
+        "planning-experiment-os-rehydrate-comparison-context-on-history-navigation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os comparison-state durability from passive URL restoration into full browser-native analysis navigation, so compare selections and score-focus changes become inspectable timeline steps instead of transient local transitions."
     },
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
@@ -2886,14 +2904,14 @@
       "description": "Extend the new comparison query-param and durable UI-state model so adjacent control-room subviews can preserve, honor, or intentionally clear comparison deep-link context instead of treating comparison selection as isolated state that can drift from the rest of the operator navigation model.",
       "status": "proposed",
       "base_priority": 91,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly says comparison persistence still lacks deep-link coordination with other control-room subviews. This is concrete follow-up work, but it should remain behind history-navigation rehydrate because `popstate` correctness is the more direct completion of the just-shipped persistence model.",
+      "dynamic_priority_delta": 5,
+      "priority_reason": "Cross-subview deep-link coordination is still valid follow-up, but the latest main-session reply now points to a more immediate history UX gap: comparison state changes still do not create their own browser history entries. Keep this queued behind history-timeline semantics.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:13:44Z",
+      "updated_at": "2026-04-19T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison deep linking from one surface-local persistence feature into a control-room-wide navigation contract that keeps analysis context coherent as operators move across subviews."
     },
