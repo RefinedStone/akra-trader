@@ -3687,6 +3687,15 @@ select {
   word-break: break-word;
 }
 
+.run-lineage-symbol-copy-link {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
 .run-lineage-order-controls {
   display: grid;
   gap: 10px;

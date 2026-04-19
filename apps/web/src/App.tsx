@@ -22830,6 +22830,12 @@ function RunStrategySnapshot({
   const parameterContractSubFocusKey = buildComparisonRunListLineSubFocusKey("parameter_contract");
   const semanticSourceSubFocusKey = buildComparisonRunListLineSubFocusKey("semantic_source");
   const operatorNotesSubFocusKey = buildComparisonRunListLineSubFocusKey("operator_notes");
+  const supportedTimeframesSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_supported_timeframes");
+  const versionLineageSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_version_lineage");
+  const resolvedParamsSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_resolved_params");
+  const requestedParamsSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_requested_params");
+  const strategyEntrypointSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_entrypoint");
+  const strategyRegisteredSubFocusKey = buildComparisonRunListLineSubFocusKey("strategy_registered");
   const activeRunListSubFocusKey =
     linkedScore?.source === "run_list"
       ? linkedScore.subFocusKey
@@ -22849,6 +22855,7 @@ function RunStrategySnapshot({
   const highlightOperatorNotes =
     Boolean(linkedScore)
     && isComparisonScoreLinkMatch(linkedScore, ["vocabulary"], "semantics");
+  const highlightVocabulary = highlightOperatorNotes;
   const highlightPanel =
     highlightStrategyKind
     || highlightExecutionModel
@@ -22957,8 +22964,18 @@ function RunStrategySnapshot({
         <Metric label="TFs" value={strategy.warmup.timeframes.join(", ")} />
       </div>
       <div className="run-strategy-copy">
-        <p>Supported timeframes: {strategy.supported_timeframes.join(", ") || "n/a"}</p>
-        <p>Version lineage: {formatVersionLineage(strategy.version_lineage, strategy.version)}</p>
+        {renderSemanticLine(
+          `Supported timeframes: ${strategy.supported_timeframes.join(", ") || "n/a"}`,
+          "vocabulary",
+          highlightVocabulary,
+          supportedTimeframesSubFocusKey,
+        )}
+        {renderSemanticLine(
+          `Version lineage: ${formatVersionLineage(strategy.version_lineage, strategy.version)}`,
+          "vocabulary",
+          highlightVocabulary,
+          versionLineageSubFocusKey,
+        )}
         {strategy.catalog_semantics.execution_model ? (
           renderSemanticLine(
             `Execution model: ${strategy.catalog_semantics.execution_model}`,
@@ -22983,11 +23000,33 @@ function RunStrategySnapshot({
             semanticSourceSubFocusKey,
           )
         ) : null}
-        <p>Resolved params: {formatParameterMap(strategy.parameter_snapshot.resolved)}</p>
-        <p>Requested params: {formatParameterMap(strategy.parameter_snapshot.requested)}</p>
-        {strategy.entrypoint ? <p>Entrypoint: {strategy.entrypoint}</p> : null}
+        {renderSemanticLine(
+          `Resolved params: ${formatParameterMap(strategy.parameter_snapshot.resolved)}`,
+          "parameter_contract",
+          highlightParameterContract,
+          resolvedParamsSubFocusKey,
+        )}
+        {renderSemanticLine(
+          `Requested params: ${formatParameterMap(strategy.parameter_snapshot.requested)}`,
+          "parameter_contract",
+          highlightParameterContract,
+          requestedParamsSubFocusKey,
+        )}
+        {strategy.entrypoint
+          ? renderSemanticLine(
+              `Entrypoint: ${strategy.entrypoint}`,
+              "source_descriptor",
+              highlightSourceDescriptor,
+              strategyEntrypointSubFocusKey,
+            )
+          : null}
         {strategy.lifecycle.registered_at ? (
-          <p>Registered: {formatTimestamp(strategy.lifecycle.registered_at)}</p>
+          renderSemanticLine(
+            `Registered: ${formatTimestamp(strategy.lifecycle.registered_at)}`,
+            "vocabulary",
+            highlightVocabulary,
+            strategyRegisteredSubFocusKey,
+          )
         ) : null}
         {strategy.catalog_semantics.operator_notes.length ? (
           renderSemanticLine(
@@ -23020,29 +23059,63 @@ function RunRuntimeSessionSummary({
   runtimeSession: NonNullable<Run["provenance"]["runtime_session"]>;
 }) {
   const runtimeSessionSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_session");
+  const runtimeStateSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_state");
+  const runtimeTicksSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_ticks");
+  const runtimeRecoveriesSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_recoveries");
+  const runtimeHeartbeatSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_heartbeat");
+  const runtimePrimedBarsSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_primed_bars");
+  const runtimeStartedSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_started");
+  const runtimeLastHeartbeatSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_last_heartbeat");
+  const runtimeLastProcessedSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_last_processed_candle");
+  const runtimeLastSeenSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_last_seen_candle");
+  const runtimeLastRecoverySubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_last_recovery");
+  const runtimeRecoveryReasonSubFocusKey = buildComparisonRunListLineSubFocusKey("runtime_recovery_reason");
   const highlightPanel =
     Boolean(linkedScore)
     && isComparisonScoreLinkMatch(linkedScore, ["provenance_richness"], "context");
+  const isRuntimeSubFocusOrigin = (subFocusKey: string) =>
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId
+    && linkedScore.subFocusKey === subFocusKey;
   const highlightOrigin =
     linkedScore?.source === "run_list"
     && linkedScore.originRunId === panelRunId
-    && linkedScore.subFocusKey === runtimeSessionSubFocusKey;
-  const renderRuntimeLine = (children: string) => {
+    && Boolean(linkedScore.subFocusKey?.startsWith("run-list-line:runtime_"));
+  const renderRuntimeMetric = (label: string, value: string, subFocusKey: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <Metric label={label} value={value} />;
+    }
+    return (
+      <Metric
+        buttonRef={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        className={highlightPanel ? "comparison-linked-panel" : ""}
+        interactivePressed={isRuntimeSubFocusOrigin(subFocusKey)}
+        label={label}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey,
+          })
+        }
+        value={value}
+      />
+    );
+  };
+  const renderRuntimeLine = (children: string, subFocusKey: string) => {
     if (!onDrillBackScoreLink || !panelRunId) {
       return <p className="run-lineage-copy-link">{children}</p>;
     }
     return (
       <button
-        aria-pressed={highlightOrigin}
+        aria-pressed={isRuntimeSubFocusOrigin(subFocusKey)}
         className={`run-lineage-copy-link comparison-run-card-link comparison-drillback-target ${
           highlightPanel ? "comparison-linked-copy" : ""
-        } ${highlightOrigin ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        } ${isRuntimeSubFocusOrigin(subFocusKey) ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
         onClick={() =>
           onDrillBackScoreLink("context", "provenance_richness", {
-            subFocusKey: runtimeSessionSubFocusKey,
+            subFocusKey,
           })
         }
-        ref={registerSubFocusRef?.(panelRunId, runtimeSessionSubFocusKey)}
+        ref={registerSubFocusRef?.(panelRunId, subFocusKey)}
         type="button"
       >
         {children}
@@ -23062,23 +23135,39 @@ function RunRuntimeSessionSummary({
         <strong>{runtimeSession.worker_kind}</strong>
       </div>
       <div className="run-lineage-grid">
-        <Metric label="State" value={runtimeSession.lifecycle_state} />
-        <Metric label="Ticks" value={String(runtimeSession.processed_tick_count)} />
-        <Metric label="Recoveries" value={String(runtimeSession.recovery_count)} />
-        <Metric
-          label="Heartbeat"
-          value={`${runtimeSession.heartbeat_interval_seconds}s / ${runtimeSession.heartbeat_timeout_seconds}s`}
-        />
-        <Metric label="Primed bars" value={String(runtimeSession.primed_candle_count)} />
+        {renderRuntimeMetric("State", runtimeSession.lifecycle_state, runtimeStateSubFocusKey)}
+        {renderRuntimeMetric("Ticks", String(runtimeSession.processed_tick_count), runtimeTicksSubFocusKey)}
+        {renderRuntimeMetric("Recoveries", String(runtimeSession.recovery_count), runtimeRecoveriesSubFocusKey)}
+        {renderRuntimeMetric(
+          "Heartbeat",
+          `${runtimeSession.heartbeat_interval_seconds}s / ${runtimeSession.heartbeat_timeout_seconds}s`,
+          runtimeHeartbeatSubFocusKey,
+        )}
+        {renderRuntimeMetric("Primed bars", String(runtimeSession.primed_candle_count), runtimePrimedBarsSubFocusKey)}
       </div>
       <div className="run-lineage-copy">
-        {renderRuntimeLine(`Session: ${runtimeSession.session_id}`)}
-        <p>Started: {formatTimestamp(runtimeSession.started_at)}</p>
-        <p>Last heartbeat: {formatTimestamp(runtimeSession.last_heartbeat_at)}</p>
-        <p>Last processed candle: {formatTimestamp(runtimeSession.last_processed_candle_at)}</p>
-        <p>Last seen candle: {formatTimestamp(runtimeSession.last_seen_candle_at)}</p>
-        <p>Last recovery: {formatTimestamp(runtimeSession.last_recovered_at)}</p>
-        <p>Recovery reason: {runtimeSession.last_recovery_reason ?? "none"}</p>
+        {renderRuntimeLine(`Session: ${runtimeSession.session_id}`, runtimeSessionSubFocusKey)}
+        {renderRuntimeLine(`Started: ${formatTimestamp(runtimeSession.started_at)}`, runtimeStartedSubFocusKey)}
+        {renderRuntimeLine(
+          `Last heartbeat: ${formatTimestamp(runtimeSession.last_heartbeat_at)}`,
+          runtimeLastHeartbeatSubFocusKey,
+        )}
+        {renderRuntimeLine(
+          `Last processed candle: ${formatTimestamp(runtimeSession.last_processed_candle_at)}`,
+          runtimeLastProcessedSubFocusKey,
+        )}
+        {renderRuntimeLine(
+          `Last seen candle: ${formatTimestamp(runtimeSession.last_seen_candle_at)}`,
+          runtimeLastSeenSubFocusKey,
+        )}
+        {renderRuntimeLine(
+          `Last recovery: ${formatTimestamp(runtimeSession.last_recovered_at)}`,
+          runtimeLastRecoverySubFocusKey,
+        )}
+        {renderRuntimeLine(
+          `Recovery reason: ${runtimeSession.last_recovery_reason ?? "none"}`,
+          runtimeRecoveryReasonSubFocusKey,
+        )}
       </div>
     </section>
   );
@@ -23188,6 +23277,58 @@ function RunOrderLifecycleSummary({
       </button>
     );
   };
+  const renderOrderPreviewMetric = (
+    orderId: string,
+    label: string,
+    value: string,
+    fieldKey: string,
+  ) => {
+    const subFocusKey = buildComparisonRunListOrderPreviewSubFocusKey(orderId, fieldKey);
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <Metric label={label} value={value} />;
+    }
+    return (
+      <Metric
+        buttonRef={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        className={highlightPanel ? "comparison-linked-panel" : ""}
+        interactivePressed={isOrderSubFocusOrigin(subFocusKey)}
+        label={label}
+        onClick={() =>
+          onDrillBackScoreLink("metrics", "trade_count", {
+            subFocusKey,
+          })
+        }
+        value={value}
+      />
+    );
+  };
+  const renderOrderPreviewLine = (
+    orderId: string,
+    children: string,
+    fieldKey: string,
+  ) => {
+    const subFocusKey = buildComparisonRunListOrderPreviewSubFocusKey(orderId, fieldKey);
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className="run-lineage-symbol-copy">{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={isOrderSubFocusOrigin(subFocusKey)}
+        className={`run-lineage-symbol-copy run-lineage-symbol-copy-link comparison-run-card-link comparison-drillback-target ${
+          highlightPanel ? "comparison-linked-copy" : ""
+        } ${isOrderSubFocusOrigin(subFocusKey) ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("metrics", "trade_count", {
+            subFocusKey,
+          })
+        }
+        ref={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
 
   return (
     <section
@@ -23219,23 +23360,36 @@ function RunOrderLifecycleSummary({
               <span>{order.status}</span>
             </div>
             <div className="run-lineage-symbol-grid">
-              <Metric label="Side" value={order.side} />
-              <Metric label="Qty" value={order.quantity.toFixed(8)} />
-              <Metric label="Filled" value={order.filled_quantity.toFixed(8)} />
-              <Metric
-                label="Remain"
-                value={(order.remaining_quantity ?? Math.max(order.quantity - order.filled_quantity, 0)).toFixed(8)}
-              />
+              {renderOrderPreviewMetric(order.order_id, "Side", order.side, "side")}
+              {renderOrderPreviewMetric(order.order_id, "Qty", order.quantity.toFixed(8), "qty")}
+              {renderOrderPreviewMetric(order.order_id, "Filled", order.filled_quantity.toFixed(8), "filled")}
+              {renderOrderPreviewMetric(
+                order.order_id,
+                "Remain",
+                (order.remaining_quantity ?? Math.max(order.quantity - order.filled_quantity, 0)).toFixed(8),
+                "remain",
+              )}
             </div>
-            <p className="run-lineage-symbol-copy">Instrument: {order.instrument_id}</p>
-            <p className="run-lineage-symbol-copy">
-              Avg fill:{" "}
-              {order.average_fill_price === null || order.average_fill_price === undefined
-                ? "n/a"
-                : order.average_fill_price}
-            </p>
-            <p className="run-lineage-symbol-copy">Updated: {formatTimestamp(order.updated_at ?? null)}</p>
-            <p className="run-lineage-symbol-copy">Synced: {formatTimestamp(order.last_synced_at ?? null)}</p>
+            {renderOrderPreviewLine(order.order_id, `Instrument: ${order.instrument_id}`, "instrument")}
+            {renderOrderPreviewLine(
+              order.order_id,
+              `Avg fill: ${
+                order.average_fill_price === null || order.average_fill_price === undefined
+                  ? "n/a"
+                  : order.average_fill_price
+              }`,
+              "avg_fill",
+            )}
+            {renderOrderPreviewLine(
+              order.order_id,
+              `Updated: ${formatTimestamp(order.updated_at ?? null)}`,
+              "updated",
+            )}
+            {renderOrderPreviewLine(
+              order.order_id,
+              `Synced: ${formatTimestamp(order.last_synced_at ?? null)}`,
+              "synced",
+            )}
             {orderControls && (order.status === "open" || order.status === "partially_filled") ? (
               <RunOrderActionControls order={order} orderControls={orderControls} />
             ) : null}
@@ -23341,29 +23495,114 @@ function RunMarketDataLineage({
 }) {
   const symbolEntries = Object.entries(lineageBySymbol ?? {});
   const dataLineageSubFocusKey = buildComparisonRunListLineSubFocusKey("data_lineage");
+  const dataProviderSubFocusKey = buildComparisonRunListLineSubFocusKey("data_provider");
+  const dataSyncSubFocusKey = buildComparisonRunListLineSubFocusKey("data_sync");
+  const dataReproSubFocusKey = buildComparisonRunListLineSubFocusKey("data_repro");
+  const dataBoundarySubFocusKey = buildComparisonRunListLineSubFocusKey("data_boundary");
+  const dataCandlesSubFocusKey = buildComparisonRunListLineSubFocusKey("data_candles");
+  const dataTimeframeSubFocusKey = buildComparisonRunListLineSubFocusKey("data_timeframe");
+  const dataRequestedWindowSubFocusKey = buildComparisonRunListLineSubFocusKey("data_requested_window");
+  const dataEffectiveWindowSubFocusKey = buildComparisonRunListLineSubFocusKey("data_effective_window");
+  const dataDatasetSubFocusKey = buildComparisonRunListLineSubFocusKey("data_dataset_identity");
+  const dataSyncCheckpointSubFocusKey = buildComparisonRunListLineSubFocusKey("data_sync_checkpoint");
+  const dataRerunBoundarySubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_boundary");
+  const dataRerunStatusSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_status");
+  const dataRerunSourceSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_source");
+  const dataRerunTargetSubFocusKey = buildComparisonRunListLineSubFocusKey("data_rerun_target");
+  const dataLastSyncSubFocusKey = buildComparisonRunListLineSubFocusKey("data_last_sync");
+  const dataIssuesSubFocusKey = buildComparisonRunListLineSubFocusKey("data_issues");
   const highlightPanel =
     Boolean(linkedScore)
     && isComparisonScoreLinkMatch(linkedScore, ["provenance_richness"], "context");
+  const isLineageSubFocusOrigin = (subFocusKey: string) =>
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId
+    && linkedScore.subFocusKey === subFocusKey;
   const highlightOrigin =
     linkedScore?.source === "run_list"
     && linkedScore.originRunId === panelRunId
-    && linkedScore.subFocusKey === dataLineageSubFocusKey;
-  const renderLineageLine = (children: string) => {
+    && Boolean(
+      linkedScore.subFocusKey === dataLineageSubFocusKey
+      || linkedScore.subFocusKey?.startsWith("run-list-line:data_"),
+    );
+  const renderLineageMetric = (label: string, value: string, subFocusKey: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <Metric label={label} value={value} />;
+    }
+    return (
+      <Metric
+        buttonRef={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        className={highlightPanel ? "comparison-linked-panel" : ""}
+        interactivePressed={isLineageSubFocusOrigin(subFocusKey)}
+        label={label}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey,
+          })
+        }
+        value={value}
+      />
+    );
+  };
+  const renderLineageLine = (children: string, subFocusKey: string) => {
     if (!onDrillBackScoreLink || !panelRunId) {
       return <p className="run-lineage-copy-link">{children}</p>;
     }
     return (
       <button
-        aria-pressed={highlightOrigin}
+        aria-pressed={isLineageSubFocusOrigin(subFocusKey)}
         className={`run-lineage-copy-link comparison-run-card-link comparison-drillback-target ${
           highlightPanel ? "comparison-linked-copy" : ""
-        } ${highlightOrigin ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        } ${isLineageSubFocusOrigin(subFocusKey) ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
         onClick={() =>
           onDrillBackScoreLink("context", "provenance_richness", {
-            subFocusKey: dataLineageSubFocusKey,
+            subFocusKey,
           })
         }
-        ref={registerSubFocusRef?.(panelRunId, dataLineageSubFocusKey)}
+        ref={registerSubFocusRef?.(panelRunId, subFocusKey)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
+  const renderSymbolMetric = (symbol: string, label: string, value: string, fieldKey: string) => {
+    const subFocusKey = buildComparisonRunListDataSymbolSubFocusKey(symbol, fieldKey);
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <Metric label={label} value={value} />;
+    }
+    return (
+      <Metric
+        buttonRef={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        className={highlightPanel ? "comparison-linked-panel" : ""}
+        interactivePressed={isLineageSubFocusOrigin(subFocusKey)}
+        label={label}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey,
+          })
+        }
+        value={value}
+      />
+    );
+  };
+  const renderSymbolCopy = (symbol: string, children: string, fieldKey: string) => {
+    const subFocusKey = buildComparisonRunListDataSymbolSubFocusKey(symbol, fieldKey);
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className="run-lineage-symbol-copy">{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={isLineageSubFocusOrigin(subFocusKey)}
+        className={`run-lineage-symbol-copy run-lineage-symbol-copy-link comparison-run-card-link comparison-drillback-target ${
+          highlightPanel ? "comparison-linked-copy" : ""
+        } ${isLineageSubFocusOrigin(subFocusKey) ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("context", "provenance_richness", {
+            subFocusKey,
+          })
+        }
+        ref={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
         type="button"
       >
         {children}
@@ -23384,25 +23623,34 @@ function RunMarketDataLineage({
         <strong>{lineage.provider}</strong>
       </div>
       <div className="run-lineage-grid">
-        <Metric label="Provider" value={lineage.provider} />
-        <Metric label="Sync" value={lineage.sync_status} />
-        <Metric label="Repro" value={lineage.reproducibility_state} />
-        <Metric label="Boundary" value={rerunBoundaryState} />
-        <Metric label="Candles" value={String(lineage.candle_count)} />
-        <Metric label="Timeframe" value={lineage.timeframe} />
+        {renderLineageMetric("Provider", lineage.provider, dataProviderSubFocusKey)}
+        {renderLineageMetric("Sync", lineage.sync_status, dataSyncSubFocusKey)}
+        {renderLineageMetric("Repro", lineage.reproducibility_state, dataReproSubFocusKey)}
+        {renderLineageMetric("Boundary", rerunBoundaryState, dataBoundarySubFocusKey)}
+        {renderLineageMetric("Candles", String(lineage.candle_count), dataCandlesSubFocusKey)}
+        {renderLineageMetric("Timeframe", lineage.timeframe, dataTimeframeSubFocusKey)}
       </div>
       <div className="run-lineage-copy">
-        {renderLineageLine(`${lineage.venue}:${lineage.symbols.join(", ")}`)}
-        <p>Requested window: {formatRange(lineage.requested_start_at, lineage.requested_end_at)}</p>
-        <p>Effective window: {formatRange(lineage.effective_start_at, lineage.effective_end_at)}</p>
-        <p>Dataset ID: {lineage.dataset_identity ?? "unavailable"}</p>
-        <p>Sync checkpoint: {lineage.sync_checkpoint_id ?? "unavailable"}</p>
-        <p>Rerun boundary: {rerunBoundaryId ?? "unavailable"}</p>
-        <p>Rerun status: {rerunMatchStatus}</p>
-        <p>Rerun source: {rerunSourceRunId ?? "n/a"}</p>
-        <p>Rerun target: {rerunTargetBoundaryId ?? "n/a"}</p>
-        <p>Last sync: {formatTimestamp(lineage.last_sync_at)}</p>
-        <p>Issues: {lineage.issues.length ? lineage.issues.join(", ") : "none"}</p>
+        {renderLineageLine(`${lineage.venue}:${lineage.symbols.join(", ")}`, dataLineageSubFocusKey)}
+        {renderLineageLine(
+          `Requested window: ${formatRange(lineage.requested_start_at, lineage.requested_end_at)}`,
+          dataRequestedWindowSubFocusKey,
+        )}
+        {renderLineageLine(
+          `Effective window: ${formatRange(lineage.effective_start_at, lineage.effective_end_at)}`,
+          dataEffectiveWindowSubFocusKey,
+        )}
+        {renderLineageLine(`Dataset ID: ${lineage.dataset_identity ?? "unavailable"}`, dataDatasetSubFocusKey)}
+        {renderLineageLine(`Sync checkpoint: ${lineage.sync_checkpoint_id ?? "unavailable"}`, dataSyncCheckpointSubFocusKey)}
+        {renderLineageLine(`Rerun boundary: ${rerunBoundaryId ?? "unavailable"}`, dataRerunBoundarySubFocusKey)}
+        {renderLineageLine(`Rerun status: ${rerunMatchStatus}`, dataRerunStatusSubFocusKey)}
+        {renderLineageLine(`Rerun source: ${rerunSourceRunId ?? "n/a"}`, dataRerunSourceSubFocusKey)}
+        {renderLineageLine(`Rerun target: ${rerunTargetBoundaryId ?? "n/a"}`, dataRerunTargetSubFocusKey)}
+        {renderLineageLine(`Last sync: ${formatTimestamp(lineage.last_sync_at)}`, dataLastSyncSubFocusKey)}
+        {renderLineageLine(
+          `Issues: ${lineage.issues.length ? lineage.issues.join(", ") : "none"}`,
+          dataIssuesSubFocusKey,
+        )}
       </div>
       {symbolEntries.length ? (
         <div className="run-lineage-symbols">
@@ -23413,19 +23661,24 @@ function RunMarketDataLineage({
                 <span>{symbolLineage.sync_status}</span>
               </div>
               <div className="run-lineage-symbol-grid">
-                <Metric label="Candles" value={String(symbolLineage.candle_count)} />
-                <Metric label="Provider" value={symbolLineage.provider} />
-                <Metric label="Repro" value={symbolLineage.reproducibility_state} />
-                <Metric label="Window" value={formatRange(symbolLineage.effective_start_at, symbolLineage.effective_end_at)} />
+                {renderSymbolMetric(symbol, "Candles", String(symbolLineage.candle_count), "candles")}
+                {renderSymbolMetric(symbol, "Provider", symbolLineage.provider, "provider")}
+                {renderSymbolMetric(symbol, "Repro", symbolLineage.reproducibility_state, "repro")}
+                {renderSymbolMetric(
+                  symbol,
+                  "Window",
+                  formatRange(symbolLineage.effective_start_at, symbolLineage.effective_end_at),
+                  "window",
+                )}
               </div>
-              <p className="run-lineage-symbol-copy">Dataset ID: {symbolLineage.dataset_identity ?? "unavailable"}</p>
-              <p className="run-lineage-symbol-copy">
-                Sync checkpoint: {symbolLineage.sync_checkpoint_id ?? "unavailable"}
-              </p>
-              <p className="run-lineage-symbol-copy">Last sync: {formatTimestamp(symbolLineage.last_sync_at)}</p>
-              <p className="run-lineage-symbol-copy">
-                Issues: {symbolLineage.issues.length ? symbolLineage.issues.join(", ") : "none"}
-              </p>
+              {renderSymbolCopy(symbol, `Dataset ID: ${symbolLineage.dataset_identity ?? "unavailable"}`, "dataset_identity")}
+              {renderSymbolCopy(symbol, `Sync checkpoint: ${symbolLineage.sync_checkpoint_id ?? "unavailable"}`, "sync_checkpoint")}
+              {renderSymbolCopy(symbol, `Last sync: ${formatTimestamp(symbolLineage.last_sync_at)}`, "last_sync")}
+              {renderSymbolCopy(
+                symbol,
+                `Issues: ${symbolLineage.issues.length ? symbolLineage.issues.join(", ") : "none"}`,
+                "issues",
+              )}
             </article>
           ))}
         </div>
@@ -23594,6 +23847,18 @@ function buildComparisonRunListLineSubFocusKey(key: string) {
   return `run-list-line:${encodeComparisonScoreLinkToken(key)}`;
 }
 
+function buildComparisonRunListOrderPreviewSubFocusKey(orderId: string, fieldKey: string) {
+  return buildComparisonRunListLineSubFocusKey(
+    `order_preview:${encodeComparisonScoreLinkToken(orderId)}:${fieldKey}`,
+  );
+}
+
+function buildComparisonRunListDataSymbolSubFocusKey(symbol: string, fieldKey: string) {
+  return buildComparisonRunListLineSubFocusKey(
+    `data_symbol:${encodeComparisonScoreLinkToken(symbol)}:${fieldKey}`,
+  );
+}
+
 function buildComparisonProvenanceArtifactSubFocusKey(path: string) {
   return `provenance-artifact:${encodeComparisonScoreLinkToken(path)}`;
 }
@@ -23636,10 +23901,26 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     return null;
   }
   const semanticLineLabels: Record<string, string> = {
+    data_boundary: "Boundary state",
     experiment_benchmark: "Benchmark family",
     experiment_dataset: "Dataset identity",
     experiment_preset: "Preset",
+    data_candles: "Candles",
     data_lineage: "Data lineage",
+    data_dataset_identity: "Dataset identity",
+    data_effective_window: "Effective window",
+    data_issues: "Issues",
+    data_last_sync: "Last sync",
+    data_provider: "Provider",
+    data_requested_window: "Requested window",
+    data_repro: "Reproducibility",
+    data_rerun_boundary: "Rerun boundary",
+    data_rerun_source: "Rerun source",
+    data_rerun_status: "Rerun status",
+    data_rerun_target: "Rerun target",
+    data_sync: "Sync status",
+    data_sync_checkpoint: "Sync checkpoint",
+    data_timeframe: "Timeframe",
     execution_model: "Execution model",
     max_drawdown_pct: "Drawdown",
     operator_notes: "Operator notes",
@@ -23652,11 +23933,28 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     parameter_contract: "Parameter contract",
     provenance_richness: "Artifact inventory",
     reference_note: "Reference note",
+    runtime_heartbeat: "Heartbeat",
+    runtime_last_heartbeat: "Last heartbeat",
+    runtime_last_processed_candle: "Last processed candle",
+    runtime_last_recovery: "Last recovery",
+    runtime_last_seen_candle: "Last seen candle",
+    runtime_primed_bars: "Primed bars",
+    runtime_recoveries: "Recoveries",
+    runtime_recovery_reason: "Recovery reason",
     runtime_session: "Runtime session",
+    runtime_started: "Started",
+    runtime_state: "Lifecycle state",
+    runtime_ticks: "Processed ticks",
     semantic_source: "Semantic source",
     status: "Status",
     source_descriptor: "Source descriptor",
+    strategy_entrypoint: "Entrypoint",
+    strategy_registered: "Registered",
+    strategy_requested_params: "Requested params",
+    strategy_resolved_params: "Resolved params",
     strategy_kind: "Semantic kind",
+    strategy_supported_timeframes: "Supported timeframes",
+    strategy_version_lineage: "Version lineage",
     total_return_pct: "Return",
     trade_count: "Trade flow",
     vocabulary: "Vocabulary",
@@ -23681,6 +23979,37 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("run-list-line:".length));
     if (lineKey.startsWith("experiment_tag:")) {
       return `Experiment tag #${lineKey.slice("experiment_tag:".length)}`;
+    }
+    if (lineKey.startsWith("order_preview:")) {
+      const [, encodedOrderId = "", fieldKey = "detail"] = lineKey.split(":");
+      const orderId = decodeComparisonScoreLinkToken(encodedOrderId);
+      const orderFieldLabels: Record<string, string> = {
+        avg_fill: "Avg fill",
+        filled: "Filled",
+        instrument: "Instrument",
+        qty: "Quantity",
+        remain: "Remaining",
+        side: "Side",
+        synced: "Synced",
+        updated: "Updated",
+      };
+      return `${shortenIdentifier(orderId)} / ${orderFieldLabels[fieldKey] ?? fieldKey.replace(/_/g, " ")}`;
+    }
+    if (lineKey.startsWith("data_symbol:")) {
+      const [, encodedSymbol = "", fieldKey = "detail"] = lineKey.split(":");
+      const symbol = decodeComparisonScoreLinkToken(encodedSymbol);
+      const dataSymbolLabels: Record<string, string> = {
+        candles: "Candles",
+        dataset_identity: "Dataset identity",
+        issues: "Issues",
+        last_sync: "Last sync",
+        provider: "Provider",
+        repro: "Reproducibility",
+        sync: "Sync status",
+        sync_checkpoint: "Sync checkpoint",
+        window: "Window",
+      };
+      return `${symbol} / ${dataSymbolLabels[fieldKey] ?? fieldKey.replace(/_/g, " ")}`;
     }
     return semanticLineLabels[lineKey] ?? lineKey.replace(/_/g, " ");
   }
