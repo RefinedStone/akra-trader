@@ -2884,18 +2884,36 @@
       "direction_id": "experiment-os",
       "title": "Push comparison state transitions into the browser history timeline",
       "description": "Extend the new comparison URL and `popstate` model so meaningful comparison state changes create distinct browser history entries, letting back or forward step through compare selection and score-focus transitions as an analysis timeline instead of only restoring whatever URL was already present.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the remaining history UX gap is that comparison state changes do not create their own history entries, so back or forward still cannot act like a compare-step timeline. With URL persistence and `popstate` rehydrate now done, this is the clearest next executable task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 8a018f8, which changed comparison run selection, comparison intent, and score-focus transitions to push browser history entries, kept rehydrate and auto-normalization paths on replace or skip to avoid history pollution, and verified the result with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-rehydrate-comparison-context-on-history-navigation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:20:00Z",
+      "updated_at": "2026-04-20T00:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os comparison-state durability from passive URL restoration into full browser-native analysis navigation, so compare selections and score-focus changes become inspectable timeline steps instead of transient local transitions."
+    },
+    {
+      "id": "planning-experiment-os-label-and-summarize-comparison-history-steps",
+      "direction_id": "experiment-os",
+      "title": "Label and summarize comparison history steps for navigation",
+      "description": "Build on the new pushed comparison-history timeline by adding human-readable compare-step labeling and explicit summary surfaces for the current history entry, so operators can understand what back or forward will restore instead of navigating opaque URL-only state transitions.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply says the remaining work is history UX tuning: comparison state now lands in browser history, but entries still lack human-readable labels or explicit compare-step summaries. That is the clearest next executable follow-up now that history push semantics are complete.",
+      "depends_on": [
+        "planning-experiment-os-push-comparison-state-transitions-into-history-timeline"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T00:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison navigation from technically correct browser-history stepping into operator-readable timeline semantics, which improves trust and usability during multi-step comparison review."
     },
     {
       "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
@@ -2905,13 +2923,13 @@
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 5,
-      "priority_reason": "Cross-subview deep-link coordination is still valid follow-up, but the latest main-session reply now points to a more immediate history UX gap: comparison state changes still do not create their own browser history entries. Keep this queued behind history-timeline semantics.",
+      "priority_reason": "Cross-subview deep-link coordination remains valid follow-up, but the latest main-session reply now names human-readable comparison history labels or step summaries as the more immediate gap after push-state timeline support shipped. Keep this behind history-step readability work.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:20:00Z",
+      "updated_at": "2026-04-20T00:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison deep linking from one surface-local persistence feature into a control-room-wide navigation contract that keeps analysis context coherent as operators move across subviews."
     },
