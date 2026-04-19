@@ -802,6 +802,7 @@ select {
 
 .gap-window-picker-title,
 .gap-window-picker-summary,
+.gap-window-picker-anchor,
 .gap-window-picker-footnote {
   margin: 0;
   font-family: "IBM Plex Mono", monospace;
@@ -815,6 +816,7 @@ select {
 }
 
 .gap-window-picker-summary,
+.gap-window-picker-anchor,
 .gap-window-picker-footnote {
   color: var(--muted);
 }
@@ -835,6 +837,10 @@ select {
 .gap-window-picker-option.is-active {
   border-color: rgba(120, 180, 255, 0.22);
   background: rgba(120, 180, 255, 0.08);
+}
+
+.gap-window-picker-option.is-anchor {
+  box-shadow: inset 2px 0 0 rgba(255, 196, 92, 0.55);
 }
 
 .gap-window-picker-option input {
