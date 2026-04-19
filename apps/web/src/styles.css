@@ -631,6 +631,66 @@ select {
   color: rgba(255, 255, 255, 0.58);
 }
 
+.comparison-history-conflict-review-overview {
+  display: grid;
+  gap: 10px;
+}
+
+.comparison-history-conflict-review-overview-card {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 24, 0.74);
+}
+
+.comparison-history-conflict-review-overview-card.is-strongest {
+  border-color: rgba(255, 207, 112, 0.28);
+  background: rgba(255, 207, 112, 0.08);
+}
+
+.comparison-history-conflict-review-overview-label,
+.comparison-history-conflict-review-overview-lane-label {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.comparison-history-conflict-review-overview-copy {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.comparison-history-conflict-review-overview-lane {
+  display: grid;
+  gap: 6px;
+}
+
+.comparison-history-conflict-review-overview-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comparison-history-conflict-review-overview-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.comparison-history-conflict-review-overview-chip.is-local {
+  background: rgba(94, 234, 212, 0.14);
+}
+
+.comparison-history-conflict-review-overview-chip.is-remote {
+  background: rgba(255, 207, 112, 0.14);
+}
+
 .comparison-history-browser-search {
   display: grid;
   gap: 6px;

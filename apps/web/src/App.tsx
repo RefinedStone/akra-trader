@@ -3051,6 +3051,17 @@ type ComparisonHistorySyncWorkspaceReviewRow = {
   selectedSource: ComparisonHistorySyncConflictFieldSource;
 };
 
+type ComparisonHistorySyncWorkspaceRecommendationOverview = {
+  totalFieldCount: number;
+  localCount: number;
+  remoteCount: number;
+  latestLocalDriftCount: number;
+  rankedDiffCount: number;
+  strongest: ComparisonHistorySyncWorkspaceReviewRow | null;
+  topLocal: ComparisonHistorySyncWorkspaceReviewRow[];
+  topRemote: ComparisonHistorySyncWorkspaceReviewRow[];
+};
+
 type ControlRoomUiStateV2 = {
   version: 2;
   expandedGapRows: Record<string, boolean>;
@@ -11411,6 +11422,33 @@ function buildComparisonHistorySyncWorkspaceReviewRows(
   ));
 }
 
+function buildComparisonHistorySyncWorkspaceRecommendationOverview(
+  rows: ComparisonHistorySyncWorkspaceReviewRow[],
+): ComparisonHistorySyncWorkspaceRecommendationOverview {
+  const rankedRows = [...rows].sort((left, right) => (
+    right.recommendationStrength - left.recommendationStrength
+    || Number(right.hasLatestLocalDrift) - Number(left.hasLatestLocalDrift)
+    || right.semanticRank - left.semanticRank
+    || left.label.localeCompare(right.label)
+  ));
+  const topLocal = rankedRows
+    .filter((row) => row.recommendedSource === "local")
+    .slice(0, 2);
+  const topRemote = rankedRows
+    .filter((row) => row.recommendedSource === "remote")
+    .slice(0, 2);
+  return {
+    totalFieldCount: rows.length,
+    localCount: rows.filter((row) => row.recommendedSource === "local").length,
+    remoteCount: rows.filter((row) => row.recommendedSource === "remote").length,
+    latestLocalDriftCount: rows.filter((row) => row.hasLatestLocalDrift).length,
+    rankedDiffCount: rows.filter((row) => row.selectedSource !== row.recommendedSource).length,
+    strongest: rankedRows[0] ?? null,
+    topLocal,
+    topRemote,
+  };
+}
+
 function formatComparisonHistorySyncWorkspaceResolutionSummary(
   review: ComparisonHistorySyncWorkspaceReview,
   latestLocalState?: ComparisonHistorySyncWorkspaceState,
@@ -13418,6 +13456,9 @@ function RunSection({
                                   comparison.latestWorkspaceSyncState,
                                 )
                               : [];
+                            const workspaceOverview = workspaceReview
+                              ? buildComparisonHistorySyncWorkspaceRecommendationOverview(workspaceRows)
+                              : null;
                             const flatReviewRows = preferenceReview ? preferenceRows : workspaceRows;
                             const reviewFieldCount = conflictReview
                               ? conflictGroups.reduce((total, group) => total + group.rows.length, 0)
@@ -13597,6 +13638,89 @@ function RunSection({
                                           </div>
                                         </div>
                                         <div className="comparison-dev-conflict-preview comparison-history-conflict-review">
+                                          {workspaceOverview ? (
+                                            <div className="comparison-history-conflict-review-overview">
+                                              <div className="comparison-history-conflict-review-overview-card">
+                                                <span className="comparison-history-conflict-review-overview-label">
+                                                  Ranked split
+                                                </span>
+                                                <strong>
+                                                  {workspaceOverview.localCount} local latest / {workspaceOverview.remoteCount} remote audit
+                                                </strong>
+                                                <span className="comparison-history-conflict-review-overview-copy">
+                                                  {workspaceOverview.rankedDiffCount > 0
+                                                    ? `${workspaceOverview.rankedDiffCount} field${workspaceOverview.rankedDiffCount === 1 ? "" : "s"} currently differ from ranked picks`
+                                                    : "Current selections already match ranked picks"}
+                                                </span>
+                                              </div>
+                                              <div className="comparison-history-conflict-review-overview-card">
+                                                <span className="comparison-history-conflict-review-overview-label">
+                                                  Latest local drift
+                                                </span>
+                                                <strong>
+                                                  {workspaceOverview.latestLocalDriftCount} / {workspaceOverview.totalFieldCount}
+                                                </strong>
+                                                <span className="comparison-history-conflict-review-overview-copy">
+                                                  {workspaceOverview.latestLocalDriftCount > 0
+                                                    ? "Fields changed after the audit snapshot"
+                                                    : "No field drift since the audit snapshot"}
+                                                </span>
+                                              </div>
+                                              <div className="comparison-history-conflict-review-overview-card is-strongest">
+                                                <span className="comparison-history-conflict-review-overview-label">
+                                                  Strongest recommendation
+                                                </span>
+                                                {workspaceOverview.strongest ? (
+                                                  <>
+                                                    <strong>
+                                                      {workspaceOverview.strongest.label}
+                                                    </strong>
+                                                    <span className="comparison-history-conflict-review-overview-copy">
+                                                      {workspaceOverview.strongest.recommendedSource === "local" ? "Local latest" : "Remote audit"} by {formatComparisonScoreValue(workspaceOverview.strongest.recommendationStrength)} points
+                                                    </span>
+                                                  </>
+                                                ) : (
+                                                  <span className="comparison-history-conflict-review-overview-copy">
+                                                    No workspace conflicts to rank.
+                                                  </span>
+                                                )}
+                                              </div>
+                                              {workspaceOverview.topLocal.length ? (
+                                                <div className="comparison-history-conflict-review-overview-lane">
+                                                  <span className="comparison-history-conflict-review-overview-lane-label">
+                                                    Top local latest picks
+                                                  </span>
+                                                  <div className="comparison-history-conflict-review-overview-chip-list">
+                                                    {workspaceOverview.topLocal.map((row) => (
+                                                      <span
+                                                        className="comparison-history-conflict-review-overview-chip is-local"
+                                                        key={`overview-local:${entry.auditId}:${row.fieldKey}`}
+                                                      >
+                                                        {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              ) : null}
+                                              {workspaceOverview.topRemote.length ? (
+                                                <div className="comparison-history-conflict-review-overview-lane">
+                                                  <span className="comparison-history-conflict-review-overview-lane-label">
+                                                    Top remote audit picks
+                                                  </span>
+                                                  <div className="comparison-history-conflict-review-overview-chip-list">
+                                                    {workspaceOverview.topRemote.map((row) => (
+                                                      <span
+                                                        className="comparison-history-conflict-review-overview-chip is-remote"
+                                                        key={`overview-remote:${entry.auditId}:${row.fieldKey}`}
+                                                      >
+                                                        {row.label} · +{formatComparisonScoreValue(row.recommendationStrength)}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </div>
+                                              ) : null}
+                                            </div>
+                                          ) : null}
                                           <div className="comparison-dev-conflict-preview-row comparison-dev-conflict-preview-head">
                                             <span>
                                               {conflictReview ? "Field" : preferenceReview ? "Preference" : "Workspace field"}
