@@ -3928,18 +3928,36 @@
       "direction_id": "experiment-os",
       "title": "Define comparison-eligible boundaries for weak-signal run-list surfaces",
       "description": "Audit the residual run-list surfaces left after the inner-detail deep-link pass and only extend the `run_list` comparison contract where a surface still maps cleanly to comparison evidence, while explicitly leaving low-signal static identity tiles such as `Mode` or `Lane` or `Lifecycle` or `Version`, mutating order-action controls, and future hover-only micro-state out of the deep-link model unless a stronger comparison meaning is established.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says commit 6e3f050 finished the meaningful inner detail rows and that the remaining surfaces are precisely the ones with weak comparison semantics: static top tiles, mutating order controls, and future hover or tooltip micro-state. The next executable queue head is to codify that boundary, selectively wire any residual evidence-bearing surfaces, and make the exclusions explicit instead of continuing blanket deep-link expansion.",
+      "priority_reason": "Completed in main session commit ba28ab7, which split run-card metric surfaces into `Supporting only` and `Comparison-eligible`, marked `Mode` or `Lane` or `Lifecycle` or `Version` as descriptive-only, kept `Return` or `Drawdown` or `Win rate` or `Trades` comparison-eligible, added `Operational only` boundary notes to lifecycle and action surfaces, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-run-list-deep-links-to-inner-detail-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:10:00Z",
+      "updated_at": "2026-04-20T12:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison traceability disciplined by stopping the run-list deep-link contract at operator-meaningful evidence surfaces instead of letting it sprawl into static labels, mutating controls, or speculative hover-only state."
+    },
+    {
+      "id": "planning-experiment-os-promote-run-list-comparison-boundaries-into-formal-contract",
+      "direction_id": "experiment-os",
+      "title": "Promote run-list comparison boundaries into a formal eligibility contract",
+      "description": "Lift the newly defined weak-signal run-list boundaries out of UI-only labeling and component wiring into a durable comparison eligibility contract, such as schema-backed comparison-surface metadata or explicit server payload fields, so `supporting`, `comparison-eligible`, and `operational-only` distinctions become enforceable policy rather than presentation-only guidance.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says the remaining work is to lift the new weak-signal or supporting or operational boundary out of UI code and into a formal comparison-eligibility schema or server-payload contract. That is the clearest executable next step for builtin next-task progression because the policy boundary is already decided and now needs durable backend or shared-contract enforcement.",
+      "depends_on": [
+        "planning-experiment-os-define-boundaries-for-weak-comparison-run-list-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from UI-stated comparison discipline to a durable experiment contract where run-list evidence surfaces carry explicit eligibility semantics across backend payloads, client wiring, and future comparison policy work."
     }
   ]
 }
