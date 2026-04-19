@@ -2848,18 +2848,54 @@
       "direction_id": "experiment-os",
       "title": "Persist comparison selection context in URL or durable UI state",
       "description": "Carry the newly bidirectional comparison selection state across reloads, deep links, and adjacent navigation by persisting the active narrative or score component context in the URL or another durable view-state layer, so operators do not lose their analysis entry point after refresh or share it only through local memory.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 19,
-      "priority_reason": "The latest main-session reply explicitly says the last remaining interaction hardening is that bidirectional metric or provenance drill-back still does not preserve selection context in the URL or persisted UI state. That is the clearest next executable task for builtin queue progression because the core drill-back loop is now complete and persisted context is the first unfinished gap called out.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 888db6b, which persisted comparison run IDs, intent, and selected score-component focus into `compare_*` query params and durable control-room UI state, restored the state across reloads, prioritized URL hydration over local state, and kept prior gap-row persistence under the same versioned UI-state model.",
       "depends_on": [
         "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:05:40Z",
+      "updated_at": "2026-04-19T11:13:44Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison explainability from transient linked interactions into durable operator workflow state, which makes score-based analysis resumable and shareable instead of session-local."
+    },
+    {
+      "id": "planning-experiment-os-rehydrate-comparison-context-on-history-navigation",
+      "direction_id": "experiment-os",
+      "title": "Rehydrate comparison selection context on browser history navigation",
+      "description": "Finish the new comparison selection persistence by wiring `popstate` or equivalent history-navigation handling so browser back or forward restores the comparison run IDs, intent, and focused score component from URL state instead of leaving the control-room UI stale until a full reload.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply says the remaining selection-persistence gap is missing `popstate` rehydrate for browser back or forward. This is the clearest immediate executable follow-up because the URL-backed state now exists and history navigation is the first explicit behavior still called out as unfinished.",
+      "depends_on": [
+        "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:13:44Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison-state durability by making URL-backed analysis context behave correctly across normal browser navigation, not only reload and copied deep links."
+    },
+    {
+      "id": "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Coordinate control-room subviews with comparison deep-link state",
+      "description": "Extend the new comparison query-param and durable UI-state model so adjacent control-room subviews can preserve, honor, or intentionally clear comparison deep-link context instead of treating comparison selection as isolated state that can drift from the rest of the operator navigation model.",
+      "status": "proposed",
+      "base_priority": 91,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply explicitly says comparison persistence still lacks deep-link coordination with other control-room subviews. This is concrete follow-up work, but it should remain behind history-navigation rehydrate because `popstate` correctness is the more direct completion of the just-shipped persistence model.",
+      "depends_on": [
+        "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:13:44Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison deep linking from one surface-local persistence feature into a control-room-wide navigation contract that keeps analysis context coherent as operators move across subviews."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
@@ -2868,14 +2904,14 @@
       "description": "Broaden the new reverse drill-back interaction so run-card semantic lines outside the current provenance panels can also select the matching score breakdown row or narrative, closing the remaining scope gap where only metric cells and provenance-linked surfaces participate in bidirectional analysis.",
       "status": "proposed",
       "base_priority": 91,
-      "dynamic_priority_delta": 2,
-      "priority_reason": "Main session explicitly called out one remaining scope extension after the shipped reverse drill-back: non-provenance semantic lines in run cards still are not selectable back into score breakdown state. This is executable follow-up work, but it is a narrower expansion after the more workflow-critical persistence gap.",
+      "dynamic_priority_delta": 1,
+      "priority_reason": "Reverse drill-back for non-provenance semantic lines is still valid follow-up, but the latest main-session reply names browser-history rehydrate and cross-subview deep-link coordination as the more immediate remaining work after persistence shipped.",
       "depends_on": [
         "planning-experiment-os-enable-score-component-drill-back-from-metric-and-provenance-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T11:05:40Z",
+      "updated_at": "2026-04-19T11:13:44Z",
       "source_turn_id": null,
       "direction_relation_note": "Further deepens experiment-os comparison traceability by widening bidirectional score-component selection beyond provenance panels into the remaining semantic explanation lines operators read during comparison review."
     }
