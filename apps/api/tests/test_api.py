@@ -3434,6 +3434,92 @@ def test_run_orders_endpoint_applies_surface_rule_contract_to_order_actions(tmp_
   )
 
 
+def test_run_positions_and_metrics_endpoints_return_surface_rule_metadata(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    run_response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+      },
+    )
+    run_id = run_response.json()["config"]["run_id"]
+
+    positions_response = client.get(f"/api/runs/{run_id}/positions")
+    metrics_response = client.get(f"/api/runs/{run_id}/metrics")
+
+  assert positions_response.status_code == 200
+  positions_payload = positions_response.json()
+  assert positions_payload["run_id"] == run_id
+  assert positions_payload["run_mode"] == "backtest"
+  assert positions_payload["run_status"] == "completed"
+  assert positions_payload["surface_enforcement"]["run_list_metric_tiles"]["enabled"] is True
+  assert positions_payload["action_availability"]["compare_select"]["allowed"] is True
+  assert positions_payload["action_availability"]["stop_run"]["allowed"] is False
+  assert isinstance(positions_payload["positions"], list)
+
+  assert metrics_response.status_code == 200
+  metrics_payload = metrics_response.json()
+  assert metrics_payload["run_id"] == run_id
+  assert metrics_payload["run_mode"] == "backtest"
+  assert metrics_payload["run_status"] == "completed"
+  assert metrics_payload["surface_enforcement"]["run_list_metric_tiles"]["enabled"] is True
+  assert metrics_payload["action_availability"]["rerun_backtest"]["allowed"] is True
+  assert "total_return_pct" in metrics_payload["metrics"]
+
+
+def test_run_positions_and_metrics_endpoints_apply_surface_rule_overrides(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    run_response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "initial_cash": 10_000,
+        "fee_rate": 0.001,
+        "slippage_bps": 3,
+        "parameters": {},
+      },
+    )
+    run_id = run_response.json()["config"]["run_id"]
+    base_capabilities = app.get_run_surface_capabilities()
+    app.get_run_surface_capabilities = lambda: without_surface_rule(
+      without_surface_rule(
+        base_capabilities,
+        family_key="comparison_eligibility",
+        surface_key="run_list_metric_tiles",
+      ),
+      family_key="execution_controls",
+      surface_key="compare_selection_workflow",
+    )
+
+    positions_response = client.get(f"/api/runs/{run_id}/positions")
+    metrics_response = client.get(f"/api/runs/{run_id}/metrics")
+
+  assert positions_response.status_code == 200
+  positions_payload = positions_response.json()
+  assert positions_payload["surface_enforcement"]["run_list_metric_tiles"]["enabled"] is False
+  assert positions_payload["surface_enforcement"]["compare_selection_workflow"]["enabled"] is False
+  assert positions_payload["action_availability"]["compare_select"]["allowed"] is False
+  assert positions_payload["action_availability"]["compare_select"]["reason"] == (
+    "Surface rule compare_selection_workflow is disabled by the run-surface capability contract."
+  )
+
+  assert metrics_response.status_code == 200
+  metrics_payload = metrics_response.json()
+  assert metrics_payload["surface_enforcement"]["run_list_metric_tiles"]["enabled"] is False
+  assert metrics_payload["surface_enforcement"]["compare_selection_workflow"]["enabled"] is False
+  assert metrics_payload["action_availability"]["compare_select"]["allowed"] is False
+  assert metrics_payload["metrics"]["trade_count"] >= 0
+
+
 def test_guarded_live_status_and_resume_expose_ownership_and_order_book(tmp_path: Path) -> None:
   database_path = tmp_path / "runs.sqlite3"
 

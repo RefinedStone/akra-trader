@@ -22968,6 +22968,47 @@ def serialize_run_orders_response(
   }
 
 
+def serialize_run_positions_response(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> dict[str, Any]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  return {
+    "run_id": run.config.run_id,
+    "run_mode": run.config.mode.value,
+    "run_status": run.status.value,
+    "surface_enforcement": _build_run_surface_enforcement(resolved_capabilities),
+    "action_availability": _build_run_action_availability(
+      run=run,
+      capabilities=resolved_capabilities,
+    ),
+    "positions": [
+      asdict(position)
+      for position in run.positions.values()
+    ],
+  }
+
+
+def serialize_run_metrics_response(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> dict[str, Any]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  return {
+    "run_id": run.config.run_id,
+    "run_mode": run.config.mode.value,
+    "run_status": run.status.value,
+    "surface_enforcement": _build_run_surface_enforcement(resolved_capabilities),
+    "action_availability": _build_run_action_availability(
+      run=run,
+      capabilities=resolved_capabilities,
+    ),
+    "metrics": deepcopy(run.metrics),
+  }
+
+
 def serialize_preset(preset: ExperimentPreset) -> dict:
   payload = asdict(preset)
   payload["tags"] = list(preset.tags)
