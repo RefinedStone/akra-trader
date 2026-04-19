@@ -3357,6 +3357,75 @@ select {
   word-break: break-word;
 }
 
+.reference-artifact-line-scrub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reference-artifact-line-scrub-indicator {
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.reference-artifact-line-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 6px;
+}
+
+.reference-artifact-line-signal-chip {
+  display: grid;
+  gap: 4px;
+  padding: 7px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  text-align: left;
+  cursor: pointer;
+}
+
+.reference-artifact-line-signal-chip strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.reference-artifact-line-signal-chip.is-active,
+.reference-artifact-line-signal-chip:hover,
+.reference-artifact-line-signal-chip:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.34);
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16);
+}
+
+.reference-artifact-line-inline-tooltip {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.18);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.reference-artifact-line-inline-tooltip strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.reference-artifact-line-inline-tooltip-label {
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.64rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .reference-artifact-line-note-card {
   padding: 8px 10px;
   border-radius: 10px;
