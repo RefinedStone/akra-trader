@@ -614,8 +614,85 @@ def default_comparison_eligibility_contract() -> ComparisonEligibilityContract:
 
 @dataclass(frozen=True)
 class RunSurfaceCapabilities:
+  @dataclass(frozen=True)
+  class Family:
+    family_key: str
+    title: str
+    summary: str
+    ui_surfaces: tuple[str, ...] = ()
+    schema_sources: tuple[str, ...] = ()
+    discovery_flow: str = ""
+
   comparison_eligibility_contract: ComparisonEligibilityContract = field(
     default_factory=default_comparison_eligibility_contract
+  )
+  families: tuple["RunSurfaceCapabilities.Family", ...] = field(
+    default_factory=lambda: (
+      RunSurfaceCapabilities.Family(
+        family_key="comparison_eligibility",
+        title="Comparison boundary contract",
+        summary="Defines which run-list surfaces are comparison-eligible, supporting-only, or operational-only.",
+        ui_surfaces=(
+          "Run-list metric tiles",
+          "Boundary note panels",
+          "Order workflow gates",
+        ),
+        schema_sources=(
+          "Run-surface capability endpoint",
+          "Comparison score drill-back wiring",
+          "Run-list boundary notes",
+        ),
+        discovery_flow="Shared UI contract panel and run-list boundary notes.",
+      ),
+      RunSurfaceCapabilities.Family(
+        family_key="strategy_schema",
+        title="Strategy schema discovery",
+        summary="Publishes typed strategy parameter schema and semantic metadata used by preset and revision workflows.",
+        ui_surfaces=(
+          "Strategy catalog cards",
+          "Preset parameter editor",
+          "Preset revision semantic diffs",
+        ),
+        schema_sources=(
+          "Strategy parameter_schema",
+          "Strategy catalog_semantics",
+          "Supported timeframe metadata",
+        ),
+        discovery_flow="Strategy catalog and preset editor schema hints.",
+      ),
+      RunSurfaceCapabilities.Family(
+        family_key="provenance_semantics",
+        title="Run provenance semantics",
+        summary="Carries semantic run context into snapshot, provenance, artifact, and comparison drill-back surfaces.",
+        ui_surfaces=(
+          "Run strategy snapshot",
+          "Reference provenance panels",
+          "Benchmark artifact summaries",
+        ),
+        schema_sources=(
+          "Run provenance strategy snapshot",
+          "Benchmark artifact metadata",
+          "Catalog semantics snapshots",
+        ),
+        discovery_flow="Run cards, provenance panels, and comparison deep-link restoration.",
+      ),
+      RunSurfaceCapabilities.Family(
+        family_key="execution_controls",
+        title="Execution control gating",
+        summary="Documents which interactive controls mutate workflow or venue state and therefore stay outside comparison semantics.",
+        ui_surfaces=(
+          "Rerun and stop controls",
+          "Compare selection workflow",
+          "Order replace/cancel actions",
+        ),
+        schema_sources=(
+          "Run-surface capability endpoint",
+          "Order lifecycle summaries",
+          "Runtime state transitions",
+        ),
+        discovery_flow="Shared UI control gating and operational-only boundary notes.",
+      ),
+    )
   )
   discovery: dict[str, Any] = field(
     default_factory=lambda: {
@@ -625,11 +702,17 @@ class RunSurfaceCapabilities:
         "operational_workflow",
         "operational_order_actions",
       ),
+      "family_order": (
+        "comparison_eligibility",
+        "strategy_schema",
+        "provenance_semantics",
+        "execution_controls",
+      ),
       "schema_summary": (
-        "Shared contract for comparison-eligible, supporting-only, and operational run surfaces."
+        "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, and operational run controls."
       ),
       "schema_title": "Run-surface capability contract",
-      "schema_version": "run-surface-capabilities.v1",
+      "schema_version": "run-surface-capabilities.v2",
     }
   )
 

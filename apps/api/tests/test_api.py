@@ -353,14 +353,24 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
 
   assert response.status_code == 200
   payload = response.json()
-  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v1"
+  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v2"
   assert payload["discovery"]["schema_title"] == "Run-surface capability contract"
+  assert payload["discovery"]["family_order"] == [
+    "comparison_eligibility",
+    "strategy_schema",
+    "provenance_semantics",
+    "execution_controls",
+  ]
   assert payload["discovery"]["comparison_eligibility_group_order"] == [
     "eligible_metrics",
     "supporting_identity",
     "operational_workflow",
     "operational_order_actions",
   ]
+  assert payload["families"][0]["family_key"] == "comparison_eligibility"
+  assert "Run-list metric tiles" in payload["families"][0]["ui_surfaces"]
+  assert payload["families"][1]["family_key"] == "strategy_schema"
+  assert "Strategy parameter_schema" in payload["families"][1]["schema_sources"]
   assert payload["comparison_eligibility_contract"]["scope"] == "run_list"
   assert payload["comparison_eligibility_contract"]["surfaces"]["return"]["eligibility"] == "eligible"
   assert payload["comparison_eligibility_contract"]["groups"]["supporting_identity"]["surface_ids"] == [

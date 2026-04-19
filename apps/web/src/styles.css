@@ -166,6 +166,59 @@ select {
   gap: 12px;
 }
 
+.run-surface-family-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.run-surface-family-card {
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 18, 28, 0.78);
+}
+
+.run-surface-family-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.run-surface-family-section {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.run-surface-family-section > span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.run-surface-family-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-surface-family-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
 .strategy-column {
   padding: 18px;
   border-radius: 20px;
@@ -3834,6 +3887,7 @@ select {
   .hero,
   .grid,
   .strategy-columns,
+  .run-surface-family-grid,
   .run-surface-capability-grid,
   .run-list,
   .run-form,

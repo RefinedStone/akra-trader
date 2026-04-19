@@ -423,8 +423,17 @@ type RunComparison = {
 
 type RunSurfaceCapabilities = {
   comparison_eligibility_contract: RunListBoundaryContract;
+  families: {
+    family_key: string;
+    title: string;
+    summary: string;
+    ui_surfaces: string[];
+    schema_sources: string[];
+    discovery_flow: string;
+  }[];
   discovery: {
     comparison_eligibility_group_order: RunListBoundaryGroupKey[];
+    family_order: string[];
     schema_summary: string;
     schema_title: string;
     schema_version: string;
@@ -14155,10 +14164,67 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
     "operational_workflow",
     "operational_order_actions",
   ],
-  schema_summary: "Shared contract for comparison-eligible, supporting-only, and operational run surfaces.",
+  family_order: [
+    "comparison_eligibility",
+    "strategy_schema",
+    "provenance_semantics",
+    "execution_controls",
+  ],
+  schema_summary: "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, and operational run controls.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v1",
+  schema_version: "run-surface-capabilities.v2",
 };
+
+const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
+  {
+    family_key: "comparison_eligibility",
+    title: "Comparison boundary contract",
+    summary: "Defines which run-list surfaces are comparison-eligible, supporting-only, or operational-only.",
+    ui_surfaces: ["Run-list metric tiles", "Boundary note panels", "Order workflow gates"],
+    schema_sources: [
+      "Run-surface capability endpoint",
+      "Comparison score drill-back wiring",
+      "Run-list boundary notes",
+    ],
+    discovery_flow: "Shared UI contract panel and run-list boundary notes.",
+  },
+  {
+    family_key: "strategy_schema",
+    title: "Strategy schema discovery",
+    summary: "Publishes typed strategy parameter schema and semantic metadata used by preset and revision workflows.",
+    ui_surfaces: ["Strategy catalog cards", "Preset parameter editor", "Preset revision semantic diffs"],
+    schema_sources: [
+      "Strategy parameter_schema",
+      "Strategy catalog_semantics",
+      "Supported timeframe metadata",
+    ],
+    discovery_flow: "Strategy catalog and preset editor schema hints.",
+  },
+  {
+    family_key: "provenance_semantics",
+    title: "Run provenance semantics",
+    summary: "Carries semantic run context into snapshot, provenance, artifact, and comparison drill-back surfaces.",
+    ui_surfaces: ["Run strategy snapshot", "Reference provenance panels", "Benchmark artifact summaries"],
+    schema_sources: [
+      "Run provenance strategy snapshot",
+      "Benchmark artifact metadata",
+      "Catalog semantics snapshots",
+    ],
+    discovery_flow: "Run cards, provenance panels, and comparison deep-link restoration.",
+  },
+  {
+    family_key: "execution_controls",
+    title: "Execution control gating",
+    summary: "Documents which interactive controls mutate workflow or venue state and therefore stay outside comparison semantics.",
+    ui_surfaces: ["Rerun and stop controls", "Compare selection workflow", "Order replace/cancel actions"],
+    schema_sources: [
+      "Run-surface capability endpoint",
+      "Order lifecycle summaries",
+      "Runtime state transitions",
+    ],
+    discovery_flow: "Shared UI control gating and operational-only boundary notes.",
+  },
+];
 
 function getRunListBoundaryContractSnapshot(contract?: RunListBoundaryContract | null) {
   if (!contract || contract.scope !== "run_list") {
@@ -14169,6 +14235,10 @@ function getRunListBoundaryContractSnapshot(contract?: RunListBoundaryContract |
 
 function getRunSurfaceCapabilityDiscovery(capabilities?: RunSurfaceCapabilities | null) {
   return capabilities?.discovery ?? DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY;
+}
+
+function getRunSurfaceCapabilityFamilies(capabilities?: RunSurfaceCapabilities | null) {
+  return capabilities?.families?.length ? capabilities.families : DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES;
 }
 
 function getRunListBoundaryGroupContract(
@@ -14231,6 +14301,12 @@ function RunSurfaceCapabilityDiscoveryPanel({
 }) {
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
+  const familyByKey = new Map(
+    getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
+  );
+  const orderedFamilies = discovery.family_order
+    .map((familyKey) => familyByKey.get(familyKey) ?? null)
+    .filter((family): family is NonNullable<typeof family> => family !== null);
   const orderedGroups = discovery.comparison_eligibility_group_order.filter(
     (groupKey): groupKey is RunListBoundaryGroupKey => groupKey in contract.groups,
   );
@@ -14244,6 +14320,40 @@ function RunSurfaceCapabilityDiscoveryPanel({
           <p className="run-note">{discovery.schema_summary}</p>
         </div>
         <span className="meta-pill subtle">{discovery.schema_version}</span>
+      </div>
+      <div className="run-surface-family-grid">
+        {orderedFamilies.map((family) => (
+          <article className="run-surface-family-card" key={family.family_key}>
+            <div className="run-surface-family-head">
+              <strong>{family.title}</strong>
+              <span className="meta-pill subtle">{family.family_key}</span>
+            </div>
+            <p className="run-note">{family.summary}</p>
+            <p className="run-note">
+              Discovery flow: {family.discovery_flow}
+            </p>
+            <div className="run-surface-family-section">
+              <span>Shared UI</span>
+              <div className="run-surface-family-chip-row">
+                {family.ui_surfaces.map((surface) => (
+                  <span className="run-surface-family-chip" key={surface}>
+                    {surface}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div className="run-surface-family-section">
+              <span>Schema sources</span>
+              <div className="run-surface-family-chip-row">
+                {family.schema_sources.map((source) => (
+                  <span className="run-surface-family-chip" key={source}>
+                    {source}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
       <div className="run-surface-capability-grid">
         {orderedGroups.map((groupKey) => (
