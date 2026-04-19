@@ -735,6 +735,70 @@ select {
   font-size: 0.78rem;
 }
 
+.comparison-history-conflict-review-score-detail-subviews {
+  display: grid;
+  gap: 10px;
+}
+
+.comparison-history-conflict-review-score-detail-section {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comparison-history-conflict-review-score-detail-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comparison-history-conflict-review-score-detail-section.is-collapsed {
+  gap: 0;
+}
+
+.comparison-history-conflict-review-score-detail-section-label {
+  color: rgba(150, 210, 255, 0.88);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-history-conflict-review-score-detail-section-summary {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.74rem;
+}
+
+.comparison-history-conflict-review-score-detail-section-body {
+  display: grid;
+  gap: 8px;
+}
+
+.comparison-history-conflict-review-score-detail-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comparison-history-conflict-review-score-detail-chip {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(120, 180, 255, 0.1);
+  color: rgba(214, 235, 255, 0.84);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+}
+
 .comparison-history-conflict-review-score-detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

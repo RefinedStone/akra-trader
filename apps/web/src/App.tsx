@@ -2915,6 +2915,10 @@ type ComparisonHistorySyncWorkspaceReviewSelectionKey =
   | ComparisonHistorySyncWorkspaceFieldKey
   | `expandedGapRows:${string}`
   | `expandedGapWindows|${string}|${string}`;
+type ComparisonHistorySyncWorkspaceSignalDetailSubviewKey =
+  | "interpretation"
+  | "lanePosition"
+  | "recommendationContext";
 type ComparisonHistorySyncAuditFilter =
   | "all"
   | "conflicts"
@@ -3010,6 +3014,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
   focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
   expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
+  collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4820,6 +4825,11 @@ export default function App() {
   >(
     () => initialComparisonHistoryPanelUiStateRef.current?.expandedWorkspaceScoreSignalDetailIds ?? {},
   );
+  const [collapsedWorkspaceScoreSignalSubviewIds, setCollapsedWorkspaceScoreSignalSubviewIds] = useState<
+    Record<string, boolean>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.collapsedWorkspaceScoreSignalSubviewIds ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5240,6 +5250,7 @@ export default function App() {
         focusedWorkspaceScoreDetailSources,
         focusedWorkspaceScoreDetailSignalKeys,
         expandedWorkspaceScoreSignalDetailIds,
+        collapsedWorkspaceScoreSignalSubviewIds,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5259,6 +5270,7 @@ export default function App() {
     focusedWorkspaceScoreDetailSources,
     focusedWorkspaceScoreDetailSignalKeys,
     expandedWorkspaceScoreSignalDetailIds,
+    collapsedWorkspaceScoreSignalSubviewIds,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8202,6 +8214,7 @@ export default function App() {
             focusedWorkspaceScoreDetailSources,
             focusedWorkspaceScoreDetailSignalKeys,
             expandedWorkspaceScoreSignalDetailIds,
+            collapsedWorkspaceScoreSignalSubviewIds,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8271,6 +8284,11 @@ export default function App() {
               setExpandedWorkspaceScoreSignalDetailIds((current) => ({
                 ...current,
                 [scoreDetailKey]: !current[scoreDetailKey],
+              })),
+            onToggleWorkspaceScoreSignalSubview: (subviewId) =>
+              setCollapsedWorkspaceScoreSignalSubviewIds((current) => ({
+                ...current,
+                [subviewId]: !current[subviewId],
               })),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
@@ -9308,6 +9326,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     focusedWorkspaceScoreDetailSources: {},
     focusedWorkspaceScoreDetailSignalKeys: {},
     expandedWorkspaceScoreSignalDetailIds: {},
+    collapsedWorkspaceScoreSignalSubviewIds: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -9950,6 +9969,19 @@ function normalizeComparisonHistoryPanelUiState(
       value?.expandedWorkspaceScoreSignalDetailIds
       && typeof value.expandedWorkspaceScoreSignalDetailIds === "object"
         ? Object.entries(value.expandedWorkspaceScoreSignalDetailIds).reduce<Record<string, boolean>>(
+            (accumulator, [key, candidate]) => {
+              if (candidate === true) {
+                accumulator[key] = true;
+              }
+              return accumulator;
+            },
+            {},
+          )
+        : {},
+    collapsedWorkspaceScoreSignalSubviewIds:
+      value?.collapsedWorkspaceScoreSignalSubviewIds
+      && typeof value.collapsedWorkspaceScoreSignalSubviewIds === "object"
+        ? Object.entries(value.collapsedWorkspaceScoreSignalSubviewIds).reduce<Record<string, boolean>>(
             (accumulator, [key, candidate]) => {
               if (candidate === true) {
                 accumulator[key] = true;
@@ -13162,6 +13194,7 @@ type RunSectionComparisonControls = {
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
   focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
   expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
+  collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13202,6 +13235,7 @@ type RunSectionComparisonControls = {
     signalKey: string | null,
   ) => void;
   onToggleWorkspaceScoreSignalDetail: (scoreDetailKey: string) => void;
+  onToggleWorkspaceScoreSignalSubview: (subviewId: string) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
@@ -13348,6 +13382,10 @@ function RunSection({
     signal: ComparisonHistorySyncWorkspaceSemanticSignal,
     index: number,
   ) => `${source}:${index}:${signal.label}:${signal.weight}`;
+  const buildWorkspaceReviewSignalSubviewSelectionId = (
+    scoreDetailKey: string,
+    subviewKey: ComparisonHistorySyncWorkspaceSignalDetailSubviewKey,
+  ) => `${scoreDetailKey}:${subviewKey}`;
   const resolveWorkspaceReviewSignalSelectionId = (
     source: ComparisonHistorySyncConflictFieldSource,
     signals: ComparisonHistorySyncWorkspaceSemanticSignal[],
@@ -14262,6 +14300,36 @@ function RunSection({
                                                       source: focusedScoreDetailSource,
                                                       persistedSignalKey: focusedScoreDetailSignalKey,
                                                     });
+                                                  const interpretationSubviewId =
+                                                    buildWorkspaceReviewSignalSubviewSelectionId(
+                                                      scoreDetailKey,
+                                                      "interpretation",
+                                                    );
+                                                  const lanePositionSubviewId =
+                                                    buildWorkspaceReviewSignalSubviewSelectionId(
+                                                      scoreDetailKey,
+                                                      "lanePosition",
+                                                    );
+                                                  const recommendationContextSubviewId =
+                                                    buildWorkspaceReviewSignalSubviewSelectionId(
+                                                      scoreDetailKey,
+                                                      "recommendationContext",
+                                                    );
+                                                  const interpretationSubviewCollapsed = Boolean(
+                                                    comparison.collapsedWorkspaceScoreSignalSubviewIds[
+                                                      interpretationSubviewId
+                                                    ],
+                                                  );
+                                                  const lanePositionSubviewCollapsed = Boolean(
+                                                    comparison.collapsedWorkspaceScoreSignalSubviewIds[
+                                                      lanePositionSubviewId
+                                                    ],
+                                                  );
+                                                  const recommendationContextSubviewCollapsed = Boolean(
+                                                    comparison.collapsedWorkspaceScoreSignalSubviewIds[
+                                                      recommendationContextSubviewId
+                                                    ],
+                                                  );
                                                   const focusScoreDetailSource = (
                                                     source: ComparisonHistorySyncConflictFieldSource,
                                                   ) => {
@@ -14623,44 +14691,187 @@ function RunSection({
                                                                     )}
                                                                   </strong>
                                                                 </div>
-                                                                <p className="comparison-history-conflict-review-score-detail-copy">
-                                                                  {focusedSignalDetail.contributionLabel}.{" "}
-                                                                  {focusedSignalDetail.recommendationRelationship}.
-                                                                </p>
-                                                                <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                    <span>Rank</span>
-                                                                    <strong>
-                                                                      {focusedSignalDetail.rank} /{" "}
-                                                                      {focusedSignalDetail.signalCount}
-                                                                    </strong>
-                                                                  </div>
-                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                    <span>Lane score</span>
-                                                                    <strong>
-                                                                      {formatComparisonScoreSignedValue(
-                                                                        focusedSignalDetail.laneScore,
-                                                                      )}
-                                                                    </strong>
-                                                                  </div>
-                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                    <span>Visible weight share</span>
-                                                                    <strong>
-                                                                      {Math.round(
-                                                                        focusedSignalDetail.shareOfVisibleWeight * 100,
-                                                                      )}
-                                                                      %
-                                                                    </strong>
-                                                                  </div>
-                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                    <span>Recommendation lane</span>
-                                                                    <strong>
-                                                                      {focusedSignalDetail.source
-                                                                      === row.recommendedSource
-                                                                        ? "Ranked lane"
-                                                                        : "Alternate lane"}
-                                                                    </strong>
-                                                                  </div>
+                                                                <div className="comparison-history-conflict-review-score-detail-subviews">
+                                                                  <section
+                                                                    className={`comparison-history-conflict-review-score-detail-section ${
+                                                                      interpretationSubviewCollapsed
+                                                                        ? "is-collapsed"
+                                                                        : ""
+                                                                    }`}
+                                                                  >
+                                                                    <button
+                                                                      className="comparison-history-conflict-review-score-detail-section-head"
+                                                                      onClick={() =>
+                                                                        comparison.onToggleWorkspaceScoreSignalSubview(
+                                                                          interpretationSubviewId,
+                                                                        )
+                                                                      }
+                                                                      type="button"
+                                                                    >
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-label">
+                                                                        Interpretation
+                                                                      </span>
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-summary">
+                                                                        {focusedSignalDetail.contributionLabel}
+                                                                      </span>
+                                                                    </button>
+                                                                    {!interpretationSubviewCollapsed ? (
+                                                                      <div className="comparison-history-conflict-review-score-detail-section-body">
+                                                                        <p className="comparison-history-conflict-review-score-detail-copy">
+                                                                          {focusedSignalDetail.contributionLabel}.{" "}
+                                                                          {focusedSignalDetail.recommendationRelationship}.
+                                                                        </p>
+                                                                        <div className="comparison-history-conflict-review-score-detail-chip-row">
+                                                                          <span className="comparison-history-conflict-review-score-detail-chip">
+                                                                            {focusedSignalDetail.sourceLabel}
+                                                                          </span>
+                                                                          <span className="comparison-history-conflict-review-score-detail-chip">
+                                                                            {focusedSignalDetail.signal.weight >= 0
+                                                                              ? "Positive semantic signal"
+                                                                              : "Negative semantic signal"}
+                                                                          </span>
+                                                                        </div>
+                                                                      </div>
+                                                                    ) : null}
+                                                                  </section>
+                                                                  <section
+                                                                    className={`comparison-history-conflict-review-score-detail-section ${
+                                                                      lanePositionSubviewCollapsed
+                                                                        ? "is-collapsed"
+                                                                        : ""
+                                                                    }`}
+                                                                  >
+                                                                    <button
+                                                                      className="comparison-history-conflict-review-score-detail-section-head"
+                                                                      onClick={() =>
+                                                                        comparison.onToggleWorkspaceScoreSignalSubview(
+                                                                          lanePositionSubviewId,
+                                                                        )
+                                                                      }
+                                                                      type="button"
+                                                                    >
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-label">
+                                                                        Lane position
+                                                                      </span>
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-summary">
+                                                                        Rank {focusedSignalDetail.rank} /{" "}
+                                                                        {focusedSignalDetail.signalCount} ·{" "}
+                                                                        {Math.round(
+                                                                          focusedSignalDetail.shareOfVisibleWeight * 100,
+                                                                        )}
+                                                                        % visible share
+                                                                      </span>
+                                                                    </button>
+                                                                    {!lanePositionSubviewCollapsed ? (
+                                                                      <div className="comparison-history-conflict-review-score-detail-section-body">
+                                                                        <div className="comparison-history-conflict-review-score-detail-grid">
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Rank</span>
+                                                                            <strong>
+                                                                              {focusedSignalDetail.rank} /{" "}
+                                                                              {focusedSignalDetail.signalCount}
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Lane score</span>
+                                                                            <strong>
+                                                                              {formatComparisonScoreSignedValue(
+                                                                                focusedSignalDetail.laneScore,
+                                                                              )}
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Visible weight share</span>
+                                                                            <strong>
+                                                                              {Math.round(
+                                                                                focusedSignalDetail.shareOfVisibleWeight
+                                                                                  * 100,
+                                                                              )}
+                                                                              %
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Signal impact</span>
+                                                                            <strong>
+                                                                              {formatComparisonScoreSignedValue(
+                                                                                focusedSignalDetail.signal.weight,
+                                                                              )}
+                                                                            </strong>
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                    ) : null}
+                                                                  </section>
+                                                                  <section
+                                                                    className={`comparison-history-conflict-review-score-detail-section ${
+                                                                      recommendationContextSubviewCollapsed
+                                                                        ? "is-collapsed"
+                                                                        : ""
+                                                                    }`}
+                                                                  >
+                                                                    <button
+                                                                      className="comparison-history-conflict-review-score-detail-section-head"
+                                                                      onClick={() =>
+                                                                        comparison.onToggleWorkspaceScoreSignalSubview(
+                                                                          recommendationContextSubviewId,
+                                                                        )
+                                                                      }
+                                                                      type="button"
+                                                                    >
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-label">
+                                                                        Recommendation context
+                                                                      </span>
+                                                                      <span className="comparison-history-conflict-review-score-detail-section-summary">
+                                                                        {focusedSignalDetail.source === row.recommendedSource
+                                                                          ? "Ranked lane"
+                                                                          : "Alternate lane"}{" "}
+                                                                        · +{formatComparisonScoreValue(
+                                                                          row.recommendationStrength,
+                                                                        )} point gap
+                                                                      </span>
+                                                                    </button>
+                                                                    {!recommendationContextSubviewCollapsed ? (
+                                                                      <div className="comparison-history-conflict-review-score-detail-section-body">
+                                                                        <div className="comparison-history-conflict-review-score-detail-grid">
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Recommendation lane</span>
+                                                                            <strong>
+                                                                              {focusedSignalDetail.source
+                                                                              === row.recommendedSource
+                                                                                ? "Ranked lane"
+                                                                                : "Alternate lane"}
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Current selection</span>
+                                                                            <strong>
+                                                                              {row.selectedSource === "local"
+                                                                                ? row.hasLatestLocalDrift
+                                                                                  ? "Local latest"
+                                                                                  : "Local"
+                                                                                : row.hasLatestLocalDrift
+                                                                                  ? "Remote audit"
+                                                                                  : "Remote"}
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Recommendation gap</span>
+                                                                            <strong>
+                                                                              +{formatComparisonScoreValue(
+                                                                                row.recommendationStrength,
+                                                                              )}
+                                                                            </strong>
+                                                                          </div>
+                                                                          <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                            <span>Why this lane</span>
+                                                                            <strong>
+                                                                              {row.recommendationReason}
+                                                                            </strong>
+                                                                          </div>
+                                                                        </div>
+                                                                      </div>
+                                                                    ) : null}
+                                                                  </section>
                                                                 </div>
                                                               </div>
                                                             ) : (
