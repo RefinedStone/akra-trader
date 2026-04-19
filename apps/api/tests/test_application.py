@@ -459,6 +459,8 @@ def test_backtest_creates_completed_run_with_metrics(tmp_path: Path) -> None:
   assert run.provenance.strategy is not None
   assert run.provenance.strategy.strategy_id == "ma_cross_v1"
   assert run.provenance.strategy.lifecycle.stage == "active"
+  assert run.provenance.strategy.catalog_semantics.strategy_kind == "standard"
+  assert run.provenance.strategy.catalog_semantics.execution_model == ""
   assert run.provenance.strategy.parameter_snapshot.requested == {}
   assert run.provenance.strategy.parameter_snapshot.resolved == {
     "short_window": 8,
@@ -13759,6 +13761,10 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert run.provenance.strategy is not None
   assert run.provenance.strategy.runtime == "freqtrade_reference"
   assert run.provenance.strategy.entrypoint == "NostalgiaForInfinityX7"
+  assert run.provenance.strategy.catalog_semantics.strategy_kind == "reference_delegate"
+  assert run.provenance.strategy.catalog_semantics.source_descriptor == (
+    "nostalgia-for-infinity:NostalgiaForInfinityX7"
+  )
   assert run.provenance.strategy.parameter_snapshot.requested == {}
   assert run.provenance.strategy.parameter_snapshot.resolved == {}
   assert run.provenance.reference_id == "nostalgia-for-infinity"
@@ -13811,6 +13817,10 @@ def test_registered_strategy_run_records_lifecycle_timestamp(tmp_path: Path) -> 
 
   assert run.provenance.strategy is not None
   assert run.provenance.strategy.lifecycle.registered_at is not None
+  assert run.provenance.strategy.catalog_semantics.strategy_kind == "imported_module"
+  assert run.provenance.strategy.catalog_semantics.source_descriptor == (
+    "akra_trader.strategies.examples:MovingAverageCrossStrategy"
+  )
   assert run.provenance.strategy.parameter_snapshot.requested == {"short_window": 13}
   assert run.provenance.strategy.parameter_snapshot.resolved == {
     "short_window": 13,

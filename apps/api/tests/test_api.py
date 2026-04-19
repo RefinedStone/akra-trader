@@ -386,6 +386,8 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
     "short_window": 5,
     "long_window": 13,
   }
+  assert payload["provenance"]["strategy"]["catalog_semantics"]["strategy_kind"] == "standard"
+  assert payload["provenance"]["strategy"]["catalog_semantics"]["parameter_contract"] == ""
   assert payload["provenance"]["strategy"]["warmup"]["required_bars"] == 21
   assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]
   assert payload["provenance"]["market_data"]["provider"] == "seeded"

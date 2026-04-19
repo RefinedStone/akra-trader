@@ -217,6 +217,13 @@ type Run = {
         stage: string;
         registered_at?: string | null;
       };
+      catalog_semantics: {
+        strategy_kind: string;
+        execution_model: string;
+        parameter_contract: string;
+        source_descriptor?: string | null;
+        operator_notes: string[];
+      };
       parameter_snapshot: {
         requested: Record<string, unknown>;
         resolved: Record<string, unknown>;
@@ -11573,17 +11580,30 @@ function RunStrategySnapshot({
       <div className="run-strategy-grid">
         <Metric label="Version" value={strategy.version} />
         <Metric label="Lifecycle" value={strategy.lifecycle.stage} />
+        <Metric label="Semantic kind" value={strategy.catalog_semantics.strategy_kind} />
         <Metric label="Warmup" value={`${strategy.warmup.required_bars} bars`} />
         <Metric label="TFs" value={strategy.warmup.timeframes.join(", ")} />
       </div>
       <div className="run-strategy-copy">
         <p>Supported timeframes: {strategy.supported_timeframes.join(", ") || "n/a"}</p>
         <p>Version lineage: {formatVersionLineage(strategy.version_lineage, strategy.version)}</p>
+        {strategy.catalog_semantics.execution_model ? (
+          <p>Execution model: {strategy.catalog_semantics.execution_model}</p>
+        ) : null}
+        {strategy.catalog_semantics.parameter_contract ? (
+          <p>Parameter contract: {strategy.catalog_semantics.parameter_contract}</p>
+        ) : null}
+        {strategy.catalog_semantics.source_descriptor ? (
+          <p>Source: {strategy.catalog_semantics.source_descriptor}</p>
+        ) : null}
         <p>Resolved params: {formatParameterMap(strategy.parameter_snapshot.resolved)}</p>
         <p>Requested params: {formatParameterMap(strategy.parameter_snapshot.requested)}</p>
         {strategy.entrypoint ? <p>Entrypoint: {strategy.entrypoint}</p> : null}
         {strategy.lifecycle.registered_at ? (
           <p>Registered: {formatTimestamp(strategy.lifecycle.registered_at)}</p>
+        ) : null}
+        {strategy.catalog_semantics.operator_notes.length ? (
+          <p>Operator notes: {strategy.catalog_semantics.operator_notes.join(" | ")}</p>
         ) : null}
       </div>
     </section>

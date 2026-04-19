@@ -315,6 +315,7 @@ class StrategySnapshot:
   version: str
   runtime: str
   lifecycle: StrategyLifecycle = field(default_factory=StrategyLifecycle)
+  catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   version_lineage: tuple[str, ...] = ()
   parameter_snapshot: StrategyParameterSnapshot = field(default_factory=StrategyParameterSnapshot)
   supported_timeframes: tuple[str, ...] = ()

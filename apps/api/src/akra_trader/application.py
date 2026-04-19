@@ -165,6 +165,7 @@ from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyLifecycle
+from akra_trader.domain.models import StrategyCatalogSemantics
 from akra_trader.domain.models import StrategyMetadata
 from akra_trader.domain.models import StrategyParameterSnapshot
 from akra_trader.domain.models import StrategyRegistration
@@ -22056,21 +22057,20 @@ class TradingApplication:
     parameters: dict,
     registration: StrategyRegistration | None,
   ) -> StrategySnapshot:
+    metadata = _apply_registration_snapshot_metadata(
+      metadata=metadata,
+      registration=registration,
+    )
     schema = deepcopy(metadata.parameter_schema)
     requested = deepcopy(parameters)
     resolved = self._resolve_parameters(schema=schema, requested=requested)
-    lifecycle = metadata.lifecycle
-    if registration is not None and lifecycle.registered_at is None:
-      lifecycle = StrategyLifecycle(
-        stage=lifecycle.stage,
-        registered_at=registration.registered_at,
-      )
     return StrategySnapshot(
       strategy_id=metadata.strategy_id,
       name=metadata.name,
       version=metadata.version,
       runtime=metadata.runtime,
-      lifecycle=lifecycle,
+      lifecycle=metadata.lifecycle,
+      catalog_semantics=deepcopy(metadata.catalog_semantics),
       version_lineage=metadata.version_lineage or (metadata.version,),
       parameter_snapshot=StrategyParameterSnapshot(
         requested=requested,
@@ -22411,6 +22411,44 @@ def _normalize_experiment_filter_value(value: str | None) -> str | None:
   return candidate or None
 
 
+def _apply_registration_snapshot_metadata(
+  *,
+  metadata: StrategyMetadata,
+  registration: StrategyRegistration | None,
+) -> StrategyMetadata:
+  if registration is None or metadata.lifecycle.registered_at is not None:
+    return metadata
+  base_semantics = metadata.catalog_semantics
+  parameter_contract = (
+    base_semantics.parameter_contract
+    or (
+      "Publishes a typed parameter schema for presets and semantic diffs."
+      if metadata.parameter_schema
+      else "Does not advertise a typed parameter schema; presets can only store freeform parameters."
+    )
+  )
+  operator_notes = tuple(
+    dict.fromkeys((*base_semantics.operator_notes, "Imported from a locally registered module path."))
+  )
+  return replace(
+    metadata,
+    lifecycle=StrategyLifecycle(
+      stage=metadata.lifecycle.stage,
+      registered_at=registration.registered_at,
+    ),
+    catalog_semantics=StrategyCatalogSemantics(
+      strategy_kind="imported_module",
+      execution_model=(
+        base_semantics.execution_model
+        or "Loaded from a locally registered module and executed through the declared runtime."
+      ),
+      parameter_contract=parameter_contract,
+      source_descriptor=f"{registration.module_path}:{registration.class_name}",
+      operator_notes=operator_notes,
+    ),
+  )
+
+
 def _normalize_experiment_identifier(value: str | None) -> str | None:
   candidate = _normalize_experiment_filter_value(value)
   if candidate is None:
@@ -22574,6 +22612,9 @@ def serialize_run(run: RunRecord) -> dict:
   if strategy_snapshot is not None:
     strategy_snapshot["version_lineage"] = list(
       run.provenance.strategy.version_lineage or (run.provenance.strategy.version,)
+    )
+    strategy_snapshot["catalog_semantics"]["operator_notes"] = list(
+      run.provenance.strategy.catalog_semantics.operator_notes
     )
     strategy_snapshot["supported_timeframes"] = list(run.provenance.strategy.supported_timeframes)
     strategy_snapshot["warmup"]["timeframes"] = list(run.provenance.strategy.warmup.timeframes)
