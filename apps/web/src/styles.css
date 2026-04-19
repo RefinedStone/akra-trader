@@ -3268,6 +3268,15 @@ select {
   outline: none;
 }
 
+.reference-artifact-section-line-wrap {
+  display: grid;
+  gap: 6px;
+}
+
+.reference-artifact-section-line-wrap.is-active {
+  padding: 2px 0 4px;
+}
+
 .reference-artifact-section-line.is-hovered {
   background: rgba(var(--comparison-accent-rgb), 0.1);
   color: rgba(255, 255, 255, 0.94);
@@ -3278,6 +3287,74 @@ select {
   background: rgba(var(--comparison-accent-rgb), 0.1);
   color: rgba(255, 255, 255, 0.94);
   box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.24);
+}
+
+.reference-artifact-section-line-tools {
+  display: grid;
+  gap: 8px;
+  padding: 0 8px 4px;
+}
+
+.reference-artifact-line-toggle {
+  justify-self: start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.24);
+  background: rgba(var(--comparison-accent-rgb), 0.08);
+  color: rgba(255, 255, 255, 0.9);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.reference-artifact-line-toggle:hover,
+.reference-artifact-line-toggle:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.42);
+  background: rgba(var(--comparison-accent-rgb), 0.12);
+}
+
+.reference-artifact-line-view-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reference-artifact-line-view-chip {
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.reference-artifact-line-view-chip.is-active,
+.reference-artifact-line-view-chip:hover,
+.reference-artifact-line-view-chip:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.34);
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.reference-artifact-line-detail {
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.16);
+  background: rgba(var(--comparison-accent-rgb), 0.06);
+}
+
+.reference-artifact-line-detail span {
+  color: var(--muted);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .run-strategy {
