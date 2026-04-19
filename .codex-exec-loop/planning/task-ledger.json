@@ -3369,19 +3369,55 @@
       "id": "planning-experiment-os-add-semantic-ranking-for-workspace-conflict-resolution",
       "direction_id": "experiment-os",
       "title": "Add semantic ranking for workspace conflict resolution",
-      "description": "Build on the shipped latest-state 3-way merge workflow by adding domain-meaningful recommendation scoring for conflict rows and gap-window choices, so larger workspace conflict sets can be triaged by more than field importance and local drift and operators get explicit semantic guidance about which remote or local changes deserve attention first.",
-      "status": "ready",
+      "description": "Build on the shipped latest-state 3-way merge workflow by adding domain-meaningful recommendation scoring for conflict rows and gap-window choices, so larger workspace conflict sets can be triaged by more than field importance and local drift and operators get explicit semantic guidance about which remote or local changes deserve attention first. This semantic ranking pass is now shipped; deeper score explainability continues in a follow-up task.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the latest-state 3-way merge is now complete in commit 4b0ca57 and that semantic ranking is the remaining executable gap. This is the clearest in-repo next task because it directly finishes the unshipped half of the prior queue head without needing extra operator decisions.",
+      "priority_reason": "Completed in main session commit 9540bd0, which added semantic ranking for workspace conflict resolution by scoring local versus remote choices per field, choosing default selections from recommendation scores instead of always preferring remote, adding a `Use ranked picks` bulk action, reordering rows with recommendation strength plus local drift, and verifying with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-latest-state-three-way-merge-for-comparison-history-conflicts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:40:00Z",
+      "updated_at": "2026-04-20T20:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Completes the remaining experiment-os workspace conflict triage gap after latest-state-aware merge guidance by ranking conflicts with domain semantics that better reflect operator intent and review urgency."
+    },
+    {
+      "id": "planning-experiment-os-add-raw-score-breakdown-drill-down-to-workspace-conflict-ranking",
+      "direction_id": "experiment-os",
+      "title": "Add raw score breakdown drill-down for workspace conflict ranking",
+      "description": "Extend the newly shipped workspace conflict semantic ranking UI so operators can expand a row and inspect the raw local versus remote score breakdown behind the recommended source, including the contributing drift, selected-run coupling, focused score component, and gap visibility coherence factors that currently only surface as compact reasons.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 19,
+      "priority_reason": "Completed in main session commit 6c5868e, which added `Show score details` drill-down cards for workspace conflict ranking rows, surfaced raw total scores plus semantic signal lists and per-signal weights for both `Local latest` and `Remote audit`, kept the recommended source highlighted inside the score breakdown, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-add-semantic-ranking-for-workspace-conflict-resolution"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict explainability by turning semantic ranking from a recommendation-only aid into inspectable operator evidence, which improves trust when local and remote state are scored against each other."
+    },
+    {
+      "id": "planning-experiment-os-add-audit-level-recommendation-overview-for-workspace-conflict-ranking",
+      "direction_id": "experiment-os",
+      "title": "Add audit-level recommendation overview for workspace conflict ranking",
+      "description": "Build the final explanation layer on top of the shipped workspace conflict score drill-downs by aggregating which fields and signals most strongly drive the overall recommendation across the whole audit, such as an overview card or ranked summary strip that highlights the strongest recommendation factors before operators inspect individual rows.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply says the raw field-level totals and signal weights are now visible in commit 6c5868e, and explicitly names the remaining gap as an audit-level overview or ranked summary strip showing which fields most strongly create the recommendation. That makes this the clearest executable next task for the queue head without additional operator decisions.",
+      "depends_on": [
+        "planning-experiment-os-add-raw-score-breakdown-drill-down-to-workspace-conflict-ranking"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict explainability from row-level evidence into audit-level triage context so operators can see the strongest recommendation drivers across the entire review set before drilling into individual conflicts."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
