@@ -15,6 +15,7 @@ from pydantic import Field
 
 from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import TradingApplication
+from akra_trader.application import get_standalone_surface_runtime_binding
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_standalone_surface_response
@@ -187,18 +188,27 @@ def create_router(container: Container) -> APIRouter:
     version: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
-    return [
-      serialize_strategy(strategy)
-      for strategy in app.list_strategies(
-        lane=lane,
-        lifecycle_stage=lifecycle_stage,
-        version=version,
-      )
-    ]
+    binding = get_standalone_surface_runtime_binding(
+      "strategy_catalog_discovery",
+      app.get_run_surface_capabilities(),
+    )
+    return serialize_standalone_surface_response(
+      binding=binding,
+      app=app,
+      filters={
+        "lane": lane,
+        "lifecycle_stage": lifecycle_stage,
+        "version": version,
+      },
+    )
 
   @router.get("/references")
   def list_references(app: TradingApplication = Depends(get_app)) -> list[dict[str, Any]]:
-    return [asdict(reference) for reference in app.list_references()]
+    binding = get_standalone_surface_runtime_binding(
+      "reference_catalog_discovery",
+      app.get_run_surface_capabilities(),
+    )
+    return serialize_standalone_surface_response(binding=binding, app=app)
 
   @router.get("/presets")
   def list_presets(
@@ -207,14 +217,19 @@ def create_router(container: Container) -> APIRouter:
     lifecycle_stage: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
-    return [
-      serialize_preset(preset)
-      for preset in app.list_presets(
-        strategy_id=strategy_id,
-        timeframe=timeframe,
-        lifecycle_stage=lifecycle_stage,
-      )
-    ]
+    binding = get_standalone_surface_runtime_binding(
+      "preset_catalog_discovery",
+      app.get_run_surface_capabilities(),
+    )
+    return serialize_standalone_surface_response(
+      binding=binding,
+      app=app,
+      filters={
+        "strategy_id": strategy_id,
+        "timeframe": timeframe,
+        "lifecycle_stage": lifecycle_stage,
+      },
+    )
 
   @router.post("/presets")
   def create_preset(

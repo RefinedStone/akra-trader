@@ -22985,6 +22985,7 @@ class StandaloneSurfaceRuntimeBinding:
   scope: str
   binding_kind: str
   subresource_key: str | None = None
+  filter_keys: tuple[str, ...] = ()
 
 
 def _serialize_run_order_subresource_item(
@@ -23130,6 +23131,32 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="run_surface_capabilities",
   )
+  strategy_discovery_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="strategy_catalog_discovery",
+    route_path="/strategies",
+    route_name="list_strategies",
+    response_title="Strategy catalog discovery",
+    scope="app",
+    binding_kind="strategy_catalog_discovery",
+    filter_keys=("lane", "lifecycle_stage", "version"),
+  )
+  reference_discovery_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="reference_catalog_discovery",
+    route_path="/references",
+    route_name="list_references",
+    response_title="Reference catalog discovery",
+    scope="app",
+    binding_kind="reference_catalog_discovery",
+  )
+  preset_discovery_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_discovery",
+    route_path="/presets",
+    route_name="list_presets",
+    response_title="Preset catalog discovery",
+    scope="app",
+    binding_kind="preset_catalog_discovery",
+    filter_keys=("strategy_id", "timeframe", "lifecycle_stage"),
+  )
   run_subresource_bindings = tuple(
     StandaloneSurfaceRuntimeBinding(
       surface_key=f"run_subresource:{binding.contract.subresource_key}",
@@ -23142,7 +23169,23 @@ def list_standalone_surface_runtime_bindings(
     )
     for binding in list_run_subresource_runtime_bindings(resolved_capabilities)
   )
-  return (capability_binding, *run_subresource_bindings)
+  return (
+    capability_binding,
+    strategy_discovery_binding,
+    reference_discovery_binding,
+    preset_discovery_binding,
+    *run_subresource_bindings,
+  )
+
+
+def get_standalone_surface_runtime_binding(
+  surface_key: str,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> StandaloneSurfaceRuntimeBinding:
+  for binding in list_standalone_surface_runtime_bindings(capabilities):
+    if binding.surface_key == surface_key:
+      return binding
+  raise ValueError(f"Unsupported standalone surface binding: {surface_key}")
 
 
 def serialize_standalone_surface_response(
@@ -23150,9 +23193,31 @@ def serialize_standalone_surface_response(
   binding: StandaloneSurfaceRuntimeBinding,
   app: TradingApplication,
   run_id: str | None = None,
-) -> dict[str, Any]:
+  filters: dict[str, Any] | None = None,
+) -> Any:
+  resolved_filters = filters or {}
   if binding.binding_kind == "run_surface_capabilities":
     return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+  if binding.binding_kind == "strategy_catalog_discovery":
+    return [
+      serialize_strategy(strategy)
+      for strategy in app.list_strategies(
+        lane=resolved_filters.get("lane"),
+        lifecycle_stage=resolved_filters.get("lifecycle_stage"),
+        version=resolved_filters.get("version"),
+      )
+    ]
+  if binding.binding_kind == "reference_catalog_discovery":
+    return [asdict(reference) for reference in app.list_references()]
+  if binding.binding_kind == "preset_catalog_discovery":
+    return [
+      serialize_preset(preset)
+      for preset in app.list_presets(
+        strategy_id=resolved_filters.get("strategy_id"),
+        timeframe=resolved_filters.get("timeframe"),
+        lifecycle_stage=resolved_filters.get("lifecycle_stage"),
+      )
+    ]
   if binding.binding_kind == "run_subresource":
     if binding.subresource_key is None:
       raise ValueError(f"Standalone surface binding is missing subresource metadata: {binding.surface_key}")

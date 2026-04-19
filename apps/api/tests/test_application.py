@@ -13901,7 +13901,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
+    presets=build_preset_catalog(tmp_path),
     runs=build_runs_repository(tmp_path),
+  )
+  app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
   )
   run = app.run_backtest(
     strategy_id="ma_cross_v1",
@@ -13920,12 +13927,18 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
 
   assert set(bindings_by_key) == {
     "run_surface_capabilities",
+    "strategy_catalog_discovery",
+    "reference_catalog_discovery",
+    "preset_catalog_discovery",
     "run_subresource:orders",
     "run_subresource:positions",
     "run_subresource:metrics",
   }
   assert bindings_by_key["run_surface_capabilities"].scope == "app"
   assert bindings_by_key["run_surface_capabilities"].route_path == "/capabilities/run-surfaces"
+  assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
+  assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
+  assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
   assert bindings_by_key["run_subresource:orders"].scope == "run"
   assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
 
@@ -13935,13 +13948,32 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   orders_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["run_subresource:orders"],
+      app=app,
+      run_id=run.config.run_id,
+  )
+  strategy_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["strategy_catalog_discovery"],
     app=app,
-    run_id=run.config.run_id,
+    filters={"lane": "native"},
+  )
+  reference_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["reference_catalog_discovery"],
+    app=app,
+  )
+  preset_payload = serialize_standalone_surface_response(
+    binding=bindings_by_key["preset_catalog_discovery"],
+    app=app,
+    filters={"strategy_id": "ma_cross_v1"},
   )
 
   assert capabilities_payload["discovery"]["shared_contracts"]
   assert orders_payload["run_id"] == run.config.run_id
   assert "orders" in orders_payload
+  assert strategy_payload
+  assert all(item["runtime"] == "native" for item in strategy_payload)
+  assert reference_payload
+  assert any(item["reference_id"] == "nautilus-trader" for item in reference_payload)
+  assert [item["preset_id"] for item in preset_payload] == ["core_5m"]
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
