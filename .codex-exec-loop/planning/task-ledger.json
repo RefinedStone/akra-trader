@@ -4216,18 +4216,36 @@
       "direction_id": "experiment-os",
       "title": "Generalize run subresource envelope serialization with a body-serializer registry",
       "description": "Build on the new shared standalone run-subresource envelope helper by lifting body serialization behind a reusable registry or typed envelope factory, so future standalone run subresources can register their payload serializer once and inherit the common envelope contract without adding another bespoke wrapper path in `application.py`.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the remaining follow-up is to generalize the new envelope layer further, potentially into a body serializer registry or typed envelope factory for future standalone run subresources. That makes this the clearest executable next queue head now that the shared envelope helper itself shipped in commit e5be9fd.",
+      "priority_reason": "Completed in main session commit 54013e7, which generalized standalone run subresource envelopes behind `RUN_SUBRESOURCE_BODY_SERIALIZERS` plus `serialize_run_subresource_response(...)`, switched `orders`, `positions`, and `metrics` routes to the shared generic serializer, added an explicit unknown-key failure guard, and verified the result with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extract-standalone-run-subresource-capability-envelopes-into-shared-serializer"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:40:00Z",
+      "updated_at": "2026-04-20T20:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os run-surface serializer discipline from one shared envelope helper into a reusable registration model, reducing future drift and keeping new standalone run subresources aligned with the common capability contract."
+    },
+    {
+      "id": "planning-experiment-os-type-run-subresource-registry-schema-and-route-bindings",
+      "direction_id": "experiment-os",
+      "title": "Type run-subresource registry metadata and declarative route bindings",
+      "description": "Build on the new `RUN_SUBRESOURCE_BODY_SERIALIZERS` registry by introducing typed subresource metadata and declarative route-to-registry bindings, so each standalone run subresource defines its serializer, body schema metadata, and API binding in one place instead of relying on ad hoc string keys spread across `application.py` and `api.py`.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 19,
+      "priority_reason": "The latest main-session reply says the body-serializer registry is shipped and explicitly identifies the next remaining work as making the registry more typed, including subresource-specific schema metadata and more declarative route-to-registry binding separation. That makes this the clearest executable follow-up for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-generalize-run-subresource-envelope-serialization-with-body-serializer-registry"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os run-surface serializer discipline from an untyped body serializer registry into a more declarative contract where standalone subresource schema metadata and route bindings stay aligned as new run-adjacent APIs are added."
     }
   ]
 }
