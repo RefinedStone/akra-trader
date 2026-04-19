@@ -585,6 +585,25 @@ select {
   gap: 10px;
 }
 
+.comparison-history-conflict-review-score-detail-bar,
+.comparison-history-conflict-review-score-detail {
+  grid-column: 1 / -1;
+}
+
+.comparison-history-conflict-review-score-detail-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.comparison-history-conflict-review-score-detail-summary {
+  color: rgba(255, 255, 255, 0.68);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
 .comparison-history-conflict-review-score-column {
   display: grid;
   gap: 8px;
@@ -673,6 +692,72 @@ select {
 
 .comparison-history-conflict-review-score-empty {
   color: rgba(255, 255, 255, 0.58);
+}
+
+.comparison-history-conflict-review-score-detail {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(120, 180, 255, 0.16);
+  background: rgba(7, 12, 22, 0.78);
+}
+
+.comparison-history-conflict-review-score-detail-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.comparison-history-conflict-review-score-detail-head strong {
+  display: block;
+}
+
+.comparison-history-conflict-review-score-detail-label {
+  display: block;
+  margin-bottom: 2px;
+  color: rgba(150, 210, 255, 0.88);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-history-conflict-review-score-detail-impact {
+  color: rgba(255, 255, 255, 0.96);
+  font-size: 0.82rem;
+}
+
+.comparison-history-conflict-review-score-detail-copy {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.78rem;
+}
+
+.comparison-history-conflict-review-score-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.comparison-history-conflict-review-score-detail-metric {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.comparison-history-conflict-review-score-detail-metric span {
+  color: rgba(255, 255, 255, 0.56);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+}
+
+.comparison-history-conflict-review-score-detail-metric strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.76rem;
 }
 
 .comparison-history-conflict-review-overview {
@@ -2986,6 +3071,10 @@ select {
   }
 
   .comparison-history-conflict-review-score-breakdown {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-history-conflict-review-score-detail-grid {
     grid-template-columns: 1fr;
   }
 

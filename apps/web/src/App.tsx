@@ -3009,6 +3009,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   expandedWorkspaceScoreDetailIds: Record<string, boolean>;
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
   focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
+  expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4814,6 +4815,11 @@ export default function App() {
   >(
     () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreDetailSignalKeys ?? {},
   );
+  const [expandedWorkspaceScoreSignalDetailIds, setExpandedWorkspaceScoreSignalDetailIds] = useState<
+    Record<string, boolean>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.expandedWorkspaceScoreSignalDetailIds ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5233,6 +5239,7 @@ export default function App() {
         expandedWorkspaceScoreDetailIds,
         focusedWorkspaceScoreDetailSources,
         focusedWorkspaceScoreDetailSignalKeys,
+        expandedWorkspaceScoreSignalDetailIds,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5251,6 +5258,7 @@ export default function App() {
     expandedWorkspaceScoreDetailIds,
     focusedWorkspaceScoreDetailSources,
     focusedWorkspaceScoreDetailSignalKeys,
+    expandedWorkspaceScoreSignalDetailIds,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8193,6 +8201,7 @@ export default function App() {
             expandedWorkspaceScoreDetailIds,
             focusedWorkspaceScoreDetailSources,
             focusedWorkspaceScoreDetailSignalKeys,
+            expandedWorkspaceScoreSignalDetailIds,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8258,6 +8267,11 @@ export default function App() {
                   [scoreDetailKey]: signalKey,
                 };
               }),
+            onToggleWorkspaceScoreSignalDetail: (scoreDetailKey) =>
+              setExpandedWorkspaceScoreSignalDetailIds((current) => ({
+                ...current,
+                [scoreDetailKey]: !current[scoreDetailKey],
+              })),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
@@ -9293,6 +9307,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     expandedWorkspaceScoreDetailIds: {},
     focusedWorkspaceScoreDetailSources: {},
     focusedWorkspaceScoreDetailSignalKeys: {},
+    expandedWorkspaceScoreSignalDetailIds: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -9925,6 +9940,19 @@ function normalizeComparisonHistoryPanelUiState(
             (accumulator, [key, candidate]) => {
               if (typeof candidate === "string" && candidate.trim()) {
                 accumulator[key] = candidate;
+              }
+              return accumulator;
+            },
+            {},
+          )
+        : {},
+    expandedWorkspaceScoreSignalDetailIds:
+      value?.expandedWorkspaceScoreSignalDetailIds
+      && typeof value.expandedWorkspaceScoreSignalDetailIds === "object"
+        ? Object.entries(value.expandedWorkspaceScoreSignalDetailIds).reduce<Record<string, boolean>>(
+            (accumulator, [key, candidate]) => {
+              if (candidate === true) {
+                accumulator[key] = true;
               }
               return accumulator;
             },
@@ -13133,6 +13161,7 @@ type RunSectionComparisonControls = {
   expandedWorkspaceScoreDetailIds: Record<string, boolean>;
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
   focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
+  expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13172,6 +13201,7 @@ type RunSectionComparisonControls = {
     scoreDetailKey: string,
     signalKey: string | null,
   ) => void;
+  onToggleWorkspaceScoreSignalDetail: (scoreDetailKey: string) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
@@ -13330,6 +13360,63 @@ function RunSection({
       return persistedSignalKey;
     }
     return signalKeys[0] ?? null;
+  };
+  const buildWorkspaceReviewSignalDetail = (params: {
+    row: ComparisonHistorySyncWorkspaceReviewRow;
+    source: ComparisonHistorySyncConflictFieldSource;
+    persistedSignalKey?: string | null;
+  }) => {
+    const { row, source, persistedSignalKey } = params;
+    const signals = source === "local" ? row.localSignals : row.remoteSignals;
+    const signalKey = resolveWorkspaceReviewSignalSelectionId(source, signals, persistedSignalKey);
+    if (!signalKey) {
+      return null;
+    }
+    const signalIndex = signals.findIndex((signal, index) =>
+      buildWorkspaceReviewSignalSelectionId(source, signal, index) === signalKey,
+    );
+    if (signalIndex < 0) {
+      return null;
+    }
+    const signal = signals[signalIndex];
+    const totalAbsoluteWeight = signals.reduce((total, candidate) => total + Math.abs(candidate.weight), 0);
+    const laneScore = source === "local" ? row.localScore : row.remoteScore;
+    const shareOfVisibleWeight = totalAbsoluteWeight > 0
+      ? Math.abs(signal.weight) / totalAbsoluteWeight
+      : 1;
+    const sourceLabel = source === "local"
+      ? row.hasLatestLocalDrift
+        ? "Local latest"
+        : "Local"
+      : row.hasLatestLocalDrift
+        ? "Remote audit"
+        : "Remote";
+    const contributionLabel =
+      signal.weight > 0
+        ? "Adds semantic support to this lane"
+        : signal.weight < 0
+          ? "Pulls semantic confidence out of this lane"
+          : "Neutral semantic signal";
+    const recommendationRelationship =
+      source === row.recommendedSource
+        ? signal.weight >= 0
+          ? "Supports the ranked recommendation"
+          : "Pushes against the ranked recommendation"
+        : signal.weight >= 0
+          ? "Supports the non-ranked alternative"
+          : "Weakens the non-ranked alternative";
+    return {
+      contributionLabel,
+      laneScore,
+      rank: signalIndex + 1,
+      recommendationRelationship,
+      shareOfVisibleWeight,
+      signal,
+      signalCount: signals.length,
+      signalKey,
+      source,
+      sourceLabel,
+    };
   };
   const activateWorkspaceReviewRow = (
     auditId: string,
@@ -14146,6 +14233,11 @@ function RunSection({
                                                     comparison.focusedWorkspaceScoreDetailSignalKeys[
                                                       scoreDetailKey
                                                     ] ?? null;
+                                                  const signalDetailExpanded = Boolean(
+                                                    comparison.expandedWorkspaceScoreSignalDetailIds[
+                                                      scoreDetailKey
+                                                    ],
+                                                  );
                                                   const rowActive =
                                                     comparison.activeWorkspaceOverviewRowId === scoreDetailKey;
                                                   const resolvedLocalSignalFocusKey =
@@ -14164,6 +14256,12 @@ function RunSection({
                                                           focusedScoreDetailSignalKey,
                                                         )
                                                       : null;
+                                                  const focusedSignalDetail =
+                                                    buildWorkspaceReviewSignalDetail({
+                                                      row,
+                                                      source: focusedScoreDetailSource,
+                                                      persistedSignalKey: focusedScoreDetailSignalKey,
+                                                    });
                                                   const focusScoreDetailSource = (
                                                     source: ComparisonHistorySyncConflictFieldSource,
                                                   ) => {
@@ -14481,6 +14579,96 @@ function RunSection({
                                                               </span>
                                                             )}
                                                           </div>
+                                                          <div className="comparison-history-conflict-review-score-detail-bar">
+                                                            <span className="comparison-history-conflict-review-score-detail-summary">
+                                                              {focusedSignalDetail
+                                                                ? `Focused signal · ${focusedSignalDetail.sourceLabel} · ${focusedSignalDetail.signal.label}`
+                                                                : "Focused signal · none selected"}
+                                                            </span>
+                                                            <button
+                                                              className="comparison-history-conflict-review-toggle"
+                                                              disabled={!focusedSignalDetail}
+                                                              onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                activateWorkspaceReviewRow(
+                                                                  entry.auditId,
+                                                                  row.fieldKey,
+                                                                );
+                                                                comparison.onToggleWorkspaceScoreSignalDetail(
+                                                                  scoreDetailKey,
+                                                                );
+                                                              }}
+                                                              type="button"
+                                                            >
+                                                              {signalDetailExpanded
+                                                                ? "Hide signal detail"
+                                                                : "Show signal detail"}
+                                                            </button>
+                                                          </div>
+                                                          {signalDetailExpanded ? (
+                                                            focusedSignalDetail ? (
+                                                              <div className="comparison-history-conflict-review-score-detail">
+                                                                <div className="comparison-history-conflict-review-score-detail-head">
+                                                                  <div>
+                                                                    <span className="comparison-history-conflict-review-score-detail-label">
+                                                                      {focusedSignalDetail.sourceLabel}
+                                                                    </span>
+                                                                    <strong>
+                                                                      {focusedSignalDetail.signal.label}
+                                                                    </strong>
+                                                                  </div>
+                                                                  <strong className="comparison-history-conflict-review-score-detail-impact">
+                                                                    {formatComparisonScoreSignedValue(
+                                                                      focusedSignalDetail.signal.weight,
+                                                                    )}
+                                                                  </strong>
+                                                                </div>
+                                                                <p className="comparison-history-conflict-review-score-detail-copy">
+                                                                  {focusedSignalDetail.contributionLabel}.{" "}
+                                                                  {focusedSignalDetail.recommendationRelationship}.
+                                                                </p>
+                                                                <div className="comparison-history-conflict-review-score-detail-grid">
+                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                    <span>Rank</span>
+                                                                    <strong>
+                                                                      {focusedSignalDetail.rank} /{" "}
+                                                                      {focusedSignalDetail.signalCount}
+                                                                    </strong>
+                                                                  </div>
+                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                    <span>Lane score</span>
+                                                                    <strong>
+                                                                      {formatComparisonScoreSignedValue(
+                                                                        focusedSignalDetail.laneScore,
+                                                                      )}
+                                                                    </strong>
+                                                                  </div>
+                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                    <span>Visible weight share</span>
+                                                                    <strong>
+                                                                      {Math.round(
+                                                                        focusedSignalDetail.shareOfVisibleWeight * 100,
+                                                                      )}
+                                                                      %
+                                                                    </strong>
+                                                                  </div>
+                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                    <span>Recommendation lane</span>
+                                                                    <strong>
+                                                                      {focusedSignalDetail.source
+                                                                      === row.recommendedSource
+                                                                        ? "Ranked lane"
+                                                                        : "Alternate lane"}
+                                                                    </strong>
+                                                                  </div>
+                                                                </div>
+                                                              </div>
+                                                            ) : (
+                                                              <span className="comparison-history-conflict-review-score-empty">
+                                                                No focused semantic signal available.
+                                                              </span>
+                                                            )
+                                                          ) : null}
                                                         </div>
                                                       ) : null}
                                                     </div>
