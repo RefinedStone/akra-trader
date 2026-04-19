@@ -2926,6 +2926,19 @@ type ComparisonHistorySyncWorkspaceSignalDetailNestedKey =
   | "weightShare"
   | "selectionAlignment"
   | "resolutionBasis";
+type ComparisonHistorySyncWorkspaceSignalMicroViewKey =
+  | "summary"
+  | "trace"
+  | "recommendation"
+  | "alternative"
+  | "position"
+  | "score"
+  | "share"
+  | "impact"
+  | "selection"
+  | "lane"
+  | "gap"
+  | "reason";
 type ComparisonHistorySyncAuditFilter =
   | "all"
   | "conflicts"
@@ -3023,6 +3036,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
+  focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4842,6 +4856,11 @@ export default function App() {
     useState<Record<string, boolean>>(
       () => initialComparisonHistoryPanelUiStateRef.current?.collapsedWorkspaceScoreSignalNestedSubviewIds ?? {},
     );
+  const [focusedWorkspaceScoreSignalMicroViews, setFocusedWorkspaceScoreSignalMicroViews] = useState<
+    Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreSignalMicroViews ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5264,6 +5283,7 @@ export default function App() {
         expandedWorkspaceScoreSignalDetailIds,
         collapsedWorkspaceScoreSignalSubviewIds,
         collapsedWorkspaceScoreSignalNestedSubviewIds,
+        focusedWorkspaceScoreSignalMicroViews,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5285,6 +5305,7 @@ export default function App() {
     expandedWorkspaceScoreSignalDetailIds,
     collapsedWorkspaceScoreSignalSubviewIds,
     collapsedWorkspaceScoreSignalNestedSubviewIds,
+    focusedWorkspaceScoreSignalMicroViews,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8230,6 +8251,7 @@ export default function App() {
             expandedWorkspaceScoreSignalDetailIds,
             collapsedWorkspaceScoreSignalSubviewIds,
             collapsedWorkspaceScoreSignalNestedSubviewIds,
+            focusedWorkspaceScoreSignalMicroViews,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8310,6 +8332,15 @@ export default function App() {
                 ...current,
                 [subviewId]: !current[subviewId],
               })),
+            onChangeWorkspaceScoreSignalMicroView: (subviewId, value) =>
+              setFocusedWorkspaceScoreSignalMicroViews((current) =>
+                current[subviewId] === value
+                  ? current
+                  : {
+                      ...current,
+                      [subviewId]: value,
+                    }
+              ),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
@@ -9348,6 +9379,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     expandedWorkspaceScoreSignalDetailIds: {},
     collapsedWorkspaceScoreSignalSubviewIds: {},
     collapsedWorkspaceScoreSignalNestedSubviewIds: {},
+    focusedWorkspaceScoreSignalMicroViews: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -10024,6 +10056,31 @@ function normalizeComparisonHistoryPanelUiState(
             },
             {},
           )
+        : {},
+    focusedWorkspaceScoreSignalMicroViews:
+      value?.focusedWorkspaceScoreSignalMicroViews
+      && typeof value.focusedWorkspaceScoreSignalMicroViews === "object"
+        ? Object.entries(value.focusedWorkspaceScoreSignalMicroViews).reduce<
+            Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>
+          >((accumulator, [key, candidate]) => {
+            if (
+              candidate === "summary"
+              || candidate === "trace"
+              || candidate === "recommendation"
+              || candidate === "alternative"
+              || candidate === "position"
+              || candidate === "score"
+              || candidate === "share"
+              || candidate === "impact"
+              || candidate === "selection"
+              || candidate === "lane"
+              || candidate === "gap"
+              || candidate === "reason"
+            ) {
+              accumulator[key] = candidate;
+            }
+            return accumulator;
+          }, {})
         : {},
     activeWorkspaceOverviewRowId:
       typeof value?.activeWorkspaceOverviewRowId === "string"
@@ -13230,6 +13287,7 @@ type RunSectionComparisonControls = {
   expandedWorkspaceScoreSignalDetailIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalSubviewIds: Record<string, boolean>;
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
+  focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13272,6 +13330,10 @@ type RunSectionComparisonControls = {
   onToggleWorkspaceScoreSignalDetail: (scoreDetailKey: string) => void;
   onToggleWorkspaceScoreSignalSubview: (subviewId: string) => void;
   onToggleWorkspaceScoreSignalNestedSubview: (subviewId: string) => void;
+  onChangeWorkspaceScoreSignalMicroView: (
+    subviewId: string,
+    value: ComparisonHistorySyncWorkspaceSignalMicroViewKey,
+  ) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
@@ -13427,6 +13489,16 @@ function RunSection({
     subviewKey: ComparisonHistorySyncWorkspaceSignalDetailSubviewKey,
     nestedKey: ComparisonHistorySyncWorkspaceSignalDetailNestedKey,
   ) => `${scoreDetailKey}:${subviewKey}:${nestedKey}`;
+  const resolveWorkspaceReviewSignalMicroView = (
+    nestedSubviewId: string,
+    options: ComparisonHistorySyncWorkspaceSignalMicroViewKey[],
+  ) => {
+    const persistedValue = comparison?.focusedWorkspaceScoreSignalMicroViews[nestedSubviewId];
+    if (persistedValue && options.includes(persistedValue)) {
+      return persistedValue;
+    }
+    return options[0];
+  };
   const resolveWorkspaceReviewSignalSelectionId = (
     source: ComparisonHistorySyncConflictFieldSource,
     signals: ComparisonHistorySyncWorkspaceSemanticSignal[],
@@ -14437,6 +14509,36 @@ function RunSection({
                                                       recommendationResolutionBasisNestedId
                                                     ],
                                                   );
+                                                  const interpretationLaneSemanticsMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      interpretationLaneSemanticsNestedId,
+                                                      ["summary", "trace"],
+                                                    );
+                                                  const interpretationRecommendationEffectMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      interpretationRecommendationEffectNestedId,
+                                                      ["recommendation", "alternative"],
+                                                    );
+                                                  const lanePositionRankContextMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      lanePositionRankContextNestedId,
+                                                      ["position", "score"],
+                                                    );
+                                                  const lanePositionWeightShareMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      lanePositionWeightShareNestedId,
+                                                      ["share", "impact"],
+                                                    );
+                                                  const recommendationSelectionAlignmentMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      recommendationSelectionAlignmentNestedId,
+                                                      ["selection", "lane"],
+                                                    );
+                                                  const recommendationResolutionBasisMicroView =
+                                                    resolveWorkspaceReviewSignalMicroView(
+                                                      recommendationResolutionBasisNestedId,
+                                                      ["gap", "reason"],
+                                                    );
                                                   const focusScoreDetailSource = (
                                                     source: ComparisonHistorySyncConflictFieldSource,
                                                   ) => {
@@ -14852,19 +14954,63 @@ function RunSection({
                                                                           </button>
                                                                           {!interpretationLaneSemanticsNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
-                                                                              <div className="comparison-history-conflict-review-score-detail-chip-row">
-                                                                                <span className="comparison-history-conflict-review-score-detail-chip">
-                                                                                  {focusedSignalDetail.sourceLabel}
-                                                                                </span>
-                                                                                <span className="comparison-history-conflict-review-score-detail-chip">
-                                                                                  {focusedSignalDetail.signal.weight >= 0
-                                                                                    ? "Positive semantic signal"
-                                                                                    : "Negative semantic signal"}
-                                                                                </span>
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["summary", "Summary"],
+                                                                                  ["trace", "Signal trace"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      interpretationLaneSemanticsMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      interpretationLaneSemanticsMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        interpretationLaneSemanticsNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
                                                                               </div>
-                                                                              <p className="comparison-history-conflict-review-score-detail-copy">
-                                                                                {focusedSignalDetail.contributionLabel}.
-                                                                              </p>
+                                                                              {interpretationLaneSemanticsMicroView === "summary" ? (
+                                                                                <>
+                                                                                  <div className="comparison-history-conflict-review-score-detail-chip-row">
+                                                                                    <span className="comparison-history-conflict-review-score-detail-chip">
+                                                                                      {focusedSignalDetail.sourceLabel}
+                                                                                    </span>
+                                                                                    <span className="comparison-history-conflict-review-score-detail-chip">
+                                                                                      {focusedSignalDetail.signal.weight >= 0
+                                                                                        ? "Positive semantic signal"
+                                                                                        : "Negative semantic signal"}
+                                                                                    </span>
+                                                                                  </div>
+                                                                                  <p className="comparison-history-conflict-review-score-detail-copy">
+                                                                                    {focusedSignalDetail.contributionLabel}.
+                                                                                  </p>
+                                                                                </>
+                                                                              ) : (
+                                                                                <div className="comparison-history-conflict-review-score-detail-grid">
+                                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                    <span>Focused signal</span>
+                                                                                    <strong>{focusedSignalDetail.signal.label}</strong>
+                                                                                  </div>
+                                                                                  <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                    <span>Lane label</span>
+                                                                                    <strong>{focusedSignalDetail.sourceLabel}</strong>
+                                                                                  </div>
+                                                                                </div>
+                                                                              )}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -14893,9 +15039,46 @@ function RunSection({
                                                                           </button>
                                                                           {!interpretationRecommendationEffectNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
-                                                                              <p className="comparison-history-conflict-review-score-detail-copy">
-                                                                                {focusedSignalDetail.recommendationRelationship}.
-                                                                              </p>
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["recommendation", "Ranked lane"],
+                                                                                  ["alternative", "Alternate lane"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      interpretationRecommendationEffectMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      interpretationRecommendationEffectMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        interpretationRecommendationEffectNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
+                                                                              {interpretationRecommendationEffectMicroView === "recommendation" ? (
+                                                                                <p className="comparison-history-conflict-review-score-detail-copy">
+                                                                                  {focusedSignalDetail.recommendationRelationship}.
+                                                                                </p>
+                                                                              ) : (
+                                                                                <p className="comparison-history-conflict-review-score-detail-copy">
+                                                                                  {focusedSignalDetail.source === row.recommendedSource
+                                                                                    ? "This signal currently sits on the ranked lane, so the alternate lane loses this semantic support."
+                                                                                    : "This signal currently sits on the alternate lane, showing what the non-ranked branch is still preserving."}
+                                                                                </p>
+                                                                              )}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -14958,22 +15141,70 @@ function RunSection({
                                                                           </button>
                                                                           {!lanePositionRankContextNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["position", "Rank view"],
+                                                                                  ["score", "Lane score"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      lanePositionRankContextMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      lanePositionRankContextMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        lanePositionRankContextNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
                                                                               <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Rank</span>
-                                                                                  <strong>
-                                                                                    {focusedSignalDetail.rank} /{" "}
-                                                                                    {focusedSignalDetail.signalCount}
-                                                                                  </strong>
-                                                                                </div>
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Lane score</span>
-                                                                                  <strong>
-                                                                                    {formatComparisonScoreSignedValue(
-                                                                                      focusedSignalDetail.laneScore,
-                                                                                    )}
-                                                                                  </strong>
-                                                                                </div>
+                                                                                {lanePositionRankContextMicroView === "position" ? (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Rank</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.rank} /{" "}
+                                                                                        {focusedSignalDetail.signalCount}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Signals in lane</span>
+                                                                                      <strong>{focusedSignalDetail.signalCount}</strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                ) : (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Lane score</span>
+                                                                                      <strong>
+                                                                                        {formatComparisonScoreSignedValue(
+                                                                                          focusedSignalDetail.laneScore,
+                                                                                        )}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Signal impact</span>
+                                                                                      <strong>
+                                                                                        {formatComparisonScoreSignedValue(
+                                                                                          focusedSignalDetail.signal.weight,
+                                                                                        )}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                )}
                                                                               </div>
                                                                             </div>
                                                                           ) : null}
@@ -15007,25 +15238,77 @@ function RunSection({
                                                                           </button>
                                                                           {!lanePositionWeightShareNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["share", "Share"],
+                                                                                  ["impact", "Impact"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      lanePositionWeightShareMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      lanePositionWeightShareMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        lanePositionWeightShareNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
                                                                               <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Visible weight share</span>
-                                                                                  <strong>
-                                                                                    {Math.round(
-                                                                                      focusedSignalDetail.shareOfVisibleWeight
-                                                                                        * 100,
-                                                                                    )}
-                                                                                    %
-                                                                                  </strong>
-                                                                                </div>
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Signal impact</span>
-                                                                                  <strong>
-                                                                                    {formatComparisonScoreSignedValue(
-                                                                                      focusedSignalDetail.signal.weight,
-                                                                                    )}
-                                                                                  </strong>
-                                                                                </div>
+                                                                                {lanePositionWeightShareMicroView === "share" ? (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Visible weight share</span>
+                                                                                      <strong>
+                                                                                        {Math.round(
+                                                                                          focusedSignalDetail.shareOfVisibleWeight
+                                                                                            * 100,
+                                                                                        )}
+                                                                                        %
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Interpretation</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.shareOfVisibleWeight >= 0.5
+                                                                                          ? "Dominant visible signal"
+                                                                                          : "Partial visible share"}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                ) : (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Signal impact</span>
+                                                                                      <strong>
+                                                                                        {formatComparisonScoreSignedValue(
+                                                                                          focusedSignalDetail.signal.weight,
+                                                                                        )}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Impact direction</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.signal.weight >= 0
+                                                                                          ? "Supports lane confidence"
+                                                                                          : "Reduces lane confidence"}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                )}
                                                                               </div>
                                                                             </div>
                                                                           ) : null}
@@ -15090,28 +15373,76 @@ function RunSection({
                                                                           </button>
                                                                           {!recommendationSelectionAlignmentNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["selection", "Current selection"],
+                                                                                  ["lane", "Ranked lane"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      recommendationSelectionAlignmentMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      recommendationSelectionAlignmentMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        recommendationSelectionAlignmentNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
                                                                               <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Recommendation lane</span>
-                                                                                  <strong>
-                                                                                    {focusedSignalDetail.source
-                                                                                    === row.recommendedSource
-                                                                                      ? "Ranked lane"
-                                                                                      : "Alternate lane"}
-                                                                                  </strong>
-                                                                                </div>
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Current selection</span>
-                                                                                  <strong>
-                                                                                    {row.selectedSource === "local"
-                                                                                      ? row.hasLatestLocalDrift
-                                                                                        ? "Local latest"
-                                                                                        : "Local"
-                                                                                      : row.hasLatestLocalDrift
-                                                                                        ? "Remote audit"
-                                                                                        : "Remote"}
-                                                                                  </strong>
-                                                                                </div>
+                                                                                {recommendationSelectionAlignmentMicroView === "selection" ? (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Current selection</span>
+                                                                                      <strong>
+                                                                                        {row.selectedSource === "local"
+                                                                                          ? row.hasLatestLocalDrift
+                                                                                            ? "Local latest"
+                                                                                            : "Local"
+                                                                                          : row.hasLatestLocalDrift
+                                                                                            ? "Remote audit"
+                                                                                            : "Remote"}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Focused signal lane</span>
+                                                                                      <strong>{focusedSignalDetail.sourceLabel}</strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                ) : (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Recommendation lane</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.source
+                                                                                        === row.recommendedSource
+                                                                                          ? "Ranked lane"
+                                                                                          : "Alternate lane"}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Alignment</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.source === row.recommendedSource
+                                                                                          ? "Signal matches ranked lane"
+                                                                                          : "Signal is tracing the alternate lane"}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                )}
                                                                               </div>
                                                                             </div>
                                                                           ) : null}
@@ -15144,21 +15475,65 @@ function RunSection({
                                                                           </button>
                                                                           {!recommendationResolutionBasisNestedCollapsed ? (
                                                                             <div className="comparison-history-conflict-review-score-detail-nested-body">
+                                                                              <div className="comparison-history-conflict-review-score-detail-microview-row">
+                                                                                {([
+                                                                                  ["gap", "Gap"],
+                                                                                  ["reason", "Reason"],
+                                                                                ] as const).map(([value, label]) => (
+                                                                                  <button
+                                                                                    aria-pressed={
+                                                                                      recommendationResolutionBasisMicroView
+                                                                                      === value
+                                                                                    }
+                                                                                    className={`comparison-history-conflict-review-score-detail-microview-chip ${
+                                                                                      recommendationResolutionBasisMicroView
+                                                                                      === value
+                                                                                        ? "is-active"
+                                                                                        : ""
+                                                                                    }`}
+                                                                                    key={value}
+                                                                                    onClick={() =>
+                                                                                      comparison.onChangeWorkspaceScoreSignalMicroView(
+                                                                                        recommendationResolutionBasisNestedId,
+                                                                                        value,
+                                                                                      )
+                                                                                    }
+                                                                                    type="button"
+                                                                                  >
+                                                                                    {label}
+                                                                                  </button>
+                                                                                ))}
+                                                                              </div>
                                                                               <div className="comparison-history-conflict-review-score-detail-grid">
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Recommendation gap</span>
-                                                                                  <strong>
-                                                                                    +{formatComparisonScoreValue(
-                                                                                      row.recommendationStrength,
-                                                                                    )}
-                                                                                  </strong>
-                                                                                </div>
-                                                                                <div className="comparison-history-conflict-review-score-detail-metric">
-                                                                                  <span>Why this lane</span>
-                                                                                  <strong>
-                                                                                    {row.recommendationReason}
-                                                                                  </strong>
-                                                                                </div>
+                                                                                {recommendationResolutionBasisMicroView === "gap" ? (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Recommendation gap</span>
+                                                                                      <strong>
+                                                                                        +{formatComparisonScoreValue(
+                                                                                          row.recommendationStrength,
+                                                                                        )}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Signal lane</span>
+                                                                                      <strong>{focusedSignalDetail.sourceLabel}</strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                ) : (
+                                                                                  <>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Why this lane</span>
+                                                                                      <strong>{row.recommendationReason}</strong>
+                                                                                    </div>
+                                                                                    <div className="comparison-history-conflict-review-score-detail-metric">
+                                                                                      <span>Signal relationship</span>
+                                                                                      <strong>
+                                                                                        {focusedSignalDetail.recommendationRelationship}
+                                                                                      </strong>
+                                                                                    </div>
+                                                                                  </>
+                                                                                )}
                                                                               </div>
                                                                             </div>
                                                                           ) : null}
