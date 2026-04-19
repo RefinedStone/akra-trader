@@ -3226,18 +3226,36 @@
       "direction_id": "experiment-os",
       "title": "Add haptic or platform touch feedback to manual gap-window picker sweep activation",
       "description": "Finish the next executable mobile gesture pass by adding platform-appropriate tactile or equivalent touch feedback when the manual gap-window picker long-press arms or activates sweep mode, so touch-first operators get a non-visual confirmation path in addition to the newly shipped hold-progress rail.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply explicitly says the remaining mobile gesture work is that the picker still has visual hold progress only and no haptic vibration or OS-level feedback. That makes platform feedback the clearest executable follow-up after commit b9c85ee completed visible hold progress.",
+      "priority_reason": "Completed in main session commit be8f10f, which added best-effort `navigator.vibrate(18)` feedback when touch long-press promotes into sweep mode, paired it with visual pulse feedback on the picker and activation anchor row, verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-hold-progress-feedback-to-manual-gap-window-picker-touch-sweep"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:20:00Z",
+      "updated_at": "2026-04-20T18:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os touch gesture trust by complementing visible hold progress with mobile-native activation feedback so long-press sweep mode is legible even when the operator is focused on finger motion rather than the helper rail."
+    },
+    {
+      "id": "planning-experiment-os-extend-manual-gap-window-picker-touch-feedback-beyond-navigator-vibrate",
+      "direction_id": "experiment-os",
+      "title": "Extend manual gap-window picker touch feedback beyond `navigator.vibrate`",
+      "description": "Finish the next platform-tuning pass for manual gap-window picker sweep activation by adding a clearer platform-specific haptic integration seam or fallback contract beyond best-effort `navigator.vibrate`, so iOS Safari and other non-vibration environments can deliver stronger activation feedback than the current visual pulse alone.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says the shipped feedback is limited to best-effort `navigator.vibrate`, that iOS Safari lacks the vibration API, and that native bridge-based haptic integration is still missing. That makes broader platform-specific activation feedback the clearest executable next task after commit be8f10f.",
+      "depends_on": [
+        "planning-experiment-os-add-haptic-or-platform-touch-feedback-to-manual-gap-window-picker-sweep-activation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T18:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os mobile gesture trust moving from baseline web vibration support toward a platform-aware activation feedback contract that remains legible on iOS-class environments where web haptics are limited."
     },
     {
       "id": "planning-experiment-os-differentiate-touch-hold-feedback-by-cancellation-reason-in-manual-gap-window-picker",
