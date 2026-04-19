@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -15,7 +14,8 @@ from pydantic import BaseModel
 from pydantic import Field
 
 from akra_trader.application import TradingApplication
-from akra_trader.application import get_run_subresource_serializer_spec
+from akra_trader.application import list_run_subresource_contracts
+from akra_trader.application import RunSubresourceContract
 from akra_trader.application import serialize_run_comparison
 from akra_trader.application import serialize_run
 from akra_trader.application import serialize_run_subresource_response
@@ -132,47 +132,6 @@ class ExternalIncidentSyncRequest(BaseModel):
   escalation_level: int | None = Field(default=None, ge=1)
   payload: dict[str, Any] = Field(default_factory=dict)
 
-
-@dataclass(frozen=True)
-class RunSubresourceRouteBinding:
-  path: str
-  route_name: str
-  subresource_key: str
-
-
-RUN_SUBRESOURCE_ROUTE_BINDINGS = (
-  RunSubresourceRouteBinding(
-    path="/runs/{run_id}/orders",
-    route_name="get_run_orders",
-    subresource_key="orders",
-  ),
-  RunSubresourceRouteBinding(
-    path="/runs/{run_id}/positions",
-    route_name="get_run_positions",
-    subresource_key="positions",
-  ),
-  RunSubresourceRouteBinding(
-    path="/runs/{run_id}/metrics",
-    route_name="get_run_metrics",
-    subresource_key="metrics",
-  ),
-)
-
-
-def serialize_run_subresource_route_bindings() -> list[dict[str, str]]:
-  return [
-    {
-      "subresource_key": binding.subresource_key,
-      "route_name": binding.route_name,
-      "path": binding.path,
-      "body_key": spec.body_key,
-      "response_title": spec.response_title,
-    }
-    for binding in RUN_SUBRESOURCE_ROUTE_BINDINGS
-    for spec in (get_run_subresource_serializer_spec(binding.subresource_key),)
-  ]
-
-
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -191,7 +150,7 @@ def create_router(container: Container) -> APIRouter:
       capabilities=app.get_run_surface_capabilities(),
     )
 
-  def build_run_subresource_route_handler(binding: RunSubresourceRouteBinding):
+  def build_run_subresource_route_handler(contract: RunSubresourceContract):
     def get_run_subresource(
       run_id: str,
       app: TradingApplication = Depends(get_app),
@@ -201,11 +160,11 @@ def create_router(container: Container) -> APIRouter:
         raise HTTPException(status_code=404, detail="Run not found")
       return serialize_run_subresource_response(
         run,
-        subresource_key=binding.subresource_key,
+        subresource_key=contract.subresource_key,
         capabilities=app.get_run_surface_capabilities(),
       )
 
-    get_run_subresource.__name__ = binding.route_name
+    get_run_subresource.__name__ = contract.route_name
     return get_run_subresource
 
   @router.get("/health")
@@ -214,9 +173,7 @@ def create_router(container: Container) -> APIRouter:
 
   @router.get("/capabilities/run-surfaces")
   def get_run_surface_capabilities(app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    payload = serialize_run_surface_capabilities(app.get_run_surface_capabilities())
-    payload["discovery"]["run_subresource_routes"] = serialize_run_subresource_route_bindings()
-    return payload
+    return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
 
   @router.get("/strategies")
   def list_strategies(
@@ -623,14 +580,13 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
     return serialize_run_response(run, app)
 
-  for binding in RUN_SUBRESOURCE_ROUTE_BINDINGS:
-    spec = get_run_subresource_serializer_spec(binding.subresource_key)
+  for contract in list_run_subresource_contracts():
     router.add_api_route(
-      binding.path,
-      build_run_subresource_route_handler(binding),
+      contract.route_path,
+      build_run_subresource_route_handler(contract),
       methods=["GET"],
-      name=binding.route_name,
-      summary=spec.response_title,
+      name=contract.route_name,
+      summary=contract.response_title,
     )
 
   @router.get("/market-data/status")

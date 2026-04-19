@@ -18,8 +18,9 @@ from akra_trader.adapters.references import load_reference_catalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
+from akra_trader.application import get_run_subresource_contract
+from akra_trader.application import list_run_subresource_contracts
 from akra_trader.application import TradingApplication
-from akra_trader.application import get_run_subresource_serializer_spec
 from akra_trader.application import serialize_run_surface_capabilities
 from akra_trader.application import serialize_run_subresource_response
 from akra_trader.domain.models import AssetType
@@ -13787,35 +13788,48 @@ def test_run_subresource_serializer_registry_rejects_unknown_key(tmp_path: Path)
 
 
 def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
-  orders_spec = get_run_subresource_serializer_spec("orders")
-  positions_spec = get_run_subresource_serializer_spec("positions")
-  metrics_spec = get_run_subresource_serializer_spec("metrics")
+  contracts = list_run_subresource_contracts()
+  orders_contract = get_run_subresource_contract("orders")
+  positions_contract = get_run_subresource_contract("positions")
+  metrics_contract = get_run_subresource_contract("metrics")
 
-  assert orders_spec.subresource_key == "orders"
-  assert orders_spec.body_key == "orders"
-  assert orders_spec.response_title == "Run order list"
-  assert positions_spec.body_key == "positions"
-  assert positions_spec.response_title == "Run positions"
-  assert metrics_spec.body_key == "metrics"
-  assert metrics_spec.response_title == "Run metrics"
+  assert [contract.subresource_key for contract in contracts] == ["orders", "positions", "metrics"]
+  assert orders_contract.body_key == "orders"
+  assert orders_contract.response_title == "Run order list"
+  assert orders_contract.route_path == "/runs/{run_id}/orders"
+  assert orders_contract.route_name == "get_run_orders"
+  assert positions_contract.body_key == "positions"
+  assert positions_contract.response_title == "Run positions"
+  assert positions_contract.route_path == "/runs/{run_id}/positions"
+  assert positions_contract.route_name == "get_run_positions"
+  assert metrics_contract.body_key == "metrics"
+  assert metrics_contract.response_title == "Run metrics"
+  assert metrics_contract.route_path == "/runs/{run_id}/metrics"
+  assert metrics_contract.route_name == "get_run_metrics"
 
   payload = serialize_run_surface_capabilities(RunSurfaceCapabilities())
 
-  assert payload["discovery"]["run_subresources"] == [
+  assert payload["discovery"]["run_subresource_contracts"] == [
     {
       "subresource_key": "orders",
       "body_key": "orders",
       "response_title": "Run order list",
+      "route_path": "/runs/{run_id}/orders",
+      "route_name": "get_run_orders",
     },
     {
       "subresource_key": "positions",
       "body_key": "positions",
       "response_title": "Run positions",
+      "route_path": "/runs/{run_id}/positions",
+      "route_name": "get_run_positions",
     },
     {
       "subresource_key": "metrics",
       "body_key": "metrics",
       "response_title": "Run metrics",
+      "route_path": "/runs/{run_id}/metrics",
+      "route_name": "get_run_metrics",
     },
   ]
 
@@ -14654,7 +14668,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v6"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v7"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",

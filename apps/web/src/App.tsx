@@ -493,17 +493,12 @@ type RunSurfaceCapabilities = {
   discovery: {
     comparison_eligibility_group_order: RunListBoundaryGroupKey[];
     family_order: string[];
-    run_subresources: {
+    run_subresource_contracts: {
       subresource_key: string;
       body_key: string;
       response_title: string;
-    }[];
-    run_subresource_routes: {
-      subresource_key: string;
+      route_path: string;
       route_name: string;
-      path: string;
-      body_key: string;
-      response_title: string;
     }[];
     schema_summary: string;
     schema_title: string;
@@ -14318,50 +14313,33 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
     "provenance_semantics",
     "execution_controls",
   ],
-  run_subresources: [
+  run_subresource_contracts: [
     {
       subresource_key: "orders",
       body_key: "orders",
       response_title: "Run order list",
-    },
-    {
-      subresource_key: "positions",
-      body_key: "positions",
-      response_title: "Run positions",
-    },
-    {
-      subresource_key: "metrics",
-      body_key: "metrics",
-      response_title: "Run metrics",
-    },
-  ],
-  run_subresource_routes: [
-    {
-      subresource_key: "orders",
       route_name: "get_run_orders",
-      path: "/runs/{run_id}/orders",
-      body_key: "orders",
-      response_title: "Run order list",
+      route_path: "/runs/{run_id}/orders",
     },
     {
       subresource_key: "positions",
-      route_name: "get_run_positions",
-      path: "/runs/{run_id}/positions",
       body_key: "positions",
       response_title: "Run positions",
+      route_name: "get_run_positions",
+      route_path: "/runs/{run_id}/positions",
     },
     {
       subresource_key: "metrics",
-      route_name: "get_run_metrics",
-      path: "/runs/{run_id}/metrics",
       body_key: "metrics",
       response_title: "Run metrics",
+      route_name: "get_run_metrics",
+      route_path: "/runs/{run_id}/metrics",
     },
   ],
   schema_summary:
     "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v6",
+  schema_version: "run-surface-capabilities.v7",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14776,8 +14754,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
 }) {
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
-  const runSubresources = discovery.run_subresources ?? [];
-  const runSubresourceRoutes = discovery.run_subresource_routes ?? [];
+  const runSubresourceContracts = discovery.run_subresource_contracts ?? [];
   const familyByKey = new Map(
     getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
   );
@@ -14798,45 +14775,21 @@ function RunSurfaceCapabilityDiscoveryPanel({
         </div>
         <span className="meta-pill subtle">{discovery.schema_version}</span>
       </div>
-      {runSubresources.length ? (
+      {runSubresourceContracts.length ? (
         <div className="run-surface-family-section">
-          <span>Run subresources</span>
+          <span>Run subresource contracts</span>
           <div className="run-surface-family-rule-grid">
-            {runSubresources.map((subresource) => (
-              <div className="run-surface-family-rule-card" key={subresource.subresource_key}>
+            {runSubresourceContracts.map((contract) => (
+              <div className="run-surface-family-rule-card" key={contract.subresource_key}>
                 <div className="run-surface-family-rule-head">
-                  <strong>{subresource.response_title}</strong>
-                  <span className="meta-pill subtle">{subresource.subresource_key}</span>
+                  <strong>{contract.response_title}</strong>
+                  <span className="meta-pill subtle">{contract.route_name}</span>
                 </div>
                 <p className="run-note">
-                  Envelope body: {subresource.body_key}
+                  Path: {contract.route_path}
                 </p>
                 <p className="run-note">
-                  Registry key: {subresource.subresource_key}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-      {runSubresourceRoutes.length ? (
-        <div className="run-surface-family-section">
-          <span>Route bindings</span>
-          <div className="run-surface-family-rule-grid">
-            {runSubresourceRoutes.map((route) => (
-              <div
-                className="run-surface-family-rule-card"
-                key={`${route.subresource_key}:${route.route_name}`}
-              >
-                <div className="run-surface-family-rule-head">
-                  <strong>{route.response_title}</strong>
-                  <span className="meta-pill subtle">{route.route_name}</span>
-                </div>
-                <p className="run-note">
-                  Path: {route.path}
-                </p>
-                <p className="run-note">
-                  Subresource: {route.subresource_key} · Body: {route.body_key}
+                  Subresource: {contract.subresource_key} · Body: {contract.body_key}
                 </p>
               </div>
             ))}

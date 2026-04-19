@@ -22960,10 +22960,12 @@ def _serialize_run_subresource_envelope(
 
 
 @dataclass(frozen=True)
-class RunSubresourceSerializerSpec:
+class RunSubresourceContract:
   subresource_key: str
   body_key: str
   response_title: str
+  route_path: str
+  route_name: str
   body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
 
 
@@ -23019,52 +23021,64 @@ def _serialize_run_metrics_subresource_body(
   return deepcopy(run.metrics)
 
 
-RUN_SUBRESOURCE_SERIALIZER_SPECS: dict[str, RunSubresourceSerializerSpec] = {
-  "orders": RunSubresourceSerializerSpec(
+RUN_SUBRESOURCE_CONTRACTS: tuple[RunSubresourceContract, ...] = (
+  RunSubresourceContract(
     subresource_key="orders",
     body_key="orders",
     response_title="Run order list",
+    route_path="/runs/{run_id}/orders",
+    route_name="get_run_orders",
     body_serializer=lambda run, capabilities: _serialize_run_orders_subresource_body(
       run,
       capabilities=capabilities,
     ),
   ),
-  "positions": RunSubresourceSerializerSpec(
+  RunSubresourceContract(
     subresource_key="positions",
     body_key="positions",
     response_title="Run positions",
+    route_path="/runs/{run_id}/positions",
+    route_name="get_run_positions",
     body_serializer=lambda run, capabilities: _serialize_run_positions_subresource_body(
       run,
       capabilities=capabilities,
     ),
   ),
-  "metrics": RunSubresourceSerializerSpec(
+  RunSubresourceContract(
     subresource_key="metrics",
     body_key="metrics",
     response_title="Run metrics",
+    route_path="/runs/{run_id}/metrics",
+    route_name="get_run_metrics",
     body_serializer=lambda run, capabilities: _serialize_run_metrics_subresource_body(
       run,
       capabilities=capabilities,
     ),
   ),
-}
+)
 
 
-def get_run_subresource_serializer_spec(subresource_key: str) -> RunSubresourceSerializerSpec:
-  spec = RUN_SUBRESOURCE_SERIALIZER_SPECS.get(subresource_key)
-  if spec is None:
-    raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
-  return spec
+def list_run_subresource_contracts() -> tuple[RunSubresourceContract, ...]:
+  return RUN_SUBRESOURCE_CONTRACTS
 
 
-def serialize_run_subresource_registry_metadata() -> list[dict[str, str]]:
+def get_run_subresource_contract(subresource_key: str) -> RunSubresourceContract:
+  for contract in RUN_SUBRESOURCE_CONTRACTS:
+    if contract.subresource_key == subresource_key:
+      return contract
+  raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+
+
+def serialize_run_subresource_contract_metadata() -> list[dict[str, str]]:
   return [
     {
-      "subresource_key": spec.subresource_key,
-      "body_key": spec.body_key,
-      "response_title": spec.response_title,
+      "subresource_key": contract.subresource_key,
+      "body_key": contract.body_key,
+      "response_title": contract.response_title,
+      "route_path": contract.route_path,
+      "route_name": contract.route_name,
     }
-    for spec in RUN_SUBRESOURCE_SERIALIZER_SPECS.values()
+    for contract in RUN_SUBRESOURCE_CONTRACTS
   ]
 
 
@@ -23075,12 +23089,12 @@ def serialize_run_subresource_response(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  spec = get_run_subresource_serializer_spec(subresource_key)
+  contract = get_run_subresource_contract(subresource_key)
   return _serialize_run_subresource_envelope(
     run,
     capabilities=resolved_capabilities,
-    body_key=spec.body_key,
-    body_value=spec.body_serializer(run, resolved_capabilities),
+    body_key=contract.body_key,
+    body_value=contract.body_serializer(run, resolved_capabilities),
   )
 
 
@@ -23204,7 +23218,7 @@ def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> 
         capabilities.discovery.get("comparison_eligibility_group_order", ())
       ),
       "family_order": list(capabilities.discovery.get("family_order", ())),
-      "run_subresources": serialize_run_subresource_registry_metadata(),
+      "run_subresource_contracts": serialize_run_subresource_contract_metadata(),
     },
     "comparison_eligibility_contract": serialize_comparison_eligibility_contract(
       capabilities.comparison_eligibility_contract

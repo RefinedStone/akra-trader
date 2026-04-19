@@ -378,7 +378,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
 
   assert response.status_code == 200
   payload = response.json()
-  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v6"
+  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v7"
   assert payload["discovery"]["schema_title"] == "Run-surface capability contract"
   assert payload["discovery"]["family_order"] == [
     "comparison_eligibility",
@@ -392,44 +392,27 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     "operational_workflow",
     "operational_order_actions",
   ]
-  assert payload["discovery"]["run_subresources"] == [
+  assert payload["discovery"]["run_subresource_contracts"] == [
     {
       "subresource_key": "orders",
       "body_key": "orders",
       "response_title": "Run order list",
-    },
-    {
-      "subresource_key": "positions",
-      "body_key": "positions",
-      "response_title": "Run positions",
-    },
-    {
-      "subresource_key": "metrics",
-      "body_key": "metrics",
-      "response_title": "Run metrics",
-    },
-  ]
-  assert payload["discovery"]["run_subresource_routes"] == [
-    {
-      "subresource_key": "orders",
+      "route_path": "/runs/{run_id}/orders",
       "route_name": "get_run_orders",
-      "path": "/runs/{run_id}/orders",
-      "body_key": "orders",
-      "response_title": "Run order list",
     },
     {
       "subresource_key": "positions",
-      "route_name": "get_run_positions",
-      "path": "/runs/{run_id}/positions",
       "body_key": "positions",
       "response_title": "Run positions",
+      "route_path": "/runs/{run_id}/positions",
+      "route_name": "get_run_positions",
     },
     {
       "subresource_key": "metrics",
-      "route_name": "get_run_metrics",
-      "path": "/runs/{run_id}/metrics",
       "body_key": "metrics",
       "response_title": "Run metrics",
+      "route_path": "/runs/{run_id}/metrics",
+      "route_name": "get_run_metrics",
     },
   ]
   assert payload["families"][0]["family_key"] == "comparison_eligibility"
