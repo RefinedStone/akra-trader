@@ -3,6 +3,7 @@ import {
   FormEvent,
   KeyboardEvent,
   MouseEvent,
+  PointerEvent,
   forwardRef,
   useEffect,
   useId,
@@ -2807,6 +2808,13 @@ const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
 type ExpandedGapWindowSelections = Record<string, string[]>;
+type GapWindowDragSelectionState = {
+  anchorGapWindowKey: string;
+  baselineSelectedGapWindowKeys: string[];
+  latestGapWindowKey: string;
+  pointerId: number;
+  targetSelected: boolean;
+};
 
 type ControlRoomUiStateV1 = {
   version: 1;
@@ -8227,6 +8235,7 @@ function BackfillQualityStatus({
   selectedGapWindowKeys?: string[] | null;
 }) {
   const [rangeAnchorGapWindowKey, setRangeAnchorGapWindowKey] = useState<string | null>(null);
+  const [dragSelectionState, setDragSelectionState] = useState<GapWindowDragSelectionState | null>(null);
   const orderedGapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
     buildGapWindowKey(gapWindow),
   );
@@ -8238,6 +8247,37 @@ function BackfillQualityStatus({
       setRangeAnchorGapWindowKey(null);
     }
   }, [orderedGapWindowKeys, rangeAnchorGapWindowKey]);
+  useEffect(() => {
+    if (!dragSelectionState) {
+      return;
+    }
+    if (
+      !orderedGapWindowKeys.includes(dragSelectionState.anchorGapWindowKey)
+      || !orderedGapWindowKeys.includes(dragSelectionState.latestGapWindowKey)
+    ) {
+      setDragSelectionState(null);
+    }
+  }, [dragSelectionState, orderedGapWindowKeys]);
+  useEffect(() => {
+    if (!gapWindowPickerOpen && dragSelectionState) {
+      setDragSelectionState(null);
+    }
+  }, [dragSelectionState, gapWindowPickerOpen]);
+  useEffect(() => {
+    if (!dragSelectionState) {
+      return;
+    }
+    const finishDragSelection = () => {
+      setRangeAnchorGapWindowKey(dragSelectionState.latestGapWindowKey);
+      setDragSelectionState(null);
+    };
+    window.addEventListener("pointerup", finishDragSelection);
+    window.addEventListener("pointercancel", finishDragSelection);
+    return () => {
+      window.removeEventListener("pointerup", finishDragSelection);
+      window.removeEventListener("pointercancel", finishDragSelection);
+    };
+  }, [dragSelectionState]);
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
@@ -8268,6 +8308,94 @@ function BackfillQualityStatus({
   const rangeAnchorLabel = rangeAnchorGapWindowKey
     ? formatGapWindowKeyLabel(rangeAnchorGapWindowKey)
     : null;
+  const applyGapWindowSelectionChange = ({
+    anchorGapWindowKey,
+    selectedGapWindowKeys,
+    targetGapWindowKey,
+    targetSelected,
+  }: {
+    anchorGapWindowKey?: string | null;
+    selectedGapWindowKeys?: string[] | null;
+    targetGapWindowKey: string;
+    targetSelected: boolean;
+  }) => {
+    const nextSelectedGapWindowKeys = buildGapWindowSelectionUpdate({
+      orderedGapWindowKeys,
+      rangeAnchorGapWindowKey: anchorGapWindowKey,
+      selectedGapWindowKeys,
+      targetGapWindowKey,
+      targetSelected,
+    });
+    onChangeGapWindowSelections?.(nextSelectedGapWindowKeys);
+    return nextSelectedGapWindowKeys;
+  };
+  const handleGapWindowPointerDown = (
+    event: PointerEvent<HTMLLabelElement>,
+    gapWindowKey: string,
+    checked: boolean,
+  ) => {
+    if (event.button !== 0) {
+      return;
+    }
+    event.preventDefault();
+    applyGapWindowSelectionChange({
+      selectedGapWindowKeys: resolvedSelectedGapWindowKeys,
+      targetGapWindowKey: gapWindowKey,
+      targetSelected: !checked,
+    });
+    setRangeAnchorGapWindowKey(gapWindowKey);
+    setDragSelectionState({
+      anchorGapWindowKey: gapWindowKey,
+      baselineSelectedGapWindowKeys: resolvedSelectedGapWindowKeys,
+      latestGapWindowKey: gapWindowKey,
+      pointerId: event.pointerId,
+      targetSelected: !checked,
+    });
+  };
+  const handleGapWindowPointerEnter = (
+    event: PointerEvent<HTMLLabelElement>,
+    gapWindowKey: string,
+  ) => {
+    if (
+      !dragSelectionState
+      || event.pointerId !== dragSelectionState.pointerId
+      || event.buttons === 0
+      || dragSelectionState.latestGapWindowKey === gapWindowKey
+    ) {
+      return;
+    }
+    applyGapWindowSelectionChange({
+      anchorGapWindowKey: dragSelectionState.anchorGapWindowKey,
+      selectedGapWindowKeys: dragSelectionState.baselineSelectedGapWindowKeys,
+      targetGapWindowKey: gapWindowKey,
+      targetSelected: dragSelectionState.targetSelected,
+    });
+    setDragSelectionState((current) =>
+      current
+        ? {
+            ...current,
+            latestGapWindowKey: gapWindowKey,
+          }
+        : current,
+    );
+  };
+  const handleGapWindowKeyboardToggle = (
+    event: KeyboardEvent<HTMLInputElement>,
+    gapWindowKey: string,
+    checked: boolean,
+  ) => {
+    if (event.key !== " " && event.key !== "Enter") {
+      return;
+    }
+    event.preventDefault();
+    applyGapWindowSelectionChange({
+      anchorGapWindowKey: event.shiftKey ? rangeAnchorGapWindowKey : null,
+      selectedGapWindowKeys: resolvedSelectedGapWindowKeys,
+      targetGapWindowKey: gapWindowKey,
+      targetSelected: !checked,
+    });
+    setRangeAnchorGapWindowKey(gapWindowKey);
+  };
   return (
     <div className="progress-stack">
       <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
@@ -8333,7 +8461,7 @@ function BackfillQualityStatus({
         </div>
       ) : null}
       {gapWindowPickerOpen && canPickGapWindows ? (
-        <div className="gap-window-picker">
+        <div className={`gap-window-picker ${dragSelectionState ? "is-sweeping" : ""}`}>
           <div className="gap-window-picker-head">
             <span className="gap-window-picker-title">Visible gap windows</span>
             <span className="gap-window-picker-summary">
@@ -8341,9 +8469,13 @@ function BackfillQualityStatus({
             </span>
           </div>
           <span className="gap-window-picker-anchor">
-            {rangeAnchorLabel
-              ? `Range anchor: ${rangeAnchorLabel}. Shift-click another gap to apply the full range.`
-              : "Tip: click a gap to set the range anchor, then shift-click another gap to apply the full range."}
+            {dragSelectionState
+              ? `Sweep ${dragSelectionState.targetSelected ? "select" : "hide"} mode from ${formatGapWindowKeyLabel(
+                  dragSelectionState.anchorGapWindowKey,
+                )}.`
+              : rangeAnchorLabel
+                ? `Range anchor: ${rangeAnchorLabel}. Shift-click another gap to apply the full range.`
+                : "Tip: click a gap to set the range anchor, then shift-click or drag across gaps to apply a range."}
           </span>
           <div className="gap-window-picker-list">
             {instrument.backfill_gap_windows.map((gapWindow) => {
@@ -8353,24 +8485,26 @@ function BackfillQualityStatus({
                 <label
                   className={`gap-window-picker-option ${checked ? "is-active" : ""} ${
                     rangeAnchorGapWindowKey === gapWindowKey ? "is-anchor" : ""
+                  } ${
+                    dragSelectionState?.latestGapWindowKey === gapWindowKey ? "is-sweep-target" : ""
                   }`}
                   key={gapWindowKey}
+                  onPointerDown={(event) =>
+                    handleGapWindowPointerDown(event, gapWindowKey, checked)
+                  }
+                  onPointerEnter={(event) =>
+                    handleGapWindowPointerEnter(event, gapWindowKey)
+                  }
                 >
                   <input
                     checked={checked}
                     disabled={checked && selectedGapWindowCount === 1}
                     onClick={(event) => {
                       event.preventDefault();
-                      const nextSelectedGapWindowKeys = buildGapWindowSelectionUpdate({
-                        orderedGapWindowKeys,
-                        rangeAnchorGapWindowKey: event.shiftKey ? rangeAnchorGapWindowKey : null,
-                        selectedGapWindowKeys: resolvedSelectedGapWindowKeys,
-                        targetGapWindowKey: gapWindowKey,
-                        targetSelected: !checked,
-                      });
-                      onChangeGapWindowSelections?.(nextSelectedGapWindowKeys);
-                      setRangeAnchorGapWindowKey(gapWindowKey);
                     }}
+                    onKeyDown={(event) =>
+                      handleGapWindowKeyboardToggle(event, gapWindowKey, checked)
+                    }
                     readOnly
                     type="checkbox"
                   />
