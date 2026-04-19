@@ -3801,19 +3801,37 @@
       "id": "planning-experiment-os-persist-fine-grained-line-detail-microstate-inside-provenance-artifact-deep-links",
       "direction_id": "experiment-os",
       "title": "Persist fine-grained line detail micro-state inside provenance artifact deep-link surfaces",
-      "description": "Build on the shipped line-level detail open or closed and active lens restoration by carrying the smaller transient state that still lives inside each opened line detail view, such as nested tooltip visibility, trace-step selection, nested expansion rows, or similar detail-local micro-interactions, so reopening a comparison deep link restores the exact evidence state inside the selected line detail instead of stopping at the detail shell and current lens.",
-      "status": "ready",
+      "description": "Build on the shipped line-level detail open or closed and active lens restoration by carrying the smaller transient state that still lives inside each opened line detail view, such as nested tooltip visibility, trace-step selection, nested expansion rows, or similar detail-local micro-interactions, so reopening a comparison deep link restores the exact evidence state inside the selected line detail instead of stopping at the detail shell and current lens. This task is now completed for the current `micro view` (`structure` / `signal` / `note`) selection and `note page` restoration layer; an even narrower ephemeral-interaction follow-up remains.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 37,
-      "priority_reason": "The latest main-session reply says commit 59ef4e6 finished line detail open or closed plus active lens persistence, and explicitly identifies tooltip, trace-step, and nested expansion state inside line detail as the remaining executable deep-link restoration gap. That makes this the next automatic queue head.",
+      "priority_reason": "Completed in main session commit 701f4b0, which persisted provenance line-detail `micro view` selection and `note page` into URL, history, and local selection restoration, added the line-detail micro-view switch plus note pager, verified with `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-line-transient-state-inside-provenance-artifact-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:30:00Z",
+      "updated_at": "2026-04-21T00:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison deep links progressing from restored line-level shells and lenses into the last detail-local micro-state operators use while inspecting nested provenance evidence inside a selected line."
+    },
+    {
+      "id": "planning-experiment-os-persist-smallest-ephemeral-line-detail-interactions-inside-provenance-artifact-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Persist smallest ephemeral line-detail interactions inside provenance artifact deep-link surfaces",
+      "description": "Build on the shipped line-detail `micro view` and `note page` restoration by carrying the still-more-ephemeral interaction state inside each selected line detail, such as note-local hover state, trace scrub step or cursor position, inline tooltip visibility, or similar transient evidence controls, so reopening a provenance artifact deep link restores the exact line-detail interaction instead of stopping at the correct micro-view shell.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 38,
+      "priority_reason": "The latest main-session reply says commit 701f4b0 finished persisted `micro view` and `note page` restoration, and explicitly calls out note hover, trace scrub step, and inline tooltip state as the remaining executable deep-link gap. That makes this the next automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-fine-grained-line-detail-microstate-inside-provenance-artifact-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison deep links moving from restored line-detail subview shells into the smallest transient evidence interactions operators actually use while inspecting provenance lines."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
