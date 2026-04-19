@@ -3008,6 +3008,7 @@ type ControlRoomComparisonHistoryPanelUiState = {
   expandedConflictReviewIds: Record<string, boolean>;
   expandedWorkspaceScoreDetailIds: Record<string, boolean>;
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
+  focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4808,6 +4809,11 @@ export default function App() {
   >(
     () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreDetailSources ?? {},
   );
+  const [focusedWorkspaceScoreDetailSignalKeys, setFocusedWorkspaceScoreDetailSignalKeys] = useState<
+    Record<string, string>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreDetailSignalKeys ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5226,6 +5232,7 @@ export default function App() {
         expandedConflictReviewIds: expandedHistoryConflictReviewIds,
         expandedWorkspaceScoreDetailIds,
         focusedWorkspaceScoreDetailSources,
+        focusedWorkspaceScoreDetailSignalKeys,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5243,6 +5250,7 @@ export default function App() {
     expandedHistoryConflictReviewIds,
     expandedWorkspaceScoreDetailIds,
     focusedWorkspaceScoreDetailSources,
+    focusedWorkspaceScoreDetailSignalKeys,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8184,6 +8192,7 @@ export default function App() {
             expandedHistoryConflictReviewIds,
             expandedWorkspaceScoreDetailIds,
             focusedWorkspaceScoreDetailSources,
+            focusedWorkspaceScoreDetailSignalKeys,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8231,6 +8240,24 @@ export default function App() {
                       [scoreDetailKey]: source,
                     }
               ),
+            onChangeFocusedWorkspaceScoreDetailSignalKey: (scoreDetailKey, signalKey) =>
+              setFocusedWorkspaceScoreDetailSignalKeys((current) => {
+                if (!signalKey) {
+                  if (!(scoreDetailKey in current)) {
+                    return current;
+                  }
+                  const next = { ...current };
+                  delete next[scoreDetailKey];
+                  return next;
+                }
+                if (current[scoreDetailKey] === signalKey) {
+                  return current;
+                }
+                return {
+                  ...current,
+                  [scoreDetailKey]: signalKey,
+                };
+              }),
             onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
@@ -9265,6 +9292,7 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     expandedConflictReviewIds: {},
     expandedWorkspaceScoreDetailIds: {},
     focusedWorkspaceScoreDetailSources: {},
+    focusedWorkspaceScoreDetailSignalKeys: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -9889,6 +9917,19 @@ function normalizeComparisonHistoryPanelUiState(
             }
             return accumulator;
           }, {})
+        : {},
+    focusedWorkspaceScoreDetailSignalKeys:
+      value?.focusedWorkspaceScoreDetailSignalKeys
+      && typeof value.focusedWorkspaceScoreDetailSignalKeys === "object"
+        ? Object.entries(value.focusedWorkspaceScoreDetailSignalKeys).reduce<Record<string, string>>(
+            (accumulator, [key, candidate]) => {
+              if (typeof candidate === "string" && candidate.trim()) {
+                accumulator[key] = candidate;
+              }
+              return accumulator;
+            },
+            {},
+          )
         : {},
     activeWorkspaceOverviewRowId:
       typeof value?.activeWorkspaceOverviewRowId === "string"
@@ -13091,6 +13132,7 @@ type RunSectionComparisonControls = {
   expandedHistoryConflictReviewIds: Record<string, boolean>;
   expandedWorkspaceScoreDetailIds: Record<string, boolean>;
   focusedWorkspaceScoreDetailSources: Record<string, ComparisonHistorySyncConflictFieldSource>;
+  focusedWorkspaceScoreDetailSignalKeys: Record<string, string>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13125,6 +13167,10 @@ type RunSectionComparisonControls = {
   onChangeFocusedWorkspaceScoreDetailSource: (
     scoreDetailKey: string,
     source: ComparisonHistorySyncConflictFieldSource,
+  ) => void;
+  onChangeFocusedWorkspaceScoreDetailSignalKey: (
+    scoreDetailKey: string,
+    signalKey: string | null,
   ) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
@@ -13267,6 +13313,24 @@ function RunSection({
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   ) => `${auditId}:${fieldKey}`;
+  const buildWorkspaceReviewSignalSelectionId = (
+    source: ComparisonHistorySyncConflictFieldSource,
+    signal: ComparisonHistorySyncWorkspaceSemanticSignal,
+    index: number,
+  ) => `${source}:${index}:${signal.label}:${signal.weight}`;
+  const resolveWorkspaceReviewSignalSelectionId = (
+    source: ComparisonHistorySyncConflictFieldSource,
+    signals: ComparisonHistorySyncWorkspaceSemanticSignal[],
+    persistedSignalKey?: string | null,
+  ) => {
+    const signalKeys = signals.map((signal, index) =>
+      buildWorkspaceReviewSignalSelectionId(source, signal, index),
+    );
+    if (persistedSignalKey && signalKeys.includes(persistedSignalKey)) {
+      return persistedSignalKey;
+    }
+    return signalKeys[0] ?? null;
+  };
   const activateWorkspaceReviewRow = (
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
@@ -13279,6 +13343,7 @@ function RunSection({
     auditId: string,
     fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
     preferredScoreSource?: ComparisonHistorySyncConflictFieldSource,
+    preferredSignalKey?: string | null,
   ) => {
     const scoreDetailKey = buildWorkspaceReviewRowSelectionId(auditId, fieldKey);
     comparison?.onChangeActiveWorkspaceOverviewRowId(scoreDetailKey);
@@ -13288,6 +13353,13 @@ function RunSection({
       && !comparison.focusedWorkspaceScoreDetailSources[scoreDetailKey]
     ) {
       comparison.onChangeFocusedWorkspaceScoreDetailSource(scoreDetailKey, preferredScoreSource);
+    }
+    if (
+      comparison
+      && preferredSignalKey
+      && !comparison.focusedWorkspaceScoreDetailSignalKeys[scoreDetailKey]
+    ) {
+      comparison.onChangeFocusedWorkspaceScoreDetailSignalKey(scoreDetailKey, preferredSignalKey);
     }
     if (comparison && !comparison.expandedWorkspaceScoreDetailIds[scoreDetailKey]) {
       comparison.onToggleWorkspaceScoreDetail(scoreDetailKey);
@@ -13808,6 +13880,12 @@ function RunSection({
                                                       entry.auditId,
                                                       activeWorkspaceOverviewRow.fieldKey,
                                                       activeWorkspaceOverviewRow.recommendedSource,
+                                                      resolveWorkspaceReviewSignalSelectionId(
+                                                        activeWorkspaceOverviewRow.recommendedSource,
+                                                        activeWorkspaceOverviewRow.recommendedSource === "local"
+                                                          ? activeWorkspaceOverviewRow.localSignals
+                                                          : activeWorkspaceOverviewRow.remoteSignals,
+                                                      ),
                                                     )
                                                   }
                                                   type="button"
@@ -13866,6 +13944,12 @@ function RunSection({
                                                         entry.auditId,
                                                         workspaceOverview.strongest.fieldKey,
                                                         workspaceOverview.strongest.recommendedSource,
+                                                        resolveWorkspaceReviewSignalSelectionId(
+                                                          workspaceOverview.strongest.recommendedSource,
+                                                          workspaceOverview.strongest.recommendedSource === "local"
+                                                            ? workspaceOverview.strongest.localSignals
+                                                            : workspaceOverview.strongest.remoteSignals,
+                                                        ),
                                                       )
                                                     : undefined
                                                 }
@@ -13912,6 +13996,12 @@ function RunSection({
                                                               entry.auditId,
                                                               row.fieldKey,
                                                               row.recommendedSource,
+                                                              resolveWorkspaceReviewSignalSelectionId(
+                                                                row.recommendedSource,
+                                                                row.recommendedSource === "local"
+                                                                  ? row.localSignals
+                                                                  : row.remoteSignals,
+                                                              ),
                                                             )
                                                           }
                                                           key={`overview-local:${entry.auditId}:${row.fieldKey}`}
@@ -13947,6 +14037,12 @@ function RunSection({
                                                               entry.auditId,
                                                               row.fieldKey,
                                                               row.recommendedSource,
+                                                              resolveWorkspaceReviewSignalSelectionId(
+                                                                row.recommendedSource,
+                                                                row.recommendedSource === "local"
+                                                                  ? row.localSignals
+                                                                  : row.remoteSignals,
+                                                              ),
                                                             )
                                                           }
                                                           key={`overview-remote:${entry.auditId}:${row.fieldKey}`}
@@ -14046,8 +14142,28 @@ function RunSection({
                                                     comparison.focusedWorkspaceScoreDetailSources[
                                                       scoreDetailKey
                                                     ] ?? row.recommendedSource;
+                                                  const focusedScoreDetailSignalKey =
+                                                    comparison.focusedWorkspaceScoreDetailSignalKeys[
+                                                      scoreDetailKey
+                                                    ] ?? null;
                                                   const rowActive =
                                                     comparison.activeWorkspaceOverviewRowId === scoreDetailKey;
+                                                  const resolvedLocalSignalFocusKey =
+                                                    focusedScoreDetailSource === "local"
+                                                      ? resolveWorkspaceReviewSignalSelectionId(
+                                                          "local",
+                                                          row.localSignals,
+                                                          focusedScoreDetailSignalKey,
+                                                        )
+                                                      : null;
+                                                  const resolvedRemoteSignalFocusKey =
+                                                    focusedScoreDetailSource === "remote"
+                                                      ? resolveWorkspaceReviewSignalSelectionId(
+                                                          "remote",
+                                                          row.remoteSignals,
+                                                          focusedScoreDetailSignalKey,
+                                                        )
+                                                      : null;
                                                   const focusScoreDetailSource = (
                                                     source: ComparisonHistorySyncConflictFieldSource,
                                                   ) => {
@@ -14055,6 +14171,28 @@ function RunSection({
                                                     comparison.onChangeFocusedWorkspaceScoreDetailSource(
                                                       scoreDetailKey,
                                                       source,
+                                                    );
+                                                    comparison.onChangeFocusedWorkspaceScoreDetailSignalKey(
+                                                      scoreDetailKey,
+                                                      resolveWorkspaceReviewSignalSelectionId(
+                                                        source,
+                                                        source === "local" ? row.localSignals : row.remoteSignals,
+                                                        focusedScoreDetailSignalKey,
+                                                      ),
+                                                    );
+                                                  };
+                                                  const focusScoreDetailSignal = (
+                                                    source: ComparisonHistorySyncConflictFieldSource,
+                                                    signalKey: string,
+                                                  ) => {
+                                                    activateWorkspaceReviewRow(entry.auditId, row.fieldKey);
+                                                    comparison.onChangeFocusedWorkspaceScoreDetailSource(
+                                                      scoreDetailKey,
+                                                      source,
+                                                    );
+                                                    comparison.onChangeFocusedWorkspaceScoreDetailSignalKey(
+                                                      scoreDetailKey,
+                                                      signalKey,
                                                     );
                                                   };
                                                   return (
@@ -14096,6 +14234,22 @@ function RunSection({
                                                               comparison.onChangeFocusedWorkspaceScoreDetailSource(
                                                                 scoreDetailKey,
                                                                 row.recommendedSource,
+                                                              );
+                                                            }
+                                                            if (
+                                                              !scoreDetailsExpanded
+                                                              && !comparison.focusedWorkspaceScoreDetailSignalKeys[
+                                                                scoreDetailKey
+                                                              ]
+                                                            ) {
+                                                              comparison.onChangeFocusedWorkspaceScoreDetailSignalKey(
+                                                                scoreDetailKey,
+                                                                resolveWorkspaceReviewSignalSelectionId(
+                                                                  row.recommendedSource,
+                                                                  row.recommendedSource === "local"
+                                                                    ? row.localSignals
+                                                                    : row.remoteSignals,
+                                                                ),
                                                               );
                                                             }
                                                             comparison.onToggleWorkspaceScoreDetail(scoreDetailKey);
@@ -14195,10 +14349,39 @@ function RunSection({
                                                             </div>
                                                             {row.localSignals.length ? (
                                                               <div className="comparison-history-conflict-review-score-signal-list">
-                                                                {row.localSignals.map((signal) => (
+                                                                {row.localSignals.map((signal, index) => {
+                                                                  const signalKey = buildWorkspaceReviewSignalSelectionId(
+                                                                    "local",
+                                                                    signal,
+                                                                    index,
+                                                                  );
+                                                                  return (
                                                                   <div
-                                                                    className="comparison-history-conflict-review-score-signal"
-                                                                    key={`local:${scoreDetailKey}:${signal.label}`}
+                                                                    aria-label={`Focus local latest signal ${signal.label}`}
+                                                                    aria-pressed={resolvedLocalSignalFocusKey === signalKey}
+                                                                    className={`comparison-history-conflict-review-score-signal ${
+                                                                      resolvedLocalSignalFocusKey === signalKey
+                                                                        ? "is-focused"
+                                                                        : ""
+                                                                    }`}
+                                                                    key={`local:${scoreDetailKey}:${signalKey}`}
+                                                                    onClick={(event) => {
+                                                                      event.stopPropagation();
+                                                                      focusScoreDetailSignal("local", signalKey);
+                                                                    }}
+                                                                    onFocus={() =>
+                                                                      focusScoreDetailSignal("local", signalKey)
+                                                                    }
+                                                                    onKeyDown={(event) => {
+                                                                      if (event.key !== "Enter" && event.key !== " ") {
+                                                                        return;
+                                                                      }
+                                                                      event.preventDefault();
+                                                                      event.stopPropagation();
+                                                                      focusScoreDetailSignal("local", signalKey);
+                                                                    }}
+                                                                    role="button"
+                                                                    tabIndex={0}
                                                                   >
                                                                     <span>{signal.label}</span>
                                                                     <strong
@@ -14209,7 +14392,8 @@ function RunSection({
                                                                       {formatComparisonScoreSignedValue(signal.weight)}
                                                                     </strong>
                                                                   </div>
-                                                                ))}
+                                                                  );
+                                                                })}
                                                               </div>
                                                             ) : (
                                                               <span className="comparison-history-conflict-review-score-empty">
@@ -14245,10 +14429,39 @@ function RunSection({
                                                             </div>
                                                             {row.remoteSignals.length ? (
                                                               <div className="comparison-history-conflict-review-score-signal-list">
-                                                                {row.remoteSignals.map((signal) => (
+                                                                {row.remoteSignals.map((signal, index) => {
+                                                                  const signalKey = buildWorkspaceReviewSignalSelectionId(
+                                                                    "remote",
+                                                                    signal,
+                                                                    index,
+                                                                  );
+                                                                  return (
                                                                   <div
-                                                                    className="comparison-history-conflict-review-score-signal"
-                                                                    key={`remote:${scoreDetailKey}:${signal.label}`}
+                                                                    aria-label={`Focus remote audit signal ${signal.label}`}
+                                                                    aria-pressed={resolvedRemoteSignalFocusKey === signalKey}
+                                                                    className={`comparison-history-conflict-review-score-signal ${
+                                                                      resolvedRemoteSignalFocusKey === signalKey
+                                                                        ? "is-focused"
+                                                                        : ""
+                                                                    }`}
+                                                                    key={`remote:${scoreDetailKey}:${signalKey}`}
+                                                                    onClick={(event) => {
+                                                                      event.stopPropagation();
+                                                                      focusScoreDetailSignal("remote", signalKey);
+                                                                    }}
+                                                                    onFocus={() =>
+                                                                      focusScoreDetailSignal("remote", signalKey)
+                                                                    }
+                                                                    onKeyDown={(event) => {
+                                                                      if (event.key !== "Enter" && event.key !== " ") {
+                                                                        return;
+                                                                      }
+                                                                      event.preventDefault();
+                                                                      event.stopPropagation();
+                                                                      focusScoreDetailSignal("remote", signalKey);
+                                                                    }}
+                                                                    role="button"
+                                                                    tabIndex={0}
                                                                   >
                                                                     <span>{signal.label}</span>
                                                                     <strong
@@ -14259,7 +14472,8 @@ function RunSection({
                                                                       {formatComparisonScoreSignedValue(signal.weight)}
                                                                     </strong>
                                                                   </div>
-                                                                ))}
+                                                                  );
+                                                                })}
                                                               </div>
                                                             ) : (
                                                               <span className="comparison-history-conflict-review-score-empty">

@@ -637,10 +637,26 @@ select {
   gap: 12px;
   align-items: flex-start;
   color: rgba(255, 255, 255, 0.76);
+  border-radius: 10px;
+  padding: 4px 6px;
 }
 
 .comparison-history-conflict-review-score-signal span {
   flex: 1 1 auto;
+}
+
+.comparison-history-conflict-review-score-signal[role="button"] {
+  cursor: pointer;
+}
+
+.comparison-history-conflict-review-score-signal.is-focused {
+  background: rgba(120, 180, 255, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(120, 180, 255, 0.24);
+}
+
+.comparison-history-conflict-review-score-signal.is-focused:focus-visible {
+  outline: 2px solid rgba(120, 180, 255, 0.54);
+  outline-offset: 2px;
 }
 
 .comparison-history-conflict-review-score-signal-weight {
