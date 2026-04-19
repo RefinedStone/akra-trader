@@ -96,6 +96,18 @@ type ExperimentPreset = {
   updated_at: string;
 };
 
+type PresetRevisionFilterState = {
+  action: string;
+  query: string;
+};
+
+type PresetRevisionDiff = {
+  basisLabel: string;
+  changeCount: number;
+  lines: string[];
+  summary: string;
+};
+
 type BenchmarkArtifact = {
   kind: string;
   label: string;
@@ -3034,6 +3046,11 @@ const defaultPresetForm = {
   parameters_text: "",
 };
 
+const defaultPresetRevisionFilter: PresetRevisionFilterState = {
+  action: "all",
+  query: "",
+};
+
 function buildPresetFormFromPreset(preset: ExperimentPreset) {
   return {
     name: preset.name,
@@ -3047,6 +3064,146 @@ function buildPresetFormFromPreset(preset: ExperimentPreset) {
       ? JSON.stringify(preset.parameters, null, 2)
       : "",
   };
+}
+
+function buildCurrentPresetRevisionSnapshot(preset: ExperimentPreset): ExperimentPresetRevision {
+  return {
+    revision_id: `${preset.preset_id}:current`,
+    actor: preset.lifecycle.updated_by,
+    reason: preset.lifecycle.last_action,
+    created_at: preset.updated_at,
+    action: "current",
+    source_revision_id: null,
+    name: preset.name,
+    description: preset.description,
+    strategy_id: preset.strategy_id ?? null,
+    timeframe: preset.timeframe ?? null,
+    benchmark_family: preset.benchmark_family ?? null,
+    tags: [...preset.tags],
+    parameters: { ...preset.parameters },
+  };
+}
+
+function describePresetRevisionDiff(
+  revision: ExperimentPresetRevision,
+  reference: ExperimentPresetRevision | null,
+  basisLabel: string,
+): PresetRevisionDiff {
+  if (!reference) {
+    return {
+      basisLabel,
+      changeCount: 0,
+      lines: [],
+      summary: "Initial revision in the catalog. No earlier snapshot is available for comparison.",
+    };
+  }
+
+  const lines: string[] = [];
+  if (revision.name !== reference.name) {
+    lines.push(`Name: ${reference.name || "none"} -> ${revision.name || "none"}`);
+  }
+  if (revision.description !== reference.description) {
+    lines.push(`Description: ${reference.description || "none"} -> ${revision.description || "none"}`);
+  }
+  if ((revision.strategy_id ?? null) !== (reference.strategy_id ?? null)) {
+    lines.push(`Strategy: ${reference.strategy_id ?? "any"} -> ${revision.strategy_id ?? "any"}`);
+  }
+  if ((revision.timeframe ?? null) !== (reference.timeframe ?? null)) {
+    lines.push(`Timeframe: ${reference.timeframe ?? "any"} -> ${revision.timeframe ?? "any"}`);
+  }
+  if ((revision.benchmark_family ?? null) !== (reference.benchmark_family ?? null)) {
+    lines.push(
+      `Benchmark family: ${reference.benchmark_family ?? "none"} -> ${revision.benchmark_family ?? "none"}`,
+    );
+  }
+
+  const tagsAdded = revision.tags.filter((tag) => !reference.tags.includes(tag));
+  const tagsRemoved = reference.tags.filter((tag) => !revision.tags.includes(tag));
+  if (tagsAdded.length || tagsRemoved.length) {
+    lines.push(
+      `Tags: ${tagsAdded.length ? `+${tagsAdded.join(", ")}` : "no additions"} / ${
+        tagsRemoved.length ? `-${tagsRemoved.join(", ")}` : "no removals"
+      }`,
+    );
+  }
+
+  const parameterKeys = Array.from(
+    new Set([...Object.keys(reference.parameters), ...Object.keys(revision.parameters)]),
+  ).sort();
+  parameterKeys.forEach((key) => {
+    const referenceHasKey = Object.prototype.hasOwnProperty.call(reference.parameters, key);
+    const revisionHasKey = Object.prototype.hasOwnProperty.call(revision.parameters, key);
+    if (!referenceHasKey && revisionHasKey) {
+      lines.push(`Parameter added: ${key}=${formatParameterValue(revision.parameters[key])}`);
+      return;
+    }
+    if (referenceHasKey && !revisionHasKey) {
+      lines.push(`Parameter removed: ${key} (was ${formatParameterValue(reference.parameters[key])})`);
+      return;
+    }
+    const referenceValue = JSON.stringify(reference.parameters[key]);
+    const revisionValue = JSON.stringify(revision.parameters[key]);
+    if (referenceValue !== revisionValue) {
+      lines.push(
+        `Parameter ${key}: ${formatParameterValue(reference.parameters[key])} -> ${formatParameterValue(
+          revision.parameters[key],
+        )}`,
+      );
+    }
+  });
+
+  return {
+    basisLabel,
+    changeCount: lines.length,
+    lines,
+    summary: lines.length
+      ? `${lines.length} change${lines.length === 1 ? "" : "s"} vs ${basisLabel}.`
+      : `Matches ${basisLabel}.`,
+  };
+}
+
+function matchesPresetRevisionFilter(
+  revision: ExperimentPresetRevision,
+  diff: PresetRevisionDiff,
+  filter: PresetRevisionFilterState,
+) {
+  if (filter.action !== "all" && revision.action !== filter.action) {
+    return false;
+  }
+  const query = filter.query.trim().toLowerCase();
+  if (!query) {
+    return true;
+  }
+  const searchable = [
+    revision.revision_id,
+    revision.actor,
+    revision.reason,
+    revision.action,
+    revision.name,
+    revision.description,
+    revision.strategy_id ?? "",
+    revision.timeframe ?? "",
+    revision.benchmark_family ?? "",
+    revision.tags.join(" "),
+    Object.keys(revision.parameters).join(" "),
+    diff.summary,
+    ...diff.lines,
+  ]
+    .join(" ")
+    .toLowerCase();
+  return searchable.includes(query);
+}
+
+function formatRelativeTimestampLabel(value?: string | null) {
+  if (!value) {
+    return "n/a";
+  }
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return formatTimestamp(value);
+  }
+  const relative = formatComparisonTooltipConflictSessionRelativeTime(timestamp, new Date());
+  return relative ? `${relative} · ${formatTimestamp(value)}` : formatTimestamp(value);
 }
 
 const defaultRunHistoryFilter: RunHistoryFilter = {
@@ -6258,6 +6415,22 @@ function PresetCatalogPanel({
   onToggleRevisions: (presetId: string) => void;
 }) {
   const isEditing = editingPresetId !== null;
+  const [revisionFiltersByPreset, setRevisionFiltersByPreset] = useState<
+    Record<string, PresetRevisionFilterState>
+  >({});
+  const [expandedRevisionDiffIds, setExpandedRevisionDiffIds] = useState<Record<string, boolean>>({});
+  const [pendingRestoreTarget, setPendingRestoreTarget] = useState<{
+    presetId: string;
+    revisionId: string;
+  } | null>(null);
+
+  async function confirmRevisionRestore(presetId: string, revisionId: string) {
+    await onRestoreRevision(presetId, revisionId);
+    setPendingRestoreTarget((current) =>
+      current?.presetId === presetId && current?.revisionId === revisionId ? null : current,
+    );
+  }
+
   return (
     <>
       <form className="run-form" onSubmit={onSubmit}>
@@ -6361,120 +6534,259 @@ function PresetCatalogPanel({
                 const revisions = [...preset.revisions].reverse();
                 const latestRevisionId = revisions[0]?.revision_id;
                 const revisionsExpanded = Boolean(expandedPresetRevisionIds[preset.preset_id]);
+                const revisionFilter = revisionFiltersByPreset[preset.preset_id] ?? defaultPresetRevisionFilter;
+                const visibleRevisionEntries = revisions
+                  .map((revision, index) => {
+                    const diffReference =
+                      revision.revision_id === latestRevisionId
+                        ? revisions[index + 1] ?? null
+                        : buildCurrentPresetRevisionSnapshot(preset);
+                    const diffBasisLabel =
+                      revision.revision_id === latestRevisionId
+                        ? revisions[index + 1]
+                          ? "previous snapshot"
+                          : "initial revision"
+                        : "current bundle";
+                    const diff = describePresetRevisionDiff(revision, diffReference, diffBasisLabel);
+                    return { diff, revision };
+                  })
+                  .filter(({ diff, revision }) => matchesPresetRevisionFilter(revision, diff, revisionFilter));
                 return (
                   <>
-              <div className="run-card-head">
-                <div>
-                  <strong>{preset.name}</strong>
-                  <span>{preset.preset_id}</span>
-                </div>
-                <div className={`run-status ${preset.lifecycle.stage === "archived" ? "failed" : "completed"}`}>
-                  {formatPresetLifecycleStage(preset.lifecycle.stage)}
-                </div>
-              </div>
-              <div className="run-metrics">
-                <Metric label="Strategy" value={preset.strategy_id ?? "any"} />
-                <Metric label="Timeframe" value={preset.timeframe ?? "any"} />
-                <Metric label="Params" value={formatParameterMap(preset.parameters)} />
-                <Metric label="Revisions" value={String(preset.revisions.length)} />
-                <Metric label="Updated" value={formatTimestamp(preset.updated_at)} />
-              </div>
-              <ExperimentMetadataPills
-                benchmarkFamily={preset.benchmark_family}
-                presetId={preset.preset_id}
-                tags={preset.tags}
-              />
-              <p className="run-note">
-                Lifecycle: {formatPresetLifecycleStage(preset.lifecycle.stage)} via{" "}
-                {preset.lifecycle.last_action} by {preset.lifecycle.updated_by} at{" "}
-                {formatTimestamp(preset.lifecycle.updated_at)}.
-              </p>
-              {preset.description ? <p className="run-note">{preset.description}</p> : null}
-              <div className="run-actions">
-                <button className="ghost-button" onClick={() => onEditPreset(preset)} type="button">
-                  {editingPresetId === preset.preset_id ? "Editing bundle" : "Edit bundle"}
-                </button>
-                <button
-                  className="ghost-button"
-                  onClick={() => onToggleRevisions(preset.preset_id)}
-                  type="button"
-                >
-                  {revisionsExpanded ? "Hide revisions" : `Show revisions (${preset.revisions.length})`}
-                </button>
-                {preset.lifecycle.stage !== "archived" ? (
-                  <>
-                    {preset.lifecycle.stage !== "live_candidate" ? (
+                    <div className="run-card-head">
+                      <div>
+                        <strong>{preset.name}</strong>
+                        <span>{preset.preset_id}</span>
+                      </div>
+                      <div className={`run-status ${preset.lifecycle.stage === "archived" ? "failed" : "completed"}`}>
+                        {formatPresetLifecycleStage(preset.lifecycle.stage)}
+                      </div>
+                    </div>
+                    <div className="run-metrics">
+                      <Metric label="Strategy" value={preset.strategy_id ?? "any"} />
+                      <Metric label="Timeframe" value={preset.timeframe ?? "any"} />
+                      <Metric label="Params" value={formatParameterMap(preset.parameters)} />
+                      <Metric label="Revisions" value={String(preset.revisions.length)} />
+                      <Metric label="Updated" value={formatTimestamp(preset.updated_at)} />
+                    </div>
+                    <ExperimentMetadataPills
+                      benchmarkFamily={preset.benchmark_family}
+                      presetId={preset.preset_id}
+                      tags={preset.tags}
+                    />
+                    <p className="run-note">
+                      Lifecycle: {formatPresetLifecycleStage(preset.lifecycle.stage)} via{" "}
+                      {preset.lifecycle.last_action} by {preset.lifecycle.updated_by} at{" "}
+                      {formatTimestamp(preset.lifecycle.updated_at)}.
+                    </p>
+                    {preset.description ? <p className="run-note">{preset.description}</p> : null}
+                    <div className="run-actions">
+                      <button className="ghost-button" onClick={() => onEditPreset(preset)} type="button">
+                        {editingPresetId === preset.preset_id ? "Editing bundle" : "Edit bundle"}
+                      </button>
                       <button
                         className="ghost-button"
-                        onClick={() => void onLifecycleAction(preset.preset_id, "promote")}
+                        onClick={() => onToggleRevisions(preset.preset_id)}
                         type="button"
                       >
-                        Promote
+                        {revisionsExpanded ? "Hide revisions" : `Show revisions (${preset.revisions.length})`}
                       </button>
-                    ) : null}
-                    <button
-                      className="ghost-button danger"
-                      onClick={() => void onLifecycleAction(preset.preset_id, "archive")}
-                      type="button"
-                    >
-                      Archive
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="ghost-button"
-                    onClick={() => void onLifecycleAction(preset.preset_id, "restore")}
-                    type="button"
-                  >
-                    Restore to draft
-                  </button>
-                )}
-              </div>
-              {revisionsExpanded ? (
-                <div className="run-list">
-                  {revisions.map((revision) => (
-                    <article className="run-card" key={revision.revision_id}>
-                      <div className="run-card-head">
-                        <div>
-                          <strong>{revision.revision_id}</strong>
-                          <span>{revision.action}</span>
-                        </div>
-                        <div
-                          className={`run-status ${revision.revision_id === latestRevisionId ? "completed" : "pending"}`}
-                        >
-                          {revision.revision_id === latestRevisionId ? "current bundle" : "snapshot"}
-                        </div>
-                      </div>
-                      <div className="run-metrics">
-                        <Metric label="Actor" value={revision.actor} />
-                        <Metric label="Strategy" value={revision.strategy_id ?? "any"} />
-                        <Metric label="Timeframe" value={revision.timeframe ?? "any"} />
-                        <Metric label="Params" value={formatParameterMap(revision.parameters)} />
-                      </div>
-                      <ExperimentMetadataPills
-                        benchmarkFamily={revision.benchmark_family}
-                        tags={revision.tags}
-                      />
-                      <p className="run-note">
-                        Reason: {revision.reason}. Recorded at {formatTimestamp(revision.created_at)}.
-                        {revision.source_revision_id ? ` Restored from ${revision.source_revision_id}.` : ""}
-                      </p>
-                      {revision.description ? <p className="run-note">{revision.description}</p> : null}
-                      {revision.revision_id !== latestRevisionId ? (
-                        <div className="run-actions">
+                      {preset.lifecycle.stage !== "archived" ? (
+                        <>
+                          {preset.lifecycle.stage !== "live_candidate" ? (
+                            <button
+                              className="ghost-button"
+                              onClick={() => void onLifecycleAction(preset.preset_id, "promote")}
+                              type="button"
+                            >
+                              Promote
+                            </button>
+                          ) : null}
                           <button
-                            className="ghost-button"
-                            onClick={() => void onRestoreRevision(preset.preset_id, revision.revision_id)}
+                            className="ghost-button danger"
+                            onClick={() => void onLifecycleAction(preset.preset_id, "archive")}
                             type="button"
                           >
-                            Restore bundle
+                            Archive
                           </button>
+                        </>
+                      ) : (
+                        <button
+                          className="ghost-button"
+                          onClick={() => void onLifecycleAction(preset.preset_id, "restore")}
+                          type="button"
+                        >
+                          Restore to draft
+                        </button>
+                      )}
+                    </div>
+                    {revisionsExpanded ? (
+                      <>
+                        <div className="run-form">
+                          <label>
+                            Search revisions
+                            <input
+                              placeholder="actor, reason, parameter, tag"
+                              value={revisionFilter.query}
+                              onChange={(event) =>
+                                setRevisionFiltersByPreset((current) => ({
+                                  ...current,
+                                  [preset.preset_id]: {
+                                    ...(current[preset.preset_id] ?? defaultPresetRevisionFilter),
+                                    query: event.target.value,
+                                  },
+                                }))
+                              }
+                            />
+                          </label>
+                          <label>
+                            Action
+                            <select
+                              value={revisionFilter.action}
+                              onChange={(event) =>
+                                setRevisionFiltersByPreset((current) => ({
+                                  ...current,
+                                  [preset.preset_id]: {
+                                    ...(current[preset.preset_id] ?? defaultPresetRevisionFilter),
+                                    action: event.target.value,
+                                  },
+                                }))
+                              }
+                            >
+                              <option value="all">All actions</option>
+                              <option value="created">Created</option>
+                              <option value="updated">Updated</option>
+                              <option value="restored">Restored</option>
+                              <option value="migrated">Migrated</option>
+                            </select>
+                          </label>
                         </div>
-                      ) : null}
-                    </article>
-                  ))}
-                </div>
-              ) : null}
+                        <p className="run-note">
+                          Showing {visibleRevisionEntries.length} of {revisions.length} revision
+                          {revisions.length === 1 ? "" : "s"}.
+                        </p>
+                        {visibleRevisionEntries.length ? (
+                          <div className="run-list">
+                            {visibleRevisionEntries.map(({ revision, diff }) => {
+                              const diffExpanded = Boolean(expandedRevisionDiffIds[revision.revision_id]);
+                              const confirmingRestore =
+                                pendingRestoreTarget?.presetId === preset.preset_id &&
+                                pendingRestoreTarget?.revisionId === revision.revision_id;
+                              return (
+                                <article className="run-card" key={revision.revision_id}>
+                                  <div className="run-card-head">
+                                    <div>
+                                      <strong>{revision.revision_id}</strong>
+                                      <span>{revision.action}</span>
+                                    </div>
+                                    <div
+                                      className={`run-status ${
+                                        revision.revision_id === latestRevisionId ? "completed" : "pending"
+                                      }`}
+                                    >
+                                      {revision.revision_id === latestRevisionId ? "current bundle" : "snapshot"}
+                                    </div>
+                                  </div>
+                                  <div className="run-metrics">
+                                    <Metric label="Actor" value={revision.actor} />
+                                    <Metric label="Recorded" value={formatRelativeTimestampLabel(revision.created_at)} />
+                                    <Metric label="Strategy" value={revision.strategy_id ?? "any"} />
+                                    <Metric label="Diff" value={`${diff.changeCount} change${diff.changeCount === 1 ? "" : "s"}`} />
+                                  </div>
+                                  <ExperimentMetadataPills
+                                    benchmarkFamily={revision.benchmark_family}
+                                    tags={revision.tags}
+                                  />
+                                  <p className="run-note">
+                                    Reason: {revision.reason}. {diff.summary}
+                                    {revision.source_revision_id ? ` Restored from ${revision.source_revision_id}.` : ""}
+                                  </p>
+                                  {revision.description ? <p className="run-note">{revision.description}</p> : null}
+                                  <div className="run-actions">
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() =>
+                                        setExpandedRevisionDiffIds((current) => ({
+                                          ...current,
+                                          [revision.revision_id]: !current[revision.revision_id],
+                                        }))
+                                      }
+                                      type="button"
+                                    >
+                                      {diffExpanded ? "Hide diff" : `Show diff vs ${diff.basisLabel}`}
+                                    </button>
+                                    {revision.revision_id !== latestRevisionId ? (
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() =>
+                                          setPendingRestoreTarget({
+                                            presetId: preset.preset_id,
+                                            revisionId: revision.revision_id,
+                                          })
+                                        }
+                                        type="button"
+                                      >
+                                        Restore bundle
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                  {diffExpanded ? (
+                                    <div className="comparison-dev-session-summary">
+                                      <p className="comparison-dev-session-summary-title">
+                                        Diff vs {diff.basisLabel}
+                                      </p>
+                                      {diff.lines.length ? (
+                                        <ul className="comparison-dev-session-summary-list">
+                                          {diff.lines.map((line) => (
+                                            <li
+                                              className="comparison-dev-session-summary-item"
+                                              key={`${revision.revision_id}:${line}`}
+                                            >
+                                              <div className="comparison-dev-session-summary-item-copy">
+                                                <span>{line}</span>
+                                              </div>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : (
+                                        <p className="empty-state">{diff.summary}</p>
+                                      )}
+                                    </div>
+                                  ) : null}
+                                  {confirmingRestore ? (
+                                    <div className="comparison-dev-confirm-card">
+                                      <p className="comparison-dev-feedback">
+                                        Restore {revision.revision_id} into {preset.preset_id}? This will create a new
+                                        current revision from the selected snapshot.
+                                      </p>
+                                      <p className="run-note">{diff.summary}</p>
+                                      <div className="comparison-dev-actions comparison-dev-actions-inline">
+                                        <button
+                                          className="ghost-button comparison-dev-reset"
+                                          onClick={() => void confirmRevisionRestore(preset.preset_id, revision.revision_id)}
+                                          type="button"
+                                        >
+                                          Confirm restore
+                                        </button>
+                                        <button
+                                          className="ghost-button comparison-dev-reset"
+                                          onClick={() => setPendingRestoreTarget(null)}
+                                          type="button"
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                </article>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p className="empty-state">No revisions match the current filter.</p>
+                        )}
+                      </>
+                    ) : null}
                   </>
                 );
               })()}
