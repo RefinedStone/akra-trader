@@ -23089,19 +23089,6 @@ def get_run_subresource_contract(subresource_key: str) -> RunSubresourceContract
   raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
 
 
-def serialize_run_subresource_contract_metadata() -> list[dict[str, str]]:
-  return [
-    {
-      "subresource_key": contract.subresource_key,
-      "body_key": contract.body_key,
-      "response_title": contract.response_title,
-      "route_path": contract.route_path,
-      "route_name": contract.route_name,
-    }
-    for contract in RUN_SUBRESOURCE_CONTRACTS
-  ]
-
-
 def list_run_surface_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[RunSurfaceSharedContract, ...]:
@@ -23354,33 +23341,7 @@ def serialize_run_comparison(
 
 def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> dict[str, Any]:
   return {
-    "families": [
-      {
-        **asdict(family),
-        "policy": {
-          **asdict(family.policy),
-          "applies_to": list(family.policy.applies_to),
-        },
-        "enforcement": {
-          **asdict(family.enforcement),
-          "enforcement_points": list(family.enforcement.enforcement_points),
-        },
-        "surface_rules": [
-          asdict(rule)
-          for rule in family.surface_rules
-        ],
-        "ui_surfaces": list(family.ui_surfaces),
-        "schema_sources": list(family.schema_sources),
-      }
-      for family in capabilities.families
-    ],
     "discovery": {
-      **capabilities.discovery,
-      "comparison_eligibility_group_order": list(
-        capabilities.discovery.get("comparison_eligibility_group_order", ())
-      ),
-      "family_order": list(capabilities.discovery.get("family_order", ())),
-      "run_subresource_contracts": serialize_run_subresource_contract_metadata(),
       "shared_contracts": serialize_run_surface_shared_contracts(capabilities),
     },
     "comparison_eligibility_contract": serialize_comparison_eligibility_contract(

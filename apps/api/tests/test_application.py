@@ -13809,35 +13809,14 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
 
   payload = serialize_run_surface_capabilities(RunSurfaceCapabilities())
 
-  assert payload["discovery"]["run_subresource_contracts"] == [
-    {
-      "subresource_key": "orders",
-      "body_key": "orders",
-      "response_title": "Run order list",
-      "route_path": "/runs/{run_id}/orders",
-      "route_name": "get_run_orders",
-    },
-    {
-      "subresource_key": "positions",
-      "body_key": "positions",
-      "response_title": "Run positions",
-      "route_path": "/runs/{run_id}/positions",
-      "route_name": "get_run_positions",
-    },
-    {
-      "subresource_key": "metrics",
-      "body_key": "metrics",
-      "response_title": "Run metrics",
-      "route_path": "/runs/{run_id}/metrics",
-      "route_name": "get_run_metrics",
-    },
-  ]
+  assert payload["discovery"].keys() == {"shared_contracts"}
+  assert "families" not in payload
   shared_contracts = {
     contract["contract_key"]: contract
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v9"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v10"
   assert shared_contracts["schema:run-surface-capabilities"]["related_family_keys"] == [
     "comparison_eligibility",
     "strategy_schema",
@@ -14731,7 +14710,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   )
   capabilities = app.get_run_surface_capabilities()
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v9"
+  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v10"
   assert capabilities.discovery["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",
