@@ -14838,11 +14838,138 @@ def test_compare_runs_uses_strategy_semantics_to_break_close_ranking_ties(tmp_pa
   assert imported_run.provenance.strategy.catalog_semantics.strategy_kind == "imported_module"
   assert narrative_by_run[imported_run.config.run_id].comparison_type == "native_vs_native"
   assert narrative_by_run[imported_run.config.run_id].insight_score > 0
+  assert narrative_by_run[alternate_native_run.config.run_id].insight_score > 0
   assert (
     narrative_by_run[imported_run.config.run_id].insight_score
     > narrative_by_run[alternate_native_run.config.run_id].insight_score
   )
-  assert narrative_by_run[alternate_native_run.config.run_id].insight_score == 0.0
+
+
+def test_compare_runs_uses_provenance_richness_to_rank_reference_peers(tmp_path: Path) -> None:
+  repo_root = Path(__file__).resolve().parents[3]
+  references = build_references()
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=references,
+    runs=runs,
+    freqtrade_reference=FreqtradeReferenceAdapter(repo_root, references),
+  )
+
+  baseline_run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  sparse_reference_run = app.run_backtest(
+    strategy_id="nfi_x7_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+  rich_reference_run = app.run_backtest(
+    strategy_id="nfi_next_reference",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  baseline_run.metrics.update({
+    "total_return_pct": 10.0,
+    "max_drawdown_pct": 5.0,
+    "win_rate_pct": 60.0,
+    "trade_count": 20,
+  })
+  sparse_reference_run.provenance.benchmark_artifacts = (
+    BenchmarkArtifact(
+      kind="result_snapshot_root",
+      label="Backtest results root",
+      path="/tmp/reference/sparse/backtest_results",
+      summary={
+        "strategy_name": "NostalgiaForInfinityX7",
+        "profit_total_pct": 12.0,
+        "max_drawdown_pct": 6.0,
+        "trade_count": 22,
+        "win_rate_pct": 61.0,
+      },
+      sections={
+        "benchmark_story": {
+          "headline": "Sparse reference captured a compact benchmark headline.",
+        },
+      },
+    ),
+  )
+  rich_reference_run.provenance.benchmark_artifacts = (
+    BenchmarkArtifact(
+      kind="result_snapshot_root",
+      label="Backtest results root",
+      path="/tmp/reference/rich/backtest_results",
+      summary={
+        "strategy_name": "NostalgiaForInfinityNext",
+        "profit_total_pct": 12.0,
+        "max_drawdown_pct": 6.0,
+        "trade_count": 22,
+        "win_rate_pct": 61.0,
+      },
+      sections={
+        "benchmark_story": {
+          "headline": "Rich reference captured a benchmark headline.",
+          "signal_context": "Signal exports covered 22 decisions.",
+          "pair_context": "Top pair concentration stayed below 35%.",
+        },
+        "pair_metrics": {
+          "best": {"pair": "BTC/USDT", "profit_total_pct": 14.2},
+        },
+        "zip_signal_exports": {
+          "rows": 22,
+        },
+      },
+      summary_source_path="/tmp/reference/rich/backtest_results/latest_result.json",
+    ),
+    BenchmarkArtifact(
+      kind="runtime_log_root",
+      label="Runtime logs root",
+      path="/tmp/reference/rich/logs",
+      is_directory=True,
+    ),
+  )
+
+  for run in (baseline_run, sparse_reference_run, rich_reference_run):
+    runs.save_run(run)
+
+  comparison = app.compare_runs(
+    run_ids=[
+      baseline_run.config.run_id,
+      sparse_reference_run.config.run_id,
+      rich_reference_run.config.run_id,
+    ],
+    intent="benchmark_validation",
+  )
+
+  assert [narrative.run_id for narrative in comparison.narratives] == [
+    rich_reference_run.config.run_id,
+    sparse_reference_run.config.run_id,
+  ]
+  narrative_by_run = {
+    narrative.run_id: narrative
+    for narrative in comparison.narratives
+  }
+  assert (
+    narrative_by_run[rich_reference_run.config.run_id].insight_score
+    > narrative_by_run[sparse_reference_run.config.run_id].insight_score
+  )
+  assert narrative_by_run[rich_reference_run.config.run_id].comparison_type == "native_vs_reference"
 
 
 def test_backtest_failure_still_records_requested_market_lineage(tmp_path: Path) -> None:

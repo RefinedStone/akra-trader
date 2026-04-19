@@ -211,6 +211,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_execution_bonus": 0.8,
     "semantic_source_bonus": 0.8,
     "semantic_parameter_contract_bonus": 0.4,
+    "semantic_vocabulary_unit_bonus": 0.28,
+    "provenance_richness_unit_bonus": 0.24,
     "native_reference_bonus": 8.0,
     "reference_bonus": 3.0,
     "status_bonus": 1.5,
@@ -226,6 +228,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_execution_bonus": 0.6,
     "semantic_source_bonus": 0.4,
     "semantic_parameter_contract_bonus": 0.3,
+    "semantic_vocabulary_unit_bonus": 0.18,
+    "provenance_richness_unit_bonus": 0.2,
     "native_reference_bonus": 3.0,
     "reference_bonus": 1.0,
     "status_bonus": 3.0,
@@ -241,6 +245,8 @@ COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
     "semantic_execution_bonus": 0.7,
     "semantic_source_bonus": 0.6,
     "semantic_parameter_contract_bonus": 0.5,
+    "semantic_vocabulary_unit_bonus": 0.38,
+    "provenance_richness_unit_bonus": 0.12,
     "native_reference_bonus": 1.5,
     "reference_bonus": 0.5,
     "status_bonus": 0.8,
@@ -22978,6 +22984,16 @@ def _score_comparison_narrative(
     run=run,
     weights=weights,
   )
+  score += _score_comparison_semantic_vocabulary(
+    baseline_run=baseline_run,
+    run=run,
+    weights=weights,
+  )
+  score += _score_comparison_provenance_richness(
+    baseline_run=baseline_run,
+    run=run,
+    weights=weights,
+  )
 
   if comparison_type == "native_vs_reference":
     score += weights["native_reference_bonus"]
@@ -23027,6 +23043,107 @@ def _normalized_semantic_text(value: str | None) -> str | None:
     return None
   normalized = value.strip()
   return normalized or None
+
+
+def _score_comparison_semantic_vocabulary(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  weights: dict[str, float],
+) -> float:
+  baseline_schema = _strategy_parameter_schema(baseline_run)
+  run_schema = _strategy_parameter_schema(run)
+  baseline_parameters = _strategy_parameter_values(baseline_run)
+  run_parameters = _strategy_parameter_values(run)
+
+  changed_keys = sorted(
+    key
+    for key in set(baseline_parameters) | set(run_parameters)
+    if baseline_parameters.get(key) != run_parameters.get(key)
+  )
+
+  richness_units = 0.0
+  for key in changed_keys:
+    schema_entry = run_schema.get(key)
+    if not isinstance(schema_entry, dict):
+      schema_entry = baseline_schema.get(key)
+    richness_units += _parameter_semantic_descriptor_score(schema_entry)
+
+  schema_richness_delta = max(
+    _semantic_schema_richness(run_schema) - _semantic_schema_richness(baseline_schema),
+    0.0,
+  )
+  richness_units += min(schema_richness_delta, 4.0) * 0.35
+  return min(richness_units, 8.0) * weights["semantic_vocabulary_unit_bonus"]
+
+
+def _score_comparison_provenance_richness(
+  *,
+  baseline_run: RunRecord,
+  run: RunRecord,
+  weights: dict[str, float],
+) -> float:
+  richness_delta = max(
+    _benchmark_provenance_richness(run) - _benchmark_provenance_richness(baseline_run),
+    0.0,
+  )
+  return min(richness_delta, 10.0) * weights["provenance_richness_unit_bonus"]
+
+
+def _strategy_parameter_schema(run: RunRecord) -> dict[str, Any]:
+  strategy_snapshot = run.provenance.strategy
+  if strategy_snapshot is None:
+    return {}
+  return strategy_snapshot.parameter_snapshot.schema
+
+
+def _strategy_parameter_values(run: RunRecord) -> dict[str, Any]:
+  strategy_snapshot = run.provenance.strategy
+  if strategy_snapshot is None:
+    return run.config.parameters
+  return strategy_snapshot.parameter_snapshot.resolved or run.config.parameters
+
+
+def _parameter_semantic_descriptor_score(schema_entry: object) -> float:
+  if not isinstance(schema_entry, dict):
+    return 0.0
+  score = 0.0
+  if _normalized_semantic_text(schema_entry.get("semantic_hint")) is not None:
+    score += 1.0
+  if (
+    _normalized_semantic_text(schema_entry.get("delta_higher_label")) is not None
+    or _normalized_semantic_text(schema_entry.get("delta_lower_label")) is not None
+  ):
+    score += 0.75
+  semantic_ranks = schema_entry.get("semantic_ranks")
+  if isinstance(semantic_ranks, dict) and semantic_ranks:
+    score += 0.5
+  if _normalized_semantic_text(schema_entry.get("unit")) is not None:
+    score += 0.25
+  return score
+
+
+def _semantic_schema_richness(schema: dict[str, Any]) -> float:
+  return sum(
+    _parameter_semantic_descriptor_score(schema_entry)
+    for schema_entry in schema.values()
+  )
+
+
+def _benchmark_provenance_richness(run: RunRecord) -> float:
+  score = 0.0
+  for artifact in run.provenance.benchmark_artifacts:
+    if artifact.exists:
+      score += 0.2
+    score += 0.8
+    score += min(len(artifact.summary), 6) * 0.2
+    score += min(len(artifact.sections), 8) * 0.3
+    if artifact.summary_source_path:
+      score += 0.5
+    benchmark_story = artifact.sections.get("benchmark_story")
+    if isinstance(benchmark_story, dict):
+      score += min(len(benchmark_story), 6) * 0.25
+  return score
 
 
 def _normalize_comparison_intent(intent: str | None) -> str:
