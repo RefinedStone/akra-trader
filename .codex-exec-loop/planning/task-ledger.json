@@ -3855,19 +3855,37 @@
       "id": "planning-experiment-os-extend-comparison-deep-links-to-run-list-semantic-summaries",
       "direction_id": "experiment-os",
       "title": "Extend comparison deep-link surfaces to run-list semantic summaries",
-      "description": "Carry the new comparison deep-link and reverse drill-back contract beyond comparison run cards into general run-list summary surfaces such as `RunStrategySnapshot`, so non-comparison semantic summaries can still jump into the matching comparison evidence instead of leaving operators to manually re-find the same strategy semantics.",
-      "status": "ready",
+      "description": "Carry the new comparison deep-link and reverse drill-back contract beyond comparison run cards into general run-list summary surfaces such as `RunStrategySnapshot`, so non-comparison semantic summaries can still jump into the matching comparison evidence instead of leaving operators to manually re-find the same strategy semantics. This task is now completed for `RunStrategySnapshot`; remaining run-list summary blocks continue in a dedicated follow-up task.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 2,
-      "priority_reason": "The latest main-session reply says comparison-card semantic lines now drill back correctly, and directly identifies run-list semantic summaries like `RunStrategySnapshot` as the remaining executable gap. That makes this the clearest immediate next task for automatic queue progression.",
+      "priority_reason": "Completed in main session commit 19dfb2d, which added `run_list` deep-link sources for `RunStrategySnapshot` semantic kind, execution model, parameter contract, source, and operator notes, restored `subFocusKey` selection through reload and history navigation, constrained interaction to runs actually included in the comparison, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:50:00Z",
+      "updated_at": "2026-04-20T11:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison traceability from comparison-card-local semantics into the broader run-history summary surfaces operators browse before opening a detailed comparison, tightening the experiment OS navigation contract across list and detail views."
+    },
+    {
+      "id": "planning-experiment-os-extend-run-list-deep-links-to-non-strategy-summary-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Extend run-list comparison deep links to non-strategy summary surfaces",
+      "description": "Build on the shipped `RunStrategySnapshot` drill-back contract by wiring the remaining run-list summary blocks such as reference badges or notes, runtime session summaries, and market-lineage summaries into the same `run_list` deep-link model, so operators can jump from any meaningful run-list summary surface back to the matching comparison evidence instead of only from strategy-semantic rows.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply explicitly says the remaining executable work is to extend `run_list` deep links beyond `RunStrategySnapshot` to other run-list summary blocks like reference badge or note, runtime session, and market lineage. That is a concrete immediate follow-up, so promote it to the ready queue head for automatic progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-comparison-deep-links-to-run-list-semantic-summaries"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison traceability from strategy-semantic run-list summaries into the broader non-strategy run-history summary blocks operators scan first, keeping comparison drill-back coherent across the full run list rather than one summary component."
     }
   ]
 }
