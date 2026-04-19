@@ -2870,7 +2870,13 @@ type ComparisonHistorySyncConflictFieldKey =
   | "selection.intent"
   | "selection.selectedRunIds"
   | "selection.scoreLink";
-type ComparisonHistorySyncPreferenceFieldKey = "open" | "searchQuery" | "showPinnedOnly";
+type ComparisonHistorySyncAuditFilter = "all" | "conflicts" | "preferences" | "merges";
+type ComparisonHistorySyncPreferenceFieldKey =
+  | "open"
+  | "searchQuery"
+  | "showPinnedOnly"
+  | "auditFilter"
+  | "showResolvedAuditEntries";
 
 type ComparisonHistorySyncConflictReview = {
   entryId: string;
@@ -2888,6 +2894,8 @@ type ComparisonHistorySyncPreferenceState = {
   open: boolean;
   searchQuery: string;
   showPinnedOnly: boolean;
+  auditFilter: ComparisonHistorySyncAuditFilter;
+  showResolvedAuditEntries: boolean;
 };
 
 type ComparisonHistorySyncPreferenceReview = {
@@ -2928,6 +2936,8 @@ type ControlRoomComparisonHistoryPanelUiState = {
   open: boolean;
   searchQuery: string;
   showPinnedOnly: boolean;
+  auditFilter: ComparisonHistorySyncAuditFilter;
+  showResolvedAuditEntries: boolean;
   sync: ComparisonHistoryPanelSyncState | null;
 };
 
@@ -3004,6 +3014,8 @@ const COMPARISON_HISTORY_SYNC_PREFERENCE_FIELD_DEFINITIONS: Array<{
   { fieldKey: "open", label: "Browser visibility" },
   { fieldKey: "searchQuery", label: "Search filter" },
   { fieldKey: "showPinnedOnly", label: "Pinned-only mode" },
+  { fieldKey: "auditFilter", label: "Audit list filter" },
+  { fieldKey: "showResolvedAuditEntries", label: "Resolved audit visibility" },
 ];
 
 type RunHistoryFilter = {
@@ -4653,6 +4665,12 @@ export default function App() {
   const [comparisonHistoryShowPinnedOnly, setComparisonHistoryShowPinnedOnly] = useState(
     () => initialComparisonHistoryPanelUiStateRef.current?.showPinnedOnly ?? false,
   );
+  const [comparisonHistoryAuditFilter, setComparisonHistoryAuditFilter] = useState<ComparisonHistorySyncAuditFilter>(
+    () => initialComparisonHistoryPanelUiStateRef.current?.auditFilter ?? "all",
+  );
+  const [comparisonHistoryShowResolvedAuditEntries, setComparisonHistoryShowResolvedAuditEntries] = useState(
+    () => initialComparisonHistoryPanelUiStateRef.current?.showResolvedAuditEntries ?? true,
+  );
   const [comparisonHistorySharedSyncState, setComparisonHistorySharedSyncState] =
     useState<ComparisonHistoryPanelSyncState | null>(
       () => initialComparisonHistoryPanelUiStateRef.current?.sync ?? null,
@@ -4711,12 +4729,16 @@ export default function App() {
         historyBrowserOpen: comparisonHistoryPanelOpen,
         historySearchQuery: comparisonHistorySearchQuery,
         showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
+        auditFilter: comparisonHistoryAuditFilter,
+        showResolvedAuditEntries: comparisonHistoryShowResolvedAuditEntries,
       }),
     [
       comparisonHistoryPanel,
       comparisonHistoryPanelOpen,
       comparisonHistorySearchQuery,
       comparisonHistoryShowPinnedOnly,
+      comparisonHistoryAuditFilter,
+      comparisonHistoryShowResolvedAuditEntries,
       comparisonSelection,
     ],
   );
@@ -4937,6 +4959,10 @@ export default function App() {
         remoteSearchQuery: remoteState.comparisonHistoryPanel.searchQuery,
         localShowPinnedOnly: comparisonHistoryShowPinnedOnly,
         remoteShowPinnedOnly: remoteState.comparisonHistoryPanel.showPinnedOnly,
+        localAuditFilter: comparisonHistoryAuditFilter,
+        remoteAuditFilter: remoteState.comparisonHistoryPanel.auditFilter,
+        localShowResolvedAuditEntries: comparisonHistoryShowResolvedAuditEntries,
+        remoteShowResolvedAuditEntries: remoteState.comparisonHistoryPanel.showResolvedAuditEntries,
         remoteSync: remoteSyncState,
       });
       const hasRemoteUiChange =
@@ -4969,6 +4995,8 @@ export default function App() {
     comparisonHistoryPanelOpen,
     comparisonHistorySearchQuery,
     comparisonHistoryShowPinnedOnly,
+    comparisonHistoryAuditFilter,
+    comparisonHistoryShowResolvedAuditEntries,
     comparisonSelection,
   ]);
 
@@ -5033,6 +5061,8 @@ export default function App() {
         panel: comparisonHistoryPanel,
         searchQuery: comparisonHistorySearchQuery,
         showPinnedOnly: comparisonHistoryShowPinnedOnly,
+        auditFilter: comparisonHistoryAuditFilter,
+        showResolvedAuditEntries: comparisonHistoryShowResolvedAuditEntries,
         sync: nextSharedSyncState,
       },
       expandedGapRows,
@@ -5043,6 +5073,8 @@ export default function App() {
     comparisonHistoryPanelOpen,
     comparisonHistorySearchQuery,
     comparisonHistoryShowPinnedOnly,
+    comparisonHistoryAuditFilter,
+    comparisonHistoryShowResolvedAuditEntries,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
     comparisonSelection,
@@ -5395,6 +5427,8 @@ export default function App() {
     setComparisonHistoryPanelOpen(resolvedState.open);
     setComparisonHistorySearchQuery(resolvedState.searchQuery);
     setComparisonHistoryShowPinnedOnly(resolvedState.showPinnedOnly);
+    setComparisonHistoryAuditFilter(resolvedState.auditFilter);
+    setComparisonHistoryShowResolvedAuditEntries(resolvedState.showResolvedAuditEntries);
     setComparisonHistorySharedSyncState(buildComparisonHistoryPanelSyncState(comparisonHistoryTabIdentity));
     setComparisonHistorySyncAuditTrail((current) =>
       current.map((entry) => {
@@ -7770,6 +7804,8 @@ export default function App() {
             historyBrowserOpen: comparisonHistoryPanelOpen,
             historySearchQuery: comparisonHistorySearchQuery,
             showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
+            historyAuditFilter: comparisonHistoryAuditFilter,
+            showResolvedHistoryAudits: comparisonHistoryShowResolvedAuditEntries,
             canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
             canNavigateHistoryForward:
               visibleComparisonHistoryActiveIndex >= 0
@@ -7783,6 +7819,8 @@ export default function App() {
             onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
             onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
             onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
+            onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
+            onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
             onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
@@ -8121,6 +8159,8 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     panel: defaultComparisonHistoryPanelState(),
     searchQuery: "",
     showPinnedOnly: false,
+    auditFilter: "all",
+    showResolvedAuditEntries: true,
     sync: null,
   };
 }
@@ -8474,6 +8514,8 @@ function buildComparisonHistorySyncSignature(state: {
   historyBrowserOpen: boolean;
   historySearchQuery: string;
   showPinnedHistoryOnly: boolean;
+  auditFilter: ComparisonHistorySyncAuditFilter;
+  showResolvedAuditEntries: boolean;
 }) {
   return JSON.stringify({
     comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
@@ -8481,6 +8523,8 @@ function buildComparisonHistorySyncSignature(state: {
     historyBrowserOpen: state.historyBrowserOpen,
     historySearchQuery: state.historySearchQuery.trim(),
     showPinnedHistoryOnly: state.showPinnedHistoryOnly,
+    auditFilter: state.auditFilter,
+    showResolvedAuditEntries: state.showResolvedAuditEntries,
   });
 }
 
@@ -8685,8 +8729,16 @@ function normalizeComparisonHistoryPanelUiState(
     panel: normalizeComparisonHistoryPanelState(value?.panel),
     searchQuery: typeof value?.searchQuery === "string" ? value.searchQuery : "",
     showPinnedOnly: value?.showPinnedOnly === true,
+    auditFilter: normalizeComparisonHistorySyncAuditFilter(value?.auditFilter),
+    showResolvedAuditEntries: value?.showResolvedAuditEntries !== false,
     sync: normalizeComparisonHistoryPanelSyncState(value?.sync),
   };
+}
+
+function normalizeComparisonHistorySyncAuditFilter(value: unknown): ComparisonHistorySyncAuditFilter {
+  return value === "conflicts" || value === "preferences" || value === "merges"
+    ? value
+    : "all";
 }
 
 function normalizeComparisonHistoryPanelSyncState(
@@ -8883,6 +8935,8 @@ function normalizeComparisonHistorySyncPreferenceState(
     open: candidate.open === true,
     searchQuery: typeof candidate.searchQuery === "string" ? candidate.searchQuery : "",
     showPinnedOnly: candidate.showPinnedOnly === true,
+    auditFilter: normalizeComparisonHistorySyncAuditFilter(candidate.auditFilter),
+    showResolvedAuditEntries: candidate.showResolvedAuditEntries !== false,
   };
 }
 
@@ -9282,6 +9336,10 @@ function summarizeComparisonHistorySyncPreferenceChanges(state: {
   remoteSearchQuery: string;
   localShowPinnedOnly: boolean;
   remoteShowPinnedOnly: boolean;
+  localAuditFilter: ComparisonHistorySyncAuditFilter;
+  remoteAuditFilter: ComparisonHistorySyncAuditFilter;
+  localShowResolvedAuditEntries: boolean;
+  remoteShowResolvedAuditEntries: boolean;
 }) {
   const changes: string[] = [];
   if (state.localOpen !== state.remoteOpen) {
@@ -9297,6 +9355,14 @@ function summarizeComparisonHistorySyncPreferenceChanges(state: {
   if (state.localShowPinnedOnly !== state.remoteShowPinnedOnly) {
     changes.push(state.remoteShowPinnedOnly ? "enabled pinned-only" : "disabled pinned-only");
   }
+  if (state.localAuditFilter !== state.remoteAuditFilter) {
+    changes.push(`audit filter '${state.remoteAuditFilter}'`);
+  }
+  if (state.localShowResolvedAuditEntries !== state.remoteShowResolvedAuditEntries) {
+    changes.push(
+      state.remoteShowResolvedAuditEntries ? "showing resolved audits" : "hiding resolved audits",
+    );
+  }
   return changes;
 }
 
@@ -9304,11 +9370,15 @@ function buildComparisonHistorySyncPreferenceState(state: {
   open: boolean;
   searchQuery: string;
   showPinnedOnly: boolean;
+  auditFilter: ComparisonHistorySyncAuditFilter;
+  showResolvedAuditEntries: boolean;
 }): ComparisonHistorySyncPreferenceState {
   return {
     open: state.open,
     searchQuery: state.searchQuery,
     showPinnedOnly: state.showPinnedOnly,
+    auditFilter: state.auditFilter,
+    showResolvedAuditEntries: state.showResolvedAuditEntries,
   };
 }
 
@@ -9323,6 +9393,10 @@ function formatComparisonHistorySyncPreferenceFieldValue(
       return state.searchQuery.trim() ? `Search '${state.searchQuery.trim()}'` : "No search";
     case "showPinnedOnly":
       return state.showPinnedOnly ? "Pinned only" : "All steps";
+    case "auditFilter":
+      return state.auditFilter === "all" ? "All audit events" : `${state.auditFilter} only`;
+    case "showResolvedAuditEntries":
+      return state.showResolvedAuditEntries ? "Resolved audits shown" : "Resolved audits hidden";
     default:
       return "n/a";
   }
@@ -9340,6 +9414,10 @@ function hasComparisonHistorySyncPreferenceFieldDifference(
       return localState.searchQuery !== remoteState.searchQuery;
     case "showPinnedOnly":
       return localState.showPinnedOnly !== remoteState.showPinnedOnly;
+    case "auditFilter":
+      return localState.auditFilter !== remoteState.auditFilter;
+    case "showResolvedAuditEntries":
+      return localState.showResolvedAuditEntries !== remoteState.showResolvedAuditEntries;
     default:
       return false;
   }
@@ -9366,16 +9444,24 @@ function buildComparisonHistorySyncPreferenceReview(state: {
   remoteSearchQuery: string;
   localShowPinnedOnly: boolean;
   remoteShowPinnedOnly: boolean;
+  localAuditFilter: ComparisonHistorySyncAuditFilter;
+  remoteAuditFilter: ComparisonHistorySyncAuditFilter;
+  localShowResolvedAuditEntries: boolean;
+  remoteShowResolvedAuditEntries: boolean;
 }): ComparisonHistorySyncPreferenceReview {
   const localState = buildComparisonHistorySyncPreferenceState({
     open: state.localOpen,
     searchQuery: state.localSearchQuery,
     showPinnedOnly: state.localShowPinnedOnly,
+    auditFilter: state.localAuditFilter,
+    showResolvedAuditEntries: state.localShowResolvedAuditEntries,
   });
   const remoteState = buildComparisonHistorySyncPreferenceState({
     open: state.remoteOpen,
     searchQuery: state.remoteSearchQuery,
     showPinnedOnly: state.remoteShowPinnedOnly,
+    auditFilter: state.remoteAuditFilter,
+    showResolvedAuditEntries: state.remoteShowResolvedAuditEntries,
   });
   return {
     localState,
@@ -9455,6 +9541,14 @@ function resolveComparisonHistorySyncPreferenceReview(
       review.selectedSources.showPinnedOnly === "local"
         ? review.localState.showPinnedOnly
         : review.remoteState.showPinnedOnly,
+    auditFilter:
+      review.selectedSources.auditFilter === "local"
+        ? review.localState.auditFilter
+        : review.remoteState.auditFilter,
+    showResolvedAuditEntries:
+      review.selectedSources.showResolvedAuditEntries === "local"
+        ? review.localState.showResolvedAuditEntries
+        : review.remoteState.showResolvedAuditEntries,
   };
 }
 
@@ -9467,6 +9561,10 @@ function buildComparisonHistorySyncAuditEntries(state: {
   remoteSearchQuery: string;
   localShowPinnedOnly: boolean;
   remoteShowPinnedOnly: boolean;
+  localAuditFilter: ComparisonHistorySyncAuditFilter;
+  remoteAuditFilter: ComparisonHistorySyncAuditFilter;
+  localShowResolvedAuditEntries: boolean;
+  remoteShowResolvedAuditEntries: boolean;
   remoteSync: ComparisonHistoryPanelSyncState | null;
 }): ComparisonHistorySyncAuditEntry[] {
   const sourceTabId = state.remoteSync?.tabId ?? "unknown";
@@ -9493,6 +9591,10 @@ function buildComparisonHistorySyncAuditEntries(state: {
     remoteSearchQuery: state.remoteSearchQuery,
     localShowPinnedOnly: state.localShowPinnedOnly,
     remoteShowPinnedOnly: state.remoteShowPinnedOnly,
+    localAuditFilter: state.localAuditFilter,
+    remoteAuditFilter: state.remoteAuditFilter,
+    localShowResolvedAuditEntries: state.localShowResolvedAuditEntries,
+    remoteShowResolvedAuditEntries: state.remoteShowResolvedAuditEntries,
   });
   const nextEntries: ComparisonHistorySyncAuditEntry[] = [];
   if (remoteAdditions.length) {
@@ -9539,6 +9641,10 @@ function buildComparisonHistorySyncAuditEntries(state: {
         remoteSearchQuery: state.remoteSearchQuery,
         localShowPinnedOnly: state.localShowPinnedOnly,
         remoteShowPinnedOnly: state.remoteShowPinnedOnly,
+        localAuditFilter: state.localAuditFilter,
+        remoteAuditFilter: state.remoteAuditFilter,
+        localShowResolvedAuditEntries: state.localShowResolvedAuditEntries,
+        remoteShowResolvedAuditEntries: state.remoteShowResolvedAuditEntries,
       }),
     });
   }
@@ -10824,6 +10930,8 @@ type RunSectionComparisonControls = {
   historyBrowserOpen: boolean;
   historySearchQuery: string;
   showPinnedHistoryOnly: boolean;
+  historyAuditFilter: ComparisonHistorySyncAuditFilter;
+  showResolvedHistoryAudits: boolean;
   canNavigateHistoryBackward: boolean;
   canNavigateHistoryForward: boolean;
   selectedScoreLink: ComparisonScoreLinkTarget | null;
@@ -10838,6 +10946,8 @@ type RunSectionComparisonControls = {
   onToggleHistoryBrowser: () => void;
   onChangeHistorySearchQuery: (value: string) => void;
   onChangeShowPinnedHistoryOnly: (value: boolean) => void;
+  onChangeHistoryAuditFilter: (value: ComparisonHistorySyncAuditFilter) => void;
+  onChangeShowResolvedHistoryAudits: (value: boolean) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
   onToggleHistoryEntryPinned: (entryId: string) => void;
@@ -10935,6 +11045,29 @@ function RunSection({
   const pinnedHistoryCount = comparison
     ? comparison.visibleHistoryEntries.filter((entry) => entry.pinned).length
     : 0;
+  const filteredHistorySyncAuditEntries = comparison
+    ? comparison.historySyncAuditTrail
+        .slice()
+        .reverse()
+        .filter((entry) => {
+          if (!comparison.showResolvedHistoryAudits) {
+            const resolvedAt = entry.conflictReview?.resolvedAt ?? entry.preferenceReview?.resolvedAt ?? null;
+            if (resolvedAt) {
+              return false;
+            }
+          }
+          if (comparison.historyAuditFilter === "conflicts") {
+            return entry.kind === "conflict";
+          }
+          if (comparison.historyAuditFilter === "preferences") {
+            return entry.kind === "preferences";
+          }
+          if (comparison.historyAuditFilter === "merges") {
+            return entry.kind === "merge";
+          }
+          return true;
+        })
+    : [];
   const toggleHistoryConflictReview = (auditId: string) =>
     setExpandedHistoryConflictReviewIds((current) => ({
       ...current,
@@ -11163,6 +11296,31 @@ function RunSection({
                         ? "Showing pinned only"
                         : `Pinned only (${pinnedHistoryCount})`}
                     </button>
+                    <label className="comparison-history-browser-search comparison-history-browser-audit-filter">
+                      Audit view
+                      <select
+                        onChange={(event) =>
+                          comparison.onChangeHistoryAuditFilter(
+                            event.target.value as ComparisonHistorySyncAuditFilter,
+                          )
+                        }
+                        value={comparison.historyAuditFilter}
+                      >
+                        <option value="all">All audit events</option>
+                        <option value="conflicts">Conflicts only</option>
+                        <option value="preferences">Browser preferences</option>
+                        <option value="merges">Merges only</option>
+                      </select>
+                    </label>
+                    <button
+                      className={`ghost-button ${comparison.showResolvedHistoryAudits ? "is-active" : ""}`}
+                      onClick={() =>
+                        comparison.onChangeShowResolvedHistoryAudits(!comparison.showResolvedHistoryAudits)
+                      }
+                      type="button"
+                    >
+                      {comparison.showResolvedHistoryAudits ? "Showing resolved audits" : "Hiding resolved audits"}
+                    </button>
                   </div>
                   <div className="comparison-history-browser-sync">
                     <div className="comparison-history-browser-sync-head">
@@ -11188,11 +11346,9 @@ function RunSection({
                       </p>
                     </div>
                     {comparison.historySyncAuditTrail.length ? (
+                      filteredHistorySyncAuditEntries.length ? (
                       <div className="comparison-history-browser-audit-list">
-                        {comparison.historySyncAuditTrail
-                          .slice()
-                          .reverse()
-                          .map((entry) => {
+                        {filteredHistorySyncAuditEntries.map((entry) => {
                             const conflictReview = entry.conflictReview;
                             const preferenceReview = entry.preferenceReview;
                             const conflictGroups = conflictReview
@@ -11463,8 +11619,13 @@ function RunSection({
                                 ) : null}
                               </article>
                             );
-                          })}
+                        })}
                       </div>
+                      ) : (
+                        <p className="comparison-history-browser-empty">
+                          No sync audit events match the current audit view and resolved-visibility settings.
+                        </p>
+                      )
                     ) : (
                       <p className="comparison-history-browser-empty">
                         No cross-tab merge or conflict events have been observed in this tab yet.

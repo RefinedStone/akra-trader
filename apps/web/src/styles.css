@@ -548,6 +548,15 @@ select {
   color: var(--text);
 }
 
+.comparison-history-browser-search select {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
 .comparison-history-browser-list {
   display: grid;
   gap: 10px;
