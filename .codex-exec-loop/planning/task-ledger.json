@@ -3118,16 +3118,16 @@
       "direction_id": "experiment-os",
       "title": "Give expanded gap windows stable identity beyond range-based merge keys",
       "description": "Replace the current `start/end/missing_candles`-derived gap-window merge key with a stable per-window identity model so conflict review and merged workspace state can distinguish duplicate windows that share the same range and candle count instead of collapsing them into one selection target.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply says the new gap-window merge still cannot distinguish duplicate windows with the same range and missing-candle count. This is the strongest immediate follow-up because it hardens correctness of the just-shipped per-window conflict workflow without needing any broader product decision first.",
+      "priority_reason": "Completed in main session commit 6a93ea0, which added backend-issued stable `gap_window_id` values plus model-level fallback ids, rewired web expansion and merge state to use the stable ids, preserved legacy range-based selections through id promotion, and verified the change with targeted pytest, `py_compile`, web typecheck, and diff checks before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-gap-window-level-merge-for-expanded-gap-row-conflicts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:05:00Z",
+      "updated_at": "2026-04-20T17:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os workspace conflict trust by ensuring per-window reconciliation keys map to real distinct gap records even when multiple windows share the same visible range summary."
     },
@@ -3138,14 +3138,14 @@
       "description": "Extend the normal comparison UI with a manual gap-window picker so operators can curate the visible gap-window subset even when no sync conflict is active, instead of only seeing merged subsets that originated from conflict resolution state.",
       "status": "ready",
       "base_priority": 88,
-      "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says the ordinary UI still lacks a manual gap-window picker even though conflict review can now save a selected subset. This is concrete executable follow-up work, but it sits behind stable window identity because the picker should operate on the same unambiguous per-window model.",
+      "dynamic_priority_delta": 19,
+      "priority_reason": "The latest main-session reply explicitly says the ordinary control-room UI still lacks any manual gap-window picker outside conflict review, and the prerequisite stable `gap_window_id` model has now shipped in commit 6a93ea0. This is the clearest executable next task because operators can now reuse the same unambiguous per-window identity for ordinary gap curation without needing a broader product decision first.",
       "depends_on": [
         "planning-experiment-os-give-expanded-gap-windows-stable-identity-beyond-range-based-merge-keys"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:05:00Z",
+      "updated_at": "2026-04-20T17:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace control from conflict-only gap-window reconciliation into a general operator editing affordance, so curated gap subsets remain usable during ordinary comparison review rather than only during sync repair."
     },
