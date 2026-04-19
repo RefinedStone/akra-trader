@@ -9789,29 +9789,34 @@ function ComparisonNarrativeScoreBreakdown({
 }: {
   breakdown: RunComparison["narratives"][number]["score_breakdown"];
 }) {
+  const [expanded, setExpanded] = useState(false);
   const sections: Array<{
     key: "metrics" | "semantics" | "context";
     label: string;
     total: number;
     highlights: string[];
+    components: Record<string, { score: number; [key: string]: unknown }>;
   }> = [
     {
       key: "metrics",
       label: "Metrics",
       total: breakdown.metrics.total,
       highlights: buildComparisonScoreHighlights("metrics", breakdown.metrics.components),
+      components: breakdown.metrics.components,
     },
     {
       key: "semantics",
       label: "Semantics",
       total: breakdown.semantics.total,
       highlights: buildComparisonScoreHighlights("semantics", breakdown.semantics.components),
+      components: breakdown.semantics.components,
     },
     {
       key: "context",
       label: "Context",
       total: breakdown.context.total,
       highlights: buildComparisonScoreHighlights("context", breakdown.context.components),
+      components: breakdown.context.components,
     },
   ];
 
@@ -9834,6 +9839,42 @@ function ComparisonNarrativeScoreBreakdown({
           </article>
         ))}
       </div>
+      <button
+        aria-expanded={expanded}
+        className="comparison-score-breakdown-toggle"
+        onClick={() => setExpanded((current) => !current)}
+        type="button"
+      >
+        {expanded ? "Hide score details" : "Show score details"}
+      </button>
+      {expanded ? (
+        <div className="comparison-score-detail-grid">
+          {sections.map((section) => (
+            <article className="comparison-score-detail-card" key={section.key}>
+              <div className="comparison-score-detail-card-head">
+                <span>{section.label}</span>
+                <strong>{formatComparisonScoreValue(section.total)}</strong>
+              </div>
+              <div className="comparison-score-detail-list">
+                {buildComparisonScoreDetailRows(section.key, section.components).map((row) => (
+                  <div
+                    className={`comparison-score-detail-row ${row.score > 0 ? "is-active" : ""}`}
+                    key={`${section.key}-${row.key}`}
+                  >
+                    <div className="comparison-score-detail-row-head">
+                      <span>{row.label}</span>
+                      <strong>{formatComparisonScoreValue(row.score)}</strong>
+                    </div>
+                    <p className="comparison-score-detail-row-copy">
+                      {row.details.length ? row.details.join(" / ") : "No active contribution"}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -12017,6 +12058,27 @@ function buildComparisonScoreHighlights(
     .map(([key, component]) => formatComparisonScoreHighlight(section, key, component));
 }
 
+function buildComparisonScoreDetailRows(
+  section: "metrics" | "semantics" | "context",
+  components: Record<string, { score: number; [key: string]: unknown }>,
+) {
+  return Object.entries(components)
+    .sort((left, right) => {
+      if (right[1].score !== left[1].score) {
+        return right[1].score - left[1].score;
+      }
+      return formatComparisonScoreComponentLabel(section, left[0]).localeCompare(
+        formatComparisonScoreComponentLabel(section, right[0]),
+      );
+    })
+    .map(([key, component]) => ({
+      key,
+      label: formatComparisonScoreComponentLabel(section, key),
+      score: component.score,
+      details: buildComparisonScoreComponentDetails(section, key, component),
+    }));
+}
+
 function formatComparisonScoreHighlight(
   section: "metrics" | "semantics" | "context",
   key: string,
@@ -12077,6 +12139,87 @@ function formatComparisonScoreComponentDetail(
     return component.applied ? "applied" : "inactive";
   }
   return "";
+}
+
+function buildComparisonScoreComponentDetails(
+  section: "metrics" | "semantics" | "context",
+  key: string,
+  component: { score: number; [key: string]: unknown },
+) {
+  const details: string[] = [];
+  if (section === "metrics") {
+    if (typeof component.delta === "number") {
+      details.push(`Delta ${formatComparisonScoreSignedValue(component.delta)}`);
+    }
+    if (typeof component.effective_delta === "number") {
+      details.push(`Effective ${formatComparisonScoreValue(component.effective_delta)}`);
+    }
+    if (typeof component.weight === "number") {
+      details.push(`Weight ${formatComparisonScoreValue(component.weight)}`);
+    }
+    return details;
+  }
+
+  if (section === "semantics" && key === "vocabulary") {
+    const changedKeys = Array.isArray(component.changed_keys)
+      ? component.changed_keys.map((item) => String(item))
+      : [];
+    if (changedKeys.length) {
+      details.push(`Changed keys: ${changedKeys.join(", ")}`);
+    }
+    if (typeof component.schema_richness_delta === "number") {
+      details.push(`Schema delta ${formatComparisonScoreValue(component.schema_richness_delta)}`);
+    }
+  }
+
+  if (section === "semantics" && key === "provenance_richness") {
+    if (typeof component.baseline_units === "number" && typeof component.target_units === "number") {
+      details.push(
+        `Units ${formatComparisonScoreValue(component.baseline_units)} -> ${formatComparisonScoreValue(component.target_units)}`,
+      );
+    }
+  }
+
+  if ("baseline" in component || "target" in component) {
+    const baseline = formatComparisonScoreComponentRawValue(component.baseline);
+    const target = formatComparisonScoreComponentRawValue(component.target);
+    if (baseline || target) {
+      details.push(`Baseline ${baseline || "n/a"} -> Target ${target || "n/a"}`);
+    }
+  }
+
+  if (typeof component.units === "number") {
+    details.push(`Units ${formatComparisonScoreValue(component.units)}`);
+  }
+  if (typeof component.capped_units === "number") {
+    details.push(`Capped ${formatComparisonScoreValue(component.capped_units)}`);
+  }
+  if (typeof component.weight === "number") {
+    details.push(`Weight ${formatComparisonScoreValue(component.weight)}`);
+  }
+  if (typeof component.applied === "boolean") {
+    details.push(component.applied ? "Applied" : "Inactive");
+  }
+  return details;
+}
+
+function formatComparisonScoreComponentRawValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") {
+    return "";
+  }
+  if (typeof value === "number") {
+    return formatComparisonScoreValue(value);
+  }
+  if (typeof value === "boolean") {
+    return value ? "true" : "false";
+  }
+  if (Array.isArray(value)) {
+    return value
+      .map((item): string => formatComparisonScoreComponentRawValue(item))
+      .filter(Boolean)
+      .join(", ");
+  }
+  return String(value);
 }
 
 function formatComparisonScoreSignedValue(value: number) {
