@@ -3136,18 +3136,54 @@
       "direction_id": "experiment-os",
       "title": "Add a manual gap-window picker outside conflict review",
       "description": "Extend the normal comparison UI with a manual gap-window picker so operators can curate the visible gap-window subset even when no sync conflict is active, instead of only seeing merged subsets that originated from conflict resolution state.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 19,
-      "priority_reason": "The latest main-session reply explicitly says the ordinary control-room UI still lacks any manual gap-window picker outside conflict review, and the prerequisite stable `gap_window_id` model has now shipped in commit 6a93ea0. This is the clearest executable next task because operators can now reuse the same unambiguous per-window identity for ordinary gap curation without needing a broader product decision first.",
+      "priority_reason": "Completed in main session commit 1016ecd, which extended the ordinary control-room market data quality cells with a `Pick visible gaps` checkbox picker, reused durable `expandedGapWindowSelections` so focused subsets persist across reloads, added `Focused subset` and `Show full range` states outside conflict review, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-give-expanded-gap-windows-stable-identity-beyond-range-based-merge-keys"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T17:00:00Z",
+      "updated_at": "2026-04-20T17:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os workspace control from conflict-only gap-window reconciliation into a general operator editing affordance, so curated gap subsets remain usable during ordinary comparison review rather than only during sync repair."
+    },
+    {
+      "id": "planning-experiment-os-add-drag-range-selection-for-manual-gap-window-picker",
+      "direction_id": "experiment-os",
+      "title": "Add drag or range selection to the manual gap-window picker",
+      "description": "Build on the shipped checkbox-based gap-window subset picker by letting operators select visible gap windows through drag or contiguous range gestures in the ordinary control-room UI, so curating larger gap subsets does not remain a one-checkbox-at-a-time workflow.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply explicitly says the remaining picker UX step is drag or range selection in the general UI now that commit 1016ecd shipped the manual checkbox picker outside conflict review. This is the clearest executable next task because the subset model and persistence already exist, leaving interaction efficiency as the direct follow-up.",
+      "depends_on": [
+        "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T17:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os operator control over curated gap subsets by moving the new general-purpose picker from functional checkbox editing to faster, more scalable range-oriented interaction."
+    },
+    {
+      "id": "planning-experiment-os-decide-whether-manual-gap-picker-open-state-should-restore-after-reload",
+      "direction_id": "experiment-os",
+      "title": "Decide whether manual gap-picker open state should restore after reload",
+      "description": "Decide whether the ordinary control-room gap-window picker should restore its open or closed UI state after reload, or whether only the selected subset should remain durable, so picker persistence behavior is an explicit product contract instead of an incidental local-state detail.",
+      "status": "proposed",
+      "base_priority": 84,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply notes that only the chosen subset persists today while the picker open state itself stays local and does not restore after reload. That gap is real, but it still needs a product decision about whether reopening transient panels is helpful operator continuity or unwanted UI stickiness, so keep it proposed.",
+      "depends_on": [
+        "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T17:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Captures the remaining persistence-contract question around the new manual gap picker so experiment-os workspace behavior stays intentional across reload and resume flows."
     },
     {
       "id": "planning-experiment-os-expand-workspace-conflict-audit-beyond-control-room-browser-state",
