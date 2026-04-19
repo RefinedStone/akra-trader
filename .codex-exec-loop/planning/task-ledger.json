@@ -180,6 +180,21 @@
       "direction_relation_note": "Preserves experiment-os trust in run history by making the post-split paper lane honest about legacy ambiguity instead of relying on silent misclassification."
     },
     {
+      "id": "planning-operator-trust-reconcile-program-mapping-and-queue-priority-basis",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Reconcile blueprint program mapping and queue priority basis",
+      "description": "Align the planning and documentation baseline by resolving the Program-number mismatch between blueprint docs and operator-trust guidance, then restate which document controls global execution priority versus stream-local queue order so future queue heads do not outrun the documented plan.",
+      "status": "ready",
+      "base_priority": 98,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest operator request explicitly asks to re-check directions, queue, and docs before resuming the project, and the latest main-session reply identifies two logical gaps that should be fixed first: Program 5 is mapped inconsistently between blueprint docs and operator-trust guidance, and current-state priority order does not match the queue head. This is the clearest immediately executable planning follow-up before more provider-remediation breadth work.",
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T03:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Directly satisfies the operator-trust requirement that current-state, roadmap, blueprint, and operational docs stay aligned as implementation and queue ordering change over time."
+    },
+    {
       "id": "planning-operator-trust-paper-replay-audit-and-approval-metadata",
       "direction_id": "operator-trust-and-discipline",
       "title": "Attach paper replay audit trail and approval metadata to operator actions",
@@ -1716,18 +1731,18 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Expand provider-managed remediation coverage beyond Intercom",
       "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, Help Scout, Kayako, and Intercom adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-eight providers.",
-      "status": "ready",
+      "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": 49,
-      "priority_reason": "The latest main-session reply explicitly lists expanding provider-managed remediation coverage beyond Intercom as the first remaining item after commit f24801b on 2026-04-18, so the next provider-breadth expansion becomes the new ready queue head while deeper provider-native telemetry mirroring remains the secondary follow-up.",
+      "dynamic_priority_delta": 43,
+      "priority_reason": "The latest main-session reply had listed the next provider-breadth expansion as the first implementation follow-up after commit f24801b on 2026-04-18, but the newer operator request asks to re-check directions, queue, and docs first, and that review surfaced a higher-priority planning gap around inconsistent Program mapping and global priority ordering. Provider-breadth expansion remains executable once the documentation and queue baseline is reconciled.",
       "depends_on": [
         "planning-operator-trust-expand-provider-managed-remediation-beyond-kayako"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-18T06:45:00Z",
+      "updated_at": "2026-04-19T03:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership by treating Intercom as the new waypoint and continuing breadth expansion to the next incident-management adapter."
+      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership, but now as the next implementation stream after the planning baseline is re-aligned to the documented Program mapping and priority rules."
     },
     {
       "id": "planning-guarded-live-audit-and-reconciliation-substrate",
