@@ -4216,18 +4216,36 @@
       "direction_id": "experiment-os",
       "title": "Promote run-subresource contract assembly into domain-level shared contracts",
       "description": "Now that `RunSurfaceCapabilities` internals use `shared_contracts` as the canonical source, move the remaining run-subresource route and serializer contract assembly out of the application-layer merge step and into the domain-level shared contract model so all run-surface capability families resolve from one contract source without application-specific stitching.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 25,
-      "priority_reason": "The latest main-session reply says the only remaining follow-up is scope expansion: run-subresource route and serializer contracts are still appended in the application layer even after the internal shared-contract refactor. That is a concrete executable next task and should replace the completed refactor as the new queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 6be3a71, which moved run-subresource contract metadata into domain-level `RunSurfaceCapabilities.shared_contracts`, made `list_run_surface_shared_contracts()` return the domain contracts directly, left application assembly responsible only for binding serializer/body handlers into runtime `RunSubresourceContract` instances, and verified the result with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-refactor-run-surface-capabilities-internal-model-around-shared-contracts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:35:00Z",
+      "updated_at": "2026-04-20T22:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from a shared-contract-first internal run-surface model to a fully unified domain contract source where standalone run-subresource bindings no longer rely on application-layer assembly."
+    },
+    {
+      "id": "planning-experiment-os-generalize-run-subresource-runtime-binding-beyond-application-registries",
+      "direction_id": "experiment-os",
+      "title": "Generalize run-subresource runtime binding beyond application-layer registries",
+      "description": "Now that domain `shared_contracts` owns the canonical run-subresource metadata, lift the remaining body serializer registry and FastAPI route handler factory out of application-local wiring into a reusable contract-driven runtime binding layer so new standalone run subresources can be registered from one contract path instead of parallel registry and route definitions.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 26,
+      "priority_reason": "The latest main-session reply explicitly says the remaining follow-up is further generalization of the body serializer registry and FastAPI route handler factory, which still live in the application/API layer after the domain shared-contract promotion. That is the clearest executable next task and should become the new queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-promote-run-subresource-contract-assembly-into-domain-shared-contracts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from canonical domain-level run-subresource metadata to a fully contract-driven runtime binding model where standalone serializer and route execution wiring no longer remain as application-specific registries."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
