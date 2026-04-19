@@ -3909,19 +3909,37 @@
       "id": "planning-experiment-os-extend-run-list-deep-links-to-inner-detail-surfaces",
       "direction_id": "experiment-os",
       "title": "Extend run-list comparison deep links to remaining inner detail surfaces",
-      "description": "Build on the now-complete outer summary coverage by wiring the remaining inner run-list detail surfaces such as static `Mode` or `Lane` or `Lifecycle` or `Version` tiles, order preview card rows, and any adjacent informational or action-adjacent controls into the same `run_list` deep-link contract where comparison drill-back remains meaningful, so operators can jump from the exact inner run detail they inspect back into comparison evidence instead of losing context below the top summary shell.",
-      "status": "ready",
+      "description": "Build on the now-complete outer summary coverage by wiring the remaining inner run-list detail surfaces such as static `Mode` or `Lane` or `Lifecycle` or `Version` tiles, order preview card rows, and any adjacent informational or action-adjacent controls into the same `run_list` deep-link contract where comparison drill-back remains meaningful, so operators can jump from the exact inner run detail they inspect back into comparison evidence instead of losing context below the top summary shell. This task is now completed for `Strategy snapshot`, `Runtime session`, `Order lifecycle` preview rows, `Data lineage`, and symbol-level lineage detail surfaces; weaker-comparison residual surfaces continue in a narrower boundary-setting follow-up task.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply says the outer summary pass is complete in commit 281efa3 and explicitly identifies the next unfinished executable work as the inner run-list surfaces: static tiles like `Mode` or `Lane` or `Lifecycle` or `Version`, order preview card rows, and action button areas that still do not participate in comparison deep links. That makes this the clearest next ready queue head for automatic progression.",
+      "priority_reason": "Completed in main session commit 6e3f050, which extended `run_list` comparison deep links into `Strategy snapshot`, `Runtime session`, `Order lifecycle` preview rows, `Data lineage`, and symbol-level lineage detail surfaces, added readable formatters for dynamic order and lineage keys, restored sub-focus scroll on reload and history navigation, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-run-list-deep-links-to-outer-summary-blocks"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:40:00Z",
+      "updated_at": "2026-04-20T12:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison traceability moving from top-level run summary blocks into the remaining inner run-list detail surfaces where operators inspect exact line-item context before or during comparison review."
+    },
+    {
+      "id": "planning-experiment-os-define-boundaries-for-weak-comparison-run-list-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Define comparison-eligible boundaries for weak-signal run-list surfaces",
+      "description": "Audit the residual run-list surfaces left after the inner-detail deep-link pass and only extend the `run_list` comparison contract where a surface still maps cleanly to comparison evidence, while explicitly leaving low-signal static identity tiles such as `Mode` or `Lane` or `Lifecycle` or `Version`, mutating order-action controls, and future hover-only micro-state out of the deep-link model unless a stronger comparison meaning is established.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply says commit 6e3f050 finished the meaningful inner detail rows and that the remaining surfaces are precisely the ones with weak comparison semantics: static top tiles, mutating order controls, and future hover or tooltip micro-state. The next executable queue head is to codify that boundary, selectively wire any residual evidence-bearing surfaces, and make the exclusions explicit instead of continuing blanket deep-link expansion.",
+      "depends_on": [
+        "planning-experiment-os-extend-run-list-deep-links-to-inner-detail-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison traceability disciplined by stopping the run-list deep-link contract at operator-meaningful evidence surfaces instead of letting it sprawl into static labels, mutating controls, or speculative hover-only state."
     }
   ]
 }
