@@ -117,6 +117,7 @@ class ExperimentPresetCatalogPort(Protocol):
     *,
     strategy_id: str | None = None,
     timeframe: str | None = None,
+    lifecycle_stage: str | None = None,
   ) -> list[ExperimentPreset]: ...
 
   def get_preset(self, preset_id: str) -> ExperimentPreset | None: ...

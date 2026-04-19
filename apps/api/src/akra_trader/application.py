@@ -415,6 +415,7 @@ class TradingApplication:
       *,
       strategy_id: str | None = None,
       timeframe: str | None = None,
+      lifecycle_stage: str | None = None,
     ) -> list[ExperimentPreset]:
       presets = list(reversed(tuple(self._presets.values())))
       if strategy_id is not None:
@@ -428,6 +429,12 @@ class TradingApplication:
           preset
           for preset in presets
           if preset.timeframe is None or preset.timeframe == timeframe
+        ]
+      if lifecycle_stage is not None:
+        presets = [
+          preset
+          for preset in presets
+          if preset.lifecycle.stage == lifecycle_stage
         ]
       return presets
 
@@ -700,10 +707,12 @@ class TradingApplication:
     *,
     strategy_id: str | None = None,
     timeframe: str | None = None,
+    lifecycle_stage: str | None = None,
   ) -> list[ExperimentPreset]:
     return self._presets.list_presets(
       strategy_id=_normalize_experiment_filter_value(strategy_id),
       timeframe=_normalize_experiment_filter_value(timeframe),
+      lifecycle_stage=_normalize_preset_lifecycle_stage(lifecycle_stage),
     )
 
   def create_preset(
@@ -715,6 +724,7 @@ class TradingApplication:
     strategy_id: str | None = None,
     timeframe: str | None = None,
     tags: Iterable[str] = (),
+    parameters: dict[str, Any] | None = None,
     benchmark_family: str | None = None,
   ) -> ExperimentPreset:
     normalized_name = name.strip()
@@ -734,6 +744,9 @@ class TradingApplication:
       if normalized_strategy_id not in available_strategy_ids:
         raise ValueError(f"Strategy not found for preset: {normalized_strategy_id}")
     normalized_timeframe = _normalize_experiment_filter_value(timeframe)
+    normalized_parameters = deepcopy(parameters or {})
+    if normalized_parameters and normalized_strategy_id is None:
+      raise ValueError("Preset parameters require a strategy_id.")
     current_time = self._clock()
     preset = ExperimentPreset(
       preset_id=normalized_preset_id,
@@ -743,10 +756,74 @@ class TradingApplication:
       timeframe=normalized_timeframe,
       benchmark_family=_normalize_experiment_identifier(benchmark_family),
       tags=_normalize_experiment_tags(tags),
+      parameters=normalized_parameters,
+      lifecycle=ExperimentPreset.Lifecycle(
+        stage="draft",
+        updated_at=current_time,
+        updated_by="operator",
+        last_action="created",
+        history=(
+          ExperimentPreset.LifecycleEvent(
+            action="created",
+            actor="operator",
+            reason="preset_created",
+            occurred_at=current_time,
+            from_stage=None,
+            to_stage="draft",
+          ),
+        ),
+      ),
       created_at=current_time,
       updated_at=current_time,
     )
     return self._presets.save_preset(preset)
+
+  def apply_preset_lifecycle_action(
+    self,
+    *,
+    preset_id: str,
+    action: str,
+    actor: str = "operator",
+    reason: str = "manual_preset_lifecycle_action",
+  ) -> ExperimentPreset:
+    normalized_preset_id = _normalize_experiment_identifier(preset_id)
+    if normalized_preset_id is None:
+      raise ValueError("Preset ID is required.")
+    preset = self._presets.get_preset(normalized_preset_id)
+    if preset is None:
+      raise LookupError(f"Preset not found: {normalized_preset_id}")
+    normalized_action = _normalize_preset_lifecycle_action(action)
+    if normalized_action is None:
+      raise ValueError(f"Unsupported preset lifecycle action: {action}")
+    current_stage = preset.lifecycle.stage
+    target_stage = _resolve_preset_lifecycle_target_stage(
+      current_stage=current_stage,
+      action=normalized_action,
+    )
+    current_time = self._clock()
+    updated = replace(
+      preset,
+      lifecycle=replace(
+        preset.lifecycle,
+        stage=target_stage,
+        updated_at=current_time,
+        updated_by=(actor or "operator").strip() or "operator",
+        last_action=normalized_action,
+        history=(
+          *preset.lifecycle.history,
+          ExperimentPreset.LifecycleEvent(
+            action=normalized_action,
+            actor=(actor or "operator").strip() or "operator",
+            reason=(reason or normalized_action).strip() or normalized_action,
+            occurred_at=current_time,
+            from_stage=current_stage,
+            to_stage=target_stage,
+          ),
+        ),
+      ),
+      updated_at=current_time,
+    )
+    return self._presets.save_preset(updated)
 
   def list_runs(
     self,
@@ -14714,11 +14791,15 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     preset = self._resolve_experiment_preset(
       preset_id=preset_id,
-      strategy_id=metadata.strategy_id,
+      strategy_id=strategy_id,
       timeframe=timeframe,
+    )
+    resolved_parameters = _merge_preset_parameters(preset=preset, requested_parameters=parameters)
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(
+      strategy_id=strategy_id,
+      parameters=resolved_parameters,
     )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
@@ -14734,7 +14815,7 @@ class TradingApplication:
       venue="binance",
       symbols=(symbol,),
       timeframe=timeframe,
-      parameters=parameters,
+      parameters=resolved_parameters,
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
@@ -14966,11 +15047,15 @@ class TradingApplication:
   ) -> RunRecord:
     self._ensure_guarded_live_worker_start_allowed()
     state = self._guarded_live_state.load_state()
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     preset = self._resolve_experiment_preset(
       preset_id=preset_id,
-      strategy_id=metadata.strategy_id,
+      strategy_id=strategy_id,
       timeframe=timeframe,
+    )
+    resolved_parameters = _merge_preset_parameters(preset=preset, requested_parameters=parameters)
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(
+      strategy_id=strategy_id,
+      parameters=resolved_parameters,
     )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
@@ -14986,7 +15071,7 @@ class TradingApplication:
       venue=self._guarded_live_venue,
       symbols=(symbol,),
       timeframe=timeframe,
-      parameters=parameters,
+      parameters=resolved_parameters,
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
@@ -15123,11 +15208,15 @@ class TradingApplication:
     preset_id: str | None = None,
     benchmark_family: str | None = None,
   ) -> RunRecord:
-    strategy, metadata, strategy_snapshot = self._prepare_strategy(strategy_id=strategy_id, parameters=parameters)
     preset = self._resolve_experiment_preset(
       preset_id=preset_id,
-      strategy_id=metadata.strategy_id,
+      strategy_id=strategy_id,
       timeframe=timeframe,
+    )
+    resolved_parameters = _merge_preset_parameters(preset=preset, requested_parameters=parameters)
+    strategy, metadata, strategy_snapshot = self._prepare_strategy(
+      strategy_id=strategy_id,
+      parameters=resolved_parameters,
     )
     experiment_metadata = _build_run_experiment_metadata(
       tags=tags,
@@ -15143,7 +15232,7 @@ class TradingApplication:
       venue="binance",
       symbols=(symbol,),
       timeframe=timeframe,
-      parameters=parameters,
+      parameters=resolved_parameters,
       initial_cash=initial_cash,
       fee_rate=fee_rate,
       slippage_bps=slippage_bps,
@@ -21859,6 +21948,8 @@ class TradingApplication:
     preset = self._presets.get_preset(normalized_preset_id)
     if preset is None:
       raise ValueError(f"Preset not found: {normalized_preset_id}")
+    if preset.lifecycle.stage == "archived":
+      raise ValueError(f"Preset {normalized_preset_id} is archived and cannot be launched.")
     if preset.strategy_id is not None and preset.strategy_id != strategy_id:
       raise ValueError(
         f"Preset {normalized_preset_id} is pinned to strategy {preset.strategy_id}, not {strategy_id}."
@@ -21886,6 +21977,23 @@ class TradingApplication:
         run.provenance.experiment.benchmark_family
       ),
       tags=_normalize_experiment_tags(run.provenance.experiment.tags),
+      parameters=deepcopy(run.config.parameters),
+      lifecycle=ExperimentPreset.Lifecycle(
+        stage="draft",
+        updated_at=run.started_at,
+        updated_by="system",
+        last_action="migrated",
+        history=(
+          ExperimentPreset.LifecycleEvent(
+            action="migrated",
+            actor="system",
+            reason="legacy_run_metadata_migration",
+            occurred_at=run.started_at,
+            from_stage=None,
+            to_stage="draft",
+          ),
+        ),
+      ),
       created_at=run.started_at,
       updated_at=run.started_at,
     )
@@ -22102,6 +22210,58 @@ def _normalize_experiment_tags(tags: Iterable[str] | None) -> tuple[str, ...]:
   return tuple(normalized)
 
 
+def _normalize_preset_lifecycle_stage(stage: str | None) -> str | None:
+  candidate = _normalize_experiment_filter_value(stage)
+  if candidate is None:
+    return None
+  normalized = candidate.lower().replace(" ", "_")
+  if normalized not in {"draft", "benchmark_candidate", "sandbox_candidate", "live_candidate", "archived"}:
+    return None
+  return normalized
+
+
+def _normalize_preset_lifecycle_action(action: str | None) -> str | None:
+  candidate = _normalize_experiment_filter_value(action)
+  if candidate is None:
+    return None
+  normalized = candidate.lower().replace(" ", "_")
+  if normalized not in {"promote", "archive", "restore"}:
+    return None
+  return normalized
+
+
+def _resolve_preset_lifecycle_target_stage(*, current_stage: str, action: str) -> str:
+  normalized_stage = _normalize_preset_lifecycle_stage(current_stage)
+  if normalized_stage is None:
+    raise ValueError(f"Unsupported preset lifecycle stage: {current_stage}")
+  if action == "archive":
+    if normalized_stage == "archived":
+      raise ValueError("Preset is already archived.")
+    return "archived"
+  if action == "restore":
+    if normalized_stage != "archived":
+      raise ValueError("Only archived presets can be restored.")
+    return "draft"
+  promotion_order = ("draft", "benchmark_candidate", "sandbox_candidate", "live_candidate")
+  if normalized_stage == "archived":
+    raise ValueError("Archived presets must be restored before promotion.")
+  if normalized_stage == promotion_order[-1]:
+    raise ValueError("Preset is already at the live_candidate stage.")
+  current_index = promotion_order.index(normalized_stage)
+  return promotion_order[current_index + 1]
+
+
+def _merge_preset_parameters(
+  *,
+  preset: ExperimentPreset | None,
+  requested_parameters: dict[str, Any] | None,
+) -> dict[str, Any]:
+  merged = deepcopy(preset.parameters) if preset is not None else {}
+  for key, value in deepcopy(requested_parameters or {}).items():
+    merged[key] = value
+  return merged
+
+
 def _build_run_experiment_metadata(
   *,
   tags: Iterable[str] = (),
@@ -22150,6 +22310,10 @@ def serialize_run(run: RunRecord) -> dict:
 def serialize_preset(preset: ExperimentPreset) -> dict:
   payload = asdict(preset)
   payload["tags"] = list(preset.tags)
+  payload["lifecycle"]["history"] = [
+    asdict(event)
+    for event in preset.lifecycle.history
+  ]
   payload["created_at"] = preset.created_at.isoformat()
   payload["updated_at"] = preset.updated_at.isoformat()
   return payload

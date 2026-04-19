@@ -252,6 +252,7 @@ class InMemoryExperimentPresetCatalog(ExperimentPresetCatalogPort):
     *,
     strategy_id: str | None = None,
     timeframe: str | None = None,
+    lifecycle_stage: str | None = None,
   ) -> list[ExperimentPreset]:
     presets = list(reversed(self._presets.values()))
     if strategy_id is not None:
@@ -265,6 +266,12 @@ class InMemoryExperimentPresetCatalog(ExperimentPresetCatalogPort):
         preset
         for preset in presets
         if preset.timeframe is None or preset.timeframe == timeframe
+      ]
+    if lifecycle_stage is not None:
+      presets = [
+        preset
+        for preset in presets
+        if preset.lifecycle.stage == lifecycle_stage
       ]
     return presets
 

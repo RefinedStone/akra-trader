@@ -15,6 +15,7 @@ from akra_trader.adapters.guarded_live import SqlAlchemyGuardedLiveStateReposito
 from akra_trader.adapters.in_memory import LocalStrategyCatalog
 from akra_trader.adapters.in_memory import SeededMarketDataAdapter
 from akra_trader.adapters.references import load_reference_catalog
+from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
@@ -78,6 +79,10 @@ def build_references():
 
 def build_runs_repository(tmp_path: Path) -> SqlAlchemyRunRepository:
   return SqlAlchemyRunRepository(f"sqlite:///{tmp_path / 'runs.sqlite3'}")
+
+
+def build_preset_catalog(tmp_path: Path) -> SqlAlchemyExperimentPresetCatalog:
+  return SqlAlchemyExperimentPresetCatalog(f"sqlite:///{tmp_path / 'runs.sqlite3'}")
 
 
 class MutableClock:
@@ -13854,10 +13859,12 @@ def test_list_runs_can_filter_by_strategy_metadata(tmp_path: Path) -> None:
 
 def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(tmp_path: Path) -> None:
   runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
   app = TradingApplication(
     market_data=SeededMarketDataAdapter(),
     strategies=LocalStrategyCatalog(),
     references=build_references(),
+    presets=presets,
     runs=runs,
   )
   app.create_preset(
@@ -13866,6 +13873,7 @@ def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(t
     strategy_id="ma_cross_v1",
     timeframe="5m",
     benchmark_family="native_validation",
+    parameters={"short_window": 5, "long_window": 13},
   )
   app.create_preset(
     name="Tuned 5m",
@@ -13922,6 +13930,128 @@ def test_run_experiment_metadata_is_durable_queryable_and_preserved_for_reruns(t
   rerun = app.rerun_backtest_from_boundary(rerun_boundary_id=baseline.provenance.rerun_boundary_id)
 
   assert rerun.provenance.experiment == baseline.provenance.experiment
+
+
+def test_preset_parameter_bundle_applies_and_request_parameters_override(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=presets,
+    runs=runs,
+  )
+  app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    parameters={"short_window": 5, "long_window": 13},
+  )
+
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={"long_window": 21},
+    preset_id="core_5m",
+  )
+
+  assert run.config.parameters == {"short_window": 5, "long_window": 21}
+  assert run.provenance.strategy is not None
+  assert run.provenance.strategy.parameter_snapshot.requested == {"short_window": 5, "long_window": 21}
+  assert run.provenance.strategy.parameter_snapshot.resolved == {"short_window": 5, "long_window": 21}
+
+
+def test_preset_lifecycle_actions_are_durable(tmp_path: Path) -> None:
+  presets = build_preset_catalog(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=presets,
+    runs=build_runs_repository(tmp_path),
+  )
+  created = app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+    parameters={"short_window": 5, "long_window": 13},
+  )
+
+  assert created.lifecycle.stage == "draft"
+
+  promoted = app.apply_preset_lifecycle_action(
+    preset_id="core_5m",
+    action="promote",
+    actor="operator",
+    reason="benchmark_candidate_ready",
+  )
+  archived = app.apply_preset_lifecycle_action(
+    preset_id="core_5m",
+    action="archive",
+    actor="operator",
+    reason="superseded_by_v2",
+  )
+  restored = app.apply_preset_lifecycle_action(
+    preset_id="core_5m",
+    action="restore",
+    actor="operator",
+    reason="reopening_research_path",
+  )
+  reloaded = build_preset_catalog(tmp_path).get_preset("core_5m")
+
+  assert promoted.lifecycle.stage == "benchmark_candidate"
+  assert archived.lifecycle.stage == "archived"
+  assert restored.lifecycle.stage == "draft"
+  assert reloaded is not None
+  assert reloaded.parameters == {"short_window": 5, "long_window": 13}
+  assert reloaded.lifecycle.stage == "draft"
+  assert [event.action for event in reloaded.lifecycle.history] == [
+    "created",
+    "promote",
+    "archive",
+    "restore",
+  ]
+
+
+def test_archived_preset_cannot_launch_run(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=build_preset_catalog(tmp_path),
+    runs=build_runs_repository(tmp_path),
+  )
+  app.create_preset(
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+  )
+  app.apply_preset_lifecycle_action(
+    preset_id="core_5m",
+    action="archive",
+    actor="operator",
+    reason="superseded",
+  )
+
+  with pytest.raises(ValueError, match="archived and cannot be launched"):
+    app.run_backtest(
+      strategy_id="ma_cross_v1",
+      symbol="BTC/USDT",
+      timeframe="5m",
+      initial_cash=10_000,
+      fee_rate=0.001,
+      slippage_bps=3,
+      parameters={},
+      preset_id="core_5m",
+    )
 
 
 def test_run_backtest_requires_cataloged_preset(tmp_path: Path) -> None:

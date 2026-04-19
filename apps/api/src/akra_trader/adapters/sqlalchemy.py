@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from pathlib import Path
@@ -55,6 +57,7 @@ experiment_presets = Table(
   Column("preset_id", String, primary_key=True),
   Column("strategy_id", String, nullable=True, index=True),
   Column("timeframe", String, nullable=True, index=True),
+  Column("lifecycle_stage", String, nullable=False, index=True, server_default="draft"),
   Column("updated_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
@@ -247,12 +250,14 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
     metadata.create_all(self._engine)
     self._ensure_schema()
     self._backfill_legacy_presets()
+    self._upgrade_existing_presets()
 
   def list_presets(
     self,
     *,
     strategy_id: str | None = None,
     timeframe: str | None = None,
+    lifecycle_stage: str | None = None,
   ) -> list[ExperimentPreset]:
     statement = select(experiment_presets.c.payload).order_by(
       experiment_presets.c.updated_at.desc(),
@@ -262,6 +267,8 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
       statement = statement.where(experiment_presets.c.strategy_id == strategy_id)
     if timeframe is not None:
       statement = statement.where(experiment_presets.c.timeframe == timeframe)
+    if lifecycle_stage is not None:
+      statement = statement.where(experiment_presets.c.lifecycle_stage == lifecycle_stage)
     with self._engine.connect() as connection:
       rows = connection.execute(statement).mappings().all()
     return [self._adapter.validate_python(row["payload"]) for row in rows]
@@ -281,6 +288,7 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
       "preset_id": preset.preset_id,
       "strategy_id": preset.strategy_id,
       "timeframe": preset.timeframe,
+      "lifecycle_stage": preset.lifecycle.stage,
       "updated_at": preset.updated_at.isoformat(),
       "payload": payload,
     }
@@ -300,9 +308,18 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
 
   def _ensure_schema(self) -> None:
     with self._engine.begin() as connection:
+      existing_columns = {
+        column["name"]
+        for column in inspect(self._engine).get_columns("experiment_presets")
+      }
+      if "lifecycle_stage" not in existing_columns:
+        connection.exec_driver_sql(
+          "ALTER TABLE experiment_presets ADD COLUMN lifecycle_stage TEXT NOT NULL DEFAULT 'draft'"
+        )
       for index_name, column_name in (
         ("ix_experiment_presets_strategy_id", "strategy_id"),
         ("ix_experiment_presets_timeframe", "timeframe"),
+        ("ix_experiment_presets_lifecycle_stage", "lifecycle_stage"),
         ("ix_experiment_presets_updated_at", "updated_at"),
       ):
         connection.exec_driver_sql(
@@ -345,6 +362,23 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
             for tag in experiment_payload.get("tags", ())
             if isinstance(tag, str) and tag
           ),
+          parameters={},
+          lifecycle=ExperimentPreset.Lifecycle(
+            stage="draft",
+            updated_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
+            updated_by="system",
+            last_action="migrated",
+            history=(
+              ExperimentPreset.LifecycleEvent(
+                action="migrated",
+                actor="system",
+                reason="legacy_run_metadata_migration",
+                occurred_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
+                from_stage=None,
+                to_stage="draft",
+              ),
+            ),
+          ),
           created_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
           updated_at=_coerce_datetime(payload.get("started_at")) or datetime.now(UTC),
         )
@@ -353,11 +387,62 @@ class SqlAlchemyExperimentPresetCatalog(ExperimentPresetCatalogPort):
             preset_id=preset.preset_id,
             strategy_id=preset.strategy_id,
             timeframe=preset.timeframe,
+            lifecycle_stage=preset.lifecycle.stage,
             updated_at=preset.updated_at.isoformat(),
             payload=self._adapter.dump_python(preset, mode="json"),
           )
         )
         existing_ids.add(preset_id)
+
+  def _upgrade_existing_presets(self) -> None:
+    with self._engine.begin() as connection:
+      rows = connection.execute(
+        select(
+          experiment_presets.c.preset_id,
+          experiment_presets.c.payload,
+          experiment_presets.c.updated_at,
+        )
+      ).mappings().all()
+      for row in rows:
+        payload = row["payload"] or {}
+        if "parameters" in payload and "lifecycle" in payload:
+          continue
+        preset = self._adapter.validate_python(payload)
+        updated_at = _coerce_datetime(payload.get("updated_at")) or _coerce_datetime(row["updated_at"]) or datetime.now(UTC)
+        created_at = _coerce_datetime(payload.get("created_at")) or updated_at
+        upgraded = replace(
+          preset,
+          parameters=deepcopy(payload.get("parameters", preset.parameters)),
+          lifecycle=ExperimentPreset.Lifecycle(
+            stage="draft",
+            updated_at=updated_at,
+            updated_by="system",
+            last_action="migrated",
+            history=(
+              ExperimentPreset.LifecycleEvent(
+                action="migrated",
+                actor="system",
+                reason="preset_catalog_schema_upgrade",
+                occurred_at=updated_at,
+                from_stage=None,
+                to_stage="draft",
+              ),
+            ),
+          ),
+          created_at=created_at,
+          updated_at=updated_at,
+        )
+        connection.execute(
+          update(experiment_presets)
+          .where(experiment_presets.c.preset_id == row["preset_id"])
+          .values(
+            strategy_id=upgraded.strategy_id,
+            timeframe=upgraded.timeframe,
+            lifecycle_stage=upgraded.lifecycle.stage,
+            updated_at=upgraded.updated_at.isoformat(),
+            payload=self._adapter.dump_python(upgraded, mode="json"),
+          )
+        )
 
 
 def _coerce_datetime(value: str | None) -> datetime | None:

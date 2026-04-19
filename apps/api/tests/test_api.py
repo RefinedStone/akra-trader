@@ -59,6 +59,7 @@ def create_preset(
   timeframe: str | None = None,
   benchmark_family: str | None = None,
   tags: list[str] | None = None,
+  parameters: dict[str, object] | None = None,
 ) -> dict:
   response = client.post(
     "/api/presets",
@@ -69,6 +70,7 @@ def create_preset(
       "timeframe": timeframe,
       "benchmark_family": benchmark_family,
       "tags": tags or [],
+      "parameters": parameters or {},
     },
   )
   assert response.status_code == 200
@@ -174,12 +176,15 @@ def test_presets_endpoint_persists_catalog_entries_across_restart(tmp_path: Path
     timeframe="5m",
     benchmark_family="native_validation",
     tags=["baseline"],
+    parameters={"short_window": 5, "long_window": 13},
   )
 
   assert created["preset_id"] == "core_5m"
   assert created["strategy_id"] == "ma_cross_v1"
   assert created["benchmark_family"] == "native_validation"
   assert created["tags"] == ["baseline"]
+  assert created["parameters"] == {"short_window": 5, "long_window": 13}
+  assert created["lifecycle"]["stage"] == "draft"
 
   restarted_client = build_client(database_path)
   response = restarted_client.get("/api/presets")
@@ -187,6 +192,36 @@ def test_presets_endpoint_persists_catalog_entries_across_restart(tmp_path: Path
   assert response.status_code == 200
   payload = response.json()
   assert any(item["preset_id"] == "core_5m" for item in payload)
+
+
+def test_preset_lifecycle_action_endpoint_updates_stage(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(
+    client,
+    name="Core 5m",
+    preset_id="core_5m",
+    strategy_id="ma_cross_v1",
+    timeframe="5m",
+  )
+
+  promoted = client.post(
+    "/api/presets/core_5m/lifecycle",
+    json={"action": "promote", "actor": "operator", "reason": "benchmark_candidate_ready"},
+  )
+  archived = client.post(
+    "/api/presets/core_5m/lifecycle",
+    json={"action": "archive", "actor": "operator", "reason": "superseded"},
+  )
+
+  assert promoted.status_code == 200
+  assert promoted.json()["lifecycle"]["stage"] == "benchmark_candidate"
+  assert archived.status_code == 200
+  assert archived.json()["lifecycle"]["stage"] == "archived"
+  assert [event["action"] for event in archived.json()["lifecycle"]["history"]] == [
+    "created",
+    "promote",
+    "archive",
+  ]
 
 
 def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
@@ -198,6 +233,7 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
     strategy_id="ma_cross_v1",
     timeframe="5m",
     benchmark_family="native_validation",
+    parameters={"short_window": 5, "long_window": 13},
   )
   response = client.post(
     "/api/runs/backtests",
@@ -220,10 +256,13 @@ def test_backtest_endpoint_returns_run_payload(tmp_path: Path) -> None:
   assert payload["config"]["strategy_id"] == "ma_cross_v1"
   assert payload["provenance"]["strategy"]["strategy_id"] == "ma_cross_v1"
   assert payload["provenance"]["strategy"]["lifecycle"]["stage"] == "active"
-  assert payload["provenance"]["strategy"]["parameter_snapshot"]["requested"] == {}
+  assert payload["provenance"]["strategy"]["parameter_snapshot"]["requested"] == {
+    "short_window": 5,
+    "long_window": 13,
+  }
   assert payload["provenance"]["strategy"]["parameter_snapshot"]["resolved"] == {
-    "short_window": 8,
-    "long_window": 21,
+    "short_window": 5,
+    "long_window": 13,
   }
   assert payload["provenance"]["strategy"]["warmup"]["required_bars"] == 21
   assert payload["provenance"]["strategy"]["warmup"]["timeframes"] == ["5m"]

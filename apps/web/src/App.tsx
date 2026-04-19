@@ -60,6 +60,21 @@ type ExperimentPreset = {
   timeframe?: string | null;
   benchmark_family?: string | null;
   tags: string[];
+  parameters: Record<string, unknown>;
+  lifecycle: {
+    stage: string;
+    updated_at: string;
+    updated_by: string;
+    last_action: string;
+    history: {
+      action: string;
+      actor: string;
+      reason: string;
+      occurred_at: string;
+      from_stage?: string | null;
+      to_stage: string;
+    }[];
+  };
   created_at: string;
   updated_at: string;
 };
@@ -2999,6 +3014,7 @@ const defaultPresetForm = {
   timeframe: "5m",
   benchmark_family: "",
   tags_text: "",
+  parameters_text: "",
 };
 
 const defaultRunHistoryFilter: RunHistoryFilter = {
@@ -3026,6 +3042,22 @@ function parseExperimentTags(value: string) {
         .filter(Boolean),
     ),
   );
+}
+
+function parseJsonObjectInput(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return {};
+  }
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Parameter bundle must be a JSON object.");
+  }
+  return parsed as Record<string, unknown>;
+}
+
+function formatPresetLifecycleStage(stage: string) {
+  return stage.replaceAll("_", " ");
 }
 
 function buildRunSubmissionPayload(form: typeof defaultRunForm, extras: Record<string, unknown> = {}) {
@@ -3056,6 +3088,7 @@ function normalizeRunFormPreset(
   const matchingPreset = presets.find((preset) => preset.preset_id === current.preset_id);
   if (
     matchingPreset &&
+    matchingPreset.lifecycle.stage !== "archived" &&
     (!matchingPreset.strategy_id || matchingPreset.strategy_id === current.strategy_id) &&
     (!matchingPreset.timeframe || matchingPreset.timeframe === current.timeframe)
   ) {
@@ -3355,6 +3388,7 @@ export default function App() {
     event.preventDefault();
     setStatusText("Saving experiment preset...");
     try {
+      const parameters = parseJsonObjectInput(presetForm.parameters_text);
       await fetchJson<ExperimentPreset>("/presets", {
         method: "POST",
         body: JSON.stringify({
@@ -3365,6 +3399,7 @@ export default function App() {
           timeframe: presetForm.timeframe.trim() || null,
           benchmark_family: presetForm.benchmark_family.trim() || null,
           tags: parseExperimentTags(presetForm.tags_text),
+          parameters,
         }),
       });
       setPresetForm((current) => ({
@@ -3375,6 +3410,23 @@ export default function App() {
       await loadAll();
     } catch (error) {
       setStatusText(`Preset save failed: ${(error as Error).message}`);
+    }
+  }
+
+  async function applyPresetLifecycleAction(presetId: string, action: "promote" | "archive" | "restore") {
+    setStatusText(`Applying preset lifecycle action ${action} to ${presetId}...`);
+    try {
+      await fetchJson<ExperimentPreset>(`/presets/${encodeURIComponent(presetId)}/lifecycle`, {
+        method: "POST",
+        body: JSON.stringify({
+          action,
+          actor: "operator",
+          reason: `preset_${action}`,
+        }),
+      });
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Preset lifecycle action failed: ${(error as Error).message}`);
     }
   }
 
@@ -3820,6 +3872,7 @@ export default function App() {
             presets={presets}
             setForm={setPresetForm}
             strategies={strategies}
+            onLifecycleAction={applyPresetLifecycleAction}
             onSubmit={handlePresetSubmit}
           />
         </section>
@@ -6058,12 +6111,14 @@ function PresetCatalogPanel({
   presets,
   setForm,
   strategies,
+  onLifecycleAction,
   onSubmit,
 }: {
   form: typeof defaultPresetForm;
   presets: ExperimentPreset[];
   setForm: (updater: (value: typeof defaultPresetForm) => typeof defaultPresetForm) => void;
   strategies: Strategy[];
+  onLifecycleAction: (presetId: string, action: "promote" | "archive" | "restore") => Promise<void> | void;
   onSubmit: (event: FormEvent) => Promise<void> | void;
 }) {
   return (
@@ -6133,6 +6188,17 @@ function PresetCatalogPanel({
             onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))}
           />
         </label>
+        <label>
+          Parameters JSON
+          <textarea
+            placeholder='{"short_window": 5, "long_window": 13}'
+            rows={4}
+            value={form.parameters_text}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, parameters_text: event.target.value }))
+            }
+          />
+        </label>
         <button type="submit">Save preset</button>
       </form>
 
@@ -6145,11 +6211,14 @@ function PresetCatalogPanel({
                   <strong>{preset.name}</strong>
                   <span>{preset.preset_id}</span>
                 </div>
-                <div className="run-status completed">catalog</div>
+                <div className={`run-status ${preset.lifecycle.stage === "archived" ? "failed" : "completed"}`}>
+                  {formatPresetLifecycleStage(preset.lifecycle.stage)}
+                </div>
               </div>
               <div className="run-metrics">
                 <Metric label="Strategy" value={preset.strategy_id ?? "any"} />
                 <Metric label="Timeframe" value={preset.timeframe ?? "any"} />
+                <Metric label="Params" value={formatParameterMap(preset.parameters)} />
                 <Metric label="Updated" value={formatTimestamp(preset.updated_at)} />
               </div>
               <ExperimentMetadataPills
@@ -6157,7 +6226,42 @@ function PresetCatalogPanel({
                 presetId={preset.preset_id}
                 tags={preset.tags}
               />
+              <p className="run-note">
+                Lifecycle: {formatPresetLifecycleStage(preset.lifecycle.stage)} via{" "}
+                {preset.lifecycle.last_action} by {preset.lifecycle.updated_by} at{" "}
+                {formatTimestamp(preset.lifecycle.updated_at)}.
+              </p>
               {preset.description ? <p className="run-note">{preset.description}</p> : null}
+              <div className="run-actions">
+                {preset.lifecycle.stage !== "archived" ? (
+                  <>
+                    {preset.lifecycle.stage !== "live_candidate" ? (
+                      <button
+                        className="ghost-button"
+                        onClick={() => void onLifecycleAction(preset.preset_id, "promote")}
+                        type="button"
+                      >
+                        Promote
+                      </button>
+                    ) : null}
+                    <button
+                      className="ghost-button danger"
+                      onClick={() => void onLifecycleAction(preset.preset_id, "archive")}
+                      type="button"
+                    >
+                      Archive
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    className="ghost-button"
+                    onClick={() => void onLifecycleAction(preset.preset_id, "restore")}
+                    type="button"
+                  >
+                    Restore to draft
+                  </button>
+                )}
+              </div>
             </article>
           ))}
         </div>
@@ -6183,6 +6287,7 @@ function RunForm({
 }) {
   const availablePresets = presets.filter(
     (preset) =>
+      preset.lifecycle.stage !== "archived" &&
       (!preset.strategy_id || preset.strategy_id === form.strategy_id) &&
       (!preset.timeframe || preset.timeframe === form.timeframe),
   );
@@ -6274,6 +6379,12 @@ function RunForm({
           onChange={(event) => setForm((current) => ({ ...current, tags_text: event.target.value }))}
         />
       </label>
+      {selectedPreset ? (
+        <div className="run-note">
+          Preset stage: {formatPresetLifecycleStage(selectedPreset.lifecycle.stage)}. Parameters:{" "}
+          {formatParameterMap(selectedPreset.parameters)}.
+        </div>
+      ) : null}
       <button type="submit">Submit</button>
     </form>
   );

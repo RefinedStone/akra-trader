@@ -329,6 +329,23 @@ class BenchmarkArtifact:
 
 @dataclass(frozen=True)
 class ExperimentPreset:
+  @dataclass(frozen=True)
+  class LifecycleEvent:
+    action: str
+    actor: str
+    reason: str
+    occurred_at: datetime
+    from_stage: str | None = None
+    to_stage: str = "draft"
+
+  @dataclass(frozen=True)
+  class Lifecycle:
+    stage: str = "draft"
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_by: str = "operator"
+    last_action: str = "created"
+    history: tuple["ExperimentPreset.LifecycleEvent", ...] = ()
+
   preset_id: str
   name: str
   description: str = ""
@@ -336,6 +353,10 @@ class ExperimentPreset:
   timeframe: str | None = None
   benchmark_family: str | None = None
   tags: tuple[str, ...] = ()
+  parameters: dict[str, Any] = field(default_factory=dict)
+  lifecycle: "ExperimentPreset.Lifecycle" = field(
+    default_factory=lambda: ExperimentPreset.Lifecycle()
+  )
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

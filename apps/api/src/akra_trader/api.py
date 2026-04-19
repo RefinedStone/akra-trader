@@ -34,7 +34,14 @@ class ExperimentPresetRequest(BaseModel):
   strategy_id: str | None = None
   timeframe: str | None = None
   tags: list[str] = Field(default_factory=list)
+  parameters: dict[str, Any] = Field(default_factory=dict)
   benchmark_family: str | None = None
+
+
+class ExperimentPresetLifecycleActionRequest(BaseModel):
+  action: str
+  actor: str = "operator"
+  reason: str = "manual_preset_lifecycle_action"
 
 
 class BacktestRequest(BaseModel):
@@ -138,11 +145,16 @@ def create_router(container: Container) -> APIRouter:
   def list_presets(
     strategy_id: str | None = None,
     timeframe: str | None = None,
+    lifecycle_stage: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
     return [
       serialize_preset(preset)
-      for preset in app.list_presets(strategy_id=strategy_id, timeframe=timeframe)
+      for preset in app.list_presets(
+        strategy_id=strategy_id,
+        timeframe=timeframe,
+        lifecycle_stage=lifecycle_stage,
+      )
     ]
 
   @router.post("/presets")
@@ -158,10 +170,30 @@ def create_router(container: Container) -> APIRouter:
         strategy_id=request.strategy_id,
         timeframe=request.timeframe,
         tags=request.tags,
+        parameters=request.parameters,
         benchmark_family=request.benchmark_family,
       )
     except ValueError as exc:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return serialize_preset(preset)
+
+  @router.post("/presets/{preset_id}/lifecycle")
+  def apply_preset_lifecycle_action(
+    preset_id: str,
+    request: ExperimentPresetLifecycleActionRequest,
+    app: TradingApplication = Depends(get_app),
+  ) -> dict[str, Any]:
+    try:
+      preset = app.apply_preset_lifecycle_action(
+        preset_id=preset_id,
+        action=request.action,
+        actor=request.actor,
+        reason=request.reason,
+      )
+    except ValueError as exc:
+      raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except LookupError as exc:
+      raise HTTPException(status_code=404, detail=str(exc)) from exc
     return serialize_preset(preset)
 
   @router.post("/strategies/register")
