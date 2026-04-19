@@ -3891,19 +3891,37 @@
       "id": "planning-experiment-os-extend-run-list-deep-links-to-outer-summary-blocks",
       "direction_id": "experiment-os",
       "title": "Extend run-list comparison deep links to remaining outer summary blocks",
-      "description": "Carry the now-shipped `run_list` deep-link contract beyond strategy, provenance, runtime-session, and data-lineage summaries into the remaining outer run-list summary blocks such as order lifecycle and any adjacent summary sections, so operators can enter comparison evidence directly from the broader top-level run summary layout instead of stopping at the currently wired blocks.",
-      "status": "ready",
+      "description": "Carry the now-shipped `run_list` deep-link contract beyond strategy, provenance, runtime-session, and data-lineage summaries into the remaining outer run-list summary blocks such as order lifecycle and any adjacent summary sections, so operators can enter comparison evidence directly from the broader top-level run summary layout instead of stopping at the currently wired blocks. This task is now completed for status, return/drawdown/win-rate/trades metric tiles, experiment metadata pills, reference notes, and the order lifecycle summary; narrower inner-detail surfaces continue in a follow-up task.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply explicitly says the remaining executable work is the outer run-list summary surface, with order lifecycle called out as an example of a summary block that still is not connected to comparison selection. That is a concrete immediate follow-up, so promote it to the ready queue head for automatic progression.",
+      "priority_reason": "Completed in main session commit 281efa3, which extended `run_list` comparison deep links across the remaining outer summary blocks including status, metric tiles, experiment metadata pills, reference notes, and order lifecycle summary surfaces, preserved `subFocusKey` restoration with reload and history scroll return, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-run-list-deep-links-to-non-strategy-summary-surfaces"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:25:00Z",
+      "updated_at": "2026-04-20T11:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison traceability moving outward from inner run-list detail summaries into the remaining top-level run summary blocks operators scan before opening detailed comparison views."
+    },
+    {
+      "id": "planning-experiment-os-extend-run-list-deep-links-to-inner-detail-surfaces",
+      "direction_id": "experiment-os",
+      "title": "Extend run-list comparison deep links to remaining inner detail surfaces",
+      "description": "Build on the now-complete outer summary coverage by wiring the remaining inner run-list detail surfaces such as static `Mode` or `Lane` or `Lifecycle` or `Version` tiles, order preview card rows, and any adjacent informational or action-adjacent controls into the same `run_list` deep-link contract where comparison drill-back remains meaningful, so operators can jump from the exact inner run detail they inspect back into comparison evidence instead of losing context below the top summary shell.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply says the outer summary pass is complete in commit 281efa3 and explicitly identifies the next unfinished executable work as the inner run-list surfaces: static tiles like `Mode` or `Lane` or `Lifecycle` or `Version`, order preview card rows, and action button areas that still do not participate in comparison deep links. That makes this the clearest next ready queue head for automatic progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-run-list-deep-links-to-outer-summary-blocks"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison traceability moving from top-level run summary blocks into the remaining inner run-list detail surfaces where operators inspect exact line-item context before or during comparison review."
     }
   ]
 }
