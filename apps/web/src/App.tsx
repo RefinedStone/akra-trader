@@ -2830,6 +2830,10 @@ type TouchGapWindowHoldProgressState = {
   anchorGapWindowKey: string;
   targetSelected: boolean;
 };
+type TouchGapWindowActivationFeedbackState = {
+  activationId: number;
+  anchorGapWindowKey: string;
+};
 
 type ControlRoomUiStateV1 = {
   version: 1;
@@ -8253,9 +8257,13 @@ function BackfillQualityStatus({
   const [dragSelectionState, setDragSelectionState] = useState<GapWindowDragSelectionState | null>(null);
   const [touchSweepHoldProgressState, setTouchSweepHoldProgressState] =
     useState<TouchGapWindowHoldProgressState | null>(null);
+  const [touchSweepActivationFeedbackState, setTouchSweepActivationFeedbackState] =
+    useState<TouchGapWindowActivationFeedbackState | null>(null);
   const gapWindowPickerListRef = useRef<HTMLDivElement | null>(null);
   const pendingTouchSweepStateRef = useRef<PendingTouchGapWindowSweepState | null>(null);
   const touchSweepHoldTimeoutRef = useRef<number | null>(null);
+  const touchSweepActivationFeedbackTimeoutRef = useRef<number | null>(null);
+  const touchSweepActivationFeedbackIdRef = useRef(0);
   const orderedGapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
     buildGapWindowKey(gapWindow),
   );
@@ -8263,6 +8271,12 @@ function BackfillQualityStatus({
     if (touchSweepHoldTimeoutRef.current !== null) {
       window.clearTimeout(touchSweepHoldTimeoutRef.current);
       touchSweepHoldTimeoutRef.current = null;
+    }
+  };
+  const clearTouchSweepActivationFeedbackTimeout = () => {
+    if (touchSweepActivationFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(touchSweepActivationFeedbackTimeoutRef.current);
+      touchSweepActivationFeedbackTimeoutRef.current = null;
     }
   };
   useEffect(() => {
@@ -8304,6 +8318,8 @@ function BackfillQualityStatus({
     clearTouchSweepHoldTimeout();
     pendingTouchSweepStateRef.current = null;
     setTouchSweepHoldProgressState(null);
+    clearTouchSweepActivationFeedbackTimeout();
+    setTouchSweepActivationFeedbackState(null);
   }, [gapWindowPickerOpen]);
   useEffect(() => {
     if (!dragSelectionState) {
@@ -8322,6 +8338,7 @@ function BackfillQualityStatus({
   }, [dragSelectionState]);
   useEffect(() => () => {
     clearTouchSweepHoldTimeout();
+    clearTouchSweepActivationFeedbackTimeout();
   }, []);
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
@@ -8359,6 +8376,28 @@ function BackfillQualityStatus({
   const touchSweepHoldProgressStyle = {
     "--gap-window-touch-hold-duration": `${TOUCH_GAP_WINDOW_SWEEP_HOLD_MS}ms`,
   } as CSSProperties;
+  const triggerTouchSweepActivationFeedback = (anchorGapWindowKey: string) => {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try {
+        navigator.vibrate?.(18);
+      } catch {
+        // Ignore unsupported or blocked vibration calls.
+      }
+    }
+    const nextActivationId = touchSweepActivationFeedbackIdRef.current + 1;
+    touchSweepActivationFeedbackIdRef.current = nextActivationId;
+    clearTouchSweepActivationFeedbackTimeout();
+    setTouchSweepActivationFeedbackState({
+      activationId: nextActivationId,
+      anchorGapWindowKey,
+    });
+    touchSweepActivationFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setTouchSweepActivationFeedbackState((current) =>
+        current?.activationId === nextActivationId ? null : current,
+      );
+      touchSweepActivationFeedbackTimeoutRef.current = null;
+    }, 320);
+  };
   const applyGapWindowSelectionChange = ({
     anchorGapWindowKey,
     selectedGapWindowKeys,
@@ -8445,6 +8484,7 @@ function BackfillQualityStatus({
           return;
         }
         setTouchSweepHoldProgressState(null);
+        triggerTouchSweepActivationFeedback(pendingTouchSweepState.anchorGapWindowKey);
         setRangeAnchorGapWindowKey(pendingTouchSweepState.anchorGapWindowKey);
         updateActiveGapWindowSweepTarget({
           anchorGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
@@ -8643,7 +8683,11 @@ function BackfillQualityStatus({
         </div>
       ) : null}
       {gapWindowPickerOpen && canPickGapWindows ? (
-        <div className={`gap-window-picker ${dragSelectionState ? "is-sweeping" : ""}`}>
+        <div
+          className={`gap-window-picker ${dragSelectionState ? "is-sweeping" : ""} ${
+            touchSweepActivationFeedbackState ? "has-touch-feedback" : ""
+          }`}
+        >
           <div className="gap-window-picker-head">
             <span className="gap-window-picker-title">Visible gap windows</span>
             <span className="gap-window-picker-summary">
@@ -8684,6 +8728,10 @@ function BackfillQualityStatus({
                     rangeAnchorGapWindowKey === gapWindowKey ? "is-anchor" : ""
                   } ${
                     dragSelectionState?.latestGapWindowKey === gapWindowKey ? "is-sweep-target" : ""
+                  } ${
+                    touchSweepActivationFeedbackState?.anchorGapWindowKey === gapWindowKey
+                      ? "has-touch-feedback"
+                      : ""
                   }`}
                   data-gap-window-key={gapWindowKey}
                   key={gapWindowKey}

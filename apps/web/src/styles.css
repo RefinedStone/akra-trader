@@ -792,6 +792,10 @@ select {
   border-color: rgba(255, 196, 92, 0.28);
 }
 
+.gap-window-picker.has-touch-feedback {
+  animation: gap-window-touch-feedback 320ms ease-out;
+}
+
 .gap-window-picker-head,
 .gap-window-picker-option {
   display: flex;
@@ -869,6 +873,10 @@ select {
   background: rgba(255, 196, 92, 0.08);
 }
 
+.gap-window-picker-option.has-touch-feedback {
+  animation: gap-window-touch-feedback 320ms ease-out;
+}
+
 .gap-window-picker-option input {
   margin: 2px 0 0;
 }
@@ -899,6 +907,23 @@ select {
 
   to {
     transform: scaleX(1);
+  }
+}
+
+@keyframes gap-window-touch-feedback {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 196, 92, 0.32);
+    transform: scale(1);
+  }
+
+  40% {
+    box-shadow: 0 0 0 7px rgba(255, 196, 92, 0.12);
+    transform: scale(1.01);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 196, 92, 0);
+    transform: scale(1);
   }
 }
 
