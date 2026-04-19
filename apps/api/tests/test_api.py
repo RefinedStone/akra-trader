@@ -3543,11 +3543,17 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert [run["lane"] for run in payload["runs"]] == ["native", "reference"]
   assert payload["runs"][0]["experiment"]["preset_id"] == "core_5m"
   assert payload["runs"][0]["experiment"]["tags"] == ["baseline"]
+  assert payload["runs"][0]["catalog_semantics"]["strategy_kind"] == "standard"
   assert payload["runs"][0]["dataset_identity"].startswith("dataset-v1:")
   assert payload["runs"][1]["experiment"]["preset_id"] == "nfi_baseline"
   assert payload["runs"][1]["experiment"]["benchmark_family"] == "reference:nostalgia-for-infinity"
   assert payload["runs"][1]["reference_id"] == "nostalgia-for-infinity"
   assert payload["runs"][1]["integration_mode"] == "external_runtime"
+  assert payload["runs"][1]["catalog_semantics"]["strategy_kind"] == "reference_delegate"
+  assert payload["runs"][1]["catalog_semantics"]["source_descriptor"] == (
+    "nostalgia-for-infinity:NostalgiaForInfinityX7"
+  )
+  assert payload["runs"][1]["catalog_semantics"]["operator_notes"]
   assert payload["runs"][1]["reference"]["title"] == "NostalgiaForInfinity"
   assert payload["runs"][1]["artifact_paths"]
   assert len(payload["narratives"]) == 1

@@ -325,6 +325,13 @@ type RunComparison = {
     strategy_id: string;
     strategy_name?: string | null;
     strategy_version: string;
+    catalog_semantics: {
+      strategy_kind: string;
+      execution_model: string;
+      parameter_contract: string;
+      source_descriptor?: string | null;
+      operator_notes: string[];
+    };
     symbols: string[];
     timeframe: string;
     started_at: string;
@@ -8443,6 +8450,7 @@ function RunSection({
                   externalCommand={run.provenance.external_command}
                   reference={run.provenance.reference}
                   referenceVersion={run.provenance.reference_version}
+                  strategySemantics={run.provenance.strategy?.catalog_semantics}
                   workingDirectory={run.provenance.working_directory}
                 />
               ) : null}
@@ -9489,6 +9497,9 @@ function RunComparisonPanel({
             <div className="strategy-badges">
               <span className="meta-pill">{run.lane}</span>
               <span className="meta-pill subtle">{run.strategy_version}</span>
+              {run.catalog_semantics.strategy_kind ? (
+                <span className="meta-pill subtle">{run.catalog_semantics.strategy_kind}</span>
+              ) : null}
               {run.reference_id ? (
                 <span className="meta-pill subtle">{run.reference_id}</span>
               ) : null}
@@ -9496,6 +9507,19 @@ function RunComparisonPanel({
             <p className="run-note">
               {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
             </p>
+            {run.catalog_semantics.execution_model ? (
+              <p className="run-note">Execution model: {run.catalog_semantics.execution_model}</p>
+            ) : null}
+            {run.catalog_semantics.parameter_contract ? (
+              <p className="run-note">
+                Parameter contract: {run.catalog_semantics.parameter_contract}
+              </p>
+            ) : null}
+            {run.catalog_semantics.operator_notes.length ? (
+              <p className="run-note">
+                Operator notes: {run.catalog_semantics.operator_notes.join(" | ")}
+              </p>
+            ) : null}
             <ExperimentMetadataPills
               benchmarkFamily={run.experiment.benchmark_family}
               datasetIdentity={run.dataset_identity}
@@ -9513,6 +9537,7 @@ function RunComparisonPanel({
                 externalCommand={run.external_command}
                 reference={run.reference}
                 referenceVersion={run.reference_version}
+                strategySemantics={run.catalog_semantics}
                 workingDirectory={run.working_directory}
               />
             ) : null}
@@ -11482,6 +11507,7 @@ function ReferenceRunProvenanceSummary({
   externalCommand,
   reference,
   referenceVersion,
+  strategySemantics,
   workingDirectory,
 }: {
   artifactPaths: string[];
@@ -11489,6 +11515,13 @@ function ReferenceRunProvenanceSummary({
   externalCommand: string[];
   reference: ReferenceSource;
   referenceVersion?: string | null;
+  strategySemantics?: {
+    strategy_kind: string;
+    execution_model: string;
+    parameter_contract: string;
+    source_descriptor?: string | null;
+    operator_notes: string[];
+  } | null;
   workingDirectory?: string | null;
 }) {
   return (
@@ -11506,6 +11539,21 @@ function ReferenceRunProvenanceSummary({
       <div className="reference-provenance-copy">
         <p>ID: {reference.reference_id}</p>
         {reference.homepage ? <p>Homepage: {reference.homepage}</p> : null}
+        {strategySemantics?.strategy_kind ? (
+          <p>Semantic kind: {strategySemantics.strategy_kind}</p>
+        ) : null}
+        {strategySemantics?.execution_model ? (
+          <p>Execution model: {strategySemantics.execution_model}</p>
+        ) : null}
+        {strategySemantics?.parameter_contract ? (
+          <p>Parameter contract: {strategySemantics.parameter_contract}</p>
+        ) : null}
+        {strategySemantics?.source_descriptor ? (
+          <p>Semantic source: {strategySemantics.source_descriptor}</p>
+        ) : null}
+        {strategySemantics?.operator_notes?.length ? (
+          <p>Operator notes: {strategySemantics.operator_notes.join(" | ")}</p>
+        ) : null}
         {workingDirectory ? <p>Working dir: {workingDirectory}</p> : null}
         {externalCommand.length ? <p>Command: {externalCommand.join(" ")}</p> : null}
         {benchmarkArtifacts.length ? (

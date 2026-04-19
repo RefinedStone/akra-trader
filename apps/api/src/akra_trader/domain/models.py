@@ -447,6 +447,7 @@ class RunComparisonRun:
   symbols: tuple[str, ...]
   timeframe: str
   started_at: datetime
+  catalog_semantics: StrategyCatalogSemantics = field(default_factory=StrategyCatalogSemantics)
   ended_at: datetime | None = None
   reference_id: str | None = None
   reference_version: str | None = None

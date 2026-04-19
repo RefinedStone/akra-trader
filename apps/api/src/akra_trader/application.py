@@ -22660,6 +22660,10 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
       "external_command": list(run.external_command),
       "artifact_paths": list(run.artifact_paths),
       "benchmark_artifacts": [asdict(artifact) for artifact in run.benchmark_artifacts],
+      "catalog_semantics": {
+        **run_payload["catalog_semantics"],
+        "operator_notes": list(run.catalog_semantics.operator_notes),
+      },
       "notes": list(run.notes),
     }
     for run_payload, run in zip(payload["runs"], comparison.runs, strict=True)
@@ -22687,6 +22691,11 @@ def _serialize_comparison_run(run: RunRecord) -> RunComparisonRun:
     strategy_id=run.config.strategy_id,
     strategy_name=run.provenance.strategy.name if run.provenance.strategy is not None else None,
     strategy_version=run.config.strategy_version,
+    catalog_semantics=deepcopy(
+      run.provenance.strategy.catalog_semantics
+      if run.provenance.strategy is not None
+      else StrategyCatalogSemantics()
+    ),
     symbols=run.config.symbols,
     timeframe=run.config.timeframe,
     started_at=run.started_at,

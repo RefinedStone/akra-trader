@@ -14478,9 +14478,16 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.intent == "benchmark_validation"
   assert comparison.baseline_run_id == native_run.config.run_id
   assert [run.lane for run in comparison.runs] == ["native", "reference"]
+  assert comparison.runs[0].catalog_semantics.strategy_kind == "standard"
+  assert comparison.runs[0].catalog_semantics.execution_model == ""
   assert comparison.runs[1].reference_id == "nostalgia-for-infinity"
   assert comparison.runs[1].reference is not None
   assert comparison.runs[1].reference.integration_mode == "external_runtime"
+  assert comparison.runs[1].catalog_semantics.strategy_kind == "reference_delegate"
+  assert comparison.runs[1].catalog_semantics.source_descriptor == (
+    "nostalgia-for-infinity:NostalgiaForInfinityX7"
+  )
+  assert comparison.runs[1].catalog_semantics.operator_notes
   assert comparison.runs[1].artifact_paths
   assert comparison.runs[1].benchmark_artifacts
   assert all(isinstance(artifact.summary, dict) for artifact in comparison.runs[1].benchmark_artifacts)
