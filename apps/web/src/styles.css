@@ -336,6 +336,110 @@ select {
   line-height: 1.45;
 }
 
+.comparison-history-browser {
+  flex-basis: 100%;
+  padding: 14px 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(120, 180, 255, 0.16);
+  background: rgba(6, 12, 22, 0.92);
+  display: grid;
+  gap: 14px;
+}
+
+.comparison-history-browser-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.comparison-history-browser-title,
+.comparison-history-browser-copy,
+.comparison-history-browser-entry-meta,
+.comparison-history-browser-entry-summary,
+.comparison-history-browser-empty {
+  margin: 0;
+}
+
+.comparison-history-browser-title {
+  color: var(--text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-history-browser-copy,
+.comparison-history-browser-empty,
+.comparison-history-browser-entry-summary {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.comparison-history-browser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comparison-history-browser-list {
+  display: grid;
+  gap: 10px;
+}
+
+.comparison-history-browser-entry {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(10, 18, 32, 0.88);
+  color: inherit;
+  text-align: left;
+  display: grid;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.comparison-history-browser-entry.is-active {
+  border-color: rgba(120, 180, 255, 0.35);
+  background: rgba(14, 26, 44, 0.94);
+}
+
+.comparison-history-browser-entry-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.comparison-history-browser-entry-order {
+  color: var(--muted);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-history-browser-entry-label {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.comparison-history-browser-entry-badge {
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(120, 180, 255, 0.18);
+  color: var(--text);
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.comparison-history-browser-entry-meta {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 .comparison-intent-field {
   display: grid;
   gap: 6px;
@@ -2258,6 +2362,14 @@ select {
 
   .comparison-history-step {
     flex-basis: 100%;
+  }
+
+  .comparison-history-browser-head {
+    flex-direction: column;
+  }
+
+  .comparison-history-browser-actions {
+    width: 100%;
   }
 
   .shell {
