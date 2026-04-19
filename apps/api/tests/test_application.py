@@ -98,18 +98,18 @@ def without_surface_rule(
 ) -> RunSurfaceCapabilities:
   return replace(
     capabilities,
-    families=tuple(
+    shared_contracts=tuple(
       replace(
-        family,
+        contract,
         surface_rules=tuple(
           rule
-          for rule in family.surface_rules
+          for rule in contract.surface_rules
           if rule.surface_key != surface_key
         ),
       )
-      if family.family_key == family_key
-      else family
-      for family in capabilities.families
+      if contract.contract_key == f"family:{family_key}" and contract.contract_kind == "capability_family"
+      else contract
+      for contract in capabilities.shared_contracts
     ),
   )
 
@@ -14709,24 +14709,32 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     for bullet in comparison.narratives[0].bullets
   )
   capabilities = app.get_run_surface_capabilities()
+  shared_contracts = {
+    contract.contract_key: contract
+    for contract in capabilities.shared_contracts
+  }
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert capabilities.discovery["schema_version"] == "run-surface-capabilities.v10"
-  assert capabilities.discovery["family_order"] == (
+  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v10"
+  assert shared_contracts["schema:run-surface-capabilities"].schema_detail["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",
     "provenance_semantics",
     "execution_controls",
   )
-  assert capabilities.families[0].family_key == "comparison_eligibility"
-  assert "Run-list metric tiles" in capabilities.families[0].ui_surfaces
-  assert capabilities.families[0].policy.policy_key == "comparison_surface_allowlist"
-  assert capabilities.families[0].enforcement.level == "hard_gate"
-  assert capabilities.families[0].surface_rules[0].rule_key == "run_list_metric_tile_gate"
-  assert capabilities.families[0].surface_rules[0].surface_key == "run_list_metric_tiles"
-  assert capabilities.families[1].family_key == "strategy_schema"
-  assert capabilities.families[1].policy.policy_mode == "schema_contract"
-  assert capabilities.families[1].enforcement.level == "advisory"
-  assert capabilities.families[1].surface_rules[1].surface_key == "preset_parameter_editor"
+  assert shared_contracts["family:comparison_eligibility"].contract_kind == "capability_family"
+  assert "Run-list metric tiles" in shared_contracts["family:comparison_eligibility"].ui_surfaces
+  assert shared_contracts["family:comparison_eligibility"].policy is not None
+  assert shared_contracts["family:comparison_eligibility"].policy.policy_key == "comparison_surface_allowlist"
+  assert shared_contracts["family:comparison_eligibility"].enforcement is not None
+  assert shared_contracts["family:comparison_eligibility"].enforcement.level == "hard_gate"
+  assert shared_contracts["family:comparison_eligibility"].surface_rules[0].rule_key == "run_list_metric_tile_gate"
+  assert shared_contracts["family:comparison_eligibility"].surface_rules[0].surface_key == "run_list_metric_tiles"
+  assert shared_contracts["family:strategy_schema"].contract_kind == "capability_family"
+  assert shared_contracts["family:strategy_schema"].policy is not None
+  assert shared_contracts["family:strategy_schema"].policy.policy_mode == "schema_contract"
+  assert shared_contracts["family:strategy_schema"].enforcement is not None
+  assert shared_contracts["family:strategy_schema"].enforcement.level == "advisory"
+  assert shared_contracts["family:strategy_schema"].surface_rules[1].surface_key == "preset_parameter_editor"
   assert capabilities.comparison_eligibility_contract.surfaces["return"].eligibility == "eligible"
   assert capabilities.comparison_eligibility_contract.surfaces["compare_toggle"].group == (
     "operational_workflow"

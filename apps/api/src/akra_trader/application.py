@@ -3,7 +3,6 @@ from __future__ import annotations
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
-from dataclasses import field
 from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
@@ -167,6 +166,7 @@ from akra_trader.domain.models import RunExperimentMetadata
 from akra_trader.domain.models import RunMode
 from akra_trader.domain.models import RunProvenance
 from akra_trader.domain.models import RunRecord
+from akra_trader.domain.models import RunSurfaceSharedContract
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyLifecycle
 from akra_trader.domain.models import StrategyCatalogSemantics
@@ -22657,10 +22657,11 @@ def serialize_preset_revision(revision: ExperimentPreset.Revision) -> dict[str, 
 def _get_run_surface_capability_family(
   capabilities: RunSurfaceCapabilities,
   family_key: str,
-) -> RunSurfaceCapabilities.Family | None:
-  for family in capabilities.families:
-    if family.family_key == family_key:
-      return family
+) -> RunSurfaceSharedContract | None:
+  contract_key = f"family:{family_key}"
+  for contract in capabilities.shared_contracts:
+    if contract.contract_kind == "capability_family" and contract.contract_key == contract_key:
+      return contract
   return None
 
 
@@ -22970,25 +22971,6 @@ class RunSubresourceContract:
   body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
 
 
-@dataclass(frozen=True)
-class RunSurfaceSharedContract:
-  contract_key: str
-  contract_kind: str
-  title: str
-  summary: str
-  source_of_truth: str
-  version: str | None = None
-  discovery_flow: str | None = None
-  related_family_keys: tuple[str, ...] = ()
-  member_keys: tuple[str, ...] = ()
-  ui_surfaces: tuple[str, ...] = ()
-  schema_sources: tuple[str, ...] = ()
-  policy: RunSurfaceCapabilities.Policy | None = None
-  enforcement: RunSurfaceCapabilities.Enforcement | None = None
-  surface_rules: tuple[RunSurfaceCapabilities.SurfaceRule, ...] = ()
-  schema_detail: dict[str, Any] = field(default_factory=dict)
-
-
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -23093,66 +23075,10 @@ def list_run_surface_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[RunSurfaceSharedContract, ...]:
   resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  discovery = resolved_capabilities.discovery
-  schema_contract = RunSurfaceSharedContract(
-    contract_key="schema:run-surface-capabilities",
-    contract_kind="schema_metadata",
-    title=str(discovery.get("schema_title", "Run-surface capability contract")),
-    summary=str(
-      discovery.get(
-        "schema_summary",
-        "Shared capability surface for run-surface contracts.",
-      )
-    ),
-    source_of_truth="run_surface_capabilities.discovery",
-    version=str(discovery.get("schema_version", "")) or None,
-    related_family_keys=tuple(
-      family_key
-      for family_key in discovery.get("family_order", ())
-      if isinstance(family_key, str)
-    ),
-    member_keys=tuple(
-      [f"family:{family_key}" for family_key in discovery.get("family_order", ()) if isinstance(family_key, str)]
-      + [
-        f"group:{group_key}"
-        for group_key in discovery.get("comparison_eligibility_group_order", ())
-        if isinstance(group_key, str)
-      ]
-    ),
-    schema_detail={
-      "comparison_eligibility_group_order": tuple(
-        group_key
-        for group_key in discovery.get("comparison_eligibility_group_order", ())
-        if isinstance(group_key, str)
-      ),
-      "family_order": tuple(
-        family_key
-        for family_key in discovery.get("family_order", ())
-        if isinstance(family_key, str)
-      ),
-      "run_subresource_contract_keys": tuple(
-        f"subresource:{contract.subresource_key}"
-        for contract in list_run_subresource_contracts()
-      ),
-    },
-  )
-  family_contracts = tuple(
-    RunSurfaceSharedContract(
-      contract_key=f"family:{family.family_key}",
-      contract_kind="capability_family",
-      title=family.title,
-      summary=family.summary,
-      source_of_truth=family.policy.source_of_truth or "run_surface_capabilities.families",
-      discovery_flow=family.discovery_flow,
-      related_family_keys=(family.family_key,),
-      member_keys=tuple(rule.surface_key for rule in family.surface_rules),
-      ui_surfaces=family.ui_surfaces,
-      schema_sources=family.schema_sources,
-      policy=family.policy,
-      enforcement=family.enforcement,
-      surface_rules=family.surface_rules,
-    )
-    for family in resolved_capabilities.families
+  base_contracts = tuple(
+    contract
+    for contract in resolved_capabilities.shared_contracts
+    if contract.contract_kind != "run_subresource"
   )
   subresource_contracts = tuple(
     RunSurfaceSharedContract(
@@ -23174,7 +23100,7 @@ def list_run_surface_shared_contracts(
     )
     for contract in list_run_subresource_contracts()
   )
-  return (schema_contract, *family_contracts, *subresource_contracts)
+  return (*base_contracts, *subresource_contracts)
 
 
 def serialize_run_surface_shared_contracts(

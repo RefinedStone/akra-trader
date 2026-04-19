@@ -90,18 +90,18 @@ def without_surface_rule(
 ) -> RunSurfaceCapabilities:
   return replace(
     capabilities,
-    families=tuple(
+    shared_contracts=tuple(
       replace(
-        family,
+        contract,
         surface_rules=tuple(
           rule
-          for rule in family.surface_rules
+          for rule in contract.surface_rules
           if rule.surface_key != surface_key
         ),
       )
-      if family.family_key == family_key
-      else family
-      for family in capabilities.families
+      if contract.contract_key == f"family:{family_key}" and contract.contract_kind == "capability_family"
+      else contract
+      for contract in capabilities.shared_contracts
     ),
   )
 
