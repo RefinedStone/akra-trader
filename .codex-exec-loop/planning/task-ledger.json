@@ -3694,18 +3694,36 @@
       "direction_id": "experiment-os",
       "title": "Coordinate comparison deep-link state across drill-back, overview, and provenance panels",
       "description": "Extend the persisted comparison and workspace micro-state model so comparison score drill-back, workspace conflict overview chip focus, and provenance-side evidence panels can reuse and synchronize the same deep-link context instead of restoring state only inside one micro-view while adjacent control-room panels drift or reset.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 31,
-      "priority_reason": "The latest main-session reply says commit 509aff8 finished restoring hover, scrub, and note state inside workspace conflict micro-views, and explicitly leaves the next gap that this micro-state is still isolated from external panels such as comparison score drill-back, overview chip focus, and provenance panels. That makes cross-panel deep-link and focus synchronization the clearest executable follow-up for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit 9cecf7a, which extended comparison deep-link persistence to carry `component`, `source`, and `originRunId`, restored drill-back, overview-card, metric-cell, and provenance-panel focus from URL or history or local state, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-selection-context-across-url-and-ui-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:30:00Z",
+      "updated_at": "2026-04-20T23:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os comparison and workspace-state durability from micro-view-local restoration into a control-room-wide navigation contract that keeps drill-back focus, overview emphasis, and provenance evidence coherent as operators move across adjacent subviews."
+    },
+    {
+      "id": "planning-experiment-os-restore-deeper-surface-subfocus-inside-comparison-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Restore deeper sub-focus inside comparison deep-link surfaces",
+      "description": "Build on the shipped cross-panel comparison deep-link contract by persisting and restoring finer-grained sub-focus inside each selected surface, such as provenance artifact section anchors and comparison tooltip or open-state context, so reopening a deep link returns operators to the exact nested evidence state instead of only the correct panel, card, row, or cell shell.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 32,
+      "priority_reason": "The latest main-session reply says commit 9cecf7a completed cross-panel deep-link restoration for surface-level targets and explicitly leaves the remaining gap that deeper surface-internal state, including provenance artifact sections and comparison tooltip or open state, is not yet restored. That makes nested sub-focus restoration the clearest executable next task for builtin queue continuation.",
+      "depends_on": [
+        "planning-experiment-os-coordinate-control-room-subviews-with-comparison-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os comparison-state durability from panel-level deep links into exact nested evidence restoration, so shared comparison URLs can reopen not just the right surface but also the specific artifact section or transient comparison context the operator was inspecting."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
