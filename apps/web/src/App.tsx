@@ -13851,37 +13851,119 @@ function RunForm({
 function ExperimentMetadataPills({
   benchmarkFamily,
   datasetIdentity,
+  interactionSource = "run_list",
+  linkedScore,
+  onDrillBackScoreLink,
+  panelRunId,
   presetId,
+  registerSubFocusRef,
   tags,
 }: {
   benchmarkFamily?: string | null;
   datasetIdentity?: string | null;
+  interactionSource?: ComparisonScoreLinkSource;
+  linkedScore?: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => void;
+  panelRunId?: string;
   presetId?: string | null;
+  registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
   tags: string[];
 }) {
   if (!tags.length && !presetId && !benchmarkFamily && !datasetIdentity) {
     return null;
   }
+  const activeRunListSubFocusKey =
+    linkedScore?.source === interactionSource
+      ? linkedScore.subFocusKey
+      : null;
+  const renderPill = (
+    label: string,
+    title: string | undefined,
+    componentKey: string,
+    subFocusKey: string,
+    highlighted: boolean,
+  ) => {
+    const isPressed =
+      linkedScore?.section === "context"
+      && linkedScore.componentKey === componentKey
+      && activeRunListSubFocusKey === subFocusKey;
+    const className = `meta-pill subtle comparison-run-card-pill-button ${
+      highlighted ? "comparison-linked-badge" : ""
+    } ${
+      isPressed ? "comparison-linked-badge-origin comparison-linked-subfocus" : ""
+    }`.trim();
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return (
+        <span className={className} title={title}>
+          {label}
+        </span>
+      );
+    }
+    return (
+      <button
+        aria-pressed={isPressed}
+        className={className}
+        onClick={() =>
+          onDrillBackScoreLink("context", componentKey, {
+            subFocusKey,
+          })
+        }
+        ref={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        title={title}
+        type="button"
+      >
+        {label}
+      </button>
+    );
+  };
+  const highlightProvenance =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore ?? null, ["provenance_richness"], "context");
+  const highlightBenchmarkStory =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore ?? null, ["benchmark_story_bonus"], "context");
   return (
     <div className="strategy-badges">
       {presetId ? (
-        <span className="meta-pill subtle" title={presetId}>
-          preset {presetId}
-        </span>
+        renderPill(
+          `preset ${presetId}`,
+          presetId,
+          "provenance_richness",
+          buildComparisonRunListLineSubFocusKey("experiment_preset"),
+          highlightProvenance,
+        )
       ) : null}
       {benchmarkFamily ? (
-        <span className="meta-pill subtle" title={benchmarkFamily}>
-          benchmark {benchmarkFamily}
-        </span>
+        renderPill(
+          `benchmark ${benchmarkFamily}`,
+          benchmarkFamily,
+          "benchmark_story_bonus",
+          buildComparisonRunListLineSubFocusKey("experiment_benchmark"),
+          highlightBenchmarkStory,
+        )
       ) : null}
       {datasetIdentity ? (
-        <span className="meta-pill subtle" title={datasetIdentity}>
-          dataset {shortenIdentifier(datasetIdentity)}
-        </span>
+        renderPill(
+          `dataset ${shortenIdentifier(datasetIdentity)}`,
+          datasetIdentity,
+          "provenance_richness",
+          buildComparisonRunListLineSubFocusKey("experiment_dataset"),
+          highlightProvenance,
+        )
       ) : null}
       {tags.map((tag) => (
-        <span className="meta-pill subtle" key={tag}>
-          #{tag}
+        <span key={tag}>
+          {renderPill(
+            `#${tag}`,
+            tag,
+            "benchmark_story_bonus",
+            buildComparisonRunListLineSubFocusKey(`experiment_tag:${tag}`),
+            highlightBenchmarkStory,
+          )}
         </span>
       ))}
     </div>
@@ -17110,6 +17192,46 @@ function RunSection({
                     role: comparisonLinkedRunRole,
                   }
                 : null;
+            const linkedRunListMetricSelection =
+              linkedRunListSelection && linkedRunListSelection.section === "metrics"
+                ? linkedRunListSelection
+                : null;
+            const linkedRunListContextSelection =
+              linkedRunListSelection && linkedRunListSelection.section === "context"
+                ? linkedRunListSelection
+                : null;
+            const statusSubFocusKey = buildComparisonRunListLineSubFocusKey("status");
+            const totalReturnSubFocusKey = buildComparisonRunListLineSubFocusKey("total_return_pct");
+            const drawdownSubFocusKey = buildComparisonRunListLineSubFocusKey("max_drawdown_pct");
+            const winRateSubFocusKey = buildComparisonRunListLineSubFocusKey("win_rate_pct");
+            const tradeCountSubFocusKey = buildComparisonRunListLineSubFocusKey("trade_count");
+            const referenceNoteSubFocusKey = buildComparisonRunListLineSubFocusKey("reference_note");
+            const isRunListSubFocusOrigin = (subFocusKey: string) =>
+              linkedRunListSelection?.source === "run_list"
+              && linkedRunListSelection.originRunId === run.config.run_id
+              && linkedRunListSelection.subFocusKey === subFocusKey;
+            const highlightStatus =
+              Boolean(linkedRunListContextSelection)
+              && isComparisonScoreLinkMatch(linkedRunListContextSelection, ["status_bonus"], "context");
+            const highlightReferenceNote =
+              Boolean(linkedRunListContextSelection)
+              && isComparisonScoreLinkMatch(linkedRunListContextSelection, [
+                "native_reference_bonus",
+                "reference_bonus",
+                "reference_floor",
+              ], "context");
+            const highlightReturn =
+              Boolean(linkedRunListMetricSelection)
+              && isComparisonScoreLinkMatch(linkedRunListMetricSelection, ["total_return_pct"], "metrics");
+            const highlightDrawdown =
+              Boolean(linkedRunListMetricSelection)
+              && isComparisonScoreLinkMatch(linkedRunListMetricSelection, ["max_drawdown_pct"], "metrics");
+            const highlightWinRate =
+              Boolean(linkedRunListMetricSelection)
+              && isComparisonScoreLinkMatch(linkedRunListMetricSelection, ["win_rate_pct"], "metrics");
+            const highlightTradeCount =
+              Boolean(linkedRunListMetricSelection)
+              && isComparisonScoreLinkMatch(linkedRunListMetricSelection, ["trade_count"], "metrics");
             return (
               <article className="run-card" key={run.config.run_id} ref={registerRunListCardRef(run.config.run_id)}>
               <div className="run-card-head">
@@ -17119,7 +17241,34 @@ function RunSection({
                     {run.config.symbols.join(", ")} / {run.config.strategy_version}
                   </span>
                 </div>
-                <div className={`run-status ${run.status}`}>{run.status}</div>
+                {comparisonLinkedRunRole ? (
+                  <button
+                    aria-pressed={isRunListSubFocusOrigin(statusSubFocusKey)}
+                    className={`run-status run-status-button ${run.status} ${
+                      highlightStatus ? "comparison-linked-badge" : ""
+                    } ${
+                      isRunListSubFocusOrigin(statusSubFocusKey)
+                        ? "comparison-linked-badge-origin comparison-linked-subfocus"
+                        : ""
+                    }`.trim()}
+                    onClick={() =>
+                      handleRunListScoreLinkSelection(
+                        run.config.run_id,
+                        "context",
+                        "status_bonus",
+                        {
+                          subFocusKey: statusSubFocusKey,
+                        },
+                      )
+                    }
+                    ref={(node) => registerRunListSubFocusRef(run.config.run_id, statusSubFocusKey)(node)}
+                    type="button"
+                  >
+                    {run.status}
+                  </button>
+                ) : (
+                  <div className={`run-status ${run.status}`}>{run.status}</div>
+                )}
               </div>
               <div className="run-metrics">
                 <Metric label="Mode" value={run.config.mode} />
@@ -17129,15 +17278,121 @@ function RunSection({
                   value={run.provenance.strategy?.lifecycle.stage ?? "n/a"}
                 />
                 <Metric label="Version" value={run.config.strategy_version} />
-                <Metric label="Return" value={formatMetric(run.metrics.total_return_pct, "%")} />
-                <Metric label="Drawdown" value={formatMetric(run.metrics.max_drawdown_pct, "%")} />
-                <Metric label="Win rate" value={formatMetric(run.metrics.win_rate_pct, "%")} />
-                <Metric label="Trades" value={formatMetric(run.metrics.trade_count)} />
+                <Metric
+                  buttonRef={
+                    comparisonLinkedRunRole
+                      ? (node) => registerRunListSubFocusRef(run.config.run_id, totalReturnSubFocusKey)(node)
+                      : undefined
+                  }
+                  className={highlightReturn ? "comparison-linked-panel" : ""}
+                  interactivePressed={isRunListSubFocusOrigin(totalReturnSubFocusKey)}
+                  label="Return"
+                  onClick={
+                    comparisonLinkedRunRole
+                      ? () =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            "metrics",
+                            "total_return_pct",
+                            {
+                              subFocusKey: totalReturnSubFocusKey,
+                            },
+                          )
+                      : undefined
+                  }
+                  value={formatMetric(run.metrics.total_return_pct, "%")}
+                />
+                <Metric
+                  buttonRef={
+                    comparisonLinkedRunRole
+                      ? (node) => registerRunListSubFocusRef(run.config.run_id, drawdownSubFocusKey)(node)
+                      : undefined
+                  }
+                  className={highlightDrawdown ? "comparison-linked-panel" : ""}
+                  interactivePressed={isRunListSubFocusOrigin(drawdownSubFocusKey)}
+                  label="Drawdown"
+                  onClick={
+                    comparisonLinkedRunRole
+                      ? () =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            "metrics",
+                            "max_drawdown_pct",
+                            {
+                              subFocusKey: drawdownSubFocusKey,
+                            },
+                          )
+                      : undefined
+                  }
+                  value={formatMetric(run.metrics.max_drawdown_pct, "%")}
+                />
+                <Metric
+                  buttonRef={
+                    comparisonLinkedRunRole
+                      ? (node) => registerRunListSubFocusRef(run.config.run_id, winRateSubFocusKey)(node)
+                      : undefined
+                  }
+                  className={highlightWinRate ? "comparison-linked-panel" : ""}
+                  interactivePressed={isRunListSubFocusOrigin(winRateSubFocusKey)}
+                  label="Win rate"
+                  onClick={
+                    comparisonLinkedRunRole
+                      ? () =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            "metrics",
+                            "win_rate_pct",
+                            {
+                              subFocusKey: winRateSubFocusKey,
+                            },
+                          )
+                      : undefined
+                  }
+                  value={formatMetric(run.metrics.win_rate_pct, "%")}
+                />
+                <Metric
+                  buttonRef={
+                    comparisonLinkedRunRole
+                      ? (node) => registerRunListSubFocusRef(run.config.run_id, tradeCountSubFocusKey)(node)
+                      : undefined
+                  }
+                  className={highlightTradeCount ? "comparison-linked-panel" : ""}
+                  interactivePressed={isRunListSubFocusOrigin(tradeCountSubFocusKey)}
+                  label="Trades"
+                  onClick={
+                    comparisonLinkedRunRole
+                      ? () =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            "metrics",
+                            "trade_count",
+                            {
+                              subFocusKey: tradeCountSubFocusKey,
+                            },
+                          )
+                      : undefined
+                  }
+                  value={formatMetric(run.metrics.trade_count)}
+                />
               </div>
               <ExperimentMetadataPills
                 benchmarkFamily={run.provenance.experiment.benchmark_family}
                 datasetIdentity={run.provenance.market_data?.dataset_identity}
+                linkedScore={linkedRunListContextSelection}
+                onDrillBackScoreLink={
+                  comparisonLinkedRunRole
+                    ? (section, componentKey, options) =>
+                        handleRunListScoreLinkSelection(
+                          run.config.run_id,
+                          section,
+                          componentKey,
+                          options,
+                        )
+                    : undefined
+                }
+                panelRunId={run.config.run_id}
                 presetId={run.provenance.experiment.preset_id}
+                registerSubFocusRef={registerRunListSubFocusRef}
                 tags={run.provenance.experiment.tags}
               />
               {run.provenance.strategy ? (
@@ -17161,11 +17416,38 @@ function RunSection({
                   strategy={run.provenance.strategy}
                 />
               ) : null}
-              <p className="run-note">
-                {run.provenance.reference_id
-                  ? `Reference ${run.provenance.reference_id} (${run.provenance.reference_version ?? "unknown"})`
-                  : run.notes[0] ?? "No notes recorded."}
-              </p>
+              {comparisonLinkedRunRole && run.provenance.reference_id ? (
+                <button
+                  aria-pressed={isRunListSubFocusOrigin(referenceNoteSubFocusKey)}
+                  className={`run-note comparison-run-card-link ${
+                    highlightReferenceNote ? "comparison-linked-copy" : ""
+                  } ${
+                    isRunListSubFocusOrigin(referenceNoteSubFocusKey)
+                      ? "comparison-linked-copy-origin comparison-linked-subfocus"
+                      : ""
+                  }`.trim()}
+                  onClick={() =>
+                    handleRunListScoreLinkSelection(
+                      run.config.run_id,
+                      "context",
+                      "reference_bonus",
+                      {
+                        subFocusKey: referenceNoteSubFocusKey,
+                      },
+                    )
+                  }
+                  ref={(node) => registerRunListSubFocusRef(run.config.run_id, referenceNoteSubFocusKey)(node)}
+                  type="button"
+                >
+                  Reference {run.provenance.reference_id} ({run.provenance.reference_version ?? "unknown"})
+                </button>
+              ) : (
+                <p className="run-note">
+                  {run.provenance.reference_id
+                    ? `Reference ${run.provenance.reference_id} (${run.provenance.reference_version ?? "unknown"})`
+                    : run.notes[0] ?? "No notes recorded."}
+                </p>
+              )}
               {run.provenance.reference ? (
                 <ReferenceRunProvenanceSummary
                   artifactPaths={run.provenance.artifact_paths}
@@ -17217,7 +17499,24 @@ function RunSection({
                 />
               ) : null}
               {run.orders.length ? (
-                <RunOrderLifecycleSummary orders={run.orders} orderControls={orderControls} />
+                <RunOrderLifecycleSummary
+                  linkedScore={linkedRunListMetricSelection}
+                  onDrillBackScoreLink={
+                    comparisonLinkedRunRole
+                      ? (section, componentKey, options) =>
+                          handleRunListScoreLinkSelection(
+                            run.config.run_id,
+                            section,
+                            componentKey,
+                            options,
+                          )
+                      : undefined
+                  }
+                  orderControls={orderControls}
+                  orders={run.orders}
+                  panelRunId={run.config.run_id}
+                  registerSubFocusRef={registerRunListSubFocusRef}
+                />
               ) : null}
               {run.provenance.market_data ? (
                 <RunMarketDataLineage
@@ -22786,11 +23085,23 @@ function RunRuntimeSessionSummary({
 }
 
 function RunOrderLifecycleSummary({
+  linkedScore,
+  onDrillBackScoreLink,
   orders,
   orderControls,
+  panelRunId,
+  registerSubFocusRef,
 }: {
+  linkedScore: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
+  onDrillBackScoreLink?: (
+    section: ComparisonScoreSection,
+    componentKey: string,
+    options?: ComparisonScoreDrillBackOptions,
+  ) => void;
   orders: Run["orders"];
   orderControls?: RunOrderControls | null;
+  panelRunId?: string;
+  registerSubFocusRef?: (runId: string, subFocusKey: string) => (node: HTMLElement | null) => void;
 }) {
   const openCount = orders.filter((order) => order.status === "open").length;
   const partialCount = orders.filter((order) => order.status === "partially_filled").length;
@@ -22815,22 +23126,90 @@ function RunOrderLifecycleSummary({
       return rightTimestamp.localeCompare(leftTimestamp);
     })
     .slice(0, 4);
+  const highlightPanel =
+    Boolean(linkedScore)
+    && isComparisonScoreLinkMatch(linkedScore, ["trade_count"], "metrics");
+  const orderOpenSubFocusKey = buildComparisonRunListLineSubFocusKey("order_open");
+  const orderPartialSubFocusKey = buildComparisonRunListLineSubFocusKey("order_partial");
+  const orderFilledSubFocusKey = buildComparisonRunListLineSubFocusKey("order_filled");
+  const orderCanceledSubFocusKey = buildComparisonRunListLineSubFocusKey("order_canceled");
+  const orderRejectedSubFocusKey = buildComparisonRunListLineSubFocusKey("order_rejected");
+  const orderSyncSubFocusKey = buildComparisonRunListLineSubFocusKey("order_sync");
+  const isOrderSubFocusOrigin = (subFocusKey: string) =>
+    linkedScore?.source === "run_list"
+    && linkedScore.originRunId === panelRunId
+    && linkedScore.subFocusKey === subFocusKey;
+  const highlightOrigin = [
+    orderOpenSubFocusKey,
+    orderPartialSubFocusKey,
+    orderFilledSubFocusKey,
+    orderCanceledSubFocusKey,
+    orderRejectedSubFocusKey,
+    orderSyncSubFocusKey,
+  ].some(isOrderSubFocusOrigin);
+  const renderOrderMetric = (label: string, value: string, subFocusKey: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <Metric label={label} value={value} />;
+    }
+    return (
+      <Metric
+        buttonRef={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        className={highlightPanel ? "comparison-linked-panel" : ""}
+        interactivePressed={isOrderSubFocusOrigin(subFocusKey)}
+        label={label}
+        onClick={() =>
+          onDrillBackScoreLink("metrics", "trade_count", {
+            subFocusKey,
+          })
+        }
+        value={value}
+      />
+    );
+  };
+  const renderOrderCopyLine = (children: string, subFocusKey: string) => {
+    if (!onDrillBackScoreLink || !panelRunId) {
+      return <p className="run-lineage-copy-link">{children}</p>;
+    }
+    return (
+      <button
+        aria-pressed={isOrderSubFocusOrigin(subFocusKey)}
+        className={`run-lineage-copy-link comparison-run-card-link comparison-drillback-target ${
+          highlightPanel ? "comparison-linked-copy" : ""
+        } ${isOrderSubFocusOrigin(subFocusKey) ? "comparison-linked-copy-origin comparison-linked-subfocus" : ""}`.trim()}
+        onClick={() =>
+          onDrillBackScoreLink("metrics", "trade_count", {
+            subFocusKey,
+          })
+        }
+        ref={(node) => registerSubFocusRef?.(panelRunId, subFocusKey)(node)}
+        type="button"
+      >
+        {children}
+      </button>
+    );
+  };
 
   return (
-    <section className="run-lineage">
+    <section
+      className={`run-lineage ${highlightPanel ? "comparison-linked-panel" : ""} ${
+        linkedScore?.role === "target" ? "comparison-linked-panel-target" : ""
+      } ${linkedScore?.role === "baseline" ? "comparison-linked-panel-baseline" : ""} ${
+        highlightOrigin ? "comparison-linked-panel-origin" : ""
+      }`.trim()}
+    >
       <div className="run-lineage-head">
         <span>Order lifecycle</span>
         <strong>{orders.length} tracked</strong>
       </div>
       <div className="run-lineage-grid">
-        <Metric label="Open" value={String(openCount)} />
-        <Metric label="Partial" value={String(partialCount)} />
-        <Metric label="Filled" value={String(filledCount)} />
-        <Metric label="Canceled" value={String(canceledCount)} />
-        <Metric label="Rejected" value={String(rejectedCount)} />
+        {renderOrderMetric("Open", String(openCount), orderOpenSubFocusKey)}
+        {renderOrderMetric("Partial", String(partialCount), orderPartialSubFocusKey)}
+        {renderOrderMetric("Filled", String(filledCount), orderFilledSubFocusKey)}
+        {renderOrderMetric("Canceled", String(canceledCount), orderCanceledSubFocusKey)}
+        {renderOrderMetric("Rejected", String(rejectedCount), orderRejectedSubFocusKey)}
       </div>
       <div className="run-lineage-copy">
-        <p>Last order sync: {formatTimestamp(latestSyncAt)}</p>
+        {renderOrderCopyLine(`Last order sync: ${formatTimestamp(latestSyncAt)}`, orderSyncSubFocusKey)}
       </div>
       <div className="run-lineage-symbols">
         {previewOrders.map((order) => (
@@ -23055,12 +23434,43 @@ function RunMarketDataLineage({
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  buttonRef,
+  className,
+  interactivePressed,
+  label,
+  onClick,
+  value,
+}: {
+  buttonRef?: (node: HTMLButtonElement | null) => void;
+  className?: string;
+  interactivePressed?: boolean;
+  label: string;
+  onClick?: () => void;
+  value: string;
+}) {
+  const resolvedClassName = `metric-tile ${className ?? ""}`.trim();
+  if (!onClick) {
+    return (
+      <div className={resolvedClassName}>
+        <span>{label}</span>
+        <strong>{value}</strong>
+      </div>
+    );
+  }
   return (
-    <div className="metric-tile">
+    <button
+      aria-pressed={interactivePressed}
+      className={`${resolvedClassName} comparison-run-summary-metric-button ${
+        interactivePressed ? "comparison-linked-panel-origin comparison-linked-subfocus is-active" : ""
+      }`.trim()}
+      onClick={onClick}
+      ref={buttonRef}
+      type="button"
+    >
       <span>{label}</span>
       <strong>{value}</strong>
-    </div>
+    </button>
   );
 }
 
@@ -23226,17 +23636,32 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
     return null;
   }
   const semanticLineLabels: Record<string, string> = {
+    experiment_benchmark: "Benchmark family",
+    experiment_dataset: "Dataset identity",
+    experiment_preset: "Preset",
     data_lineage: "Data lineage",
     execution_model: "Execution model",
+    max_drawdown_pct: "Drawdown",
     operator_notes: "Operator notes",
+    order_canceled: "Canceled orders",
+    order_filled: "Filled orders",
+    order_open: "Open orders",
+    order_partial: "Partial fills",
+    order_rejected: "Rejected orders",
+    order_sync: "Order sync",
     parameter_contract: "Parameter contract",
     provenance_richness: "Artifact inventory",
+    reference_note: "Reference note",
     runtime_session: "Runtime session",
     semantic_source: "Semantic source",
+    status: "Status",
     source_descriptor: "Source descriptor",
     strategy_kind: "Semantic kind",
+    total_return_pct: "Return",
+    trade_count: "Trade flow",
     vocabulary: "Vocabulary",
     working_directory: "Working dir",
+    win_rate_pct: "Win rate",
   };
   if (subFocusKey.startsWith("provenance-line:")) {
     const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("provenance-line:".length));
@@ -23254,6 +23679,9 @@ function formatComparisonScoreLinkSubFocusLabel(subFocusKey: string | null) {
   }
   if (subFocusKey.startsWith("run-list-line:")) {
     const lineKey = decodeComparisonScoreLinkToken(subFocusKey.slice("run-list-line:".length));
+    if (lineKey.startsWith("experiment_tag:")) {
+      return `Experiment tag #${lineKey.slice("experiment_tag:".length)}`;
+    }
     return semanticLineLabels[lineKey] ?? lineKey.replace(/_/g, " ");
   }
   if (subFocusKey.startsWith("provenance-artifact-section:")) {

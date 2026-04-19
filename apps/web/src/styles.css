@@ -1519,6 +1519,20 @@ select {
   text-transform: uppercase;
 }
 
+.run-status-button {
+  border: 1px solid transparent;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+}
+
+.run-status-button:hover,
+.run-status-button:focus-visible {
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.28),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
+}
+
 .run-status.completed {
   background: rgba(134, 239, 172, 0.14);
   color: var(--success);
