@@ -2858,6 +2858,30 @@ type ComparisonHistoryPanelSyncState = {
 };
 
 type ComparisonHistorySyncAuditKind = "merge" | "conflict" | "preferences";
+type ComparisonHistorySyncConflictFieldSource = "local" | "remote";
+type ComparisonHistorySyncConflictFieldKey =
+  | "stepIndex"
+  | "label"
+  | "summary"
+  | "title"
+  | "url"
+  | "hidden"
+  | "pinned"
+  | "selection.intent"
+  | "selection.selectedRunIds"
+  | "selection.scoreLink";
+
+type ComparisonHistorySyncConflictReview = {
+  entryId: string;
+  entryLabel: string;
+  localEntry: ComparisonHistoryPanelEntry;
+  remoteEntry: ComparisonHistoryPanelEntry;
+  selectedSources: Partial<
+    Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>
+  >;
+  resolvedAt?: string | null;
+  resolutionSummary?: string | null;
+};
 
 type ComparisonHistorySyncAuditEntry = {
   auditId: string;
@@ -2867,6 +2891,7 @@ type ComparisonHistorySyncAuditEntry = {
   recordedAt: string;
   sourceTabId: string;
   sourceTabLabel: string;
+  conflictReview?: ComparisonHistorySyncConflictReview | null;
 };
 
 type ComparisonHistorySyncAuditTrailState = {
@@ -2888,6 +2913,23 @@ type ControlRoomComparisonHistoryPanelUiState = {
   sync: ComparisonHistoryPanelSyncState | null;
 };
 
+type ComparisonHistorySyncConflictReviewRow = {
+  fieldKey: ComparisonHistorySyncConflictFieldKey;
+  groupKey: string;
+  groupLabel: string;
+  label: string;
+  localValue: string;
+  remoteValue: string;
+  selectedSource: ComparisonHistorySyncConflictFieldSource;
+};
+
+type ComparisonHistorySyncConflictReviewGroup = {
+  key: string;
+  label: string;
+  rows: ComparisonHistorySyncConflictReviewRow[];
+  summaryLabel: string;
+};
+
 type ControlRoomUiStateV2 = {
   version: 2;
   expandedGapRows: Record<string, boolean>;
@@ -2900,6 +2942,34 @@ type ControlRoomUiStateV3 = {
   comparisonSelection: ControlRoomComparisonSelectionState;
   comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
 };
+
+const COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS: Array<{
+  fieldKey: ComparisonHistorySyncConflictFieldKey;
+  groupKey: string;
+  groupLabel: string;
+  label: string;
+}> = [
+  { fieldKey: "stepIndex", groupKey: "timeline", groupLabel: "Timeline", label: "Step order" },
+  { fieldKey: "url", groupKey: "timeline", groupLabel: "Timeline", label: "Deep link" },
+  { fieldKey: "label", groupKey: "copy", groupLabel: "Copy", label: "Step label" },
+  { fieldKey: "summary", groupKey: "copy", groupLabel: "Copy", label: "Step summary" },
+  { fieldKey: "title", groupKey: "copy", groupLabel: "Copy", label: "Document title" },
+  { fieldKey: "hidden", groupKey: "flags", groupLabel: "Flags", label: "Visibility" },
+  { fieldKey: "pinned", groupKey: "flags", groupLabel: "Flags", label: "Pinned state" },
+  { fieldKey: "selection.intent", groupKey: "selection", groupLabel: "Selection", label: "Intent" },
+  {
+    fieldKey: "selection.selectedRunIds",
+    groupKey: "selection",
+    groupLabel: "Selection",
+    label: "Selected runs",
+  },
+  {
+    fieldKey: "selection.scoreLink",
+    groupKey: "selection",
+    groupLabel: "Selection",
+    label: "Focused score component",
+  },
+];
 
 type RunHistoryFilter = {
   strategy_id: string;
@@ -5156,6 +5226,87 @@ export default function App() {
             : nextEntries[0]?.entryId ?? null,
       };
     });
+  };
+
+  const handleSetComparisonHistoryConflictFieldSource = (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncConflictFieldKey,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => {
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.conflictReview) {
+          return entry;
+        }
+        return {
+          ...entry,
+          conflictReview: {
+            ...entry.conflictReview,
+            selectedSources: {
+              ...entry.conflictReview.selectedSources,
+              [fieldKey]: source,
+            },
+          },
+        };
+      }),
+    );
+  };
+
+  const handleSetComparisonHistoryConflictFieldSourceAll = (
+    auditId: string,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => {
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.conflictReview) {
+          return entry;
+        }
+        const selectedSources = buildDefaultComparisonHistorySyncConflictSelectedSources(
+          entry.conflictReview.localEntry,
+          entry.conflictReview.remoteEntry,
+        );
+        const nextSelectedSources = Object.keys(selectedSources).reduce<
+          Partial<Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>>
+        >((accumulator, key) => {
+          accumulator[key as ComparisonHistorySyncConflictFieldKey] = source;
+          return accumulator;
+        }, {});
+        return {
+          ...entry,
+          conflictReview: {
+            ...entry.conflictReview,
+            selectedSources: nextSelectedSources,
+          },
+        };
+      }),
+    );
+  };
+
+  const handleApplyComparisonHistoryConflictResolution = (auditId: string) => {
+    const targetAudit = comparisonHistorySyncAuditTrail.find((entry) => entry.auditId === auditId);
+    if (!targetAudit?.conflictReview) {
+      return;
+    }
+    const resolvedEntry = resolveComparisonHistorySyncConflictReviewEntry(targetAudit.conflictReview);
+    const resolutionSummary = formatComparisonHistorySyncConflictResolutionSummary(
+      targetAudit.conflictReview,
+    );
+    setComparisonHistoryPanel((current) => applyResolvedComparisonHistoryPanelEntry(current, resolvedEntry));
+    setComparisonHistorySyncAuditTrail((current) =>
+      current.map((entry) => {
+        if (entry.auditId !== auditId || !entry.conflictReview) {
+          return entry;
+        }
+        return {
+          ...entry,
+          conflictReview: {
+            ...entry.conflictReview,
+            resolvedAt: new Date().toISOString(),
+            resolutionSummary,
+          },
+        };
+      }),
+    );
   };
 
   useEffect(() => {
@@ -7532,6 +7683,9 @@ export default function App() {
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
             onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
             onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
+            onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
+            onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
+            onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
             onToggleRunSelection: toggleComparisonRun,
             onClearSelection: clearComparisonRuns,
             onSelectBenchmarkPair: selectBenchmarkPair,
@@ -8540,7 +8694,52 @@ function normalizeComparisonHistorySyncAuditEntry(
     recordedAt,
     sourceTabId,
     sourceTabLabel,
+    conflictReview: normalizeComparisonHistorySyncConflictReview(candidate.conflictReview),
   };
+}
+
+function normalizeComparisonHistorySyncConflictReview(
+  value: unknown,
+): ComparisonHistorySyncConflictReview | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonHistorySyncConflictReview>;
+  const entryId = typeof candidate.entryId === "string" ? candidate.entryId.trim() : "";
+  const entryLabel = typeof candidate.entryLabel === "string" ? candidate.entryLabel : "";
+  const localEntry = normalizeComparisonHistoryPanelEntry(candidate.localEntry);
+  const remoteEntry = normalizeComparisonHistoryPanelEntry(candidate.remoteEntry);
+  if (!entryId || !entryLabel || !localEntry || !remoteEntry) {
+    return null;
+  }
+  const selectedSources = normalizeComparisonHistorySyncConflictSelectedSources(candidate.selectedSources);
+  return {
+    entryId,
+    entryLabel,
+    localEntry,
+    remoteEntry,
+    selectedSources,
+    resolvedAt: typeof candidate.resolvedAt === "string" ? candidate.resolvedAt : null,
+    resolutionSummary:
+      typeof candidate.resolutionSummary === "string" ? candidate.resolutionSummary : null,
+  };
+}
+
+function normalizeComparisonHistorySyncConflictSelectedSources(
+  value: unknown,
+): Partial<Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  >((accumulator, definition) => {
+    const candidate = (value as Record<string, unknown>)[definition.fieldKey];
+    if (candidate === "local" || candidate === "remote") {
+      accumulator[definition.fieldKey] = candidate;
+    }
+    return accumulator;
+  }, {});
 }
 
 function limitComparisonHistorySyncAuditEntries(entries: ComparisonHistorySyncAuditEntry[]) {
@@ -8640,11 +8839,279 @@ function getComparisonHistoryPanelEntryChangedFields(
   return fields;
 }
 
+function formatComparisonHistorySyncConflictScoreLinkValue(
+  scoreLink: ControlRoomComparisonSelectionState["scoreLink"],
+) {
+  if (!scoreLink) {
+    return "No focus";
+  }
+  return `${truncateLabel(scoreLink.narrativeRunId, 18)} · ${formatComparisonScoreComponentLabel(
+    scoreLink.section,
+    scoreLink.componentKey,
+  )}`;
+}
+
+function formatComparisonHistorySyncConflictRunSelectionValue(selectedRunIds: string[]) {
+  if (!selectedRunIds.length) {
+    return "No runs selected";
+  }
+  const sample = selectedRunIds.slice(0, 2).map((runId) => truncateLabel(runId, 18)).join(", ");
+  return selectedRunIds.length > 2
+    ? `${selectedRunIds.length} runs · ${sample} +${selectedRunIds.length - 2}`
+    : `${selectedRunIds.length} run${selectedRunIds.length === 1 ? "" : "s"} · ${sample}`;
+}
+
+function formatComparisonHistorySyncConflictFieldValue(
+  fieldKey: ComparisonHistorySyncConflictFieldKey,
+  entry: ComparisonHistoryPanelEntry,
+) {
+  switch (fieldKey) {
+    case "stepIndex":
+      return `Step ${entry.stepIndex + 1}`;
+    case "label":
+      return entry.label;
+    case "summary":
+      return entry.summary;
+    case "title":
+      return entry.title;
+    case "url":
+      return entry.url;
+    case "hidden":
+      return entry.hidden ? "Cleared" : "Visible";
+    case "pinned":
+      return entry.pinned ? "Pinned" : "Not pinned";
+    case "selection.intent":
+      return formatComparisonIntentLabel(entry.selection.intent);
+    case "selection.selectedRunIds":
+      return formatComparisonHistorySyncConflictRunSelectionValue(entry.selection.selectedRunIds);
+    case "selection.scoreLink":
+      return formatComparisonHistorySyncConflictScoreLinkValue(entry.selection.scoreLink);
+    default:
+      return "n/a";
+  }
+}
+
+function hasComparisonHistorySyncConflictFieldDifference(
+  fieldKey: ComparisonHistorySyncConflictFieldKey,
+  localEntry: ComparisonHistoryPanelEntry,
+  remoteEntry: ComparisonHistoryPanelEntry,
+) {
+  switch (fieldKey) {
+    case "stepIndex":
+      return localEntry.stepIndex !== remoteEntry.stepIndex;
+    case "label":
+      return localEntry.label !== remoteEntry.label;
+    case "summary":
+      return localEntry.summary !== remoteEntry.summary;
+    case "title":
+      return localEntry.title !== remoteEntry.title;
+    case "url":
+      return localEntry.url !== remoteEntry.url;
+    case "hidden":
+      return localEntry.hidden !== remoteEntry.hidden;
+    case "pinned":
+      return localEntry.pinned !== remoteEntry.pinned;
+    case "selection.intent":
+      return localEntry.selection.intent !== remoteEntry.selection.intent;
+    case "selection.selectedRunIds":
+      return !(
+        localEntry.selection.selectedRunIds.length === remoteEntry.selection.selectedRunIds.length
+        && localEntry.selection.selectedRunIds.every(
+          (runId, index) => runId === remoteEntry.selection.selectedRunIds[index],
+        )
+      );
+    case "selection.scoreLink":
+      return !(
+        localEntry.selection.scoreLink?.narrativeRunId === remoteEntry.selection.scoreLink?.narrativeRunId
+        && localEntry.selection.scoreLink?.section === remoteEntry.selection.scoreLink?.section
+        && localEntry.selection.scoreLink?.componentKey === remoteEntry.selection.scoreLink?.componentKey
+      );
+    default:
+      return false;
+  }
+}
+
+function buildDefaultComparisonHistorySyncConflictSelectedSources(
+  localEntry: ComparisonHistoryPanelEntry,
+  remoteEntry: ComparisonHistoryPanelEntry,
+) {
+  return COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.reduce<
+    Partial<Record<ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource>>
+  >((accumulator, definition) => {
+    if (hasComparisonHistorySyncConflictFieldDifference(definition.fieldKey, localEntry, remoteEntry)) {
+      accumulator[definition.fieldKey] = "remote";
+    }
+    return accumulator;
+  }, {});
+}
+
+function buildComparisonHistorySyncConflictReview(
+  localEntry: ComparisonHistoryPanelEntry,
+  remoteEntry: ComparisonHistoryPanelEntry,
+): ComparisonHistorySyncConflictReview {
+  return {
+    entryId: remoteEntry.entryId,
+    entryLabel: remoteEntry.label,
+    localEntry,
+    remoteEntry,
+    selectedSources: buildDefaultComparisonHistorySyncConflictSelectedSources(localEntry, remoteEntry),
+    resolvedAt: null,
+    resolutionSummary: null,
+  };
+}
+
+function buildComparisonHistorySyncConflictReviewGroups(
+  review: ComparisonHistorySyncConflictReview,
+): ComparisonHistorySyncConflictReviewGroup[] {
+  const groupedRows = new Map<string, ComparisonHistorySyncConflictReviewGroup>();
+  COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.forEach((definition) => {
+    const localValue = formatComparisonHistorySyncConflictFieldValue(definition.fieldKey, review.localEntry);
+    const remoteValue = formatComparisonHistorySyncConflictFieldValue(definition.fieldKey, review.remoteEntry);
+    if (!hasComparisonHistorySyncConflictFieldDifference(definition.fieldKey, review.localEntry, review.remoteEntry)) {
+      return;
+    }
+    const group = groupedRows.get(definition.groupKey) ?? {
+      key: definition.groupKey,
+      label: definition.groupLabel,
+      rows: [],
+      summaryLabel: "",
+    };
+    group.rows.push({
+      fieldKey: definition.fieldKey,
+      groupKey: definition.groupKey,
+      groupLabel: definition.groupLabel,
+      label: definition.label,
+      localValue,
+      remoteValue,
+      selectedSource: review.selectedSources[definition.fieldKey] ?? "remote",
+    });
+    groupedRows.set(definition.groupKey, group);
+  });
+  return [...groupedRows.values()].map((group) => {
+    const localCount = group.rows.filter((row) => row.selectedSource === "local").length;
+    const remoteCount = group.rows.length - localCount;
+    return {
+      ...group,
+      summaryLabel: `${group.rows.length} field${group.rows.length === 1 ? "" : "s"} · ${localCount} local / ${remoteCount} remote`,
+    };
+  });
+}
+
 function summarizeComparisonHistoryPanelEntryConflict(
   entry: ComparisonHistoryPanelEntry,
   fields: string[],
 ) {
   return `${entry.label}: ${fields.join(", ")}`;
+}
+
+function formatComparisonHistorySyncConflictResolutionSummary(
+  review: ComparisonHistorySyncConflictReview,
+) {
+  const selectedFields = Object.entries(review.selectedSources) as Array<
+    [ComparisonHistorySyncConflictFieldKey, ComparisonHistorySyncConflictFieldSource]
+  >;
+  if (!selectedFields.length) {
+    return "Kept remote values for all fields.";
+  }
+  const localFields = selectedFields
+    .filter(([, source]) => source === "local")
+    .map(([fieldKey]) =>
+      COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.find((definition) => definition.fieldKey === fieldKey)?.label
+      ?? fieldKey,
+    );
+  const remoteFields = selectedFields
+    .filter(([, source]) => source === "remote")
+    .map(([fieldKey]) =>
+      COMPARISON_HISTORY_SYNC_CONFLICT_FIELD_DEFINITIONS.find((definition) => definition.fieldKey === fieldKey)?.label
+      ?? fieldKey,
+    );
+  const parts: string[] = [];
+  if (localFields.length) {
+    parts.push(`Local: ${localFields.join(", ")}`);
+  }
+  if (remoteFields.length) {
+    parts.push(`Remote: ${remoteFields.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
+function resolveComparisonHistorySyncConflictReviewEntry(
+  review: ComparisonHistorySyncConflictReview,
+) {
+  const resolvedEntry: ComparisonHistoryPanelEntry = {
+    ...review.remoteEntry,
+    selection: {
+      ...review.remoteEntry.selection,
+      selectedRunIds: [...review.remoteEntry.selection.selectedRunIds],
+      scoreLink: review.remoteEntry.selection.scoreLink
+        ? { ...review.remoteEntry.selection.scoreLink }
+        : null,
+    },
+  };
+  const selectedSources = review.selectedSources;
+  if (selectedSources.stepIndex === "local") {
+    resolvedEntry.stepIndex = review.localEntry.stepIndex;
+  }
+  if (selectedSources.label === "local") {
+    resolvedEntry.label = review.localEntry.label;
+  }
+  if (selectedSources.summary === "local") {
+    resolvedEntry.summary = review.localEntry.summary;
+  }
+  if (selectedSources.title === "local") {
+    resolvedEntry.title = review.localEntry.title;
+  }
+  if (selectedSources.url === "local") {
+    resolvedEntry.url = review.localEntry.url;
+  }
+  if (selectedSources.hidden === "local") {
+    resolvedEntry.hidden = review.localEntry.hidden;
+  }
+  if (selectedSources.pinned === "local") {
+    resolvedEntry.pinned = review.localEntry.pinned;
+  }
+  if (selectedSources["selection.intent"] === "local") {
+    resolvedEntry.selection.intent = review.localEntry.selection.intent;
+  }
+  if (selectedSources["selection.selectedRunIds"] === "local") {
+    resolvedEntry.selection.selectedRunIds = [...review.localEntry.selection.selectedRunIds];
+  }
+  if (selectedSources["selection.scoreLink"] === "local") {
+    resolvedEntry.selection.scoreLink = review.localEntry.selection.scoreLink
+      ? { ...review.localEntry.selection.scoreLink }
+      : null;
+  }
+  return resolvedEntry;
+}
+
+function applyResolvedComparisonHistoryPanelEntry(
+  current: ComparisonHistoryPanelState,
+  resolvedEntry: ComparisonHistoryPanelEntry,
+): ComparisonHistoryPanelState {
+  const currentEntry = current.entries.find((entry) => entry.entryId === resolvedEntry.entryId) ?? null;
+  const nextResolvedEntry = currentEntry
+    ? {
+        ...resolvedEntry,
+        recordedAt: currentEntry.recordedAt,
+      }
+    : resolvedEntry;
+  const entryExists = Boolean(currentEntry);
+  const nextEntries = sortComparisonHistoryPanelEntries(
+    entryExists
+      ? current.entries.map((entry) => (entry.entryId === nextResolvedEntry.entryId ? nextResolvedEntry : entry))
+      : [...current.entries, nextResolvedEntry],
+  );
+  const visibleEntries = nextEntries.filter((entry) => !entry.hidden);
+  const nextActiveEntryId =
+    current.activeEntryId === nextResolvedEntry.entryId && nextResolvedEntry.hidden
+      ? visibleEntries[visibleEntries.length - 1]?.entryId ?? null
+      : current.activeEntryId && nextEntries.some((entry) => entry.entryId === current.activeEntryId)
+        ? current.activeEntryId
+        : visibleEntries[visibleEntries.length - 1]?.entryId ?? null;
+  return {
+    entries: limitComparisonHistoryPanelEntries(nextEntries),
+    activeEntryId: nextActiveEntryId,
+  };
 }
 
 function summarizeComparisonHistorySyncPreferenceChanges(state: {
@@ -8698,7 +9165,7 @@ function buildComparisonHistorySyncAuditEntries(state: {
       return [];
     }
     const fields = getComparisonHistoryPanelEntryChangedFields(localEntry, remoteEntry);
-    return fields.length ? [{ entry: remoteEntry, fields }] : [];
+    return fields.length ? [{ localEntry, remoteEntry, fields }] : [];
   });
   const preferenceChanges = summarizeComparisonHistorySyncPreferenceChanges({
     localOpen: state.localOpen,
@@ -8725,22 +9192,18 @@ function buildComparisonHistorySyncAuditEntries(state: {
       sourceTabLabel,
     });
   }
-  if (conflictingEntries.length) {
-    const detail = conflictingEntries
-      .slice(0, 2)
-      .map(({ entry, fields }) => summarizeComparisonHistoryPanelEntryConflict(entry, fields))
-      .join(" · ");
-    const remainderCount = Math.max(conflictingEntries.length - 2, 0);
+  conflictingEntries.forEach(({ localEntry, remoteEntry, fields }) => {
     nextEntries.push({
       auditId: buildComparisonHistorySyncAuditId(),
       kind: "conflict",
-      summary: `Resolved ${conflictingEntries.length} sync conflict${conflictingEntries.length === 1 ? "" : "s"} from ${sourceTabLabel}`,
-      detail: remainderCount > 0 ? `${detail} +${remainderCount} more` : detail,
+      summary: `Review conflict on ${remoteEntry.label}`,
+      detail: summarizeComparisonHistoryPanelEntryConflict(remoteEntry, fields),
       recordedAt,
       sourceTabId,
       sourceTabLabel,
+      conflictReview: buildComparisonHistorySyncConflictReview(localEntry, remoteEntry),
     });
-  }
+  });
   if (preferenceChanges.length) {
     nextEntries.push({
       auditId: buildComparisonHistorySyncAuditId(),
@@ -10052,6 +10515,16 @@ type RunSectionComparisonControls = {
   onNavigateHistoryRelative: (delta: number) => void;
   onToggleHistoryEntryPinned: (entryId: string) => void;
   onTrimHistoryEntries: () => void;
+  onSetHistoryConflictFieldSource: (
+    auditId: string,
+    fieldKey: ComparisonHistorySyncConflictFieldKey,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => void;
+  onSetHistoryConflictFieldSourceAll: (
+    auditId: string,
+    source: ComparisonHistorySyncConflictFieldSource,
+  ) => void;
+  onApplyHistoryConflictResolution: (auditId: string) => void;
   onToggleRunSelection: (runId: string) => void;
   onClearSelection: () => void;
   onSelectBenchmarkPair: () => void;
@@ -10097,6 +10570,9 @@ function RunSection({
   onStop?: (runId: string) => Promise<void>;
   getOrderControls?: (run: Run) => RunOrderControls | null;
 }) {
+  const [expandedHistoryConflictReviewIds, setExpandedHistoryConflictReviewIds] = useState<
+    Record<string, boolean>
+  >({});
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const presetOptions = presets.filter(
     (preset) =>
@@ -10122,6 +10598,11 @@ function RunSection({
   const pinnedHistoryCount = comparison
     ? comparison.visibleHistoryEntries.filter((entry) => entry.pinned).length
     : 0;
+  const toggleHistoryConflictReview = (auditId: string) =>
+    setExpandedHistoryConflictReviewIds((current) => ({
+      ...current,
+      [auditId]: !current[auditId],
+    }));
 
   return (
     <section className="panel panel-wide">
@@ -10374,22 +10855,184 @@ function RunSection({
                         {comparison.historySyncAuditTrail
                           .slice()
                           .reverse()
-                          .map((entry) => (
-                            <article className="comparison-history-browser-audit" key={entry.auditId}>
-                              <div className="comparison-history-browser-audit-head">
-                                <span
-                                  className={`comparison-history-browser-entry-badge sync-audit ${entry.kind}`}
-                                >
-                                  {formatComparisonHistorySyncAuditKindLabel(entry.kind)}
-                                </span>
-                                <strong>{entry.summary}</strong>
-                              </div>
-                              <p className="comparison-history-browser-entry-summary">{entry.detail}</p>
-                              <p className="comparison-history-browser-entry-meta">
-                                {entry.sourceTabLabel} · {formatRelativeTimestampLabel(entry.recordedAt)}
-                              </p>
-                            </article>
-                          ))}
+                          .map((entry) => {
+                            const conflictReview = entry.conflictReview;
+                            const conflictGroups = conflictReview
+                              ? buildComparisonHistorySyncConflictReviewGroups(conflictReview)
+                              : [];
+                            const conflictingFieldCount = conflictGroups.reduce(
+                              (total, group) => total + group.rows.length,
+                              0,
+                            );
+                            const localChoiceCount = conflictGroups.reduce(
+                              (total, group) =>
+                                total + group.rows.filter((row) => row.selectedSource === "local").length,
+                              0,
+                            );
+                            const remoteChoiceCount = conflictingFieldCount - localChoiceCount;
+                            const reviewExpanded = Boolean(expandedHistoryConflictReviewIds[entry.auditId]);
+                            return (
+                              <article
+                                className={`comparison-history-browser-audit ${
+                                  conflictReview?.resolvedAt ? "is-resolved" : ""
+                                }`}
+                                key={entry.auditId}
+                              >
+                                <div className="comparison-history-browser-audit-head">
+                                  <span
+                                    className={`comparison-history-browser-entry-badge sync-audit ${entry.kind}`}
+                                  >
+                                    {formatComparisonHistorySyncAuditKindLabel(entry.kind)}
+                                  </span>
+                                  <strong>{entry.summary}</strong>
+                                </div>
+                                <p className="comparison-history-browser-entry-summary">{entry.detail}</p>
+                                <p className="comparison-history-browser-entry-meta">
+                                  {entry.sourceTabLabel} · {formatRelativeTimestampLabel(entry.recordedAt)}
+                                </p>
+                                {conflictReview ? (
+                                  <>
+                                    <div className="comparison-history-browser-audit-actions">
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => toggleHistoryConflictReview(entry.auditId)}
+                                        type="button"
+                                      >
+                                        {reviewExpanded
+                                          ? "Hide field review"
+                                          : `Review ${conflictingFieldCount} field${
+                                              conflictingFieldCount === 1 ? "" : "s"
+                                            }`}
+                                      </button>
+                                      <span
+                                        className={`comparison-history-browser-audit-status ${
+                                          conflictReview.resolvedAt ? "is-resolved" : "is-pending"
+                                        }`}
+                                      >
+                                        {conflictReview.resolvedAt
+                                          ? `Resolved ${formatRelativeTimestampLabel(conflictReview.resolvedAt)}`
+                                          : "Pending manual review"}
+                                      </span>
+                                    </div>
+                                    {conflictReview.resolutionSummary ? (
+                                      <p className="comparison-history-browser-entry-meta">
+                                        {conflictReview.resolutionSummary}
+                                      </p>
+                                    ) : null}
+                                    {reviewExpanded ? (
+                                      <div className="comparison-history-browser-conflict-review">
+                                        <div className="comparison-history-browser-conflict-actions">
+                                          <p className="comparison-history-browser-entry-meta">
+                                            {localChoiceCount} local / {remoteChoiceCount} remote selections
+                                          </p>
+                                          <div className="comparison-history-browser-entry-actions">
+                                            <button
+                                              className="ghost-button"
+                                              onClick={() =>
+                                                comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "local")
+                                              }
+                                              type="button"
+                                            >
+                                              Use local all
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              onClick={() =>
+                                                comparison.onSetHistoryConflictFieldSourceAll(entry.auditId, "remote")
+                                              }
+                                              type="button"
+                                            >
+                                              Use remote all
+                                            </button>
+                                            <button
+                                              className="ghost-button"
+                                              onClick={() =>
+                                                comparison.onApplyHistoryConflictResolution(entry.auditId)
+                                              }
+                                              type="button"
+                                            >
+                                              {conflictReview.resolvedAt ? "Apply updated resolution" : "Apply resolution"}
+                                            </button>
+                                          </div>
+                                        </div>
+                                        <div className="comparison-dev-conflict-preview comparison-history-conflict-review">
+                                          <div className="comparison-dev-conflict-preview-row comparison-dev-conflict-preview-head">
+                                            <span>Field</span>
+                                            <span>Keep local</span>
+                                            <span>Keep remote</span>
+                                          </div>
+                                          {conflictGroups.map((group) => (
+                                            <div className="comparison-dev-conflict-preview-group" key={group.key}>
+                                              <div className="comparison-dev-conflict-preview-group-title">
+                                                <span>{group.label}</span>
+                                                <span className="comparison-dev-conflict-preview-group-meta">
+                                                  <span className="comparison-dev-conflict-preview-group-summary">
+                                                    {group.summaryLabel}
+                                                  </span>
+                                                </span>
+                                              </div>
+                                              {group.rows.map((row) => (
+                                                <div
+                                                  className="comparison-history-conflict-review-row"
+                                                  key={`${entry.auditId}:${row.fieldKey}`}
+                                                >
+                                                  <span className="comparison-dev-conflict-preview-label-group">
+                                                    <span className="comparison-dev-conflict-preview-label">
+                                                      {row.label}
+                                                    </span>
+                                                  </span>
+                                                  <button
+                                                    className={`comparison-history-conflict-review-choice ${
+                                                      row.selectedSource === "local" ? "is-selected" : ""
+                                                    }`}
+                                                    onClick={() =>
+                                                      comparison.onSetHistoryConflictFieldSource(
+                                                        entry.auditId,
+                                                        row.fieldKey,
+                                                        "local",
+                                                      )
+                                                    }
+                                                    type="button"
+                                                  >
+                                                    <span className="comparison-history-conflict-review-choice-label">
+                                                      Local
+                                                    </span>
+                                                    <span className="comparison-history-conflict-review-choice-value">
+                                                      {row.localValue}
+                                                    </span>
+                                                  </button>
+                                                  <button
+                                                    className={`comparison-history-conflict-review-choice ${
+                                                      row.selectedSource === "remote" ? "is-selected" : ""
+                                                    }`}
+                                                    onClick={() =>
+                                                      comparison.onSetHistoryConflictFieldSource(
+                                                        entry.auditId,
+                                                        row.fieldKey,
+                                                        "remote",
+                                                      )
+                                                    }
+                                                    type="button"
+                                                  >
+                                                    <span className="comparison-history-conflict-review-choice-label">
+                                                      Remote
+                                                    </span>
+                                                    <span className="comparison-history-conflict-review-choice-value">
+                                                      {row.remoteValue}
+                                                    </span>
+                                                  </button>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                  </>
+                                ) : null}
+                              </article>
+                            );
+                          })}
                       </div>
                     ) : (
                       <p className="comparison-history-browser-empty">
