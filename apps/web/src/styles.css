@@ -135,6 +135,37 @@ select {
   margin-top: 20px;
 }
 
+.run-surface-capability-panel {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(88, 217, 255, 0.18);
+  background: rgba(5, 15, 24, 0.82);
+}
+
+.run-surface-capability-panel.compact {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.run-surface-capability-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.run-surface-capability-head h3 {
+  margin: 0;
+}
+
+.run-surface-capability-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .strategy-column {
   padding: 18px;
   border-radius: 20px;
@@ -3803,6 +3834,7 @@ select {
   .hero,
   .grid,
   .strategy-columns,
+  .run-surface-capability-grid,
   .run-list,
   .run-form,
   .run-list-metric-boundaries,

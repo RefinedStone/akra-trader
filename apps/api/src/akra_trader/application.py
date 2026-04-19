@@ -22697,6 +22697,12 @@ def serialize_run_comparison(comparison: RunComparison) -> dict:
 
 def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> dict[str, Any]:
   return {
+    "discovery": {
+      **capabilities.discovery,
+      "comparison_eligibility_group_order": list(
+        capabilities.discovery.get("comparison_eligibility_group_order", ())
+      ),
+    },
     "comparison_eligibility_contract": serialize_comparison_eligibility_contract(
       capabilities.comparison_eligibility_contract
     )

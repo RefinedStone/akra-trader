@@ -617,6 +617,21 @@ class RunSurfaceCapabilities:
   comparison_eligibility_contract: ComparisonEligibilityContract = field(
     default_factory=default_comparison_eligibility_contract
   )
+  discovery: dict[str, Any] = field(
+    default_factory=lambda: {
+      "comparison_eligibility_group_order": (
+        "eligible_metrics",
+        "supporting_identity",
+        "operational_workflow",
+        "operational_order_actions",
+      ),
+      "schema_summary": (
+        "Shared contract for comparison-eligible, supporting-only, and operational run surfaces."
+      ),
+      "schema_title": "Run-surface capability contract",
+      "schema_version": "run-surface-capabilities.v1",
+    }
+  )
 
 
 @dataclass(frozen=True)

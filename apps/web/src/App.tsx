@@ -423,6 +423,12 @@ type RunComparison = {
 
 type RunSurfaceCapabilities = {
   comparison_eligibility_contract: RunListBoundaryContract;
+  discovery: {
+    comparison_eligibility_group_order: RunListBoundaryGroupKey[];
+    schema_summary: string;
+    schema_title: string;
+    schema_version: string;
+  };
 };
 
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
@@ -6585,6 +6591,8 @@ export default function App() {
             </button>
           </div>
 
+          <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} />
+
           <div className="strategy-columns">
             <StrategyColumn title="Native" strategies={strategyGroups.native} accent="amber" />
             <StrategyColumn title="NFI References" strategies={strategyGroups.reference} accent="cyan" />
@@ -6634,6 +6642,7 @@ export default function App() {
           <PresetCatalogPanel
             form={presetForm}
             presets={presets}
+            runSurfaceCapabilities={runSurfaceCapabilities}
             setForm={setPresetForm}
             strategies={strategies}
             editingPresetId={editingPresetId}
@@ -13286,6 +13295,7 @@ function PresetStructuredDiffPreview({
 function PresetCatalogPanel({
   form,
   presets,
+  runSurfaceCapabilities,
   setForm,
   strategies,
   editingPresetId,
@@ -13299,6 +13309,7 @@ function PresetCatalogPanel({
 }: {
   form: typeof defaultPresetForm;
   presets: ExperimentPreset[];
+  runSurfaceCapabilities: RunSurfaceCapabilities | null;
   setForm: (updater: (value: typeof defaultPresetForm) => typeof defaultPresetForm) => void;
   strategies: Strategy[];
   editingPresetId: string | null;
@@ -13339,6 +13350,7 @@ function PresetCatalogPanel({
 
   return (
     <>
+      <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} compact />
       <form className="run-form" onSubmit={onSubmit}>
         <label>
           Name
@@ -14136,11 +14148,27 @@ const RUN_LIST_BOUNDARY_CONTRACT: RunListBoundaryContract = {
   } satisfies Record<RunListBoundaryGroupKey, RunListBoundaryGroupContract>,
 };
 
+const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discovery"] = {
+  comparison_eligibility_group_order: [
+    "eligible_metrics",
+    "supporting_identity",
+    "operational_workflow",
+    "operational_order_actions",
+  ],
+  schema_summary: "Shared contract for comparison-eligible, supporting-only, and operational run surfaces.",
+  schema_title: "Run-surface capability contract",
+  schema_version: "run-surface-capabilities.v1",
+};
+
 function getRunListBoundaryContractSnapshot(contract?: RunListBoundaryContract | null) {
   if (!contract || contract.scope !== "run_list") {
     return RUN_LIST_BOUNDARY_CONTRACT;
   }
   return contract;
+}
+
+function getRunSurfaceCapabilityDiscovery(capabilities?: RunSurfaceCapabilities | null) {
+  return capabilities?.discovery ?? DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY;
 }
 
 function getRunListBoundaryGroupContract(
@@ -14191,6 +14219,38 @@ function RunListComparisonBoundaryNote({
         ))}
       </div>
     </div>
+  );
+}
+
+function RunSurfaceCapabilityDiscoveryPanel({
+  capabilities,
+  compact = false,
+}: {
+  capabilities: RunSurfaceCapabilities | null;
+  compact?: boolean;
+}) {
+  const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
+  const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
+  const orderedGroups = discovery.comparison_eligibility_group_order.filter(
+    (groupKey): groupKey is RunListBoundaryGroupKey => groupKey in contract.groups,
+  );
+
+  return (
+    <section className={`run-surface-capability-panel ${compact ? "compact" : ""}`.trim()}>
+      <div className="run-surface-capability-head">
+        <div>
+          <p className="kicker">{compact ? "Schema discovery" : "Shared UI contract"}</p>
+          <h3>{discovery.schema_title}</h3>
+          <p className="run-note">{discovery.schema_summary}</p>
+        </div>
+        <span className="meta-pill subtle">{discovery.schema_version}</span>
+      </div>
+      <div className="run-surface-capability-grid">
+        {orderedGroups.map((groupKey) => (
+          <RunListComparisonBoundaryNote contract={contract} groupKey={groupKey} key={groupKey} />
+        ))}
+      </div>
+    </section>
   );
 }
 
