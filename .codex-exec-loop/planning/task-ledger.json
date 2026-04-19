@@ -93,18 +93,54 @@
       "direction_id": "experiment-os",
       "title": "Add preset bundle edit and revision APIs",
       "description": "Let operators update existing preset parameter bundles through explicit API and UI flows with revision history or version semantics, so reusable presets can evolve without losing the exact bundle lineage that prior runs depended on.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply lists preset parameter bundle modification and versioning as the first missing capability after commit 5a32a03. It is the clearest executable continuation for the newly expanded preset catalog, and it should be queued ahead of wider benchmark-pack modeling.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit ca4c556, which added preset fetch and patch APIs, revision listing and restore endpoints, durable revision snapshots with actor and reason metadata, and legacy preset backfill so revision history survives reloads.",
       "depends_on": [
         "planning-experiment-os-preset-bundle-management"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:45:00Z",
+      "updated_at": "2026-04-19T08:57:42Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the experiment-os preset catalog from reusable templates into versioned experiment assets whose exact parameter lineage remains inspectable across launches and comparisons."
+    },
+    {
+      "id": "planning-experiment-os-preset-revision-ui-workflows",
+      "direction_id": "experiment-os",
+      "title": "Expose preset edit and revision workflows in the control room",
+      "description": "Wire the newly shipped preset edit, revision history, and restore APIs into the web UI so operators can inspect a preset, edit its bundle, browse revisions, and restore prior snapshots without falling back to direct API use.",
+      "status": "done",
+      "base_priority": 92,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit fd132d9, which shipped preset edit mode, revision browsing, lifecycle actions on the same control-room card, restore from revision snapshots, and passed `cd apps/web && npx tsc --noEmit`.",
+      "depends_on": [
+        "planning-experiment-os-preset-bundle-revision-api"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the operator-facing control-room integration for preset editing, revision browsing, and restore flows so the preset revision backend is usable without direct API calls."
+    },
+    {
+      "id": "planning-experiment-os-preset-revision-diff-model",
+      "direction_id": "experiment-os",
+      "title": "Deepen preset revision UX with diff, restore confirmation, and revision filtering",
+      "description": "Build the next preset revision control-room pass by surfacing revision-to-revision diffs, adding an explicit confirmation step before restore, and letting operators search or filter revision history so the newly shipped revision workflow is safe and scalable for larger preset timelines.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says the core preset revision workflow is complete and explicitly lists the next gaps: no diff view, no restore confirmation modal, and no search/filter for revision history. Those are concrete executable UI follow-ups, so this becomes the next ready queue head.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-ui-workflows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Strengthens experiment-os operator trust around evolving presets by making revision changes readable, restore actions deliberate, and longer revision histories navigable from the control room."
     },
     {
       "id": "planning-experiment-os-preset-lifecycle-mode-gating",
@@ -114,13 +150,13 @@
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says preset lifecycle stage does not yet gate run mode beyond archived blocking. That is a real follow-up, but bundle edit and revision support is the more immediate continuation of the preset-management surface shipped in commit 5a32a03.",
+      "priority_reason": "Lifecycle stage gating is still a valid experiment-os follow-up, but the latest main-session reply gives a more immediate concrete continuation in preset revision UX hardening: diff visibility, restore confirmation, and revision filtering.",
       "depends_on": [
         "planning-experiment-os-preset-bundle-management"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:45:00Z",
+      "updated_at": "2026-04-19T09:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances the experiment-os goal that lifecycle and promotion state drive real operator decisions and execution boundaries rather than remaining informative metadata."
     },
@@ -132,13 +168,13 @@
       "status": "proposed",
       "base_priority": 91,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says presets still lack strategy-version pinning and benchmark-pack entity linkage. That broadens this task's scope, but preset bundle revision support remains the clearer immediate queue head before widening into cross-entity experiment modeling.",
+      "priority_reason": "Benchmark-pack modeling remains valid, but it is no longer the most immediate follow-up because the latest main-session reply directly enumerates unfinished preset revision UX work that can be executed next.",
       "depends_on": [
         "planning-experiment-os-queryable-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:45:00Z",
+      "updated_at": "2026-04-19T09:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os beyond filterable metadata by making benchmark configuration a durable object that can anchor comparison and promotion workflows."
     },
@@ -150,13 +186,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 0,
-      "priority_reason": "Preset selection now has a catalog-backed surface, but a general facet or discovery API should still wait until the newly added preset entity carries full parameter-bundle semantics and the benchmark-pack model exists for it to expose cleanly.",
+      "priority_reason": "Discovery APIs still matter, but the just-finished preset revision UI now leaves a tighter next step in revision UX hardening before broader metadata filter discovery becomes the queue head.",
       "depends_on": [
         "planning-experiment-os-queryable-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T04:30:00Z",
+      "updated_at": "2026-04-19T09:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs into discoverable product surfaces."
     },
