@@ -3747,19 +3747,37 @@
       "id": "planning-experiment-os-persist-provenance-artifact-ephemeral-state-inside-comparison-deep-links",
       "direction_id": "experiment-os",
       "title": "Persist provenance artifact ephemeral state inside comparison deep-link surfaces",
-      "description": "Narrow the remaining comparison deep-link persistence gap to provenance artifact internals by carrying finer-grained ephemeral interaction state, such as artifact-local hover focus, nested collapse toggles, or similar transient sub-controls, in the deep-link payload and restoration path so reopening a comparison link returns operators to the exact artifact evidence state instead of only the artifact card, section, and current metric-tooltip shell.",
-      "status": "ready",
+      "description": "Narrow the remaining comparison deep-link persistence gap to provenance artifact internals by carrying finer-grained ephemeral interaction state, such as artifact-local hover focus, nested collapse toggles, or similar transient sub-controls, in the deep-link payload and restoration path so reopening a comparison link returns operators to the exact artifact evidence state instead of only the artifact card, section, and current metric-tooltip shell. This task is now completed for artifact detail open or closed state plus summary-row hover and focus restoration; a narrower section-body micro-state follow-up remains.",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 34,
-      "priority_reason": "The latest main-session reply says commit 2f22439 finished comparison-surface transient state for `detailExpanded` and metric tooltip focus, and directly identifies provenance artifact-local hover or extra collapse state as the remaining executable deep-link restoration gap. That makes this the clearest next task for builtin queue continuation.",
+      "priority_reason": "Completed in main session commit b4b095b, which persisted provenance artifact detail open or closed state plus summary-row hover and focus into URL, history, and local selection restoration, added show or hide detail toggles with summary-row scroll restoration, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-transient-interaction-state-inside-comparison-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:58:30Z",
+      "updated_at": "2026-04-21T00:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os comparison deep links moving from panel-level and current surface transient restoration into the last provenance-artifact micro-interactions operators use while inspecting nested evidence."
+    },
+    {
+      "id": "planning-experiment-os-persist-section-body-microstate-inside-provenance-artifact-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Persist section-body micro-state inside provenance artifact deep-link surfaces",
+      "description": "Build on the shipped provenance artifact detail open or closed and summary-row hover or focus restoration by carrying the finer transient state that still lives inside artifact section bodies, such as intra-section hover targets, future tooltip visibility, or additional nested collapse controls, so reopening a comparison deep link restores the exact evidence state inside the selected artifact body instead of stopping at the artifact shell and summary row.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 35,
+      "priority_reason": "The latest main-session reply says commit b4b095b finished provenance artifact detail collapse and summary-row hover or focus persistence, and directly identifies section-body internal hover plus future tooltip or collapse state as the remaining executable deep-link restoration gap. That makes this the next automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-provenance-artifact-ephemeral-state-inside-comparison-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os comparison deep links progressing from restored provenance artifact shells into the remaining section-body micro-interactions operators use while inspecting nested evidence inside each artifact."
     },
     {
       "id": "planning-experiment-os-extend-reverse-drillback-to-run-card-semantic-lines",
