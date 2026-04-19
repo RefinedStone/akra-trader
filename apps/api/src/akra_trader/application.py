@@ -22969,6 +22969,18 @@ class RunSubresourceContract:
   body_serializer: Callable[[RunRecord, RunSurfaceCapabilities], Any]
 
 
+@dataclass(frozen=True)
+class RunSurfaceSharedContract:
+  contract_key: str
+  contract_kind: str
+  title: str
+  summary: str
+  source_of_truth: str
+  version: str | None = None
+  related_family_keys: tuple[str, ...] = ()
+  member_keys: tuple[str, ...] = ()
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -23079,6 +23091,80 @@ def serialize_run_subresource_contract_metadata() -> list[dict[str, str]]:
       "route_name": contract.route_name,
     }
     for contract in RUN_SUBRESOURCE_CONTRACTS
+  ]
+
+
+def list_run_surface_shared_contracts(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> tuple[RunSurfaceSharedContract, ...]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  discovery = resolved_capabilities.discovery
+  schema_contract = RunSurfaceSharedContract(
+    contract_key="schema:run-surface-capabilities",
+    contract_kind="schema_metadata",
+    title=str(discovery.get("schema_title", "Run-surface capability contract")),
+    summary=str(
+      discovery.get(
+        "schema_summary",
+        "Shared capability surface for run-surface contracts.",
+      )
+    ),
+    source_of_truth="run_surface_capabilities.discovery",
+    version=str(discovery.get("schema_version", "")) or None,
+    related_family_keys=tuple(
+      family_key
+      for family_key in discovery.get("family_order", ())
+      if isinstance(family_key, str)
+    ),
+    member_keys=tuple(
+      [f"family:{family_key}" for family_key in discovery.get("family_order", ()) if isinstance(family_key, str)]
+      + [
+        f"group:{group_key}"
+        for group_key in discovery.get("comparison_eligibility_group_order", ())
+        if isinstance(group_key, str)
+      ]
+    ),
+  )
+  family_contracts = tuple(
+    RunSurfaceSharedContract(
+      contract_key=f"family:{family.family_key}",
+      contract_kind="capability_family",
+      title=family.title,
+      summary=family.summary,
+      source_of_truth=family.policy.source_of_truth or "run_surface_capabilities.families",
+      related_family_keys=(family.family_key,),
+      member_keys=tuple(rule.surface_key for rule in family.surface_rules),
+    )
+    for family in resolved_capabilities.families
+  )
+  subresource_contracts = tuple(
+    RunSurfaceSharedContract(
+      contract_key=f"subresource:{contract.subresource_key}",
+      contract_kind="run_subresource",
+      title=contract.response_title,
+      summary=(
+        f"Declarative route binding and serializer contract for the standalone "
+        f"`{contract.subresource_key}` run subresource."
+      ),
+      source_of_truth="run_subresource_contracts",
+      related_family_keys=(),
+      member_keys=(f"body:{contract.body_key}", f"route:{contract.route_name}"),
+    )
+    for contract in list_run_subresource_contracts()
+  )
+  return (schema_contract, *family_contracts, *subresource_contracts)
+
+
+def serialize_run_surface_shared_contracts(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> list[dict[str, Any]]:
+  return [
+    {
+      **asdict(contract),
+      "related_family_keys": list(contract.related_family_keys),
+      "member_keys": list(contract.member_keys),
+    }
+    for contract in list_run_surface_shared_contracts(capabilities)
   ]
 
 
@@ -23219,6 +23305,7 @@ def serialize_run_surface_capabilities(capabilities: RunSurfaceCapabilities) -> 
       ),
       "family_order": list(capabilities.discovery.get("family_order", ())),
       "run_subresource_contracts": serialize_run_subresource_contract_metadata(),
+      "shared_contracts": serialize_run_surface_shared_contracts(capabilities),
     },
     "comparison_eligibility_contract": serialize_comparison_eligibility_contract(
       capabilities.comparison_eligibility_contract

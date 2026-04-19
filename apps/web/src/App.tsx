@@ -500,6 +500,16 @@ type RunSurfaceCapabilities = {
       route_path: string;
       route_name: string;
     }[];
+    shared_contracts: {
+      contract_key: string;
+      contract_kind: string;
+      title: string;
+      summary: string;
+      source_of_truth: string;
+      version: string | null;
+      related_family_keys: string[];
+      member_keys: string[];
+    }[];
     schema_summary: string;
     schema_title: string;
     schema_version: string;
@@ -14336,10 +14346,119 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       route_path: "/runs/{run_id}/metrics",
     },
   ],
+  shared_contracts: [
+    {
+      contract_key: "schema:run-surface-capabilities",
+      contract_kind: "schema_metadata",
+      title: "Run-surface capability contract",
+      summary:
+        "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
+      source_of_truth: "run_surface_capabilities.discovery",
+      version: "run-surface-capabilities.v8",
+      related_family_keys: [
+        "comparison_eligibility",
+        "strategy_schema",
+        "provenance_semantics",
+        "execution_controls",
+      ],
+      member_keys: [
+        "family:comparison_eligibility",
+        "family:strategy_schema",
+        "family:provenance_semantics",
+        "family:execution_controls",
+        "group:eligible_metrics",
+        "group:supporting_identity",
+        "group:operational_workflow",
+        "group:operational_order_actions",
+      ],
+    },
+    {
+      contract_key: "family:comparison_eligibility",
+      contract_kind: "capability_family",
+      title: "Comparison boundary contract",
+      summary: "Defines which run-list surfaces are comparison-eligible, supporting-only, or operational-only.",
+      source_of_truth: "comparison_eligibility_contract",
+      version: null,
+      related_family_keys: ["comparison_eligibility"],
+      member_keys: ["run_list_metric_tiles", "boundary_note_panels", "order_workflow_gates"],
+    },
+    {
+      contract_key: "family:strategy_schema",
+      contract_kind: "capability_family",
+      title: "Strategy schema discovery",
+      summary: "Publishes typed strategy parameter schema and semantic metadata used by preset and revision workflows.",
+      source_of_truth: "strategy_catalog",
+      version: null,
+      related_family_keys: ["strategy_schema"],
+      member_keys: [
+        "strategy_catalog_cards",
+        "preset_parameter_editor",
+        "preset_revision_semantic_diffs",
+      ],
+    },
+    {
+      contract_key: "family:provenance_semantics",
+      contract_kind: "capability_family",
+      title: "Run provenance semantics",
+      summary: "Carries semantic run context into snapshot, provenance, artifact, and comparison drill-back surfaces.",
+      source_of_truth: "run_provenance_snapshot",
+      version: null,
+      related_family_keys: ["provenance_semantics"],
+      member_keys: [
+        "run_strategy_snapshot",
+        "reference_provenance_panels",
+        "benchmark_artifact_summaries",
+      ],
+    },
+    {
+      contract_key: "family:execution_controls",
+      contract_kind: "capability_family",
+      title: "Execution control gating",
+      summary: "Documents which interactive controls mutate workflow or venue state and therefore stay outside comparison semantics.",
+      source_of_truth: "run_surface_capability_endpoint",
+      version: null,
+      related_family_keys: ["execution_controls"],
+      member_keys: [
+        "rerun_and_stop_controls",
+        "compare_selection_workflow",
+        "order_replace_cancel_actions",
+      ],
+    },
+    {
+      contract_key: "subresource:orders",
+      contract_kind: "run_subresource",
+      title: "Run order list",
+      summary: "Declarative route binding and serializer contract for the standalone `orders` run subresource.",
+      source_of_truth: "run_subresource_contracts",
+      version: null,
+      related_family_keys: [],
+      member_keys: ["body:orders", "route:get_run_orders"],
+    },
+    {
+      contract_key: "subresource:positions",
+      contract_kind: "run_subresource",
+      title: "Run positions",
+      summary: "Declarative route binding and serializer contract for the standalone `positions` run subresource.",
+      source_of_truth: "run_subresource_contracts",
+      version: null,
+      related_family_keys: [],
+      member_keys: ["body:positions", "route:get_run_positions"],
+    },
+    {
+      contract_key: "subresource:metrics",
+      contract_kind: "run_subresource",
+      title: "Run metrics",
+      summary: "Declarative route binding and serializer contract for the standalone `metrics` run subresource.",
+      source_of_truth: "run_subresource_contracts",
+      version: null,
+      related_family_keys: [],
+      member_keys: ["body:metrics", "route:get_run_metrics"],
+    },
+  ],
   schema_summary:
     "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
   schema_title: "Run-surface capability contract",
-  schema_version: "run-surface-capabilities.v7",
+  schema_version: "run-surface-capabilities.v8",
 };
 
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilities["families"] = [
@@ -14755,6 +14874,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const discovery = getRunSurfaceCapabilityDiscovery(capabilities);
   const contract = getRunListBoundaryContractSnapshot(capabilities?.comparison_eligibility_contract ?? null);
   const runSubresourceContracts = discovery.run_subresource_contracts ?? [];
+  const sharedContracts = discovery.shared_contracts ?? [];
   const familyByKey = new Map(
     getRunSurfaceCapabilityFamilies(capabilities).map((family) => [family.family_key, family]),
   );
@@ -14775,6 +14895,48 @@ function RunSurfaceCapabilityDiscoveryPanel({
         </div>
         <span className="meta-pill subtle">{discovery.schema_version}</span>
       </div>
+      {sharedContracts.length ? (
+        <div className="run-surface-family-section">
+          <span>Shared contracts</span>
+          <div className="run-surface-family-rule-grid">
+            {sharedContracts.map((sharedContract) => (
+              <div className="run-surface-family-rule-card" key={sharedContract.contract_key}>
+                <div className="run-surface-family-rule-head">
+                  <strong>{sharedContract.title}</strong>
+                  <span className="meta-pill subtle">{sharedContract.contract_kind}</span>
+                </div>
+                <p className="run-note">{sharedContract.summary}</p>
+                <p className="run-note">
+                  Source: {sharedContract.source_of_truth}
+                </p>
+                {sharedContract.version ? (
+                  <p className="run-note">
+                    Version: {sharedContract.version}
+                  </p>
+                ) : null}
+                {sharedContract.related_family_keys.length ? (
+                  <div className="run-surface-family-chip-row">
+                    {sharedContract.related_family_keys.map((familyKey) => (
+                      <span className="run-surface-family-chip" key={`${sharedContract.contract_key}:${familyKey}`}>
+                        {familyKey}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+                {sharedContract.member_keys.length ? (
+                  <div className="run-surface-family-chip-row">
+                    {sharedContract.member_keys.map((memberKey) => (
+                      <span className="run-surface-family-chip" key={`${sharedContract.contract_key}:${memberKey}`}>
+                        {memberKey}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
       {runSubresourceContracts.length ? (
         <div className="run-surface-family-section">
           <span>Run subresource contracts</span>

@@ -378,7 +378,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
 
   assert response.status_code == 200
   payload = response.json()
-  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v7"
+  assert payload["discovery"]["schema_version"] == "run-surface-capabilities.v8"
   assert payload["discovery"]["schema_title"] == "Run-surface capability contract"
   assert payload["discovery"]["family_order"] == [
     "comparison_eligibility",
@@ -414,6 +414,19 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
       "route_path": "/runs/{run_id}/metrics",
       "route_name": "get_run_metrics",
     },
+  ]
+  shared_contracts = {
+    contract["contract_key"]: contract
+    for contract in payload["discovery"]["shared_contracts"]
+  }
+  assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v8"
+  assert shared_contracts["family:strategy_schema"]["contract_kind"] == "capability_family"
+  assert "preset_parameter_editor" in shared_contracts["family:strategy_schema"]["member_keys"]
+  assert shared_contracts["subresource:metrics"]["contract_kind"] == "run_subresource"
+  assert shared_contracts["subresource:metrics"]["member_keys"] == [
+    "body:metrics",
+    "route:get_run_metrics",
   ]
   assert payload["families"][0]["family_key"] == "comparison_eligibility"
   assert "Run-list metric tiles" in payload["families"][0]["ui_surfaces"]
