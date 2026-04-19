@@ -2974,18 +2974,36 @@
       "direction_id": "experiment-os",
       "title": "Coordinate persisted comparison history state across browser tabs",
       "description": "Build on the shipped localStorage-backed comparison history persistence by reconciling inventory, active entry, and management-state updates across concurrent tabs or windows, so pinned items, search or filter state, and timeline cleanup do not silently diverge when operators review the same control room in more than one session.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says reload persistence is complete in commit 0bc4459 and explicitly calls out the remaining lack of cross-tab concurrent-edit coordination. That makes multi-tab reconciliation the clearest directly executable next task for builtin next-task progression.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 50860b6, which synchronized persisted comparison history panel state across tabs via the `storage` event, merged inventory updates instead of replacing them, shared open state plus search plus pinned-only filters, treated unpinned clears as tombstones for stable cross-tab hiding, and preserved active-entry matching after reload before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:05:00Z",
+      "updated_at": "2026-04-20T01:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os comparison-state durability from single-tab reload recovery into coherent multi-session operator behavior, which matters once the history browser is durable enough to be opened in parallel control-room tabs."
+    },
+    {
+      "id": "planning-experiment-os-add-tab-identity-and-conflict-audit-for-comparison-history-state",
+      "direction_id": "experiment-os",
+      "title": "Add tab identity and conflict audit trail for comparison history sync",
+      "description": "Build on the shipped cross-tab comparison history sync by attaching explicit tab identity and per-change metadata to persisted panel-state updates, so concurrent tabs can attribute who last changed inventory, open state, filters, and tombstones and can surface conflict or overwrite hints instead of relying on unaudited near-real-time propagation alone.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply says the remaining gap after commit 50860b6 is a stronger multi-tab collaboration layer because the current localStorage `storage` sync still has no explicit tab identity or conflict audit trail. That makes attribution and conflict visibility the clearest directly executable next task.",
+      "depends_on": [
+        "planning-experiment-os-coordinate-persisted-comparison-history-across-tabs"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os comparison-state collaboration beyond basic cross-tab propagation into an operator-trustable multi-tab model where concurrent edits can be attributed and conflict-prone state changes can be reviewed instead of silently merged."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
