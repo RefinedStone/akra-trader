@@ -784,6 +784,47 @@ select {
   gap: 8px;
 }
 
+.comparison-history-conflict-review-score-detail-nested {
+  display: grid;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.comparison-history-conflict-review-score-detail-nested.is-collapsed {
+  gap: 0;
+}
+
+.comparison-history-conflict-review-score-detail-nested-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 6px 12px;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.comparison-history-conflict-review-score-detail-nested-label {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.72rem;
+}
+
+.comparison-history-conflict-review-score-detail-nested-summary {
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.72rem;
+}
+
+.comparison-history-conflict-review-score-detail-nested-body {
+  display: grid;
+  gap: 8px;
+}
+
 .comparison-history-conflict-review-score-detail-chip-row {
   display: flex;
   flex-wrap: wrap;
