@@ -2834,6 +2834,26 @@ type TouchGapWindowActivationFeedbackState = {
   activationId: number;
   anchorGapWindowKey: string;
 };
+type PlatformTouchFeedbackBridge = {
+  ReactNativeWebView?: {
+    postMessage?: (message: string) => void;
+  };
+  Telegram?: {
+    WebApp?: {
+      HapticFeedback?: {
+        impactOccurred?: (style: "light" | "medium" | "heavy" | "rigid" | "soft") => void;
+      };
+    };
+  };
+  webkit?: {
+    messageHandlers?: Record<
+      string,
+      {
+        postMessage?: (payload: unknown) => void;
+      }
+    >;
+  };
+};
 
 type ControlRoomUiStateV1 = {
   version: 1;
@@ -8377,7 +8397,61 @@ function BackfillQualityStatus({
     "--gap-window-touch-hold-duration": `${TOUCH_GAP_WINDOW_SWEEP_HOLD_MS}ms`,
   } as CSSProperties;
   const triggerTouchSweepActivationFeedback = (anchorGapWindowKey: string) => {
-    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+    const touchFeedbackDetail = {
+      impactStyle: "light" as const,
+      source: "gap-window-picker-sweep-activation",
+      trigger: "touch-hold",
+    };
+    const platformBridge = window as Window & typeof globalThis & PlatformTouchFeedbackBridge;
+    let usedPlatformFeedbackBridge = false;
+    const telegramHaptics = platformBridge.Telegram?.WebApp?.HapticFeedback;
+    if (typeof telegramHaptics?.impactOccurred === "function") {
+      try {
+        telegramHaptics.impactOccurred("light");
+        usedPlatformFeedbackBridge = true;
+      } catch {
+        // Ignore Telegram bridge failures and continue through fallbacks.
+      }
+    }
+    if (!usedPlatformFeedbackBridge) {
+      const webkitMessageHandlerNames = [
+        "hapticFeedback",
+        "haptics",
+        "touchFeedback",
+        "akraHaptics",
+        "akraTouchFeedback",
+      ];
+      for (const handlerName of webkitMessageHandlerNames) {
+        const handler = platformBridge.webkit?.messageHandlers?.[handlerName];
+        if (typeof handler?.postMessage !== "function") {
+          continue;
+        }
+        try {
+          handler.postMessage(touchFeedbackDetail);
+          usedPlatformFeedbackBridge = true;
+          break;
+        } catch {
+          // Ignore failing handlers and keep probing fallbacks.
+        }
+      }
+    }
+    if (
+      !usedPlatformFeedbackBridge
+      && typeof platformBridge.ReactNativeWebView?.postMessage === "function"
+    ) {
+      try {
+        platformBridge.ReactNativeWebView.postMessage(
+          JSON.stringify({
+            detail: touchFeedbackDetail,
+            type: "akra-trader:haptic-feedback",
+          }),
+        );
+        usedPlatformFeedbackBridge = true;
+      } catch {
+        // Ignore React Native host bridge failures and continue through fallbacks.
+      }
+    }
+    if (!usedPlatformFeedbackBridge && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
       try {
         navigator.vibrate?.(18);
       } catch {
