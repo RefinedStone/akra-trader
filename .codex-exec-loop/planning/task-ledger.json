@@ -4126,18 +4126,36 @@
       "direction_id": "experiment-os",
       "title": "Wire run-surface contracts into runtime gating and automatic enforcement",
       "description": "Carry the shipped machine-readable capability policy and `surface_rules` model into actual runtime and consumer enforcement so worker or orchestration paths, plus surface-specific flows, make consistent allow, block, fallback, and auto-apply decisions from the shared contract instead of relying only on discovery metadata or handwritten branching.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply says the direct next stage is to connect the new `surface_rules` into actual runtime gating and surface-specific automatic enforcement. That is now the clearest executable follow-up for builtin queue progression, while consumer negotiation still remains a separate design-sensitive branch.",
+      "priority_reason": "Completed in main session commit 043b84a, which wired run-surface contracts into runtime gating and UI-side automatic enforcement across run-list metric drill-back, strategy catalog schema hints, preset parameter hydration, semantic drill-back panels, and operational boundary notes, then passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-add-surface-level-enforcement-rules-to-run-surface-capabilities"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T09:00:00Z",
+      "updated_at": "2026-04-19T22:03:21Z",
       "source_turn_id": null,
       "direction_relation_note": "Connects experiment-os capability metadata to real runtime and surface enforcement so shared policy semantics stop being discovery-only and start governing actual launch, gating, and fallback behavior."
+    },
+    {
+      "id": "planning-experiment-os-add-server-side-surface-rule-enforcement-to-runtime-responses",
+      "direction_id": "experiment-os",
+      "title": "Apply surface-rule contracts in backend responses and action availability",
+      "description": "Extend the shipped contract-driven UI enforcement into server-side evaluation so backend and consumer negotiation paths can use `surface_rules` directly to shape response payloads, omit unavailable actions, and expose consistent allow, block, or fallback semantics before UI rendering.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply says frontend runtime gating and UI-side enforcement are done, and explicitly calls out backend or consumer-negotiation-side evaluation of surface rules to control response shape and action availability as the remaining deeper automation. That is now the clearest executable next task for queue progression.",
+      "depends_on": [
+        "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T22:03:21Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os capability contracts past UI gating into backend enforcement so shared run-surface policy can directly govern API response shape and action availability across consumers."
     }
   ]
 }
