@@ -3208,18 +3208,54 @@
       "direction_id": "experiment-os",
       "title": "Add hold-progress feedback to manual gap-window picker touch sweep",
       "description": "Build on the shipped touch long-press sweep gesture by giving touch-first operators clear hold-state feedback before sweep activation, such as visible press progress and mobile-friendly activation cues, so the picker communicates when a press will become a sweep instead of relying on invisible timing alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply explicitly says the remaining mobile polish is that touch sweep now works through long-press, but still lacks any haptic or visual hold-progress feedback. This is the clearest executable next task after commit 3d20cbc completed the underlying touch sweep activation model.",
+      "priority_reason": "Completed in main session commit b9c85ee, which added touch hold-progress feedback to the manual gap-window picker by surfacing hold-state helper copy plus a filling progress rail during long-press, clearing the feedback immediately on sweep activation, cancel-on-move, or tap end, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-polish-touch-sweep-gestures-for-manual-gap-window-picker"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:10:00Z",
+      "updated_at": "2026-04-20T18:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os touch usability for manual gap subset editing by turning the newly reliable long-press sweep gesture into a legible mobile interaction with explicit activation feedback."
+    },
+    {
+      "id": "planning-experiment-os-add-haptic-or-platform-touch-feedback-to-manual-gap-window-picker-sweep-activation",
+      "direction_id": "experiment-os",
+      "title": "Add haptic or platform touch feedback to manual gap-window picker sweep activation",
+      "description": "Finish the next executable mobile gesture pass by adding platform-appropriate tactile or equivalent touch feedback when the manual gap-window picker long-press arms or activates sweep mode, so touch-first operators get a non-visual confirmation path in addition to the newly shipped hold-progress rail.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply explicitly says the remaining mobile gesture work is that the picker still has visual hold progress only and no haptic vibration or OS-level feedback. That makes platform feedback the clearest executable follow-up after commit b9c85ee completed visible hold progress.",
+      "depends_on": [
+        "planning-experiment-os-add-hold-progress-feedback-to-manual-gap-window-picker-touch-sweep"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T18:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os touch gesture trust by complementing visible hold progress with mobile-native activation feedback so long-press sweep mode is legible even when the operator is focused on finger motion rather than the helper rail."
+    },
+    {
+      "id": "planning-experiment-os-differentiate-touch-hold-feedback-by-cancellation-reason-in-manual-gap-window-picker",
+      "direction_id": "experiment-os",
+      "title": "Differentiate touch hold feedback by cancellation reason in the manual gap-window picker",
+      "description": "Refine the new touch hold-progress feedback so the manual gap-window picker can present different visual or motion outcomes for sweep activation, movement cancellation, and tap completion instead of one shared CSS-duration rail, making the touch interaction explain why the hold did or did not promote into sweep mode.",
+      "status": "proposed",
+      "base_priority": 85,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply says the hold progress is still CSS-duration based and does not yet vary feedback by touch cancellation reason. That is a valid follow-up, but it is a refinement pass after the more direct platform-feedback gap and may still need a UX choice about which cancellation reasons deserve distinct variants.",
+      "depends_on": [
+        "planning-experiment-os-add-hold-progress-feedback-to-manual-gap-window-picker-touch-sweep"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T18:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os mobile gesture polish moving past generic timing feedback toward reason-aware touch outcomes that better explain whether sweep selection armed, canceled, or resolved as an ordinary tap."
     },
     {
       "id": "planning-experiment-os-decide-whether-manual-gap-picker-open-state-should-restore-after-reload",
