@@ -2826,6 +2826,10 @@ type PendingTouchGapWindowSweepState = {
   startClientY: number;
   targetSelected: boolean;
 };
+type TouchGapWindowHoldProgressState = {
+  anchorGapWindowKey: string;
+  targetSelected: boolean;
+};
 
 type ControlRoomUiStateV1 = {
   version: 1;
@@ -8247,6 +8251,8 @@ function BackfillQualityStatus({
 }) {
   const [rangeAnchorGapWindowKey, setRangeAnchorGapWindowKey] = useState<string | null>(null);
   const [dragSelectionState, setDragSelectionState] = useState<GapWindowDragSelectionState | null>(null);
+  const [touchSweepHoldProgressState, setTouchSweepHoldProgressState] =
+    useState<TouchGapWindowHoldProgressState | null>(null);
   const gapWindowPickerListRef = useRef<HTMLDivElement | null>(null);
   const pendingTouchSweepStateRef = useRef<PendingTouchGapWindowSweepState | null>(null);
   const touchSweepHoldTimeoutRef = useRef<number | null>(null);
@@ -8267,6 +8273,14 @@ function BackfillQualityStatus({
       setRangeAnchorGapWindowKey(null);
     }
   }, [orderedGapWindowKeys, rangeAnchorGapWindowKey]);
+  useEffect(() => {
+    if (
+      touchSweepHoldProgressState
+      && !orderedGapWindowKeys.includes(touchSweepHoldProgressState.anchorGapWindowKey)
+    ) {
+      setTouchSweepHoldProgressState(null);
+    }
+  }, [orderedGapWindowKeys, touchSweepHoldProgressState]);
   useEffect(() => {
     if (!dragSelectionState) {
       return;
@@ -8289,6 +8303,7 @@ function BackfillQualityStatus({
     }
     clearTouchSweepHoldTimeout();
     pendingTouchSweepStateRef.current = null;
+    setTouchSweepHoldProgressState(null);
   }, [gapWindowPickerOpen]);
   useEffect(() => {
     if (!dragSelectionState) {
@@ -8338,6 +8353,12 @@ function BackfillQualityStatus({
   const rangeAnchorLabel = rangeAnchorGapWindowKey
     ? formatGapWindowKeyLabel(rangeAnchorGapWindowKey)
     : null;
+  const touchSweepHoldLabel = touchSweepHoldProgressState
+    ? formatGapWindowKeyLabel(touchSweepHoldProgressState.anchorGapWindowKey)
+    : null;
+  const touchSweepHoldProgressStyle = {
+    "--gap-window-touch-hold-duration": `${TOUCH_GAP_WINDOW_SWEEP_HOLD_MS}ms`,
+  } as CSSProperties;
   const applyGapWindowSelectionChange = ({
     anchorGapWindowKey,
     selectedGapWindowKeys,
@@ -8410,6 +8431,10 @@ function BackfillQualityStatus({
         startClientY: event.clientY,
         targetSelected: !checked,
       };
+      setTouchSweepHoldProgressState({
+        anchorGapWindowKey: gapWindowKey,
+        targetSelected: !checked,
+      });
       event.currentTarget.setPointerCapture(event.pointerId);
       touchSweepHoldTimeoutRef.current = window.setTimeout(() => {
         const pendingTouchSweepState = pendingTouchSweepStateRef.current;
@@ -8419,6 +8444,7 @@ function BackfillQualityStatus({
         ) {
           return;
         }
+        setTouchSweepHoldProgressState(null);
         setRangeAnchorGapWindowKey(pendingTouchSweepState.anchorGapWindowKey);
         updateActiveGapWindowSweepTarget({
           anchorGapWindowKey: pendingTouchSweepState.anchorGapWindowKey,
@@ -8480,6 +8506,7 @@ function BackfillQualityStatus({
       if (pointerTravel > TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX) {
         clearTouchSweepHoldTimeout();
         pendingTouchSweepStateRef.current = null;
+        setTouchSweepHoldProgressState(null);
         if (event.currentTarget.hasPointerCapture(event.pointerId)) {
           event.currentTarget.releasePointerCapture(event.pointerId);
         }
@@ -8517,6 +8544,7 @@ function BackfillQualityStatus({
       return;
     }
     clearTouchSweepHoldTimeout();
+    setTouchSweepHoldProgressState(null);
     if (!dragSelectionState) {
       applyGapWindowSelectionChange({
         selectedGapWindowKeys: pendingTouchSweepState.baselineSelectedGapWindowKeys,
@@ -8627,10 +8655,22 @@ function BackfillQualityStatus({
               ? `Sweep ${dragSelectionState.targetSelected ? "select" : "hide"} mode from ${formatGapWindowKeyLabel(
                   dragSelectionState.anchorGapWindowKey,
                 )}.`
+              : touchSweepHoldLabel
+                ? `Hold to ${
+                    touchSweepHoldProgressState?.targetSelected ? "sweep select" : "sweep hide"
+                  } from ${touchSweepHoldLabel}.`
               : rangeAnchorLabel
                 ? `Range anchor: ${rangeAnchorLabel}. Shift-click another gap to apply the full range.`
                 : "Tip: click a gap to set the range anchor, then shift-click or drag across gaps to apply a range."}
           </span>
+          {touchSweepHoldProgressState ? (
+            <div
+              className="gap-window-picker-hold-progress"
+              style={touchSweepHoldProgressStyle}
+            >
+              <span className="gap-window-picker-hold-progress-bar" />
+            </div>
+          ) : null}
           <div
             className="gap-window-picker-list"
             ref={gapWindowPickerListRef}
