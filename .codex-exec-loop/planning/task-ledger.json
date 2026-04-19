@@ -129,18 +129,54 @@
       "direction_id": "experiment-os",
       "title": "Deepen preset revision UX with diff, restore confirmation, and revision filtering",
       "description": "Build the next preset revision control-room pass by surfacing revision-to-revision diffs, adding an explicit confirmation step before restore, and letting operators search or filter revision history so the newly shipped revision workflow is safe and scalable for larger preset timelines.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says the core preset revision workflow is complete and explicitly lists the next gaps: no diff view, no restore confirmation modal, and no search/filter for revision history. Those are concrete executable UI follow-ups, so this becomes the next ready queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit cfc5f63, which added revision search and action filtering, revision-to-current and revision-to-previous change summaries, restore confirmation with impact preview, relative timestamps, and passed `cd apps/web && npx tsc --noEmit`.",
       "depends_on": [
         "planning-experiment-os-preset-revision-ui-workflows"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:05:00Z",
+      "updated_at": "2026-04-19T09:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Strengthens experiment-os operator trust around evolving presets by making revision changes readable, restore actions deliberate, and longer revision histories navigable from the control room."
+      "direction_relation_note": "Completed the next preset revision control-room pass by making revision changes readable, restore actions deliberate, and longer revision histories navigable from the control room."
+    },
+    {
+      "id": "planning-experiment-os-preset-revision-structured-diff-and-draft-guard",
+      "direction_id": "experiment-os",
+      "title": "Upgrade preset revision restore UX with structured diffs and draft-conflict guards",
+      "description": "Replace the current summary-plus-change-list revision diff with a more structured side-by-side comparison, and extend restore confirmation to warn when the selected snapshot conflicts with unsaved preset form draft edits so operators can safely review and restore revisions without accidental draft loss.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply says the just-shipped revision UX still lacks a structured side-by-side diff and does not warn about conflicts with in-progress form drafts during restore confirmation. Those are concrete safety and readability gaps in the active preset workflow, so this is the clearest next executable task.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-diff-model"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Strengthens experiment-os operator trust around mutable presets by making revision deltas reviewable in a richer format and by preventing restore actions from silently stomping in-progress edits."
+    },
+    {
+      "id": "planning-experiment-os-preset-revision-filter-persistence",
+      "direction_id": "experiment-os",
+      "title": "Persist preset revision filters in URL or durable view state",
+      "description": "Promote the new revision search and action filters from local-only UI state into URL-backed or otherwise durable view state so operators can reload, share, or navigate long preset timelines without losing their revision-history slice.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says revision filtering now exists but is still local UI state with no URL or durable persistence. That is a valid follow-up, but it is less immediate than improving structured diff readability and restore-safety warnings in the active workflow.",
+      "depends_on": [
+        "planning-experiment-os-preset-revision-diff-model"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T09:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends the preset revision control-room workflow from session-local convenience into a durable operator navigation surface that supports revisit and sharing."
     },
     {
       "id": "planning-experiment-os-preset-lifecycle-mode-gating",
