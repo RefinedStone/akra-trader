@@ -2784,7 +2784,7 @@ const MAX_VISIBLE_GAP_WINDOWS = 3;
 const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
-const CONTROL_ROOM_UI_STATE_VERSION = 2;
+const CONTROL_ROOM_UI_STATE_VERSION = 3;
 const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
 const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_STORAGE_KEY = "akra-trader-comparison-tooltip-tuning";
@@ -2846,10 +2846,24 @@ type ComparisonHistoryPanelState = {
   activeEntryId: string | null;
 };
 
+type ControlRoomComparisonHistoryPanelUiState = {
+  panel: ComparisonHistoryPanelState;
+  open: boolean;
+  searchQuery: string;
+  showPinnedOnly: boolean;
+};
+
 type ControlRoomUiStateV2 = {
+  version: 2;
+  expandedGapRows: Record<string, boolean>;
+  comparisonSelection: ControlRoomComparisonSelectionState;
+};
+
+type ControlRoomUiStateV3 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
   expandedGapRows: Record<string, boolean>;
   comparisonSelection: ControlRoomComparisonSelectionState;
+  comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
 };
 
 type RunHistoryFilter = {
@@ -4449,8 +4463,13 @@ export default function App() {
   const [paperRunFilter, setPaperRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const [liveRunFilter, setLiveRunFilter] = useState<RunHistoryFilter>(defaultRunHistoryFilter);
   const initialComparisonSelectionRef = useRef<ControlRoomComparisonSelectionState | null>(null);
+  const initialComparisonHistoryPanelUiStateRef =
+    useRef<ControlRoomComparisonHistoryPanelUiState | null>(null);
   if (!initialComparisonSelectionRef.current) {
     initialComparisonSelectionRef.current = loadPersistedComparisonSelection();
+  }
+  if (!initialComparisonHistoryPanelUiStateRef.current) {
+    initialComparisonHistoryPanelUiStateRef.current = loadPersistedComparisonHistoryPanelUiState();
   }
   const [selectedComparisonRunIds, setSelectedComparisonRunIds] = useState<string[]>(
     () => initialComparisonSelectionRef.current?.selectedRunIds ?? [],
@@ -4468,11 +4487,19 @@ export default function App() {
   const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
     loadExpandedGapRows,
   );
-  const [comparisonHistoryPanel, setComparisonHistoryPanel] = useState<ComparisonHistoryPanelState>({
-    entries: [],
-    activeEntryId: null,
-  });
-  const [comparisonHistoryPanelOpen, setComparisonHistoryPanelOpen] = useState(false);
+  const [comparisonHistoryPanel, setComparisonHistoryPanel] = useState<ComparisonHistoryPanelState>(
+    () =>
+      initialComparisonHistoryPanelUiStateRef.current?.panel ?? defaultComparisonHistoryPanelState(),
+  );
+  const [comparisonHistoryPanelOpen, setComparisonHistoryPanelOpen] = useState(
+    () => initialComparisonHistoryPanelUiStateRef.current?.open ?? false,
+  );
+  const [comparisonHistorySearchQuery, setComparisonHistorySearchQuery] = useState(
+    () => initialComparisonHistoryPanelUiStateRef.current?.searchQuery ?? "",
+  );
+  const [comparisonHistoryShowPinnedOnly, setComparisonHistoryShowPinnedOnly] = useState(
+    () => initialComparisonHistoryPanelUiStateRef.current?.showPinnedOnly ?? false,
+  );
   const comparisonHistoryWriteModeRef = useRef<ComparisonHistoryWriteMode>("replace");
   const comparisonHistoryUrlRef = useRef<string | null>(null);
   const comparisonSelection = useMemo(
@@ -4665,9 +4692,14 @@ export default function App() {
           ),
         );
       } else {
-        setComparisonHistoryPanel({
-          entries: [],
-          activeEntryId: null,
+        setComparisonHistoryPanel((current) => {
+          const matchingEntry = findComparisonHistoryPanelEntryForSelection(current, nextSelection);
+          return matchingEntry
+            ? {
+                ...current,
+                activeEntryId: matchingEntry.entryId,
+              }
+            : current;
         });
       }
       applyComparisonSelectionState(nextSelection);
@@ -4717,9 +4749,22 @@ export default function App() {
   useEffect(() => {
     persistControlRoomUiState({
       comparisonSelection,
+      comparisonHistoryPanel: {
+        open: comparisonHistoryPanelOpen,
+        panel: comparisonHistoryPanel,
+        searchQuery: comparisonHistorySearchQuery,
+        showPinnedOnly: comparisonHistoryShowPinnedOnly,
+      },
       expandedGapRows,
     });
-  }, [comparisonSelection, expandedGapRows]);
+  }, [
+    comparisonHistoryPanel,
+    comparisonHistoryPanelOpen,
+    comparisonHistorySearchQuery,
+    comparisonHistoryShowPinnedOnly,
+    comparisonSelection,
+    expandedGapRows,
+  ]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -4730,17 +4775,25 @@ export default function App() {
       loadComparisonSelectionFromUrl() ?? defaultControlRoomComparisonSelectionState(),
     );
     const currentBrowserState = readComparisonHistoryBrowserState(window.history.state);
+    const matchingPersistedEntry =
+      currentBrowserState
+        ? null
+        : findComparisonHistoryPanelEntryForSelection(comparisonHistoryPanel, comparisonSelection);
     const nextEntryId =
       comparisonHistoryWriteModeRef.current === "push"
         ? buildComparisonHistoryEntryId()
-        : currentBrowserState?.entryId ?? buildComparisonHistoryEntryId();
+        : currentBrowserState?.entryId
+          ?? matchingPersistedEntry?.entryId
+          ?? buildComparisonHistoryEntryId();
     const nextStepIndex =
       comparisonHistoryWriteModeRef.current === "push"
         ? (
             currentBrowserState?.stepIndex
+            ?? matchingPersistedEntry?.stepIndex
             ?? (comparisonHistoryActiveStepIndex >= 0 ? comparisonHistoryActiveStepIndex : -1)
           ) + 1
         : currentBrowserState?.stepIndex
+          ?? matchingPersistedEntry?.stepIndex
           ?? (comparisonHistoryActiveStepIndex >= 0 ? comparisonHistoryActiveStepIndex : 0);
     const nextBrowserState = readComparisonHistoryBrowserState(buildComparisonHistoryBrowserState(
       window.history.state,
@@ -4846,7 +4899,7 @@ export default function App() {
         "replace",
       ),
     );
-  }, [comparisonHistoryStep, comparisonSelection]);
+  }, [comparisonHistoryActiveStepIndex, comparisonHistoryPanel, comparisonHistoryStep, comparisonSelection]);
 
   useEffect(() => {
     if (typeof document === "undefined") {
@@ -7261,6 +7314,8 @@ export default function App() {
             historyEntries: comparisonHistoryPanel.entries,
             activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
             historyBrowserOpen: comparisonHistoryPanelOpen,
+            historySearchQuery: comparisonHistorySearchQuery,
+            showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
             canNavigateHistoryBackward: comparisonHistoryActiveIndex > 0,
             canNavigateHistoryForward:
               comparisonHistoryActiveIndex >= 0
@@ -7272,6 +7327,8 @@ export default function App() {
             onChangeComparisonIntent: handleComparisonIntentChange,
             onChangeSelectedScoreLink: handleSelectedComparisonScoreLinkChange,
             onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
+            onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
+            onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
             onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
             onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
             onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
@@ -7591,7 +7648,27 @@ function loadPersistedComparisonSelection(): ControlRoomComparisonSelectionState
   return loadControlRoomUiState()?.comparisonSelection ?? defaultControlRoomComparisonSelectionState();
 }
 
-function loadControlRoomUiState(): ControlRoomUiStateV2 | null {
+function defaultComparisonHistoryPanelState(): ComparisonHistoryPanelState {
+  return {
+    entries: [],
+    activeEntryId: null,
+  };
+}
+
+function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPanelUiState {
+  return {
+    open: false,
+    panel: defaultComparisonHistoryPanelState(),
+    searchQuery: "",
+    showPinnedOnly: false,
+  };
+}
+
+function loadPersistedComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPanelUiState {
+  return loadControlRoomUiState()?.comparisonHistoryPanel ?? defaultComparisonHistoryPanelUiState();
+}
+
+function loadControlRoomUiState(): ControlRoomUiStateV3 | null {
   if (typeof window === "undefined") {
     return null;
   }
@@ -7601,11 +7678,20 @@ function loadControlRoomUiState(): ControlRoomUiStateV2 | null {
       return null;
     }
     const parsed = JSON.parse(raw);
-    if (isControlRoomUiStateV2(parsed)) {
+    if (isControlRoomUiStateV3(parsed)) {
       return {
         version: parsed.version,
         expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
         comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
+        comparisonHistoryPanel: normalizeComparisonHistoryPanelUiState(parsed.comparisonHistoryPanel),
+      };
+    }
+    if (isControlRoomUiStateV2(parsed)) {
+      return {
+        version: CONTROL_ROOM_UI_STATE_VERSION,
+        expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+        comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
+        comparisonHistoryPanel: defaultComparisonHistoryPanelUiState(),
       };
     }
     if (!isControlRoomUiStateV1(parsed)) {
@@ -7615,6 +7701,7 @@ function loadControlRoomUiState(): ControlRoomUiStateV2 | null {
       version: CONTROL_ROOM_UI_STATE_VERSION,
       expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
       comparisonSelection: defaultControlRoomComparisonSelectionState(),
+      comparisonHistoryPanel: defaultComparisonHistoryPanelUiState(),
     };
   } catch {
     return null;
@@ -7623,15 +7710,17 @@ function loadControlRoomUiState(): ControlRoomUiStateV2 | null {
 
 function persistControlRoomUiState(state: {
   comparisonSelection: ControlRoomComparisonSelectionState;
+  comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
   expandedGapRows: Record<string, boolean>;
 }) {
   if (typeof window === "undefined") {
     return;
   }
   try {
-    const nextState: ControlRoomUiStateV2 = {
+    const nextState: ControlRoomUiStateV3 = {
       version: CONTROL_ROOM_UI_STATE_VERSION,
       comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
+      comparisonHistoryPanel: normalizeComparisonHistoryPanelUiState(state.comparisonHistoryPanel),
       expandedGapRows: filterExpandedGapRows(state.expandedGapRows),
     };
     window.localStorage.setItem(
@@ -7835,6 +7924,25 @@ function buildComparisonHistoryPanelEntry(
   };
 }
 
+function findComparisonHistoryPanelEntryForSelection(
+  panel: ComparisonHistoryPanelState,
+  selection: ControlRoomComparisonSelectionState,
+) {
+  const matchingEntries = panel.entries.filter((entry) =>
+    isSameComparisonSelection(entry.selection, selection),
+  );
+  if (!matchingEntries.length) {
+    return null;
+  }
+  if (panel.activeEntryId) {
+    const activeMatch = matchingEntries.find((entry) => entry.entryId === panel.activeEntryId);
+    if (activeMatch) {
+      return activeMatch;
+    }
+  }
+  return matchingEntries[matchingEntries.length - 1] ?? null;
+}
+
 function reconcileComparisonHistoryPanelState(
   current: ComparisonHistoryPanelState,
   entry: ComparisonHistoryPanelEntry,
@@ -7925,6 +8033,75 @@ function limitComparisonHistoryPanelEntries(entries: ComparisonHistoryPanelEntry
     ...pinnedEntries,
     ...unpinnedEntries.slice(-(MAX_COMPARISON_HISTORY_PANEL_ENTRIES - pinnedEntries.length)),
   ]);
+}
+
+function normalizeComparisonHistoryPanelUiState(
+  value: Partial<ControlRoomComparisonHistoryPanelUiState> | null | undefined,
+): ControlRoomComparisonHistoryPanelUiState {
+  return {
+    open: value?.open === true,
+    panel: normalizeComparisonHistoryPanelState(value?.panel),
+    searchQuery: typeof value?.searchQuery === "string" ? value.searchQuery : "",
+    showPinnedOnly: value?.showPinnedOnly === true,
+  };
+}
+
+function normalizeComparisonHistoryPanelState(
+  value: Partial<ComparisonHistoryPanelState> | null | undefined,
+): ComparisonHistoryPanelState {
+  const entries = limitComparisonHistoryPanelEntries(
+    sortComparisonHistoryPanelEntries(
+      Array.isArray(value?.entries)
+        ? value.entries
+            .map((entry) => normalizeComparisonHistoryPanelEntry(entry))
+            .filter((entry): entry is ComparisonHistoryPanelEntry => entry !== null)
+        : [],
+    ),
+  );
+  const activeEntryId =
+    typeof value?.activeEntryId === "string" && entries.some((entry) => entry.entryId === value.activeEntryId)
+      ? value.activeEntryId
+      : entries[entries.length - 1]?.entryId ?? null;
+  return {
+    entries,
+    activeEntryId,
+  };
+}
+
+function normalizeComparisonHistoryPanelEntry(value: unknown): ComparisonHistoryPanelEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<ComparisonHistoryPanelEntry>;
+  const entryId = typeof candidate.entryId === "string" ? candidate.entryId.trim() : "";
+  const label = typeof candidate.label === "string" ? candidate.label : "";
+  const summary = typeof candidate.summary === "string" ? candidate.summary : "";
+  const title = typeof candidate.title === "string" ? candidate.title : "";
+  const url = typeof candidate.url === "string" ? candidate.url : "";
+  const recordedAt = typeof candidate.recordedAt === "string" ? candidate.recordedAt : "";
+  if (
+    !entryId
+    || !label
+    || !summary
+    || !title
+    || !url
+    || !recordedAt
+    || typeof candidate.stepIndex !== "number"
+    || !Number.isFinite(candidate.stepIndex)
+  ) {
+    return null;
+  }
+  return {
+    entryId,
+    stepIndex: candidate.stepIndex,
+    label,
+    summary,
+    title,
+    url,
+    pinned: candidate.pinned === true,
+    recordedAt,
+    selection: normalizeControlRoomComparisonSelection(candidate.selection),
+  };
 }
 
 function loadLegacyExpandedGapRows() {
@@ -8207,9 +8384,22 @@ function isControlRoomUiStateV2(value: unknown): value is ControlRoomUiStateV2 {
   }
   const candidate = value as Partial<ControlRoomUiStateV2>;
   return (
-    candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
+    candidate.version === 2 &&
     candidate.expandedGapRows !== undefined &&
     candidate.comparisonSelection !== undefined
+  );
+}
+
+function isControlRoomUiStateV3(value: unknown): value is ControlRoomUiStateV3 {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ControlRoomUiStateV3>;
+  return (
+    candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
+    candidate.expandedGapRows !== undefined &&
+    candidate.comparisonSelection !== undefined &&
+    candidate.comparisonHistoryPanel !== undefined
   );
 }
 
@@ -9174,6 +9364,8 @@ type RunSectionComparisonControls = {
   historyEntries: ComparisonHistoryPanelEntry[];
   activeHistoryEntryId: string | null;
   historyBrowserOpen: boolean;
+  historySearchQuery: string;
+  showPinnedHistoryOnly: boolean;
   canNavigateHistoryBackward: boolean;
   canNavigateHistoryForward: boolean;
   selectedScoreLink: ComparisonScoreLinkTarget | null;
@@ -9186,6 +9378,8 @@ type RunSectionComparisonControls = {
     historyMode?: ComparisonHistoryWriteMode,
   ) => void;
   onToggleHistoryBrowser: () => void;
+  onChangeHistorySearchQuery: (value: string) => void;
+  onChangeShowPinnedHistoryOnly: (value: boolean) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
   onToggleHistoryEntryPinned: (entryId: string) => void;
@@ -9242,12 +9436,10 @@ function RunSection({
       filter.strategy_id === ALL_FILTER_VALUE ||
       preset.strategy_id === filter.strategy_id,
   );
-  const [historySearchQuery, setHistorySearchQuery] = useState("");
-  const [showPinnedHistoryOnly, setShowPinnedHistoryOnly] = useState(false);
-  const historySearchQueryNormalized = historySearchQuery.trim().toLowerCase();
+  const historySearchQueryNormalized = comparison?.historySearchQuery.trim().toLowerCase() ?? "";
   const filteredHistoryEntries = comparison
     ? comparison.historyEntries.filter((entry) => {
-        if (showPinnedHistoryOnly && !entry.pinned) {
+        if (comparison.showPinnedHistoryOnly && !entry.pinned) {
           return false;
         }
         if (!historySearchQueryNormalized) {
@@ -9469,17 +9661,21 @@ function RunSection({
                     <label className="comparison-history-browser-search">
                       Search steps
                       <input
-                        onChange={(event) => setHistorySearchQuery(event.target.value)}
+                        onChange={(event) => comparison.onChangeHistorySearchQuery(event.target.value)}
                         placeholder="intent, label, summary"
-                        value={historySearchQuery}
+                        value={comparison.historySearchQuery}
                       />
                     </label>
                     <button
-                      className={`ghost-button ${showPinnedHistoryOnly ? "is-active" : ""}`}
-                      onClick={() => setShowPinnedHistoryOnly((current) => !current)}
+                      className={`ghost-button ${comparison.showPinnedHistoryOnly ? "is-active" : ""}`}
+                      onClick={() =>
+                        comparison.onChangeShowPinnedHistoryOnly(!comparison.showPinnedHistoryOnly)
+                      }
                       type="button"
                     >
-                      {showPinnedHistoryOnly ? "Showing pinned only" : `Pinned only (${pinnedHistoryCount})`}
+                      {comparison.showPinnedHistoryOnly
+                        ? "Showing pinned only"
+                        : `Pinned only (${pinnedHistoryCount})`}
                     </button>
                   </div>
                   {!comparison.historyEntries.length ? (
