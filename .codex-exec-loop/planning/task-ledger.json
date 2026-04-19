@@ -3405,19 +3405,37 @@
       "id": "planning-experiment-os-add-audit-level-recommendation-overview-for-workspace-conflict-ranking",
       "direction_id": "experiment-os",
       "title": "Add audit-level recommendation overview for workspace conflict ranking",
-      "description": "Build the final explanation layer on top of the shipped workspace conflict score drill-downs by aggregating which fields and signals most strongly drive the overall recommendation across the whole audit, such as an overview card or ranked summary strip that highlights the strongest recommendation factors before operators inspect individual rows.",
-      "status": "ready",
+      "description": "Build the final explanation layer on top of the shipped workspace conflict score drill-downs by aggregating which fields and signals most strongly drive the overall recommendation across the whole audit, such as an overview card or ranked summary strip that highlights the strongest recommendation factors before operators inspect individual rows. This overview pass is now shipped; interaction handoff from overview chips into row-level drill-down remains a follow-up task.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says the raw field-level totals and signal weights are now visible in commit 6c5868e, and explicitly names the remaining gap as an audit-level overview or ranked summary strip showing which fields most strongly create the recommendation. That makes this the clearest executable next task for the queue head without additional operator decisions.",
+      "priority_reason": "Completed in main session commit 558b79a, which added an audit-level recommendation overview to the workspace conflict card with ranked split, latest local drift, strongest recommendation, and top local versus remote pick chips, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`. The remaining gap is interactive handoff from overview chips into row-level conflict inspection.",
       "depends_on": [
         "planning-experiment-os-add-raw-score-breakdown-drill-down-to-workspace-conflict-ranking"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:20:00Z",
+      "updated_at": "2026-04-20T20:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os workspace conflict explainability from row-level evidence into audit-level triage context so operators can see the strongest recommendation drivers across the entire review set before drilling into individual conflicts."
+    },
+    {
+      "id": "planning-experiment-os-link-workspace-conflict-overview-chips-to-row-drill-down",
+      "direction_id": "experiment-os",
+      "title": "Link workspace conflict overview chips to row scroll and drill-down",
+      "description": "Turn the newly shipped audit-level workspace conflict overview from a read-only summary into an interaction handoff by making strongest-recommendation and top-pick chips jump to the relevant conflict row, reveal the matching score drill-down automatically when useful, and preserve enough selection state that operators can move from audit summary into evidence without manual scanning.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply says the audit-level overview is now complete in commit 558b79a and explicitly names the remaining gap as interaction wiring so strongest and top-pick chips can scroll to the relevant row or open score drill-down automatically. That makes this the clearest executable next task for the queue head without additional operator decisions.",
+      "depends_on": [
+        "planning-experiment-os-add-audit-level-recommendation-overview-for-workspace-conflict-ranking"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:30:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os workspace conflict explainability by connecting audit-level recommendation summaries directly to the row-level evidence operators need next, reducing manual search inside larger conflict reviews."
     },
     {
       "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
