@@ -3982,18 +3982,54 @@
       "direction_id": "experiment-os",
       "title": "Extend eligibility contract across run/list and shared run surfaces",
       "description": "Carry the newly shared comparison eligibility contract beyond `/api/runs/compare` into general run/list APIs and other run-facing surfaces so boundary notes, labels, and eligibility gating come from one backend contract everywhere operators inspect runs, instead of compare-only payload enrichment plus UI fallback logic.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 92,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says the shared domain plus compare API schema work is complete and that the remaining follow-up is to widen the same eligibility contract into normal run/list APIs and other surfaces. That is now the clearest executable next task because it directly continues the shipped contract rollout and removes the remaining compare-only boundary from the experiment model.",
+      "priority_reason": "Completed in main session commit e40e40e, which extended the eligibility contract into shared run serializers for both `/api/runs/compare` and general run payloads, updated web consumers to prefer per-run `eligibility_contract` data across shared run surfaces with comparison payload fallback only, verified with `python -m py_compile`, targeted pytest coverage, `cd apps/web && npx tsc --noEmit`, `git diff --check`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-promote-comparison-eligibility-contract-into-shared-domain-and-api-schema"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:50:00Z",
+      "updated_at": "2026-04-20T13:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os from a compare-surface eligibility contract into a fully shared run interface so list, detail, and comparison experiences all consume the same backend-enforced boundary policy."
+    },
+    {
+      "id": "planning-experiment-os-extract-eligibility-contract-into-shared-capability-surface",
+      "direction_id": "experiment-os",
+      "title": "Extract eligibility contract into a shared capability surface",
+      "description": "Lift the now-shared run payload `eligibility_contract` beyond per-run serialization into a more reusable experiment capability model, such as strategy metadata or a dedicated shared capability/schema endpoint, so run/list, compare, and adjacent experiment surfaces resolve eligibility policy from one common contract instead of copying the same shape through each payload path.",
+      "status": "done",
+      "base_priority": 92,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "Completed in main session commit b7aeda7, which extracted the eligibility contract into the shared `RunSurfaceCapabilities` domain model and `/api/capabilities/run-surfaces` endpoint, updated web consumers to load the shared capability surface on startup and prefer it for labels, boundary notes, and gating, kept embedded payload contracts as compatibility fallback, and verified the change with py_compile, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-extend-eligibility-contract-across-run-list-and-shared-run-surfaces"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T13:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from shared run-payload eligibility fields into a broader experiment capability contract that can be reused across run, comparison, strategy, and future schema-driven operator surfaces."
+    },
+    {
+      "id": "planning-experiment-os-remove-embedded-eligibility-contract-duplication-from-run-and-compare-payloads",
+      "direction_id": "experiment-os",
+      "title": "Remove embedded eligibility contract duplication from run and compare payloads",
+      "description": "Now that `RunSurfaceCapabilities` and `/api/capabilities/run-surfaces` are the canonical eligibility source, remove or intentionally narrow the duplicate embedded `eligibility_contract` copies still carried inside run and compare payloads, while preserving a deliberate compatibility path only where it is still required.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly says the shared capability surface is now canonical and the remaining work is deciding and executing how to retire the duplicated embedded contract from run and compare payloads. That makes this the clearest immediate executable follow-up because it completes the consolidation path the finished capability-surface task intentionally left behind.",
+      "depends_on": [
+        "planning-experiment-os-extract-eligibility-contract-into-shared-capability-surface"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T13:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from introducing a canonical run-surface capability contract into actually eliminating duplicated eligibility-policy payload copies, which keeps the experiment interface enforceable and easier to evolve across run and comparison surfaces."
     }
   ]
 }
