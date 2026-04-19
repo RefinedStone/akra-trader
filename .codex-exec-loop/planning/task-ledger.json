@@ -2685,18 +2685,73 @@
       "direction_id": "experiment-os",
       "title": "Expose strategy semantics in run comparison and artifact views",
       "description": "Extend the newly shipped run-level strategy semantics beyond single-run provenance panels so run comparison rows or cards and benchmark or reference artifact views also surface semantic kind, execution model, parameter contract, source descriptor, and operator notes wherever operators review multiple runs side by side.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly says run comparison rows or cards and benchmark or reference artifact views still do not expose the new strategy semantics. This is the clearest executable next step because it is a direct continuation of the completed provenance work and keeps multi-run review surfaces aligned with the run snapshot semantics already shipped.",
+      "priority_reason": "Completed in main session commit 8e070b0, which added `catalog_semantics` to comparison payloads and surfaced semantic kind, execution model, parameter contract, semantic source, and operator notes in control-room comparison cards plus reference artifact and provenance blocks, then verified the change with py_compile, targeted pytest, web typecheck, diff checks, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-propagate-catalog-semantics-into-run-provenance-views"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:52:00Z",
+      "updated_at": "2026-04-19T11:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os strategy provenance from single-run inspection into the multi-run comparison and benchmark review surfaces operators use for promotion and benchmark decisions."
+    },
+    {
+      "id": "planning-experiment-os-use-strategy-semantics-in-comparison-narratives-and-metric-annotations",
+      "direction_id": "experiment-os",
+      "title": "Use strategy semantics in comparison narratives and metric annotations",
+      "description": "Build on the newly exposed comparison and artifact semantics by teaching comparison narrative generation and metric annotation layers to incorporate semantic kind, execution model, parameter contract, source, and operator notes, so multi-run summaries explain why runs differ instead of only displaying the metadata alongside them.",
+      "status": "done",
+      "base_priority": 91,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "Completed in main session commit 8da3dd6, which wired strategy semantics into comparison metric annotations and narrative generation so baseline, reference, and imported roles appear in metric delta copy, title subjects, summary text, and native-vs-reference lane bullets, then verified with py_compile, four targeted pytest cases, diff checks, and push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-expose-strategy-semantics-in-comparison-and-artifact-views"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from showing strategy semantics as passive provenance into using them inside comparison explanations and metric context, which better supports promotion and benchmark interpretation."
+    }
+    ,
+    {
+      "id": "planning-experiment-os-apply-strategy-semantics-to-comparison-ranking-and-score-calculation",
+      "direction_id": "experiment-os",
+      "title": "Apply strategy semantics to comparison ranking and score calculation",
+      "description": "Extend the newly shipped semantic narrative and annotation layer into the comparison scorer itself so run ranking and score calculation can distinguish baseline, reference, imported, and native semantic roles plus execution-model context, instead of remaining purely metric-delta ordered with semantics only visible in explanatory copy.",
+      "status": "done",
+      "base_priority": 92,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "Completed in main session commit f5942c2, which updated comparison `insight_score` to add weighted strategy-semantic deltas on top of metric deltas, making imported-module and other semantic-rich variants rank above otherwise-equal native runs, then verified with py_compile, five targeted pytest cases, `git diff --check`, and push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-use-strategy-semantics-in-comparison-narratives-and-metric-annotations"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os comparison review from semantic explanation into semantic-aware decision support by letting ranking and score calculation account for strategy role and provenance context, not just raw metric deltas."
+    },
+    {
+      "id": "planning-experiment-os-deepen-semantic-score-interpretation-with-vocabulary-and-provenance-richness",
+      "direction_id": "experiment-os",
+      "title": "Deepen semantic comparison scoring with strategy vocabulary and provenance richness",
+      "description": "Build on the shipped semantic-weighted comparison scorer by adding explicit score features for strategy-specific vocabulary and artifact-derived provenance richness, so semantic ranking reflects not only field-difference bonuses but also how much interpretable strategy intent and source evidence a run carries.",
+      "status": "ready",
+      "base_priority": 92,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply says the remaining work is semantic-score interpretation: scoring still uses weighted field-difference bonuses only and does not yet incorporate strategy-specific vocabulary or artifact-derived provenance richness. That is the clearest executable next step, so it should become the new queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-apply-strategy-semantics-to-comparison-ranking-and-score-calculation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T11:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os comparison scoring from generic semantic bonuses into richer operator-meaningful ranking that can distinguish semantically well-described strategies by intent vocabulary and provenance evidence quality."
     }
   ]
 }
