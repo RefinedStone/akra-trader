@@ -3190,18 +3190,36 @@
       "direction_id": "experiment-os",
       "title": "Polish touch sweep gestures for the manual gap-window picker",
       "description": "Extend the newly shipped pointer drag sweep model so touch-first operators can intentionally long-press and drag across visible gap-window rows without accidental taps or scroll fights, bringing the manual picker's high-volume selection workflow beyond mouse and pen input.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply says the remaining concrete follow-up is finer gesture polish, specifically that sweep currently works well for mouse and pen via pointer-enter semantics while touch-only long-press and drag UX still needs dedicated handling. This is the clearest executable next task after commit aadecbf completed pointer sweep for desktop-style input.",
+      "priority_reason": "Completed in main session commit 3d20cbc, which changed the manual gap-window picker touch flow to require long-press before sweep mode activates, cancels small pre-activation moves as scroll intent, tracks rows under the finger via `elementFromPoint`, preserves tap-to-toggle behavior for short taps, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-pointer-drag-sweep-selection-to-manual-gap-window-picker"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T17:50:00Z",
+      "updated_at": "2026-04-20T18:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os manual gap subset editing from desktop pointer efficiency into touch-capable operator workflows so the picker's large-range curation gestures are usable across input modes."
+    },
+    {
+      "id": "planning-experiment-os-add-hold-progress-feedback-to-manual-gap-window-picker-touch-sweep",
+      "direction_id": "experiment-os",
+      "title": "Add hold-progress feedback to manual gap-window picker touch sweep",
+      "description": "Build on the shipped touch long-press sweep gesture by giving touch-first operators clear hold-state feedback before sweep activation, such as visible press progress and mobile-friendly activation cues, so the picker communicates when a press will become a sweep instead of relying on invisible timing alone.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply explicitly says the remaining mobile polish is that touch sweep now works through long-press, but still lacks any haptic or visual hold-progress feedback. This is the clearest executable next task after commit 3d20cbc completed the underlying touch sweep activation model.",
+      "depends_on": [
+        "planning-experiment-os-polish-touch-sweep-gestures-for-manual-gap-window-picker"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T18:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os touch usability for manual gap subset editing by turning the newly reliable long-press sweep gesture into a legible mobile interaction with explicit activation feedback."
     },
     {
       "id": "planning-experiment-os-decide-whether-manual-gap-picker-open-state-should-restore-after-reload",
@@ -3211,13 +3229,13 @@
       "status": "proposed",
       "base_priority": 84,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply notes that the picker's drag-selection anchor remains local UI state and does not restore after reload or picker close, alongside the existing open-state question. That persistence gap is real, but it still needs a product decision about which transient picker UI state should survive reload versus stay intentionally ephemeral, so keep it proposed.",
+      "priority_reason": "The latest main-session reply says the touch drag anchor and hold state remain picker-local gesture state and still do not restore across sessions, alongside the existing open-state question. That persistence gap is real, but it still needs a product decision about which transient picker UI state should survive reload versus stay intentionally ephemeral, so keep it proposed.",
       "depends_on": [
         "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T17:50:00Z",
+      "updated_at": "2026-04-20T18:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Captures the remaining persistence-contract question around the new manual gap picker so experiment-os workspace behavior stays intentional across reload and resume flows."
     },
