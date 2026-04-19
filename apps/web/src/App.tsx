@@ -2785,7 +2785,7 @@ const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
-const CONTROL_ROOM_UI_STATE_VERSION = 3;
+const CONTROL_ROOM_UI_STATE_VERSION = 4;
 const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
 const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
 const COMPARISON_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-comparison-history-tab-id";
@@ -2805,6 +2805,7 @@ const COMPARISON_FOCUS_COMPONENT_SEARCH_PARAM = "compare_focus_component";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
+type ExpandedGapWindowSelections = Record<string, string[]>;
 
 type ControlRoomUiStateV1 = {
   version: 1;
@@ -2877,7 +2878,8 @@ type ComparisonHistorySyncWorkspaceFieldKey =
   | "expandedGapRows";
 type ComparisonHistorySyncWorkspaceReviewSelectionKey =
   | ComparisonHistorySyncWorkspaceFieldKey
-  | `expandedGapRows:${string}`;
+  | `expandedGapRows:${string}`
+  | `expandedGapWindows|${string}|${string}`;
 type ComparisonHistorySyncAuditFilter =
   | "all"
   | "conflicts"
@@ -2924,6 +2926,7 @@ type ComparisonHistorySyncPreferenceReview = {
 type ComparisonHistorySyncWorkspaceState = {
   comparisonSelection: ControlRoomComparisonSelectionState;
   expandedGapRows: Record<string, boolean>;
+  expandedGapWindowSelections: ExpandedGapWindowSelections;
 };
 
 type ComparisonHistorySyncWorkspaceReview = {
@@ -3010,8 +3013,16 @@ type ControlRoomUiStateV2 = {
 };
 
 type ControlRoomUiStateV3 = {
+  version: 3;
+  expandedGapRows: Record<string, boolean>;
+  comparisonSelection: ControlRoomComparisonSelectionState;
+  comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
+};
+
+type ControlRoomUiStateV4 = {
   version: typeof CONTROL_ROOM_UI_STATE_VERSION;
   expandedGapRows: Record<string, boolean>;
+  expandedGapWindowSelections: ExpandedGapWindowSelections;
   comparisonSelection: ControlRoomComparisonSelectionState;
   comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
 };
@@ -4699,6 +4710,9 @@ export default function App() {
   const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
     loadExpandedGapRows,
   );
+  const [expandedGapWindowSelections, setExpandedGapWindowSelections] = useState<ExpandedGapWindowSelections>(
+    loadExpandedGapWindowSelections,
+  );
   const [comparisonHistoryPanel, setComparisonHistoryPanel] = useState<ComparisonHistoryPanelState>(
     () =>
       initialComparisonHistoryPanelUiStateRef.current?.panel ?? defaultComparisonHistoryPanelState(),
@@ -4774,6 +4788,7 @@ export default function App() {
         comparisonSelection,
         comparisonHistoryPanel,
         expandedGapRows,
+        expandedGapWindowSelections,
         historyBrowserOpen: comparisonHistoryPanelOpen,
         historySearchQuery: comparisonHistorySearchQuery,
         showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
@@ -4783,6 +4798,7 @@ export default function App() {
     [
       comparisonHistoryPanel,
       expandedGapRows,
+      expandedGapWindowSelections,
       comparisonHistoryPanelOpen,
       comparisonHistorySearchQuery,
       comparisonHistoryShowPinnedOnly,
@@ -5006,6 +5022,8 @@ export default function App() {
         remoteComparisonSelection: remoteState.comparisonSelection,
         localExpandedGapRows: expandedGapRows,
         remoteExpandedGapRows: remoteState.expandedGapRows,
+        localExpandedGapWindowSelections: expandedGapWindowSelections,
+        remoteExpandedGapWindowSelections: remoteState.expandedGapWindowSelections,
         localOpen: comparisonHistoryPanelOpen,
         remoteOpen: remoteState.comparisonHistoryPanel.open,
         localSearchQuery: comparisonHistorySearchQuery,
@@ -5046,6 +5064,7 @@ export default function App() {
     comparisonHistoryPanel,
     comparisonHistorySharedSyncState,
     expandedGapRows,
+    expandedGapWindowSelections,
     comparisonHistoryPanelOpen,
     comparisonHistorySearchQuery,
     comparisonHistoryShowPinnedOnly,
@@ -5120,6 +5139,7 @@ export default function App() {
         sync: nextSharedSyncState,
       },
       expandedGapRows,
+      expandedGapWindowSelections,
     });
   }, [
     comparisonHistorySyncSignature,
@@ -5133,6 +5153,7 @@ export default function App() {
     comparisonHistoryTabIdentity,
     comparisonSelection,
     expandedGapRows,
+    expandedGapWindowSelections,
   ]);
 
   useEffect(() => {
@@ -5568,6 +5589,9 @@ export default function App() {
     const nextExpandedGapRows = marketStatus
       ? pruneExpandedGapRows(resolvedState.expandedGapRows, marketStatus)
       : filterExpandedGapRows(resolvedState.expandedGapRows);
+    const nextExpandedGapWindowSelections = marketStatus
+      ? pruneExpandedGapWindowSelections(resolvedState.expandedGapWindowSelections, marketStatus)
+      : filterExpandedGapWindowSelections(resolvedState.expandedGapWindowSelections);
     if (!isSameComparisonSelection(comparisonSelection, nextComparisonSelection)) {
       queueComparisonHistoryWriteMode("push");
       applyComparisonSelectionState(nextComparisonSelection);
@@ -5575,6 +5599,11 @@ export default function App() {
     if (!isSameComparisonHistoryExpandedGapRows(expandedGapRows, nextExpandedGapRows)) {
       setExpandedGapRows(nextExpandedGapRows);
     }
+    setExpandedGapWindowSelections((current) =>
+      isSameExpandedGapWindowSelections(current, nextExpandedGapWindowSelections)
+        ? current
+        : nextExpandedGapWindowSelections,
+    );
     setComparisonHistorySharedSyncState(buildComparisonHistoryPanelSyncState(comparisonHistoryTabIdentity));
     setComparisonHistorySyncAuditTrail((current) =>
       current.map((entry) => {
@@ -5598,6 +5627,7 @@ export default function App() {
       return;
     }
     setExpandedGapRows((current) => pruneExpandedGapRows(current, marketStatus));
+    setExpandedGapWindowSelections((current) => pruneExpandedGapWindowSelections(current, marketStatus));
   }, [marketStatus]);
 
   const strategyGroups = useMemo(() => {
@@ -6388,9 +6418,23 @@ export default function App() {
                         <BackfillQualityStatus
                           expanded={Boolean(expandedGapRows[instrumentGapRowKey(instrument)])}
                           instrument={instrument}
+                          selectedGapWindowKeys={
+                            expandedGapWindowSelections[instrumentGapRowKey(instrument)] ?? null
+                          }
                           onToggle={() => {
                             const key = instrumentGapRowKey(instrument);
+                            const gapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
+                              buildGapWindowKey(gapWindow),
+                            );
                             setExpandedGapRows((current) => toggleExpandedGapRow(current, key));
+                            setExpandedGapWindowSelections((current) => {
+                              if (current[key]?.length) {
+                                return current;
+                              }
+                              return gapWindowKeys.length
+                                ? { ...current, [key]: gapWindowKeys }
+                                : current;
+                            });
                           }}
                         />
                       </td>
@@ -8089,17 +8133,24 @@ function BackfillQualityStatus({
   expanded,
   instrument,
   onToggle,
+  selectedGapWindowKeys,
 }: {
   expanded: boolean;
   instrument: MarketDataStatus["instruments"][number];
   onToggle: () => void;
+  selectedGapWindowKeys?: string[] | null;
 }) {
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
+  const visibleGapWindowKeys = new Set(selectedGapWindowKeys ?? []);
+  const selectedGapWindows =
+    expanded && visibleGapWindowKeys.size
+      ? instrument.backfill_gap_windows.filter((gap) => visibleGapWindowKeys.has(buildGapWindowKey(gap)))
+      : instrument.backfill_gap_windows;
   const canToggleGapWindows = instrument.backfill_gap_windows.length > MAX_VISIBLE_GAP_WINDOWS;
   const gapLines = expanded
-    ? formatGapWindows(instrument.backfill_gap_windows)
+    ? formatGapWindows(selectedGapWindows)
     : summarizeGapWindows(instrument.backfill_gap_windows);
   return (
     <div className="progress-stack">
@@ -8120,6 +8171,9 @@ function BackfillQualityStatus({
             </span>
           ))}
         </div>
+      ) : null}
+      {expanded && visibleGapWindowKeys.size && visibleGapWindowKeys.size < instrument.backfill_gap_windows.length ? (
+        <span>{`Review subset: ${visibleGapWindowKeys.size} / ${instrument.backfill_gap_windows.length} gaps`}</span>
       ) : null}
       {canToggleGapWindows ? (
         <button
@@ -8235,6 +8289,54 @@ function formatGapWindows(
   }));
 }
 
+function buildGapWindowKey(
+  gapWindow: MarketDataStatus["instruments"][number]["backfill_gap_windows"][number],
+) {
+  return `${gapWindow.start_at}|${gapWindow.end_at}|${gapWindow.missing_candles}`;
+}
+
+function parseGapWindowKey(key: string) {
+  const [startAt, endAt, missingCandlesRaw] = key.split("|");
+  const missingCandles = Number(missingCandlesRaw);
+  return {
+    startAt: startAt || null,
+    endAt: endAt || null,
+    missingCandles: Number.isFinite(missingCandles) ? missingCandles : null,
+  };
+}
+
+function formatGapWindowKeyLabel(key: string) {
+  const parsed = parseGapWindowKey(key);
+  return `${formatRange(parsed.startAt, parsed.endAt)} (${parsed.missingCandles ?? "n/a"})`;
+}
+
+function normalizeExpandedGapWindowSelectionList(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return [...new Set(value.filter((candidate): candidate is string => typeof candidate === "string" && candidate.trim().length > 0))].sort();
+}
+
+function filterExpandedGapWindowSelections(value: unknown): ExpandedGapWindowSelections {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>)
+      .map(([rowKey, selectedWindows]) => [rowKey, normalizeExpandedGapWindowSelectionList(selectedWindows)] as const)
+      .filter(([, selectedWindows]) => selectedWindows.length > 0),
+  );
+}
+
+function buildGapWindowSelectionLookup(marketStatus: MarketDataStatus) {
+  return Object.fromEntries(
+    marketStatus.instruments.map((instrument) => [
+      instrumentGapRowKey(instrument),
+      instrument.backfill_gap_windows.map((gapWindow) => buildGapWindowKey(gapWindow)),
+    ]),
+  ) as Record<string, string[]>;
+}
+
 function instrumentGapRowKey(instrument: MarketDataStatus["instruments"][number]) {
   return `${instrument.instrument_id}:${instrument.timeframe}`;
 }
@@ -8271,12 +8373,49 @@ function pruneExpandedGapRows(
   return next;
 }
 
+function pruneExpandedGapWindowSelections(
+  current: ExpandedGapWindowSelections,
+  marketStatus: MarketDataStatus,
+) {
+  const activeSelections = buildGapWindowSelectionLookup(marketStatus);
+  const next = Object.fromEntries(
+    Object.entries(filterExpandedGapWindowSelections(current)).flatMap(([rowKey, selectedWindows]) => {
+      const activeWindows = new Set(activeSelections[rowKey] ?? []);
+      if (!activeWindows.size) {
+        return [];
+      }
+      const nextSelectedWindows = selectedWindows.filter((windowKey) => activeWindows.has(windowKey));
+      return nextSelectedWindows.length ? [[rowKey, nextSelectedWindows]] : [];
+    }),
+  );
+  const currentEntries = Object.entries(filterExpandedGapWindowSelections(current));
+  const nextEntries = Object.entries(next);
+  if (
+    currentEntries.length === nextEntries.length
+    && currentEntries.every(([rowKey, selectedWindows], index) => {
+      const [nextRowKey, nextSelectedWindows] = nextEntries[index] ?? [];
+      return (
+        rowKey === nextRowKey
+        && selectedWindows.length === (nextSelectedWindows?.length ?? 0)
+        && selectedWindows.every((windowKey, windowIndex) => windowKey === nextSelectedWindows?.[windowIndex])
+      );
+    })
+  ) {
+    return current;
+  }
+  return next;
+}
+
 function loadExpandedGapRows() {
   const persistedState = loadControlRoomUiState();
   if (persistedState) {
     return persistedState.expandedGapRows;
   }
   return loadLegacyExpandedGapRows();
+}
+
+function loadExpandedGapWindowSelections() {
+  return loadControlRoomUiState()?.expandedGapWindowSelections ?? {};
 }
 
 function defaultControlRoomComparisonSelectionState(): ControlRoomComparisonSelectionState {
@@ -8318,23 +8457,33 @@ function loadPersistedComparisonHistoryPanelUiState(): ControlRoomComparisonHist
   return loadControlRoomUiState()?.comparisonHistoryPanel ?? defaultComparisonHistoryPanelUiState();
 }
 
-function loadControlRoomUiState(): ControlRoomUiStateV3 | null {
+function loadControlRoomUiState(): ControlRoomUiStateV4 | null {
   if (typeof window === "undefined") {
     return null;
   }
   return readControlRoomUiStateValue(window.localStorage.getItem(CONTROL_ROOM_UI_STATE_STORAGE_KEY));
 }
 
-function readControlRoomUiStateValue(raw: string | null): ControlRoomUiStateV3 | null {
+function readControlRoomUiStateValue(raw: string | null): ControlRoomUiStateV4 | null {
   if (!raw) {
     return null;
   }
   try {
     const parsed = JSON.parse(raw);
-    if (isControlRoomUiStateV3(parsed)) {
+    if (isControlRoomUiStateV4(parsed)) {
       return {
         version: parsed.version,
         expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+        expandedGapWindowSelections: filterExpandedGapWindowSelections(parsed.expandedGapWindowSelections),
+        comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
+        comparisonHistoryPanel: normalizeComparisonHistoryPanelUiState(parsed.comparisonHistoryPanel),
+      };
+    }
+    if (isControlRoomUiStateV3(parsed)) {
+      return {
+        version: CONTROL_ROOM_UI_STATE_VERSION,
+        expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+        expandedGapWindowSelections: {},
         comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
         comparisonHistoryPanel: normalizeComparisonHistoryPanelUiState(parsed.comparisonHistoryPanel),
       };
@@ -8343,6 +8492,7 @@ function readControlRoomUiStateValue(raw: string | null): ControlRoomUiStateV3 |
       return {
         version: CONTROL_ROOM_UI_STATE_VERSION,
         expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+        expandedGapWindowSelections: {},
         comparisonSelection: normalizeControlRoomComparisonSelection(parsed.comparisonSelection),
         comparisonHistoryPanel: defaultComparisonHistoryPanelUiState(),
       };
@@ -8353,6 +8503,7 @@ function readControlRoomUiStateValue(raw: string | null): ControlRoomUiStateV3 |
     return {
       version: CONTROL_ROOM_UI_STATE_VERSION,
       expandedGapRows: filterExpandedGapRows(parsed.expandedGapRows),
+      expandedGapWindowSelections: {},
       comparisonSelection: defaultControlRoomComparisonSelectionState(),
       comparisonHistoryPanel: defaultComparisonHistoryPanelUiState(),
     };
@@ -8365,16 +8516,18 @@ function persistControlRoomUiState(state: {
   comparisonSelection: ControlRoomComparisonSelectionState;
   comparisonHistoryPanel: ControlRoomComparisonHistoryPanelUiState;
   expandedGapRows: Record<string, boolean>;
+  expandedGapWindowSelections: ExpandedGapWindowSelections;
 }) {
   if (typeof window === "undefined") {
     return;
   }
   try {
-    const nextState: ControlRoomUiStateV3 = {
+    const nextState: ControlRoomUiStateV4 = {
       version: CONTROL_ROOM_UI_STATE_VERSION,
       comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
       comparisonHistoryPanel: normalizeComparisonHistoryPanelUiState(state.comparisonHistoryPanel),
       expandedGapRows: filterExpandedGapRows(state.expandedGapRows),
+      expandedGapWindowSelections: filterExpandedGapWindowSelections(state.expandedGapWindowSelections),
     };
     window.localStorage.setItem(
       CONTROL_ROOM_UI_STATE_STORAGE_KEY,
@@ -8661,6 +8814,7 @@ function buildComparisonHistorySyncSignature(state: {
   comparisonSelection: ControlRoomComparisonSelectionState;
   comparisonHistoryPanel: ComparisonHistoryPanelState;
   expandedGapRows: Record<string, boolean>;
+  expandedGapWindowSelections: ExpandedGapWindowSelections;
   historyBrowserOpen: boolean;
   historySearchQuery: string;
   showPinnedHistoryOnly: boolean;
@@ -8671,6 +8825,7 @@ function buildComparisonHistorySyncSignature(state: {
     comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
     comparisonHistoryPanel: normalizeComparisonHistoryPanelState(state.comparisonHistoryPanel),
     expandedGapRowKeys: listComparisonHistoryExpandedGapRowKeys(state.expandedGapRows),
+    expandedGapWindowSelections: filterExpandedGapWindowSelections(state.expandedGapWindowSelections),
     historyBrowserOpen: state.historyBrowserOpen,
     historySearchQuery: state.historySearchQuery.trim(),
     showPinnedHistoryOnly: state.showPinnedHistoryOnly,
@@ -9124,6 +9279,7 @@ function normalizeComparisonHistorySyncWorkspaceState(
   return {
     comparisonSelection: normalizeControlRoomComparisonSelection(candidate.comparisonSelection),
     expandedGapRows: filterExpandedGapRows(candidate.expandedGapRows),
+    expandedGapWindowSelections: filterExpandedGapWindowSelections(candidate.expandedGapWindowSelections),
   };
 }
 
@@ -9160,7 +9316,7 @@ function normalizeComparisonHistorySyncWorkspaceSelectedSources(
     return accumulator;
   }, {});
   Object.entries(value as Record<string, unknown>).forEach(([key, candidate]) => {
-    if (!key.startsWith("expandedGapRows:")) {
+    if (!key.startsWith("expandedGapRows:") && !key.startsWith("expandedGapWindows|")) {
       return;
     }
     if (candidate === "local" || candidate === "remote") {
@@ -9794,6 +9950,42 @@ function parseComparisonHistoryExpandedGapRowSelectionKey(
   return fieldKey.startsWith("expandedGapRows:") ? fieldKey.slice("expandedGapRows:".length) : null;
 }
 
+function buildComparisonHistoryExpandedGapWindowSelectionKey(
+  rowKey: string,
+  windowKey: string,
+): ComparisonHistorySyncWorkspaceReviewSelectionKey {
+  return `expandedGapWindows|${encodeURIComponent(rowKey)}|${encodeURIComponent(windowKey)}`;
+}
+
+function parseComparisonHistoryExpandedGapWindowSelectionKey(
+  fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
+) {
+  if (!fieldKey.startsWith("expandedGapWindows|")) {
+    return null;
+  }
+  const [, encodedRowKey = "", encodedWindowKey = ""] = fieldKey.split("|");
+  return {
+    rowKey: decodeURIComponent(encodedRowKey),
+    windowKey: decodeURIComponent(encodedWindowKey),
+  };
+}
+
+function listComparisonHistoryExpandedGapWindowDiffKeys(
+  localExpandedGapWindowSelections: ExpandedGapWindowSelections,
+  remoteExpandedGapWindowSelections: ExpandedGapWindowSelections,
+  rowKey: string,
+) {
+  const keys = new Set([
+    ...(localExpandedGapWindowSelections[rowKey] ?? []),
+    ...(remoteExpandedGapWindowSelections[rowKey] ?? []),
+  ]);
+  return [...keys].sort().filter(
+    (windowKey) =>
+      (localExpandedGapWindowSelections[rowKey] ?? []).includes(windowKey)
+      !== (remoteExpandedGapWindowSelections[rowKey] ?? []).includes(windowKey),
+  );
+}
+
 function isSameComparisonHistoryExpandedGapRows(
   left: Record<string, boolean>,
   right: Record<string, boolean>,
@@ -9803,6 +9995,31 @@ function isSameComparisonHistoryExpandedGapRows(
   return (
     leftKeys.length === rightKeys.length
     && leftKeys.every((key, index) => key === rightKeys[index])
+  );
+}
+
+function isSameExpandedGapWindowSelections(
+  left: ExpandedGapWindowSelections,
+  right: ExpandedGapWindowSelections,
+) {
+  const normalizedLeft = filterExpandedGapWindowSelections(left);
+  const normalizedRight = filterExpandedGapWindowSelections(right);
+  const leftEntries = Object.entries(normalizedLeft).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  );
+  const rightEntries = Object.entries(normalizedRight).sort(([leftKey], [rightKey]) =>
+    leftKey.localeCompare(rightKey),
+  );
+  return (
+    leftEntries.length === rightEntries.length
+    && leftEntries.every(([rowKey, selectedWindows], index) => {
+      const [rightRowKey, rightSelectedWindows] = rightEntries[index] ?? [];
+      return (
+        rowKey === rightRowKey
+        && selectedWindows.length === (rightSelectedWindows?.length ?? 0)
+        && selectedWindows.every((windowKey, windowIndex) => windowKey === rightSelectedWindows?.[windowIndex])
+      );
+    })
   );
 }
 
@@ -9851,6 +10068,10 @@ function formatComparisonHistoryExpandedGapRowsDiffValue(
 function formatComparisonHistorySyncWorkspaceSelectionKeyLabel(
   fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
 ) {
+  const expandedGapWindowSelection = parseComparisonHistoryExpandedGapWindowSelectionKey(fieldKey);
+  if (expandedGapWindowSelection) {
+    return `Gap window · ${formatComparisonHistoryExpandedGapRowKey(expandedGapWindowSelection.rowKey)} · ${formatGapWindowKeyLabel(expandedGapWindowSelection.windowKey)}`;
+  }
   const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
   if (expandedGapRowKey) {
     return `Expanded gap row · ${formatComparisonHistoryExpandedGapRowKey(expandedGapRowKey)}`;
@@ -9865,6 +10086,8 @@ function summarizeComparisonHistorySyncWorkspaceChanges(state: {
   remoteComparisonSelection: ControlRoomComparisonSelectionState;
   localExpandedGapRows: Record<string, boolean>;
   remoteExpandedGapRows: Record<string, boolean>;
+  localExpandedGapWindowSelections: ExpandedGapWindowSelections;
+  remoteExpandedGapWindowSelections: ExpandedGapWindowSelections;
 }) {
   const changes: string[] = [];
   if (state.localComparisonSelection.intent !== state.remoteComparisonSelection.intent) {
@@ -9905,16 +10128,36 @@ function summarizeComparisonHistorySyncWorkspaceChanges(state: {
       )}`,
     );
   }
+  const changedGapWindowCount = Object.keys(filterExpandedGapWindowSelections(state.localExpandedGapWindowSelections))
+    .reduce((total, rowKey) => {
+      const localSelectedWindows = state.localExpandedGapWindowSelections[rowKey] ?? [];
+      const remoteSelectedWindows = state.remoteExpandedGapWindowSelections[rowKey] ?? [];
+      const changedWindows = new Set([...localSelectedWindows, ...remoteSelectedWindows]);
+      return total + [...changedWindows].filter(
+        (windowKey) => localSelectedWindows.includes(windowKey) !== remoteSelectedWindows.includes(windowKey),
+      ).length;
+    }, 0)
+    + Object.keys(filterExpandedGapWindowSelections(state.remoteExpandedGapWindowSelections))
+      .filter((rowKey) => !(rowKey in state.localExpandedGapWindowSelections))
+      .reduce(
+        (total, rowKey) => total + (state.remoteExpandedGapWindowSelections[rowKey]?.length ?? 0),
+        0,
+      );
+  if (changedGapWindowCount > 0) {
+    changes.push(`${changedGapWindowCount} gap-window selections changed`);
+  }
   return changes;
 }
 
 function buildComparisonHistorySyncWorkspaceState(state: {
   comparisonSelection: ControlRoomComparisonSelectionState;
   expandedGapRows: Record<string, boolean>;
+  expandedGapWindowSelections: ExpandedGapWindowSelections;
 }): ComparisonHistorySyncWorkspaceState {
   return {
     comparisonSelection: normalizeControlRoomComparisonSelection(state.comparisonSelection),
     expandedGapRows: filterExpandedGapRows(state.expandedGapRows),
+    expandedGapWindowSelections: filterExpandedGapWindowSelections(state.expandedGapWindowSelections),
   };
 }
 
@@ -9922,6 +10165,14 @@ function formatComparisonHistorySyncWorkspaceFieldValue(
   fieldKey: ComparisonHistorySyncWorkspaceReviewSelectionKey,
   state: ComparisonHistorySyncWorkspaceState,
 ) {
+  const expandedGapWindowSelection = parseComparisonHistoryExpandedGapWindowSelectionKey(fieldKey);
+  if (expandedGapWindowSelection) {
+    return (state.expandedGapWindowSelections[expandedGapWindowSelection.rowKey] ?? []).includes(
+      expandedGapWindowSelection.windowKey,
+    )
+      ? "Visible"
+      : "Hidden";
+  }
   const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
   if (expandedGapRowKey) {
     return state.expandedGapRows[expandedGapRowKey] ? "Expanded" : "Collapsed";
@@ -9945,6 +10196,15 @@ function hasComparisonHistorySyncWorkspaceFieldDifference(
   localState: ComparisonHistorySyncWorkspaceState,
   remoteState: ComparisonHistorySyncWorkspaceState,
 ) {
+  const expandedGapWindowSelection = parseComparisonHistoryExpandedGapWindowSelectionKey(fieldKey);
+  if (expandedGapWindowSelection) {
+    return (localState.expandedGapWindowSelections[expandedGapWindowSelection.rowKey] ?? []).includes(
+      expandedGapWindowSelection.windowKey,
+    )
+      !== (remoteState.expandedGapWindowSelections[expandedGapWindowSelection.rowKey] ?? []).includes(
+        expandedGapWindowSelection.windowKey,
+      );
+  }
   const expandedGapRowKey = parseComparisonHistoryExpandedGapRowSelectionKey(fieldKey);
   if (expandedGapRowKey) {
     return Boolean(localState.expandedGapRows[expandedGapRowKey])
@@ -10000,6 +10260,18 @@ function buildDefaultComparisonHistorySyncWorkspaceSelectedSources(
   ).forEach((key) => {
     selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(key)] = "remote";
   });
+  new Set([
+    ...Object.keys(localState.expandedGapWindowSelections),
+    ...Object.keys(remoteState.expandedGapWindowSelections),
+  ]).forEach((rowKey) => {
+    listComparisonHistoryExpandedGapWindowDiffKeys(
+      localState.expandedGapWindowSelections,
+      remoteState.expandedGapWindowSelections,
+      rowKey,
+    ).forEach((windowKey) => {
+      selectedSources[buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey)] = "remote";
+    });
+  });
   return selectedSources;
 }
 
@@ -10008,14 +10280,18 @@ function buildComparisonHistorySyncWorkspaceReview(state: {
   remoteComparisonSelection: ControlRoomComparisonSelectionState;
   localExpandedGapRows: Record<string, boolean>;
   remoteExpandedGapRows: Record<string, boolean>;
+  localExpandedGapWindowSelections: ExpandedGapWindowSelections;
+  remoteExpandedGapWindowSelections: ExpandedGapWindowSelections;
 }): ComparisonHistorySyncWorkspaceReview {
   const localState = buildComparisonHistorySyncWorkspaceState({
     comparisonSelection: state.localComparisonSelection,
     expandedGapRows: state.localExpandedGapRows,
+    expandedGapWindowSelections: state.localExpandedGapWindowSelections,
   });
   const remoteState = buildComparisonHistorySyncWorkspaceState({
     comparisonSelection: state.remoteComparisonSelection,
     expandedGapRows: state.remoteExpandedGapRows,
+    expandedGapWindowSelections: state.remoteExpandedGapWindowSelections,
   });
   return {
     localState,
@@ -10066,6 +10342,29 @@ function buildComparisonHistorySyncWorkspaceReviewRows(
           ?? "remote",
       };
     }),
+    ...[...new Set([
+      ...Object.keys(review.localState.expandedGapWindowSelections),
+      ...Object.keys(review.remoteState.expandedGapWindowSelections),
+    ])].flatMap((rowKey) =>
+      listComparisonHistoryExpandedGapWindowDiffKeys(
+        review.localState.expandedGapWindowSelections,
+        review.remoteState.expandedGapWindowSelections,
+        rowKey,
+      ).map((windowKey) => {
+        const fieldKey = buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey);
+        return {
+          fieldKey,
+          label: formatComparisonHistorySyncWorkspaceSelectionKeyLabel(fieldKey),
+          localValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.localState),
+          remoteValue: formatComparisonHistorySyncWorkspaceFieldValue(fieldKey, review.remoteState),
+          selectedSource:
+            review.selectedSources[fieldKey]
+            ?? review.selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(rowKey)]
+            ?? review.selectedSources.expandedGapRows
+            ?? "remote",
+        };
+      }),
+    ),
   );
 }
 
@@ -10111,11 +10410,21 @@ function resolveComparisonHistorySyncWorkspaceReview(
   }
   const localExpandedGapRows = filterExpandedGapRows(review.localState.expandedGapRows);
   const remoteExpandedGapRows = filterExpandedGapRows(review.remoteState.expandedGapRows);
+  const localExpandedGapWindowSelections = filterExpandedGapWindowSelections(
+    review.localState.expandedGapWindowSelections,
+  );
+  const remoteExpandedGapWindowSelections = filterExpandedGapWindowSelections(
+    review.remoteState.expandedGapWindowSelections,
+  );
   const aggregateExpandedGapRowsSource = review.selectedSources.expandedGapRows;
   const resolvedExpandedGapRows =
     aggregateExpandedGapRowsSource === "local"
       ? { ...localExpandedGapRows }
       : { ...remoteExpandedGapRows };
+  const resolvedExpandedGapWindowSelections =
+    aggregateExpandedGapRowsSource === "local"
+      ? { ...localExpandedGapWindowSelections }
+      : { ...remoteExpandedGapWindowSelections };
   listComparisonHistoryExpandedGapRowDiffKeys(
     localExpandedGapRows,
     remoteExpandedGapRows,
@@ -10132,9 +10441,51 @@ function resolveComparisonHistorySyncWorkspaceReview(
     }
     delete resolvedExpandedGapRows[key];
   });
+  new Set([
+    ...Object.keys(localExpandedGapWindowSelections),
+    ...Object.keys(remoteExpandedGapWindowSelections),
+  ]).forEach((rowKey) => {
+    const aggregateRowSource =
+      review.selectedSources[buildComparisonHistoryExpandedGapRowSelectionKey(rowKey)]
+      ?? aggregateExpandedGapRowsSource
+      ?? "remote";
+    const defaultWindowSelections =
+      aggregateRowSource === "local"
+        ? localExpandedGapWindowSelections[rowKey] ?? []
+        : remoteExpandedGapWindowSelections[rowKey] ?? [];
+    resolvedExpandedGapWindowSelections[rowKey] = [...defaultWindowSelections];
+    listComparisonHistoryExpandedGapWindowDiffKeys(
+      localExpandedGapWindowSelections,
+      remoteExpandedGapWindowSelections,
+      rowKey,
+    ).forEach((windowKey) => {
+      const fieldKey = buildComparisonHistoryExpandedGapWindowSelectionKey(rowKey, windowKey);
+      const source =
+        review.selectedSources[fieldKey]
+        ?? aggregateRowSource
+        ?? "remote";
+      const sourceSelections =
+        source === "local"
+          ? localExpandedGapWindowSelections[rowKey] ?? []
+          : remoteExpandedGapWindowSelections[rowKey] ?? [];
+      if (sourceSelections.includes(windowKey)) {
+        resolvedExpandedGapWindowSelections[rowKey] = [
+          ...new Set([...resolvedExpandedGapWindowSelections[rowKey], windowKey]),
+        ].sort();
+        return;
+      }
+      resolvedExpandedGapWindowSelections[rowKey] = resolvedExpandedGapWindowSelections[rowKey].filter(
+        (candidate) => candidate !== windowKey,
+      );
+    });
+    if (!resolvedExpandedGapWindowSelections[rowKey]?.length) {
+      delete resolvedExpandedGapWindowSelections[rowKey];
+    }
+  });
   return {
     comparisonSelection: normalizeControlRoomComparisonSelection(resolvedSelection),
     expandedGapRows: resolvedExpandedGapRows,
+    expandedGapWindowSelections: resolvedExpandedGapWindowSelections,
   };
 }
 
@@ -10145,6 +10496,8 @@ function buildComparisonHistorySyncAuditEntries(state: {
   remoteComparisonSelection: ControlRoomComparisonSelectionState;
   localExpandedGapRows: Record<string, boolean>;
   remoteExpandedGapRows: Record<string, boolean>;
+  localExpandedGapWindowSelections: ExpandedGapWindowSelections;
+  remoteExpandedGapWindowSelections: ExpandedGapWindowSelections;
   localOpen: boolean;
   remoteOpen: boolean;
   localSearchQuery: string;
@@ -10191,6 +10544,8 @@ function buildComparisonHistorySyncAuditEntries(state: {
     remoteComparisonSelection: state.remoteComparisonSelection,
     localExpandedGapRows: state.localExpandedGapRows,
     remoteExpandedGapRows: state.remoteExpandedGapRows,
+    localExpandedGapWindowSelections: state.localExpandedGapWindowSelections,
+    remoteExpandedGapWindowSelections: state.remoteExpandedGapWindowSelections,
   });
   const nextEntries: ComparisonHistorySyncAuditEntry[] = [];
   if (remoteAdditions.length) {
@@ -10235,6 +10590,8 @@ function buildComparisonHistorySyncAuditEntries(state: {
         remoteComparisonSelection: state.remoteComparisonSelection,
         localExpandedGapRows: state.localExpandedGapRows,
         remoteExpandedGapRows: state.remoteExpandedGapRows,
+        localExpandedGapWindowSelections: state.localExpandedGapWindowSelections,
+        remoteExpandedGapWindowSelections: state.remoteExpandedGapWindowSelections,
       }),
     });
   }
@@ -10571,8 +10928,22 @@ function isControlRoomUiStateV3(value: unknown): value is ControlRoomUiStateV3 {
   }
   const candidate = value as Partial<ControlRoomUiStateV3>;
   return (
+    candidate.version === 3 &&
+    candidate.expandedGapRows !== undefined &&
+    candidate.comparisonSelection !== undefined &&
+    candidate.comparisonHistoryPanel !== undefined
+  );
+}
+
+function isControlRoomUiStateV4(value: unknown): value is ControlRoomUiStateV4 {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const candidate = value as Partial<ControlRoomUiStateV4>;
+  return (
     candidate.version === CONTROL_ROOM_UI_STATE_VERSION &&
     candidate.expandedGapRows !== undefined &&
+    candidate.expandedGapWindowSelections !== undefined &&
     candidate.comparisonSelection !== undefined &&
     candidate.comparisonHistoryPanel !== undefined
   );
