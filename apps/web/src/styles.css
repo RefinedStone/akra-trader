@@ -877,6 +877,81 @@ select {
   font-size: 0.72rem;
 }
 
+.comparison-history-conflict-review-score-detail-ephemeral {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 10px;
+  background: rgba(6, 10, 18, 0.5);
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-group {
+  display: grid;
+  gap: 6px;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-label {
+  color: rgba(150, 210, 255, 0.82);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-chip,
+.comparison-history-conflict-review-score-detail-ephemeral-nav {
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.68);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  cursor: pointer;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-chip.is-active {
+  border-color: rgba(120, 180, 255, 0.24);
+  background: rgba(120, 180, 255, 0.1);
+  color: rgba(221, 239, 255, 0.96);
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-copy,
+.comparison-history-conflict-review-score-detail-ephemeral-note-title {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.72rem;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-note-title {
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-note-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px 12px;
+  align-items: center;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-note-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.comparison-history-conflict-review-score-detail-ephemeral-note-index {
+  color: rgba(255, 255, 255, 0.54);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+}
+
 .comparison-history-conflict-review-score-detail-chip-row {
   display: flex;
   flex-wrap: wrap;

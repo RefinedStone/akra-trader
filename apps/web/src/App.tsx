@@ -3053,6 +3053,9 @@ type ControlRoomComparisonHistoryPanelUiState = {
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
   focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
   focusedWorkspaceScoreSignalMicroInteractions: Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>;
+  hoveredWorkspaceScoreSignalMicroTargets: Record<string, string>;
+  scrubbedWorkspaceScoreSignalMicroSteps: Record<string, number>;
+  selectedWorkspaceScoreSignalMicroNotePages: Record<string, number>;
   activeWorkspaceOverviewRowId: string | null;
   sync: ComparisonHistoryPanelSyncState | null;
 };
@@ -4881,6 +4884,21 @@ export default function App() {
     useState<Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>>(
       () => initialComparisonHistoryPanelUiStateRef.current?.focusedWorkspaceScoreSignalMicroInteractions ?? {},
     );
+  const [hoveredWorkspaceScoreSignalMicroTargets, setHoveredWorkspaceScoreSignalMicroTargets] = useState<
+    Record<string, string>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.hoveredWorkspaceScoreSignalMicroTargets ?? {},
+  );
+  const [scrubbedWorkspaceScoreSignalMicroSteps, setScrubbedWorkspaceScoreSignalMicroSteps] = useState<
+    Record<string, number>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.scrubbedWorkspaceScoreSignalMicroSteps ?? {},
+  );
+  const [selectedWorkspaceScoreSignalMicroNotePages, setSelectedWorkspaceScoreSignalMicroNotePages] = useState<
+    Record<string, number>
+  >(
+    () => initialComparisonHistoryPanelUiStateRef.current?.selectedWorkspaceScoreSignalMicroNotePages ?? {},
+  );
   const [activeWorkspaceOverviewRowId, setActiveWorkspaceOverviewRowId] = useState<string | null>(
     () => initialComparisonHistoryPanelUiStateRef.current?.activeWorkspaceOverviewRowId ?? null,
   );
@@ -5305,6 +5323,9 @@ export default function App() {
         collapsedWorkspaceScoreSignalNestedSubviewIds,
         focusedWorkspaceScoreSignalMicroViews,
         focusedWorkspaceScoreSignalMicroInteractions,
+        hoveredWorkspaceScoreSignalMicroTargets,
+        scrubbedWorkspaceScoreSignalMicroSteps,
+        selectedWorkspaceScoreSignalMicroNotePages,
         activeWorkspaceOverviewRowId,
         sync: nextSharedSyncState,
       },
@@ -5328,6 +5349,9 @@ export default function App() {
     collapsedWorkspaceScoreSignalNestedSubviewIds,
     focusedWorkspaceScoreSignalMicroViews,
     focusedWorkspaceScoreSignalMicroInteractions,
+    hoveredWorkspaceScoreSignalMicroTargets,
+    scrubbedWorkspaceScoreSignalMicroSteps,
+    selectedWorkspaceScoreSignalMicroNotePages,
     activeWorkspaceOverviewRowId,
     comparisonHistorySharedSyncState,
     comparisonHistoryTabIdentity,
@@ -8275,6 +8299,9 @@ export default function App() {
             collapsedWorkspaceScoreSignalNestedSubviewIds,
             focusedWorkspaceScoreSignalMicroViews,
             focusedWorkspaceScoreSignalMicroInteractions,
+            hoveredWorkspaceScoreSignalMicroTargets,
+            scrubbedWorkspaceScoreSignalMicroSteps,
+            selectedWorkspaceScoreSignalMicroNotePages,
             activeWorkspaceOverviewRowId,
             historyStep: comparisonHistoryStep,
             historyTabIdentity: comparisonHistoryTabIdentity,
@@ -8366,6 +8393,33 @@ export default function App() {
               ),
             onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
               setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
+                current[interactionId] === value
+                  ? current
+                  : {
+                      ...current,
+                      [interactionId]: value,
+                    }
+              ),
+            onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId, value) =>
+              setHoveredWorkspaceScoreSignalMicroTargets((current) =>
+                current[interactionId] === value
+                  ? current
+                  : {
+                      ...current,
+                      [interactionId]: value,
+                    }
+              ),
+            onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId, value) =>
+              setScrubbedWorkspaceScoreSignalMicroSteps((current) =>
+                current[interactionId] === value
+                  ? current
+                  : {
+                      ...current,
+                      [interactionId]: value,
+                    }
+              ),
+            onChangeWorkspaceScoreSignalMicroNotePage: (interactionId, value) =>
+              setSelectedWorkspaceScoreSignalMicroNotePages((current) =>
                 current[interactionId] === value
                   ? current
                   : {
@@ -9413,6 +9467,9 @@ function defaultComparisonHistoryPanelUiState(): ControlRoomComparisonHistoryPan
     collapsedWorkspaceScoreSignalNestedSubviewIds: {},
     focusedWorkspaceScoreSignalMicroViews: {},
     focusedWorkspaceScoreSignalMicroInteractions: {},
+    hoveredWorkspaceScoreSignalMicroTargets: {},
+    scrubbedWorkspaceScoreSignalMicroSteps: {},
+    selectedWorkspaceScoreSignalMicroNotePages: {},
     activeWorkspaceOverviewRowId: null,
     sync: null,
   };
@@ -10141,6 +10198,45 @@ function normalizeComparisonHistoryPanelUiState(
             }
             return accumulator;
           }, {})
+        : {},
+    hoveredWorkspaceScoreSignalMicroTargets:
+      value?.hoveredWorkspaceScoreSignalMicroTargets
+      && typeof value.hoveredWorkspaceScoreSignalMicroTargets === "object"
+        ? Object.entries(value.hoveredWorkspaceScoreSignalMicroTargets).reduce<Record<string, string>>(
+            (accumulator, [key, candidate]) => {
+              if (typeof candidate === "string" && candidate.trim()) {
+                accumulator[key] = candidate;
+              }
+              return accumulator;
+            },
+            {},
+          )
+        : {},
+    scrubbedWorkspaceScoreSignalMicroSteps:
+      value?.scrubbedWorkspaceScoreSignalMicroSteps
+      && typeof value.scrubbedWorkspaceScoreSignalMicroSteps === "object"
+        ? Object.entries(value.scrubbedWorkspaceScoreSignalMicroSteps).reduce<Record<string, number>>(
+            (accumulator, [key, candidate]) => {
+              if (typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0) {
+                accumulator[key] = candidate;
+              }
+              return accumulator;
+            },
+            {},
+          )
+        : {},
+    selectedWorkspaceScoreSignalMicroNotePages:
+      value?.selectedWorkspaceScoreSignalMicroNotePages
+      && typeof value.selectedWorkspaceScoreSignalMicroNotePages === "object"
+        ? Object.entries(value.selectedWorkspaceScoreSignalMicroNotePages).reduce<Record<string, number>>(
+            (accumulator, [key, candidate]) => {
+              if (typeof candidate === "number" && Number.isInteger(candidate) && candidate >= 0) {
+                accumulator[key] = candidate;
+              }
+              return accumulator;
+            },
+            {},
+          )
         : {},
     activeWorkspaceOverviewRowId:
       typeof value?.activeWorkspaceOverviewRowId === "string"
@@ -13349,6 +13445,9 @@ type RunSectionComparisonControls = {
   collapsedWorkspaceScoreSignalNestedSubviewIds: Record<string, boolean>;
   focusedWorkspaceScoreSignalMicroViews: Record<string, ComparisonHistorySyncWorkspaceSignalMicroViewKey>;
   focusedWorkspaceScoreSignalMicroInteractions: Record<string, ComparisonHistorySyncWorkspaceSignalMicroInteractionKey>;
+  hoveredWorkspaceScoreSignalMicroTargets: Record<string, string>;
+  scrubbedWorkspaceScoreSignalMicroSteps: Record<string, number>;
+  selectedWorkspaceScoreSignalMicroNotePages: Record<string, number>;
   activeWorkspaceOverviewRowId: string | null;
   historyStep: ComparisonHistoryStepDescriptor;
   historyTabIdentity: ComparisonHistoryTabIdentity;
@@ -13399,6 +13498,9 @@ type RunSectionComparisonControls = {
     interactionId: string,
     value: ComparisonHistorySyncWorkspaceSignalMicroInteractionKey,
   ) => void;
+  onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId: string, value: string) => void;
+  onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId: string, value: number) => void;
+  onChangeWorkspaceScoreSignalMicroNotePage: (interactionId: string, value: number) => void;
   onChangeActiveWorkspaceOverviewRowId: (value: string | null) => void;
   onNavigateHistoryEntry: (entryId: string) => void;
   onNavigateHistoryRelative: (delta: number) => void;
@@ -13577,6 +13679,147 @@ function RunSection({
       return persistedValue;
     }
     return options[0];
+  };
+  const resolveWorkspaceReviewSignalMicroHoverTarget = (
+    interactionId: string,
+    options: string[],
+  ) => {
+    const persistedValue = comparison?.hoveredWorkspaceScoreSignalMicroTargets[interactionId];
+    if (persistedValue && options.includes(persistedValue)) {
+      return persistedValue;
+    }
+    return options[0];
+  };
+  const resolveWorkspaceReviewSignalMicroScrubStep = (
+    interactionId: string,
+    stepCount: number,
+  ) => {
+    const persistedValue = comparison?.scrubbedWorkspaceScoreSignalMicroSteps[interactionId];
+    if (typeof persistedValue === "number" && Number.isInteger(persistedValue)) {
+      return Math.max(0, Math.min(stepCount - 1, persistedValue));
+    }
+    return 0;
+  };
+  const resolveWorkspaceReviewSignalMicroNotePage = (
+    interactionId: string,
+    noteCount: number,
+  ) => {
+    const persistedValue = comparison?.selectedWorkspaceScoreSignalMicroNotePages[interactionId];
+    if (typeof persistedValue === "number" && Number.isInteger(persistedValue)) {
+      return Math.max(0, Math.min(noteCount - 1, persistedValue));
+    }
+    return 0;
+  };
+  const renderWorkspaceReviewSignalMicroState = (params: {
+    interactionId: string;
+    hoverOptions: Array<{ key: string; label: string; copy: string }>;
+    scrubCopies: string[];
+    notePages: Array<{ label: string; copy: string }>;
+  }) => {
+    const { interactionId, hoverOptions, scrubCopies, notePages } = params;
+    if (!comparison || !hoverOptions.length || !scrubCopies.length || !notePages.length) {
+      return null;
+    }
+    const hoverTarget = resolveWorkspaceReviewSignalMicroHoverTarget(
+      interactionId,
+      hoverOptions.map((option) => option.key),
+    );
+    const scrubStep = resolveWorkspaceReviewSignalMicroScrubStep(interactionId, scrubCopies.length);
+    const notePage = resolveWorkspaceReviewSignalMicroNotePage(interactionId, notePages.length);
+    const activeHoverOption = hoverOptions.find((option) => option.key === hoverTarget) ?? hoverOptions[0];
+    const activeNotePage = notePages[notePage] ?? notePages[0];
+    return (
+      <div className="comparison-history-conflict-review-score-detail-ephemeral">
+        <div className="comparison-history-conflict-review-score-detail-ephemeral-group">
+          <span className="comparison-history-conflict-review-score-detail-ephemeral-label">
+            Hover memory
+          </span>
+          <div className="comparison-history-conflict-review-score-detail-ephemeral-chip-row">
+            {hoverOptions.map((option) => (
+              <button
+                aria-pressed={hoverTarget === option.key}
+                className={`comparison-history-conflict-review-score-detail-ephemeral-chip ${
+                  hoverTarget === option.key ? "is-active" : ""
+                }`}
+                key={option.key}
+                onClick={() =>
+                  comparison.onChangeWorkspaceScoreSignalMicroHoverTarget(interactionId, option.key)
+                }
+                onFocus={() =>
+                  comparison.onChangeWorkspaceScoreSignalMicroHoverTarget(interactionId, option.key)
+                }
+                onMouseEnter={() =>
+                  comparison.onChangeWorkspaceScoreSignalMicroHoverTarget(interactionId, option.key)
+                }
+                type="button"
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <p className="comparison-history-conflict-review-score-detail-ephemeral-copy">
+            {activeHoverOption.copy}
+          </p>
+        </div>
+        <div className="comparison-history-conflict-review-score-detail-ephemeral-group">
+          <span className="comparison-history-conflict-review-score-detail-ephemeral-label">
+            Scrub memory
+          </span>
+          <div className="comparison-history-conflict-review-score-detail-ephemeral-chip-row">
+            {scrubCopies.map((copy, index) => (
+              <button
+                aria-pressed={scrubStep === index}
+                className={`comparison-history-conflict-review-score-detail-ephemeral-chip ${
+                  scrubStep === index ? "is-active" : ""
+                }`}
+                key={`scrub:${index}`}
+                onClick={() => comparison.onChangeWorkspaceScoreSignalMicroScrubStep(interactionId, index)}
+                type="button"
+              >
+                Step {index + 1}
+              </button>
+            ))}
+          </div>
+          <p className="comparison-history-conflict-review-score-detail-ephemeral-copy">
+            {scrubCopies[scrubStep] ?? scrubCopies[0]}
+          </p>
+        </div>
+        <div className="comparison-history-conflict-review-score-detail-ephemeral-group">
+          <div className="comparison-history-conflict-review-score-detail-ephemeral-note-head">
+            <span className="comparison-history-conflict-review-score-detail-ephemeral-label">
+              Note memory
+            </span>
+            <div className="comparison-history-conflict-review-score-detail-ephemeral-note-actions">
+              <button
+                className="comparison-history-conflict-review-score-detail-ephemeral-nav"
+                disabled={notePage === 0}
+                onClick={() => comparison.onChangeWorkspaceScoreSignalMicroNotePage(interactionId, notePage - 1)}
+                type="button"
+              >
+                Prev
+              </button>
+              <span className="comparison-history-conflict-review-score-detail-ephemeral-note-index">
+                {notePage + 1} / {notePages.length}
+              </span>
+              <button
+                className="comparison-history-conflict-review-score-detail-ephemeral-nav"
+                disabled={notePage >= notePages.length - 1}
+                onClick={() => comparison.onChangeWorkspaceScoreSignalMicroNotePage(interactionId, notePage + 1)}
+                type="button"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          <p className="comparison-history-conflict-review-score-detail-ephemeral-note-title">
+            {activeNotePage.label}
+          </p>
+          <p className="comparison-history-conflict-review-score-detail-ephemeral-copy">
+            {activeNotePage.copy}
+          </p>
+        </div>
+      </div>
+    );
   };
   const resolveWorkspaceReviewSignalSelectionId = (
     source: ComparisonHistorySyncConflictFieldSource,
@@ -15186,6 +15429,45 @@ function RunSection({
                                                                                     ? "The focused signal is adding confidence to the lane rather than draining it."
                                                                                     : "The focused signal is subtracting confidence from the lane rather than supporting it."}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: interpretationLaneSemanticsInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "lane",
+                                                                                    label: "Lane",
+                                                                                    copy: `${focusedSignalDetail.sourceLabel} is the lane currently carrying this semantic signal.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "signal",
+                                                                                    label: "Signal",
+                                                                                    copy: `${focusedSignalDetail.signal.label} is the specific semantic phrase now under inspection.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "impact",
+                                                                                    label: "Impact",
+                                                                                    copy: `This signal contributes ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.signal.weight,
+                                                                                    )} to the lane.`,
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Snapshot 1 keeps the lane/source relationship exactly as captured in the current review row.",
+                                                                                  "Snapshot 2 follows the signal deeper into the lane to see whether polarity still matches the lane label.",
+                                                                                  "Snapshot 3 replays the signal as the dominant semantic phrase in the lane.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Lane note",
+                                                                                    copy: `${focusedSignalDetail.sourceLabel} is the durable owner of this semantic phrase inside the current workspace branch.`,
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Polarity note",
+                                                                                    copy: focusedSignalDetail.signal.weight >= 0
+                                                                                      ? "Positive polarity means this phrase is strengthening the lane rather than weakening it."
+                                                                                      : "Negative polarity means this phrase is reducing confidence in the lane rather than supporting it.",
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15290,6 +15572,45 @@ function RunSection({
                                                                                     ? "Changing away from the ranked lane would drop this specific semantic support."
                                                                                     : "Keeping the alternate lane preserves this signal even though the overall ranking prefers the other branch."}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: interpretationRecommendationEffectInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "support",
+                                                                                    label: "Support",
+                                                                                    copy: focusedSignalDetail.recommendationRelationship,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "tradeoff",
+                                                                                    label: "Trade-off",
+                                                                                    copy: focusedSignalDetail.source === row.recommendedSource
+                                                                                      ? "Leaving the ranked lane would surrender this support."
+                                                                                      : "Keeping the alternate lane preserves this phrase even while the score prefers another branch.",
+                                                                                  },
+                                                                                  {
+                                                                                    key: "source",
+                                                                                    label: "Source",
+                                                                                    copy: `${focusedSignalDetail.sourceLabel} is the branch currently contributing this recommendation effect.`,
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Step 1 reads the recommendation effect in isolation.",
+                                                                                  "Step 2 compares what the ranked lane keeps against what the alternate lane gives up.",
+                                                                                  "Step 3 emphasizes the branch cost of switching away from the current semantic carrier.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Support note",
+                                                                                    copy: focusedSignalDetail.recommendationRelationship,
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Trade-off note",
+                                                                                    copy: focusedSignalDetail.source === row.recommendedSource
+                                                                                      ? "This phrase is part of why the ranked lane still wins."
+                                                                                      : "This phrase is one of the strongest things the non-ranked lane is still holding onto.",
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15453,6 +15774,45 @@ function RunSection({
                                                                                       focusedSignalDetail.laneScore,
                                                                                     )} is the broader context around this signal's own impact.`}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: lanePositionRankContextInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "rank",
+                                                                                    label: "Rank",
+                                                                                    copy: `The signal sits at position ${focusedSignalDetail.rank} of ${focusedSignalDetail.signalCount} in the lane.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "score",
+                                                                                    label: "Score",
+                                                                                    copy: `Lane context is ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.laneScore,
+                                                                                    )} while the signal itself contributes ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.signal.weight,
+                                                                                    )}.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "signal",
+                                                                                    label: "Signal",
+                                                                                    copy: `${focusedSignalDetail.signal.label} is the phrase occupying this rank slot.`,
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Step 1 keeps the current rank ordering as recorded.",
+                                                                                  "Step 2 compares rank against the total lane score context.",
+                                                                                  "Step 3 treats the signal as if it were the lane headline for quick triage.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Rank note",
+                                                                                    copy: `Rank ${focusedSignalDetail.rank} means there are ${focusedSignalDetail.rank - 1} signals carrying more absolute weight in this lane.`,
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Score note",
+                                                                                    copy: "Lane score is broader than any single signal, so rank and score do not always move together.",
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15596,6 +15956,50 @@ function RunSection({
                                                                                       focusedSignalDetail.signal.weight,
                                                                                     )} on the lane.`}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: lanePositionWeightShareInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "share",
+                                                                                    label: "Share",
+                                                                                    copy: `${Math.round(
+                                                                                      focusedSignalDetail.shareOfVisibleWeight
+                                                                                        * 100,
+                                                                                    )}% of visible weight currently belongs to this signal.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "impact",
+                                                                                    label: "Impact",
+                                                                                    copy: `Signed impact is ${formatComparisonScoreSignedValue(
+                                                                                      focusedSignalDetail.signal.weight,
+                                                                                    )} inside the active lane.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "source",
+                                                                                    label: "Lane",
+                                                                                    copy: `${focusedSignalDetail.sourceLabel} is the lane that this weight share belongs to.`,
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Step 1 shows the current visible-share split.",
+                                                                                  "Step 2 rebalances attention toward direct impact instead of share.",
+                                                                                  "Step 3 treats the signal as the primary visible contributor for this lane.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Share note",
+                                                                                    copy: focusedSignalDetail.shareOfVisibleWeight >= 0.5
+                                                                                      ? "This phrase dominates the visible semantic weight in the lane."
+                                                                                      : "This phrase matters, but it does not dominate the lane's visible weight.",
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Impact note",
+                                                                                    copy: focusedSignalDetail.signal.weight >= 0
+                                                                                      ? "Positive impact means the signal is reinforcing the lane."
+                                                                                      : "Negative impact means the signal is actively eroding the lane.",
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15764,6 +16168,53 @@ function RunSection({
                                                                                   ? "This lens follows the operator's currently chosen source for the row."
                                                                                   : "This lens follows the lane that currently owns the focused signal, even if it is not the chosen row source."}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: recommendationSelectionAlignmentInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "selected",
+                                                                                    label: "Selected",
+                                                                                    copy: `Current row selection is ${
+                                                                                      row.selectedSource === "local"
+                                                                                        ? row.hasLatestLocalDrift
+                                                                                          ? "Local latest"
+                                                                                          : "Local"
+                                                                                        : row.hasLatestLocalDrift
+                                                                                          ? "Remote audit"
+                                                                                          : "Remote"
+                                                                                    }.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "focusedLane",
+                                                                                    label: "Focused lane",
+                                                                                    copy: `Focused signal is currently tied to ${focusedSignalDetail.sourceLabel}.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "lane",
+                                                                                    label: "Ranked lane",
+                                                                                    copy: focusedSignalDetail.source === row.recommendedSource
+                                                                                      ? "Focused signal is already on the ranked lane."
+                                                                                      : "Focused signal is tracing the alternate lane instead of the ranked lane.",
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Step 1 follows the operator's current row choice.",
+                                                                                  "Step 2 follows the lane that currently owns the focused signal.",
+                                                                                  "Step 3 compares both against the ranked lane recommendation.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Selection note",
+                                                                                    copy: "Operator choice and signal ownership can diverge when the review explores the non-ranked branch.",
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Alignment note",
+                                                                                    copy: focusedSignalDetail.source === row.recommendedSource
+                                                                                      ? "Alignment is clean: the focused signal is already on the ranked lane."
+                                                                                      : "Alignment is intentionally split: the focused signal is being inspected on the alternate lane.",
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
@@ -15891,6 +16342,43 @@ function RunSection({
                                                                                     )} points between the two lanes.`
                                                                                   : `The current recommendation reason is: ${row.recommendationReason}.`}
                                                                               </p>
+                                                                              {renderWorkspaceReviewSignalMicroState({
+                                                                                interactionId: recommendationResolutionBasisInteractionId,
+                                                                                hoverOptions: [
+                                                                                  {
+                                                                                    key: "gap",
+                                                                                    label: "Gap",
+                                                                                    copy: `Recommendation gap is +${formatComparisonScoreValue(
+                                                                                      row.recommendationStrength,
+                                                                                    )} points.`,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "reason",
+                                                                                    label: "Reason",
+                                                                                    copy: row.recommendationReason,
+                                                                                  },
+                                                                                  {
+                                                                                    key: "signal",
+                                                                                    label: "Signal",
+                                                                                    copy: `${focusedSignalDetail.signal.label} is one of the phrases informing that gap.`,
+                                                                                  },
+                                                                                ],
+                                                                                scrubCopies: [
+                                                                                  "Step 1 shows the current recommendation gap at face value.",
+                                                                                  "Step 2 replays why the narrative currently prefers one lane.",
+                                                                                  "Step 3 ties the signal back into the final resolution basis.",
+                                                                                ],
+                                                                                notePages: [
+                                                                                  {
+                                                                                    label: "Gap note",
+                                                                                    copy: "A wider gap usually means this signal is less likely to flip the lane ranking by itself.",
+                                                                                  },
+                                                                                  {
+                                                                                    label: "Reason note",
+                                                                                    copy: `Resolution reason currently reads: ${row.recommendationReason}.`,
+                                                                                  },
+                                                                                ],
+                                                                              })}
                                                                             </div>
                                                                           ) : null}
                                                                         </div>
