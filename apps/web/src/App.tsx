@@ -2785,6 +2785,9 @@ const apiBase = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api"
 const MAX_VISIBLE_GAP_WINDOWS = 3;
 const TOUCH_GAP_WINDOW_SWEEP_HOLD_MS = 220;
 const TOUCH_GAP_WINDOW_SWEEP_MOVE_TOLERANCE_PX = 14;
+const AKRA_TOUCH_FEEDBACK_EVENT_NAME = "akra-trader:haptic-feedback";
+const AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION = 1;
+const AKRA_TOUCH_FEEDBACK_WEBKIT_HANDLER = "akraTouchFeedback";
 const DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE = "Akra Trader Control Room";
 const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
@@ -2834,6 +2837,18 @@ type TouchGapWindowActivationFeedbackState = {
   activationId: number;
   anchorGapWindowKey: string;
 };
+type AkraTouchFeedbackDetail = {
+  anchorGapWindowKey: string;
+  effect: "impact";
+  impactStyle: "light";
+  source: "gap-window-picker-sweep-activation";
+  trigger: "touch-hold";
+};
+type AkraTouchFeedbackEnvelope = {
+  detail: AkraTouchFeedbackDetail;
+  type: typeof AKRA_TOUCH_FEEDBACK_EVENT_NAME;
+  version: typeof AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION;
+};
 type PlatformTouchFeedbackBridge = {
   ReactNativeWebView?: {
     postMessage?: (message: string) => void;
@@ -2846,12 +2861,11 @@ type PlatformTouchFeedbackBridge = {
     };
   };
   webkit?: {
-    messageHandlers?: Record<
-      string,
-      {
-        postMessage?: (payload: unknown) => void;
-      }
-    >;
+    messageHandlers?: {
+      akraTouchFeedback?: {
+        postMessage?: (payload: AkraTouchFeedbackEnvelope) => void;
+      };
+    };
   };
 };
 
@@ -8397,10 +8411,17 @@ function BackfillQualityStatus({
     "--gap-window-touch-hold-duration": `${TOUCH_GAP_WINDOW_SWEEP_HOLD_MS}ms`,
   } as CSSProperties;
   const triggerTouchSweepActivationFeedback = (anchorGapWindowKey: string) => {
-    const touchFeedbackDetail = {
-      impactStyle: "light" as const,
+    const touchFeedbackDetail: AkraTouchFeedbackDetail = {
+      anchorGapWindowKey,
+      effect: "impact",
+      impactStyle: "light",
       source: "gap-window-picker-sweep-activation",
       trigger: "touch-hold",
+    };
+    const touchFeedbackEnvelope: AkraTouchFeedbackEnvelope = {
+      detail: touchFeedbackDetail,
+      type: AKRA_TOUCH_FEEDBACK_EVENT_NAME,
+      version: AKRA_TOUCH_FEEDBACK_BRIDGE_VERSION,
     };
     const platformBridge = window as Window & typeof globalThis & PlatformTouchFeedbackBridge;
     let usedPlatformFeedbackBridge = false;
@@ -8414,22 +8435,12 @@ function BackfillQualityStatus({
       }
     }
     if (!usedPlatformFeedbackBridge) {
-      const webkitMessageHandlerNames = [
-        "hapticFeedback",
-        "haptics",
-        "touchFeedback",
-        "akraHaptics",
-        "akraTouchFeedback",
-      ];
-      for (const handlerName of webkitMessageHandlerNames) {
-        const handler = platformBridge.webkit?.messageHandlers?.[handlerName];
-        if (typeof handler?.postMessage !== "function") {
-          continue;
-        }
+      const handler =
+        platformBridge.webkit?.messageHandlers?.[AKRA_TOUCH_FEEDBACK_WEBKIT_HANDLER];
+      if (typeof handler?.postMessage === "function") {
         try {
-          handler.postMessage(touchFeedbackDetail);
+          handler.postMessage(touchFeedbackEnvelope);
           usedPlatformFeedbackBridge = true;
-          break;
         } catch {
           // Ignore failing handlers and keep probing fallbacks.
         }
@@ -8441,14 +8452,22 @@ function BackfillQualityStatus({
     ) {
       try {
         platformBridge.ReactNativeWebView.postMessage(
-          JSON.stringify({
-            detail: touchFeedbackDetail,
-            type: "akra-trader:haptic-feedback",
-          }),
+          JSON.stringify(touchFeedbackEnvelope),
         );
         usedPlatformFeedbackBridge = true;
       } catch {
         // Ignore React Native host bridge failures and continue through fallbacks.
+      }
+    }
+    if (!usedPlatformFeedbackBridge) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent<AkraTouchFeedbackEnvelope>(AKRA_TOUCH_FEEDBACK_EVENT_NAME, {
+            detail: touchFeedbackEnvelope,
+          }),
+        );
+      } catch {
+        // Ignore custom-event bridge failures and continue through fallbacks.
       }
     }
     if (!usedPlatformFeedbackBridge && typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
