@@ -511,6 +511,11 @@ select {
   background: rgba(120, 180, 255, 0.08);
 }
 
+.comparison-history-conflict-review-choice.is-recommended {
+  border-color: rgba(255, 207, 112, 0.28);
+  background: rgba(255, 207, 112, 0.08);
+}
+
 .comparison-history-conflict-review-choice.is-selected {
   border-color: rgba(94, 234, 212, 0.38);
   background: rgba(94, 234, 212, 0.12);
@@ -534,6 +539,12 @@ select {
   color: rgba(255, 255, 255, 0.62);
   font-size: 0.58rem;
   line-height: 1.4;
+}
+
+.comparison-history-conflict-review-recommendation {
+  color: rgba(255, 216, 145, 0.96);
+  font-size: 0.68rem;
+  line-height: 1.45;
 }
 
 .comparison-history-browser-search {
