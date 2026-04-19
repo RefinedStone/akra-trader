@@ -4714,6 +4714,7 @@ export default function App() {
   const [expandedGapWindowSelections, setExpandedGapWindowSelections] = useState<ExpandedGapWindowSelections>(
     loadExpandedGapWindowSelections,
   );
+  const [activeGapWindowPickerRowKey, setActiveGapWindowPickerRowKey] = useState<string | null>(null);
   const [comparisonHistoryPanel, setComparisonHistoryPanel] = useState<ComparisonHistoryPanelState>(
     () =>
       initialComparisonHistoryPanelUiStateRef.current?.panel ?? defaultComparisonHistoryPanelState(),
@@ -5631,6 +5632,25 @@ export default function App() {
     setExpandedGapWindowSelections((current) => pruneExpandedGapWindowSelections(current, marketStatus));
   }, [marketStatus]);
 
+  useEffect(() => {
+    setActiveGapWindowPickerRowKey((current) => {
+      if (!current || !marketStatus) {
+        return current;
+      }
+      const matchingInstrument = marketStatus.instruments.find(
+        (instrument) => instrumentGapRowKey(instrument) === current,
+      );
+      if (
+        !matchingInstrument
+        || !expandedGapRows[current]
+        || matchingInstrument.backfill_gap_windows.length <= 1
+      ) {
+        return null;
+      }
+      return current;
+    });
+  }, [expandedGapRows, marketStatus]);
+
   const strategyGroups = useMemo(() => {
     return {
       native: strategies.filter((strategy) => strategy.runtime === "native"),
@@ -6416,28 +6436,86 @@ export default function App() {
                         <BackfillCountStatus instrument={instrument} />
                       </td>
                       <td>
-                        <BackfillQualityStatus
-                          expanded={Boolean(expandedGapRows[instrumentGapRowKey(instrument)])}
-                          instrument={instrument}
-                          selectedGapWindowKeys={
-                            expandedGapWindowSelections[instrumentGapRowKey(instrument)] ?? null
-                          }
-                          onToggle={() => {
-                            const key = instrumentGapRowKey(instrument);
-                            const gapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
-                              buildGapWindowKey(gapWindow),
-                            );
-                            setExpandedGapRows((current) => toggleExpandedGapRow(current, key));
-                            setExpandedGapWindowSelections((current) => {
-                              if (current[key]?.length) {
-                                return current;
-                              }
-                              return gapWindowKeys.length
-                                ? { ...current, [key]: gapWindowKeys }
-                                : current;
-                            });
-                          }}
-                        />
+                        {(() => {
+                          const rowKey = instrumentGapRowKey(instrument);
+                          const gapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
+                            buildGapWindowKey(gapWindow),
+                          );
+                          const expanded = Boolean(expandedGapRows[rowKey]);
+                          return (
+                            <BackfillQualityStatus
+                              expanded={expanded}
+                              gapWindowPickerOpen={activeGapWindowPickerRowKey === rowKey}
+                              instrument={instrument}
+                              onSelectAllGapWindows={() => {
+                                if (!gapWindowKeys.length) {
+                                  return;
+                                }
+                                setExpandedGapWindowSelections((current) => ({
+                                  ...current,
+                                  [rowKey]: gapWindowKeys,
+                                }));
+                              }}
+                              onToggle={() => {
+                                const nextExpanded = !expanded;
+                                if (!nextExpanded && activeGapWindowPickerRowKey === rowKey) {
+                                  setActiveGapWindowPickerRowKey(null);
+                                }
+                                setExpandedGapRows((current) => toggleExpandedGapRow(current, rowKey));
+                                setExpandedGapWindowSelections((current) => {
+                                  if (current[rowKey]?.length) {
+                                    return current;
+                                  }
+                                  return gapWindowKeys.length
+                                    ? { ...current, [rowKey]: gapWindowKeys }
+                                    : current;
+                                });
+                              }}
+                              onToggleGapWindowPicker={() => {
+                                if (!gapWindowKeys.length) {
+                                  return;
+                                }
+                                if (!expanded) {
+                                  setExpandedGapRows((current) =>
+                                    current[rowKey] ? current : { ...current, [rowKey]: true },
+                                  );
+                                }
+                                setExpandedGapWindowSelections((current) => {
+                                  if (current[rowKey]?.length) {
+                                    return current;
+                                  }
+                                  return { ...current, [rowKey]: gapWindowKeys };
+                                });
+                                setActiveGapWindowPickerRowKey((current) =>
+                                  current === rowKey ? null : rowKey,
+                                );
+                              }}
+                              onToggleGapWindowSelection={(gapWindowKey) => {
+                                setExpandedGapWindowSelections((current) => {
+                                  const defaultSelection = current[rowKey]?.length
+                                    ? current[rowKey]
+                                    : gapWindowKeys;
+                                  const nextSelectedWindows = new Set(defaultSelection);
+                                  if (nextSelectedWindows.has(gapWindowKey)) {
+                                    if (nextSelectedWindows.size === 1) {
+                                      return current;
+                                    }
+                                    nextSelectedWindows.delete(gapWindowKey);
+                                  } else {
+                                    nextSelectedWindows.add(gapWindowKey);
+                                  }
+                                  return {
+                                    ...current,
+                                    [rowKey]: gapWindowKeys.filter((candidate) =>
+                                      nextSelectedWindows.has(candidate),
+                                    ),
+                                  };
+                                });
+                              }}
+                              selectedGapWindowKeys={expandedGapWindowSelections[rowKey] ?? null}
+                            />
+                          );
+                        })()}
                       </td>
                       <td>{instrument.lag_seconds ?? "n/a"}</td>
                       <td>{instrument.last_timestamp ?? "n/a"}</td>
@@ -8132,27 +8210,50 @@ function BackfillCountStatus({
 
 function BackfillQualityStatus({
   expanded,
+  gapWindowPickerOpen,
   instrument,
   onToggle,
+  onSelectAllGapWindows,
+  onToggleGapWindowPicker,
+  onToggleGapWindowSelection,
   selectedGapWindowKeys,
 }: {
   expanded: boolean;
+  gapWindowPickerOpen: boolean;
   instrument: MarketDataStatus["instruments"][number];
   onToggle: () => void;
+  onSelectAllGapWindows?: () => void;
+  onToggleGapWindowPicker?: () => void;
+  onToggleGapWindowSelection?: (gapWindowKey: string) => void;
   selectedGapWindowKeys?: string[] | null;
 }) {
   if (instrument.backfill_contiguous_completion_ratio === null) {
     return <span>n/a</span>;
   }
   const visibleGapWindowKeys = new Set(selectedGapWindowKeys ?? []);
-  const selectedGapWindows =
-    expanded && visibleGapWindowKeys.size
-      ? instrument.backfill_gap_windows.filter((gap) => visibleGapWindowKeys.has(buildGapWindowKey(gap)))
-      : instrument.backfill_gap_windows;
+  const hasGapWindowSelection = visibleGapWindowKeys.size > 0;
+  const hasGapWindowSubset =
+    hasGapWindowSelection
+    && visibleGapWindowKeys.size < instrument.backfill_gap_windows.length;
+  const selectedGapWindows = hasGapWindowSelection
+    ? instrument.backfill_gap_windows.filter((gap) => visibleGapWindowKeys.has(buildGapWindowKey(gap)))
+    : instrument.backfill_gap_windows;
   const canToggleGapWindows = instrument.backfill_gap_windows.length > MAX_VISIBLE_GAP_WINDOWS;
-  const gapLines = expanded
+  const canPickGapWindows = instrument.backfill_gap_windows.length > 1;
+  const showExactGapLines =
+    expanded
+    || hasGapWindowSubset
+    || instrument.backfill_gap_windows.length <= MAX_VISIBLE_GAP_WINDOWS;
+  const gapLines = showExactGapLines
     ? formatGapWindows(selectedGapWindows)
     : summarizeGapWindows(instrument.backfill_gap_windows);
+  const selectedGapWindowCount = hasGapWindowSelection
+    ? selectedGapWindows.length
+    : instrument.backfill_gap_windows.length;
+  const selectedGapWindowMissingCandles = selectedGapWindows.reduce(
+    (total, gapWindow) => total + gapWindow.missing_candles,
+    0,
+  );
   return (
     <div className="progress-stack">
       <strong>{formatCompletion(instrument.backfill_contiguous_completion_ratio)}</strong>
@@ -8173,19 +8274,90 @@ function BackfillQualityStatus({
           ))}
         </div>
       ) : null}
-      {expanded && visibleGapWindowKeys.size && visibleGapWindowKeys.size < instrument.backfill_gap_windows.length ? (
-        <span>{`Review subset: ${visibleGapWindowKeys.size} / ${instrument.backfill_gap_windows.length} gaps`}</span>
+      {hasGapWindowSubset ? (
+        <span>
+          {`${expanded ? "Review subset" : "Focused subset"}: ${selectedGapWindowCount} / ${
+            instrument.backfill_gap_windows.length
+          } gaps`}
+        </span>
       ) : null}
-      {canToggleGapWindows ? (
-        <button
-          className="progress-toggle"
-          onClick={onToggle}
-          type="button"
-        >
-          {expanded
-            ? "Collapse gaps"
-            : `Show all ${instrument.backfill_gap_windows.length} gaps`}
-        </button>
+      {canToggleGapWindows || canPickGapWindows ? (
+        <div className="progress-action-row">
+          {canToggleGapWindows ? (
+            <button
+              className="progress-toggle"
+              onClick={onToggle}
+              type="button"
+            >
+              {expanded
+                ? "Collapse gap detail"
+                : `Expand ${instrument.backfill_gap_windows.length}-gap detail`}
+            </button>
+          ) : null}
+          {canPickGapWindows && onToggleGapWindowPicker ? (
+            <button
+              className="progress-toggle"
+              onClick={onToggleGapWindowPicker}
+              type="button"
+            >
+              {gapWindowPickerOpen
+                ? "Hide gap picker"
+                : hasGapWindowSubset
+                  ? "Refine focused gaps"
+                  : "Pick visible gaps"}
+            </button>
+          ) : null}
+          {gapWindowPickerOpen && hasGapWindowSubset && onSelectAllGapWindows ? (
+            <button
+              className="progress-toggle"
+              onClick={onSelectAllGapWindows}
+              type="button"
+            >
+              Show full range
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      {gapWindowPickerOpen && canPickGapWindows ? (
+        <div className="gap-window-picker">
+          <div className="gap-window-picker-head">
+            <span className="gap-window-picker-title">Visible gap windows</span>
+            <span className="gap-window-picker-summary">
+              {`${selectedGapWindowCount} / ${instrument.backfill_gap_windows.length} selected · ${selectedGapWindowMissingCandles} missing candles`}
+            </span>
+          </div>
+          <div className="gap-window-picker-list">
+            {instrument.backfill_gap_windows.map((gapWindow) => {
+              const gapWindowKey = buildGapWindowKey(gapWindow);
+              const checked =
+                !hasGapWindowSelection || visibleGapWindowKeys.has(gapWindowKey);
+              return (
+                <label
+                  className={`gap-window-picker-option ${checked ? "is-active" : ""}`}
+                  key={gapWindowKey}
+                >
+                  <input
+                    checked={checked}
+                    disabled={checked && selectedGapWindowCount === 1}
+                    onChange={() => onToggleGapWindowSelection?.(gapWindowKey)}
+                    type="checkbox"
+                  />
+                  <span className="gap-window-picker-option-copy">
+                    <span className="gap-window-picker-option-label">
+                      {formatGapWindowKeyLabel(gapWindowKey)}
+                    </span>
+                    <span className="gap-window-picker-option-meta">
+                      {`${gapWindow.missing_candles} missing candles`}
+                    </span>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <span className="gap-window-picker-footnote">
+            Keep at least one gap window visible for review.
+          </span>
+        </div>
       ) : null}
       <div className="progress-track" aria-hidden="true">
         <span
@@ -8284,7 +8456,7 @@ function formatGapWindows(
   gapWindows: MarketDataStatus["instruments"][number]["backfill_gap_windows"],
 ) {
   return gapWindows.map((gap) => ({
-    key: gap.gap_window_id,
+    key: buildGapWindowKey(gap),
     kind: "exact" as const,
     label: `${formatRange(gap.start_at, gap.end_at)} (${gap.missing_candles})`,
   }));

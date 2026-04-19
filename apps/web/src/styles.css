@@ -757,6 +757,13 @@ select {
   color: var(--cyan);
 }
 
+.progress-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
 .progress-toggle {
   border: 0;
   padding: 0;
@@ -770,6 +777,87 @@ select {
 
 .progress-toggle:hover {
   opacity: 0.85;
+}
+
+.gap-window-picker {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(120, 180, 255, 0.16);
+  background: rgba(8, 15, 27, 0.78);
+}
+
+.gap-window-picker-head,
+.gap-window-picker-option {
+  display: flex;
+  gap: 10px;
+}
+
+.gap-window-picker-head {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.gap-window-picker-title,
+.gap-window-picker-summary,
+.gap-window-picker-footnote {
+  margin: 0;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+}
+
+.gap-window-picker-title {
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.gap-window-picker-summary,
+.gap-window-picker-footnote {
+  color: var(--muted);
+}
+
+.gap-window-picker-list {
+  display: grid;
+  gap: 6px;
+}
+
+.gap-window-picker-option {
+  align-items: flex-start;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.gap-window-picker-option.is-active {
+  border-color: rgba(120, 180, 255, 0.22);
+  background: rgba(120, 180, 255, 0.08);
+}
+
+.gap-window-picker-option input {
+  margin: 2px 0 0;
+}
+
+.gap-window-picker-option-copy {
+  display: grid;
+  gap: 3px;
+}
+
+.gap-window-picker-option-label,
+.gap-window-picker-option-meta {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.7rem;
+}
+
+.gap-window-picker-option-label {
+  color: var(--text);
+}
+
+.gap-window-picker-option-meta {
+  color: var(--muted);
 }
 
 .progress-track {
