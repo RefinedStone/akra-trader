@@ -392,6 +392,16 @@ type RunComparison = {
   }[];
 };
 
+type ComparisonScoreSection = "metrics" | "semantics" | "context";
+
+type ComparisonScoreLinkTarget = {
+  narrativeRunId: string;
+  section: ComparisonScoreSection;
+  componentKey: string;
+};
+
+type ComparisonScoreLinkedRunRole = "baseline" | "target";
+
 type MarketDataStatus = {
   provider: string;
   venue: string;
@@ -8616,6 +8626,9 @@ function RunComparisonPanel({
   const [tooltipPresetDraftName, setTooltipPresetDraftName] = useState("");
   const [pendingTooltipPresetImportConflict, setPendingTooltipPresetImportConflict] =
     useState<ComparisonTooltipPendingPresetImportConflict | null>(null);
+  const [selectedScoreLink, setSelectedScoreLink] = useState<ComparisonScoreLinkTarget | null>(
+    null,
+  );
   const [tooltipShareDraft, setTooltipShareDraft] = useState("");
   const [tooltipShareFeedback, setTooltipShareFeedback] = useState<string | null>(null);
   const [hasHydratedTooltipTuningState, setHasHydratedTooltipTuningState] = useState(
@@ -9355,6 +9368,25 @@ function RunComparisonPanel({
     };
   }, [activeTooltipId]);
 
+  useEffect(() => {
+    if (!selectedScoreLink) {
+      return;
+    }
+
+    const narrative = comparison.narratives.find(
+      (candidate) => candidate.run_id === selectedScoreLink.narrativeRunId,
+    );
+    if (!narrative) {
+      setSelectedScoreLink(null);
+      return;
+    }
+
+    const sectionBreakdown = narrative.score_breakdown[selectedScoreLink.section];
+    if (!(selectedScoreLink.componentKey in sectionBreakdown.components)) {
+      setSelectedScoreLink(null);
+    }
+  }, [comparison, selectedScoreLink]);
+
   return (
     <section className={`comparison-panel ${intentClassName}`}>
       <div className="comparison-head">
@@ -9487,89 +9519,159 @@ function RunComparisonPanel({
         />
       ) : null}
       <div className="comparison-run-grid">
-        {comparison.runs.map((run) => (
-          <article
-            className={`comparison-run-card ${
-              run.run_id === comparison.baseline_run_id
-                ? "baseline comparison-cue-card comparison-tooltip"
-                : ""
-            }`}
-            key={run.run_id}
-            ref={
-              run.run_id === comparison.baseline_run_id
-                ? registerComparisonTooltipTargetRef(baselineRunTooltipId)
-                : undefined
-            }
-            tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
-            {...(run.run_id === comparison.baseline_run_id
-              ? getComparisonTooltipTargetProps(baselineRunTooltipId)
-              : {})}
-          >
-            <div className="comparison-run-head">
-              <strong>{run.strategy_name ?? run.strategy_id}</strong>
-              <div className={`run-status ${run.status}`}>{run.status}</div>
-            </div>
-            <div className="strategy-badges">
-              <span className="meta-pill">{run.lane}</span>
-              <span className="meta-pill subtle">{run.strategy_version}</span>
-              {run.catalog_semantics.strategy_kind ? (
-                <span className="meta-pill subtle">{run.catalog_semantics.strategy_kind}</span>
-              ) : null}
-              {run.reference_id ? (
-                <span className="meta-pill subtle">{run.reference_id}</span>
-              ) : null}
-            </div>
-            <p className="run-note">
-              {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
-            </p>
-            {run.catalog_semantics.execution_model ? (
-              <p className="run-note">Execution model: {run.catalog_semantics.execution_model}</p>
-            ) : null}
-            {run.catalog_semantics.parameter_contract ? (
+        {comparison.runs.map((run) => {
+          const linkedRunRole = getComparisonScoreLinkedRunRole(
+            selectedScoreLink,
+            comparison.baseline_run_id,
+            run.run_id,
+          );
+          const linkedSelection = linkedRunRole ? selectedScoreLink : null;
+          const highlightStatus =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, ["status_bonus"], "context");
+          const highlightStrategyKind =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, ["strategy_kind", "vocabulary"], "semantics");
+          const highlightExecutionModel =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, ["execution_model", "vocabulary"], "semantics");
+          const highlightParameterContract =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, ["parameter_contract", "vocabulary"], "semantics");
+          const highlightSourceDescriptor =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, [
+              "source_descriptor",
+              "vocabulary",
+              "native_reference_bonus",
+              "reference_bonus",
+              "reference_floor",
+            ]);
+          const highlightOperatorNotes =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, ["vocabulary"], "semantics");
+          const highlightReferenceBadge =
+            Boolean(linkedSelection)
+            && isComparisonScoreLinkMatch(linkedSelection, [
+              "source_descriptor",
+              "provenance_richness",
+              "native_reference_bonus",
+              "reference_bonus",
+              "reference_floor",
+              "benchmark_story_bonus",
+            ]);
+
+          return (
+            <article
+              className={`comparison-run-card ${
+                run.run_id === comparison.baseline_run_id
+                  ? "baseline comparison-cue-card comparison-tooltip"
+                  : ""
+              } ${linkedRunRole ? "is-linked" : ""} ${
+                linkedRunRole === "target" ? "is-linked-target" : ""
+              } ${linkedRunRole === "baseline" ? "is-linked-baseline" : ""}`.trim()}
+              key={run.run_id}
+              ref={
+                run.run_id === comparison.baseline_run_id
+                  ? registerComparisonTooltipTargetRef(baselineRunTooltipId)
+                  : undefined
+              }
+              tabIndex={run.run_id === comparison.baseline_run_id ? 0 : undefined}
+              {...(run.run_id === comparison.baseline_run_id
+                ? getComparisonTooltipTargetProps(baselineRunTooltipId)
+                : {})}
+            >
+              <div className="comparison-run-head">
+                <strong>{run.strategy_name ?? run.strategy_id}</strong>
+                <div className={`run-status ${run.status} ${highlightStatus ? "comparison-linked-badge" : ""}`}>
+                  {run.status}
+                </div>
+              </div>
+              <div className="strategy-badges">
+                <span className="meta-pill">{run.lane}</span>
+                <span className="meta-pill subtle">{run.strategy_version}</span>
+                {run.catalog_semantics.strategy_kind ? (
+                  <span
+                    className={`meta-pill subtle ${highlightStrategyKind ? "comparison-linked-badge" : ""}`}
+                  >
+                    {run.catalog_semantics.strategy_kind}
+                  </span>
+                ) : null}
+                {run.reference_id ? (
+                  <span
+                    className={`meta-pill subtle ${highlightReferenceBadge ? "comparison-linked-badge" : ""}`}
+                  >
+                    {run.reference_id}
+                  </span>
+                ) : null}
+              </div>
               <p className="run-note">
-                Parameter contract: {run.catalog_semantics.parameter_contract}
+                {run.strategy_id} / {run.symbols.join(", ")} / {run.timeframe}
               </p>
-            ) : null}
-            {run.catalog_semantics.operator_notes.length ? (
+              {run.catalog_semantics.execution_model ? (
+                <p className={`run-note ${highlightExecutionModel ? "comparison-linked-copy" : ""}`}>
+                  Execution model: {run.catalog_semantics.execution_model}
+                </p>
+              ) : null}
+              {run.catalog_semantics.parameter_contract ? (
+                <p className={`run-note ${highlightParameterContract ? "comparison-linked-copy" : ""}`}>
+                  Parameter contract: {run.catalog_semantics.parameter_contract}
+                </p>
+              ) : null}
+              {run.catalog_semantics.source_descriptor ? (
+                <p className={`run-note ${highlightSourceDescriptor ? "comparison-linked-copy" : ""}`}>
+                  Semantic source: {run.catalog_semantics.source_descriptor}
+                </p>
+              ) : null}
+              {run.catalog_semantics.operator_notes.length ? (
+                <p className={`run-note ${highlightOperatorNotes ? "comparison-linked-copy" : ""}`}>
+                  Operator notes: {run.catalog_semantics.operator_notes.join(" | ")}
+                </p>
+              ) : null}
+              <ExperimentMetadataPills
+                benchmarkFamily={run.experiment.benchmark_family}
+                datasetIdentity={run.dataset_identity}
+                presetId={run.experiment.preset_id}
+                tags={run.experiment.tags}
+              />
               <p className="run-note">
-                Operator notes: {run.catalog_semantics.operator_notes.join(" | ")}
+                Started {formatTimestamp(run.started_at)}
+                {run.ended_at ? ` / Ended ${formatTimestamp(run.ended_at)}` : ""}
               </p>
-            ) : null}
-            <ExperimentMetadataPills
-              benchmarkFamily={run.experiment.benchmark_family}
-              datasetIdentity={run.dataset_identity}
-              presetId={run.experiment.preset_id}
-              tags={run.experiment.tags}
-            />
-            <p className="run-note">
-              Started {formatTimestamp(run.started_at)}
-              {run.ended_at ? ` / Ended ${formatTimestamp(run.ended_at)}` : ""}
-            </p>
-            {run.reference ? (
-              <ReferenceRunProvenanceSummary
-                artifactPaths={run.artifact_paths}
-                benchmarkArtifacts={run.benchmark_artifacts}
-                externalCommand={run.external_command}
-                reference={run.reference}
-                referenceVersion={run.reference_version}
-                strategySemantics={run.catalog_semantics}
-                workingDirectory={run.working_directory}
-              />
-            ) : null}
-            {run.run_id === comparison.baseline_run_id ? (
-              <ComparisonTooltipBubble
-                id={baselineRunTooltipId}
-                layout={
-                  activeTooltipLayout?.tooltipId === baselineRunTooltipId
-                    ? activeTooltipLayout
-                    : null
-                }
-                ref={registerComparisonTooltipBubbleRef(baselineRunTooltipId)}
-                text={baselineTooltip}
-              />
-            ) : null}
-          </article>
-        ))}
+              {run.reference ? (
+                <ReferenceRunProvenanceSummary
+                  artifactPaths={run.artifact_paths}
+                  benchmarkArtifacts={run.benchmark_artifacts}
+                  externalCommand={run.external_command}
+                  linkedScore={
+                    linkedSelection && linkedRunRole && linkedSelection.section !== "metrics"
+                      ? {
+                          ...linkedSelection,
+                          role: linkedRunRole,
+                        }
+                      : null
+                  }
+                  reference={run.reference}
+                  referenceVersion={run.reference_version}
+                  strategySemantics={run.catalog_semantics}
+                  workingDirectory={run.working_directory}
+                />
+              ) : null}
+              {run.run_id === comparison.baseline_run_id ? (
+                <ComparisonTooltipBubble
+                  id={baselineRunTooltipId}
+                  layout={
+                    activeTooltipLayout?.tooltipId === baselineRunTooltipId
+                      ? activeTooltipLayout
+                      : null
+                  }
+                  ref={registerComparisonTooltipBubbleRef(baselineRunTooltipId)}
+                  text={baselineTooltip}
+                />
+              ) : null}
+            </article>
+          );
+        })}
       </div>
       {primaryNarrative ? (
         <div className="comparison-top-story">
@@ -9595,8 +9697,10 @@ function RunComparisonPanel({
             comparison={comparison}
             featured
             narrative={primaryNarrative}
+            onSelectScoreLink={setSelectedScoreLink}
             registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
             registerTooltipTargetRef={registerComparisonTooltipTargetRef}
+            selectedScoreLink={selectedScoreLink}
             tooltipId={featuredNarrativeTooltipId}
             tooltipTargetProps={
               featuredNarrativeTooltipId
@@ -9615,8 +9719,10 @@ function RunComparisonPanel({
               comparison={comparison}
               key={`${narrative.baseline_run_id}-${narrative.run_id}`}
               narrative={narrative}
+              onSelectScoreLink={setSelectedScoreLink}
               registerTooltipBubbleRef={registerComparisonTooltipBubbleRef}
               registerTooltipTargetRef={registerComparisonTooltipTargetRef}
+              selectedScoreLink={selectedScoreLink}
             />
           ))}
         </div>
@@ -9632,80 +9738,98 @@ function RunComparisonPanel({
             </tr>
           </thead>
           <tbody>
-            {comparison.metric_rows.map((metricRow) => (
-              <tr key={metricRow.key}>
-                <th>
-                  <span>{metricRow.label}</span>
-                  {metricRow.annotation ? (
-                    <small className="comparison-metric-annotation">{metricRow.annotation}</small>
-                  ) : null}
-                </th>
-                {comparison.runs.map((run) => {
-                  const cellTooltip =
-                    buildComparisonCellTooltip(
-                      comparison.intent,
-                      metricRow.label,
-                      run.run_id === comparison.baseline_run_id,
-                      metricRow.best_run_id === run.run_id,
-                    ) || undefined;
-                  const cellTooltipId = cellTooltip
-                    ? buildComparisonTooltipId(tooltipScopeId, "metric", metricRow.key, run.run_id)
-                    : undefined;
-                  const cellClassName =
-                    [
-                      metricRow.best_run_id === run.run_id ? "comparison-best" : "",
-                      run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
-                      cellTooltip ? "comparison-cue comparison-tooltip comparison-cell-cue" : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" ") || undefined;
+            {comparison.metric_rows.map((metricRow) => {
+              const metricRowLinked = isComparisonScoreLinkMatch(
+                selectedScoreLink,
+                [metricRow.key],
+                "metrics",
+              );
 
-                  return (
-                    <td
-                      className={cellClassName}
-                      key={`${metricRow.key}-${run.run_id}`}
-                      ref={
-                        cellTooltipId
-                          ? registerComparisonTooltipTargetRef(cellTooltipId)
-                          : undefined
-                      }
-                      tabIndex={cellTooltip ? 0 : undefined}
-                      {...(cellTooltipId
-                        ? getMetricComparisonTooltipTargetProps(
-                            cellTooltipId,
-                            metricRow.key,
-                            run.run_id,
-                          )
-                        : {})}
-                    >
-                      <strong>
-                        {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
-                      </strong>
-                      <span className="comparison-delta">
-                        {run.run_id === comparison.baseline_run_id
-                          ? metricRow.delta_annotations[run.run_id] ?? "baseline"
-                          : metricRow.delta_annotations[run.run_id] ?? formatComparisonDelta(
-                              metricRow.deltas_vs_baseline[run.run_id],
-                              metricRow.unit,
-                            )}
-                      </span>
-                      {cellTooltipId && cellTooltip ? (
-                        <ComparisonTooltipBubble
-                          id={cellTooltipId}
-                          layout={
-                            activeTooltipLayout?.tooltipId === cellTooltipId
-                              ? activeTooltipLayout
-                              : null
-                          }
-                          ref={registerComparisonTooltipBubbleRef(cellTooltipId)}
-                          text={cellTooltip}
-                        />
-                      ) : null}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+              return (
+                <tr className={metricRowLinked ? "comparison-linked-metric-row" : undefined} key={metricRow.key}>
+                  <th className={metricRowLinked ? "comparison-linked-metric-label" : undefined}>
+                    <span>{metricRow.label}</span>
+                    {metricRow.annotation ? (
+                      <small className="comparison-metric-annotation">{metricRow.annotation}</small>
+                    ) : null}
+                  </th>
+                  {comparison.runs.map((run) => {
+                    const cellTooltip =
+                      buildComparisonCellTooltip(
+                        comparison.intent,
+                        metricRow.label,
+                        run.run_id === comparison.baseline_run_id,
+                        metricRow.best_run_id === run.run_id,
+                      ) || undefined;
+                    const cellTooltipId = cellTooltip
+                      ? buildComparisonTooltipId(tooltipScopeId, "metric", metricRow.key, run.run_id)
+                      : undefined;
+                    const linkedRunRole = metricRowLinked
+                      ? getComparisonScoreLinkedRunRole(
+                          selectedScoreLink,
+                          comparison.baseline_run_id,
+                          run.run_id,
+                        )
+                      : null;
+                    const cellClassName =
+                      [
+                        metricRow.best_run_id === run.run_id ? "comparison-best" : "",
+                        run.run_id === comparison.baseline_run_id ? "comparison-baseline-cell" : "",
+                        cellTooltip ? "comparison-cue comparison-tooltip comparison-cell-cue" : "",
+                        metricRowLinked ? "comparison-linked-metric-cell" : "",
+                        linkedRunRole === "target" ? "comparison-linked-metric-cell-target" : "",
+                        linkedRunRole === "baseline" ? "comparison-linked-metric-cell-baseline" : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ") || undefined;
+
+                    return (
+                      <td
+                        className={cellClassName}
+                        key={`${metricRow.key}-${run.run_id}`}
+                        ref={
+                          cellTooltipId
+                            ? registerComparisonTooltipTargetRef(cellTooltipId)
+                            : undefined
+                        }
+                        tabIndex={cellTooltip ? 0 : undefined}
+                        {...(cellTooltipId
+                          ? getMetricComparisonTooltipTargetProps(
+                              cellTooltipId,
+                              metricRow.key,
+                              run.run_id,
+                            )
+                          : {})}
+                      >
+                        <strong>
+                          {formatComparisonMetric(metricRow.values[run.run_id], metricRow.unit)}
+                        </strong>
+                        <span className="comparison-delta">
+                          {run.run_id === comparison.baseline_run_id
+                            ? metricRow.delta_annotations[run.run_id] ?? "baseline"
+                            : metricRow.delta_annotations[run.run_id] ?? formatComparisonDelta(
+                                metricRow.deltas_vs_baseline[run.run_id],
+                                metricRow.unit,
+                              )}
+                        </span>
+                        {cellTooltipId && cellTooltip ? (
+                          <ComparisonTooltipBubble
+                            id={cellTooltipId}
+                            layout={
+                              activeTooltipLayout?.tooltipId === cellTooltipId
+                                ? activeTooltipLayout
+                                : null
+                            }
+                            ref={registerComparisonTooltipBubbleRef(cellTooltipId)}
+                            text={cellTooltip}
+                          />
+                        ) : null}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
             <tr>
               <th>Notes</th>
               {comparison.runs.map((run) => (
@@ -9726,8 +9850,10 @@ function ComparisonNarrativeCard({
   comparison,
   narrative,
   featured = false,
+  onSelectScoreLink,
   registerTooltipBubbleRef,
   registerTooltipTargetRef,
+  selectedScoreLink,
   tooltipId,
   tooltipTargetProps,
   tooltip,
@@ -9736,8 +9862,10 @@ function ComparisonNarrativeCard({
   comparison: RunComparison;
   narrative: RunComparison["narratives"][number];
   featured?: boolean;
+  onSelectScoreLink: (value: ComparisonScoreLinkTarget | null) => void;
   registerTooltipBubbleRef: (tooltipId: string) => (node: HTMLSpanElement | null) => void;
   registerTooltipTargetRef: (tooltipId?: string) => (node: HTMLElement | null) => void;
+  selectedScoreLink: ComparisonScoreLinkTarget | null;
   tooltipId?: string;
   tooltipTargetProps?: ComparisonTooltipTargetProps;
   tooltip?: string;
@@ -9749,7 +9877,7 @@ function ComparisonNarrativeCard({
     <article
       className={`comparison-story-card ${
         featured ? "featured comparison-cue-card comparison-tooltip" : ""
-      }`}
+      } ${selectedScoreLink?.narrativeRunId === narrative.run_id ? "is-linked" : ""}`.trim()}
       ref={tooltipId ? registerTooltipTargetRef(tooltipId) : undefined}
       tabIndex={tooltip ? 0 : undefined}
       {...tooltipTargetProps}
@@ -9762,7 +9890,12 @@ function ComparisonNarrativeCard({
         <span>#{narrative.rank}</span>
         <span>Score {formatComparisonScoreValue(narrative.insight_score)}</span>
       </div>
-      <ComparisonNarrativeScoreBreakdown breakdown={narrative.score_breakdown} />
+      <ComparisonNarrativeScoreBreakdown
+        breakdown={narrative.score_breakdown}
+        narrativeRunId={narrative.run_id}
+        onSelectScoreLink={onSelectScoreLink}
+        selectedScoreLink={selectedScoreLink}
+      />
       <p className="comparison-story-title">{narrative.title}</p>
       <p className="comparison-story-summary">{narrative.summary}</p>
       {narrative.bullets.length ? (
@@ -9786,12 +9919,18 @@ function ComparisonNarrativeCard({
 
 function ComparisonNarrativeScoreBreakdown({
   breakdown,
+  narrativeRunId,
+  onSelectScoreLink,
+  selectedScoreLink,
 }: {
   breakdown: RunComparison["narratives"][number]["score_breakdown"];
+  narrativeRunId: string;
+  onSelectScoreLink: (value: ComparisonScoreLinkTarget | null) => void;
+  selectedScoreLink: ComparisonScoreLinkTarget | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const sections: Array<{
-    key: "metrics" | "semantics" | "context";
+    key: ComparisonScoreSection;
     label: string;
     total: number;
     highlights: string[];
@@ -9819,6 +9958,11 @@ function ComparisonNarrativeScoreBreakdown({
       components: breakdown.context.components,
     },
   ];
+  const activeSelection =
+    selectedScoreLink?.narrativeRunId === narrativeRunId ? selectedScoreLink : null;
+  const activeSelectionLabel = activeSelection
+    ? formatComparisonScoreComponentLabel(activeSelection.section, activeSelection.componentKey)
+    : null;
 
   return (
     <section className="comparison-score-breakdown" aria-label="Narrative score breakdown">
@@ -9839,6 +9983,11 @@ function ComparisonNarrativeScoreBreakdown({
           </article>
         ))}
       </div>
+      {activeSelectionLabel ? (
+        <p className="comparison-score-link-copy">
+          Tracing {activeSelectionLabel} into the run deck, metric table, and provenance panels.
+        </p>
+      ) : null}
       <button
         aria-expanded={expanded}
         className="comparison-score-breakdown-toggle"
@@ -9856,20 +10005,40 @@ function ComparisonNarrativeScoreBreakdown({
                 <strong>{formatComparisonScoreValue(section.total)}</strong>
               </div>
               <div className="comparison-score-detail-list">
-                {buildComparisonScoreDetailRows(section.key, section.components).map((row) => (
-                  <div
-                    className={`comparison-score-detail-row ${row.score > 0 ? "is-active" : ""}`}
-                    key={`${section.key}-${row.key}`}
-                  >
-                    <div className="comparison-score-detail-row-head">
-                      <span>{row.label}</span>
-                      <strong>{formatComparisonScoreValue(row.score)}</strong>
-                    </div>
-                    <p className="comparison-score-detail-row-copy">
-                      {row.details.length ? row.details.join(" / ") : "No active contribution"}
-                    </p>
-                  </div>
-                ))}
+                {buildComparisonScoreDetailRows(section.key, section.components).map((row) => {
+                  const rowIsLinked =
+                    activeSelection?.section === section.key
+                    && activeSelection.componentKey === row.key;
+                  return (
+                    <button
+                      aria-pressed={rowIsLinked}
+                      className={`comparison-score-detail-row ${row.score > 0 ? "is-active" : ""} ${
+                        rowIsLinked ? "is-linked" : ""
+                      }`}
+                      key={`${section.key}-${row.key}`}
+                      onClick={() =>
+                        onSelectScoreLink(
+                          rowIsLinked
+                            ? null
+                            : {
+                                narrativeRunId,
+                                section: section.key,
+                                componentKey: row.key,
+                              },
+                        )
+                      }
+                      type="button"
+                    >
+                      <div className="comparison-score-detail-row-head">
+                        <span>{row.label}</span>
+                        <strong>{formatComparisonScoreValue(row.score)}</strong>
+                      </div>
+                      <p className="comparison-score-detail-row-copy">
+                        {row.details.length ? row.details.join(" / ") : "No active contribution"}
+                      </p>
+                    </button>
+                  );
+                })}
               </div>
             </article>
           ))}
@@ -11616,6 +11785,7 @@ function ReferenceRunProvenanceSummary({
   artifactPaths,
   benchmarkArtifacts,
   externalCommand,
+  linkedScore,
   reference,
   referenceVersion,
   strategySemantics,
@@ -11624,6 +11794,7 @@ function ReferenceRunProvenanceSummary({
   artifactPaths: string[];
   benchmarkArtifacts: BenchmarkArtifact[];
   externalCommand: string[];
+  linkedScore?: (ComparisonScoreLinkTarget & { role: ComparisonScoreLinkedRunRole }) | null;
   reference: ReferenceSource;
   referenceVersion?: string | null;
   strategySemantics?: {
@@ -11635,8 +11806,66 @@ function ReferenceRunProvenanceSummary({
   } | null;
   workingDirectory?: string | null;
 }) {
+  const linkedScoreSelection = linkedScore ?? null;
+  const highlightStrategyKind =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, ["strategy_kind", "vocabulary"], "semantics");
+  const highlightExecutionModel =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, ["execution_model", "vocabulary"], "semantics");
+  const highlightParameterContract =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, ["parameter_contract", "vocabulary"], "semantics");
+  const highlightSourceDescriptor =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, [
+      "source_descriptor",
+      "vocabulary",
+      "native_reference_bonus",
+      "reference_bonus",
+      "reference_floor",
+    ]);
+  const highlightReferenceIdentity =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, [
+      "source_descriptor",
+      "provenance_richness",
+      "native_reference_bonus",
+      "reference_bonus",
+      "reference_floor",
+      "benchmark_story_bonus",
+    ]);
+  const highlightOperatorNotes =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, ["vocabulary"], "semantics");
+  const highlightExecutionContext =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, [
+      "provenance_richness",
+      "reference_bonus",
+      "reference_floor",
+      "native_reference_bonus",
+      "benchmark_story_bonus",
+    ]);
+  const highlightArtifacts =
+    Boolean(linkedScoreSelection)
+    && isComparisonScoreLinkMatch(linkedScoreSelection, ["provenance_richness", "benchmark_story_bonus"]);
+  const highlightPanel =
+    highlightStrategyKind
+    || highlightExecutionModel
+    || highlightParameterContract
+    || highlightSourceDescriptor
+    || highlightReferenceIdentity
+    || highlightOperatorNotes
+    || highlightExecutionContext
+    || highlightArtifacts;
+
   return (
-    <section className="reference-provenance">
+    <section
+      className={`reference-provenance ${highlightPanel ? "comparison-linked-panel" : ""} ${
+        linkedScore?.role === "target" ? "comparison-linked-panel-target" : ""
+      } ${linkedScore?.role === "baseline" ? "comparison-linked-panel-baseline" : ""}`.trim()}
+    >
       <div className="reference-provenance-head">
         <span>Reference provenance</span>
         <strong>{reference.integration_mode}</strong>
@@ -11648,32 +11877,59 @@ function ReferenceRunProvenanceSummary({
         <Metric label="Runtime" value={reference.runtime ?? "n/a"} />
       </div>
       <div className="reference-provenance-copy">
-        <p>ID: {reference.reference_id}</p>
-        {reference.homepage ? <p>Homepage: {reference.homepage}</p> : null}
+        <p className={highlightReferenceIdentity ? "comparison-linked-copy" : undefined}>
+          ID: {reference.reference_id}
+        </p>
+        {reference.homepage ? (
+          <p className={highlightReferenceIdentity ? "comparison-linked-copy" : undefined}>
+            Homepage: {reference.homepage}
+          </p>
+        ) : null}
         {strategySemantics?.strategy_kind ? (
-          <p>Semantic kind: {strategySemantics.strategy_kind}</p>
+          <p className={highlightStrategyKind ? "comparison-linked-copy" : undefined}>
+            Semantic kind: {strategySemantics.strategy_kind}
+          </p>
         ) : null}
         {strategySemantics?.execution_model ? (
-          <p>Execution model: {strategySemantics.execution_model}</p>
+          <p className={highlightExecutionModel ? "comparison-linked-copy" : undefined}>
+            Execution model: {strategySemantics.execution_model}
+          </p>
         ) : null}
         {strategySemantics?.parameter_contract ? (
-          <p>Parameter contract: {strategySemantics.parameter_contract}</p>
+          <p className={highlightParameterContract ? "comparison-linked-copy" : undefined}>
+            Parameter contract: {strategySemantics.parameter_contract}
+          </p>
         ) : null}
         {strategySemantics?.source_descriptor ? (
-          <p>Semantic source: {strategySemantics.source_descriptor}</p>
+          <p className={highlightSourceDescriptor ? "comparison-linked-copy" : undefined}>
+            Semantic source: {strategySemantics.source_descriptor}
+          </p>
         ) : null}
         {strategySemantics?.operator_notes?.length ? (
-          <p>Operator notes: {strategySemantics.operator_notes.join(" | ")}</p>
+          <p className={highlightOperatorNotes ? "comparison-linked-copy" : undefined}>
+            Operator notes: {strategySemantics.operator_notes.join(" | ")}
+          </p>
         ) : null}
-        {workingDirectory ? <p>Working dir: {workingDirectory}</p> : null}
-        {externalCommand.length ? <p>Command: {externalCommand.join(" ")}</p> : null}
+        {workingDirectory ? (
+          <p className={highlightExecutionContext ? "comparison-linked-copy" : undefined}>
+            Working dir: {workingDirectory}
+          </p>
+        ) : null}
+        {externalCommand.length ? (
+          <p className={highlightExecutionContext ? "comparison-linked-copy" : undefined}>
+            Command: {externalCommand.join(" ")}
+          </p>
+        ) : null}
         {benchmarkArtifacts.length ? (
           <div className="reference-artifact-list">
             {benchmarkArtifacts.map((artifact) => {
               const summaryEntries = formatBenchmarkArtifactSummaryEntries(artifact.summary);
               const sectionEntries = formatBenchmarkArtifactSectionEntries(artifact.sections ?? {});
               return (
-                <article className="reference-artifact-card" key={`${artifact.kind}-${artifact.path}`}>
+                <article
+                  className={`reference-artifact-card ${highlightArtifacts ? "is-linked" : ""}`}
+                  key={`${artifact.kind}-${artifact.path}`}
+                >
                   <div className="reference-artifact-head">
                     <strong>{artifact.label}</strong>
                     <span>{artifact.kind}</span>
@@ -12225,6 +12481,35 @@ function formatComparisonScoreComponentRawValue(value: unknown): string {
 function formatComparisonScoreSignedValue(value: number) {
   const prefix = value > 0 ? "+" : "";
   return `${prefix}${formatComparisonScoreValue(value)}`;
+}
+
+function getComparisonScoreLinkedRunRole(
+  selection: ComparisonScoreLinkTarget | null,
+  baselineRunId: string,
+  runId: string,
+): ComparisonScoreLinkedRunRole | null {
+  if (!selection) {
+    return null;
+  }
+  if (runId === selection.narrativeRunId) {
+    return "target";
+  }
+  if (runId === baselineRunId) {
+    return "baseline";
+  }
+  return null;
+}
+
+function isComparisonScoreLinkMatch(
+  selection: ComparisonScoreLinkTarget | null,
+  componentKeys: string[],
+  section?: ComparisonScoreSection,
+) {
+  return Boolean(
+    selection
+    && (!section || selection.section === section)
+    && componentKeys.includes(selection.componentKey),
+  );
 }
 
 function formatEditableNumber(value: number) {

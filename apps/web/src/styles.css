@@ -1363,6 +1363,13 @@ select {
     0 20px 36px rgba(0, 0, 0, 0.22);
 }
 
+.comparison-story-card.is-linked {
+  border-color: rgba(var(--comparison-accent-rgb), 0.42);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.2),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.12);
+}
+
 .comparison-story-head {
   display: flex;
   justify-content: space-between;
@@ -1479,6 +1486,14 @@ select {
   line-height: 1.45;
 }
 
+.comparison-score-link-copy {
+  margin: 0;
+  color: rgba(var(--comparison-accent-rgb), 0.9);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .comparison-score-detail-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1524,15 +1539,37 @@ select {
 .comparison-score-detail-row {
   display: grid;
   gap: 6px;
+  width: 100%;
   padding: 10px;
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  color: inherit;
 }
 
 .comparison-score-detail-row.is-active {
   border-color: rgba(var(--comparison-accent-rgb), 0.2);
   background: rgba(var(--comparison-accent-rgb), 0.08);
+}
+
+.comparison-score-detail-row:hover,
+.comparison-score-detail-row:focus-visible {
+  border-color: rgba(var(--comparison-accent-rgb), 0.34);
+  background: rgba(var(--comparison-accent-rgb), 0.1);
+}
+
+.comparison-score-detail-row.is-linked {
+  border-color: rgba(var(--comparison-accent-rgb), 0.44);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.18), rgba(var(--comparison-accent-rgb), 0.08)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.18),
+    0 8px 18px rgba(0, 0, 0, 0.18);
 }
 
 .comparison-score-detail-row-head {
@@ -1603,6 +1640,27 @@ select {
   background: rgba(4, 10, 17, 0.64);
 }
 
+.comparison-run-card.is-linked {
+  border-color: rgba(var(--comparison-accent-rgb), 0.22);
+  box-shadow: inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
+}
+
+.comparison-run-card.is-linked-target {
+  border-color: rgba(var(--comparison-accent-rgb), 0.4);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.12), rgba(var(--comparison-accent-rgb), 0.03)),
+    rgba(4, 10, 17, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.18),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.1);
+}
+
+.comparison-run-card.is-linked-baseline {
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.08), rgba(var(--comparison-accent-rgb), 0.02)),
+    rgba(4, 10, 17, 0.68);
+}
+
 .comparison-run-card.baseline {
   border-color: rgba(var(--comparison-accent-rgb), 0.42);
   box-shadow:
@@ -1667,6 +1725,15 @@ select {
   display: block;
 }
 
+.comparison-linked-metric-row > th,
+.comparison-linked-metric-row > td {
+  background: rgba(var(--comparison-accent-rgb), 0.04);
+}
+
+.comparison-linked-metric-label {
+  box-shadow: inset 3px 0 0 rgba(var(--comparison-accent-rgb), 0.54);
+}
+
 .comparison-metric-annotation {
   display: block;
   margin-top: 6px;
@@ -1682,6 +1749,28 @@ select {
 .comparison-table td strong {
   display: block;
   font-size: 1rem;
+}
+
+.comparison-linked-metric-cell {
+  position: relative;
+}
+
+.comparison-linked-metric-cell::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--comparison-accent-rgb), 0.16);
+  pointer-events: none;
+}
+
+.comparison-linked-metric-cell-baseline::after {
+  border-color: rgba(var(--comparison-accent-rgb), 0.3);
+}
+
+.comparison-linked-metric-cell-target::after {
+  border-color: rgba(var(--comparison-accent-rgb), 0.56);
+  box-shadow: 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.16);
 }
 
 .comparison-baseline-cell {
@@ -1734,6 +1823,18 @@ select {
   line-height: 1.5;
 }
 
+.comparison-linked-badge {
+  background: rgba(var(--comparison-accent-rgb), 0.2);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow:
+    inset 0 0 0 1px rgba(var(--comparison-accent-rgb), 0.28),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
+}
+
+.comparison-linked-copy {
+  color: rgba(255, 255, 255, 0.94);
+}
+
 .reference-provenance {
   margin: 14px 0;
   padding: 16px;
@@ -1742,6 +1843,24 @@ select {
   background:
     linear-gradient(180deg, rgba(88, 217, 255, 0.05), rgba(88, 217, 255, 0.01)),
     rgba(255, 255, 255, 0.02);
+}
+
+.comparison-linked-panel {
+  border-color: rgba(var(--comparison-accent-rgb), 0.28);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.1), rgba(var(--comparison-accent-rgb), 0.03)),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.14);
+}
+
+.comparison-linked-panel-target {
+  box-shadow:
+    inset 0 1px 0 rgba(var(--comparison-accent-rgb), 0.18),
+    0 0 0 1px rgba(var(--comparison-accent-rgb), 0.08);
+}
+
+.comparison-linked-panel-baseline {
+  border-style: solid;
 }
 
 .reference-provenance-head {
@@ -1788,6 +1907,13 @@ select {
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(4, 10, 17, 0.48);
+}
+
+.reference-artifact-card.is-linked {
+  border-color: rgba(var(--comparison-accent-rgb), 0.28);
+  background:
+    linear-gradient(180deg, rgba(var(--comparison-accent-rgb), 0.1), rgba(var(--comparison-accent-rgb), 0.03)),
+    rgba(4, 10, 17, 0.56);
 }
 
 .reference-artifact-head {
