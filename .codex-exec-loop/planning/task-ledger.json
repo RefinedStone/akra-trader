@@ -237,18 +237,72 @@
       "direction_id": "experiment-os",
       "title": "Extend strategy catalog semantic metadata to reference and imported strategies",
       "description": "Expand the strategy catalog and schema loading path so reference or imported strategies can publish the same strategy-specific semantic metadata that built-in strategies now expose, allowing preset diff, restore, and draft preview vocabulary to stay strategy-aware beyond hardcoded built-ins.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply says the remaining work is strategy catalog expansion and explicitly calls out that reference/imported strategies still cannot provide semantic metadata. This is the clearest executable next step because it extends the just-shipped strategy-specific vocabulary model to the broader catalog instead of leaving it limited to built-ins.",
+      "priority_reason": "Completed in main session commit 4e22b25, which added structured `catalog_semantics` for built-in, reference, and imported strategies, propagated the metadata through register and catalog APIs, surfaced execution model or parameter contract or source or operator notes in the control room, and verified the result with targeted pytest, py_compile, web typecheck, and diff checks before push.",
       "depends_on": [
         "planning-experiment-os-preset-strategy-specific-semantic-vocabulary"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:20:00Z",
+      "updated_at": "2026-04-19T10:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os toward a durable strategy catalog by making semantic parameter meaning a catalog capability shared by native and imported strategy definitions rather than a built-in-only shortcut."
+    },
+    {
+      "id": "planning-experiment-os-propagate-catalog-semantics-into-run-provenance-views",
+      "direction_id": "experiment-os",
+      "title": "Propagate strategy catalog semantics into run snapshot and provenance views",
+      "description": "Extend the newly shipped `catalog_semantics` payload beyond the strategy catalog so run snapshot, run provenance, and adjacent operator surfaces expose the same execution model, parameter contract, source, and operator note context for the strategy version attached to each run.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply explicitly says catalog semantics have not yet been propagated into run snapshot or provenance screens. This is the clearest executable next step because it carries the just-shipped metadata into the operator surfaces where run review and promotion decisions happen.",
+      "depends_on": [
+        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os strategy semantics from catalog discovery into the durable run-review surfaces that operators use to understand what executed, how it was parameterized, and where it came from."
+    },
+    {
+      "id": "planning-experiment-os-reference-strategy-typed-override-semantics",
+      "direction_id": "experiment-os",
+      "title": "Advertise typed override schemas for reference strategy semantics",
+      "description": "Deepen reference strategy `catalog_semantics` so reference delegates can publish parameter-level typed override schema and contract details instead of stopping at the current high-level execution model and parameter contract summary.",
+      "status": "proposed",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says reference strategies still do not advertise parameter-level typed override schema. This is concrete follow-up work, but propagating the already-available catalog semantics into run provenance is the stronger immediate queue head.",
+      "depends_on": [
+        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Improves experiment-os strategy catalog fidelity by making reference delegate semantics precise enough for operators and downstream diff tooling to inspect override contracts at parameter level."
+    },
+    {
+      "id": "planning-experiment-os-imported-strategy-domain-vocabulary-extraction",
+      "direction_id": "experiment-os",
+      "title": "Extract imported strategy domain vocabulary into catalog semantics",
+      "description": "Move imported strategy semantics beyond registration metadata and advertised schema shape by extracting or deriving module-level domain vocabulary that can describe strategy intent for imported classes with less manual operator interpretation.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "The latest main-session reply says imported strategy semantics still do not automatically extract module-level domain vocabulary. This is valid follow-up, but it should stay behind run-provenance propagation and reference override-schema depth because those are more direct continuations of the shipped catalog-semantics work.",
+      "depends_on": [
+        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-19T10:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os imported strategy support beyond structural schema hints toward richer strategy-intent semantics that can feed preset review and operator decision surfaces."
     },
     {
       "id": "planning-experiment-os-launch-form-strategy-semantic-help",
@@ -258,13 +312,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says strategy-specific vocabulary is wired into diff, restore, and draft preview but not yet into the launch-form parameter editor help. This is concrete executable follow-up, but broadening metadata coverage to reference/imported strategies is the stronger immediate queue head because it closes the catalog-level gap first.",
+      "priority_reason": "The latest main-session reply shows `catalog_semantics` now exists for built-in, reference, and imported strategies, but that richer metadata is still not surfaced in the launch-form parameter editor. This remains concrete follow-up, though propagating the same semantics into run snapshot and provenance review is the stronger immediate queue head.",
       "depends_on": [
-        "planning-experiment-os-preset-strategy-specific-semantic-vocabulary"
+        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:20:00Z",
+      "updated_at": "2026-04-19T10:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Improves experiment-os operator guidance by moving strategy-aware parameter meaning earlier in the workflow, where preset bundles are authored rather than only reviewed after revisions."
     },
