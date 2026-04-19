@@ -19,6 +19,7 @@ from akra_trader.adapters.sqlalchemy import SqlAlchemyExperimentPresetCatalog
 from akra_trader.adapters.sqlalchemy import SqlAlchemyRunRepository
 from akra_trader.adapters.venue_execution import SeededVenueExecutionAdapter
 from akra_trader.application import TradingApplication
+from akra_trader.application import serialize_run_subresource_response
 from akra_trader.domain.models import AssetType
 from akra_trader.domain.models import BenchmarkArtifact
 from akra_trader.domain.models import Candle
@@ -13759,6 +13760,28 @@ def test_stop_paper_run_persists_terminal_state(tmp_path: Path) -> None:
   assert reloaded.status == RunStatus.STOPPED
   assert reloaded.ended_at is not None
   assert reloaded.notes[-1] == "Paper run stopped by operator."
+
+
+def test_run_subresource_serializer_registry_rejects_unknown_key(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+  run = app.run_backtest(
+    strategy_id="ma_cross_v1",
+    symbol="BTC/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+  )
+
+  with pytest.raises(ValueError, match="Unsupported run subresource serializer: unknown"):
+    serialize_run_subresource_response(run, subresource_key="unknown")
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

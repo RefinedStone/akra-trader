@@ -15,10 +15,8 @@ from pydantic import Field
 
 from akra_trader.application import TradingApplication
 from akra_trader.application import serialize_run_comparison
-from akra_trader.application import serialize_run_metrics_response
-from akra_trader.application import serialize_run_orders_response
-from akra_trader.application import serialize_run_positions_response
 from akra_trader.application import serialize_run
+from akra_trader.application import serialize_run_subresource_response
 from akra_trader.application import serialize_strategy
 from akra_trader.application import serialize_preset
 from akra_trader.application import serialize_preset_revision
@@ -569,8 +567,9 @@ def create_router(container: Container) -> APIRouter:
     run = app.get_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_orders_response(
+    return serialize_run_subresource_response(
       run,
+      subresource_key="orders",
       capabilities=app.get_run_surface_capabilities(),
     )
 
@@ -579,8 +578,9 @@ def create_router(container: Container) -> APIRouter:
     run = app.get_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_positions_response(
+    return serialize_run_subresource_response(
       run,
+      subresource_key="positions",
       capabilities=app.get_run_surface_capabilities(),
     )
 
@@ -589,8 +589,9 @@ def create_router(container: Container) -> APIRouter:
     run = app.get_run(run_id)
     if run is None:
       raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_metrics_response(
+    return serialize_run_subresource_response(
       run,
+      subresource_key="metrics",
       capabilities=app.get_run_surface_capabilities(),
     )
 

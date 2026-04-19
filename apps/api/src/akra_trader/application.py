@@ -22975,24 +22975,88 @@ def _serialize_run_order_subresource_item(
   }
 
 
+def _serialize_run_orders_subresource_body(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities,
+) -> list[dict[str, Any]]:
+  return [
+    _serialize_run_order_subresource_item(
+      run,
+      order=order,
+      capabilities=capabilities,
+    )
+    for order in run.orders
+  ]
+
+
+def _serialize_run_positions_subresource_body(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities,
+) -> list[dict[str, Any]]:
+  _ = capabilities
+  return [
+    asdict(position)
+    for position in run.positions.values()
+  ]
+
+
+def _serialize_run_metrics_subresource_body(
+  run: RunRecord,
+  *,
+  capabilities: RunSurfaceCapabilities,
+) -> dict[str, Any]:
+  _ = capabilities
+  return deepcopy(run.metrics)
+
+
+RUN_SUBRESOURCE_BODY_SERIALIZERS: dict[
+  str,
+  Callable[[RunRecord, RunSurfaceCapabilities], Any],
+] = {
+  "orders": lambda run, capabilities: _serialize_run_orders_subresource_body(
+    run,
+    capabilities=capabilities,
+  ),
+  "positions": lambda run, capabilities: _serialize_run_positions_subresource_body(
+    run,
+    capabilities=capabilities,
+  ),
+  "metrics": lambda run, capabilities: _serialize_run_metrics_subresource_body(
+    run,
+    capabilities=capabilities,
+  ),
+}
+
+
+def serialize_run_subresource_response(
+  run: RunRecord,
+  *,
+  subresource_key: str,
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> dict[str, Any]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  body_serializer = RUN_SUBRESOURCE_BODY_SERIALIZERS.get(subresource_key)
+  if body_serializer is None:
+    raise ValueError(f"Unsupported run subresource serializer: {subresource_key}")
+  return _serialize_run_subresource_envelope(
+    run,
+    capabilities=resolved_capabilities,
+    body_key=subresource_key,
+    body_value=body_serializer(run, resolved_capabilities),
+  )
+
+
 def serialize_run_orders_response(
   run: RunRecord,
   *,
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
-  resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return _serialize_run_subresource_envelope(
+  return serialize_run_subresource_response(
     run,
-    capabilities=resolved_capabilities,
-    body_key="orders",
-    body_value=[
-      _serialize_run_order_subresource_item(
-        run,
-        order=order,
-        capabilities=resolved_capabilities,
-      )
-      for order in run.orders
-    ],
+    subresource_key="orders",
+    capabilities=capabilities,
   )
 
 
@@ -23001,15 +23065,10 @@ def serialize_run_positions_response(
   *,
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
-  resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return _serialize_run_subresource_envelope(
+  return serialize_run_subresource_response(
     run,
-    capabilities=resolved_capabilities,
-    body_key="positions",
-    body_value=[
-      asdict(position)
-      for position in run.positions.values()
-    ],
+    subresource_key="positions",
+    capabilities=capabilities,
   )
 
 
@@ -23018,12 +23077,10 @@ def serialize_run_metrics_response(
   *,
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> dict[str, Any]:
-  resolved_capabilities = capabilities or RunSurfaceCapabilities()
-  return _serialize_run_subresource_envelope(
+  return serialize_run_subresource_response(
     run,
-    capabilities=resolved_capabilities,
-    body_key="metrics",
-    body_value=deepcopy(run.metrics),
+    subresource_key="metrics",
+    capabilities=capabilities,
   )
 
 
