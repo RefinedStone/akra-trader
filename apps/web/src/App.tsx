@@ -52,6 +52,22 @@ type ReferenceSource = {
   summary: string;
 };
 
+type ExperimentPresetRevision = {
+  revision_id: string;
+  actor: string;
+  reason: string;
+  created_at: string;
+  action: string;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  strategy_id?: string | null;
+  timeframe?: string | null;
+  benchmark_family?: string | null;
+  tags: string[];
+  parameters: Record<string, unknown>;
+};
+
 type ExperimentPreset = {
   preset_id: string;
   name: string;
@@ -75,6 +91,7 @@ type ExperimentPreset = {
       to_stage: string;
     }[];
   };
+  revisions: ExperimentPresetRevision[];
   created_at: string;
   updated_at: string;
 };
@@ -3017,6 +3034,21 @@ const defaultPresetForm = {
   parameters_text: "",
 };
 
+function buildPresetFormFromPreset(preset: ExperimentPreset) {
+  return {
+    name: preset.name,
+    preset_id: preset.preset_id,
+    description: preset.description,
+    strategy_id: preset.strategy_id ?? "",
+    timeframe: preset.timeframe ?? "",
+    benchmark_family: preset.benchmark_family ?? "",
+    tags_text: preset.tags.join(", "),
+    parameters_text: Object.keys(preset.parameters).length
+      ? JSON.stringify(preset.parameters, null, 2)
+      : "",
+  };
+}
+
 const defaultRunHistoryFilter: RunHistoryFilter = {
   strategy_id: ALL_FILTER_VALUE,
   strategy_version: ALL_FILTER_VALUE,
@@ -3117,6 +3149,8 @@ export default function App() {
     Record<string, LiveOrderReplacementDraft>
   >({});
   const [presetForm, setPresetForm] = useState(defaultPresetForm);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [expandedPresetRevisionIds, setExpandedPresetRevisionIds] = useState<Record<string, boolean>>({});
   const [backtestForm, setBacktestForm] = useState(defaultRunForm);
   const [sandboxForm, setSandboxForm] = useState(defaultRunForm);
   const [liveForm, setLiveForm] = useState(defaultRunForm);
@@ -3198,6 +3232,23 @@ export default function App() {
     setPaperRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
     setLiveRunFilter((current) => normalizeRunHistoryPresetFilter(current, presets));
   }, [presets]);
+
+  useEffect(() => {
+    if (!editingPresetId) {
+      return;
+    }
+    const editingPreset = presets.find((preset) => preset.preset_id === editingPresetId);
+    if (!editingPreset) {
+      setEditingPresetId(null);
+      setPresetForm((current) => ({
+        ...defaultPresetForm,
+        strategy_id: current.strategy_id,
+        timeframe: current.timeframe,
+      }));
+      return;
+    }
+    setPresetForm(buildPresetFormFromPreset(editingPreset));
+  }, [editingPresetId, presets]);
 
   useEffect(() => {
     if (!strategies.length) {
@@ -3386,30 +3437,50 @@ export default function App() {
 
   async function handlePresetSubmit(event: FormEvent) {
     event.preventDefault();
-    setStatusText("Saving experiment preset...");
+    const editing = editingPresetId !== null;
+    setStatusText(editing ? "Updating experiment preset..." : "Saving experiment preset...");
     try {
       const parameters = parseJsonObjectInput(presetForm.parameters_text);
-      await fetchJson<ExperimentPreset>("/presets", {
-        method: "POST",
-        body: JSON.stringify({
-          name: presetForm.name,
-          preset_id: presetForm.preset_id.trim() || null,
-          description: presetForm.description,
-          strategy_id: presetForm.strategy_id || null,
-          timeframe: presetForm.timeframe.trim() || null,
-          benchmark_family: presetForm.benchmark_family.trim() || null,
-          tags: parseExperimentTags(presetForm.tags_text),
-          parameters,
-        }),
-      });
-      setPresetForm((current) => ({
-        ...defaultPresetForm,
-        strategy_id: current.strategy_id,
-        timeframe: current.timeframe,
-      }));
+      const payload = {
+        name: presetForm.name,
+        description: presetForm.description,
+        strategy_id: presetForm.strategy_id || null,
+        timeframe: presetForm.timeframe.trim() || null,
+        benchmark_family: presetForm.benchmark_family.trim() || null,
+        tags: parseExperimentTags(presetForm.tags_text),
+        parameters,
+      };
+      const savedPreset = editing
+        ? await fetchJson<ExperimentPreset>(`/presets/${encodeURIComponent(editingPresetId)}`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              ...payload,
+              actor: "operator",
+              reason: "control_room_bundle_edit",
+            }),
+          })
+        : await fetchJson<ExperimentPreset>("/presets", {
+            method: "POST",
+            body: JSON.stringify({
+              ...payload,
+              preset_id: presetForm.preset_id.trim() || null,
+            }),
+          });
+      setPresetForm(
+        editing
+          ? buildPresetFormFromPreset(savedPreset)
+          : {
+              ...defaultPresetForm,
+              strategy_id: presetForm.strategy_id,
+              timeframe: presetForm.timeframe,
+            },
+      );
+      if (editing) {
+        setExpandedPresetRevisionIds((current) => ({ ...current, [savedPreset.preset_id]: true }));
+      }
       await loadAll();
     } catch (error) {
-      setStatusText(`Preset save failed: ${(error as Error).message}`);
+      setStatusText(`Preset ${editing ? "update" : "save"} failed: ${(error as Error).message}`);
     }
   }
 
@@ -3427,6 +3498,53 @@ export default function App() {
       await loadAll();
     } catch (error) {
       setStatusText(`Preset lifecycle action failed: ${(error as Error).message}`);
+    }
+  }
+
+  function beginPresetEdit(preset: ExperimentPreset) {
+    setEditingPresetId(preset.preset_id);
+    setExpandedPresetRevisionIds((current) => ({ ...current, [preset.preset_id]: true }));
+    setPresetForm(buildPresetFormFromPreset(preset));
+    setStatusText(`Editing preset ${preset.preset_id}.`);
+  }
+
+  function resetPresetEditor() {
+    setEditingPresetId(null);
+    setPresetForm((current) => ({
+      ...defaultPresetForm,
+      strategy_id: current.strategy_id,
+      timeframe: current.timeframe || "5m",
+    }));
+    setStatusText("Preset editor reset.");
+  }
+
+  function togglePresetRevisions(presetId: string) {
+    setExpandedPresetRevisionIds((current) => ({
+      ...current,
+      [presetId]: !current[presetId],
+    }));
+  }
+
+  async function restorePresetRevision(presetId: string, revisionId: string) {
+    setStatusText(`Restoring preset bundle ${revisionId} for ${presetId}...`);
+    try {
+      const restoredPreset = await fetchJson<ExperimentPreset>(
+        `/presets/${encodeURIComponent(presetId)}/revisions/${encodeURIComponent(revisionId)}/restore`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            actor: "operator",
+            reason: "control_room_revision_restore",
+          }),
+        },
+      );
+      setExpandedPresetRevisionIds((current) => ({ ...current, [presetId]: true }));
+      if (editingPresetId === restoredPreset.preset_id) {
+        setPresetForm(buildPresetFormFromPreset(restoredPreset));
+      }
+      await loadAll();
+    } catch (error) {
+      setStatusText(`Preset revision restore failed: ${(error as Error).message}`);
     }
   }
 
@@ -3872,8 +3990,14 @@ export default function App() {
             presets={presets}
             setForm={setPresetForm}
             strategies={strategies}
+            editingPresetId={editingPresetId}
+            expandedPresetRevisionIds={expandedPresetRevisionIds}
+            onEditPreset={beginPresetEdit}
+            onResetEditor={resetPresetEditor}
             onLifecycleAction={applyPresetLifecycleAction}
+            onRestoreRevision={restorePresetRevision}
             onSubmit={handlePresetSubmit}
+            onToggleRevisions={togglePresetRevisions}
           />
         </section>
 
@@ -6111,16 +6235,29 @@ function PresetCatalogPanel({
   presets,
   setForm,
   strategies,
+  editingPresetId,
+  expandedPresetRevisionIds,
+  onEditPreset,
+  onResetEditor,
   onLifecycleAction,
+  onRestoreRevision,
   onSubmit,
+  onToggleRevisions,
 }: {
   form: typeof defaultPresetForm;
   presets: ExperimentPreset[];
   setForm: (updater: (value: typeof defaultPresetForm) => typeof defaultPresetForm) => void;
   strategies: Strategy[];
+  editingPresetId: string | null;
+  expandedPresetRevisionIds: Record<string, boolean>;
+  onEditPreset: (preset: ExperimentPreset) => void;
+  onResetEditor: () => void;
   onLifecycleAction: (presetId: string, action: "promote" | "archive" | "restore") => Promise<void> | void;
+  onRestoreRevision: (presetId: string, revisionId: string) => Promise<void> | void;
   onSubmit: (event: FormEvent) => Promise<void> | void;
+  onToggleRevisions: (presetId: string) => void;
 }) {
+  const isEditing = editingPresetId !== null;
   return (
     <>
       <form className="run-form" onSubmit={onSubmit}>
@@ -6135,6 +6272,7 @@ function PresetCatalogPanel({
         <label>
           Preset ID
           <input
+            disabled={isEditing}
             placeholder="core_5m"
             value={form.preset_id}
             onChange={(event) => setForm((current) => ({ ...current, preset_id: event.target.value }))}
@@ -6199,13 +6337,32 @@ function PresetCatalogPanel({
             }
           />
         </label>
-        <button type="submit">Save preset</button>
+        {isEditing ? (
+          <p className="run-note">
+            Editing {editingPresetId}. Preset IDs are immutable, so this form updates the current bundle and records a
+            new revision.
+          </p>
+        ) : null}
+        <div className="run-actions">
+          <button type="submit">{isEditing ? "Save revision" : "Save preset"}</button>
+          {isEditing ? (
+            <button className="ghost-button" onClick={onResetEditor} type="button">
+              New preset
+            </button>
+          ) : null}
+        </div>
       </form>
 
       {presets.length ? (
         <div className="run-list">
           {presets.map((preset) => (
             <article className="run-card" key={preset.preset_id}>
+              {(() => {
+                const revisions = [...preset.revisions].reverse();
+                const latestRevisionId = revisions[0]?.revision_id;
+                const revisionsExpanded = Boolean(expandedPresetRevisionIds[preset.preset_id]);
+                return (
+                  <>
               <div className="run-card-head">
                 <div>
                   <strong>{preset.name}</strong>
@@ -6219,6 +6376,7 @@ function PresetCatalogPanel({
                 <Metric label="Strategy" value={preset.strategy_id ?? "any"} />
                 <Metric label="Timeframe" value={preset.timeframe ?? "any"} />
                 <Metric label="Params" value={formatParameterMap(preset.parameters)} />
+                <Metric label="Revisions" value={String(preset.revisions.length)} />
                 <Metric label="Updated" value={formatTimestamp(preset.updated_at)} />
               </div>
               <ExperimentMetadataPills
@@ -6233,6 +6391,16 @@ function PresetCatalogPanel({
               </p>
               {preset.description ? <p className="run-note">{preset.description}</p> : null}
               <div className="run-actions">
+                <button className="ghost-button" onClick={() => onEditPreset(preset)} type="button">
+                  {editingPresetId === preset.preset_id ? "Editing bundle" : "Edit bundle"}
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => onToggleRevisions(preset.preset_id)}
+                  type="button"
+                >
+                  {revisionsExpanded ? "Hide revisions" : `Show revisions (${preset.revisions.length})`}
+                </button>
                 {preset.lifecycle.stage !== "archived" ? (
                   <>
                     {preset.lifecycle.stage !== "live_candidate" ? (
@@ -6262,6 +6430,54 @@ function PresetCatalogPanel({
                   </button>
                 )}
               </div>
+              {revisionsExpanded ? (
+                <div className="run-list">
+                  {revisions.map((revision) => (
+                    <article className="run-card" key={revision.revision_id}>
+                      <div className="run-card-head">
+                        <div>
+                          <strong>{revision.revision_id}</strong>
+                          <span>{revision.action}</span>
+                        </div>
+                        <div
+                          className={`run-status ${revision.revision_id === latestRevisionId ? "completed" : "pending"}`}
+                        >
+                          {revision.revision_id === latestRevisionId ? "current bundle" : "snapshot"}
+                        </div>
+                      </div>
+                      <div className="run-metrics">
+                        <Metric label="Actor" value={revision.actor} />
+                        <Metric label="Strategy" value={revision.strategy_id ?? "any"} />
+                        <Metric label="Timeframe" value={revision.timeframe ?? "any"} />
+                        <Metric label="Params" value={formatParameterMap(revision.parameters)} />
+                      </div>
+                      <ExperimentMetadataPills
+                        benchmarkFamily={revision.benchmark_family}
+                        tags={revision.tags}
+                      />
+                      <p className="run-note">
+                        Reason: {revision.reason}. Recorded at {formatTimestamp(revision.created_at)}.
+                        {revision.source_revision_id ? ` Restored from ${revision.source_revision_id}.` : ""}
+                      </p>
+                      {revision.description ? <p className="run-note">{revision.description}</p> : null}
+                      {revision.revision_id !== latestRevisionId ? (
+                        <div className="run-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() => void onRestoreRevision(preset.preset_id, revision.revision_id)}
+                            type="button"
+                          >
+                            Restore bundle
+                          </button>
+                        </div>
+                      ) : null}
+                    </article>
+                  ))}
+                </div>
+              ) : null}
+                  </>
+                );
+              })()}
             </article>
           ))}
         </div>
