@@ -4144,18 +4144,36 @@
       "direction_id": "experiment-os",
       "title": "Generalize shared run-surface contracts across capability families and schema metadata",
       "description": "Build on the shipped `RunSubresourceContract` by extending the same declarative contract pattern to the next run-surface capability families and any remaining standalone subresource schema metadata, so discovery, registration, and consumer rendering evolve around one reusable contract abstraction instead of a run-subresource-only special case.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is to widen the new shared contract abstraction beyond run-subresource binding and serializer coupling into other standalone capability families or subresource schema metadata. That is now the clearest executable next task, and it should be queued as the new head instead of repeating the just-finished shared-contract extraction.",
+      "priority_reason": "Completed in main session commit 2dce36d, which introduced a shared `RunSurfaceSharedContract`, raised discovery to `run-surface-capabilities.v8`, published schema metadata contracts, capability-family contracts, and run-subresource contracts under one `shared_contracts` shape, updated backend serialization plus capability-panel rendering, and verified the change with `python -m py_compile`, targeted pytest, `cd apps/web && npx tsc --noEmit`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-promote-run-subresource-binding-and-serializer-coupling-into-shared-contract"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:20:00Z",
+      "updated_at": "2026-04-20T21:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os run-surface discovery extensible by turning the newly proven `RunSubresourceContract` into a broader contract pattern that can absorb adjacent capability families and schema metadata before drift reappears."
+    },
+    {
+      "id": "planning-experiment-os-fully-replace-legacy-family-payloads-with-shared-run-surface-contracts",
+      "direction_id": "experiment-os",
+      "title": "Finish converging policy, enforcement, and schema detail onto shared run-surface contracts",
+      "description": "Build on the shipped `shared_contracts` discovery shape by moving the remaining family-specific `policy` and `enforcement` payloads plus subresource-specific schema detail behind the same shared contract abstraction, so discovery and downstream consumers stop carrying parallel legacy payload shapes beside the new generic contract list.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 22,
+      "priority_reason": "The latest main-session reply says the generic shared contract list is now shipped, but family-level policy or enforcement payloads and subresource-specific schema detail are not yet fully replaced by the common contract abstraction. That is the clearest executable follow-up and should become the new queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-shared-binding-contract-pattern-to-other-capability-families"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from publishing a shared run-surface contract list to actually consolidating the remaining capability-family and schema-detail semantics behind one reusable contract model, which reduces drift between discovery metadata and contract-driven consumers."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
