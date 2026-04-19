@@ -4429,6 +4429,14 @@ export default function App() {
   const [expandedGapRows, setExpandedGapRows] = useState<Record<string, boolean>>(
     loadExpandedGapRows,
   );
+  const applyComparisonSelectionState = (
+    value: ControlRoomComparisonSelectionState,
+  ) => {
+    const normalizedValue = normalizeControlRoomComparisonSelection(value);
+    setSelectedComparisonRunIds(normalizedValue.selectedRunIds);
+    setComparisonIntent(normalizedValue.intent);
+    setSelectedComparisonScoreLink(normalizedValue.scoreLink);
+  };
 
   async function loadAll() {
     setStatusText("Refreshing data plane...");
@@ -4540,6 +4548,21 @@ export default function App() {
     }
     setSelectedComparisonScoreLink(null);
   }, [selectedComparisonRunIds, selectedComparisonScoreLink]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const handlePopState = () => {
+      const nextSelection =
+        loadComparisonSelectionFromUrl() ?? defaultControlRoomComparisonSelectionState();
+      applyComparisonSelectionState(nextSelection);
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
   useEffect(() => {
     if (selectedComparisonRunIds.length < 2) {
