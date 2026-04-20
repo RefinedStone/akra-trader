@@ -55,7 +55,8 @@ The product is still not fully decomposed. `application.py`, `operator_delivery.
 - `operator_delivery.py` still contains too many provider implementation bodies in one file
 - `domain/models.py` is broader than one bounded feature area should be
 - `App.tsx` still holds too much feature state and JSX even after shell extraction
-- standalone surface binding catalogs still need their own dedicated modules
+- standalone surface binding catalogs are now isolated from the executor, but the catalog itself is
+  still broad and should split by bounded flow
 
 ## Operational Rule
 

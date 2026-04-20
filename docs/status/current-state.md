@@ -45,6 +45,8 @@ It is not yet a finished live trading product:
 - run-surface enforcement and run serialization helpers moved into `application_support/run_surfaces.py`
 - standalone surface/runtime query types plus filter/sort helpers moved into
   `application_support/runtime_queries.py`
+- standalone surface binding catalogs moved into
+  `application_support/standalone_surface_catalog.py`
 - standalone surface execution, query-discovery serialization, and run-subresource binding helpers
   moved into `application_support/standalone_surfaces.py`
 - durable run storage through `SqlAlchemyRunRepository`
@@ -111,8 +113,8 @@ It is not yet a finished live trading product:
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to
   be extracted out of `App.tsx`
-- standalone surface binding catalogs still live in `application.py` even though the executors and
-  query-discovery helpers moved out
+- standalone surface binding catalogs are isolated from the executor now, but the catalog module is
+  still broad and should split further by bounded flow
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator
   workflows are still weaker than the underlying backend capabilities
 - `application.py` and `operator_delivery.py` are smaller and more structured than before, but both
