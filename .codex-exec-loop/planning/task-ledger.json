@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining contract gap moved one step deeper: arbitrary nested paths and grouped OR or AND shipped, while nested grouped expressions or a more general boolean AST shape still do not. Keep discovery proposed behind that broader expression-model pass so discovery endpoints do not advertise a query surface that stops at one grouping level.",
+      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining contract gap moved again after boolean trees shipped: named reusable predicates and quantified list predicates are still missing. Keep discovery proposed behind that next expression-contract pass so discovery endpoints advertise the richer reusable and collection-aware query surface instead of another intermediate shape.",
       "depends_on": [
-        "planning-experiment-os-extend-typed-query-to-nested-boolean-expression-trees"
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:15:00Z",
+      "updated_at": "2026-04-21T03:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4504,18 +4504,54 @@
       "direction_id": "experiment-os",
       "title": "Extend typed query from grouped filters to nested boolean expression trees",
       "description": "Build on the shipped arbitrary nested-path filters and one-level grouped OR or AND support by introducing a more general nested boolean query expression model, such as nested group composition or an explicit AST-shaped filter grammar, so experiment read surfaces can express deeper combinations without hard-coding each extra layer into flat query parameter names.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 41,
-      "priority_reason": "The latest main-session reply says the next unfinished work is the more complex query-expression hierarchy: nested grouped expression composition or a broader boolean AST shape is still missing after the arbitrary nested path and grouped filter pass. That is now the clearest executable queue head before capability discovery or wider contract reuse builds on the query model.",
+      "priority_reason": "Completed in main session commit 9403c13, which added the JSON `filter_expr` boolean-tree contract with recursive `logic`, `conditions`, `children`, and `negated` parsing, evaluated the expression tree alongside existing filters, exposed the contract through `x-akra-query-schema`, covered nested OR or AND plus negation in API tests, and verified with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-generalize-typed-query-to-arbitrary-nested-paths-and-grouped-filter-expressions"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:25:00Z",
+      "updated_at": "2026-04-21T03:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os queryability moving from grouped flat filters toward a genuinely composable query model that future discovery surfaces and broader runtime-binding reuse can treat as a stable contract instead of another route-local convention."
+    },
+    {
+      "id": "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees",
+      "direction_id": "experiment-os",
+      "title": "Add reusable predicate references and quantified list predicates to typed query expressions",
+      "description": "Build on the shipped JSON boolean tree by introducing named reusable predicate definitions or references plus quantified list predicate semantics such as any, all, or none over nested collections, so typed query can express repeated clauses and collection-aware matching without exploding ad hoc duplicated subtrees.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 42,
+      "priority_reason": "The latest main-session reply explicitly says the boolean-tree pass is complete and the remaining deeper generalization is adding named reusable predicates plus quantified list predicates. That is now the clearest executable queue head because it extends the query contract itself, while expression normalization or optimization can remain a follow-on once the richer predicate surface stabilizes.",
+      "depends_on": [
+        "planning-experiment-os-extend-typed-query-to-nested-boolean-expression-trees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T03:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os queryability from general boolean composition into reusable and collection-aware predicate semantics, which should make the typed query contract more expressive before discovery APIs and broader runtime-binding reuse cement it."
+    },
+    {
+      "id": "planning-experiment-os-normalize-and-optimize-typed-query-expression-trees",
+      "direction_id": "experiment-os",
+      "title": "Add normalization and optimization passes for typed query expression trees",
+      "description": "Introduce canonicalization, simplification, and execution-oriented optimization for typed query expression trees so semantically equivalent reusable or quantified expressions can be normalized, validated, cached, or evaluated efficiently instead of remaining raw user-supplied JSON shapes.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply also calls out expression normalization or optimization as remaining work, but the more immediate queue head is still extending the contract with reusable predicates and quantified list semantics. Keep normalization proposed behind that richer contract pass so the optimizer targets the settled expression vocabulary instead of another transient tree shape.",
+      "depends_on": [
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T03:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Supports experiment-os queryability by turning the richer expression contract into a stable canonical form that discovery, caching, and runtime evaluation can rely on without duplicated route-local simplification rules."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
