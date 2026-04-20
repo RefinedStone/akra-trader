@@ -394,7 +394,8 @@ select {
 }
 
 .run-surface-query-builder-control > select,
-.run-surface-query-builder-control > input {
+.run-surface-query-builder-control > input,
+.run-surface-query-builder-control > textarea {
   width: 100%;
   padding: 9px 10px;
   border-radius: 10px;
@@ -405,7 +406,8 @@ select {
 }
 
 .run-surface-query-builder-control > select:focus-visible,
-.run-surface-query-builder-control > input:focus-visible {
+.run-surface-query-builder-control > input:focus-visible,
+.run-surface-query-builder-control > textarea:focus-visible {
   outline: 1px solid rgba(88, 217, 255, 0.42);
   border-color: rgba(88, 217, 255, 0.32);
 }

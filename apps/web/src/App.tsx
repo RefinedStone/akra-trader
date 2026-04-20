@@ -15758,6 +15758,8 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState = {
   key: string;
   label: string;
   customLabel: string;
+  groupName: string;
+  helpNote: string;
   valueType: string;
   description: string | null;
   options: string[];
@@ -15835,12 +15837,43 @@ function mergeRunSurfaceCollectionQueryBuilderTemplateParameters(
         ? {
             ...parameter,
             customLabel: existing.customLabel,
+            groupName: existing.groupName,
+            helpNote: existing.helpNote,
             defaultValue: existing.defaultValue,
             bindingPreset: existing.bindingPreset,
           }
         : parameter,
     ];
   });
+}
+
+function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
+  parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[],
+) {
+  const groups = new Map<
+    string,
+    {
+      key: string;
+      label: string;
+      parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+    }
+  >();
+  parameters.forEach((parameter) => {
+    const normalizedLabel = parameter.groupName.trim();
+    const key = normalizedLabel || "__ungrouped__";
+    const label = normalizedLabel || "Ungrouped parameters";
+    const existing = groups.get(key);
+    if (existing) {
+      existing.parameters.push(parameter);
+      return;
+    }
+    groups.set(key, {
+      key,
+      label,
+      parameters: [parameter],
+    });
+  });
+  return Array.from(groups.values());
 }
 
 function cloneRunSurfaceCollectionQueryBuilderChildState(
@@ -16456,6 +16489,8 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
       key: bindingKey,
       label: `${parameter.key} path binding`,
       customLabel: "",
+      groupName: "",
+      helpNote: "",
       valueType: "string",
       description: parameter.description || `Collection path binding for ${activeSchema.label}.`,
       options: parameter.domain?.values.length ? parameter.domain.values : parameter.examples,
@@ -16468,6 +16503,8 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
       key: clause.valueBindingKey.trim(),
       label: `${activeField?.title ?? activeField?.key ?? clause.fieldKey} value binding`,
       customLabel: "",
+      groupName: "",
+      helpNote: "",
       valueType: activeField?.valueType ?? "string",
       description: activeField?.description ?? "Bound condition value.",
       options: [],
@@ -16509,6 +16546,8 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParameters(
           key: bindingKey,
           label: referencedParameter?.label ?? `${parameterKey} nested binding`,
           customLabel: "",
+          groupName: referencedParameter?.groupName ?? "",
+          helpNote: referencedParameter?.helpNote ?? "",
           valueType: referencedParameter?.valueType ?? "string",
           description:
             referencedParameter?.description
@@ -16613,11 +16652,23 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
               && typeof (rawParameter as Record<string, unknown>).binding_preset === "string"
                 ? ((rawParameter as Record<string, string>).binding_preset)
                 : "";
+            const rawGroupName =
+              rawParameter && typeof rawParameter === "object" && !Array.isArray(rawParameter)
+              && typeof (rawParameter as Record<string, unknown>).group === "string"
+                ? ((rawParameter as Record<string, string>).group)
+                : "";
+            const rawHelpNote =
+              rawParameter && typeof rawParameter === "object" && !Array.isArray(rawParameter)
+              && typeof (rawParameter as Record<string, unknown>).help_note === "string"
+                ? ((rawParameter as Record<string, string>).help_note)
+                : "";
             const valueType = inferredParameter?.valueType ?? "string";
             return inferredParameter
               ? {
                   ...inferredParameter,
                   customLabel: rawCustomLabel || inferredParameter.customLabel,
+                  groupName: rawGroupName || inferredParameter.groupName,
+                  helpNote: rawHelpNote || inferredParameter.helpNote,
                   defaultValue:
                     rawDefault === undefined
                       ? inferredParameter.defaultValue
@@ -16628,6 +16679,8 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
                   key: parameterKey,
                   label: parameterKey,
                   customLabel: rawCustomLabel,
+                  groupName: rawGroupName,
+                  helpNote: rawHelpNote,
                   valueType,
                   description: null,
                   options: [],
@@ -16913,6 +16966,10 @@ function RunSurfaceCollectionQueryBuilder({
   const [templateParameterDraftDefaultsByContext, setTemplateParameterDraftDefaultsByContext] =
     useState<Record<string, Record<string, string>>>({});
   const [templateParameterDraftLabelsByContext, setTemplateParameterDraftLabelsByContext] =
+    useState<Record<string, Record<string, string>>>({});
+  const [templateParameterDraftGroupsByContext, setTemplateParameterDraftGroupsByContext] =
+    useState<Record<string, Record<string, string>>>({});
+  const [templateParameterDraftHelpNotesByContext, setTemplateParameterDraftHelpNotesByContext] =
     useState<Record<string, Record<string, string>>>({});
   const [templateParameterDraftBindingPresetsByContext, setTemplateParameterDraftBindingPresetsByContext] =
     useState<Record<string, Record<string, string>>>({});
@@ -17258,6 +17315,8 @@ function RunSurfaceCollectionQueryBuilder({
           (parameter) =>
             parameter.defaultValue.trim()
             || parameter.customLabel.trim()
+            || parameter.groupName.trim()
+            || parameter.helpNote.trim()
             || parameter.bindingPreset.trim(),
         )
           ? Object.fromEntries(
@@ -17274,6 +17333,12 @@ function RunSurfaceCollectionQueryBuilder({
                     : {}),
                   ...(parameter.customLabel.trim()
                     ? { label: parameter.customLabel.trim() }
+                    : {}),
+                  ...(parameter.groupName.trim()
+                    ? { group: parameter.groupName.trim() }
+                    : {}),
+                  ...(parameter.helpNote.trim()
+                    ? { help_note: parameter.helpNote.trim() }
                     : {}),
                   ...(parameter.bindingPreset.trim()
                     ? { binding_preset: parameter.bindingPreset.trim() }
@@ -17888,6 +17953,8 @@ function RunSurfaceCollectionQueryBuilder({
       contextKey: string,
     ) => {
       const labelOverrides = templateParameterDraftLabelsByContext[contextKey] ?? {};
+      const groupOverrides = templateParameterDraftGroupsByContext[contextKey] ?? {};
+      const helpNoteOverrides = templateParameterDraftHelpNotesByContext[contextKey] ?? {};
       const bindingPresetOverrides = templateParameterDraftBindingPresetsByContext[contextKey] ?? {};
       const order = templateParameterDraftOrderByContext[contextKey] ?? [];
       const parameterMap = new Map(
@@ -17908,6 +17975,8 @@ function RunSurfaceCollectionQueryBuilder({
           ...parameter,
           label: labelOverrides[key]?.trim() || parameter.label,
           customLabel: labelOverrides[key] ?? parameter.customLabel ?? "",
+          groupName: groupOverrides[key] ?? parameter.groupName ?? "",
+          helpNote: helpNoteOverrides[key] ?? parameter.helpNote ?? "",
           defaultValue:
             templateParameterDraftDefaultsByContext[contextKey]?.[key]
             ?? parameter.defaultValue
@@ -17922,6 +17991,8 @@ function RunSurfaceCollectionQueryBuilder({
     [
       templateParameterDraftBindingPresetsByContext,
       templateParameterDraftDefaultsByContext,
+      templateParameterDraftGroupsByContext,
+      templateParameterDraftHelpNotesByContext,
       templateParameterDraftLabelsByContext,
       templateParameterDraftOrderByContext,
     ],
@@ -17999,6 +18070,21 @@ function RunSurfaceCollectionQueryBuilder({
       templateDraftAuthoringTarget,
     ],
   );
+  const editableTemplateParameterKeys = useMemo(
+    () => editableTemplateParameters.map((parameter) => parameter.key),
+    [editableTemplateParameters],
+  );
+  const editableTemplateParameterIndexMap = useMemo(
+    () =>
+      new Map(
+        editableTemplateParameters.map((parameter, index) => [parameter.key, index] as const),
+      ),
+    [editableTemplateParameters],
+  );
+  const editableTemplateParameterGroups = useMemo(
+    () => groupRunSurfaceCollectionQueryBuilderTemplateParameters(editableTemplateParameters),
+    [editableTemplateParameters],
+  );
   const canAuthorSubtreeTemplateDefaults = Boolean(
     expressionMode === "grouped"
     && selectedSubtreeNode
@@ -18020,6 +18106,30 @@ function RunSurfaceCollectionQueryBuilder({
   const updateTemplateParameterDraftLabel = useCallback(
     (contextKey: string, parameterKey: string, value: string) => {
       setTemplateParameterDraftLabelsByContext((current) => ({
+        ...current,
+        [contextKey]: {
+          ...(current[contextKey] ?? {}),
+          [parameterKey]: value,
+        },
+      }));
+    },
+    [],
+  );
+  const updateTemplateParameterDraftGroup = useCallback(
+    (contextKey: string, parameterKey: string, value: string) => {
+      setTemplateParameterDraftGroupsByContext((current) => ({
+        ...current,
+        [contextKey]: {
+          ...(current[contextKey] ?? {}),
+          [parameterKey]: value,
+        },
+      }));
+    },
+    [],
+  );
+  const updateTemplateParameterDraftHelpNote = useCallback(
+    (contextKey: string, parameterKey: string, value: string) => {
+      setTemplateParameterDraftHelpNotesByContext((current) => ({
         ...current,
         [contextKey]: {
           ...(current[contextKey] ?? {}),
@@ -18595,144 +18705,190 @@ function RunSurfaceCollectionQueryBuilder({
                       ? `Editing unsaved defaults for ${selectedGroupLabel}. Saving a clause template will keep using clause draft defaults.`
                       : "Editing clause-level template defaults for save/update flows."}
                   </p>
-                  <div className="run-surface-query-builder-parameter-grid">
-                    {editableTemplateParameters.map((parameter, parameterIndex) => {
-                      const presetBindingOptions = Array.from(
-                        new Set([
-                          ...nestedTemplateBindingParameterKeys.filter((key) => key !== parameter.key),
-                          parameter.bindingPreset,
-                        ].filter(Boolean)),
-                      );
-                      return (
-                        <div className="run-surface-query-builder-domain-card" key={`template-parameter:${parameter.key}`}>
-                          <div className="run-surface-query-builder-card-head">
-                            <strong>{parameter.customLabel.trim() || parameter.label}</strong>
-                            <span>{parameter.key}</span>
-                          </div>
-                          <div className="run-surface-query-builder-actions">
-                            <button
-                              className="ghost-button"
-                              disabled={parameterIndex === 0}
-                              onClick={() =>
-                                moveTemplateParameterDraftOrder(
-                                  templateParameterEditorContextKey,
-                                  parameter.key,
-                                  "up",
-                                  editableTemplateParameters.map((entry) => entry.key),
-                                )}
-                              type="button"
-                            >
-                              Move up
-                            </button>
-                            <button
-                              className="ghost-button"
-                              disabled={parameterIndex === editableTemplateParameters.length - 1}
-                              onClick={() =>
-                                moveTemplateParameterDraftOrder(
-                                  templateParameterEditorContextKey,
-                                  parameter.key,
-                                  "down",
-                                  editableTemplateParameters.map((entry) => entry.key),
-                                )}
-                              type="button"
-                            >
-                              Move down
-                            </button>
-                          </div>
-                          <div className="run-surface-query-builder-parameter-grid">
-                            <label className="run-surface-query-builder-control">
-                              <span>Custom label</span>
-                              <input
-                                type="text"
-                                value={parameter.customLabel}
-                                onChange={(event) =>
-                                  updateTemplateParameterDraftLabel(
-                                    templateParameterEditorContextKey,
-                                    parameter.key,
-                                    event.target.value,
-                                  )}
-                                placeholder={parameter.label}
-                              />
-                            </label>
-                            <label className="run-surface-query-builder-control">
-                              <span>Default value</span>
-                              {parameter.options.length ? (
-                                <select
-                                  value={parameter.defaultValue}
-                                  onChange={(event) =>
-                                    updateTemplateParameterDraftDefault(
-                                      templateParameterEditorContextKey,
-                                      parameter.key,
-                                      event.target.value,
-                                    )}
-                                >
-                                  <option value="">No default</option>
-                                  {Array.from(
-                                    new Set([
-                                      ...parameter.options,
-                                      parameter.defaultValue,
-                                    ].filter(Boolean)),
-                                  ).map((value) => (
-                                    <option key={`${parameter.key}:default:${value}`} value={value}>
-                                      {value}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={parameter.defaultValue}
-                                  onChange={(event) =>
-                                    updateTemplateParameterDraftDefault(
-                                      templateParameterEditorContextKey,
-                                      parameter.key,
-                                      event.target.value,
-                                    )}
-                                  placeholder={`Optional default (${parameter.valueType})`}
-                                />
-                              )}
-                            </label>
-                            <label className="run-surface-query-builder-control">
-                              <span>Nested binding preset</span>
-                              {presetBindingOptions.length ? (
-                                <select
-                                  value={parameter.bindingPreset}
-                                  onChange={(event) =>
-                                    updateTemplateParameterDraftBindingPreset(
-                                      templateParameterEditorContextKey,
-                                      parameter.key,
-                                      event.target.value,
-                                    )}
-                                >
-                                  <option value="">No preset</option>
-                                  {presetBindingOptions.map((value) => (
-                                    <option key={`${parameter.key}:preset:${value}`} value={value}>
-                                      {value}
-                                    </option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <input
-                                  type="text"
-                                  value={parameter.bindingPreset}
-                                  onChange={(event) =>
-                                    updateTemplateParameterDraftBindingPreset(
-                                      templateParameterEditorContextKey,
-                                      parameter.key,
-                                      event.target.value,
-                                    )}
-                                  placeholder="outer_template_parameter"
-                                />
-                              )}
-                            </label>
-                          </div>
-                          <small className="run-note">
-                            {parameter.description ?? parameter.label} · {parameter.valueType}
-                            {parameter.bindingPreset.trim() ? ` · preset $${parameter.bindingPreset}` : ""}
-                          </small>
+                  <div className="run-surface-query-builder-domain-list">
+                    {editableTemplateParameterGroups.map((parameterGroup) => (
+                      <div
+                        className="run-surface-query-builder-section"
+                        key={`template-parameter-group:${parameterGroup.key}`}
+                      >
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>{parameterGroup.label}</strong>
+                          <span>{parameterGroup.parameters.length}</span>
                         </div>
-                      );
-                    })}
+                        <div className="run-surface-query-builder-parameter-grid">
+                          {parameterGroup.parameters.map((parameter) => {
+                            const parameterIndex = editableTemplateParameterIndexMap.get(parameter.key) ?? 0;
+                            const presetBindingOptions = Array.from(
+                              new Set([
+                                ...nestedTemplateBindingParameterKeys.filter((key) => key !== parameter.key),
+                                parameter.bindingPreset,
+                              ].filter(Boolean)),
+                            );
+                            return (
+                              <div className="run-surface-query-builder-domain-card" key={`template-parameter:${parameter.key}`}>
+                                <div className="run-surface-query-builder-card-head">
+                                  <strong>{parameter.customLabel.trim() || parameter.label}</strong>
+                                  <span>{parameter.key}</span>
+                                </div>
+                                <div className="run-surface-query-builder-actions">
+                                  <button
+                                    className="ghost-button"
+                                    disabled={parameterIndex === 0}
+                                    onClick={() =>
+                                      moveTemplateParameterDraftOrder(
+                                        templateParameterEditorContextKey,
+                                        parameter.key,
+                                        "up",
+                                        editableTemplateParameterKeys,
+                                      )}
+                                    type="button"
+                                  >
+                                    Move up
+                                  </button>
+                                  <button
+                                    className="ghost-button"
+                                    disabled={parameterIndex === editableTemplateParameters.length - 1}
+                                    onClick={() =>
+                                      moveTemplateParameterDraftOrder(
+                                        templateParameterEditorContextKey,
+                                        parameter.key,
+                                        "down",
+                                        editableTemplateParameterKeys,
+                                      )}
+                                    type="button"
+                                  >
+                                    Move down
+                                  </button>
+                                </div>
+                                <div className="run-surface-query-builder-parameter-grid">
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Custom label</span>
+                                    <input
+                                      type="text"
+                                      value={parameter.customLabel}
+                                      onChange={(event) =>
+                                        updateTemplateParameterDraftLabel(
+                                          templateParameterEditorContextKey,
+                                          parameter.key,
+                                          event.target.value,
+                                        )}
+                                      placeholder={parameter.label}
+                                    />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Group</span>
+                                    <input
+                                      type="text"
+                                      value={parameter.groupName}
+                                      onChange={(event) =>
+                                        updateTemplateParameterDraftGroup(
+                                          templateParameterEditorContextKey,
+                                          parameter.key,
+                                          event.target.value,
+                                        )}
+                                      placeholder="Ungrouped parameters"
+                                    />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Default value</span>
+                                    {parameter.options.length ? (
+                                      <select
+                                        value={parameter.defaultValue}
+                                        onChange={(event) =>
+                                          updateTemplateParameterDraftDefault(
+                                            templateParameterEditorContextKey,
+                                            parameter.key,
+                                            event.target.value,
+                                          )}
+                                      >
+                                        <option value="">No default</option>
+                                        {Array.from(
+                                          new Set([
+                                            ...parameter.options,
+                                            parameter.defaultValue,
+                                          ].filter(Boolean)),
+                                        ).map((value) => (
+                                          <option key={`${parameter.key}:default:${value}`} value={value}>
+                                            {value}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={parameter.defaultValue}
+                                        onChange={(event) =>
+                                          updateTemplateParameterDraftDefault(
+                                            templateParameterEditorContextKey,
+                                            parameter.key,
+                                            event.target.value,
+                                          )}
+                                        placeholder={`Optional default (${parameter.valueType})`}
+                                      />
+                                    )}
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Nested binding preset</span>
+                                    {presetBindingOptions.length ? (
+                                      <select
+                                        value={parameter.bindingPreset}
+                                        onChange={(event) =>
+                                          updateTemplateParameterDraftBindingPreset(
+                                            templateParameterEditorContextKey,
+                                            parameter.key,
+                                            event.target.value,
+                                          )}
+                                      >
+                                        <option value="">No preset</option>
+                                        {presetBindingOptions.map((value) => (
+                                          <option key={`${parameter.key}:preset:${value}`} value={value}>
+                                            {value}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    ) : (
+                                      <input
+                                        type="text"
+                                        value={parameter.bindingPreset}
+                                        onChange={(event) =>
+                                          updateTemplateParameterDraftBindingPreset(
+                                            templateParameterEditorContextKey,
+                                            parameter.key,
+                                            event.target.value,
+                                          )}
+                                        placeholder="outer_template_parameter"
+                                      />
+                                    )}
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Help note</span>
+                                    <textarea
+                                      onChange={(event) =>
+                                        updateTemplateParameterDraftHelpNote(
+                                          templateParameterEditorContextKey,
+                                          parameter.key,
+                                          event.target.value,
+                                        )}
+                                      placeholder="Optional authoring note for predicate/template users"
+                                      rows={3}
+                                      value={parameter.helpNote}
+                                    />
+                                  </label>
+                                </div>
+                                <small className="run-note">
+                                  {parameter.description ?? parameter.label} · {parameter.valueType}
+                                  {parameter.groupName.trim() ? ` · group ${parameter.groupName}` : ""}
+                                  {parameter.bindingPreset.trim() ? ` · preset $${parameter.bindingPreset}` : ""}
+                                </small>
+                                {parameter.helpNote.trim() ? (
+                                  <p className="run-note">{parameter.helpNote}</p>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               ) : null}
@@ -18837,10 +18993,14 @@ function RunSurfaceCollectionQueryBuilder({
                         )}
                         <small>
                           {parameter.key} · {parameter.description ?? parameter.label} · {parameter.valueType}
+                          {parameter.groupName.trim() ? ` · group ${parameter.groupName}` : ""}
                           {parameter.defaultValue.trim() ? ` · default ${parameter.defaultValue}` : ""}
                           {parameter.bindingPreset.trim() ? ` · preset $${parameter.bindingPreset}` : ""}
                           {usesBindingReference ? " · nested template binding" : ""}
                         </small>
+                        {parameter.helpNote.trim() ? (
+                          <small>{parameter.helpNote}</small>
+                        ) : null}
                       </label>
                     );
                   })}
@@ -19044,11 +19204,49 @@ function RunSurfaceCollectionQueryBuilder({
                               {formatRunSurfaceCollectionQueryBuilderChildSummary(template.node, contracts)}
                             </p>
                             {template.parameters.length ? (
-                              <div className="run-surface-family-chip-row">
-                                {template.parameters.map((parameter) => (
-                                  <span className="run-surface-family-chip" key={`${template.id}:${parameter.key}`}>
-                                    {`${parameter.customLabel.trim() || parameter.key}${parameter.defaultValue.trim() ? `=${parameter.defaultValue}` : ""}${parameter.bindingPreset.trim() ? `->$${parameter.bindingPreset}` : ""}`}
-                                  </span>
+                              <div className="run-surface-query-builder-domain-list">
+                                {groupRunSurfaceCollectionQueryBuilderTemplateParameters(template.parameters).map((parameterGroup) => (
+                                  <div
+                                    className="run-surface-query-builder-section"
+                                    key={`${template.id}:group:${parameterGroup.key}`}
+                                  >
+                                    <div className="run-surface-query-builder-card-head">
+                                      <strong>{parameterGroup.label}</strong>
+                                      <span>{parameterGroup.parameters.length}</span>
+                                    </div>
+                                    <div className="run-surface-query-builder-domain-list">
+                                      {parameterGroup.parameters.map((parameter) => (
+                                        <div
+                                          className="run-surface-query-builder-domain-card"
+                                          key={`${template.id}:${parameter.key}`}
+                                        >
+                                          <div className="run-surface-query-builder-card-head">
+                                            <strong>{parameter.customLabel.trim() || parameter.key}</strong>
+                                            <span>{parameter.key}</span>
+                                          </div>
+                                          <div className="run-surface-family-chip-row">
+                                            <span className="run-surface-family-chip">{parameter.valueType}</span>
+                                            {parameter.defaultValue.trim() ? (
+                                              <span className="run-surface-family-chip">
+                                                {`default ${parameter.defaultValue}`}
+                                              </span>
+                                            ) : null}
+                                            {parameter.bindingPreset.trim() ? (
+                                              <span className="run-surface-family-chip">
+                                                {`preset $${parameter.bindingPreset}`}
+                                              </span>
+                                            ) : null}
+                                          </div>
+                                          <p className="run-note">
+                                            {parameter.description ?? parameter.label}
+                                          </p>
+                                          {parameter.helpNote.trim() ? (
+                                            <p className="run-note">{parameter.helpNote}</p>
+                                          ) : null}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
                                 ))}
                               </div>
                             ) : null}
