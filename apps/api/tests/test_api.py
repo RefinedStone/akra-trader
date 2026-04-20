@@ -318,6 +318,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "alias_token",
     "app",
   )
+  assert tuple(inspect.signature(routes["get_replay_link_alias_history"].endpoint).parameters) == (
+    "alias_token",
+    "app",
+  )
   assert tuple(inspect.signature(routes["revoke_replay_link_alias"].endpoint).parameters) == (
     "alias_token",
     "request",
@@ -387,6 +391,19 @@ def test_replay_link_alias_endpoints_resolve_and_revoke(tmp_path: Path) -> None:
   assert revoke_response.status_code == 200
   assert revoke_response.json()["revoked_by_tab_label"] == "Remote tab"
 
+  history_response = client.get(
+    f"/api/replay-links/aliases/{created_alias['alias_token']}/history",
+  )
+
+  assert history_response.status_code == 200
+  history_payload = history_response.json()
+  assert history_payload["alias"]["retention_policy"] == "7d"
+  assert [item["action"] for item in history_payload["history"]] == [
+    "revoked",
+    "resolved",
+    "created",
+  ]
+
   revoked_resolve_response = client.get(
     f"/api/replay-links/aliases/{created_alias['alias_token']}",
   )
@@ -432,6 +449,15 @@ def test_replay_link_alias_registry_survives_restart(tmp_path: Path) -> None:
   assert revoke_response.status_code == 200
 
   second_restart_client = build_client(database_path)
+  history_response = second_restart_client.get(
+    f"/api/replay-links/aliases/{alias_token}/history",
+  )
+  assert history_response.status_code == 200
+  assert [item["action"] for item in history_response.json()["history"]] == [
+    "revoked",
+    "resolved",
+    "created",
+  ]
   revoked_resolve_response = second_restart_client.get(f"/api/replay-links/aliases/{alias_token}")
 
   assert revoked_resolve_response.status_code == 404

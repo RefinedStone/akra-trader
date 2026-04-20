@@ -13996,6 +13996,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "run_surface_capabilities",
     "replay_link_alias_create",
     "replay_link_alias_resolve",
+    "replay_link_alias_history",
     "replay_link_alias_revoke",
     "market_data_status",
     "operator_visibility",
@@ -14044,6 +14045,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_surface_capabilities"].route_path == "/capabilities/run-surfaces"
   assert bindings_by_key["replay_link_alias_create"].methods == ("POST",)
   assert bindings_by_key["replay_link_alias_resolve"].path_param_keys == ("alias_token",)
+  assert bindings_by_key["replay_link_alias_history"].route_path == "/replay-links/aliases/{alias_token}/history"
   assert bindings_by_key["replay_link_alias_revoke"].request_payload_kind == "replay_link_alias_revoke"
   assert bindings_by_key["market_data_status"].route_path == "/market-data/status"
   assert bindings_by_key["market_data_status"].filter_param_specs[0].key == "timeframe"
@@ -14401,6 +14403,7 @@ def test_replay_link_alias_bindings_create_resolve_and_revoke(tmp_path: Path) ->
   )
 
   assert resolved_alias["intent"]["replayIndex"] == 2
+  assert resolved_alias["retention_policy"] == "7d"
   assert resolved_alias["revoked_at"] is None
 
   revoked_alias = execute_standalone_surface_binding(
@@ -14415,6 +14418,21 @@ def test_replay_link_alias_bindings_create_resolve_and_revoke(tmp_path: Path) ->
 
   assert revoked_alias["revoked_at"] is not None
   assert revoked_alias["revoked_by_tab_label"] == "Remote tab"
+
+  history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_alias_history"],
+    app=app,
+    path_params={"alias_token": created_alias["alias_token"]},
+  )
+
+  assert history_payload["alias"]["revoked_by_tab_label"] == "Remote tab"
+  assert [item["action"] for item in history_payload["history"]] == [
+    "revoked",
+    "resolved",
+    "created",
+  ]
+  assert history_payload["history"][0]["source_tab_label"] == "Remote tab"
+  assert all(item["retention_policy"] == "7d" for item in history_payload["history"])
 
   with pytest.raises(LookupError, match="revoked"):
     execute_standalone_surface_binding(
@@ -14467,8 +14485,49 @@ def test_replay_link_alias_records_survive_application_restart(tmp_path: Path) -
     runs=runs,
   )
 
+  history = second_restart.list_replay_intent_alias_history(alias_token)
+  assert [item.action for item in history] == ["revoked", "resolved", "created"]
+  assert history[0].source_tab_label == "Remote tab"
+
   with pytest.raises(LookupError, match="revoked"):
     second_restart.resolve_replay_intent_alias(alias_token)
+
+
+def test_replay_link_alias_history_retention_prunes_expired_audit_records(tmp_path: Path) -> None:
+  clock = MutableClock(datetime(2026, 1, 1, tzinfo=UTC))
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  created_alias = app.create_replay_intent_alias(
+    template_key="template_a",
+    template_label="Template A",
+    intent={"replayScope": "all", "replayIndex": 1},
+    redaction_policy="summary_only",
+    retention_policy="1d",
+    source_tab_id="tab_local",
+    source_tab_label="Local tab",
+  )
+  alias_token = f"{created_alias.alias_id}.{created_alias.signature}"
+
+  clock.advance(timedelta(hours=2))
+  app.resolve_replay_intent_alias(alias_token)
+
+  clock.advance(timedelta(days=2))
+  restarted = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    clock=clock,
+  )
+
+  assert restarted.list_replay_intent_alias_history(alias_token) == ()
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

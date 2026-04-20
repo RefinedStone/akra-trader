@@ -22,6 +22,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import ExperimentPreset
+from akra_trader.domain.models import ReplayIntentAliasAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -72,6 +73,17 @@ replay_intent_alias_records = Table(
   Column("revoked_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+replay_intent_alias_audit_records = Table(
+  "replay_intent_alias_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("alias_id", String, nullable=False, index=True),
+  Column("template_key", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 replay_intent_alias_state = Table(
   "replay_intent_alias_state",
   metadata,
@@ -97,6 +109,7 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _terminal_statuses = {RunStatus.COMPLETED, RunStatus.STOPPED, RunStatus.FAILED}
   _adapter = TypeAdapter(RunRecord)
   _replay_alias_adapter = TypeAdapter(ReplayIntentAliasRecord)
+  _replay_alias_audit_adapter = TypeAdapter(ReplayIntentAliasAuditRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -239,6 +252,63 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       return None
     return self._replay_alias_adapter.validate_python(row["payload"])
 
+  def save_replay_intent_alias_audit_record(
+    self,
+    record: ReplayIntentAliasAuditRecord,
+  ) -> ReplayIntentAliasAuditRecord:
+    payload = self._replay_alias_audit_adapter.dump_python(record, mode="json")
+    row = {
+      "audit_id": record.audit_id,
+      "alias_id": record.alias_id,
+      "template_key": record.template_key,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_audit_records.c.audit_id).where(
+          replay_intent_alias_audit_records.c.audit_id == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(replay_intent_alias_audit_records).values(**row))
+      else:
+        connection.execute(
+          update(replay_intent_alias_audit_records)
+          .where(replay_intent_alias_audit_records.c.audit_id == record.audit_id)
+          .values(**row)
+        )
+    return record
+
+  def list_replay_intent_alias_audit_records(
+    self,
+    alias_id: str,
+  ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    with self._engine.connect() as connection:
+      rows = connection.execute(
+        select(replay_intent_alias_audit_records.c.payload)
+        .where(replay_intent_alias_audit_records.c.alias_id == alias_id)
+        .order_by(
+          replay_intent_alias_audit_records.c.recorded_at.desc(),
+          replay_intent_alias_audit_records.c.audit_id.desc(),
+        )
+      ).mappings().all()
+    return tuple(
+      self._replay_alias_audit_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> None:
+    with self._engine.begin() as connection:
+      connection.execute(
+        delete(replay_intent_alias_audit_records).where(
+          replay_intent_alias_audit_records.c.expires_at.is_not(None),
+          replay_intent_alias_audit_records.c.expires_at <= current_time.isoformat(),
+        )
+      )
+
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     with self._engine.connect() as connection:
       row = connection.execute(
@@ -326,11 +396,18 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_replay_intent_alias_records_created_at", "created_at"),
         ("ix_replay_intent_alias_records_expires_at", "expires_at"),
         ("ix_replay_intent_alias_records_revoked_at", "revoked_at"),
+        ("ix_replay_intent_alias_audit_records_alias_id", "alias_id"),
+        ("ix_replay_intent_alias_audit_records_template_key", "template_key"),
+        ("ix_replay_intent_alias_audit_records_action", "action"),
+        ("ix_replay_intent_alias_audit_records_recorded_at", "recorded_at"),
+        ("ix_replay_intent_alias_audit_records_expires_at", "expires_at"),
       ):
         table_name = (
           "run_record_tags"
           if index_name == "ix_run_record_tags_tag"
-          else "replay_intent_alias_records"
+          else "replay_intent_alias_audit_records"
+            if index_name.startswith("ix_replay_intent_alias_audit_records_")
+            else "replay_intent_alias_records"
             if index_name.startswith("ix_replay_intent_alias_records_")
             else "run_records"
         )

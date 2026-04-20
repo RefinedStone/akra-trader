@@ -26,6 +26,7 @@ from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import ComparisonEligibilityContract
 from akra_trader.domain.models import default_comparison_eligibility_contract
+from akra_trader.domain.models import ReplayIntentAliasAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
@@ -708,6 +709,7 @@ class TradingApplication:
     )
     self._replay_intent_alias_signing_secret = self._load_or_create_replay_intent_alias_signing_secret()
     self._replay_intent_alias_records: dict[str, ReplayIntentAliasRecord] = {}
+    self._replay_intent_alias_audit_records: dict[str, ReplayIntentAliasAuditRecord] = {}
 
   def list_strategies(
     self,
@@ -1210,6 +1212,17 @@ class TradingApplication:
       return None
     return created_at + retention_delta
 
+  def _build_replay_intent_alias_audit_expiry(
+    self,
+    *,
+    retention_policy: str,
+    recorded_at: datetime,
+  ) -> datetime | None:
+    retention_delta = self._get_replay_intent_alias_retention_delta(retention_policy)
+    if retention_delta is None:
+      return None
+    return recorded_at + retention_delta
+
   def _build_replay_intent_alias_signature(
     self,
     *,
@@ -1271,6 +1284,36 @@ class TradingApplication:
       return get_alias(alias_id)
     return self._replay_intent_alias_records.get(alias_id)
 
+  def _save_replay_intent_alias_audit_record(
+    self,
+    record: ReplayIntentAliasAuditRecord,
+  ) -> ReplayIntentAliasAuditRecord:
+    save_audit = getattr(self._runs, "save_replay_intent_alias_audit_record", None)
+    if callable(save_audit):
+      return save_audit(record)
+    self._replay_intent_alias_audit_records[record.audit_id] = record
+    return record
+
+  def _list_replay_intent_alias_audit_records(
+    self,
+    alias_id: str,
+  ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    list_audits = getattr(self._runs, "list_replay_intent_alias_audit_records", None)
+    if callable(list_audits):
+      return tuple(list_audits(alias_id))
+    records = [
+      record
+      for record in self._replay_intent_alias_audit_records.values()
+      if record.alias_id == alias_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
   def _prune_replay_intent_alias_records(self) -> None:
     current_time = self._clock()
     self._replay_intent_alias_records = {
@@ -1278,6 +1321,60 @@ class TradingApplication:
       for alias_id, record in self._replay_intent_alias_records.items()
       if record.expires_at is None or record.expires_at > current_time
     }
+
+  def _prune_replay_intent_alias_audit_records(self) -> None:
+    current_time = self._clock()
+    prune_audits = getattr(self._runs, "prune_replay_intent_alias_audit_records", None)
+    if callable(prune_audits):
+      prune_audits(current_time)
+      return
+    self._replay_intent_alias_audit_records = {
+      audit_id: record
+      for audit_id, record in self._replay_intent_alias_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+
+  def _record_replay_intent_alias_audit_event(
+    self,
+    *,
+    record: ReplayIntentAliasRecord,
+    action: str,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ReplayIntentAliasAuditRecord:
+    self._prune_replay_intent_alias_audit_records()
+    recorded_at = self._clock()
+    audit_record = ReplayIntentAliasAuditRecord(
+      audit_id=uuid4().hex[:12],
+      alias_id=record.alias_id,
+      action=action,
+      template_key=record.template_key,
+      template_label=record.template_label,
+      redaction_policy=record.redaction_policy,
+      retention_policy=record.retention_policy,
+      recorded_at=recorded_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy=record.retention_policy,
+        recorded_at=recorded_at,
+      ),
+      alias_created_at=record.created_at,
+      alias_expires_at=record.expires_at,
+      alias_revoked_at=record.revoked_at,
+      source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+      detail=(
+        "Replay link alias created."
+        if action == "created"
+        else "Replay link alias revoked."
+          if action == "revoked"
+          else "Replay link alias resolved."
+      ),
+    )
+    return self._save_replay_intent_alias_audit_record(audit_record)
 
   def _get_replay_intent_alias_record_for_token(
     self,
@@ -1352,6 +1449,7 @@ class TradingApplication:
       template_label=(template_label or normalized_template_key).strip() or normalized_template_key,
       intent=normalized_intent,
       redaction_policy=self._normalize_replay_intent_alias_redaction_policy(redaction_policy),
+      retention_policy=normalized_retention_policy,
       created_at=created_at,
       expires_at=expires_at,
       created_by_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
@@ -1361,11 +1459,30 @@ class TradingApplication:
         else None
       ),
     )
-    self._save_replay_intent_alias_record(record)
-    return record
+    saved_record = self._save_replay_intent_alias_record(record)
+    self._record_replay_intent_alias_audit_event(
+      record=saved_record,
+      action="created",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    return saved_record
+
+  def get_replay_intent_alias(
+    self,
+    alias_token: str,
+    *,
+    require_active: bool = False,
+  ) -> ReplayIntentAliasRecord:
+    return self._get_replay_intent_alias_record_for_token(
+      alias_token,
+      require_active=require_active,
+    )
 
   def resolve_replay_intent_alias(self, alias_token: str) -> ReplayIntentAliasRecord:
-    return self._get_replay_intent_alias_record_for_token(alias_token, require_active=True)
+    record = self._get_replay_intent_alias_record_for_token(alias_token, require_active=True)
+    self._record_replay_intent_alias_audit_event(record=record, action="resolved")
+    return record
 
   def revoke_replay_intent_alias(
     self,
@@ -1387,7 +1504,22 @@ class TradingApplication:
         else None
       ),
     )
-    return self._save_replay_intent_alias_record(revoked_record)
+    saved_record = self._save_replay_intent_alias_record(revoked_record)
+    self._record_replay_intent_alias_audit_event(
+      record=saved_record,
+      action="revoked",
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
+    return saved_record
+
+  def list_replay_intent_alias_history(
+    self,
+    alias_token: str,
+  ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    record = self.get_replay_intent_alias(alias_token, require_active=False)
+    self._prune_replay_intent_alias_audit_records()
+    return self._list_replay_intent_alias_audit_records(record.alias_id)
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
@@ -23979,6 +24111,7 @@ def serialize_replay_intent_alias_record(record: ReplayIntentAliasRecord) -> dic
     "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
     "intent": deepcopy(record.intent),
     "redaction_policy": record.redaction_policy,
+    "retention_policy": record.retention_policy,
     "resolution_source": "server",
     "revoked_at": record.revoked_at.isoformat() if record.revoked_at is not None else None,
     "revoked_by_tab_id": record.revoked_by_tab_id,
@@ -23986,6 +24119,45 @@ def serialize_replay_intent_alias_record(record: ReplayIntentAliasRecord) -> dic
     "signature": record.signature,
     "template_key": record.template_key,
     "template_label": record.template_label,
+  }
+
+
+def serialize_replay_intent_alias_audit_record(record: ReplayIntentAliasAuditRecord) -> dict[str, Any]:
+  return {
+    "action": record.action,
+    "alias_created_at": (
+      record.alias_created_at.isoformat() if record.alias_created_at is not None else None
+    ),
+    "alias_expires_at": (
+      record.alias_expires_at.isoformat() if record.alias_expires_at is not None else None
+    ),
+    "alias_id": record.alias_id,
+    "alias_revoked_at": (
+      record.alias_revoked_at.isoformat() if record.alias_revoked_at is not None else None
+    ),
+    "audit_id": record.audit_id,
+    "detail": record.detail,
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "recorded_at": record.recorded_at.isoformat(),
+    "redaction_policy": record.redaction_policy,
+    "retention_policy": record.retention_policy,
+    "source_tab_id": record.source_tab_id,
+    "source_tab_label": record.source_tab_label,
+    "template_key": record.template_key,
+    "template_label": record.template_label,
+  }
+
+
+def serialize_replay_intent_alias_history(
+  record: ReplayIntentAliasRecord,
+  audit_records: tuple[ReplayIntentAliasAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "alias": serialize_replay_intent_alias_record(record),
+    "history": [
+      serialize_replay_intent_alias_audit_record(audit_record)
+      for audit_record in audit_records
+    ],
   }
 
 
@@ -24157,6 +24329,15 @@ def list_standalone_surface_runtime_bindings(
     response_title="Resolve replay link alias",
     scope="app",
     binding_kind="replay_link_alias_resolve",
+    path_param_keys=("alias_token",),
+  )
+  replay_alias_history_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_alias_history",
+    route_path="/replay-links/aliases/{alias_token}/history",
+    route_name="get_replay_link_alias_history",
+    response_title="Replay link alias history",
+    scope="app",
+    binding_kind="replay_link_alias_history",
     path_param_keys=("alias_token",),
   )
   replay_alias_revoke_binding = StandaloneSurfaceRuntimeBinding(
@@ -25441,6 +25622,7 @@ def list_standalone_surface_runtime_bindings(
     capability_binding,
     replay_alias_create_binding,
     replay_alias_resolve_binding,
+    replay_alias_history_binding,
     replay_alias_revoke_binding,
     market_data_status_binding,
     operator_visibility_binding,
@@ -25526,6 +25708,15 @@ def execute_standalone_surface_binding(
   if binding.binding_kind == "replay_link_alias_resolve":
     return serialize_replay_intent_alias_record(
       app.resolve_replay_intent_alias(resolved_path_params["alias_token"])
+    )
+  if binding.binding_kind == "replay_link_alias_history":
+    resolved_record = app.get_replay_intent_alias(
+      resolved_path_params["alias_token"],
+      require_active=False,
+    )
+    return serialize_replay_intent_alias_history(
+      resolved_record,
+      app.list_replay_intent_alias_history(resolved_path_params["alias_token"]),
     )
   if binding.binding_kind == "replay_link_alias_revoke":
     return serialize_replay_intent_alias_record(

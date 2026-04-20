@@ -19,6 +19,7 @@ from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
+from akra_trader.domain.models import ReplayIntentAliasAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -183,6 +184,7 @@ class InMemoryRunRepository(RunRepositoryPort):
   def __init__(self) -> None:
     self._runs: OrderedDict[str, RunRecord] = OrderedDict()
     self._replay_intent_alias_records: OrderedDict[str, ReplayIntentAliasRecord] = OrderedDict()
+    self._replay_intent_alias_audit_records: OrderedDict[str, ReplayIntentAliasAuditRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -252,6 +254,40 @@ class InMemoryRunRepository(RunRepositoryPort):
 
   def get_replay_intent_alias(self, alias_id: str) -> ReplayIntentAliasRecord | None:
     return self._replay_intent_alias_records.get(alias_id)
+
+  def save_replay_intent_alias_audit_record(
+    self,
+    record: ReplayIntentAliasAuditRecord,
+  ) -> ReplayIntentAliasAuditRecord:
+    self._replay_intent_alias_audit_records[record.audit_id] = record
+    return record
+
+  def list_replay_intent_alias_audit_records(
+    self,
+    alias_id: str,
+  ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    records = [
+      record
+      for record in self._replay_intent_alias_audit_records.values()
+      if record.alias_id == alias_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> None:
+    self._replay_intent_alias_audit_records = OrderedDict(
+      (
+        audit_id,
+        record,
+      )
+      for audit_id, record in self._replay_intent_alias_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

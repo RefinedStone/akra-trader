@@ -698,6 +698,7 @@ class ReplayIntentAliasRecord:
   template_label: str
   intent: dict[str, Any]
   redaction_policy: str
+  retention_policy: str
   created_at: datetime
   expires_at: datetime | None = None
   revoked_at: datetime | None = None
@@ -705,6 +706,25 @@ class ReplayIntentAliasRecord:
   created_by_tab_label: str | None = None
   revoked_by_tab_id: str | None = None
   revoked_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ReplayIntentAliasAuditRecord:
+  audit_id: str
+  alias_id: str
+  action: str
+  template_key: str
+  template_label: str
+  redaction_policy: str
+  retention_policy: str
+  recorded_at: datetime
+  expires_at: datetime | None = None
+  alias_created_at: datetime | None = None
+  alias_expires_at: datetime | None = None
+  alias_revoked_at: datetime | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  detail: str = ""
 
 
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
