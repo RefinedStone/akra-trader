@@ -21261,39 +21261,112 @@ function RunSurfaceCollectionQueryBuilder({
     () => Object.fromEntries(
       simulatedCoordinationGroups.map((group) => {
         let previousBundleKey = "";
-        let attributedStepIndex = -1;
-        let attributedActionType: string | null = null;
-        let attributedDetail: string | null = null;
+        const chain: Array<{
+          detail: string;
+          kind: "selection_change" | "group_action" | "dependency_edge";
+          stepIndex: number;
+          stepLabel: string;
+          type: string | null;
+        }> = [];
         for (let stepIndex = 0; stepIndex < simulatedPredicateRefSolverReplay.length; stepIndex += 1) {
           const step = simulatedPredicateRefSolverReplay[stepIndex];
           const resolvedBundleKey = step.resolvedSelectionsByGroupKey[group.key] ?? "";
-          const matchingActions = step.actions.filter((action) => action.groupKey === group.key);
-          const attributedAction = matchingActions.find((action) => action.type !== "idle")
-            ?? matchingActions[0]
-            ?? null;
+          const matchingActions = step.actions.filter((action) =>
+            action.groupKey === group.key
+            || action.dependencyEdges.some((edge) =>
+              edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key));
+          const directAction = matchingActions.find((action) => action.groupKey === group.key);
+          const edgeAction = matchingActions.find((action) =>
+            action.dependencyEdges.some((edge) =>
+              edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key));
           const selectionChanged = resolvedBundleKey !== previousBundleKey;
-          if (selectionChanged || attributedAction) {
-            attributedStepIndex = stepIndex;
-            attributedActionType = attributedAction?.type ?? null;
-            attributedDetail = attributedAction?.detail ?? step.summary;
-            break;
+          const resolvedBundle =
+            getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === resolvedBundleKey)
+            ?? null;
+          if (selectionChanged) {
+            chain.push({
+              detail: resolvedBundle
+                ? `${group.label} switched to ${resolvedBundle.label} during ${step.title.toLowerCase()}.`
+                : `${group.label} became unresolved during ${step.title.toLowerCase()}.`,
+              kind: "selection_change",
+              stepIndex,
+              stepLabel: `Replay step ${stepIndex + 1}`,
+              type: directAction?.type ?? edgeAction?.type ?? null,
+            });
+          } else if (directAction) {
+            chain.push({
+              detail: directAction.detail,
+              kind: "group_action",
+              stepIndex,
+              stepLabel: `Replay step ${stepIndex + 1}`,
+              type: directAction.type,
+            });
+          } else if (edgeAction) {
+            const edgeLabels = edgeAction.dependencyEdges
+              .filter((edge) => edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key)
+              .map((edge) => edge.label);
+            chain.push({
+              detail: edgeLabels.length
+                ? `${group.label} participates in ${edgeLabels.join(", ")} during ${step.title.toLowerCase()}.`
+                : edgeAction.detail,
+              kind: "dependency_edge",
+              stepIndex,
+              stepLabel: `Replay step ${stepIndex + 1}`,
+              type: edgeAction.type,
+            });
           }
           previousBundleKey = resolvedBundleKey;
         }
+        const firstAttribution = chain[0] ?? null;
         return [group.key, {
-          detail: attributedDetail,
-          stepIndex: attributedStepIndex,
-          stepLabel:
-            attributedStepIndex >= 0
-              ? `Replay step ${attributedStepIndex + 1}`
-              : "No replay attribution",
-          type: attributedActionType,
+          chain,
+          chainSummary:
+            chain.length > 1
+              ? `${chain.length} replay steps · ${chain[0]?.stepLabel ?? "Replay"} → ${chain[chain.length - 1]?.stepLabel ?? "Replay"}`
+              : chain.length === 1
+                ? `1 replay step · ${chain[0]?.stepLabel ?? "Replay"}`
+                : "No replay attribution",
+          detail: firstAttribution?.detail ?? null,
+          stepIndex: firstAttribution?.stepIndex ?? -1,
+          stepLabel: firstAttribution?.stepLabel ?? "No replay attribution",
+          type: firstAttribution?.type ?? null,
         }] as const;
       }),
     ),
     [
+      getSortedTemplateGroupPresetBundles,
       simulatedCoordinationGroups,
       simulatedPredicateRefSolverReplay,
+    ],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedChain = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+        ? (
+            simulatedPredicateRefSolverReplayAttributionByGroupKey[
+              activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+            ]?.chain ?? []
+          )
+        : []
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+      simulatedPredicateRefSolverReplayAttributionByGroupKey,
+    ],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet = useMemo(
+    () => new Set(
+      activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry) => entry.stepIndex),
+    ),
+    [activePredicateRefReplayApplyConflictSimulationFocusedChain],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedChainPosition = useMemo(
+    () => activePredicateRefReplayApplyConflictSimulationFocusedChain.findIndex(
+      (entry) => entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex,
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedChain,
+      activeSimulatedPredicateRefSolverReplayIndex,
     ],
   );
   useEffect(() => {
@@ -21412,8 +21485,17 @@ function RunSurfaceCollectionQueryBuilder({
       }
     }
     const attributedReplayStep = simulatedPredicateRefSolverReplayAttributionByGroupKey[preferredGroupKey] ?? null;
-    const nextIndex = attributedReplayStep?.stepIndex ?? simulatedPredicateRefSolverReplay.findIndex((step) =>
-      step.actions.some((action) => action.groupKey === preferredGroupKey));
+    const chainStepIndices = attributedReplayStep?.chain.map((entry) => entry.stepIndex) ?? [];
+    const nextIndex = chainStepIndices.length
+      ? (
+          chainStepIndices.includes(activeSimulatedPredicateRefSolverReplayIndex)
+            ? activeSimulatedPredicateRefSolverReplayIndex
+            : chainStepIndices[0]
+        )
+      : (
+          attributedReplayStep?.stepIndex ?? simulatedPredicateRefSolverReplay.findIndex((step) =>
+            step.actions.some((action) => action.groupKey === preferredGroupKey))
+        );
     if (nextIndex < 0) {
       return;
     }
@@ -23898,6 +23980,64 @@ function RunSurfaceCollectionQueryBuilder({
                                 ) : null}
                               </div>
                             ) : null}
+                            {activePredicateRefReplayApplyConflictSimulationFocusedItem
+                            && activePredicateRefReplayApplyConflictSimulationFocusedChain.length ? (
+                              <div className="run-surface-query-builder-trace-panel is-nested">
+                                <div className="run-surface-query-builder-card-head">
+                                  <strong>Reviewed field causal chain</strong>
+                                  <span>{activePredicateRefReplayApplyConflictSimulationFocusedChain.length === 1
+                                    ? "1 replay step"
+                                    : `${activePredicateRefReplayApplyConflictSimulationFocusedChain.length} replay steps`}</span>
+                                </div>
+                                <p className="run-note">
+                                  {`${activePredicateRefReplayApplyConflictSimulationFocusedItem.label} propagates through ${activePredicateRefReplayApplyConflictSimulationFocusedGroupKey ?? "the replay graph"} across the steps below.`}
+                                </p>
+                                <div className="run-surface-query-builder-trace-chip-list">
+                                  {activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry, index) => (
+                                    <button
+                                      className={`run-surface-query-builder-trace-chip${
+                                        entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
+                                          ? " is-active"
+                                          : ""
+                                      }`}
+                                      key={`focused-causal-chain:${entry.stepIndex}:${index}`}
+                                      onClick={() => setBundleCoordinationSimulationReplayIndex(entry.stepIndex)}
+                                      type="button"
+                                    >
+                                      {`${entry.stepLabel}${entry.type ? ` · ${entry.type.replaceAll("_", " ")}` : ""}`}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="run-surface-query-builder-trace-list">
+                                  {activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry, index) => (
+                                    <div
+                                      className={`run-surface-query-builder-trace-step is-${
+                                        entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
+                                          ? "success"
+                                          : entry.kind === "dependency_edge"
+                                            ? "info"
+                                            : entry.kind === "selection_change"
+                                              ? "warning"
+                                              : "info"
+                                      }`}
+                                      key={`focused-causal-step:${entry.stepIndex}:${index}`}
+                                    >
+                                      <strong>{`${entry.stepLabel}${entry.type ? ` · ${entry.type.replaceAll("_", " ")}` : ""}`}</strong>
+                                      <p>{entry.detail}</p>
+                                      <div className="run-surface-query-builder-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={() => setBundleCoordinationSimulationReplayIndex(entry.stepIndex)}
+                                          type="button"
+                                        >
+                                          Focus replay step
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                             <div className="run-surface-query-builder-actions">
                               <button
                                 className="ghost-button"
@@ -23965,10 +24105,41 @@ function RunSurfaceCollectionQueryBuilder({
                                             {diff.attributedReplayType.replaceAll("_", " ")}
                                           </span>
                                         ) : null}
+                                        <span className="run-surface-query-builder-trace-chip">
+                                          {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chainSummary
+                                            ?? "No replay attribution"}
+                                        </span>
                                       </div>
                                     ) : null}
                                     {diff.attributedReplayDetail ? (
                                       <p className="run-note">{diff.attributedReplayDetail}</p>
+                                    ) : null}
+                                    {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain.length ? (
+                                      <div className="run-surface-query-builder-trace-chip-list">
+                                        {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey].chain
+                                          .slice(0, 4)
+                                          .map((entry, index) => (
+                                            <button
+                                              className={`run-surface-query-builder-trace-chip${
+                                                entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
+                                                  ? " is-active"
+                                                  : ""
+                                              }`}
+                                              key={`simulation-diff-chain:${diff.groupKey}:${entry.stepIndex}:${index}`}
+                                              onClick={() => setBundleCoordinationSimulationReplayIndex(entry.stepIndex)}
+                                              type="button"
+                                            >
+                                              {entry.stepLabel}
+                                            </button>
+                                          ))}
+                                        {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey].chain.length > 4 ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {`+${
+                                              simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey].chain.length - 4
+                                            } more chain steps`}
+                                          </span>
+                                        ) : null}
+                                      </div>
                                     ) : null}
                                     {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]?.length ? (
                                       <div className="run-surface-query-builder-trace-chip-list">
@@ -24037,6 +24208,22 @@ function RunSurfaceCollectionQueryBuilder({
                                     {`${activeSimulatedPredicateRefSolverReplayIndex + 1}/${simulatedPredicateRefSolverReplay.length}`}
                                   </span>
                                 </div>
+                                {activePredicateRefReplayApplyConflictSimulationFocusedChain.length ? (
+                                  <div className="run-surface-query-builder-trace-chip-list">
+                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                      {`${activePredicateRefReplayApplyConflictSimulationFocusedChain.length} causal replay steps`}
+                                    </span>
+                                    <span className={`run-surface-query-builder-trace-chip${
+                                      activePredicateRefReplayApplyConflictSimulationFocusedChainPosition >= 0
+                                        ? " is-active"
+                                        : ""
+                                    }`}>
+                                      {activePredicateRefReplayApplyConflictSimulationFocusedChainPosition >= 0
+                                        ? `Focused chain step ${activePredicateRefReplayApplyConflictSimulationFocusedChainPosition + 1}/${activePredicateRefReplayApplyConflictSimulationFocusedChain.length}`
+                                        : "Current replay step is outside the focused reviewed field chain"}
+                                    </span>
+                                  </div>
+                                ) : null}
                                 <div className="run-surface-query-builder-actions">
                                   <button
                                     className="ghost-button"
@@ -25106,7 +25293,10 @@ function RunSurfaceCollectionQueryBuilder({
                                         activeSimulatedPredicateRefSolverReplayFilteredActions.map((action) => (
                                           <div
                                             className={`run-surface-query-builder-trace-step is-${
-                                              activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === action.groupKey
+                                              activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet.has(
+                                                activeSimulatedPredicateRefSolverReplayIndex,
+                                              )
+                                              && activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === action.groupKey
                                                 ? "success"
                                                 : action.type === "conflict_blocked"
                                                 ? "warning"
@@ -25118,6 +25308,17 @@ function RunSurfaceCollectionQueryBuilder({
                                           >
                                             <strong>{`${action.groupLabel} · ${action.type.replaceAll("_", " ")}`}</strong>
                                             <p>{action.detail}</p>
+                                            {activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet.has(
+                                              activeSimulatedPredicateRefSolverReplayIndex,
+                                            ) ? (
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                <span className="run-surface-query-builder-trace-chip is-active">
+                                                  {`Causal chain step ${
+                                                    activePredicateRefReplayApplyConflictSimulationFocusedChainPosition + 1
+                                                  }/${activePredicateRefReplayApplyConflictSimulationFocusedChain.length}`}
+                                                </span>
+                                              </div>
+                                            ) : null}
                                             {action.dependencyEdges.length ? (
                                               <div className="run-surface-query-builder-trace-chip-list">
                                                 {action.dependencyEdges.map((edge) => (
