@@ -235,7 +235,7 @@ def test_register_strategy_endpoint_returns_import_catalog_semantics(tmp_path: P
   assert payload["lifecycle"]["registered_at"] is not None
 
 
-def test_complex_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -> None:
+def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   routes = {
     route.name: route
@@ -243,6 +243,38 @@ def test_complex_standalone_binding_routes_expose_generated_signatures(tmp_path:
     if getattr(route, "name", None)
   }
 
+  assert tuple(inspect.signature(routes["list_strategies"].endpoint).parameters) == (
+    "lane",
+    "lifecycle_stage",
+    "version",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_presets"].endpoint).parameters) == (
+    "strategy_id",
+    "timeframe",
+    "lifecycle_stage",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_runs"].endpoint).parameters) == (
+    "mode",
+    "strategy_id",
+    "strategy_version",
+    "rerun_boundary_id",
+    "preset_id",
+    "benchmark_family",
+    "dataset_identity",
+    "tag",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["compare_runs"].endpoint).parameters) == (
+    "run_id",
+    "intent",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_market_data_status"].endpoint).parameters) == (
+    "timeframe",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
   assert tuple(inspect.signature(routes["update_preset"].endpoint).parameters) == ("preset_id", "request", "app")
   assert tuple(inspect.signature(routes["restore_preset_revision"].endpoint).parameters) == (

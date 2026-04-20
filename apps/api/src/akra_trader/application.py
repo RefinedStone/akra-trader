@@ -22987,9 +22987,18 @@ class StandaloneSurfaceRuntimeBinding:
   methods: tuple[str, ...] = ("GET",)
   subresource_key: str | None = None
   filter_keys: tuple[str, ...] = ()
+  filter_param_specs: tuple["StandaloneSurfaceFilterParamSpec", ...] = ()
   path_param_keys: tuple[str, ...] = ()
   header_keys: tuple[str, ...] = ()
   request_payload_kind: str | None = None
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceFilterParamSpec:
+  key: str
+  annotation: Any
+  default: Any = None
+  default_factory: Callable[[], Any] | None = None
 
 
 def _serialize_run_order_subresource_item(
@@ -23151,6 +23160,9 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="market_data_status",
     filter_keys=("timeframe",),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec("timeframe", str, default="5m"),
+    ),
   )
   operator_visibility_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_visibility",
@@ -23176,6 +23188,11 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="strategy_catalog_discovery",
     filter_keys=("lane", "lifecycle_stage", "version"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec("lane", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("lifecycle_stage", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("version", str | None, default=None),
+    ),
   )
   reference_discovery_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="reference_catalog_discovery",
@@ -23193,6 +23210,11 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="preset_catalog_discovery",
     filter_keys=("strategy_id", "timeframe", "lifecycle_stage"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec("strategy_id", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("timeframe", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("lifecycle_stage", str | None, default=None),
+    ),
   )
   preset_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="preset_catalog_create",
@@ -23282,6 +23304,16 @@ def list_standalone_surface_runtime_bindings(
       "dataset_identity",
       "tag",
     ),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec("mode", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("strategy_id", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("strategy_version", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("rerun_boundary_id", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("preset_id", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("benchmark_family", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("dataset_identity", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec("tag", list[str], default_factory=list),
+    ),
   )
   run_compare_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="run_compare",
@@ -23291,6 +23323,10 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="run_compare",
     filter_keys=("run_id", "intent"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec("run_id", list[str], default_factory=list),
+      StandaloneSurfaceFilterParamSpec("intent", str | None, default=None),
+    ),
   )
   run_backtest_launch_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="run_backtest_launch",

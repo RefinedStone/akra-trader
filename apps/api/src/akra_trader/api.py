@@ -16,7 +16,7 @@ from pydantic import Field
 from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import TradingApplication
 from akra_trader.application import execute_standalone_surface_binding
-from akra_trader.application import get_standalone_surface_runtime_binding
+from akra_trader.application import StandaloneSurfaceFilterParamSpec
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.bootstrap import Container
 
@@ -148,6 +148,12 @@ def _build_header_alias(header_key: str) -> str:
   return "-".join(part.capitalize() for part in header_key.split("_"))
 
 
+def _build_query_default(spec: StandaloneSurfaceFilterParamSpec) -> Any:
+  if spec.default_factory is not None:
+    return Query(default_factory=spec.default_factory)
+  return Query(default=spec.default)
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -192,6 +198,11 @@ def create_router(container: Container) -> APIRouter:
         binding=binding,
         app=kwargs["app"],
         run_id=kwargs.get("run_id"),
+        filters=(
+          {spec.key: kwargs[spec.key] for spec in binding.filter_param_specs}
+          if binding.filter_param_specs
+          else None
+        ),
         path_params=(
           {key: kwargs[key] for key in binding.path_param_keys}
           if binding.path_param_keys
@@ -220,6 +231,15 @@ def create_router(container: Container) -> APIRouter:
           path_param_key,
           inspect.Parameter.POSITIONAL_OR_KEYWORD,
           annotation=str,
+        )
+      )
+    for filter_spec in binding.filter_param_specs:
+      parameters.append(
+        inspect.Parameter(
+          filter_spec.key,
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=filter_spec.annotation,
+          default=_build_query_default(filter_spec),
         )
       )
     if binding.request_payload_kind is not None:
@@ -255,117 +275,13 @@ def create_router(container: Container) -> APIRouter:
       return_annotation=Any,
     )
     return handle_surface
-
-  @router.get("/strategies")
-  def list_strategies(
-    lane: str | None = None,
-    lifecycle_stage: str | None = None,
-    version: str | None = None,
-    app: TradingApplication = Depends(get_app),
-  ) -> list[dict[str, Any]]:
-    binding = get_standalone_surface_runtime_binding(
-      "strategy_catalog_discovery",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      filters={
-        "lane": lane,
-        "lifecycle_stage": lifecycle_stage,
-        "version": version,
-      },
-    )
-
-  @router.get("/presets")
-  def list_presets(
-    strategy_id: str | None = None,
-    timeframe: str | None = None,
-    lifecycle_stage: str | None = None,
-    app: TradingApplication = Depends(get_app),
-  ) -> list[dict[str, Any]]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_discovery",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      filters={
-        "strategy_id": strategy_id,
-        "timeframe": timeframe,
-        "lifecycle_stage": lifecycle_stage,
-      },
-    )
-
-  @router.get("/runs")
-  def list_runs(
-    mode: str | None = None,
-    strategy_id: str | None = None,
-    strategy_version: str | None = None,
-    rerun_boundary_id: str | None = None,
-    preset_id: str | None = None,
-    benchmark_family: str | None = None,
-    dataset_identity: str | None = None,
-    tag: list[str] = Query(default_factory=list),
-    app: TradingApplication = Depends(get_app),
-  ) -> list[dict[str, Any]]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_list",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      filters={
-        "mode": mode,
-        "strategy_id": strategy_id,
-        "strategy_version": strategy_version,
-        "rerun_boundary_id": rerun_boundary_id,
-        "preset_id": preset_id,
-        "benchmark_family": benchmark_family,
-        "dataset_identity": dataset_identity,
-        "tag": tag,
-      },
-    )
-
-  @router.get("/runs/compare")
-  def compare_runs(
-    run_id: list[str] = Query(default_factory=list),
-    intent: str | None = None,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_compare",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      filters={"run_id": run_id, "intent": intent},
-    )
-
   for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
-    if binding.filter_keys:
-      continue
     router.add_api_route(
       binding.route_path,
       build_standalone_surface_route_handler(binding),
       methods=list(binding.methods),
       name=binding.route_name,
       summary=binding.response_title,
-    )
-
-  @router.get("/market-data/status")
-  def get_market_data_status(timeframe: str = "5m", app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "market_data_status",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      filters={"timeframe": timeframe},
     )
 
   return router

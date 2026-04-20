@@ -13975,18 +13975,23 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_surface_capabilities"].scope == "app"
   assert bindings_by_key["run_surface_capabilities"].route_path == "/capabilities/run-surfaces"
   assert bindings_by_key["market_data_status"].route_path == "/market-data/status"
+  assert bindings_by_key["market_data_status"].filter_param_specs[0].key == "timeframe"
   assert bindings_by_key["operator_visibility"].route_path == "/operator/visibility"
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
+  assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].key == "lane"
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
+  assert bindings_by_key["preset_catalog_discovery"].filter_param_specs[1].key == "timeframe"
   assert bindings_by_key["preset_catalog_create"].methods == ("POST",)
   assert bindings_by_key["preset_catalog_item_get"].path_param_keys == ("preset_id",)
   assert bindings_by_key["preset_catalog_item_update"].methods == ("PATCH",)
   assert bindings_by_key["preset_catalog_revision_restore"].path_param_keys == ("preset_id", "revision_id")
   assert bindings_by_key["strategy_catalog_register"].methods == ("POST",)
   assert bindings_by_key["run_list"].filter_keys[-1] == "tag"
+  assert bindings_by_key["run_list"].filter_param_specs[-1].key == "tag"
   assert bindings_by_key["run_compare"].filter_keys == ("run_id", "intent")
+  assert bindings_by_key["run_compare"].filter_param_specs[0].key == "run_id"
   assert bindings_by_key["run_backtest_launch"].methods == ("POST",)
   assert bindings_by_key["run_backtest_item_get"].route_path == "/runs/backtests/{run_id}"
   assert bindings_by_key["run_rerun_backtest"].path_param_keys == ("rerun_boundary_id",)
