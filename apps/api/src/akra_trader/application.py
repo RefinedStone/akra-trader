@@ -23041,6 +23041,7 @@ class StandaloneSurfaceFilterParamSpec:
   operators: tuple[StandaloneSurfaceFilterOperatorSpec, ...] = ()
   value_path: tuple[str, ...] = ()
   query_exposed: bool = True
+  value_root: bool = False
 
 
 @dataclass(frozen=True)
@@ -23242,6 +23243,9 @@ def _build_runtime_filter_getters(
 ) -> dict[str, Callable[[Any], Any]]:
   getters: dict[str, Callable[[Any], Any]] = {}
   for spec in filter_specs:
+    if spec.value_root:
+      getters[spec.key] = lambda item: item
+      continue
     path = _default_runtime_query_value_path(spec.key, spec.value_path)
     if not path:
       continue
@@ -23368,6 +23372,50 @@ def _normalize_runtime_collection_items(value: Any) -> tuple[Any, ...] | None:
   return None
 
 
+def _resolve_runtime_collection_path_values(
+  item: Any,
+  path: tuple[str, ...],
+) -> tuple[Any, ...] | None:
+  def visit(current: Any, remaining_path: tuple[str, ...]) -> tuple[bool, tuple[Any, ...]]:
+    if current is _RUNTIME_QUERY_MISSING:
+      return (False, ())
+    if current is None:
+      return (True, ())
+    if not remaining_path:
+      normalized_items = _normalize_runtime_collection_items(current)
+      if normalized_items is not None:
+        return (True, normalized_items)
+      return (True, (current,))
+    segment = remaining_path[0]
+    tail = remaining_path[1:]
+    if isinstance(current, dict):
+      if segment in current:
+        return visit(current[segment], tail)
+      found_any = False
+      flattened_values: list[Any] = []
+      for value in current.values():
+        found, nested_values = visit(value, remaining_path)
+        found_any = found_any or found
+        flattened_values.extend(nested_values)
+      return (found_any, tuple(flattened_values))
+    if isinstance(current, (list, tuple, set)):
+      found_any = False
+      flattened_values: list[Any] = []
+      for value in current:
+        found, nested_values = visit(value, remaining_path)
+        found_any = found_any or found
+        flattened_values.extend(nested_values)
+      return (found_any, tuple(flattened_values))
+    if not hasattr(current, segment):
+      return (False, ())
+    return visit(getattr(current, segment), tail)
+
+  found_any, resolved_values = visit(item, path)
+  if not found_any:
+    return None
+  return resolved_values
+
+
 def _evaluate_runtime_quantified_expression_results(
   results: tuple[bool | None, ...],
   *,
@@ -23403,8 +23451,9 @@ def _evaluate_runtime_filter_expression(
   filter_getters: dict[str, Callable[[Any], Any]],
 ) -> bool | None:
   if expression.collection_quantifier is not None:
-    collection_items = _normalize_runtime_collection_items(
-      _resolve_runtime_query_path_value(item, expression.collection_path)
+    collection_items = _resolve_runtime_collection_path_values(
+      item,
+      expression.collection_path,
     )
     if collection_items is None:
       return None
@@ -24486,6 +24535,31 @@ def list_standalone_surface_runtime_bindings(
         ),
         value_path=("order_type", "value"),
         query_exposed=False,
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "issue_text",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Issue text",
+          description="Expression-only nested issue text field for collection predicates.",
+          examples=("gap:",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single issue text value on a collection element.",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="prefix",
+            label="Prefix",
+            description="Matches an issue text prefix on a collection element.",
+          ),
+        ),
+        query_exposed=False,
+        value_root=True,
       ),
       StandaloneSurfaceFilterParamSpec(
         "tag",

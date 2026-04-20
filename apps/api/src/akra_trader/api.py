@@ -252,7 +252,7 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
             "path": "<collection path>",
             "quantifier": "any|all|none",
           },
-          "semantics": "Evaluates the node against collection elements and folds the results with the declared quantifier.",
+          "semantics": "Evaluates the node against collection elements, flattening nested collection-of-collection paths, and folds the results with the declared quantifier.",
         },
         "condition_shape": {
           "key": "<filter_key>",

@@ -18,6 +18,7 @@ from akra_trader.domain.models import GuardedLiveOrderBookLevel
 from akra_trader.domain.models import InstrumentStatus
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketDataRemediationResult
+from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import OperatorIncidentDelivery
 from akra_trader.domain.models import OperatorIncidentEvent
 from akra_trader.domain.models import OperatorIncidentProviderPullSync
@@ -365,6 +366,7 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["quantified_conditions"]["values"] == ["any", "all", "none"]
   assert run_query_schema["expression_trees"]["collection_nodes"]["field"] == "collection"
   assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["quantifier"] == "any|all|none"
+  assert "flattening nested collection-of-collection paths" in run_query_schema["expression_trees"]["collection_nodes"]["semantics"]
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]
@@ -395,6 +397,9 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   order_status_filter = next(item for item in run_query_schema["filters"] if item["key"] == "order_status")
   assert order_status_filter["query_exposed"] is False
   assert order_status_filter["value_path"] == ["status", "value"]
+  issue_text_filter = next(item for item in run_query_schema["filters"] if item["key"] == "issue_text")
+  assert issue_text_filter["query_exposed"] is False
+  assert issue_text_filter["value_path"] == []
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
   assert any(field["key"] == "trade_count" for field in run_query_schema["sort_fields"])
@@ -942,6 +947,95 @@ def test_run_query_contract_supports_quantified_nested_object_collection_predica
     payload = response.json()
     returned_run_ids = [item["config"]["run_id"] for item in payload]
     assert returned_run_ids == [runs_by_symbol["BTC/USDT"]]
+
+
+def test_run_query_contract_supports_nested_collection_of_collection_paths(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    runs_by_symbol: dict[str, str] = {}
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      runs_by_symbol[symbol] = response.json()["config"]["run_id"]
+
+    app = client.app.state.container.app
+    lineage_by_symbol = {
+      "BTC/USDT": {
+        "binance:BTC/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("BTC/USDT",),
+          timeframe="5m",
+          issues=("gap:btc", "stale:btc"),
+        ),
+        "binance:ETH/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("ETH/USDT",),
+          timeframe="5m",
+          issues=("review:eth",),
+        ),
+      },
+      "ETH/USDT": {
+        "binance:ETH/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("ETH/USDT",),
+          timeframe="5m",
+          issues=("review:eth", "gap:eth"),
+        ),
+      },
+      "SOL/USDT": {
+        "binance:SOL/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("SOL/USDT",),
+          timeframe="5m",
+          issues=("stale:sol",),
+        ),
+      },
+    }
+    for symbol, market_data_by_symbol in lineage_by_symbol.items():
+      run = app.get_run(runs_by_symbol[symbol])
+      assert run is not None
+      run.provenance.market_data_by_symbol = market_data_by_symbol
+      app._runs.save_run(run)
+
+    filter_expression = {
+      "collection": {
+        "path": "provenance.market_data_by_symbol.issues",
+        "quantifier": "any",
+      },
+      "logic": "and",
+      "conditions": [
+        {"key": "issue_text", "operator": "prefix", "value": "gap:"},
+      ],
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("filter_expr", json.dumps(filter_expression)),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_run_ids = [item["config"]["run_id"] for item in payload]
+    assert returned_run_ids == sorted(
+      [
+        runs_by_symbol["BTC/USDT"],
+        runs_by_symbol["ETH/USDT"],
+      ]
+    )
+    assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
 
 
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:
