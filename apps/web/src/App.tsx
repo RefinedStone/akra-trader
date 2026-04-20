@@ -16938,6 +16938,58 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateTraceFromClause(params: {
   } satisfies RunSurfaceCollectionQueryRuntimeCandidateTrace;
 }
 
+function buildRunSurfaceCollectionQueryRuntimeCandidateClauseReevaluationProjection(params: {
+  candidateTrace: RunSurfaceCollectionQueryRuntimeCandidateTrace;
+  contracts: RunSurfaceCollectionQueryContract[];
+  drillthroughKey: string;
+  editorClauseState: HydratedRunSurfaceCollectionQueryBuilderState | null;
+  pinnedRuntimeCandidateClauseDiffItems: RunSurfaceCollectionQueryBuilderClauseDiffItem[];
+  pinnedRuntimeCandidateClauseOriginKey: string | null;
+  runtimeRuns: Run[];
+}) {
+  const {
+    candidateTrace,
+    contracts,
+    drillthroughKey,
+    editorClauseState,
+    pinnedRuntimeCandidateClauseDiffItems,
+    pinnedRuntimeCandidateClauseOriginKey,
+    runtimeRuns,
+  } = params;
+  const tracePinnedFromClauseDraft = pinnedRuntimeCandidateClauseOriginKey === drillthroughKey;
+  const traceClauseDiffItems =
+    tracePinnedFromClauseDraft
+      ? pinnedRuntimeCandidateClauseDiffItems
+      : [];
+  const traceReevaluationPreview =
+    tracePinnedFromClauseDraft
+    && traceClauseDiffItems.length
+    && candidateTrace.editorClause
+    && editorClauseState
+      ? buildRunSurfaceCollectionQueryRuntimeCandidateTraceFromClause({
+          bindingContextByKey: candidateTrace.bindingContextByKey,
+          clause: editorClauseState,
+          contracts,
+          detailSuffix: "Draft preview replays the current clause editor state against the same runtime binding context.",
+          location: `${candidateTrace.location}:draft_preview`,
+          runs: runtimeRuns,
+        })
+      : null;
+  const traceReevaluationPreviewDiffItems =
+    traceReevaluationPreview
+      ? buildRunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItems(
+          candidateTrace,
+          traceReevaluationPreview,
+        )
+      : [];
+  return {
+    tracePinnedFromClauseDraft,
+    traceClauseDiffItems,
+    traceReevaluationPreview,
+    traceReevaluationPreviewDiffItems,
+  };
+}
+
 type PredicateRefReplayApplyHistoryRow = {
   changesCurrent: boolean;
   currentBundleLabel: string;
@@ -24275,6 +24327,105 @@ function RunSurfaceCollectionQueryBuilder({
     availableSimulatedPredicateRefSolverReplayEdges,
     bundleCoordinationSimulationReplayEdgeFilter,
   ]);
+  const simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey = useMemo(() => {
+    if (!activePredicateRefReplayApplyConflictSimulationFocusedGroupKey) {
+      return {} as Record<string, {
+        changedCandidateCount: number;
+        previewTraceCount: number;
+        projectedTraces: Array<{
+          candidateAccessor: string;
+          candidatePath: string;
+          changedCandidateCount: number;
+          diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
+          drillthroughKey: string;
+          key: string;
+          matchedCandidateLabel: string;
+          matchedRunLabel: string;
+          stepIndex: number;
+          stepLabel: string;
+        }>;
+        tracesWithChangesCount: number;
+      }>;
+    }
+    const projectedTraces = activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations.flatMap((entry) =>
+      entry.runtimeCandidateTraces.flatMap((candidateTrace) => {
+        const drillthroughKey = buildRuntimeCandidateTraceDrillthroughKey(
+          "focused_chain",
+          entry.stepIndex,
+          candidateTrace,
+        );
+        const {
+          traceReevaluationPreview,
+          traceReevaluationPreviewDiffItems,
+        } = buildRunSurfaceCollectionQueryRuntimeCandidateClauseReevaluationProjection({
+          candidateTrace,
+          contracts,
+          drillthroughKey,
+          editorClauseState,
+          pinnedRuntimeCandidateClauseDiffItems,
+          pinnedRuntimeCandidateClauseOriginKey,
+          runtimeRuns,
+        });
+        if (!traceReevaluationPreview) {
+          return [];
+        }
+        const matchedRunCount = traceReevaluationPreview.runOutcomes.filter((outcome) => outcome.result).length;
+        return [{
+          candidateAccessor: candidateTrace.candidateAccessor,
+          candidatePath: candidateTrace.candidatePath,
+          changedCandidateCount: traceReevaluationPreviewDiffItems.length,
+          diffItems: traceReevaluationPreviewDiffItems,
+          drillthroughKey,
+          key: `${drillthroughKey}:simulation_projection`,
+          matchedCandidateLabel:
+            `${traceReevaluationPreview.sampleMatchCount}/${traceReevaluationPreview.sampleTotalCount} matched`,
+          matchedRunLabel:
+            `${matchedRunCount}/${traceReevaluationPreview.runOutcomes.length} runs true`,
+          stepIndex: entry.stepIndex,
+          stepLabel: entry.stepLabel,
+        }];
+      }),
+    );
+    if (!projectedTraces.length) {
+      return {} as Record<string, {
+        changedCandidateCount: number;
+        previewTraceCount: number;
+        projectedTraces: Array<{
+          candidateAccessor: string;
+          candidatePath: string;
+          changedCandidateCount: number;
+          diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
+          drillthroughKey: string;
+          key: string;
+          matchedCandidateLabel: string;
+          matchedRunLabel: string;
+          stepIndex: number;
+          stepLabel: string;
+        }>;
+        tracesWithChangesCount: number;
+      }>;
+    }
+    return {
+      [activePredicateRefReplayApplyConflictSimulationFocusedGroupKey]: {
+        changedCandidateCount: projectedTraces.reduce(
+          (total, trace) => total + trace.changedCandidateCount,
+          0,
+        ),
+        previewTraceCount: projectedTraces.length,
+        projectedTraces,
+        tracesWithChangesCount: projectedTraces.filter((trace) => trace.changedCandidateCount > 0).length,
+      },
+    };
+  }, [
+    activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations,
+    activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+    buildRuntimeCandidateTraceDrillthroughKey,
+    contracts,
+    editorClauseState,
+    pinnedRuntimeCandidateClauseDiffItems,
+    pinnedRuntimeCandidateClauseOriginKey,
+    runtimeRuns,
+  ]);
   const simulatedPredicateRefGroupBundleDiffs = useMemo(() => {
     if (!simulatedPredicateRefGroupBundleState) {
       return [];
@@ -24306,6 +24457,8 @@ function RunSurfaceCollectionQueryBuilder({
         attributedReplayStepIndex: replayAttribution?.stepIndex ?? -1,
         attributedReplayStepLabel: replayAttribution?.stepLabel ?? "No replay attribution",
         attributedReplayType: replayAttribution?.type ?? null,
+        clauseReevaluationProjection:
+          simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey[group.key] ?? null,
         groupKey: group.key,
         groupLabel: group.label,
         currentStatus: currentTrace?.statusLabel ?? "Idle",
@@ -24319,6 +24472,7 @@ function RunSurfaceCollectionQueryBuilder({
     coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey,
     getSortedTemplateGroupPresetBundles,
     simulatedCoordinationGroups,
+    simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
     simulatedPredicateRefGroupBundleState,
     simulatedPredicateRefSolverReplayAttributionByGroupKey,
   ]);
@@ -26711,8 +26865,6 @@ function RunSurfaceCollectionQueryBuilder({
                                                     candidateTrace,
                                                   );
                                                   const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
-                                                  const tracePinnedFromClauseDraft =
-                                                    pinnedRuntimeCandidateClauseOriginKey === drillthroughKey;
                                                   const traceLinkedFromRunContext =
                                                     Boolean(activeRuntimeCandidateRunContext)
                                                     && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
@@ -26737,31 +26889,20 @@ function RunSurfaceCollectionQueryBuilder({
                                                           doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
                                                         ).length
                                                       : 0;
-                                                  const traceClauseDiffItems =
-                                                    tracePinnedFromClauseDraft
-                                                      ? pinnedRuntimeCandidateClauseDiffItems
-                                                      : [];
-                                                  const traceReevaluationPreview =
-                                                    tracePinnedFromClauseDraft
-                                                    && traceClauseDiffItems.length
-                                                    && candidateTrace.editorClause
-                                                    && editorClauseState
-                                                      ? buildRunSurfaceCollectionQueryRuntimeCandidateTraceFromClause({
-                                                          bindingContextByKey: candidateTrace.bindingContextByKey,
-                                                          clause: editorClauseState,
-                                                          contracts,
-                                                          detailSuffix: "Draft preview replays the current clause editor state against the same runtime binding context.",
-                                                          location: `${candidateTrace.location}:draft_preview`,
-                                                          runs: runtimeRuns,
-                                                        })
-                                                      : null;
-                                                  const traceReevaluationPreviewDiffItems =
-                                                    traceReevaluationPreview
-                                                      ? buildRunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItems(
-                                                          candidateTrace,
-                                                          traceReevaluationPreview,
-                                                        )
-                                                      : [];
+                                                  const {
+                                                    traceClauseDiffItems,
+                                                    tracePinnedFromClauseDraft,
+                                                    traceReevaluationPreview,
+                                                    traceReevaluationPreviewDiffItems,
+                                                  } = buildRunSurfaceCollectionQueryRuntimeCandidateClauseReevaluationProjection({
+                                                    candidateTrace,
+                                                    contracts,
+                                                    drillthroughKey,
+                                                    editorClauseState,
+                                                    pinnedRuntimeCandidateClauseDiffItems,
+                                                    pinnedRuntimeCandidateClauseOriginKey,
+                                                    runtimeRuns,
+                                                  });
                                                   const displayedSamples = (
                                                     drillthroughOpen ? candidateTrace.allValues : candidateTrace.sampleValues
                                                   ).slice().sort((left, right) => {
@@ -27256,6 +27397,84 @@ function RunSurfaceCollectionQueryBuilder({
                                               simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey].chain.length - 4
                                             } more chain steps`}
                                           </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                    {diff.clauseReevaluationProjection ? (
+                                      <div className="run-surface-query-builder-trace-panel is-nested">
+                                        <div className="run-surface-query-builder-card-head">
+                                          <strong>Clause re-evaluation preview</strong>
+                                          <span>{`${diff.clauseReevaluationProjection.previewTraceCount} traces`}</span>
+                                        </div>
+                                        <div className="run-surface-query-builder-trace-chip-list">
+                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                            {`${diff.clauseReevaluationProjection.tracesWithChangesCount}/${diff.clauseReevaluationProjection.previewTraceCount} traces changed`}
+                                          </span>
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {`${diff.clauseReevaluationProjection.changedCandidateCount} changed candidates`}
+                                          </span>
+                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                            Linked from clause draft
+                                          </span>
+                                        </div>
+                                        <div className="run-surface-query-builder-trace-list">
+                                          {diff.clauseReevaluationProjection.projectedTraces.slice(0, 3).map((trace) => (
+                                            <div
+                                              className="run-surface-query-builder-trace-step is-info"
+                                              key={`simulation-diff-preview:${diff.groupKey}:${trace.key}`}
+                                            >
+                                              <strong>{`${trace.stepLabel} · ${trace.candidateAccessor}`}</strong>
+                                              <p>{trace.candidatePath}</p>
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                <button
+                                                  className={`run-surface-query-builder-trace-chip${
+                                                    trace.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
+                                                      ? " is-active"
+                                                      : ""
+                                                  }`}
+                                                  onClick={() => setBundleCoordinationSimulationReplayIndex(trace.stepIndex)}
+                                                  type="button"
+                                                >
+                                                  {trace.stepLabel}
+                                                </button>
+                                                <span className="run-surface-query-builder-trace-chip">
+                                                  {trace.matchedCandidateLabel}
+                                                </span>
+                                                <span className="run-surface-query-builder-trace-chip">
+                                                  {trace.matchedRunLabel}
+                                                </span>
+                                                <span className={`run-surface-query-builder-trace-chip${
+                                                  trace.changedCandidateCount ? " is-active" : ""
+                                                }`}>
+                                                  {`${trace.changedCandidateCount} changed candidates`}
+                                                </span>
+                                              </div>
+                                              {trace.diffItems.length ? (
+                                                <div className="run-surface-query-builder-trace-list">
+                                                  {trace.diffItems.slice(0, 3).map((item) => (
+                                                    <div
+                                                      className="run-surface-query-builder-trace-step is-info"
+                                                      key={`simulation-diff-preview-item:${diff.groupKey}:${trace.key}:${item.key}`}
+                                                    >
+                                                      <strong>{item.runId}</strong>
+                                                      <p>{item.detail}</p>
+                                                    </div>
+                                                  ))}
+                                                </div>
+                                              ) : (
+                                                <p className="run-note">
+                                                  The current clause draft keeps the same concrete candidate outcomes for this replay trace.
+                                                </p>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                        {diff.clauseReevaluationProjection.projectedTraces.length > 3 ? (
+                                          <p className="run-note">
+                                            {`+${
+                                              diff.clauseReevaluationProjection.projectedTraces.length - 3
+                                            } more projected traces`}
+                                          </p>
                                         ) : null}
                                       </div>
                                     ) : null}
@@ -28554,8 +28773,6 @@ function RunSurfaceCollectionQueryBuilder({
                                                               candidateTrace,
                                                             );
                                                             const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
-                                                            const tracePinnedFromClauseDraft =
-                                                              pinnedRuntimeCandidateClauseOriginKey === drillthroughKey;
                                                             const traceLinkedFromRunContext =
                                                               Boolean(activeRuntimeCandidateRunContext)
                                                               && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
@@ -28580,31 +28797,20 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
                                                                   ).length
                                                                 : 0;
-                                                            const traceClauseDiffItems =
-                                                              tracePinnedFromClauseDraft
-                                                                ? pinnedRuntimeCandidateClauseDiffItems
-                                                                : [];
-                                                            const traceReevaluationPreview =
-                                                              tracePinnedFromClauseDraft
-                                                              && traceClauseDiffItems.length
-                                                              && candidateTrace.editorClause
-                                                              && editorClauseState
-                                                                ? buildRunSurfaceCollectionQueryRuntimeCandidateTraceFromClause({
-                                                                    bindingContextByKey: candidateTrace.bindingContextByKey,
-                                                                    clause: editorClauseState,
-                                                                    contracts,
-                                                                    detailSuffix: "Draft preview replays the current clause editor state against the same runtime binding context.",
-                                                                    location: `${candidateTrace.location}:draft_preview`,
-                                                                    runs: runtimeRuns,
-                                                                  })
-                                                                : null;
-                                                            const traceReevaluationPreviewDiffItems =
-                                                              traceReevaluationPreview
-                                                                ? buildRunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItems(
-                                                                    candidateTrace,
-                                                                    traceReevaluationPreview,
-                                                                  )
-                                                                : [];
+                                                            const {
+                                                              traceClauseDiffItems,
+                                                              tracePinnedFromClauseDraft,
+                                                              traceReevaluationPreview,
+                                                              traceReevaluationPreviewDiffItems,
+                                                            } = buildRunSurfaceCollectionQueryRuntimeCandidateClauseReevaluationProjection({
+                                                              candidateTrace,
+                                                              contracts,
+                                                              drillthroughKey,
+                                                              editorClauseState,
+                                                              pinnedRuntimeCandidateClauseDiffItems,
+                                                              pinnedRuntimeCandidateClauseOriginKey,
+                                                              runtimeRuns,
+                                                            });
                                                             const previewSamples = drillthroughOpen
                                                               ? candidateTrace.allValues
                                                               : candidateTrace.sampleValues.slice(0, 2);
