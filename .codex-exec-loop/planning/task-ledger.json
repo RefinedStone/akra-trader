@@ -509,14 +509,14 @@
       "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, tags, and typed query capabilities so control-room filters or other clients can discover durable metadata options and query semantics directly instead of relying on freeform input fields or route-local knowledge over stored run metadata.",
       "status": "proposed",
       "base_priority": 90,
-      "dynamic_priority_delta": 3,
-      "priority_reason": "The latest main-session reply explicitly calls out a consumer-facing query discovery endpoint as a remaining gap after typed query binding metadata landed. That makes this proposal more relevant again, but the directly executable next step is still declaring sortable or filter operator schema inside the typed query contract first.",
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply keeps a consumer-facing query discovery endpoint on the follow-up list, but it also says the newly declared operator and sort schema is not yet connected to runtime parsing or evaluation. Keep discovery proposed behind that executable runtime-integration step so discovery does not publish semantics the runtime still ignores.",
       "depends_on": [
-        "planning-experiment-os-queryable-metadata"
+        "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T01:15:00Z",
+      "updated_at": "2026-04-21T01:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4414,18 +4414,36 @@
       "direction_id": "experiment-os",
       "title": "Declare sort and filter operator schema inside the typed query spec",
       "description": "Extend the newly typed query binding contract so sortable fields, filter operators, and their accepted values are declared in metadata instead of remaining route-local logic, allowing query parsing, validation, and downstream discovery to share one executable schema for runs list, compare, and adjacent experiment read surfaces.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 38,
-      "priority_reason": "The latest main-session reply says the next unfinished declaration step after typed constraints and OpenAPI fields is sortable or filter operator schema. That is the clearest executable follow-up for the next queued task because it keeps the query contract moving from parameter-level metadata toward a full declarative query model.",
+      "priority_reason": "Completed in main session commit f06af3b, which declared allowed filter operators and sortable field metadata inside the typed query spec, exposed the contract through `x-akra-query-schema` vendor extensions on routes such as `/runs`, `/runs/compare`, and `/market-data/status`, and verified the change with `python -m py_compile`, targeted pytest groups, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-type-query-binding-metadata-and-openapi-fields"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T01:15:00Z",
+      "updated_at": "2026-04-21T01:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability by turning sort and filter semantics into durable schema, which is the missing contract layer between typed parameter metadata and later client-facing query discovery surfaces."
+    },
+    {
+      "id": "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation",
+      "direction_id": "experiment-os",
+      "title": "Connect typed query schema to runtime sort parsing and filter evaluation",
+      "description": "Take the newly declared query operator and sort metadata beyond OpenAPI exposure by wiring sort query parameters plus operator-specific filter parsing and evaluation into the application runtime, so runs list, compare, and adjacent read surfaces enforce the same machine-readable contract they now advertise.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 39,
+      "priority_reason": "The latest main-session reply explicitly says the declaration and OpenAPI exposure are done, while actual sort query parameter handling and operator-specific parsing or evaluation are still not connected at runtime. That makes runtime execution of the typed query contract the clearest immediate queued task.",
+      "depends_on": [
+        "planning-experiment-os-declare-sort-and-filter-operator-schema-in-typed-query-spec"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T01:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closes the gap between experiment-os query schema declaration and actual runtime behavior, which is necessary before client discovery or broader binding convergence can rely on the typed query contract as an executable interface."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
@@ -4435,13 +4453,13 @@
       "status": "proposed",
       "base_priority": 87,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply identifies narrower declarative-query follow-ups first: typed operator schema, richer examples, and client-facing query discovery. Keep this larger architectural pass proposed behind those concrete query-contract steps.",
+      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply narrows the real execution gap further: the typed operator and sort schema now exists, yet runtime parsing and evaluation still lag. Keep this larger architectural pass proposed behind that concrete runtime-query step and the later discovery follow-up.",
       "depends_on": [
-        "planning-experiment-os-declare-sort-and-filter-operator-schema-in-typed-query-spec"
+        "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T01:15:00Z",
+      "updated_at": "2026-04-21T01:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
     },
