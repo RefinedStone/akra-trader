@@ -7,6 +7,8 @@ from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+import hashlib
+import json
 from numbers import Number
 import re
 from types import UnionType
@@ -24,6 +26,7 @@ from akra_trader.domain.models import RunComparisonMetricRow
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import ComparisonEligibilityContract
 from akra_trader.domain.models import default_comparison_eligibility_contract
+from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
 from akra_trader.domain.models import ClosedTrade
@@ -703,6 +706,8 @@ class TradingApplication:
       operator_alert_incident_escalation_backoff_multiplier,
       1.0,
     )
+    self._replay_intent_alias_signing_secret = uuid4().hex
+    self._replay_intent_alias_records: dict[str, ReplayIntentAliasRecord] = {}
 
   def list_strategies(
     self,
@@ -1154,6 +1159,205 @@ class TradingApplication:
 
   def get_run_surface_capabilities(self) -> RunSurfaceCapabilities:
     return RunSurfaceCapabilities()
+
+  @staticmethod
+  def _normalize_replay_intent_alias_redaction_policy(value: str | None) -> str:
+    if value in {"full", "omit_preview", "summary_only"}:
+      return value
+    return "full"
+
+  @staticmethod
+  def _normalize_replay_intent_alias_retention_policy(value: str | None) -> str:
+    if value in {"1d", "7d", "30d", "manual"}:
+      return value
+    return "30d"
+
+  @staticmethod
+  def _build_replay_intent_alias_token(alias_id: str, signature: str | None) -> str:
+    return f"{alias_id}.{signature}" if signature else alias_id
+
+  @staticmethod
+  def _parse_replay_intent_alias_token(alias_token: str) -> tuple[str, str | None]:
+    normalized_token = alias_token.strip()
+    if not normalized_token:
+      raise ValueError("Replay link alias token is required.")
+    separator_index = normalized_token.rfind(".")
+    if separator_index <= 0:
+      return normalized_token, None
+    return (
+      normalized_token[:separator_index],
+      normalized_token[separator_index + 1:] or None,
+    )
+
+  @staticmethod
+  def _get_replay_intent_alias_retention_delta(retention_policy: str) -> timedelta | None:
+    if retention_policy == "1d":
+      return timedelta(days=1)
+    if retention_policy == "7d":
+      return timedelta(days=7)
+    if retention_policy == "30d":
+      return timedelta(days=30)
+    return None
+
+  def _build_replay_intent_alias_expiry(
+    self,
+    *,
+    retention_policy: str,
+    created_at: datetime,
+  ) -> datetime | None:
+    retention_delta = self._get_replay_intent_alias_retention_delta(retention_policy)
+    if retention_delta is None:
+      return None
+    return created_at + retention_delta
+
+  def _build_replay_intent_alias_signature(
+    self,
+    *,
+    alias_id: str,
+    created_at: datetime,
+    expires_at: datetime | None,
+    intent: dict[str, Any],
+    redaction_policy: str,
+    template_key: str,
+  ) -> str:
+    payload = json.dumps(
+      {
+        "a": alias_id,
+        "c": created_at.isoformat(),
+        "e": expires_at.isoformat() if expires_at is not None else None,
+        "i": intent,
+        "r": redaction_policy,
+        "t": template_key,
+      },
+      default=str,
+      separators=(",", ":"),
+      sort_keys=True,
+    )
+    digest = hashlib.sha256(
+      f"{self._replay_intent_alias_signing_secret}:{payload}".encode("utf-8")
+    ).hexdigest()
+    return digest[:18]
+
+  def _prune_replay_intent_alias_records(self) -> None:
+    current_time = self._clock()
+    self._replay_intent_alias_records = {
+      alias_id: record
+      for alias_id, record in self._replay_intent_alias_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+
+  def _get_replay_intent_alias_record_for_token(
+    self,
+    alias_token: str,
+    *,
+    require_active: bool = True,
+  ) -> ReplayIntentAliasRecord:
+    self._prune_replay_intent_alias_records()
+    alias_id, supplied_signature = self._parse_replay_intent_alias_token(alias_token)
+    record = self._replay_intent_alias_records.get(alias_id)
+    if record is None:
+      raise LookupError("Replay link alias not found.")
+    expected_signature = self._build_replay_intent_alias_signature(
+      alias_id=record.alias_id,
+      created_at=record.created_at,
+      expires_at=record.expires_at,
+      intent=record.intent,
+      redaction_policy=record.redaction_policy,
+      template_key=record.template_key,
+    )
+    if (
+      not supplied_signature
+      or supplied_signature != record.signature
+      or record.signature != expected_signature
+    ):
+      raise LookupError("Replay link alias not found.")
+    if require_active:
+      if record.revoked_at is not None:
+        raise LookupError("Replay link alias has been revoked.")
+      if record.expires_at is not None and record.expires_at <= self._clock():
+        self._replay_intent_alias_records.pop(alias_id, None)
+        raise LookupError("Replay link alias has expired.")
+    return record
+
+  def create_replay_intent_alias(
+    self,
+    *,
+    template_key: str,
+    template_label: str | None,
+    intent: dict[str, Any],
+    redaction_policy: str,
+    retention_policy: str,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ReplayIntentAliasRecord:
+    normalized_template_key = template_key.strip()
+    if not normalized_template_key:
+      raise ValueError("Replay link aliases require a template key.")
+    if not isinstance(intent, dict):
+      raise ValueError("Replay link aliases require an intent payload object.")
+    created_at = self._clock()
+    normalized_retention_policy = self._normalize_replay_intent_alias_retention_policy(
+      retention_policy
+    )
+    expires_at = self._build_replay_intent_alias_expiry(
+      retention_policy=normalized_retention_policy,
+      created_at=created_at,
+    )
+    alias_id = uuid4().hex[:10]
+    normalized_intent = deepcopy(intent)
+    signature = self._build_replay_intent_alias_signature(
+      alias_id=alias_id,
+      created_at=created_at,
+      expires_at=expires_at,
+      intent=normalized_intent,
+      redaction_policy=self._normalize_replay_intent_alias_redaction_policy(redaction_policy),
+      template_key=normalized_template_key,
+    )
+    record = ReplayIntentAliasRecord(
+      alias_id=alias_id,
+      signature=signature,
+      template_key=normalized_template_key,
+      template_label=(template_label or normalized_template_key).strip() or normalized_template_key,
+      intent=normalized_intent,
+      redaction_policy=self._normalize_replay_intent_alias_redaction_policy(redaction_policy),
+      created_at=created_at,
+      expires_at=expires_at,
+      created_by_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      created_by_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+    )
+    self._replay_intent_alias_records[record.alias_id] = record
+    self._prune_replay_intent_alias_records()
+    return record
+
+  def resolve_replay_intent_alias(self, alias_token: str) -> ReplayIntentAliasRecord:
+    return self._get_replay_intent_alias_record_for_token(alias_token, require_active=True)
+
+  def revoke_replay_intent_alias(
+    self,
+    alias_token: str,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ReplayIntentAliasRecord:
+    record = self._get_replay_intent_alias_record_for_token(alias_token, require_active=False)
+    if record.revoked_at is not None:
+      return record
+    revoked_record = replace(
+      record,
+      revoked_at=self._clock(),
+      revoked_by_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      revoked_by_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+    )
+    self._replay_intent_alias_records[record.alias_id] = revoked_record
+    return revoked_record
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
@@ -23732,6 +23936,29 @@ def _apply_runtime_query_to_comparison(
   return replace(comparison, narratives=tuple(narratives))
 
 
+def serialize_replay_intent_alias_record(record: ReplayIntentAliasRecord) -> dict[str, Any]:
+  return {
+    "alias_id": record.alias_id,
+    "alias_token": TradingApplication._build_replay_intent_alias_token(
+      record.alias_id,
+      record.signature,
+    ),
+    "created_at": record.created_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "intent": deepcopy(record.intent),
+    "redaction_policy": record.redaction_policy,
+    "resolution_source": "server",
+    "revoked_at": record.revoked_at.isoformat() if record.revoked_at is not None else None,
+    "revoked_by_tab_id": record.revoked_by_tab_id,
+    "revoked_by_tab_label": record.revoked_by_tab_label,
+    "signature": record.signature,
+    "template_key": record.template_key,
+    "template_label": record.template_label,
+  }
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -23882,6 +24109,36 @@ def list_standalone_surface_runtime_bindings(
     response_title="Run surface capabilities",
     scope="app",
     binding_kind="run_surface_capabilities",
+  )
+  replay_alias_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_alias_create",
+    route_path="/replay-links/aliases",
+    route_name="create_replay_link_alias",
+    response_title="Create replay link alias",
+    scope="app",
+    binding_kind="replay_link_alias_create",
+    methods=("POST",),
+    request_payload_kind="replay_link_alias_create",
+  )
+  replay_alias_resolve_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_alias_resolve",
+    route_path="/replay-links/aliases/{alias_token}",
+    route_name="resolve_replay_link_alias",
+    response_title="Resolve replay link alias",
+    scope="app",
+    binding_kind="replay_link_alias_resolve",
+    path_param_keys=("alias_token",),
+  )
+  replay_alias_revoke_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_alias_revoke",
+    route_path="/replay-links/aliases/{alias_token}/revoke",
+    route_name="revoke_replay_link_alias",
+    response_title="Revoke replay link alias",
+    scope="app",
+    binding_kind="replay_link_alias_revoke",
+    methods=("POST",),
+    path_param_keys=("alias_token",),
+    request_payload_kind="replay_link_alias_revoke",
   )
   market_data_status_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="market_data_status",
@@ -25152,6 +25409,9 @@ def list_standalone_surface_runtime_bindings(
   return (
     health_binding,
     capability_binding,
+    replay_alias_create_binding,
+    replay_alias_resolve_binding,
+    replay_alias_revoke_binding,
     market_data_status_binding,
     operator_visibility_binding,
     guarded_live_status_binding,
@@ -25221,6 +25481,30 @@ def execute_standalone_surface_binding(
     return {"status": "ok"}
   if binding.binding_kind == "run_surface_capabilities":
     return serialize_run_surface_capabilities(app.get_run_surface_capabilities())
+  if binding.binding_kind == "replay_link_alias_create":
+    return serialize_replay_intent_alias_record(
+      app.create_replay_intent_alias(
+        template_key=resolved_payload["template_key"],
+        template_label=resolved_payload.get("template_label"),
+        intent=resolved_payload["intent"],
+        redaction_policy=resolved_payload.get("redaction_policy", "full"),
+        retention_policy=resolved_payload.get("retention_policy", "30d"),
+        source_tab_id=resolved_payload.get("source_tab_id"),
+        source_tab_label=resolved_payload.get("source_tab_label"),
+      )
+    )
+  if binding.binding_kind == "replay_link_alias_resolve":
+    return serialize_replay_intent_alias_record(
+      app.resolve_replay_intent_alias(resolved_path_params["alias_token"])
+    )
+  if binding.binding_kind == "replay_link_alias_revoke":
+    return serialize_replay_intent_alias_record(
+      app.revoke_replay_intent_alias(
+        resolved_path_params["alias_token"],
+        source_tab_id=resolved_payload.get("source_tab_id"),
+        source_tab_label=resolved_payload.get("source_tab_label"),
+      )
+    )
   if binding.binding_kind == "market_data_status":
     return asdict(app.get_market_data_status(resolved_filters.get("timeframe") or "5m"))
   if binding.binding_kind == "operator_visibility":

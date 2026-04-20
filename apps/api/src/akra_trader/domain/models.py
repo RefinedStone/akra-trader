@@ -690,6 +690,23 @@ class RunSurfaceSharedContract:
   schema_detail: dict[str, Any] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ReplayIntentAliasRecord:
+  alias_id: str
+  signature: str
+  template_key: str
+  template_label: str
+  intent: dict[str, Any]
+  redaction_policy: str
+  created_at: datetime
+  expires_at: datetime | None = None
+  revoked_at: datetime | None = None
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+  revoked_by_tab_id: str | None = None
+  revoked_by_tab_label: str | None = None
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

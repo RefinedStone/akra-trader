@@ -3916,6 +3916,76 @@ async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+function buildRunSurfaceCollectionQueryBuilderReplayLinkAliasEntryFromServerRecord(
+  record: RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload,
+): RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry {
+  return {
+    aliasId: record.alias_id,
+    createdAt: record.created_at,
+    createdByTabId: record.created_by_tab_id ?? "",
+    createdByTabLabel: record.created_by_tab_label ?? "Server",
+    expiresAt: record.expires_at,
+    intent:
+      normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot(record.intent)
+      ?? normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot({})!,
+    redactionPolicy: record.redaction_policy,
+    resolutionSource: "server",
+    revokedAt: record.revoked_at,
+    revokedByTabId: record.revoked_by_tab_id,
+    revokedByTabLabel: record.revoked_by_tab_label,
+    signature: record.signature,
+    templateKey: record.template_key,
+    templateLabel: record.template_label,
+  };
+}
+
+async function createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(
+  payload: {
+    intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot;
+    redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
+    sourceTabId: string;
+    sourceTabLabel: string;
+    templateKey: string;
+    templateLabel: string;
+  },
+) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload>("/replay-links/aliases", {
+    method: "POST",
+    body: JSON.stringify({
+      intent: payload.intent,
+      redaction_policy: payload.redactionPolicy,
+      retention_policy: payload.retentionPolicy,
+      source_tab_id: payload.sourceTabId,
+      source_tab_label: payload.sourceTabLabel,
+      template_key: payload.templateKey,
+      template_label: payload.templateLabel,
+    }),
+  });
+}
+
+async function resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(aliasToken: string) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload>(
+    `/replay-links/aliases/${encodeURIComponent(aliasToken)}`,
+  );
+}
+
+async function revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(
+  aliasToken: string,
+  payload: { sourceTabId: string; sourceTabLabel: string },
+) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload>(
+    `/replay-links/aliases/${encodeURIComponent(aliasToken)}/revoke`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        source_tab_id: payload.sourceTabId,
+        source_tab_label: payload.sourceTabLabel,
+      }),
+    },
+  );
+}
+
 const defaultRunForm = {
   strategy_id: "ma_cross_v1",
   symbol: "BTC/USDT",
@@ -17193,9 +17263,31 @@ type RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = {
   expiresAt: string | null;
   intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot;
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  resolutionSource: "local" | "server";
+  revokedAt: string | null;
+  revokedByTabId: string | null;
+  revokedByTabLabel: string | null;
   signature: string | null;
   templateKey: string;
   templateLabel: string;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload = {
+  alias_id: string;
+  alias_token: string;
+  created_at: string;
+  created_by_tab_id: string | null;
+  created_by_tab_label: string | null;
+  expires_at: string | null;
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot;
+  redaction_policy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  resolution_source: "server";
+  revoked_at: string | null;
+  revoked_by_tab_id: string | null;
+  revoked_by_tab_label: string | null;
+  signature: string | null;
+  template_key: string;
+  template_label: string;
 };
 
 type RunSurfaceCollectionQueryBuilderReplayLinkAliasState = {
@@ -17204,7 +17296,7 @@ type RunSurfaceCollectionQueryBuilderReplayLinkAliasState = {
 };
 
 type RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry = {
-  action: "copy" | "share";
+  action: "copy" | "share" | "revoke";
   aliasId: string | null;
   at: string;
   id: string;
@@ -17794,7 +17886,7 @@ function loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl(): {
     const aliasEntry =
       loadRunSurfaceCollectionQueryBuilderReplayLinkAliases().find((entry) => entry.aliasId === aliasToken.aliasId)
       ?? null;
-    if (aliasEntry) {
+    if (aliasEntry && aliasEntry.resolutionSource !== "server" && !aliasEntry.revokedAt) {
       const recomputedSignature = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
         aliasEntry,
         loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret(),
@@ -18122,6 +18214,15 @@ function parseRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
   };
 }
 
+function extractRunSurfaceCollectionQueryBuilderReplayLinkAliasTokenFromUrl() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  return parseRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+    new URL(window.location.href).searchParams.get(REPLAY_INTENT_ALIAS_SEARCH_PARAM),
+  );
+}
+
 function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -18298,9 +18399,13 @@ function loadRunSurfaceCollectionQueryBuilderReplayLinkAliasesFromStorageValue(
         && typeof entry.templateKey === "string"
         && typeof entry.templateLabel === "string",
       ),
-    ).map((entry) => ({
+    ).map((entry): RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry => ({
       ...entry,
       expiresAt: typeof entry.expiresAt === "string" ? entry.expiresAt : null,
+      resolutionSource: entry.resolutionSource === "server" ? "server" : "local",
+      revokedAt: typeof entry.revokedAt === "string" ? entry.revokedAt : null,
+      revokedByTabId: typeof entry.revokedByTabId === "string" ? entry.revokedByTabId : null,
+      revokedByTabLabel: typeof entry.revokedByTabLabel === "string" ? entry.revokedByTabLabel : null,
       signature: typeof entry.signature === "string" ? entry.signature : null,
     })).filter((entry) =>
       !entry.expiresAt || Date.parse(entry.expiresAt) > Date.now(),
@@ -21367,6 +21472,7 @@ function RunSurfaceCollectionQueryBuilder({
   });
   const replayIntentGovernancePendingSourceRef =
     useRef<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceChangeSource | null>(null);
+  const lastResolvedServerReplayLinkAliasTokenRef = useRef<string | null>(null);
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -23270,6 +23376,14 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [replayIntentLinkAuditTrail, selectedRefTemplate?.key],
   );
+  const visibleReplayIntentLinkAliases = useMemo(
+    () => (
+      selectedRefTemplate?.key
+        ? replayIntentLinkAliases.filter((entry) => entry.templateKey === selectedRefTemplate.key)
+        : replayIntentLinkAliases
+    ),
+    [replayIntentLinkAliases, selectedRefTemplate?.key],
+  );
   const currentReplayIntentGovernanceSnapshot = useMemo(
     () => buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot({
       redactionPolicy: replayIntentRedactionPolicy,
@@ -23671,6 +23785,76 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  useEffect(() => {
+    const parsedAliasToken = extractRunSurfaceCollectionQueryBuilderReplayLinkAliasTokenFromUrl();
+    const aliasToken = parsedAliasToken
+      ? buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+          parsedAliasToken.aliasId,
+          parsedAliasToken.signature,
+        )
+      : null;
+    if (!aliasToken || !parsedAliasToken) {
+      lastResolvedServerReplayLinkAliasTokenRef.current = null;
+      return;
+    }
+    const localAliasEntry =
+      replayIntentLinkAliases.find((entry) => entry.aliasId === parsedAliasToken.aliasId) ?? null;
+    if (localAliasEntry?.resolutionSource !== "server" && localAliasEntry && !localAliasEntry.revokedAt) {
+      lastResolvedServerReplayLinkAliasTokenRef.current = null;
+      return;
+    }
+    if (lastResolvedServerReplayLinkAliasTokenRef.current === aliasToken) {
+      if (
+        localAliasEntry?.resolutionSource === "server"
+        && !localAliasEntry.revokedAt
+        && selectedRefTemplate?.key === localAliasEntry.templateKey
+        && !areRunSurfaceCollectionQueryBuilderReplayIntentsEqual(
+          localAliasEntry.intent,
+          currentRunSurfaceCollectionQueryBuilderReplayIntent,
+        )
+      ) {
+        applyRunSurfaceCollectionQueryBuilderReplayIntent(localAliasEntry.intent);
+      }
+      return;
+    }
+    let cancelled = false;
+    void resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(aliasToken)
+      .then((record) => {
+        if (cancelled) {
+          return;
+        }
+        const aliasEntry = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasEntryFromServerRecord(record);
+        lastResolvedServerReplayLinkAliasTokenRef.current = aliasToken;
+        setReplayIntentLinkAliases((current) =>
+          mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(current, [aliasEntry]),
+        );
+        setReplayIntentUrlTemplateKey(aliasEntry.templateKey);
+        if (selectedRefTemplate?.key === aliasEntry.templateKey) {
+          applyRunSurfaceCollectionQueryBuilderReplayIntent(aliasEntry.intent);
+          return;
+        }
+        setPredicateRefDraftKey(aliasEntry.templateKey);
+      })
+      .catch(() => {
+        if (cancelled) {
+          return;
+        }
+        lastResolvedServerReplayLinkAliasTokenRef.current = aliasToken;
+        setReplayIntentShareStatus({
+          message: "Replay alias is unavailable, expired, or has been revoked on the server.",
+          tone: "error",
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    applyRunSurfaceCollectionQueryBuilderReplayIntent,
+    currentRunSurfaceCollectionQueryBuilderReplayIntent,
+    replayIntentLinkAliases,
+    selectedRefTemplate?.key,
+    setPredicateRefDraftKey,
+  ]);
   const appendReplayIntentLinkAuditEntry = useCallback(
     (entry: Omit<RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry, "id">) => {
       setReplayIntentLinkAuditTrail((current) => [
@@ -23683,13 +23867,14 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
-  const buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor = useCallback(() => {
+  const buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor = useCallback(async () => {
     if (!selectedRefTemplate?.key) {
       return null;
     }
     const redactedIntent = redactedRunSurfaceCollectionQueryBuilderReplayIntent;
     let aliasId: string | null = null;
     let aliasToken: string | null = null;
+    let resolutionSource: "local" | "server" | null = null;
     let nextUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
       selectedRefTemplate.key,
       redactedIntent,
@@ -23699,38 +23884,63 @@ function RunSurfaceCollectionQueryBuilder({
       },
     );
     if (replayIntentShareMode === "indirect") {
-      aliasId = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasId();
-      const createdAt = new Date().toISOString();
-      const expiresAt = buildRunSurfaceCollectionQueryBuilderReplayLinkExpiry(
-        replayIntentRetentionPolicy,
-        createdAt,
-      );
-      const nextAliasEntry: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = {
-        aliasId,
-        createdAt,
-        createdByTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
-        createdByTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
-        expiresAt,
-        intent: redactedIntent,
-        redactionPolicy: replayIntentRedactionPolicy,
-        signature: null,
-        templateKey: selectedRefTemplate.key,
-        templateLabel: selectedRefTemplate.key,
-      };
-      nextAliasEntry.signature = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
-        nextAliasEntry,
-        loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret(),
-      );
-      aliasToken = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
-        aliasId,
-        nextAliasEntry.signature,
-      );
-      setReplayIntentLinkAliases((current) =>
-        mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
-          current,
-          [nextAliasEntry],
-        ),
-      );
+      try {
+        const serverRecord = await createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias({
+          intent: redactedIntent,
+          redactionPolicy: replayIntentRedactionPolicy,
+          retentionPolicy: replayIntentRetentionPolicy,
+          sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+          sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+          templateKey: selectedRefTemplate.key,
+          templateLabel: selectedRefTemplate.key,
+        });
+        const serverAliasEntry =
+          buildRunSurfaceCollectionQueryBuilderReplayLinkAliasEntryFromServerRecord(serverRecord);
+        aliasId = serverAliasEntry.aliasId;
+        aliasToken = serverRecord.alias_token;
+        resolutionSource = "server";
+        setReplayIntentLinkAliases((current) =>
+          mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(current, [serverAliasEntry]),
+        );
+      } catch {
+        aliasId = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasId();
+        const createdAt = new Date().toISOString();
+        const expiresAt = buildRunSurfaceCollectionQueryBuilderReplayLinkExpiry(
+          replayIntentRetentionPolicy,
+          createdAt,
+        );
+        const nextAliasEntry: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = {
+          aliasId,
+          createdAt,
+          createdByTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+          createdByTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+          expiresAt,
+          intent: redactedIntent,
+          redactionPolicy: replayIntentRedactionPolicy,
+          resolutionSource: "local",
+          revokedAt: null,
+          revokedByTabId: null,
+          revokedByTabLabel: null,
+          signature: null,
+          templateKey: selectedRefTemplate.key,
+          templateLabel: selectedRefTemplate.key,
+        };
+        nextAliasEntry.signature = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
+          nextAliasEntry,
+          loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret(),
+        );
+        aliasToken = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+          aliasId,
+          nextAliasEntry.signature,
+        );
+        resolutionSource = "local";
+        setReplayIntentLinkAliases((current) =>
+          mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+            current,
+            [nextAliasEntry],
+          ),
+        );
+      }
       nextUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
         selectedRefTemplate.key,
         redactedIntent,
@@ -23745,6 +23955,7 @@ function RunSurfaceCollectionQueryBuilder({
       aliasToken,
       compactLength: redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue?.length ?? 0,
       redactedIntent,
+      resolutionSource,
       url: typeof window !== "undefined"
         ? new URL(nextUrl, window.location.origin).toString()
         : nextUrl,
@@ -23761,7 +23972,7 @@ function RunSurfaceCollectionQueryBuilder({
     selectedRefTemplate?.key,
   ]);
   const copyRunSurfaceCollectionQueryBuilderReplayIntentLink = useCallback(async () => {
-    const descriptor = buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor();
+    const descriptor = await buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor();
     if (!descriptor || !selectedRefTemplate?.key) {
       setReplayIntentShareStatus({
         message: "Replay deep link is unavailable for the current template state.",
@@ -23775,7 +23986,7 @@ function RunSurfaceCollectionQueryBuilder({
         setReplayIntentShareStatus({
           message:
             replayIntentShareMode === "indirect"
-              ? "Copied replay alias link."
+              ? `Copied ${descriptor.resolutionSource === "server" ? "server alias" : "local alias"} link.`
               : "Copied replay deep link.",
           tone: "success",
         });
@@ -23824,7 +24035,7 @@ function RunSurfaceCollectionQueryBuilder({
     selectedRefTemplate?.key,
   ]);
   const shareRunSurfaceCollectionQueryBuilderReplayIntentLink = useCallback(async () => {
-    const descriptor = buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor();
+    const descriptor = await buildRunSurfaceCollectionQueryBuilderReplayIntentShareDescriptor();
     if (!descriptor || !selectedRefTemplate?.key) {
       setReplayIntentShareStatus({
         message: "Replay deep link is unavailable for the current template state.",
@@ -23843,7 +24054,7 @@ function RunSurfaceCollectionQueryBuilder({
         setReplayIntentShareStatus({
           message:
             replayIntentShareMode === "indirect"
-              ? "Shared replay alias link."
+              ? `Shared ${descriptor.resolutionSource === "server" ? "server alias" : "local alias"} link.`
               : "Shared replay deep link.",
           tone: "success",
         });
@@ -23890,6 +24101,63 @@ function RunSurfaceCollectionQueryBuilder({
     replayIntentRedactionPolicy,
     replayIntentShareMode,
     selectedRefTemplate?.key,
+  ]);
+  const revokeRunSurfaceCollectionQueryBuilderReplayIntentAlias = useCallback(async (
+    aliasEntry: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry,
+  ) => {
+    const aliasToken = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+      aliasEntry.aliasId,
+      aliasEntry.signature,
+    );
+    try {
+      const revokedRecord = await revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(aliasToken, {
+        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+      });
+      const revokedEntry = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasEntryFromServerRecord(revokedRecord);
+      setReplayIntentLinkAliases((current) =>
+        mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(current, [revokedEntry]),
+      );
+      appendReplayIntentLinkAuditEntry({
+        action: "revoke",
+        aliasId: aliasEntry.aliasId,
+        at: new Date().toISOString(),
+        linkLength: aliasToken.length,
+        mode: "indirect",
+        redactionPolicy: aliasEntry.redactionPolicy,
+        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        status: "success",
+        templateKey: aliasEntry.templateKey,
+        templateLabel: aliasEntry.templateLabel,
+      });
+      setReplayIntentShareStatus({
+        message: `Revoked replay alias ${aliasEntry.aliasId.slice(0, 8)} on the server.`,
+        tone: "success",
+      });
+    } catch {
+      appendReplayIntentLinkAuditEntry({
+        action: "revoke",
+        aliasId: aliasEntry.aliasId,
+        at: new Date().toISOString(),
+        linkLength: aliasToken.length,
+        mode: "indirect",
+        redactionPolicy: aliasEntry.redactionPolicy,
+        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        status: "failed",
+        templateKey: aliasEntry.templateKey,
+        templateLabel: aliasEntry.templateLabel,
+      });
+      setReplayIntentShareStatus({
+        message: "Replay alias revocation failed.",
+        tone: "error",
+      });
+    }
+  }, [
+    appendReplayIntentLinkAuditEntry,
+    predicateRefReplayApplyHistoryTabIdentity.label,
+    predicateRefReplayApplyHistoryTabIdentity.tabId,
   ]);
   const copyRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = useCallback(async () => {
     if (!currentReplayIntentGovernancePayloadValue) {
@@ -29483,7 +29751,7 @@ function RunSurfaceCollectionQueryBuilder({
                         </div>
                         <p className="run-note">
                           {replayIntentShareMode === "indirect"
-                            ? "Indirect alias links stay short and resolve through local browser storage."
+                            ? "Indirect alias links prefer server-backed resolution and revocation, with local alias fallback if the server is unavailable."
                             : (
                                 redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue
                                   ? `Compact replay payload · ${redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue.length} chars`
@@ -29531,6 +29799,75 @@ function RunSurfaceCollectionQueryBuilder({
                           <p className={`run-note run-surface-query-builder-note is-${replayIntentGovernanceStatus.tone}`}>
                             {replayIntentGovernanceStatus.message}
                           </p>
+                        ) : null}
+                        {visibleReplayIntentLinkAliases.length ? (
+                          <div className="run-surface-query-builder-trace-panel is-nested">
+                            <div className="run-surface-query-builder-card-head">
+                              <strong>Replay alias registry</strong>
+                              <span>{`${visibleReplayIntentLinkAliases.length} aliases`}</span>
+                            </div>
+                            <div className="run-surface-query-builder-trace-list">
+                              {visibleReplayIntentLinkAliases.slice(0, 5).map((entry) => {
+                                const aliasToken = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+                                  entry.aliasId,
+                                  entry.signature,
+                                );
+                                const isExpired = entry.expiresAt ? Date.parse(entry.expiresAt) <= Date.now() : false;
+                                const isRevoked = Boolean(entry.revokedAt);
+                                return (
+                                  <div
+                                    className={`run-surface-query-builder-trace-step is-${
+                                      isRevoked ? "warning" : entry.resolutionSource === "server" ? "success" : "muted"
+                                    }`}
+                                    key={`replay-alias:${entry.aliasId}`}
+                                  >
+                                    <strong>
+                                      {`${entry.resolutionSource === "server" ? "Server" : "Local"} alias · ${entry.templateLabel}`}
+                                    </strong>
+                                    <p>
+                                      {`${entry.aliasId.slice(0, 8)} · ${entry.createdByTabLabel} · ${formatRelativeTimestampLabel(entry.createdAt)}`}
+                                    </p>
+                                    <div className="run-surface-query-builder-trace-chip-list">
+                                      <span className={`run-surface-query-builder-trace-chip${
+                                        entry.resolutionSource === "server" && !isRevoked ? " is-active" : ""
+                                      }`}>
+                                        {entry.resolutionSource}
+                                      </span>
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {isRevoked ? "revoked" : isExpired ? "expired" : "active"}
+                                      </span>
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {`${aliasToken.length} chars`}
+                                      </span>
+                                    </div>
+                                    {entry.expiresAt ? (
+                                      <p className="run-note">
+                                        {`Expires ${formatRelativeTimestampLabel(entry.expiresAt)}`}
+                                      </p>
+                                    ) : null}
+                                    {entry.revokedAt ? (
+                                      <p className="run-note">
+                                        {`Revoked ${formatRelativeTimestampLabel(entry.revokedAt)} by ${entry.revokedByTabLabel ?? "server"}.`}
+                                      </p>
+                                    ) : null}
+                                    {entry.resolutionSource === "server" && !isRevoked ? (
+                                      <div className="run-surface-query-builder-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={() => {
+                                            void revokeRunSurfaceCollectionQueryBuilderReplayIntentAlias(entry);
+                                          }}
+                                          type="button"
+                                        >
+                                          Revoke alias
+                                        </button>
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
                         ) : null}
                         {replayIntentGovernanceConflicts.length ? (
                           <div className="run-surface-query-builder-trace-panel is-nested">
@@ -29789,7 +30126,7 @@ function RunSurfaceCollectionQueryBuilder({
                                   key={`replay-link-audit:${entry.id}`}
                                 >
                                   <strong>
-                                    {`${entry.action === "copy" ? "Copied" : "Shared"} · ${
+                                    {`${entry.action === "copy" ? "Copied" : entry.action === "share" ? "Shared" : "Revoked"} · ${
                                       entry.mode === "indirect" ? "alias" : "portable"
                                     } · ${entry.redactionPolicy.replaceAll("_", " ")}`}
                                   </strong>

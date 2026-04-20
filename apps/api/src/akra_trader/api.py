@@ -143,7 +143,24 @@ class ExternalIncidentSyncRequest(BaseModel):
   payload: dict[str, Any] = Field(default_factory=dict)
 
 
+class ReplayLinkAliasCreateRequest(BaseModel):
+  template_key: str
+  template_label: str | None = None
+  intent: dict[str, Any]
+  redaction_policy: str = "full"
+  retention_policy: str = "30d"
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
+class ReplayLinkAliasRevokeRequest(BaseModel):
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+
+
 REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
+  "replay_link_alias_create": (ReplayLinkAliasCreateRequest, {}),
+  "replay_link_alias_revoke": (ReplayLinkAliasRevokeRequest, {}),
   "preset_create": (ExperimentPresetRequest, {}),
   "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
   "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),

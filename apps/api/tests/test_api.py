@@ -256,6 +256,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
 
   assert tuple(inspect.signature(routes["list_strategies"].endpoint).parameters) == (
     "request",
+    "filter_expr",
     "lane",
     "lifecycle_stage",
     "version",
@@ -265,6 +266,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["list_presets"].endpoint).parameters) == (
     "request",
+    "filter_expr",
     "strategy_id",
     "timeframe",
     "lifecycle_stage",
@@ -275,6 +277,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["list_runs"].endpoint).parameters) == (
     "request",
+    "filter_expr",
     "mode",
     "strategy_id",
     "strategy_version",
@@ -297,6 +300,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["compare_runs"].endpoint).parameters) == (
     "request",
+    "filter_expr",
     "run_id",
     "intent",
     "narrative_score",
@@ -305,7 +309,18 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["get_market_data_status"].endpoint).parameters) == (
     "request",
+    "filter_expr",
     "timeframe",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["create_replay_link_alias"].endpoint).parameters) == ("request", "app")
+  assert tuple(inspect.signature(routes["resolve_replay_link_alias"].endpoint).parameters) == (
+    "alias_token",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["revoke_replay_link_alias"].endpoint).parameters) == (
+    "alias_token",
+    "request",
     "app",
   )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
@@ -328,6 +343,56 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "x_akra_incident_sync_token",
     "app",
   )
+
+
+def test_replay_link_alias_endpoints_resolve_and_revoke(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  create_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_a",
+      "template_label": "Template A",
+      "intent": {
+        "replayScope": "all",
+        "replayIndex": 2,
+        "replayGroupFilter": "group_a",
+      },
+      "redaction_policy": "summary_only",
+      "retention_policy": "7d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+
+  assert create_response.status_code == 200
+  created_alias = create_response.json()
+  assert created_alias["resolution_source"] == "server"
+
+  resolve_response = client.get(
+    f"/api/replay-links/aliases/{created_alias['alias_token']}",
+  )
+
+  assert resolve_response.status_code == 200
+  assert resolve_response.json()["intent"]["replayIndex"] == 2
+
+  revoke_response = client.post(
+    f"/api/replay-links/aliases/{created_alias['alias_token']}/revoke",
+    json={
+      "source_tab_id": "tab_remote",
+      "source_tab_label": "Remote tab",
+    },
+  )
+
+  assert revoke_response.status_code == 200
+  assert revoke_response.json()["revoked_by_tab_label"] == "Remote tab"
+
+  revoked_resolve_response = client.get(
+    f"/api/replay-links/aliases/{created_alias['alias_token']}",
+  )
+
+  assert revoked_resolve_response.status_code == 404
+  assert "revoked" in revoked_resolve_response.json()["detail"]
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
