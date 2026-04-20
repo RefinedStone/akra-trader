@@ -17219,6 +17219,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState(0);
   const [bundleCoordinationSimulationReplayGroupFilter, setBundleCoordinationSimulationReplayGroupFilter] =
     useState<"all" | string>("all");
+  const [bundleCoordinationSimulationReplayActionTypeFilter, setBundleCoordinationSimulationReplayActionTypeFilter] =
+    useState<"all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle">("all");
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18180,6 +18182,13 @@ function RunSurfaceCollectionQueryBuilder({
     selectedRefTemplate?.id,
   ]);
   useEffect(() => {
+    setBundleCoordinationSimulationReplayActionTypeFilter("all");
+  }, [
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationScope,
+    selectedRefTemplate?.id,
+  ]);
+  useEffect(() => {
     if (!simulatedCoordinationGroups.length) {
       setBundleCoordinationSimulationReplayGroupFilter("all");
       return;
@@ -19048,19 +19057,38 @@ function RunSurfaceCollectionQueryBuilder({
   const activeSimulatedPredicateRefSolverReplayStep = simulatedPredicateRefSolverReplay.length
     ? simulatedPredicateRefSolverReplay[activeSimulatedPredicateRefSolverReplayIndex]
     : null;
+  const availableSimulatedPredicateRefSolverReplayActionTypes = useMemo(
+    () => Array.from(
+      new Set(
+        simulatedPredicateRefSolverReplay.flatMap((step) => step.actions.map((action) => action.type)),
+      ),
+    ),
+    [simulatedPredicateRefSolverReplay],
+  );
   const activeSimulatedPredicateRefSolverReplayFilteredActions = useMemo(
     () => (
       activeSimulatedPredicateRefSolverReplayStep
         ? (
-            bundleCoordinationSimulationReplayGroupFilter === "all"
-              ? activeSimulatedPredicateRefSolverReplayStep.actions
-              : activeSimulatedPredicateRefSolverReplayStep.actions.filter(
-                  (action) => action.groupKey === bundleCoordinationSimulationReplayGroupFilter,
-                )
+            activeSimulatedPredicateRefSolverReplayStep.actions.filter((action) => {
+              if (
+                bundleCoordinationSimulationReplayGroupFilter !== "all"
+                && action.groupKey !== bundleCoordinationSimulationReplayGroupFilter
+              ) {
+                return false;
+              }
+              if (
+                bundleCoordinationSimulationReplayActionTypeFilter !== "all"
+                && action.type !== bundleCoordinationSimulationReplayActionTypeFilter
+              ) {
+                return false;
+              }
+              return true;
+            })
           )
         : []
     ),
     [
+      bundleCoordinationSimulationReplayActionTypeFilter,
       activeSimulatedPredicateRefSolverReplayStep,
       bundleCoordinationSimulationReplayGroupFilter,
     ],
@@ -19077,6 +19105,17 @@ function RunSurfaceCollectionQueryBuilder({
       simulatedCoordinationGroups,
     ],
   );
+  useEffect(() => {
+    if (
+      bundleCoordinationSimulationReplayActionTypeFilter !== "all"
+      && !availableSimulatedPredicateRefSolverReplayActionTypes.includes(bundleCoordinationSimulationReplayActionTypeFilter)
+    ) {
+      setBundleCoordinationSimulationReplayActionTypeFilter("all");
+    }
+  }, [
+    availableSimulatedPredicateRefSolverReplayActionTypes,
+    bundleCoordinationSimulationReplayActionTypeFilter,
+  ]);
   const simulatedPredicateRefGroupBundleDiffs = useMemo(() => {
     if (!simulatedPredicateRefGroupBundleState) {
       return [];
@@ -21354,6 +21393,23 @@ function RunSurfaceCollectionQueryBuilder({
                                         <option key={`solver-filter:${group.key}`} value={group.key}>
                                           {group.label}
                                         </option>
+                                        ))}
+                                    </select>
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Action type filter</span>
+                                    <select
+                                      value={bundleCoordinationSimulationReplayActionTypeFilter}
+                                      onChange={(event) =>
+                                        setBundleCoordinationSimulationReplayActionTypeFilter(
+                                          event.target.value as "all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle",
+                                        )}
+                                    >
+                                      <option value="all">All actions</option>
+                                      {availableSimulatedPredicateRefSolverReplayActionTypes.map((actionType) => (
+                                        <option key={`solver-action:${actionType}`} value={actionType}>
+                                          {actionType.replaceAll("_", " ")}
+                                        </option>
                                       ))}
                                     </select>
                                   </label>
@@ -21375,6 +21431,11 @@ function RunSurfaceCollectionQueryBuilder({
                                     {activeSimulatedPredicateRefSolverReplayFilteredGroup ? (
                                       <p className="run-note">
                                         {`Filtering replay actions to ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`}
+                                      </p>
+                                    ) : null}
+                                    {bundleCoordinationSimulationReplayActionTypeFilter !== "all" ? (
+                                      <p className="run-note">
+                                        {`Showing only ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions in this replay step.`}
                                       </p>
                                     ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
@@ -21422,8 +21483,16 @@ function RunSurfaceCollectionQueryBuilder({
                                           <strong>No matching actions</strong>
                                           <p>
                                             {activeSimulatedPredicateRefSolverReplayFilteredGroup
-                                              ? `This replay step did not produce any coordination actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
-                                              : "This replay step did not produce any new coordination actions."}
+                                              ? (
+                                                  bundleCoordinationSimulationReplayActionTypeFilter !== "all"
+                                                    ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
+                                                    : `This replay step did not produce any coordination actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
+                                                )
+                                              : (
+                                                  bundleCoordinationSimulationReplayActionTypeFilter !== "all"
+                                                    ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions.`
+                                                    : "This replay step did not produce any new coordination actions."
+                                                )}
                                           </p>
                                         </div>
                                       )}
