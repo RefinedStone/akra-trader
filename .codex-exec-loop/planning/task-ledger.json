@@ -5084,18 +5084,36 @@
       "direction_id": "experiment-os",
       "title": "Promote filtered subtree solver replay edges into manual override draft",
       "description": "Extend subtree solver replay so the currently filtered dependency-edge slice can be applied into selection diff or manual override draft state with explicit preview and validation, instead of stopping at non-mutating inspection after group, action-type, and edge filtering.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply says time-sliced dependency edge filtering shipped in commit 5439eec and directly names the missing next step: promote the filtered dependency-edge replay result into selection diff or manual override draft state. This is now the clearest executable queue head because the replay-inspection track is complete enough to feed a concrete apply flow.",
+      "priority_reason": "Completed in main session commit a8bb64b, which added replay-side promotion of the currently filtered dependency-edge slice into manual override draft state, surfaced a pre-apply group-to-bundle summary, blocked conflicting target bundles with explicit conflict reasons, reused the manual bundle preset helper so binding preset and literal values carry into draft state, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-time-sliced-dependency-edge-filtering-to-subtree-solver-replay"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:05:00Z",
+      "updated_at": "2026-04-20T23:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Bridges experiment-os subtree coordination from explainable replay inspection into deliberate draft-promotion semantics, so operators can carry a filtered causal slice forward into editable selection state before any broader atomic apply workflow is finalized."
+      "direction_relation_note": "Completed the bridge from explainable replay inspection into deliberate manual-draft promotion, so operators can carry a filtered causal slice forward into editable selection state before staged apply and selective acceptance semantics are added."
+    },
+    {
+      "id": "planning-experiment-os-add-staged-apply-preview-and-partial-accept-for-promoted-replay-drafts",
+      "direction_id": "experiment-os",
+      "title": "Preview promoted replay drafts against simulation diff and stage partial apply decisions",
+      "description": "Build the next apply-flow layer after replay-edge promotion by comparing the promoted manual override draft against the current simulation diff, surfacing a reviewable staged preview, and letting operators accept or reject only selected promoted changes instead of forcing an all-or-nothing apply from replay inspection.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply says filtered replay edge promotion shipped in commit a8bb64b and directly names the remaining next step: preview the promoted draft against the current simulation diff and support partial accept or reject in a staged apply workflow. This is now the clearest executable queue head because replay inspection and manual-draft promotion are complete enough to support selective apply semantics.",
+      "depends_on": [
+        "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T23:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os subtree coordination from draft promotion into operator-reviewable staged apply, so replay-derived bundle changes can be compared against current simulation state and accepted selectively instead of only landing as an opaque manual draft."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
