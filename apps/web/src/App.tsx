@@ -15776,12 +15776,19 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState = {
   presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
 };
 
+type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState = {
+  key: string;
+  groupKey: string;
+  bundleKey: string;
+};
+
 type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState = {
   key: string;
   label: string;
   helpNote: string;
   priority: number;
   autoSelectRule: "manual" | "always" | "binding_active" | "value_active";
+  dependencies: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState[];
   parameterValues: Record<string, string>;
   parameterBindingPresets: Record<string, string>;
 };
@@ -16815,6 +16822,10 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
               bundleRecord.binding_presets && typeof bundleRecord.binding_presets === "object" && !Array.isArray(bundleRecord.binding_presets)
                 ? (bundleRecord.binding_presets as Record<string, unknown>)
                 : {};
+            const rawDependencies =
+              bundleRecord.depends_on && typeof bundleRecord.depends_on === "object" && !Array.isArray(bundleRecord.depends_on)
+                ? Object.entries(bundleRecord.depends_on as Record<string, unknown>)
+                : [];
             return [{
               key: bundleKey,
               label:
@@ -16835,6 +16846,28 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
                 || bundleRecord.auto_select_rule === "value_active"
                   ? bundleRecord.auto_select_rule
                   : "manual",
+              dependencies: rawDependencies.flatMap(([dependencyKey, rawDependency]) => {
+                if (!rawDependency || typeof rawDependency !== "object" || Array.isArray(rawDependency)) {
+                  return [];
+                }
+                const dependencyRecord = rawDependency as Record<string, unknown>;
+                const groupKey =
+                  typeof dependencyRecord.group_key === "string"
+                    ? dependencyRecord.group_key.trim()
+                    : "";
+                const targetBundleKey =
+                  typeof dependencyRecord.bundle_key === "string"
+                    ? dependencyRecord.bundle_key.trim()
+                    : "";
+                if (!groupKey || !targetBundleKey) {
+                  return [];
+                }
+                return [{
+                  key: dependencyKey,
+                  groupKey,
+                  bundleKey: targetBundleKey,
+                } satisfies RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState];
+              }),
               parameterValues: Object.fromEntries(
                 Object.entries(rawValues).flatMap(([parameterKey, rawValue]) =>
                   rawValue === undefined || rawValue === null
@@ -17554,6 +17587,20 @@ function RunSurfaceCollectionQueryBuilder({
                               ...(bundle.autoSelectRule !== "manual"
                                 ? { auto_select_rule: bundle.autoSelectRule }
                                 : {}),
+                              ...(bundle.dependencies.length
+                                ? {
+                                    depends_on: Object.fromEntries(
+                                      bundle.dependencies.flatMap((dependency) =>
+                                        dependency.groupKey.trim() && dependency.bundleKey.trim()
+                                          ? [[dependency.key, {
+                                              group_key: dependency.groupKey.trim(),
+                                              bundle_key: dependency.bundleKey.trim(),
+                                            }]]
+                                          : [],
+                                      ),
+                                    ),
+                                  }
+                                : {}),
                               ...(Object.keys(bundle.parameterValues).length
                                 ? {
                                     values: Object.fromEntries(
@@ -18181,30 +18228,203 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
-  const autoSelectedPredicateRefGroupBundles = useMemo(
-    () =>
-      Object.fromEntries(
-        selectedRefTemplateParameterGroups.flatMap((group) => {
-          if (!selectedRefTemplate) {
-            return [];
+  const coordinatedPredicateRefGroupBundleState = useMemo(() => {
+    if (!selectedRefTemplate) {
+      return {
+        autoSelectionsBySelectionKey: {} as Record<string, string>,
+        resolvedSelectionsByGroupKey: {} as Record<string, string>,
+        dependencyRequestsByGroupKey: {} as Record<string, Array<{
+          bundleKey: string;
+          sourceGroupKey: string;
+          sourceGroupLabel: string;
+          sourceBundleKey: string;
+          sourceBundleLabel: string;
+          sourcePriority: number;
+          manualSource: boolean;
+        }>>,
+        unmetDependenciesByGroupKey: {} as Record<string, Array<{
+          key: string;
+          groupKey: string;
+          groupLabel: string;
+          bundleKey: string;
+          bundleLabel: string;
+        }>>,
+      };
+    }
+    const groupMap = new Map(
+      selectedRefTemplateParameterGroups.map((group) => [group.key, group] as const),
+    );
+    const getGroupBundle = (
+      groupKey: string,
+      bundleKey: string,
+    ) =>
+      getSortedTemplateGroupPresetBundles(groupMap.get(groupKey)?.presetBundles ?? []).find(
+        (bundle) => bundle.key === bundleKey,
+      ) ?? null;
+    const buildDependencyRequests = (
+      resolvedSelectionsByGroupKey: Record<string, string>,
+      includePredictedAutoCandidates = false,
+    ) => {
+      const requestsByGroupKey: Record<string, Array<{
+        bundleKey: string;
+        sourceGroupKey: string;
+        sourceGroupLabel: string;
+        sourceBundleKey: string;
+        sourceBundleLabel: string;
+        sourcePriority: number;
+        manualSource: boolean;
+      }>> = {};
+      const appendRequestsFromBundle = (
+        sourceGroupKey: string,
+        sourceBundleKey: string,
+        manualSource: boolean,
+      ) => {
+        const sourceGroup = groupMap.get(sourceGroupKey);
+        const sourceBundle = getGroupBundle(sourceGroupKey, sourceBundleKey);
+        if (!sourceGroup || !sourceBundle) {
+          return;
+        }
+        sourceBundle.dependencies.forEach((dependency) => {
+          const targetBundle = getGroupBundle(dependency.groupKey, dependency.bundleKey);
+          if (!targetBundle) {
+            return;
           }
-          const selectedBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
+          requestsByGroupKey[dependency.groupKey] = [
+            ...(requestsByGroupKey[dependency.groupKey] ?? []),
+            {
+              bundleKey: dependency.bundleKey,
+              sourceGroupKey,
+              sourceGroupLabel: sourceGroup.label,
+              sourceBundleKey,
+              sourceBundleLabel: sourceBundle.label,
+              sourcePriority: sourceBundle.priority,
+              manualSource,
+            },
+          ];
+        });
+      };
+      Object.entries(resolvedSelectionsByGroupKey).forEach(([sourceGroupKey, sourceBundleKey]) => {
+        appendRequestsFromBundle(
+          sourceGroupKey,
+          sourceBundleKey,
+          Boolean(predicateRefGroupBundleSelections[`${selectedRefTemplate.id}:${sourceGroupKey}`]),
+        );
+      });
+      if (includePredictedAutoCandidates) {
+        selectedRefTemplateParameterGroups.forEach((group) => {
+          if (resolvedSelectionsByGroupKey[group.key]) {
+            return;
+          }
+          const predictedAutoBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
             doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings),
           );
-          if (!selectedBundle) {
+          if (!predictedAutoBundle) {
+            return;
+          }
+          appendRequestsFromBundle(group.key, predictedAutoBundle.key, false);
+        });
+      }
+      return requestsByGroupKey;
+    };
+    const manualSelectionsByGroupKey = Object.fromEntries(
+      selectedRefTemplateParameterGroups.flatMap((group) => {
+        const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
+        const manualBundleKey = predicateRefGroupBundleSelections[selectionKey] ?? "";
+        return getGroupBundle(group.key, manualBundleKey)
+          ? [[group.key, manualBundleKey]]
+          : [];
+      }),
+    );
+    const resolvedSelectionsByGroupKey = { ...manualSelectionsByGroupKey };
+    const autoSelectionsByGroupKey: Record<string, string> = {};
+    let changed = true;
+    while (changed) {
+      changed = false;
+      const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey, true);
+      selectedRefTemplateParameterGroups.forEach((group) => {
+        if (resolvedSelectionsByGroupKey[group.key]) {
+          return;
+        }
+        const dependencyRequests = [...(dependencyRequestsByGroupKey[group.key] ?? [])].sort((left, right) => {
+          if (Number(right.manualSource) !== Number(left.manualSource)) {
+            return Number(right.manualSource) - Number(left.manualSource);
+          }
+          if (right.sourcePriority !== left.sourcePriority) {
+            return right.sourcePriority - left.sourcePriority;
+          }
+          const sourceLabelComparison = left.sourceGroupLabel.localeCompare(right.sourceGroupLabel);
+          if (sourceLabelComparison !== 0) {
+            return sourceLabelComparison;
+          }
+          return left.bundleKey.localeCompare(right.bundleKey);
+        });
+        const dependencyDrivenBundle = dependencyRequests.find((request) =>
+          Boolean(getGroupBundle(group.key, request.bundleKey)),
+        );
+        if (dependencyDrivenBundle) {
+          resolvedSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
+          autoSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
+          changed = true;
+          return;
+        }
+        const directAutoBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
+          doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings)
+          && bundle.dependencies.every((dependency) =>
+            resolvedSelectionsByGroupKey[dependency.groupKey] === dependency.bundleKey,
+          ),
+        );
+        if (directAutoBundle) {
+          resolvedSelectionsByGroupKey[group.key] = directAutoBundle.key;
+          autoSelectionsByGroupKey[group.key] = directAutoBundle.key;
+          changed = true;
+        }
+      });
+    }
+    const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey);
+    const unmetDependenciesByGroupKey = Object.fromEntries(
+      Object.entries(resolvedSelectionsByGroupKey).flatMap(([groupKey, bundleKey]) => {
+        const bundle = getGroupBundle(groupKey, bundleKey);
+        if (!bundle) {
+          return [];
+        }
+        const unmetDependencies = bundle.dependencies.flatMap((dependency) => {
+          if (resolvedSelectionsByGroupKey[dependency.groupKey] === dependency.bundleKey) {
             return [];
           }
-          return [[`${selectedRefTemplate.id}:${group.key}`, selectedBundle] as const];
-        }),
+          const targetGroup = groupMap.get(dependency.groupKey);
+          const targetBundle = getGroupBundle(dependency.groupKey, dependency.bundleKey);
+          return [{
+            key: dependency.key,
+            groupKey: dependency.groupKey,
+            groupLabel: targetGroup?.label ?? dependency.groupKey,
+            bundleKey: dependency.bundleKey,
+            bundleLabel: targetBundle?.label ?? dependency.bundleKey,
+          }];
+        });
+        return unmetDependencies.length
+          ? [[groupKey, unmetDependencies]]
+          : [];
+      }),
+    );
+    return {
+      autoSelectionsBySelectionKey: Object.fromEntries(
+        Object.entries(autoSelectionsByGroupKey).map(([groupKey, bundleKey]) => [
+          `${selectedRefTemplate.id}:${groupKey}`,
+          bundleKey,
+        ]),
       ),
-    [
-      doesTemplateGroupBundleMatchAutoSelectRule,
-      getSortedTemplateGroupPresetBundles,
-      predicateRefDraftBindings,
-      selectedRefTemplate,
-      selectedRefTemplateParameterGroups,
-    ],
-  );
+      resolvedSelectionsByGroupKey,
+      dependencyRequestsByGroupKey,
+      unmetDependenciesByGroupKey,
+    };
+  }, [
+    doesTemplateGroupBundleMatchAutoSelectRule,
+    getSortedTemplateGroupPresetBundles,
+    predicateRefDraftBindings,
+    predicateRefGroupBundleSelections,
+    selectedRefTemplate,
+    selectedRefTemplateParameterGroups,
+  ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
       setPredicateRefGroupAutoBundleSelections({});
@@ -18218,7 +18438,10 @@ function RunSurfaceCollectionQueryBuilder({
       if (predicateRefGroupBundleSelections[selectionKey]) {
         return [];
       }
-      const nextAutoBundle = autoSelectedPredicateRefGroupBundles[selectionKey] ?? null;
+      const nextAutoBundleKey = coordinatedPredicateRefGroupBundleState.autoSelectionsBySelectionKey[selectionKey] ?? "";
+      const nextAutoBundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === nextAutoBundleKey)
+        ?? null;
       const currentAutoBundleKey = predicateRefGroupAutoBundleSelections[selectionKey] ?? "";
       if ((nextAutoBundle?.key ?? "") === currentAutoBundleKey) {
         return [];
@@ -18276,11 +18499,14 @@ function RunSurfaceCollectionQueryBuilder({
           return;
         }
         const currentAutoKey = current[selectionKey] ?? "";
-        if (currentAutoKey && autoSelectedPredicateRefGroupBundles[selectionKey]?.key === currentAutoKey) {
+        if (
+          currentAutoKey
+          && coordinatedPredicateRefGroupBundleState.autoSelectionsBySelectionKey[selectionKey] === currentAutoKey
+        ) {
           next[selectionKey] = currentAutoKey;
           return;
         }
-        const derivedAutoKey = autoSelectedPredicateRefGroupBundles[selectionKey]?.key ?? "";
+        const derivedAutoKey = coordinatedPredicateRefGroupBundleState.autoSelectionsBySelectionKey[selectionKey] ?? "";
         if (derivedAutoKey) {
           next[selectionKey] = derivedAutoKey;
         }
@@ -18288,9 +18514,10 @@ function RunSurfaceCollectionQueryBuilder({
       return next;
     });
   }, [
-    autoSelectedPredicateRefGroupBundles,
+    coordinatedPredicateRefGroupBundleState.autoSelectionsBySelectionKey,
     predicateRefGroupAutoBundleSelections,
     predicateRefGroupBundleSelections,
+    getSortedTemplateGroupPresetBundles,
     selectedRefTemplate,
     selectedRefTemplateParameterGroups,
   ]);
@@ -18826,6 +19053,22 @@ function RunSurfaceCollectionQueryBuilder({
           ...existingGroup,
           label: normalizedLabel || "Ungrouped parameters",
         };
+        Object.keys(currentContext).forEach((currentGroupKey) => {
+          currentContext[currentGroupKey] = {
+            ...currentContext[currentGroupKey],
+            presetBundles: currentContext[currentGroupKey].presetBundles.map((bundle) => ({
+              ...bundle,
+              dependencies: bundle.dependencies.map((dependency) =>
+                dependency.groupKey === group.key
+                  ? {
+                      ...dependency,
+                      groupKey: nextGroupKey,
+                    }
+                  : dependency,
+              ),
+            })),
+          };
+        });
         return {
           ...current,
           [contextKey]: currentContext,
@@ -18856,6 +19099,7 @@ function RunSurfaceCollectionQueryBuilder({
               helpNote: "",
               priority: 0,
               autoSelectRule: "manual",
+              dependencies: [],
               parameterValues: {},
               parameterBindingPresets: {},
             },
@@ -18864,6 +19108,55 @@ function RunSurfaceCollectionQueryBuilder({
       );
     },
     [updateTemplateParameterGroupDraftMetadata],
+  );
+  const renameTemplateParameterGroupPresetBundleKey = useCallback(
+    (
+      contextKey: string,
+      groupKey: string,
+      bundleKey: string,
+      nextKey: string,
+    ) => {
+      const normalizedNextKey = nextKey.trim();
+      setTemplateParameterGroupDraftMetadataByContext((current) => {
+        const currentContext = { ...(current[contextKey] ?? {}) };
+        const updatedContext: Record<
+          string,
+          Omit<RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState, "key">
+        > = {};
+        Object.entries(currentContext).forEach(([currentGroupKey, currentGroup]) => {
+          updatedContext[currentGroupKey] = {
+            ...currentGroup,
+            presetBundles: currentGroup.presetBundles.map((currentBundle) => {
+              if (currentGroupKey === groupKey && currentBundle.key === bundleKey) {
+                return {
+                  ...currentBundle,
+                  key: nextKey,
+                };
+              }
+              if (!normalizedNextKey || normalizedNextKey === bundleKey) {
+                return currentBundle;
+              }
+              return {
+                ...currentBundle,
+                dependencies: currentBundle.dependencies.map((dependency) =>
+                  dependency.groupKey === groupKey && dependency.bundleKey === bundleKey
+                    ? {
+                        ...dependency,
+                        bundleKey: normalizedNextKey,
+                      }
+                    : dependency,
+                ),
+              };
+            }),
+          };
+        });
+        return {
+          ...current,
+          [contextKey]: updatedContext,
+        };
+      });
+    },
+    [],
   );
   const updateTemplateParameterGroupPresetBundle = useCallback(
     (
@@ -18886,6 +19179,86 @@ function RunSurfaceCollectionQueryBuilder({
       );
     },
     [updateTemplateParameterGroupDraftMetadata],
+  );
+  const appendTemplateParameterGroupPresetBundleDependency = useCallback(
+    (
+      contextKey: string,
+      groupKey: string,
+      bundleKey: string,
+      availableGroups: Array<{
+        key: string;
+        presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
+      }>,
+    ) => {
+      const targetGroup =
+        availableGroups.find((candidate) => candidate.key !== groupKey && candidate.presetBundles.length)
+        ?? availableGroups.find((candidate) => candidate.key !== groupKey)
+        ?? null;
+      if (!targetGroup) {
+        return;
+      }
+      const targetBundleKey = targetGroup.presetBundles[0]?.key ?? "";
+      updateTemplateParameterGroupPresetBundle(
+        contextKey,
+        groupKey,
+        bundleKey,
+        (currentBundle) => ({
+          ...currentBundle,
+          dependencies: [
+            ...currentBundle.dependencies,
+            {
+              key: `dependency_${currentBundle.dependencies.length + 1}`,
+              groupKey: targetGroup.key,
+              bundleKey: targetBundleKey,
+            },
+          ],
+        }),
+      );
+    },
+    [updateTemplateParameterGroupPresetBundle],
+  );
+  const updateTemplateParameterGroupPresetBundleDependency = useCallback(
+    (
+      contextKey: string,
+      groupKey: string,
+      bundleKey: string,
+      dependencyKey: string,
+      updater: (
+        dependency: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState,
+      ) => RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleDependencyState,
+    ) => {
+      updateTemplateParameterGroupPresetBundle(
+        contextKey,
+        groupKey,
+        bundleKey,
+        (currentBundle) => ({
+          ...currentBundle,
+          dependencies: currentBundle.dependencies.map((dependency) =>
+            dependency.key === dependencyKey ? updater(dependency) : dependency,
+          ),
+        }),
+      );
+    },
+    [updateTemplateParameterGroupPresetBundle],
+  );
+  const removeTemplateParameterGroupPresetBundleDependency = useCallback(
+    (
+      contextKey: string,
+      groupKey: string,
+      bundleKey: string,
+      dependencyKey: string,
+    ) => {
+      updateTemplateParameterGroupPresetBundle(
+        contextKey,
+        groupKey,
+        bundleKey,
+        (currentBundle) => ({
+          ...currentBundle,
+          dependencies: currentBundle.dependencies.filter((dependency) => dependency.key !== dependencyKey),
+        }),
+      );
+    },
+    [updateTemplateParameterGroupPresetBundle],
   );
   const removeTemplateParameterGroupPresetBundle = useCallback(
     (contextKey: string, groupKey: string, bundleKey: string) => {
@@ -19566,11 +19939,15 @@ function RunSurfaceCollectionQueryBuilder({
                         </div>
                         {parameterGroup.presetBundles.length ? (
                           <div className="run-surface-query-builder-domain-list">
-                            {getSortedTemplateGroupPresetBundles(parameterGroup.presetBundles).map((bundle) => (
-                              <div
-                                className="run-surface-query-builder-domain-card"
-                                key={`${parameterGroup.key}:bundle:${bundle.key}`}
-                              >
+                            {getSortedTemplateGroupPresetBundles(parameterGroup.presetBundles).map((bundle) => {
+                              const dependencyTargetGroups = editableTemplateParameterGroups.filter(
+                                (candidateGroup) => candidateGroup.key !== parameterGroup.key,
+                              );
+                              return (
+                                <div
+                                  className="run-surface-query-builder-domain-card"
+                                  key={`${parameterGroup.key}:bundle:${bundle.key}`}
+                                >
                                 <div className="run-surface-query-builder-card-head">
                                   <strong>{bundle.label}</strong>
                                   <span>{bundle.key}</span>
@@ -19596,15 +19973,13 @@ function RunSurfaceCollectionQueryBuilder({
                                       type="text"
                                       value={bundle.key}
                                       onChange={(event) =>
-                                        updateTemplateParameterGroupPresetBundle(
+                                        renameTemplateParameterGroupPresetBundleKey(
                                           templateParameterEditorContextKey,
                                           parameterGroup.key,
                                           bundle.key,
-                                          (currentBundle) => ({
-                                            ...currentBundle,
-                                            key: event.target.value,
-                                          }),
-                                        )}
+                                          event.target.value,
+                                        )
+                                      }
                                       placeholder="focus_on_bindings"
                                     />
                                   </label>
@@ -19686,6 +20061,145 @@ function RunSurfaceCollectionQueryBuilder({
                                       <option value="value_active">When values are active</option>
                                     </select>
                                   </label>
+                                </div>
+                                <div className="run-surface-query-builder-section">
+                                  <div className="run-surface-query-builder-card-head">
+                                    <strong>Bundle dependencies</strong>
+                                    <span>{bundle.dependencies.length}</span>
+                                  </div>
+                                  <div className="run-surface-query-builder-actions">
+                                    <button
+                                      className="ghost-button"
+                                      disabled={!dependencyTargetGroups.length}
+                                      onClick={() =>
+                                        appendTemplateParameterGroupPresetBundleDependency(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          editableTemplateParameterGroups,
+                                        )
+                                      }
+                                      type="button"
+                                    >
+                                      Add dependency
+                                    </button>
+                                  </div>
+                                  {bundle.dependencies.length ? (
+                                    <div className="run-surface-query-builder-domain-list">
+                                      {bundle.dependencies.map((dependency) => {
+                                        const targetGroup =
+                                          editableTemplateParameterGroups.find(
+                                            (candidateGroup) => candidateGroup.key === dependency.groupKey,
+                                          ) ?? null;
+                                        const targetBundles = targetGroup
+                                          ? getSortedTemplateGroupPresetBundles(targetGroup.presetBundles)
+                                          : [];
+                                        return (
+                                          <div
+                                            className="run-surface-query-builder-domain-card"
+                                            key={`${bundle.key}:dependency:${dependency.key}`}
+                                          >
+                                            <div className="run-surface-query-builder-card-head">
+                                              <strong>{targetGroup?.label ?? dependency.groupKey}</strong>
+                                              <span>{dependency.bundleKey}</span>
+                                            </div>
+                                            <div className="run-surface-query-builder-actions">
+                                              <button
+                                                className="ghost-button"
+                                                onClick={() =>
+                                                  removeTemplateParameterGroupPresetBundleDependency(
+                                                    templateParameterEditorContextKey,
+                                                    parameterGroup.key,
+                                                    bundle.key,
+                                                    dependency.key,
+                                                  )
+                                                }
+                                                type="button"
+                                              >
+                                                Remove dependency
+                                              </button>
+                                            </div>
+                                            <div className="run-surface-query-builder-parameter-grid">
+                                              <label className="run-surface-query-builder-control">
+                                                <span>Required group</span>
+                                                <select
+                                                  value={dependency.groupKey}
+                                                  onChange={(event) => {
+                                                    const nextGroupKey = event.target.value;
+                                                    const nextGroup =
+                                                      editableTemplateParameterGroups.find(
+                                                        (candidateGroup) => candidateGroup.key === nextGroupKey,
+                                                      ) ?? null;
+                                                    updateTemplateParameterGroupPresetBundleDependency(
+                                                      templateParameterEditorContextKey,
+                                                      parameterGroup.key,
+                                                      bundle.key,
+                                                      dependency.key,
+                                                      (currentDependency) => ({
+                                                        ...currentDependency,
+                                                        groupKey: nextGroupKey,
+                                                        bundleKey:
+                                                          nextGroup?.presetBundles[0]?.key
+                                                          ?? currentDependency.bundleKey,
+                                                      }),
+                                                    );
+                                                  }}
+                                                >
+                                                  {dependencyTargetGroups.map((candidateGroup) => (
+                                                    <option
+                                                      key={`${bundle.key}:dependency-group:${candidateGroup.key}`}
+                                                      value={candidateGroup.key}
+                                                    >
+                                                      {candidateGroup.label}
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                              </label>
+                                              <label className="run-surface-query-builder-control">
+                                                <span>Required bundle</span>
+                                                <select
+                                                  value={dependency.bundleKey}
+                                                  onChange={(event) =>
+                                                    updateTemplateParameterGroupPresetBundleDependency(
+                                                      templateParameterEditorContextKey,
+                                                      parameterGroup.key,
+                                                      bundle.key,
+                                                      dependency.key,
+                                                      (currentDependency) => ({
+                                                        ...currentDependency,
+                                                        bundleKey: event.target.value,
+                                                      }),
+                                                    )
+                                                  }
+                                                >
+                                                  {targetBundles.length ? (
+                                                    targetBundles.map((targetBundle) => (
+                                                      <option
+                                                        key={`${bundle.key}:dependency-bundle:${dependency.key}:${targetBundle.key}`}
+                                                        value={targetBundle.key}
+                                                      >
+                                                        {targetBundle.label}
+                                                      </option>
+                                                    ))
+                                                  ) : (
+                                                    <option value={dependency.bundleKey}>
+                                                      {dependency.bundleKey || "No target bundle"}
+                                                    </option>
+                                                  )}
+                                                </select>
+                                              </label>
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  ) : (
+                                    <p className="run-note">
+                                      {dependencyTargetGroups.length
+                                        ? "This bundle can auto-select required bundles in other groups before it applies."
+                                        : "Add another parameter group to author cross-group bundle dependencies."}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="run-surface-query-builder-parameter-grid">
                                   {parameterGroup.parameters.map((parameter) => {
@@ -19779,8 +20293,9 @@ function RunSurfaceCollectionQueryBuilder({
                                     );
                                   })}
                                 </div>
-                              </div>
-                            ))}
+                                </div>
+                              );
+                            })}
                           </div>
                         ) : null}
                         <div className="run-surface-query-builder-parameter-grid">
@@ -19979,6 +20494,10 @@ function RunSurfaceCollectionQueryBuilder({
                     const autoSelectedBundleKey = predicateRefGroupAutoBundleSelections[selectionKey] ?? "";
                     const effectiveBundleKey = selectedBundleKey || autoSelectedBundleKey;
                     const effectiveBundle = sortedPresetBundles.find((bundle) => bundle.key === effectiveBundleKey) ?? null;
+                    const dependencyRequests =
+                      coordinatedPredicateRefGroupBundleState.dependencyRequestsByGroupKey[parameterGroup.key] ?? [];
+                    const unmetDependencies =
+                      coordinatedPredicateRefGroupBundleState.unmetDependenciesByGroupKey[parameterGroup.key] ?? [];
                     return (
                       <div className="run-surface-query-builder-section" key={groupViewKey}>
                         <div className="run-surface-query-builder-card-head">
@@ -20005,6 +20524,15 @@ function RunSurfaceCollectionQueryBuilder({
                         </p>
                         {parameterGroup.helpNote.trim() ? (
                           <p className="run-note">{parameterGroup.helpNote}</p>
+                        ) : null}
+                        {dependencyRequests.length ? (
+                          <p className="run-note">
+                            Required by{" "}
+                            {dependencyRequests
+                              .map((request) => `${request.sourceGroupLabel} → ${request.sourceBundleLabel}`)
+                              .join(", ")}
+                            .
+                          </p>
                         ) : null}
                         {parameterGroup.presetBundles.length ? (
                           <div className="run-surface-query-builder-inline-grid">
@@ -20039,12 +20567,25 @@ function RunSurfaceCollectionQueryBuilder({
                                   : autoSelectedBundleKey
                                     ? (
                                         effectiveBundle?.helpNote
-                                        || `Auto-selected by ${effectiveBundle?.autoSelectRule.replaceAll("_", " ") ?? "priority"} at priority ${effectiveBundle?.priority ?? 0}.`
+                                        || (
+                                          dependencyRequests.length
+                                            ? `Auto-selected to satisfy ${dependencyRequests[0]?.sourceGroupLabel ?? "group"} dependency at priority ${effectiveBundle?.priority ?? 0}.`
+                                            : `Auto-selected by ${effectiveBundle?.autoSelectRule.replaceAll("_", " ") ?? "priority"} at priority ${effectiveBundle?.priority ?? 0}.`
+                                        )
                                       )
                                     : "Apply a preset bundle to prefill bindings and literal values for this group."}
                               </small>
                             </label>
                           </div>
+                        ) : null}
+                        {unmetDependencies.length ? (
+                          <p className="run-note">
+                            Waiting on{" "}
+                            {unmetDependencies
+                              .map((dependency) => `${dependency.groupLabel} → ${dependency.bundleLabel}`)
+                              .join(", ")}
+                            .
+                          </p>
                         ) : null}
                         {isGroupContentVisible ? (
                           <div className="run-surface-query-builder-parameter-grid">
@@ -20420,6 +20961,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                     ? "manual only"
                                                     : `auto ${bundle.autoSelectRule.replaceAll("_", " ")}`}
                                                 </span>
+                                                {bundle.dependencies.length ? (
+                                                  <span className="run-surface-family-chip">
+                                                    {`${bundle.dependencies.length} dependenc${bundle.dependencies.length === 1 ? "y" : "ies"}`}
+                                                  </span>
+                                                ) : null}
                                                 {Object.keys(bundle.parameterValues).length ? (
                                                   <span className="run-surface-family-chip">
                                                     {`${Object.keys(bundle.parameterValues).length} preset value${Object.keys(bundle.parameterValues).length === 1 ? "" : "s"}`}
@@ -20433,6 +20979,15 @@ function RunSurfaceCollectionQueryBuilder({
                                               </div>
                                               {bundle.helpNote.trim() ? (
                                                 <p className="run-note">{bundle.helpNote}</p>
+                                              ) : null}
+                                              {bundle.dependencies.length ? (
+                                                <p className="run-note">
+                                                  Requires{" "}
+                                                  {bundle.dependencies
+                                                    .map((dependency) => `${dependency.groupKey} → ${dependency.bundleKey}`)
+                                                    .join(", ")}
+                                                  .
+                                                </p>
                                               ) : null}
                                             </div>
                                           ))}
