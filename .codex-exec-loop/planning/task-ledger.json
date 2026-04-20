@@ -4940,18 +4940,54 @@
       "direction_id": "experiment-os",
       "title": "Coordinate subtree group bundles across dependencies and groups",
       "description": "Extend the shipped group-local priority and conditional auto-selection model by defining bundle dependency rules, cross-group coordination, and conflict or merge behavior so one subtree template can automatically choose compatible bundles across multiple parameter groups instead of stopping at isolated per-group selection.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says the remaining executable gap after commit b929967 is the more complex auto-selection policy layer, specifically bundle dependencies and cross-group auto-selection coordination. With group-local priority and simple rules now shipped, this becomes the clearest next queue head to continue automatically.",
+      "priority_reason": "Completed in main session commit eae4ca1, which extended subtree group bundle coordination with cross-group dependency metadata, authoring controls for required bundles, fixed-point dependency propagation across manual and auto-selected bundles, unmet-dependency and required-by UI state, and template registry dependency summaries, then passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:50:00Z",
+      "updated_at": "2026-04-20T21:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os subtree template reuse from isolated group-local auto-selection toward coordinated multi-group execution semantics, which is the next required layer once bundle priority and conditional selection ship."
+    },
+    {
+      "id": "planning-experiment-os-add-user-defined-conflict-resolution-policy-for-subtree-bundle-coordination",
+      "direction_id": "experiment-os",
+      "title": "Add user-defined conflict resolution policy for subtree bundle coordination",
+      "description": "Build on the shipped cross-group bundle dependency resolver by letting subtree templates define or surface explicit conflict resolution policy when multiple candidate bundles or dependency chains compete, so coordination behavior is deterministic, operator-visible, and no longer limited to the current priority-only fallback.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply explicitly says the remaining executable gap is customizable dependency conflict resolution policy. The current cross-group resolver and priority ordering already ship, so making conflict handling user-definable is the clearest immediate next task for builtin next-task auto-progression.",
+      "depends_on": [
+        "planning-experiment-os-compose-subtree-group-bundles-across-groups"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os subtree bundle coordination from implicit fixed resolver behavior into explicit policy-governed composition, which is needed before more transactional or operator-critical template composition can be trusted."
+    },
+    {
+      "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
+      "direction_id": "experiment-os",
+      "title": "Add transaction-like atomic coordination for subtree bundle sets",
+      "description": "Extend subtree group bundle coordination so a whole bundle set can be selected, validated, and applied atomically across groups, instead of partially mutating selection state while dependencies resolve one group at a time, making complex coordinated templates safer to preview and apply.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply also calls out transaction-like atomic coordination as unfinished work, but it is best sequenced behind explicit conflict resolution policy so atomic application semantics can reuse a settled policy contract instead of freezing another intermediate resolver shape.",
+      "depends_on": [
+        "planning-experiment-os-add-user-defined-conflict-resolution-policy-for-subtree-bundle-coordination"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T21:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os subtree template composition from dependency-aware selection into atomic multi-group application semantics, reducing partial-state risk once policy-driven coordination rules are defined."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
