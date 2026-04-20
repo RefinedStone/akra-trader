@@ -544,36 +544,54 @@
       "direction_id": "experiment-os",
       "title": "Hydrate collection query enum values from capability metadata",
       "description": "Turn the newly advertised `parameter_domains` and enum-source metadata into actual resolved enum value hydration for collection-query consumers, so clients can fetch or materialize valid parameter values such as dynamic map keys directly from the shared `collection_query` capability contract instead of only seeing provenance hints.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 37,
-      "priority_reason": "The latest main-session reply says the clearest remaining executable gap is actual parameter-domain enum value hydration now that `collection_query` family discovery and enum-source hints shipped in commit af26d73. This is the best automatic next task because it converts the new metadata into directly consumable values without waiting on broader query-builder UX choices.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit ff3f046, which hydrated `collection_query` parameter-domain enum values from capability metadata and parameter examples, published the resolved values through both OpenAPI `x-akra-query-schema` and the shared `query_collection:run_list` contract, aligned frontend fallback discovery, and verified the change with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, and `git diff --check` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-expand-collection-query-capabilities-with-enum-sources-and-dedicated-family"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:55:00Z",
+      "updated_at": "2026-04-20T03:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os query discoverability from capability hints into executable value hydration, making collection-query parameter domains directly consumable by downstream clients and future operator tooling."
     },
     {
       "id": "planning-experiment-os-build-collection-query-builder-ui-from-capability-metadata",
       "direction_id": "experiment-os",
-      "title": "Build collection query builder UI from capability metadata",
-      "description": "Use the shared `collection_query` capability family, collection schemas, and parameter-domain metadata to drive a dedicated collection query builder UI that can author valid filters from discovered field and parameter contracts instead of hand-maintained route knowledge.",
-      "status": "proposed",
+      "title": "Connect hydrated collection query metadata to the query builder and parameter picker UI",
+      "description": "Use the shared `collection_query` capability family, collection schemas, and now-hydrated parameter-domain enum values to drive the collection query builder and parameter picker UI, so operators can choose discovered values directly from capability metadata instead of relying on hand-maintained route knowledge or fallback-only discovery.",
+      "status": "done",
       "base_priority": 88,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply explicitly names a collection query builder UI that consumes the new metadata as the other major follow-up after commit af26d73. Keep it proposed behind enum-value hydration because the UI shape is broader and will land better once discovered parameter domains can resolve concrete values rather than only enum-source hints.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit a836230, which connected hydrated `collection_query` metadata to the capability-panel query builder and parameter picker UI, generated metadata-driven `filter_expr` previews, surfaced resolved collection paths and parameter-domain enum sources, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-hydrate-collection-query-enum-values-from-capability-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:55:00Z",
+      "updated_at": "2026-04-20T03:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os operator tooling from schema discovery into direct filter-authoring UX, but sensibly follows the lower-level metadata hydration work that makes such a builder reliable."
+      "direction_relation_note": "Pushes experiment-os operator tooling from discovery-only metadata into direct filter-authoring UX, turning the completed enum hydration work into an operator-usable query builder and parameter selection surface."
+    },
+    {
+      "id": "planning-experiment-os-wire-collection-query-builder-output-into-run-list-and-saved-filter-flows",
+      "direction_id": "experiment-os",
+      "title": "Wire collection query builder output into run list queries and saved filter workflows",
+      "description": "Take the newly metadata-driven collection query builder past preview-only UX by feeding its generated `filter_expr` into actual run list query requests and any saved-filter authoring or restore workflow, so operators can execute and persist the same capability-derived collection filters instead of rebuilding them manually outside the panel.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 40,
+      "priority_reason": "The latest main-session reply says the builder and parameter picker now read hydrated capability metadata and generate preview expressions, but the remaining executable gap is wiring that output into real run list query requests and saved filter workflows. That is now the clearest automatic next task because the authoring UI exists and the missing value is end-to-end execution or persistence.",
+      "depends_on": [
+        "planning-experiment-os-build-collection-query-builder-ui-from-capability-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T03:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closes the remaining experiment-os gap between metadata-driven filter authoring and actual experiment retrieval workflows by making collection-query expressions executable and reusable in the same run-list and saved-filter paths operators already depend on."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
