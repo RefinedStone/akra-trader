@@ -24031,6 +24031,25 @@ function RunSurfaceCollectionQueryBuilder({
       simulatedPredicateRefSolverReplayAttributionByGroupKey,
     ],
   );
+  const focusRuntimeCandidateReplayTrace = useCallback((params: {
+    sampleKey?: string | null;
+    stepIndex: number;
+    traceKey: string;
+  }) => {
+    const { sampleKey = null, stepIndex, traceKey } = params;
+    setBundleCoordinationSimulationReplayIndex(stepIndex >= 0 ? stepIndex : 0);
+    setRuntimeCandidateTraceDrillthroughByKey((current) => ({
+      ...current,
+      [traceKey]: true,
+    }));
+    if (sampleKey) {
+      setFocusedRuntimeCandidateSampleKey(sampleKey);
+    }
+    bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, []);
   useEffect(() => {
     if (!activePredicateRefReplayApplyConflictSimulationGroupKeys.length) {
       return;
@@ -24337,6 +24356,8 @@ function RunSurfaceCollectionQueryBuilder({
           candidatePath: string;
           changedCandidateCount: number;
           diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
+          editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
+          focusableDiffSampleKeysByItemKey: Record<string, string | null>;
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -24370,11 +24391,24 @@ function RunSurfaceCollectionQueryBuilder({
           return [];
         }
         const matchedRunCount = traceReevaluationPreview.runOutcomes.filter((outcome) => outcome.result).length;
+        const originalSamplesByKey = new Map(
+          candidateTrace.allValues.map((sample) => [
+            buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
+            sample,
+          ] as const),
+        );
         return [{
           candidateAccessor: candidateTrace.candidateAccessor,
           candidatePath: candidateTrace.candidatePath,
           changedCandidateCount: traceReevaluationPreviewDiffItems.length,
           diffItems: traceReevaluationPreviewDiffItems,
+          editorClause: candidateTrace.editorClause,
+          focusableDiffSampleKeysByItemKey: Object.fromEntries(
+            traceReevaluationPreviewDiffItems.map((item) => [
+              item.key,
+              originalSamplesByKey.has(item.key) ? item.key : null,
+            ] as const),
+          ),
           drillthroughKey,
           key: `${drillthroughKey}:simulation_projection`,
           matchedCandidateLabel:
@@ -24395,6 +24429,8 @@ function RunSurfaceCollectionQueryBuilder({
           candidatePath: string;
           changedCandidateCount: number;
           diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
+          editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
+          focusableDiffSampleKeysByItemKey: Record<string, string | null>;
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -27449,6 +27485,32 @@ function RunSurfaceCollectionQueryBuilder({
                                                   {`${trace.changedCandidateCount} changed candidates`}
                                                 </span>
                                               </div>
+                                              <div className="run-surface-query-builder-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() =>
+                                                    focusRuntimeCandidateReplayTrace({
+                                                      stepIndex: trace.stepIndex,
+                                                      traceKey: trace.drillthroughKey,
+                                                    })}
+                                                  type="button"
+                                                >
+                                                  Focus candidate drill-through
+                                                </button>
+                                                {trace.editorClause ? (
+                                                  <button
+                                                    className="ghost-button"
+                                                    onClick={() =>
+                                                      focusRuntimeCandidateClauseEditor(
+                                                        trace.editorClause,
+                                                        trace.drillthroughKey,
+                                                      )}
+                                                    type="button"
+                                                  >
+                                                    Load clause into editor
+                                                  </button>
+                                                ) : null}
+                                              </div>
                                               {trace.diffItems.length ? (
                                                 <div className="run-surface-query-builder-trace-list">
                                                   {trace.diffItems.slice(0, 3).map((item) => (
@@ -27458,6 +27520,35 @@ function RunSurfaceCollectionQueryBuilder({
                                                     >
                                                       <strong>{item.runId}</strong>
                                                       <p>{item.detail}</p>
+                                                      <div className="run-surface-query-builder-actions">
+                                                        {trace.focusableDiffSampleKeysByItemKey[item.key] ? (
+                                                          <button
+                                                            className="ghost-button"
+                                                            onClick={() =>
+                                                              focusRuntimeCandidateReplayTrace({
+                                                                sampleKey: trace.focusableDiffSampleKeysByItemKey[item.key],
+                                                                stepIndex: trace.stepIndex,
+                                                                traceKey: trace.drillthroughKey,
+                                                              })}
+                                                            type="button"
+                                                          >
+                                                            Focus candidate
+                                                          </button>
+                                                        ) : null}
+                                                        {trace.editorClause ? (
+                                                          <button
+                                                            className="ghost-button"
+                                                            onClick={() =>
+                                                              focusRuntimeCandidateClauseEditor(
+                                                                trace.editorClause,
+                                                                trace.drillthroughKey,
+                                                              )}
+                                                            type="button"
+                                                          >
+                                                            Focus clause editor
+                                                          </button>
+                                                        ) : null}
+                                                      </div>
                                                     </div>
                                                   ))}
                                                 </div>
