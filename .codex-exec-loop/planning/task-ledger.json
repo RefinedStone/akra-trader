@@ -6037,18 +6037,36 @@
       "direction_id": "experiment-os",
       "title": "Add server-backed replay alias resolution and revocation controls",
       "description": "Extend replay short links beyond browser-local secret verification by introducing a server-backed signed indirection or alias registry contract, explicit alias revocation, and cross-device signed resolution semantics, so replay links can resolve and be invalidated across devices without trusting one browser's local signing secret as the system of record.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 20,
-      "priority_reason": "The latest main-session reply explicitly says the shipped local signed alias flow still lacks stronger resolution backing, naming server-backed signed indirection, alias revocation registry, and cross-device signed alias resolution as the remaining gap. That is the clearest executable next task and should become the next queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 578c9a0, which added replay alias records to the backend application model, exposed standalone alias create/resolve/revoke endpoints, switched the web replay-link flow to server-first alias creation and resolution with local fallback, mirrored revoke results into the local registry and audit trail, and verified with py_compile, targeted pytest, web typecheck, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-back-replay-short-links-with-portable-resolution-and-retention-controls"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:40:00Z",
+      "updated_at": "2026-04-20T12:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os replay-link governance from locally verified signed aliases into a stronger cross-device trust model with central revocation and portable signed resolution semantics."
+      "direction_relation_note": "Completed the server-backed replay-link trust boundary by moving alias issue, resolve, and revoke semantics onto backend endpoints, which now leaves durable persistence and restart-safe auditability as the next governance gap."
+    },
+    {
+      "id": "planning-experiment-os-persist-server-replay-alias-registry-and-revocation-history",
+      "direction_id": "experiment-os",
+      "title": "Persist server replay alias registry and revocation history across restarts",
+      "description": "Move the newly shipped server-backed replay alias store out of application memory into durable persistence, and retain server-side alias issue, resolve, and revoke history strongly enough that alias validity and revocation audit survive process restart instead of resetting with the API process.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply says the remaining gap is durable backing: alias resolution and revocation now work through server endpoints, but the alias store is still application-memory only and lacks persistent registry plus server-side audit or revocation history after restart. That is the clearest executable next task and should become the next queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-add-server-backed-replay-alias-resolution-and-revocation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os replay-link governance from server-mediated alias resolution into a durable system-of-record with restart-safe alias validity, revocation evidence, and operator-trustworthy history."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
