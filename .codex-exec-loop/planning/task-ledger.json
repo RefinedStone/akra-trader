@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining expression-system gaps moved again after reusable predicates and list quantifiers shipped: parameterization, macro expansion, or broader quantified collection support still need to settle. Keep discovery proposed behind that next expression-contract pass so discovery endpoints advertise a less transitional query surface.",
+      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, and the latest main-session reply now explicitly calls out dedicated collection-element schema discovery as a remaining gap. Keep this proposed behind the newly promoted nested collection-of-collection quantifier pass so discovery endpoints can describe a less transitional collection contract instead of freezing the first object-collection iteration.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:15:00Z",
+      "updated_at": "2026-04-21T04:31:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4540,18 +4540,36 @@
       "direction_id": "experiment-os",
       "title": "Generalize quantified predicates from list scalars to nested object collections",
       "description": "Extend the newly shipped `any|all|none` predicate model beyond list-valued scalar fields so typed query expressions can quantify over nested object collections with inner field predicates, allowing richer collection-aware matching without route-local flattening or ad hoc helper fields.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 44,
-      "priority_reason": "The latest main-session reply explicitly identifies broader quantified-predicate generalization to nested object collections as one of the remaining next-stage expression-system gaps, and it is the most direct executable follow-up now that reusable predicates and list quantifiers shipped. Promote this as the next queue head ahead of parameterization, macro expansion, discovery, or optimizer work.",
+      "priority_reason": "Completed in main session commit 80f25df, which generalized quantified predicates from list scalars to nested object collections by adding collection wrappers with `path` and `quantifier`, normalizing list and dict-valued collections, wiring collection-aware `x-akra-query-schema` emission plus `query_exposed` metadata, adding expression-only order collection specs, and verifying with `python -m py_compile`, targeted pytest batches, typed-query regression coverage, and `git diff --check`, then pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:15:00Z",
+      "updated_at": "2026-04-21T04:30:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os typed query evolution focused on richer executable expression semantics by making quantified predicates apply to nested collection objects instead of stopping at list scalars and route-specific projections."
+    },
+    {
+      "id": "planning-experiment-os-nest-quantified-predicates-across-collection-of-collections",
+      "direction_id": "experiment-os",
+      "title": "Support quantified predicates across nested collection-of-collection paths",
+      "description": "Extend the new collection wrapper model so typed query expressions can quantify through collection elements that themselves contain nested collections, preserving same-element evaluation at each quantifier boundary and exposing the deeper collection shape through `x-akra-query-schema` without route-local helper flattening.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 45,
+      "priority_reason": "The latest main-session reply says collection path plus same-element boolean evaluation now ships for nested object collections, but nested collection-of-collection quantification is still missing. Promote that direct continuation as the next queue head ahead of dedicated collection schema discovery, parameterized reusable predicates, macro expansion, or optimizer work.",
+      "depends_on": [
+        "planning-experiment-os-generalize-quantified-predicates-to-nested-object-collections"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T04:31:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os typed query evolution moving along the concrete remaining collection-expression gap by letting quantifiers compose across multiple nested collection boundaries instead of stopping after one object-collection hop."
     },
     {
       "id": "planning-experiment-os-normalize-and-optimize-typed-query-expression-trees",
@@ -4579,13 +4597,13 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly names predicate parameterization as a remaining next-stage expression-system option. Keep it proposed behind the broader quantified nested-collection pass so parameter binding can target the more complete expression model rather than another scalar-focused intermediate.",
+      "priority_reason": "The latest main-session reply explicitly names parameterized reusable predicates as unfinished, but nested collection-of-collection quantification is the more direct continuation immediately after collection object support shipped. Keep parameterization proposed behind that deeper collection pass so template binding targets the fuller quantifier model rather than another intermediate shape.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:15:00Z",
+      "updated_at": "2026-04-21T04:31:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from reusable fixed predicates toward template-like expression reuse, which can reduce duplication once the broader quantified collection contract is stable."
     },
@@ -4597,13 +4615,13 @@
       "status": "proposed",
       "base_priority": 88,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply also identifies expression macro expansion as a remaining next-stage option. Keep it proposed behind nested collection quantifiers and before discovery freeze so expansion targets a richer settled expression surface instead of another transitional grammar.",
+      "priority_reason": "The latest main-session reply still identifies expression macro expansion as a next-stage option, but the immediate executable gap is deeper nested collection quantification after object-collection support landed. Keep macro expansion proposed behind that pass so expansion rules target a richer settled collection grammar instead of another transitional form.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:15:00Z",
+      "updated_at": "2026-04-21T04:31:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports experiment-os queryability by offering higher-level reusable query shorthands once the lower-level expression contract is expressive enough to serve as the expansion target."
     },
