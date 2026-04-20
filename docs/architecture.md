@@ -57,6 +57,8 @@ The product is still not fully decomposed. `application.py`, `operator_delivery.
 - `App.tsx` still holds too much feature state and JSX even after shell extraction
 - standalone surface binding catalogs are now isolated from the executor, but the catalog itself is
   still broad and should split by bounded flow
+- `operator_delivery.py` now delegates the busiest provider family to a separate mixin, but the
+  long tail of provider modules is still concentrated
 
 ## Operational Rule
 

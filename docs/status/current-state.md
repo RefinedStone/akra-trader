@@ -93,6 +93,8 @@ It is not yet a finished live trading product:
   provider workflow sync
 - incident-delivery alias normalization and provider dispatch now flow through an explicit registry
   layer instead of only large condition chains
+- the highest-traffic provider family methods for PagerDuty, Opsgenie, incident.io, FireHydrant,
+  and Rootly now live in `adapters/operator_delivery_core_providers.py`
 
 ### Control room baseline
 
@@ -119,6 +121,8 @@ It is not yet a finished live trading product:
   workflows are still weaker than the underlying backend capabilities
 - `application.py` and `operator_delivery.py` are smaller and more structured than before, but both
   still need further decomposition into dedicated use-case and provider modules
+- `operator_delivery.py` no longer owns the full hot-path provider family end to end, but the
+  remaining long-tail provider bodies still need the same treatment
 - guarded-live recovery restores meaningful control-plane and order-lifecycle state, but it does not
   yet resume a full venue-native session lifecycle in all cases
 - incident delivery and provider sync are broad, but provider-owned policy management and external

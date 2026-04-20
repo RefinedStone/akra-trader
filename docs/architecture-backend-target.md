@@ -18,6 +18,8 @@ This is not fully complete yet. The current wave introduces the first executable
 - standalone surface executor, query-discovery serialization, and subresource binding helpers moved
   into `application_support/standalone_surfaces.py`
 - incident delivery dispatch is now driven by `adapters/operator_delivery_registry.py`
+- core workflow provider methods for PagerDuty, Opsgenie, incident.io, FireHydrant, and Rootly now
+  live in `adapters/operator_delivery_core_providers.py`
 
 ## Target Structure
 
@@ -70,6 +72,8 @@ This is not fully complete yet. The current wave introduces the first executable
 - Incident delivery
   - keep provider implementations in `adapters/operator_delivery.py` for now
   - move alias normalization, capability discovery, and dispatch decisions into `operator_delivery_registry.py`
+  - move high-traffic provider families into dedicated provider modules or mixins instead of growing
+    the main adapter class
 
 ## Remaining Pressure Points
 
