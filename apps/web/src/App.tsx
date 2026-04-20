@@ -3148,6 +3148,7 @@ const COMPARISON_FOCUS_ARTIFACT_LINE_SCRUB_SEARCH_PARAM = "compare_focus_artifac
 const COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM = "compare_focus_tooltip";
 const COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM = "compare_focus_artifact_hover";
 const REPLAY_INTENT_TEMPLATE_SEARCH_PARAM = "replay_template";
+const REPLAY_INTENT_SEARCH_PARAM = "replay_intent";
 const REPLAY_INTENT_SCOPE_SEARCH_PARAM = "replay_scope";
 const REPLAY_INTENT_STEP_SEARCH_PARAM = "replay_step";
 const REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM = "replay_group";
@@ -17523,6 +17524,111 @@ function isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(
   );
 }
 
+function encodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(
+  templateKey: string,
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot,
+) {
+  if (isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(intent)) {
+    return null;
+  }
+  const payload: Record<string, string | number> = {
+    t: templateKey,
+  };
+  if (intent.replayScope !== "all") {
+    payload.s = intent.replayScope;
+  }
+  if (intent.replayIndex > 0) {
+    payload.i = intent.replayIndex;
+  }
+  if (intent.replayGroupFilter !== "all") {
+    payload.g = intent.replayGroupFilter;
+  }
+  if (intent.replayActionTypeFilter !== "all") {
+    payload.a = intent.replayActionTypeFilter;
+  }
+  if (intent.replayEdgeFilter !== "all") {
+    payload.e = intent.replayEdgeFilter;
+  }
+  if (intent.previewSelection.groupKey) {
+    payload.pg = intent.previewSelection.groupKey;
+  }
+  if (intent.previewSelection.traceKey) {
+    payload.pt = intent.previewSelection.traceKey;
+  }
+  if (intent.previewSelection.diffItemKey) {
+    payload.pd = intent.previewSelection.diffItemKey;
+  }
+  try {
+    const json = JSON.stringify(payload);
+    if (typeof TextEncoder !== "undefined" && typeof btoa === "function") {
+      const bytes = new TextEncoder().encode(json);
+      let binary = "";
+      bytes.forEach((byte) => {
+        binary += String.fromCharCode(byte);
+      });
+      return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+    }
+    if (typeof btoa === "function") {
+      return btoa(json).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/u, "");
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
+function decodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(value: string | null | undefined): {
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null;
+  templateKey: string | null;
+} | null {
+  const compactValue = value?.trim() ?? "";
+  if (!compactValue) {
+    return null;
+  }
+  try {
+    if (typeof atob !== "function") {
+      return null;
+    }
+    const paddedValue = compactValue.replace(/-/g, "+").replace(/_/g, "/");
+    const normalizedValue = `${paddedValue}${"===".slice((paddedValue.length + 3) % 4)}`;
+    const binary = atob(normalizedValue);
+    const json =
+      typeof TextDecoder !== "undefined"
+        ? new TextDecoder().decode(Uint8Array.from(binary, (char) => char.charCodeAt(0)))
+        : binary;
+    const parsed = JSON.parse(json) as Partial<Record<"t" | "s" | "i" | "g" | "a" | "e" | "pg" | "pt" | "pd", string | number>> | null;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || typeof parsed.t !== "string") {
+      return null;
+    }
+    const replayActionTypeFilter =
+      parsed.a === "all"
+      || parsed.a === "manual_anchor"
+      || parsed.a === "dependency_selection"
+      || parsed.a === "direct_auto_selection"
+      || parsed.a === "conflict_blocked"
+      || parsed.a === "idle"
+        ? parsed.a
+        : undefined;
+    return {
+      intent: normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot({
+        previewSelection: {
+          diffItemKey: typeof parsed.pd === "string" ? parsed.pd : null,
+          groupKey: typeof parsed.pg === "string" ? parsed.pg : null,
+          traceKey: typeof parsed.pt === "string" ? parsed.pt : null,
+        },
+        replayActionTypeFilter,
+        replayEdgeFilter: typeof parsed.e === "string" ? parsed.e : undefined,
+        replayGroupFilter: typeof parsed.g === "string" ? parsed.g : undefined,
+        replayIndex: typeof parsed.i === "number" ? parsed.i : undefined,
+        replayScope: typeof parsed.s === "string" ? parsed.s : undefined,
+      }),
+      templateKey: parsed.t.trim() || null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 function loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl(): {
   intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null;
   templateKey: string | null;
@@ -17531,6 +17637,12 @@ function loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl(): {
     return null;
   }
   const params = new URL(window.location.href).searchParams;
+  const compactIntent = decodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(
+    params.get(REPLAY_INTENT_SEARCH_PARAM),
+  );
+  if (compactIntent) {
+    return compactIntent;
+  }
   const templateKey = params.get(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM)?.trim() ?? "";
   const hasReplayParam = [
     REPLAY_INTENT_TEMPLATE_SEARCH_PARAM,
@@ -17593,6 +17705,7 @@ function buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
       ? new URL(baseHref ?? window.location.href)
       : new URL(baseHref ?? "http://localhost/");
   const params = url.searchParams;
+  params.delete(REPLAY_INTENT_SEARCH_PARAM);
   params.delete(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM);
   params.delete(REPLAY_INTENT_SCOPE_SEARCH_PARAM);
   params.delete(REPLAY_INTENT_STEP_SEARCH_PARAM);
@@ -17604,30 +17717,38 @@ function buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
   params.delete(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM);
   const normalizedIntent = normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot(intent);
   if (templateKey?.trim() && normalizedIntent && !isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(normalizedIntent)) {
-    params.set(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM, templateKey.trim());
-    if (normalizedIntent.replayScope !== "all") {
-      params.set(REPLAY_INTENT_SCOPE_SEARCH_PARAM, normalizedIntent.replayScope);
-    }
-    if (normalizedIntent.replayIndex > 0) {
-      params.set(REPLAY_INTENT_STEP_SEARCH_PARAM, String(normalizedIntent.replayIndex));
-    }
-    if (normalizedIntent.replayGroupFilter !== "all") {
-      params.set(REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM, normalizedIntent.replayGroupFilter);
-    }
-    if (normalizedIntent.replayActionTypeFilter !== "all") {
-      params.set(REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM, normalizedIntent.replayActionTypeFilter);
-    }
-    if (normalizedIntent.replayEdgeFilter !== "all") {
-      params.set(REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM, normalizedIntent.replayEdgeFilter);
-    }
-    if (normalizedIntent.previewSelection.groupKey) {
-      params.set(REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM, normalizedIntent.previewSelection.groupKey);
-    }
-    if (normalizedIntent.previewSelection.traceKey) {
-      params.set(REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM, normalizedIntent.previewSelection.traceKey);
-    }
-    if (normalizedIntent.previewSelection.diffItemKey) {
-      params.set(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM, normalizedIntent.previewSelection.diffItemKey);
+    const compactValue = encodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(
+      templateKey.trim(),
+      normalizedIntent,
+    );
+    if (compactValue) {
+      params.set(REPLAY_INTENT_SEARCH_PARAM, compactValue);
+    } else {
+      params.set(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM, templateKey.trim());
+      if (normalizedIntent.replayScope !== "all") {
+        params.set(REPLAY_INTENT_SCOPE_SEARCH_PARAM, normalizedIntent.replayScope);
+      }
+      if (normalizedIntent.replayIndex > 0) {
+        params.set(REPLAY_INTENT_STEP_SEARCH_PARAM, String(normalizedIntent.replayIndex));
+      }
+      if (normalizedIntent.replayGroupFilter !== "all") {
+        params.set(REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM, normalizedIntent.replayGroupFilter);
+      }
+      if (normalizedIntent.replayActionTypeFilter !== "all") {
+        params.set(REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM, normalizedIntent.replayActionTypeFilter);
+      }
+      if (normalizedIntent.replayEdgeFilter !== "all") {
+        params.set(REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM, normalizedIntent.replayEdgeFilter);
+      }
+      if (normalizedIntent.previewSelection.groupKey) {
+        params.set(REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM, normalizedIntent.previewSelection.groupKey);
+      }
+      if (normalizedIntent.previewSelection.traceKey) {
+        params.set(REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM, normalizedIntent.previewSelection.traceKey);
+      }
+      if (normalizedIntent.previewSelection.diffItemKey) {
+        params.set(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM, normalizedIntent.previewSelection.diffItemKey);
+      }
     }
   }
   const nextSearch = params.toString();
@@ -20220,6 +20341,10 @@ function RunSurfaceCollectionQueryBuilder({
   const [replayIntentUrlTemplateKey, setReplayIntentUrlTemplateKey] = useState<string | null>(
     () => loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl()?.templateKey ?? null,
   );
+  const [replayIntentShareStatus, setReplayIntentShareStatus] = useState<{
+    message: string;
+    tone: "error" | "muted" | "success";
+  } | null>(null);
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -22066,6 +22191,37 @@ function RunSurfaceCollectionQueryBuilder({
       clauseReevaluationPreviewSelection,
     ],
   );
+  const currentRunSurfaceCollectionQueryBuilderReplayIntentCompactValue = useMemo(
+    () => (
+      selectedRefTemplate?.key
+        ? encodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(
+            selectedRefTemplate.key,
+            currentRunSurfaceCollectionQueryBuilderReplayIntent,
+          )
+        : null
+    ),
+    [currentRunSurfaceCollectionQueryBuilderReplayIntent, selectedRefTemplate?.key],
+  );
+  const currentRunSurfaceCollectionQueryBuilderReplayIntentLink = useMemo(() => {
+    if (typeof window === "undefined") {
+      return "";
+    }
+    return new URL(
+      buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
+        selectedRefTemplate?.key ?? replayIntentUrlTemplateKey,
+        currentRunSurfaceCollectionQueryBuilderReplayIntent,
+        window.location.href,
+      ),
+      window.location.origin,
+    ).toString();
+  }, [
+    currentRunSurfaceCollectionQueryBuilderReplayIntent,
+    replayIntentUrlTemplateKey,
+      selectedRefTemplate?.key,
+    ]);
+  useEffect(() => {
+    setReplayIntentShareStatus(null);
+  }, [currentRunSurfaceCollectionQueryBuilderReplayIntentLink]);
   const applyRunSurfaceCollectionQueryBuilderReplayIntent = useCallback(
     (intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null) => {
       if (!intent) {
@@ -22090,6 +22246,61 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const copyRunSurfaceCollectionQueryBuilderReplayIntentLink = useCallback(async () => {
+    if (!currentRunSurfaceCollectionQueryBuilderReplayIntentLink) {
+      setReplayIntentShareStatus({
+        message: "Replay deep link is unavailable for the current template state.",
+        tone: "error",
+      });
+      return;
+    }
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(currentRunSurfaceCollectionQueryBuilderReplayIntentLink);
+        setReplayIntentShareStatus({
+          message: "Copied compact replay deep link.",
+          tone: "success",
+        });
+        return;
+      }
+      throw new Error("clipboard unavailable");
+    } catch {
+      setReplayIntentShareStatus({
+        message: "Clipboard access is unavailable in this browser.",
+        tone: "error",
+      });
+    }
+  }, [currentRunSurfaceCollectionQueryBuilderReplayIntentLink]);
+  const shareRunSurfaceCollectionQueryBuilderReplayIntentLink = useCallback(async () => {
+    if (!currentRunSurfaceCollectionQueryBuilderReplayIntentLink) {
+      setReplayIntentShareStatus({
+        message: "Replay deep link is unavailable for the current template state.",
+        tone: "error",
+      });
+      return;
+    }
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share({
+          title: selectedRefTemplate?.key
+            ? `${selectedRefTemplate.key} replay deep link`
+            : "Replay deep link",
+          url: currentRunSurfaceCollectionQueryBuilderReplayIntentLink,
+        });
+        setReplayIntentShareStatus({
+          message: "Shared compact replay deep link.",
+          tone: "success",
+        });
+        return;
+      }
+      throw new Error("share unavailable");
+    } catch {
+      setReplayIntentShareStatus({
+        message: "Share is unavailable or was cancelled.",
+        tone: "muted",
+      });
+    }
+  }, [currentRunSurfaceCollectionQueryBuilderReplayIntentLink, selectedRefTemplate?.key]);
   const doesTemplateGroupMatchVisibilityRule = useCallback(
     (
       group: {
@@ -27506,6 +27717,38 @@ function RunSurfaceCollectionQueryBuilder({
                             {simulatedPredicateRefGroupBundleState?.globalPolicyTrace.statusLabel ?? "Current"}
                           </span>
                         </div>
+                        <div className="run-surface-query-builder-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() => {
+                              void copyRunSurfaceCollectionQueryBuilderReplayIntentLink();
+                            }}
+                            type="button"
+                          >
+                            Copy replay link
+                          </button>
+                          {typeof navigator !== "undefined" && typeof navigator.share === "function" ? (
+                            <button
+                              className="ghost-button"
+                              onClick={() => {
+                                void shareRunSurfaceCollectionQueryBuilderReplayIntentLink();
+                              }}
+                              type="button"
+                            >
+                              Share replay link
+                            </button>
+                          ) : null}
+                        </div>
+                        <p className="run-note">
+                          {currentRunSurfaceCollectionQueryBuilderReplayIntentCompactValue
+                            ? `Compact replay payload · ${currentRunSurfaceCollectionQueryBuilderReplayIntentCompactValue.length} chars`
+                            : "Replay deep link is currently at default state."}
+                        </p>
+                        {replayIntentShareStatus ? (
+                          <p className={`run-note run-surface-query-builder-note is-${replayIntentShareStatus.tone}`}>
+                            {replayIntentShareStatus.message}
+                          </p>
+                        ) : null}
                         <div className="run-surface-query-builder-inline-grid">
                           <label className="run-surface-query-builder-control">
                             <span>Simulation scope</span>
