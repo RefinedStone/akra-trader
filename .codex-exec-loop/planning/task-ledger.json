@@ -5390,18 +5390,54 @@
       "direction_id": "experiment-os",
       "title": "Trace multi-step causal chains for reviewed field picks across replay timeline",
       "description": "Extend the newly completed replay-review sync so a reviewed field pick that influences more than one replay step is expanded into an explicit step-level causal chain, with linked trace context that shows the sequence of affected replay steps or actions instead of collapsing attribution to only the currently focused or nearest matching step.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is finer step-level recalculation: review-side focus and source changes now realign the relevant group and replay-step attribution, but a single field pick can still influence multiple replay steps without a dedicated causal-chain trace. That is the clearest executable next task after commit 69af08a.",
+      "priority_reason": "Completed in main session commit b41f439, which traced reviewed field picks as multi-step causal chains across solver replay, surfaced replay-chain summaries and step chips in changed-group diff cards, showed causal-chain position in replay header and action cards, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-auto-focus-replay-timeline-from-collision-review-row-selection"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T07:20:00Z",
+      "updated_at": "2026-04-20T07:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os replay-apply trust from refreshed single-step alignment into full multi-step causal explanation, so operators can inspect how one reviewed field decision propagates through several replay actions before accepting or revising the merge."
+    },
+    {
+      "id": "planning-experiment-os-label-fine-grained-causes-within-reviewed-field-pick-replay-chains",
+      "direction_id": "experiment-os",
+      "title": "Label fine-grained causal edges and state transitions inside reviewed field-pick replay chains",
+      "description": "Build on the completed multi-step replay chain view by decomposing each reviewed field pick chain into finer causal semantics that identify which dependency edge, group action, or state transition the picked field directly changed at each step, so operators can distinguish broad chain participation from direct cause labeling when inspecting replay consequences.",
+      "status": "done",
+      "base_priority": 86,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "Completed in main session commit fb1b1f3, which labeled reviewed field-pick replay chains with per-step state transitions plus inbound or outbound or bridge dependency-edge roles, surfaced those labels in chain steps, changed-group diffs, and active replay action cards, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-trace-multi-step-causal-chain-for-reviewed-field-picks"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T07:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os replay-apply trust from multi-step chain visibility into direct cause semantics, so operators can tell not just that a reviewed field pick participated in a replay path but exactly which edge or transition it changed before accepting the merge."
+    },
+    {
+      "id": "planning-experiment-os-link-reviewed-field-picks-to-parameter-level-predicate-reasons-and-bundle-rules",
+      "direction_id": "experiment-os",
+      "title": "Link reviewed field picks to parameter-level predicate reasons and bundle rule explanations",
+      "description": "Build on the completed fine-grained replay-chain labels by attaching the stronger semantic causality that still remains missing: show why a reviewed field pick activated a specific dependency edge or state transition by connecting chain steps to parameter-level predicate reasons, bundle rule explanations, or equivalent rule-evaluation context instead of stopping at edge-role and transition labels.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 15,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is stronger semantic causality: reviewed field picks now show edge roles and state transitions, but the UI still does not directly explain why a pick activated that edge, such as parameter-level predicate reasons or bundle rule explanations. That is the clearest executable next task after commit fb1b1f3.",
+      "depends_on": [
+        "planning-experiment-os-label-fine-grained-causes-within-reviewed-field-pick-replay-chains"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T07:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os replay-apply trust from labeled chain mechanics into operator-usable rule semantics, so reviewed field decisions can be explained in terms of the predicates or bundle rules that actually caused each replay edge to fire."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
