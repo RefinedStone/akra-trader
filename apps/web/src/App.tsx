@@ -18329,6 +18329,9 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, Record<string, "local" | "remote">>>({});
   const [predicateRefReplayApplyConflictSimulationConflictId, setPredicateRefReplayApplyConflictSimulationConflictId] =
     useState<string | null>(null);
+  const [predicateRefReplayApplyConflictFocusedDecision, setPredicateRefReplayApplyConflictFocusedDecision] =
+    useState<{ conflictId: string; decisionKey: string } | null>(null);
+  const predicateRefReplayApplyConflictRowRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -19415,6 +19418,26 @@ function RunSurfaceCollectionQueryBuilder({
       return next;
     });
   }, []);
+  const focusPredicateRefReplayApplyConflictDecision = useCallback(
+    (conflictId: string, decisionKey: string) => {
+      setPredicateRefReplayApplyConflictFocusedDecision({ conflictId, decisionKey });
+      const refKey = `${conflictId}:${decisionKey}`;
+      requestAnimationFrame(() => {
+        const node = predicateRefReplayApplyConflictRowRefs.current[refKey];
+        if (!node) {
+          return;
+        }
+        node.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+        node.focus({
+          preventScroll: true,
+        });
+      });
+    },
+    [],
+  );
   const resolvePredicateRefReplayApplyConflict = useCallback(
     (
       conflict: PredicateRefReplayApplyConflictEntry,
@@ -19482,6 +19505,25 @@ function RunSurfaceCollectionQueryBuilder({
       return changed ? next : current;
     });
   }, [predicateRefReplayApplyConflicts]);
+  useEffect(() => {
+    if (!predicateRefReplayApplyConflictFocusedDecision) {
+      return;
+    }
+    const stillExists = selectedRefTemplateReplayApplyConflictReviews.some((review) =>
+      review.conflict.conflictId === predicateRefReplayApplyConflictFocusedDecision.conflictId
+      && [
+        ...review.summaryDiffs,
+        ...review.rowDiffs,
+        ...review.selectionSnapshotDiffs,
+        ...review.bindingSnapshotDiffs,
+      ].some((item) => item.decisionKey === predicateRefReplayApplyConflictFocusedDecision.decisionKey));
+    if (!stillExists) {
+      setPredicateRefReplayApplyConflictFocusedDecision(null);
+    }
+  }, [
+    predicateRefReplayApplyConflictFocusedDecision,
+    selectedRefTemplateReplayApplyConflictReviews,
+  ]);
   useEffect(() => {
     const conflictedEntryIds = new Set(
       predicateRefReplayApplyConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => entry.entryId),
@@ -23612,14 +23654,22 @@ function RunSurfaceCollectionQueryBuilder({
                             {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length ? (
                               <div className="run-surface-query-builder-trace-chip-list">
                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.slice(0, 4).map((pick) => (
-                                  <span
+                                  <button
                                     className={`run-surface-query-builder-trace-chip${
                                       pick.source === "remote" ? " is-active" : ""
                                     }`}
                                     key={`collision-override-global-pick:${pick.decisionKey}`}
+                                    onClick={() =>
+                                      activePredicateRefReplayApplyConflictSimulationReview
+                                        ? focusPredicateRefReplayApplyConflictDecision(
+                                            activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                            pick.decisionKey,
+                                          )
+                                        : undefined}
+                                    type="button"
                                   >
                                     {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                  </span>
+                                  </button>
                                 ))}
                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length > 4 ? (
                                   <span className="run-surface-query-builder-trace-chip">
@@ -23677,14 +23727,22 @@ function RunSurfaceCollectionQueryBuilder({
                                         {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]
                                           .slice(0, 4)
                                           .map((pick) => (
-                                            <span
+                                            <button
                                               className={`run-surface-query-builder-trace-chip${
                                                 pick.source === "remote" ? " is-active" : ""
                                               }`}
                                               key={`simulation-diff-pick:${diff.groupKey}:${pick.decisionKey}`}
+                                              onClick={() =>
+                                                activePredicateRefReplayApplyConflictSimulationReview
+                                                  ? focusPredicateRefReplayApplyConflictDecision(
+                                                      activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                                      pick.decisionKey,
+                                                    )
+                                                  : undefined}
+                                              type="button"
                                             >
                                               {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                            </span>
+                                            </button>
                                           ))}
                                         {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey].length > 4 ? (
                                           <span className="run-surface-query-builder-trace-chip">
@@ -24351,6 +24409,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                 && simulatedCoordinationGroups.some(
                                                                   (group) => group.key === item.relatedGroupKey,
                                                                 );
+                                                              const isFocusedDecision =
+                                                                predicateRefReplayApplyConflictFocusedDecision?.conflictId
+                                                                  === review.conflict.conflictId
+                                                                && predicateRefReplayApplyConflictFocusedDecision?.decisionKey
+                                                                  === item.decisionKey;
                                                               return (
                                                                 <div
                                                                   className={`run-surface-query-builder-trace-step is-${
@@ -24360,7 +24423,13 @@ function RunSurfaceCollectionQueryBuilder({
                                                                         : "info"
                                                                       : "muted"
                                                                   }`}
+                                                                  ref={(node) => {
+                                                                    predicateRefReplayApplyConflictRowRefs.current[
+                                                                      `${review.conflict.conflictId}:${item.decisionKey}`
+                                                                    ] = node;
+                                                                  }}
                                                                   key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
+                                                                  tabIndex={-1}
                                                                 >
                                                                   <strong>{item.label}</strong>
                                                                   <div className="run-surface-query-builder-trace-chip-list">
@@ -24377,6 +24446,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     {!item.editable ? (
                                                                       <span className="run-surface-query-builder-trace-chip">
                                                                         Derived
+                                                                      </span>
+                                                                    ) : null}
+                                                                    {isFocusedDecision ? (
+                                                                      <span className="run-surface-query-builder-trace-chip is-active">
+                                                                        Linked from replay
                                                                       </span>
                                                                     ) : null}
                                                                   </div>
@@ -24775,14 +24849,22 @@ function RunSurfaceCollectionQueryBuilder({
                                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey]
                                                   .slice(0, 4)
                                                   .map((pick) => (
-                                                    <span
+                                                    <button
                                                       className={`run-surface-query-builder-trace-chip${
                                                         pick.source === "remote" ? " is-active" : ""
                                                       }`}
                                                       key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:review-pick:${pick.decisionKey}`}
+                                                      onClick={() =>
+                                                        activePredicateRefReplayApplyConflictSimulationReview
+                                                          ? focusPredicateRefReplayApplyConflictDecision(
+                                                              activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                                              pick.decisionKey,
+                                                            )
+                                                          : undefined}
+                                                      type="button"
                                                     >
                                                       {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                                    </span>
+                                                    </button>
                                                   ))}
                                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey].length > 4 ? (
                                                   <span className="run-surface-query-builder-trace-chip">
