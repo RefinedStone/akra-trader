@@ -5657,6 +5657,24 @@ function normalizeRunFormPreset(
   };
 }
 
+type ControlWorkspaceId = "overview" | "research" | "runtime" | "live";
+
+type ControlWorkspaceDescriptor = {
+  id: ControlWorkspaceId;
+  kicker: string;
+  label: string;
+  description: string;
+  summary: string;
+  sections: string[];
+};
+
+type ControlStripMetric = {
+  label: string;
+  value: string;
+  detail: string;
+  tone?: "research" | "runtime" | "live" | "warning";
+};
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -5670,6 +5688,7 @@ export default function App() {
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
+  const [activeWorkspace, setActiveWorkspace] = useState<ControlWorkspaceId>("overview");
   const [guardedLiveReason, setGuardedLiveReason] = useState("operator_safety_drill");
   const [liveOrderReplacementDrafts, setLiveOrderReplacementDrafts] = useState<
     Record<string, LiveOrderReplacementDraft>
@@ -6894,6 +6913,119 @@ export default function App() {
     };
   }, [guardedLive]);
 
+  const totalTrackedRunCount =
+    backtests.length + sandboxRuns.length + paperRuns.length + liveRuns.length;
+
+  const controlStripMetrics = useMemo<ControlStripMetric[]>(
+    () => [
+      {
+        label: "Strategy catalog",
+        value: `${strategies.length}`,
+        detail: `${strategyGroups.native.length} native · ${strategyGroups.reference.length} reference`,
+        tone: "research",
+      },
+      {
+        label: "Tracked runs",
+        value: `${totalTrackedRunCount}`,
+        detail: `${backtests.length} backtests · ${sandboxRuns.length + paperRuns.length + liveRuns.length} runtime sessions`,
+        tone: "runtime",
+      },
+      {
+        label: "Data health",
+        value: formatCompletion(backfillSummary?.completionRatio ?? null),
+        detail: `${marketStatus?.instruments.length ?? 0} instruments · ${failureSummary?.failureCount24h ?? 0} failures / 24h`,
+        tone: (failureSummary?.failureCount24h ?? 0) > 0 ? "warning" : "runtime",
+      },
+      {
+        label: "Guarded live",
+        value: guardedLive?.kill_switch.state ?? "n/a",
+        detail: `${guardedLiveSummary?.blockerCount ?? 0} blockers · ${operatorSummary?.criticalCount ?? 0} critical alerts`,
+        tone: "live",
+      },
+    ],
+    [
+      backfillSummary?.completionRatio,
+      backtests.length,
+      failureSummary?.failureCount24h,
+      guardedLive?.kill_switch.state,
+      guardedLiveSummary?.blockerCount,
+      marketStatus?.instruments.length,
+      operatorSummary?.criticalCount,
+      paperRuns.length,
+      sandboxRuns.length,
+      strategies.length,
+      strategyGroups.native.length,
+      strategyGroups.reference.length,
+      totalTrackedRunCount,
+      liveRuns.length,
+    ],
+  );
+
+  const workspaceDescriptors = useMemo<ControlWorkspaceDescriptor[]>(
+    () => [
+      {
+        id: "overview",
+        kicker: "Mission control",
+        label: "Overview",
+        description:
+          "Start here to assess control posture, then move into the lane that needs action. This surface stays intentionally short and decision-oriented.",
+        summary: `${totalTrackedRunCount} tracked runs · ${strategies.length} strategies · ${operatorSummary?.alertCount ?? 0} active alerts`,
+        sections: ["Control posture", "Workspace routing", "Catalog health"],
+      },
+      {
+        id: "research",
+        kicker: "Backtests and presets",
+        label: "Research",
+        description:
+          "Use this lane for experiment design, preset management, reference review, and benchmark comparison without runtime noise.",
+        summary: `${backtests.length} backtests · ${presets.length} presets · ${references.length} references`,
+        sections: ["Launch a run", "Scenario presets", "Third-party references", "Recent backtests"],
+      },
+      {
+        id: "runtime",
+        kicker: "Sandbox and paper",
+        label: "Runtime Ops",
+        description:
+          "Monitor data freshness, sandbox and paper execution, and operator incident pressure in one operational workspace.",
+        summary: `${sandboxRuns.length} sandbox · ${paperRuns.length} paper · ${marketStatus?.instruments.length ?? 0} instruments`,
+        sections: [
+          "Start sandbox worker",
+          "Market data status",
+          "Runtime alerts and audit",
+          "Sandbox runs",
+          "Paper runs",
+        ],
+      },
+      {
+        id: "live",
+        kicker: "Guarded execution",
+        label: "Guarded Live",
+        description:
+          "Reserve this workspace for live ownership, reconciliation, recovery, and manual order intervention. Nothing exploratory belongs here.",
+        summary: `Kill switch ${guardedLive?.kill_switch.state ?? "n/a"} · ${guardedLiveSummary?.blockerCount ?? 0} blockers · ${liveRuns.length} live runs`,
+        sections: ["Start live worker", "Kill switch and reconciliation", "Guarded live runs"],
+      },
+    ],
+    [
+      backtests.length,
+      guardedLive?.kill_switch.state,
+      guardedLiveSummary?.blockerCount,
+      liveRuns.length,
+      marketStatus?.instruments.length,
+      operatorSummary?.alertCount,
+      paperRuns.length,
+      presets.length,
+      references.length,
+      sandboxRuns.length,
+      strategies.length,
+      totalTrackedRunCount,
+    ],
+  );
+
+  const activeWorkspaceDescriptor =
+    workspaceDescriptors.find((workspace) => workspace.id === activeWorkspace)
+    ?? workspaceDescriptors[0];
+
   const activeGuardedLiveAlertIds = useMemo(
     () => new Set((guardedLive?.active_alerts ?? []).map((alert) => alert.alert_id)),
     [guardedLive],
@@ -7388,22 +7520,97 @@ export default function App() {
       <header className="hero">
         <div>
           <p className="eyebrow">Akra Trader / Hexagonal Control Room</p>
-          <h1>Strategy operations with native engines and NFI reference delegates.</h1>
+          <h1>One control room, split into research, runtime ops, and guarded live workspaces.</h1>
           <p className="hero-copy">
-            The backend separates feature building, decision context creation, and execution so
-            rule-based strategies, Freqtrade references, and future LLM policies can share the
-            same orchestration layer.
+            The backend already exposes research, runtime, and guarded-live surfaces. The frontend
+            now routes operators through focused lanes instead of one endless dashboard scroll.
           </p>
         </div>
         <aside className="hero-panel">
           <span className="status-indicator" />
           <strong>{statusText}</strong>
           <p>API base: {apiBase}</p>
+          <p>Active workspace: {activeWorkspaceDescriptor.label}</p>
         </aside>
       </header>
 
-      <main className="grid">
-        <section className="panel panel-wide">
+      <main className="workspace-shell">
+        <section className="control-strip" aria-label="System metrics">
+          {controlStripMetrics.map((metric) => (
+            <article
+              className={`control-metric-card ${metric.tone ? `is-${metric.tone}` : ""}`.trim()}
+              key={metric.label}
+            >
+              <span>{metric.label}</span>
+              <strong>{metric.value}</strong>
+              <small>{metric.detail}</small>
+            </article>
+          ))}
+        </section>
+
+        <nav className="workspace-nav" aria-label="Control room workspaces">
+          {workspaceDescriptors.map((workspace) => (
+            <button
+              aria-pressed={activeWorkspace === workspace.id}
+              className={`workspace-tab ${activeWorkspace === workspace.id ? "is-active" : ""}`.trim()}
+              key={workspace.id}
+              onClick={() => setActiveWorkspace(workspace.id)}
+              type="button"
+            >
+              <span className="workspace-tab-kicker">{workspace.kicker}</span>
+              <strong>{workspace.label}</strong>
+              <span className="workspace-tab-summary">{workspace.summary}</span>
+            </button>
+          ))}
+        </nav>
+
+        <section className="panel panel-wide workspace-intro-panel">
+          <div className="workspace-intro-head">
+            <div>
+              <p className="kicker">{activeWorkspaceDescriptor.kicker}</p>
+              <h2>{activeWorkspaceDescriptor.label}</h2>
+            </div>
+            <button className="ghost-button" onClick={() => void loadAll()} type="button">
+              Refresh data
+            </button>
+          </div>
+          <div className="workspace-intro-grid">
+            <div className="workspace-intro-copy">
+              <p>{activeWorkspaceDescriptor.description}</p>
+              <strong>{activeWorkspaceDescriptor.summary}</strong>
+            </div>
+            <div className="workspace-chip-row" aria-label="Workspace surfaces">
+              {activeWorkspaceDescriptor.sections.map((section) => (
+                <span className="workspace-chip" key={section}>
+                  {section}
+                </span>
+              ))}
+            </div>
+          </div>
+          {activeWorkspace === "overview" ? (
+            <div className="workspace-route-grid">
+              {workspaceDescriptors
+                .filter((workspace) => workspace.id !== "overview")
+                .map((workspace) => (
+                  <button
+                    className="workspace-route-card"
+                    key={workspace.id}
+                    onClick={() => setActiveWorkspace(workspace.id)}
+                    type="button"
+                  >
+                    <span>{workspace.kicker}</span>
+                    <strong>{workspace.label}</strong>
+                    <p>{workspace.description}</p>
+                    <small>{workspace.summary}</small>
+                  </button>
+                ))}
+            </div>
+          ) : null}
+        </section>
+
+        <div className="workspace-panel-grid">
+          {activeWorkspace === "overview" ? (
+            <section className="panel panel-wide">
           <div className="section-heading">
             <div>
               <p className="kicker">Strategy catalog</p>
@@ -7436,9 +7643,11 @@ export default function App() {
               runSurfaceCapabilities={runSurfaceCapabilities}
             />
           </div>
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel">
+          {activeWorkspace === "research" ? (
+            <section className="panel">
           <p className="kicker">Backtest</p>
           <h2>Launch a run</h2>
           <RunForm
@@ -7448,9 +7657,11 @@ export default function App() {
             presets={presets}
             onSubmit={handleBacktestSubmit}
           />
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel">
+          {activeWorkspace === "runtime" ? (
+            <section className="panel">
           <p className="kicker">Sandbox</p>
           <h2>Start sandbox worker</h2>
           <RunForm
@@ -7460,9 +7671,11 @@ export default function App() {
             presets={presets}
             onSubmit={handleSandboxSubmit}
           />
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel">
+          {activeWorkspace === "live" ? (
+            <section className="panel">
           <p className="kicker">Guarded live</p>
           <h2>Start live worker</h2>
           <RunForm
@@ -7472,9 +7685,11 @@ export default function App() {
             presets={presets}
             onSubmit={handleLiveSubmit}
           />
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel panel-wide">
+          {activeWorkspace === "research" ? (
+            <section className="panel panel-wide">
           <p className="kicker">Experiment OS</p>
           <h2>Scenario presets</h2>
           <PresetCatalogPanel
@@ -7492,15 +7707,19 @@ export default function App() {
             onSubmit={handlePresetSubmit}
             onToggleRevisions={togglePresetRevisions}
           />
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel panel-wide">
+          {activeWorkspace === "research" ? (
+            <section className="panel panel-wide">
           <p className="kicker">Reference lane</p>
           <h2>Third-party references</h2>
           <ReferenceCatalog references={references} />
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel panel-wide">
+          {activeWorkspace === "runtime" ? (
+            <section className="panel panel-wide">
           <p className="kicker">Data plane</p>
           <h2>Market data status</h2>
           {marketStatus ? (
@@ -7685,9 +7904,11 @@ export default function App() {
           ) : (
             <p>No data status loaded.</p>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel panel-wide">
+          {activeWorkspace === "runtime" ? (
+            <section className="panel panel-wide">
           <p className="kicker">Operator trust</p>
           <h2>Runtime alerts and audit</h2>
           {operatorVisibility ? (
@@ -8013,9 +8234,11 @@ export default function App() {
           ) : (
             <p>No operator visibility loaded.</p>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <section className="panel panel-wide">
+          {activeWorkspace === "live" ? (
+            <section className="panel panel-wide">
           <p className="kicker">Guarded live</p>
           <h2>Kill switch and reconciliation</h2>
           {guardedLive ? (
@@ -9202,9 +9425,11 @@ export default function App() {
           ) : (
             <p>No guarded-live status loaded.</p>
           )}
-        </section>
+            </section>
+          ) : null}
 
-        <RunSection
+          {activeWorkspace === "research" ? (
+            <RunSection
           surfaceKey="backtest"
           title="Recent backtests"
           runs={backtests}
@@ -9390,8 +9615,10 @@ export default function App() {
               onRerun: rerunPaper,
             },
           ]}
-        />
-        <RunSection
+            />
+          ) : null}
+          {activeWorkspace === "runtime" ? (
+            <RunSection
           surfaceKey="sandbox"
           title="Sandbox runs"
           runs={sandboxRuns}
@@ -9413,8 +9640,10 @@ export default function App() {
             },
           ]}
           onStop={stopSandboxRun}
-        />
-        <RunSection
+            />
+          ) : null}
+          {activeWorkspace === "runtime" ? (
+            <RunSection
           surfaceKey="paper"
           title="Paper runs"
           runs={paperRuns}
@@ -9436,8 +9665,10 @@ export default function App() {
             },
           ]}
           onStop={stopPaperRun}
-        />
-        <RunSection
+            />
+          ) : null}
+          {activeWorkspace === "live" ? (
+            <RunSection
           surfaceKey="live"
           title="Guarded live runs"
           runs={liveRuns}
@@ -9454,7 +9685,9 @@ export default function App() {
             onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
             onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
           })}
-        />
+            />
+          ) : null}
+        </div>
       </main>
     </div>
   );
