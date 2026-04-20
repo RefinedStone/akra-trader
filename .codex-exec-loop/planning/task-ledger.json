@@ -5030,18 +5030,36 @@
       "direction_id": "experiment-os",
       "title": "Add group-level step filtering to subtree solver replay",
       "description": "Extend the newly shipped subtree policy simulation replay so operators can filter replay steps by affected group, conflict path, or action class, making longer solver traces navigable without losing the whole-graph explanation layer that now exists.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply explicitly says the remaining deeper control gap after solver explanation replay is group-level step filtering. This is the clearest immediate executable follow-up because replay playback now exists and needs better navigation before the UI adds any state-changing apply workflow.",
+      "priority_reason": "Completed in main session commit a490344, which added a replay group filter, group-scoped action-log narrowing, highlighted versus dimmed snapshot chips, an explicit no-matching-actions empty state, and safe filter reset behavior when template groups change, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-solver-explanation-replay-for-subtree-policy-simulation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:20:00Z",
+      "updated_at": "2026-04-20T22:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os subtree coordination explainability by making solver replay traces scannable at the group and action level, so operators can isolate relevant causal paths before promotion or draft-apply workflows are introduced."
+    },
+    {
+      "id": "planning-experiment-os-add-action-type-filtering-to-subtree-solver-replay",
+      "direction_id": "experiment-os",
+      "title": "Add action-type filtering to subtree solver replay",
+      "description": "Extend the subtree solver replay interaction beyond group narrowing so operators can filter a replay step's action log by action type or class while preserving the current whole-graph snapshot context, making dense traces easier to scan before any state-changing draft-apply flow is introduced.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply explicitly names action-type filtering as the next missing replay interaction after group-level filtering shipped. This is the clearest executable queue head because it continues the non-mutating replay-navigation work before the UI grows an apply flow that changes manual selection draft state.",
+      "depends_on": [
+        "planning-experiment-os-add-group-level-step-filtering-to-subtree-solver-replay"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os subtree coordination explainability by making replay traces scannable by both affected group and action type, so operators can isolate causal changes confidently before any draft-promotion workflow is allowed."
     },
     {
       "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
@@ -5051,13 +5069,13 @@
       "status": "proposed",
       "base_priority": 87,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply also calls out promoting replay steps into an actual manual selection draft as unfinished work. That follow-up remains valid, but it should stay behind the new group-filterable replay layer so operators can narrow and trust simulated causal paths before the UI gains a state-changing apply action.",
+      "priority_reason": "The latest main-session reply still calls out promoting filtered replay into an actual manual selection draft as unfinished work, but action-type replay filtering is the more immediate executable follow-up. Keep the apply workflow proposed until the replay navigation layer can narrow both group and action class before introducing a state-changing draft promotion path.",
       "depends_on": [
-        "planning-experiment-os-add-group-level-step-filtering-to-subtree-solver-replay"
+        "planning-experiment-os-add-action-type-filtering-to-subtree-solver-replay"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:20:00Z",
+      "updated_at": "2026-04-20T22:35:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os subtree template composition from inspectable simulation into deliberate state-changing promotion semantics, so coordinated multi-group bundle changes can be applied atomically only after the simulated graph behavior is explainable."
     },
