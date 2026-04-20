@@ -5210,18 +5210,36 @@
       "direction_id": "experiment-os",
       "title": "Add tab identity and sync audit trail UI for replay apply history",
       "description": "Build on the shipped cross-tab replay apply history sync by attaching explicit tab identity and per-change sync metadata to apply or restore events, then surface that attribution in the replay apply history UI so operators can see which tab triggered a replay mutation or rollback restore instead of relying on silent propagation alone.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is a sync explanation layer: replay apply history now stays aligned across tabs, but operators still cannot tell which tab issued an apply or restore or inspect a sync audit trail. That makes tab identity plus replay-history audit UI the clearest executable next task with no extra operator decision required.",
+      "priority_reason": "Completed in main session commit ce9cc8f, which added session-scoped tab identity, persisted apply and restore source-tab metadata into replay history entries, recorded `local_apply` or `local_restore` plus `remote_apply` or `remote_restore` sync audit trail entries, surfaced current-tab badges and `Applied by ...` or `Restored by ...` attribution in the replay history UI, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T06:55:00Z",
+      "updated_at": "2026-04-20T06:10:01Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay-apply trust from coherent background synchronization into operator-explainable sync behavior, so cross-tab apply and rollback history can be audited instead of only merged."
+      "direction_relation_note": "Completed the replay-history sync explanation layer by making cross-tab apply and restore mutations attributable and auditable in-product, which now leaves governance decisions like conflict policy and per-tab noise controls as the clearest follow-up."
+    },
+    {
+      "id": "planning-experiment-os-add-sync-governance-controls-for-replay-apply-history",
+      "direction_id": "experiment-os",
+      "title": "Add sync governance controls for replay apply history",
+      "description": "Build on the shipped tab-identity and sync audit trail UI by defining and surfacing replay apply history sync governance in-product: make the conflict resolution policy explicit for concurrent apply or restore mutations and add per-tab mute or filter controls so operators can manage remote sync noise without losing the audit trail.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply explicitly names the remaining work as a sync governance layer: replay apply history now shows tab identity and local or remote audit entries, but operators still lack a conflict resolution policy and per-tab mute or filter controls. That makes governance controls the clearest executable next task with no extra operator decision required.",
+      "depends_on": [
+        "planning-experiment-os-add-tab-identity-and-sync-audit-for-replay-apply-history"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:10:01Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os replay-apply trust from explained synchronization into governed synchronization, so concurrent tabs have operator-visible conflict semantics and manageable remote-event noise instead of only passive audit attribution."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
