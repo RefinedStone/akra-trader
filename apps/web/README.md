@@ -1,22 +1,28 @@
 # Akra Trader Web
 
-React + TypeScript control room for inspecting strategy lanes, market-data health, run history, and benchmark comparisons.
+React + TypeScript control room for `akra-trader`.
+
+Updated for the repository state as of April 21, 2026.
 
 ## Current Scope
+
+The web app already covers more than a backtest launcher.
 
 Implemented now:
 
 - strategy catalog grouped by runtime lane
-- reference catalog display
-- market-data status board with backfill and gap summaries
-- backtest launch form
-- native sandbox launch and stop controls
-- backtest and sandbox run history filters
-- side-by-side backtest comparison with benchmark narratives
+- reference catalog and benchmark context
+- market-data health, gap, backfill, and sync summaries
+- backtest, sandbox, and guarded-live launch flows
+- separate histories for backtest, sandbox, paper, and live modes
+- side-by-side comparison and benchmark narratives
+- guarded-live alerts, incidents, delivery history, kill switch, reconciliation, and recovery panels
+- replay-link alias governance and audit administration surfaces
 
-Important current limit:
+Current product limit:
 
-- the sandbox view controls replay-based preview runs, not continuous real-time workers
+- the control room is still a large single-screen application and needs clearer decomposition into
+  research, active-runtime, and guarded-live workflows
 
 ## Run
 

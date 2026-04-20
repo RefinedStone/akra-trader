@@ -6,66 +6,66 @@
 
 ## Risk 1: 데이터 신뢰도 부족
 
-- 설명: dataset identity가 약하면 비교와 rerun이 모두 약해진다
+- 설명: dataset identity와 mismatch 해석이 약하면 비교와 rerun 주장이 모두 약해진다
 - 트리거: 동일 입력 rerun mismatch, 반복 gap, stale data
-- 영향: Stage 2와 Stage 3 전체 신뢰도 하락
-- 대응: checkpoint identity, ingestion failure history, gap blocking rule
-- 종료 조건: reproducibility gate 통과
+- 영향: Research Core와 Operations Core 전체 신뢰도 하락
+- 대응: checkpoint identity, lineage mismatch classification, data-quality gate
+- 종료 조건: deterministic research claim을 문서와 제품에서 함께 방어 가능
 
 ## Risk 2: payload-centric storage 확장 한계
 
-- 설명: 현재 저장 모델은 유연하지만 experiment query가 비싸고 운영성 확장이 어렵다
-- 트리거: run 검색/비교/필터가 payload scan에 의존
-- 영향: Stage 2 이후 성능과 설계 복잡도 증가
-- 대응: 정규화된 query surface와 summary tables 도입
-- 종료 조건: common query가 normalized path로 동작
+- 설명: 현재 저장 모델은 유연하지만 experiment query와 artifact 관리가 비싸고 복잡해진다
+- 트리거: run 검색, 비교, export가 payload scan에 과도하게 의존
+- 영향: Experiment OS 확장과 운영성 저하
+- 대응: normalized query surface와 artifact/export model 도입
+- 종료 조건: common query와 artifact path가 구조화된 모델로 동작
 
-## Risk 3: sandbox 용어와 실제 구현 불일치
+## Risk 3: runtime 의미 혼선
 
-- 설명: preview를 sandbox로 부르면 operator가 실제 운영 가능성으로 오해한다
-- 트리거: restart/heartbeat 없는 상태에서 sandbox 명칭 유지
+- 설명: preview, sandbox worker, guarded-live의 경계가 문서나 UI에서 흔들리면 operator 판단이 왜곡된다
+- 트리거: 동일 용어가 다른 실행 의미를 가리키거나 active runtime과 history가 섞여 보일 때
 - 영향: 잘못된 기대와 위험한 운영 판단
-- 대응: preview와 worker를 모델, API, UI, 문서에서 분리
-- 종료 조건: continuous worker와 preview run이 명시적으로 구분
+- 대응: mode naming, UI separation, current-state discipline
+- 종료 조건: preview/history, worker, guarded-live가 제품과 문서에서 명시적으로 구분
 
-## Risk 4: 운영 표면 부족
+## Risk 4: 운영 표면은 있지만 운영 경험이 부족함
 
-- 설명: alert와 event가 없으면 operator는 shell로 돌아간다
-- 트리거: stale data, worker crash, unexplained drift
+- 설명: 기능은 있어도 operator workflow가 명확하지 않으면 다시 shell과 ad hoc 판단으로 돌아간다
+- 트리거: alert 과밀, monolithic UI, runbook 부재
 - 영향: control room 가치 저하, incident 대응 실패
-- 대응: operator event store, alert panel, incident taxonomy
-- 종료 조건: 주요 incident가 UI에서 식별 가능
+- 대응: active-session-first UX, operator runbooks, clearer action guidance
+- 종료 조건: 주요 daily/incident workflow를 control room과 runbook만으로 수행 가능
 
-## Risk 5: live를 너무 빨리 열 가능성
+## Risk 5: early guarded-live capability를 live-ready로 오해할 가능성
 
-- 설명: 기능 구현 압력으로 safety보다 execution이 먼저 들어갈 수 있다
-- 트리거: audit/reconciliation 없이 live adapter 추진
+- 설명: guarded-live control plane이 존재한다는 이유로 safety completion이 끝났다고 오해할 수 있다
+- 트리거: drill, deployment, venue lifecycle completion 없이 readiness를 주장할 때
 - 영향: 실제 손실 및 설계 오염
-- 대응: live readiness gate와 explicit prohibition 유지
-- 종료 조건: kill switch, audit, reconciliation이 제품 기능으로 존재
+- 대응: live readiness gate, drill discipline, explicit product-position wording
+- 종료 조건: guarded-live scope와 live candidacy 기준이 문서와 제품에 함께 고정
 
 ## Risk 6: LLM 기대 과잉
 
-- 설명: LLM lane이 차별화 포인트라는 이유로 본선 deterministic path를 침범할 수 있다
-- 트리거: trace 없이 sandbox 사용, fallback 없는 승격 논의
-- 영향: 실험과 운영 기준 붕괴
+- 설명: LLM lane이 차별화 포인트라는 이유로 deterministic path를 침범할 수 있다
+- 트리거: trace 없이 사용, fallback 없는 승격 논의
+- 영향: 연구와 운영 기준 붕괴
 - 대응: LLM lane 별도 문서와 gate, unattended live 금지
-- 종료 조건: trace/replay/fallback이 전부 구현됨
+- 종료 조건: trace, replay, fallback이 모두 구현됨
 
 ## Risk 7: market scope 확장으로 인한 분산
 
-- 설명: crypto와 stocks를 동시에 깊게 가져가려 하면 둘 다 얕아질 수 있다
-- 트리거: 초기에 stocks-specific 운영 기능까지 병행 추진
+- 설명: crypto와 stocks를 동시에 깊게 가져가면 둘 다 얕아질 수 있다
+- 트리거: early-stage에서 equities-specific 운영 기능을 병행 추진
 - 영향: 본선 완성도 저하
-- 대응: crypto 운영 우선, stocks는 adapter-friendly structure로만 준비
-- 종료 조건: crypto 운영 baseline 확보 후 stocks track 착수
+- 대응: crypto 운영 우선, stocks는 extension path만 유지
+- 종료 조건: crypto 운영 baseline 확보 후에만 확장 착수
 
 ## Risk 8: 1인 운영 과부하
 
 - 설명: 관찰, 비교, incident 대응, 승격 판단이 모두 한 사람에게 몰린다
 - 트리거: 알림 과다, manual checklist 과다, context switching 과다
 - 영향: 운영 실수, 문서 미갱신, 판단 지연
-- 대응: control room 집중, structured metadata, stop rules 명확화
+- 대응: control room 집중, structured metadata, stop rules, runbooks
 - 종료 조건: daily workflow가 shell과 ad hoc note 없이 가능
 
 ## Risk 9: reference lane 의존 왜곡
@@ -78,8 +78,8 @@
 
 ## Risk 10: 문서와 구현의 재분리
 
-- 설명: 청사진 문서가 생긴 뒤 다시 구현과 어긋날 수 있다
-- 트리거: 기능 추가 후 current-state/blueprint 미갱신
-- 영향: 우선순위 왜곡, 잘못된 기대
+- 설명: 현재 문서 정리 이후에도 다시 구현과 어긋날 수 있다
+- 트리거: 기능 추가 후 current-state, roadmap, directions 미갱신
+- 영향: 우선순위 왜곡과 잘못된 기대
 - 대응: release/change 시 문서 갱신 체크 포함
-- 종료 조건: current-state와 roadmap/blueprint drift가 관리됨
+- 종료 조건: current-state, roadmap, blueprint, directions drift가 관리됨

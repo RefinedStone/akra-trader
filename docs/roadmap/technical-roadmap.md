@@ -1,138 +1,114 @@
 # Technical Roadmap
 
-Rebased to the repository state as of April 17, 2026.
+Rebased to the repository state as of April 21, 2026.
 
 ## Goal
 
-Advance the current architecture without breaking the core boundary rule:
+Advance the architecture without breaking the core boundary rule:
 
-- domain and application code stay independent from frameworks, exchanges, storage engines, and LLM providers
+- domain and application code stay independent from frameworks, exchanges, storage engines, and
+  LLM providers
 
-## Current Baseline
+## Current Technical Baseline
 
 Already implemented:
 
-- explicit ports for market data, strategy catalog, run storage, references, and decision engines
-- native runtime services split into data, execution, risk, cache, and supervision concerns
-- durable run storage through SQLAlchemy
-- Binance market-data adapter with background sync support
-- reference-runtime delegation for NFI backtests
-- run comparison workflow through API and UI
+- explicit ports for market data, strategy catalog, run storage, guarded-live state, venue state,
+  references, and decision engines
+- durable run persistence through SQLAlchemy
+- native runtime decomposition into data, execution, risk, cache, supervision, and mode services
+- market-data sync with checkpoints, backfill status, gap visibility, and failure history
+- experiment presets, rerun boundaries, richer query/filter contracts, and comparison surfaces
+- sandbox worker heartbeat and restart recovery
+- guarded-live kill switch, reconciliation, recovery, incidents, and venue-backed launch gates
 
-Main weaknesses:
+The roadmap now focuses on technical completion and productization rather than greenfield feature
+creation.
 
-- run storage is durable but still payload-centric
-- reproducibility metadata exists but is not yet fully pinned
-- sandbox semantics are replay-oriented rather than worker-oriented
-- observability and audit features are minimal
-- the LLM lane is a contract, not a full research platform
+## Track A: Data Trust And Determinism
 
-## Track A: Data Platform
+### Current baseline
 
-### Already implemented
+- candle-backed runs already store dataset identity fingerprints
+- runs can link directly to sync checkpoints and rerun boundaries
+- market-data status already exposes checkpoints, gap windows, backfill, lag, and failure history
 
-- Binance-backed adapter behind `MarketDataPort`
-- local SQL storage for candles and sync state
-- resync, deduplication, gap detection, lag reporting, and backfill reporting
-- background sync loop for tracked symbols
+### Remaining work
 
-### Needs hardening
+- stronger deterministic claims for repeated identical inputs
+- clearer lineage mismatch reporting when rerun guarantees cannot be made
+- normalized lineage queries and ingestion-job history surfaces
 
-- stronger dataset identity and checkpointing per run
-- explicit ingestion job history and failure retention
-- clearer separation between read-side market access and write-side ingestion control
+## Track B: Experiment OS And Persistence
 
-### Not started yet
+### Current baseline
 
-- operator-facing ingestion failure history
-- richer venue coverage beyond the current Binance path
+- durable run repository with rich provenance payloads
+- presets with revisions and lifecycle actions
+- richer run, preset, strategy, and comparison query contracts
+- native and reference runs already share a comparison and provenance posture
 
-## Track B: Experiment and Persistence Platform
+### Remaining work
 
-### Already implemented
+- durable custom strategy registry and promotion lifecycle
+- normalized experiment summary tables for common query paths
+- artifact/export registry beyond loosely structured provenance payloads
+- clearer benchmark-pack and promotion review model
 
-- durable run repository
-- persisted run payloads including metrics, orders, fills, positions, notes, equity curve, and provenance
-- run comparison queries
-- strategy version and parameter snapshots in run provenance
+## Track C: Control Room Productization
 
-### Needs hardening
+### Current baseline
 
-- normalized tables for key run dimensions and metrics
-- durable run tags and scenario presets
-- export-friendly artifact storage model beyond the current provenance payload
+- one control room already covers research launch, histories, comparison, alerts, incidents, and
+  guarded-live panels
+- operator actions already reach sandbox stop, live stop, cancel/replace, reconciliation, recovery,
+  and incident workflows
 
-### Not started yet
+### Remaining work
 
-- full experiment query surface for tags, presets, and scenario history
-- durable user strategy registration history
+- decompose the current monolithic UI into clearer product surfaces
+- improve active-session views for positions, fills, lag, and recent decisions
+- align UI state and operator workflows with runbooks and promotion rules
 
-## Track C: Strategy Platform
+## Track D: Runtime Ops And Guarded-Live Stabilization
 
-### Already implemented
+### Current baseline
 
-- explicit native and reference lanes
-- decision-engine port and template strategy shape
-- metadata normalization for built-in and reference strategies
-- decision envelopes that can already carry trace metadata
+- sandbox workers already persist heartbeat, runtime-session progress, and recovery history
+- guarded-live control state already persists kill switch, reconciliation, recovery, incidents,
+  delivery history, and session ownership
+- venue-backed live launch, order cancel, and order replace already exist
+- Binance handoff, plus supported Coinbase and Kraken continuation paths, already exist at the
+  control-plane level
 
-### Needs hardening
+### Remaining work
 
-- strategy lifecycle transitions beyond current static metadata fields
-- richer trace schema for human and machine decisions
-- scenario-aware context builders for multi-timeframe or multi-symbol strategies
+- simplify and clarify runtime-session models for operators
+- broaden venue-native lifecycle recovery and amend/order-management coverage
+- make deployment, credentials, and drill workflows first-class operational concerns
 
-### Not started yet
+## Track E: Intelligence Research Lane
 
-- provider-backed decision-engine research harness
-- persistent promotion and archival workflow for strategy versions
+### Current baseline
 
-## Track D: Real-Time Execution Platform
+- `DecisionEnginePort`
+- template strategy shape
+- shared decision-envelope contract
 
-### Already implemented
+### Remaining work
 
-- shared execution mode model across backtest and sandbox concepts
-- native runtime services that can evolve toward worker-based operation
-- API and UI controls for starting and stopping sandbox preview runs
+- prompt registry
+- raw trace storage
+- replay harness
+- fallback or review enforcement
+- provider-backed decision-engine adapters
 
-### Needs hardening
-
-- clear separation between sandbox preview and future continuous workers
-- persisted worker state model that is distinct from replay results
-
-### Not started yet
-
-- long-running sandbox workers
-- live execution adapter
-- reconciliation after restart or faults
-- exchange-native order state handling
-
-## Track E: Safety, Observability, and Operations
-
-### Already implemented
-
-- basic market-data health surface
-- reference and run provenance sufficient for research inspection
-
-### Needs hardening
-
-- structured operational events
-- clearer failure surfacing for background sync and runtime errors
-- service-level runbooks and deployment guidance
-
-### Not started yet
-
-- alerts for stale data, worker failure, and risk breaches
-- operator event log
-- live audit trail
-- emergency stop workflow tied to real execution
-
-## Technical Exit Criteria for the Next Major Milestone
+## Technical Exit Criteria For The Next Major Milestone
 
 The next milestone should meet these checks:
 
-- repeated runs can point to a stable dataset identity
-- strategy and run metadata can be queried without deserializing whole payloads for common cases
-- sandbox semantics are backed by a real worker model instead of replay-only behavior
-- operational failures are visible through platform surfaces rather than only through logs
-- the LLM lane remains isolated until trace storage and replay controls exist
+- repeated runs can defend their dataset identity and mismatch posture
+- custom strategy lifecycle is durable across restart and queryable without payload-heavy scans
+- the control room reflects active runtime work as clearly as historical inspection
+- guarded-live safety is backed by productized operational discipline, not only backend capability
+- the LLM lane remains isolated until trace and replay controls exist

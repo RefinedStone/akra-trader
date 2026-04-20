@@ -4,16 +4,33 @@
 
 ## Goal
 
-Evolve DecisionEnginePort into a traceable intelligence research lane with prompt registry, trace storage, replay harnesses, evaluation, and mandatory fallback or review so LLM work stays isolated from deterministic execution guarantees.
+Evolve `DecisionEnginePort` into a traceable intelligence research lane with prompt registry, trace
+storage, replay harnesses, evaluation, and mandatory fallback or review so LLM work stays isolated
+from deterministic execution guarantees.
+
+## Current status on April 21, 2026
+
+- the lane still stops at the port, template strategy, and trace-capable envelope level
+- none of the required research infrastructure is implemented yet
+
+## Immediate gaps
+
+- prompt version registry
+- raw trace storage
+- replay harness
+- evaluation workflow
+- fallback or review enforcement
+
+## Linked docs
+
+- `docs/status/current-state.md`
+- `docs/roadmap/product-roadmap.md`
+- `docs/blueprint/llm-lane.md`
 
 ## Success criteria
 
-- Every intelligence run captures prompt version, raw response, normalized decision, and post-risk trace metadata.
-- Replay and evaluation flows can benchmark intelligence-assisted decisions against deterministic baselines.
-- No sandbox or live promotion path exists without deterministic fallback or human review.
-
-## Scope hints
-
-- Use docs/blueprint/llm-lane.md, docs/blueprint/platform-program.md Workstream E, and docs/blueprint/metrics-and-gates.md Gate 4 as the target shape.
-- Treat trace, replay, fallback, and evaluation as mandatory infrastructure rather than optional research tooling.
-- Keep intelligence-assisted strategies isolated from deterministic core behavior and forbid unattended live promotion.
+- every intelligence run captures prompt version, raw response, normalized decision, and post-risk
+  trace metadata
+- replay and evaluation flows can benchmark intelligence-assisted decisions against deterministic
+  baselines
+- no sandbox or live promotion path exists without deterministic fallback or human review

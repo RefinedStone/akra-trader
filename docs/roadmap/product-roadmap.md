@@ -1,168 +1,128 @@
 # Product Roadmap
 
-Rebased to the repository state as of April 17, 2026.
+Rebased to the repository state as of April 21, 2026.
 
 ## Objective
 
-Turn the current research platform into a reliable single-operator trading workstation for crypto research first, then real-time sandbox operation, and only then controlled live execution.
+Move `akra-trader` from a feature-dense internal platform into a maintainable single-operator
+trading workstation for crypto research first, then controlled runtime operations, and only then
+more mature guarded-live work.
 
-## North Star
+## Current Product Checkpoint
 
-One operator should be able to do the following without ad hoc scripts:
+One operator can already:
 
-1. ingest and inspect market data
-2. register or select a strategy version
-3. run a backtest with stored parameters and durable provenance
-4. compare runs and understand why results differ
-5. operate a continuous sandbox strategy from one control room
-6. enable guarded live trading with explicit risk controls
-7. evaluate LLM-assisted strategies without weakening deterministic paths
+1. inspect market-data health
+2. launch durable native backtests
+3. compare native and reference runs
+4. reuse presets and rerun stored execution boundaries
+5. start and stop sandbox workers
+6. inspect guarded-live blockers, incidents, and recovery state
 
-## Stage 0: Baseline
+The main product gaps are no longer "does the feature exist" but rather:
 
-Status:
+- can the feature be trusted as an operator workflow
+- is the capability durably modeled and queryable
+- is the control room understandable at product level
+- is the live path complete enough to be treated as operational instead of experimental
 
-- complete
+## Phase 1: Research Trust And Experiment OS
 
-Implemented now:
+### Current baseline
 
-- architecture and ADR baseline
-- strategy lane abstraction
-- reference catalog
-- native runtime core
-- initial control-room UI
+- dataset identity, sync-checkpoint linkage, and rerun boundaries already exist
+- native vs reference comparison is already a normal workflow
+- presets, preset lifecycle, revisions, and restore flows already exist
+- run and strategy query/filter surfaces are richer than a simple history list
 
-## Stage 1: Research Foundation
+### Still missing
 
-Status:
+- deterministic proof posture for repeated identical inputs
+- durable custom strategy registration and promotion lifecycle
+- normalized experiment summaries, artifact retrieval, and export posture
+- clearer benchmark-pack and promotion review workflow
 
-- largely complete
+### Exit condition
 
-Implemented now:
+`akra-trader` should behave like an experiment operating system rather than a durable run archive.
 
-- durable run storage with restart-safe lookup
-- Binance-backed market-data ingestion and status reporting
-- strategy version and parameter snapshots in run provenance
-- market-data lineage stored with runs
-- historical run listing in API and UI
+## Phase 2: Control Room Productization
 
-Still missing:
+### Current baseline
 
-- stronger dataset pinning and checkpoint identity
-- explicit proof that repeated identical inputs reproduce identical outputs
+- the control room already includes launch forms, histories, comparison, alerts, incidents, and
+  guarded-live panels
+- sandbox workers already have heartbeat and recovery semantics
+- operator visibility already captures worker failures, stale runtime, and guarded-live history
 
-Exit gap:
+### Still missing
 
-- a run must record enough immutable data identity to support deterministic rerun claims
+- active-session-first workflows for positions, fills, lag, and recent decisions
+- clearer separation between research inspection and operational action flows
+- UI decomposition away from the current monolithic single-screen implementation
+- operator guidance and runbook-linked actionability
 
-## Stage 2: Research Workflow
+### Exit condition
 
-Status:
+One operator should be able to answer what is running, what changed, whether it is safe, and what
+to do next without leaving the control room.
 
-- partially complete
+## Phase 3: Guarded-Live Safety Completion
 
-Implemented now:
+### Current baseline
 
-- native vs reference benchmark workflow
-- comparison API and control-room comparison surface
-- strategy version filtering in run history
-- reference provenance and artifact summaries
+- guarded-live kill switch, reconciliation, recovery, incidents, and venue-backed launch gates are
+  already implemented
+- live order cancel and replace controls already exist
+- partial multi-venue continuation and venue-session handoff baseline already exists
 
-Still missing:
+### Still missing
 
-- durable strategy lifecycle management beyond current metadata fields
-- run tags and scenario presets
-- richer export and artifact retrieval flows
-- stronger experiment query model than the current payload-centric repository
+- fuller venue-native session lifecycle recovery
+- broader order-management coverage beyond cancel and replace
+- clearer operator packaging for credentials, deployment, and incident drill workflows
+- stronger product-level live candidacy criteria
 
-Exit gap:
+### Exit condition
 
-- backtesting still behaves more like stored runs plus comparison than a complete experiment management workflow
+The live path should be judged by safety completeness and operational drill success, not by whether
+the adapter can submit orders.
 
-## Stage 3: Real-Time Sandbox Operations
+## Phase 4: Intelligence Research Lane
 
-Status:
-
-- groundwork only
-
-Implemented now:
-
-- market-data polling loop for Binance
-- sandbox launch and stop controls
-- replay-based sandbox preview runs on the native engine
-
-Still missing:
-
-- continuous sandbox workers
-- heartbeat and restart recovery
-- stale-data and worker-failure alerts
-- richer operational views for positions, fills, and lag over time
-
-Exit gap:
-
-- current sandbox semantics are useful for previewing recent behavior, not for continuous operation
-
-## Stage 4: Controlled Live Trading
-
-Status:
-
-- not started in practice
-
-Implemented now:
-
-- domain-level `live` execution mode placeholder
-- guardrail intent captured in ADRs and roadmap
-
-Still missing:
-
-- exchange execution adapter
-- secret handling
-- risk-limit enforcement
-- kill switch
-- reconciliation
-- operator audit log
-
-Exit gap:
-
-- no live order path should be added before safety state, auditability, and restart-safe reconciliation exist
-
-## Stage 5: LLM Decision Research Lane
-
-Status:
-
-- interface skeleton only
-
-Implemented now:
+### Current baseline
 
 - `DecisionEnginePort`
 - template external-decision strategy shape
-- shared decision-envelope contract designed to contain traces later
+- shared decision envelope that can carry trace metadata later
 
-Still missing:
+### Still missing
 
-- prompt template versioning
-- raw prompt/response trace storage
-- replay harness for historical evaluation
+- prompt version registry
+- raw trace persistence
+- replay harness
 - provider adapters
-- deterministic fallback or operator review workflow
+- mandatory fallback or review workflow
 
-Exit gap:
+### Exit condition
 
-- the LLM lane should remain isolated from live promotion until traceability and fallback behavior are real features
+LLM-assisted strategy work remains isolated until trace, replay, and fallback are real platform
+features.
 
 ## Success Measures
 
 The next meaningful product checkpoint should satisfy these conditions:
 
-- recent backtests are durable and comparable from the control room
-- one operator can see market-data health and run history without shell access
-- benchmark comparison between native and reference strategies is a normal workflow
-- sandbox semantics are no longer confused with continuous execution
-- roadmap and docs clearly separate implemented capability from planned capability
+- repeated runs can be defended against a stable data boundary
+- experiment lifecycle is durable enough for promotion decisions
+- active sandbox operation is clearer than replay preview semantics
+- guarded-live readiness is explained by product gates, not hidden implementation detail
+- roadmap and current-state stay aligned after feature work lands
 
 ## Explicit Deferrals
 
 - equal-weight support for stocks and crypto
 - multi-user RBAC or organization workflows
 - multi-node distributed execution
-- public self-service product polish before operator-grade research workflows are stable
+- unattended autonomous live behavior
+- public-facing self-service polish before operator-grade workflows are stable

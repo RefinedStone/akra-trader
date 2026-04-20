@@ -4,16 +4,34 @@
 
 ## Goal
 
-Turn run history into a durable experiment operating system with strategy lifecycle, presets, tags, benchmark packs, and queryable metadata that support promotion decisions instead of one-off backtest inspection.
+Turn run history into a durable experiment operating system with strategy lifecycle, presets, tags,
+benchmark packs, and queryable metadata that support promotion decisions instead of one-off
+inspection.
+
+## Current status on April 21, 2026
+
+- presets, preset lifecycle, revisions, comparison, rerun boundaries, and richer query/filter
+  contracts already exist
+- the remaining work is centered on durable custom strategy registration, normalized experiment
+  storage, and promotion workflow completion
+
+## Immediate gaps
+
+- durable custom strategy registry
+- promotion/lifecycle workflow durability
+- artifact and export registry
+- normalized experiment summaries for common query paths
+
+## Linked docs
+
+- `docs/status/current-state.md`
+- `docs/roadmap/product-roadmap.md`
+- `docs/roadmap/technical-roadmap.md`
 
 ## Success criteria
 
-- Strategy registration and lifecycle state are durable and queryable across restarts.
-- Runs can be filtered and compared by dataset, preset, tag, benchmark family, and strategy version without relying on payload-only scans for common paths.
-- Native and reference runs share one experiment model with consistent provenance, artifact, and export posture.
-
-## Scope hints
-
-- Use docs/blueprint/platform-program.md Workstream B, docs/blueprint/product-program.md Program Phase 1 and Program Phase 2, and docs/blueprint/backlog-map.md Program 1 as the target shape.
-- Prioritize reproducibility, presets, tags, lifecycle, and benchmark promotion flows before optimization automation or collaboration features.
-- Keep reference strategies visible as benchmark lanes and do not let external-runtime behavior define core experiment contracts.
+- strategy registration and lifecycle state are durable and queryable across restarts
+- runs can be filtered and compared by dataset, preset, tag, benchmark family, and strategy version
+  without relying on payload-only scans for common paths
+- native and reference runs share one experiment model with consistent provenance, artifact, and
+  export posture

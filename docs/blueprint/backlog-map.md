@@ -10,80 +10,75 @@
 - Program 2 = `Runtime Ops` + operator trust surfaces
 - Program 3 = `Guarded Execution`
 - Program 4 = `Intelligence Research`
-- Program 5 = cross-cutting documentation and operational discipline
+- Program 5 = documentation and operational discipline
 
 ## Program 1: Research Core (`Data Trust` + `Experiment OS`)
 
 목표:
 
-- 연구를 durable하고 rerunnable한 운영체계로 바꾼다
+- 연구를 defendable하고 rerunnable한 운영체계로 완성한다
 
-포함 epic:
+현재 baseline:
 
-- Epic 1: Reproducibility and Dataset Lineage Hardening
-- Epic 2: Experiment Metadata Completion
-- Epic 3: Durable Strategy Lifecycle and Registration
+- lineage, rerun boundary, presets, comparison이 이미 존재한다
 
-선행 순서:
+다음 핵심 순서:
 
-1. dataset identity
-2. experiment query/preset/tag
-3. lifecycle and durable strategy registration
+1. deterministic dataset boundary claim 강화
+2. durable strategy registry와 promotion model
+3. normalized experiment query, artifact, export posture
 
 주요 산출물:
 
 - stable dataset boundary
-- preset/tag/filter model
-- strategy promotion state model
+- durable strategy registry
+- experiment summary and artifact model
 
 ## Program 2: Operations Core (`Runtime Ops` + operator trust surfaces)
 
 목표:
 
-- sandbox를 실제 운영 경로로 만든다
+- 이미 존재하는 runtime substrate를 operator-grade workflow로 만든다
 
-포함 epic:
+현재 baseline:
 
-- Epic 4: Continuous Sandbox Worker
-- Epic 5: Alerts and Operator Events
-- Epic 9: Control Room Operations Upgrade
+- sandbox worker/session, heartbeat, recovery, alert surface가 이미 존재한다
 
-선행 순서:
+다음 핵심 순서:
 
-1. worker/session state model
-2. heartbeat and recovery
-3. alerts and operator event visibility
-4. control room consolidation
+1. active session UX 정리
+2. positions/fills/lag/recent-decision surface 강화
+3. control room 구조 단순화
+4. runbook-linked operator workflow 정착
 
 주요 산출물:
 
-- active worker model
-- alert/event model
-- operations UI
+- active runtime surface
+- clearer alert and action model
+- operations-oriented control room
 
 ## Program 3: Safe Execution (`Guarded Execution`)
 
 목표:
 
-- live readiness를 기능보다 먼저 정의한다
+- existing guarded-live control plane을 operational readiness 프로그램으로 완성한다
 
-포함 epic:
+현재 baseline:
 
-- Epic 6: Live Execution Guardrails
-- Epic 7: Reconciliation and Audit Trail
+- kill switch, reconciliation, recovery, incidents, delivery history, venue-backed launch gate가 이미 있다
 
-선행 순서:
+다음 핵심 순서:
 
-1. operator event and audit substrate
-2. risk and kill-switch controls
-3. reconciliation flow
-4. live candidate gate
+1. venue lifecycle scope 정리
+2. guarded-live drills와 operator discipline
+3. broader order-management posture
+4. explicit live candidacy gate
 
 주요 산출물:
 
-- kill switch
-- audit log
 - reconciliation drill
+- kill-switch drill
+- live candidacy checklist
 
 ## Program 4: Intelligence Research (`Intelligence Research`)
 
@@ -91,9 +86,9 @@
 
 - LLM decision lane을 연구 가능한 형태로 고립시킨다
 
-포함 epic:
+현재 baseline:
 
-- Epic 8: LLM Decision Research Lane
+- port와 template는 있으나 trace/replay/fallback은 없다
 
 파생 작업:
 
@@ -104,37 +99,36 @@
 
 주요 산출물:
 
-- valid LLM run definition
+- valid intelligence run definition
 - replayable trace
 - benchmarkable evaluation report
 
-## Program 5: Documentation and Operational Discipline
+## Program 5: Documentation And Operational Discipline
 
 목표:
 
 - 구현과 운영 판단을 문서 체계로 고정한다
-- 이 program은 다른 기능 program과 병행되는 cross-cutting discipline이다
 
-포함 epic:
+현재 baseline:
 
-- Epic 10: Documentation and Runbooks
+- 문서군은 충분히 많지만 drift가 생기기 쉬운 구조다
 
 파생 작업:
 
 - current-state maintenance rule
-- incident runbook set
-- promotion checklist
+- operator runbook set
 - release doc checklist
+- directions alignment rule
 
 ## 권장 실행 순서
 
 ### Wave 1
 
-- Program 1 전부
+- Program 1 마무리
 
 이유:
 
-- 연구 신뢰도 없이 이후 운영 기능을 올리면 판단 기준이 흔들린다
+- research trust와 experiment OS가 불안하면 이후 운영 판단 기준이 흔들린다
 
 ### Wave 2
 
@@ -142,20 +136,19 @@
 
 이유:
 
-- sandbox를 실제 운영 단계로 끌어올려야 Stage 3가 성립한다
+- runtime substrate는 이미 있으므로, 이제 operator workflow를 완성해야 한다
 
 ### Wave 3
 
-- Program 3 기초 + Program 4 foundation
+- Program 3 집중
 
 이유:
 
-- live readiness는 audit/reconciliation 없이 논의하지 않는다
-- LLM lane도 trace foundation부터 시작해야 한다
+- guarded-live는 기능보다 safety completion과 drill discipline이 더 중요하다
 
 ### Wave 4
 
-- Program 3 마무리 + Program 4 확장 + Program 5 정착
+- Program 4 foundation + Program 5 정착
 
 이유:
 
@@ -163,16 +156,7 @@
 
 ## 프로그램 간 차단 관계
 
-- Program 2는 Program 1이 만든 dataset identity와 experiment OS를 전제로 한다
-- Program 3는 Program 2가 만든 worker/event 기반 없이는 성립하지 않는다
-- Program 4는 Program 1의 reproducibility와 provenance가 없으면 의미가 약하다
-- Program 5는 모든 wave에 병행되지만, 특히 Wave 2 이후 중요도가 커진다
-
-## 구현 우선순위 결론
-
-중장기 작업은 아래 한 줄로 정리합니다.
-
-1. 신뢰 가능한 연구 기반을 먼저 만든다.
-2. 그 위에 운영 가능한 sandbox를 만든다.
-3. 그 다음에 live readiness를 만든다.
-4. LLM은 항상 격리된 연구 레인으로 따라온다.
+- Program 2는 Program 1이 만든 deterministic experiment 기준 없이는 완성되지 않는다
+- Program 3는 Program 2가 만든 operator workflow와 discipline 없이는 성립하지 않는다
+- Program 4는 Program 1의 provenance와 reproducibility가 약하면 의미가 약하다
+- Program 5는 모든 wave에 병행되지만 Wave 2 이후 중요도가 더 커진다

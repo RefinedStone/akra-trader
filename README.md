@@ -1,53 +1,30 @@
 # Akra Trader
 
-Python-first trading research platform with hexagonal boundaries, a native runtime core, Binance-backed market data, and a control room for backtests, replay-based sandbox runs, and benchmark comparison.
+Python-first trading research workstation for a single operator.
 
-## Current Status
+`akra-trader` combines durable research runs, benchmark comparison, sandbox worker supervision,
+and guarded-live safety surfaces behind one control room. The repository is crypto-first today and
+keeps extension paths open for additional venues and future intelligence-assisted research.
 
-Rebased to the repository state as of April 17, 2026.
+## Current Product Position
 
-What exists now:
+Updated for the repository state as of April 21, 2026.
 
-- `apps/api`
-  - FastAPI backend with domain/application/adapter separation
-  - durable run storage through `SqlAlchemyRunRepository`
-  - native backtest execution
-  - replay-based sandbox preview flow for native strategies
-  - Binance market-data adapter with sync, backfill, gap detection, and status reporting
-  - reference catalog and Freqtrade-backed NostalgiaForInfinity backtest delegation
-  - run comparison API with native vs reference benchmark support
-- `apps/web`
-  - React + TypeScript control room
-  - strategy catalog, reference catalog, market-data status, backtest launch, sandbox launch/stop
-  - run history filters and side-by-side comparison workflow
-- `reference/NostalgiaForInfinity`
-  - upstream reference repository kept as an external-runtime benchmark lane
+The project is no longer only a backtest playground. It already includes:
 
-What is still missing:
+- durable native backtests with dataset lineage and rerun boundaries
+- native vs reference benchmark comparison with stored provenance
+- experiment presets, richer query/filter surfaces, and replay-link audit utilities
+- supervised sandbox worker sessions with heartbeat and restart recovery
+- guarded-live kill switch, reconciliation, recovery, and venue-backed launch gates
+- operator visibility, incident history, delivery history, and guarded-live control surfaces
 
-- continuous sandbox workers with heartbeat and restart recovery
-- alerts, audit trail, and operator event history
-- live execution adapters and hard guardrails
-- durable strategy registration lifecycle beyond the current in-process catalog registration
-- concrete LLM provider integration, trace storage, and replay tooling
+The project is not yet:
 
-## Strategy Model
-
-The strategy boundary is intentionally broader than a single `buy` or `sell` hook.
-
-Current stack:
-
-1. `build_feature_frame`
-2. `build_decision_context`
-3. signal policy
-4. execution policy
-5. `StrategyDecisionEnvelope`
-
-This keeps three lanes compatible with one orchestration model:
-
-- native strategies
-- Freqtrade reference strategies
-- future `decision_engine` strategies
+- a fully productized live trading workstation
+- a multi-user or RBAC-enabled platform
+- a complete experiment OS with durable custom strategy registration and rich artifact storage
+- a traceable LLM research lane with replay, fallback, and provider adapters
 
 ## Run Locally
 
@@ -58,21 +35,6 @@ cd apps/api
 python3 -m venv .venv
 .venv/bin/python -m pip install -e ".[dev]"
 .venv/bin/uvicorn akra_trader.main:app --reload
-```
-
-Default behavior:
-
-- runs are stored in `.local/state/runs.sqlite3`
-- market data is stored in `.local/state/market-data.sqlite3`
-- the default market-data provider is `binance`
-- a background sync loop starts automatically when Binance is enabled
-
-Useful overrides:
-
-```bash
-AKRA_TRADER_MARKET_DATA_PROVIDER=seeded
-AKRA_TRADER_RUNS_DATABASE_URL=sqlite:////absolute/path/runs.sqlite3
-AKRA_TRADER_MARKET_DATA_DATABASE_URL=sqlite:////absolute/path/market-data.sqlite3
 ```
 
 ### Web
@@ -89,9 +51,6 @@ npm run dev
 docker compose up --build
 ```
 
-In the Compose stack, the API uses Postgres for run storage through
-`AKRA_TRADER_RUNS_DATABASE_URL=postgresql+psycopg://akra:akra@postgres:5432/akra_trader`.
-
 API default: `http://localhost:8000`
 
 Web default: `http://localhost:5173`
@@ -103,40 +62,29 @@ cd apps/api
 .venv/bin/pytest
 ```
 
-## NFI Reference Integration
+```bash
+cd apps/web
+npm run typecheck
+```
 
-The backend exposes upstream NFI strategies as catalog entries.
+## Repository Guide
 
-- `nfi_x7_reference`
-- `nfi_next_reference`
-- `nfi_nextgen_reference`
+- [docs/README.md](docs/README.md): documentation index and reading order
+- [docs/status/current-state.md](docs/status/current-state.md): canonical current-state document
+- [docs/status/product-position.md](docs/status/product-position.md): what product this is today
+- [docs/roadmap/README.md](docs/roadmap/README.md): remaining work overview
+- [docs/roadmap/next-wave-plan.md](docs/roadmap/next-wave-plan.md): detailed next-wave execution plan
+- [docs/architecture.md](docs/architecture.md): architectural shape and boundary rules
+- [docs/blueprint/README.md](docs/blueprint/README.md): longer-horizon blueprint and gate documents
 
-These entries point directly at files under [reference/NostalgiaForInfinity](/home/akra/dev/akra-trader/reference/NostalgiaForInfinity) and build Freqtrade backtest commands using upstream config conventions.
+## Reference Lanes
 
-Current scope:
-
-- backtest delegation is supported
-- sandbox/live execution for reference strategies is not supported
-- if `freqtrade` is unavailable, the prepared command and provenance are still recorded
-
-## Reference Catalog
-
-Third-party materials are tracked in [reference/catalog.toml](/home/akra/dev/akra-trader/reference/catalog.toml).
+Third-party materials are tracked in `reference/catalog.toml`.
 
 - `nostalgia-for-infinity`: external-runtime benchmark lane
-- `nautilus-trader`: architecture reference only
-- `ccxt`: direct dependency candidate used through adapters
-- `yfinance`: direct dependency candidate
+- `nautilus-trader`: architecture reference
+- `ccxt`: adapter dependency candidate already used in market-data and venue-facing layers
+- `yfinance`: future direct dependency candidate
 
-## Docs
-
-- [Current State](docs/status/current-state.md)
-- [Blueprint](docs/blueprint/README.md)
-- [Architecture](docs/architecture.md)
-- [Roadmap Overview](docs/roadmap/README.md)
-- [Product Roadmap](docs/roadmap/product-roadmap.md)
-- [Technical Roadmap](docs/roadmap/technical-roadmap.md)
-- [Epic Backlog](docs/roadmap/epic-backlog.md)
-- [ADR Index](docs/adr/README.md)
-- [NautilusTrader Notes](docs/reference-nautilus-trader.md)
-- [NostalgiaForInfinity Notes](docs/reference-nostalgia-for-infinity.md)
+Freqtrade-backed reference backtests are available through the NFI catalog entries. Sandbox and
+guarded-live execution remain native-only today.

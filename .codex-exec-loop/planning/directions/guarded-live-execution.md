@@ -4,16 +4,33 @@
 
 ## Goal
 
-Make live candidacy a gated safety program, not an execution shortcut, by requiring audit coverage, operator events, risk controls, kill switch behavior, and reconciliation before any venue-backed live path is considered real.
+Make live candidacy a gated safety program, not an execution shortcut, by requiring audit coverage,
+operator events, risk controls, kill switch behavior, and reconciliation before any venue-backed
+live path is treated as operationally ready.
+
+## Current status on April 21, 2026
+
+- kill switch, reconciliation, recovery, incidents, delivery history, and venue-backed launch gates
+  already exist
+- the remaining work is completeness of venue lifecycle, drills, and operational discipline
+
+## Immediate gaps
+
+- broader venue-native lifecycle recovery
+- clearer guarded-live drill and candidacy rules
+- deployment and credential discipline
+- fuller order-management posture beyond the current baseline
+
+## Linked docs
+
+- `docs/status/current-state.md`
+- `docs/roadmap/next-wave-plan.md`
+- `docs/blueprint/platform-program.md`
 
 ## Success criteria
 
-- Live-affecting actions are blocked unless safety configuration, audit capture, and operator event logging are present.
-- Reconciliation and emergency-stop drills are first-class product flows rather than ad hoc procedures.
-- Live candidacy is explicit and distinct from sandbox worker readiness, with promotion blocked until safety gates pass.
-
-## Scope hints
-
-- Use docs/blueprint/platform-program.md Workstream D, docs/blueprint/metrics-and-gates.md Gate 3, and docs/blueprint/risk-register.md Risk 5 as the governing rules.
-- Do not ship execution-first shortcuts or unattended live behavior before audit and reconciliation exist.
-- Treat account state, exposure state, operator events, audit views, and reconciliation results as required interfaces.
+- live-affecting actions are blocked unless safety configuration, audit capture, and operator event
+  logging are present
+- reconciliation and emergency-stop drills are first-class product flows rather than ad hoc procedures
+- live candidacy is explicit and distinct from sandbox worker readiness, with promotion blocked until
+  safety gates pass

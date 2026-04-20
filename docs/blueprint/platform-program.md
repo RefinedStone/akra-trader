@@ -10,213 +10,159 @@
 - Workstream D: Guarded Execution
 - Workstream E: Intelligence Research
 
-각 workstream은 현재 구현을 확장하는 방식으로 설계합니다. 핵심은 기존 hexagonal boundary를 유지하면서 운영성과 재현성을 강화하는 것입니다.
+이 문서는 "무엇을 더 완성해야 하는가"를 정의합니다. 현재 구현 상태 판정은
+`docs/status/current-state.md`를 따릅니다.
 
 ## Workstream A: Data Trust
 
 목적:
 
-- 모든 run이 믿을 수 있는 데이터 경계를 갖게 만든다
+- 모든 run이 설명 가능한 데이터 경계와 실패 해석을 갖게 만든다
 
-현재 공백:
+현재 baseline:
 
-- lineage는 있으나 stable dataset identity가 부족하다
-- ingestion job history와 failure retention이 약하다
-- crypto 외 시장 확장 전략이 아직 문서 수준이다
+- dataset fingerprint, sync-checkpoint linkage, rerun boundary가 이미 존재한다
+- market-data status에 freshness, gap, backfill, failure history가 이미 드러난다
+
+남은 핵심 공백:
+
+- deterministic rerun claim을 더 강하게 증명하는 규약
+- lineage mismatch를 제품 표면에서 해석하는 방식
+- ingestion job history와 normalized lineage query
 
 목표 상태:
 
-- run이 dataset id 또는 sync checkpoint id를 가진다
-- data freshness, gap, failure가 제품 표면에 드러난다
-- crypto 운영 본선을 유지하면서 stocks adapter를 위한 구조적 경계가 유지된다
+- run이 stable dataset boundary를 가리킨다
+- rerun mismatch가 generic drift가 아니라 분류된 원인으로 설명된다
+- operator가 shell 없이도 데이터 경계 상태를 판단할 수 있다
 
 필수 capability:
 
 - dataset/checkpoint identity
+- lineage mismatch classification
 - ingestion job log
-- lag/failure summary
 - symbol/timeframe별 data quality contract
-
-필요한 인터페이스 방향:
-
-- run metadata에 `dataset_identity` 또는 동등 개념 추가
-- market-data status에 failure history와 checkpoint 정보 확장
-- 읽기용 query와 쓰기용 sync control의 책임 분리
-
-선행조건:
-
-- 현재 Binance adapter 유지
-- SQLite/Postgres 겸용 저장 구조 존중
-
-미루는 것:
-
-- 다중 거래소 동기 운영
-- broad equities venue support
 
 ## Workstream B: Experiment OS
 
 목적:
 
-- backtest를 실행 기록이 아니라 실험 운영체계로 승격한다
+- backtest와 비교를 실행 기록이 아니라 실험 운영체계로 승격한다
 
-현재 공백:
+현재 baseline:
 
-- strategy lifecycle이 metadata 수준에 머무른다
-- run tags/presets가 없다
-- payload-centric query 모델이라 실험 검색성과 확장성이 약하다
+- presets, revisions, query/filter contracts, comparison, rerun boundary가 이미 있다
+- native와 reference lane은 공통 비교 및 provenance 흐름을 공유한다
+
+남은 핵심 공백:
+
+- durable custom strategy registry
+- promotion/lifecycle workflow의 영속화
+- normalized experiment summaries, artifact registry, export posture
 
 목표 상태:
 
-- 전략, 시나리오, 데이터 기준, 결과 비교가 하나의 실험 모델로 연결된다
+- 전략, 시나리오, 데이터 기준, 결과 비교, 승격 판단이 하나의 실험 모델로 연결된다
 
 필수 capability:
 
 - durable strategy registration
-- lifecycle state machine
-- run tags
-- scenario presets
-- benchmark pack
-- export/artifact registry
-
-필요한 인터페이스 방향:
-
-- strategy metadata에 lifecycle/promotion status
-- run metadata에 `tags`, `preset_id`, `benchmark_family`
-- query model에 strategy/version/preset/tag/dataset 기준 필터
-
-선행조건:
-
-- dataset identity 정립
-- reference/native provenance 공통 규약 유지
-
-미루는 것:
-
-- 대규모 optimization sweep orchestration
-- collaborative annotation workflow
+- lifecycle and promotion model
+- normalized experiment query surface
+- artifact/export registry
+- benchmark pack and review workflow
 
 ## Workstream C: Runtime Ops
 
 목적:
 
-- 현재 preview 중심 sandbox를 운영 가능한 runtime으로 바꾼다
+- 현재 존재하는 sandbox worker 기반을 실제 운영 가능한 runtime 경험으로 완성한다
 
-현재 공백:
+현재 baseline:
 
-- sandbox가 replay preview에 가깝다
-- worker/session 상태 모델이 없다
-- restart recovery와 heartbeat가 없다
+- sandbox worker/session model, heartbeat, restart recovery가 이미 존재한다
+- stale runtime과 worker failure는 operator surface로 노출된다
+
+남은 핵심 공백:
+
+- active session 중심의 operator workflow
+- lag, fills, positions, recent decisions에 대한 더 명확한 제품 표면
+- control room 구조의 단순화와 운영성 강화
 
 목표 상태:
 
-- active sandbox session이 worker로 돌고 control room에서 관찰/중지/회복할 수 있다
+- active sandbox session이 product-level workflow로 관찰, 중지, 해석, 복구될 수 있다
 
 필수 capability:
 
-- worker session model
-- heartbeat
-- restart semantics
-- runtime state persistence
-- preview run과 worker run 분리
-
-필요한 인터페이스 방향:
-
-- run record와 별도로 worker/session state model 도입
-- alert model과 worker health model 연결
-- UI에 active session status, decision stream, lag surface 추가
-
-선행조건:
-
-- market-data freshness surface
-- operator event model
-
-미루는 것:
-
-- 멀티노드 scheduler
-- fully automated self-healing orchestration
+- active session surface
+- clearer health and lag model
+- operator action guidance
+- preview/history view와 active-runtime view의 명확한 분리
 
 ## Workstream D: Guarded Execution
 
 목적:
 
-- live를 "기능"이 아니라 "통제된 승격 경로"로 만든다
+- guarded-live를 "이미 가능한 기능"에서 "통제된 운영 readiness 프로그램"으로 완성한다
 
-현재 공백:
+현재 baseline:
 
-- live adapter 부재
-- audit trail 부재
-- reconciliation 부재
-- kill switch 부재
+- kill switch, reconciliation, recovery, incidents, delivery history, live launch gate가 이미 있다
+- venue-backed launch, cancel, replace, session ownership, open-order snapshot도 이미 있다
+
+남은 핵심 공백:
+
+- fuller venue-native lifecycle recovery
+- broader order-management posture
+- deployment, credential, and drill discipline
+- 더 명확한 live candidacy 규약
 
 목표 상태:
 
-- live candidacy는 분명하되, 미달 상태에서는 실행이 차단된다
+- live candidacy는 분명하되, 기준 미달 상태에서는 항상 차단된다
 
 필수 capability:
 
-- risk limits
-- operator confirmation path
-- kill switch
-- audit event store
-- reconciliation model
-
-필요한 인터페이스 방향:
-
-- operator event type
-- alert type
-- account/exposure state model
-- reconciliation result model
-
-선행조건:
-
-- Runtime Ops 안정화
-- alerts와 event logging 기초
-
-미루는 것:
-
-- 다중 계정 운영
-- unattended autonomous live
+- risk and operator confirmation path
+- audit/event discipline
+- reconciliation drill
+- kill-switch drill
+- venue lifecycle scope definition
 
 ## Workstream E: Intelligence Research
 
 목적:
 
-- decision-engine contract를 추적 가능한 연구 레인으로 승격한다
+- decision-engine contract를 traceable research lane으로 승격한다
 
-현재 공백:
+현재 baseline:
 
-- template strategy와 port는 있지만 trace/replay/fallback이 없다
+- `DecisionEnginePort`, template strategy, trace-capable envelope만 존재한다
+
+남은 핵심 공백:
+
+- prompt registry
+- trace store
+- replay harness
+- fallback 또는 review enforcement
+- provider adapter
 
 목표 상태:
 
-- LLM run은 deterministic run과 동일한 실행 계약을 따르되, 별도 연구 규칙으로 기록된다
+- LLM run은 deterministic lane과 분리되되, 비교 가능하고 재현 가능한 연구 기록으로 남는다
 
 필수 capability:
 
 - prompt version registry
-- trace store
+- trace schema
 - replay harness
 - evaluation report
-- human review 또는 fallback
-
-필요한 인터페이스 방향:
-
-- decision trace model
-- prompt registry model
-- fallback result and review status model
-
-선행조건:
-
-- Experiment OS 정립
-- dataset identity 정립
-
-미루는 것:
-
-- unattended live promotion
-- provider-specific deep optimization
+- fallback or review policy
 
 ## 공통 기술 원칙
 
 - domain/application은 provider나 framework 세부 구현을 모르면 된다
 - reference lane은 benchmark lane이며 native contract를 대체하지 않는다
-- preview와 worker, worker와 live를 문서와 모델에서 명확히 분리한다
+- preview와 worker, worker와 guarded-live를 문서와 모델에서 명확히 분리한다
 - audit와 alert는 운영 부가 기능이 아니라 제품 일부로 취급한다

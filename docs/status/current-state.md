@@ -1,198 +1,137 @@
 # Current State
 
-Canonical status snapshot for the repository as of April 17, 2026.
+Canonical status snapshot for the repository as of April 21, 2026.
 
-Use this document as the source of truth for "what exists now" before reading roadmap or architecture docs.
+Use this document as the source of truth for what is actually implemented. Forward-looking planning
+lives under [Roadmap](../roadmap/README.md) and [Blueprint](../blueprint/README.md).
 
-Forward-looking planning lives under [Blueprint](../blueprint/README.md).
+## Product Position
 
-## Stage Summary
+`akra-trader` is currently best described as a single-operator research and runtime control
+workstation for crypto-first strategy development.
+
+It is no longer only a backtest demo:
+
+- durable research runs, comparison, presets, and reruns are already present
+- sandbox worker sessions exist with heartbeat and restart recovery semantics
+- guarded-live control surfaces exist with kill switch, reconciliation, recovery, and venue-backed
+  launch gates
+- operator visibility includes incidents, delivery history, and audit-oriented surfaces
+
+It is not yet a finished live trading product:
+
+- custom strategy registration is still process-local
+- experiment storage remains payload-centric in key paths
+- control-room UX is still monolithic and operator workflows are not fully productized
+- guarded-live venue lifecycle handling is real but not complete
+- LLM research infrastructure remains an interface skeleton
+
+## Stage Read
 
 - Stage 0: complete
-- Stage 1: largely complete
-- Stage 2: partially complete
-- Stage 3: early groundwork only
-- Stage 4: not started in practice
-- Stage 5: interface skeleton only
+- Stage 1 Research Foundation: largely complete
+- Stage 2 Experiment OS: materially underway
+- Stage 3 Runtime Ops: partially complete with real worker semantics
+- Stage 4 Guarded Live: early but real control-plane coverage
+- Stage 5 Intelligence Research: contract only
 
 ## Implemented Now
 
-### Backend platform
+### Research core
 
-- FastAPI backend with explicit domain, application, adapter, and runtime layers
+- FastAPI backend with explicit domain, application, adapter, and runtime boundaries
 - durable run storage through `SqlAlchemyRunRepository`
-- repo-local SQLite defaults, with Postgres support through configuration
-- run persistence for config, metrics, orders, fills, positions, notes, equity curve, and provenance payloads
+- repo-local SQLite defaults with configurable Postgres support
+- native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,
+  and provenance
+- native market-data lineage with dataset identity fingerprints, sync-checkpoint links, and rerun
+  boundaries
+- reference-runtime delegation for NostalgiaForInfinity backtests with stored benchmark provenance
 
-### Market data
+### Experiment OS baseline
 
-- ccxt-backed `MarketDataPort` adapter for Binance, Coinbase, and Kraken
-- tracked-symbol sync and historical backfill
-- duplicate avoidance, lag tracking, and gap reporting
-- background sync job started from the app lifespan when a supported ccxt provider is active
-- seeded market-data adapter still available for tests and fixture-driven flows
+- run history listing and filtering by mode, strategy, version, and rerun-boundary identity
+- native vs reference comparison API and control-room comparison workflow
+- experiment presets with lifecycle actions, revisions, and restore flows
+- typed query/filter contracts for strategies, presets, runs, and comparison surfaces
+- replay-link alias governance, audit browsing, and export-job utilities for query-builder surfaces
+- native, sandbox, and paper reruns from stored rerun boundaries with match-or-drift tracking
 
-### Strategy and execution
+### Runtime ops baseline
 
-- native runtime lane
-- Freqtrade reference runtime lane for NostalgiaForInfinity backtests
-- decision-engine lane contract through `DecisionEnginePort`
-- runtime decomposition into `DataEngine`, `ExecutionEngine`, `RiskEngine`, `StateCache`, `RunSupervisor`, and `ExecutionModeService`
-- strategy snapshots and parameter snapshots stored in run provenance
+- sandbox worker sessions that continue processing newly arrived candles after a priming window
+- persisted sandbox heartbeat cadence, processed-candle progress, and recovery history
+- separate paper-session mode instead of collapsing paper into sandbox history
+- market-data sync for ccxt-backed Binance, Coinbase, and Kraken with gap detection, lag reporting,
+  sync checkpoints, backfill status, and failure history
+- operator visibility for stale sandbox workers, worker failures, and recent runtime audit events
 
-### Research workflow
+### Guarded-live baseline
 
-- backtest execution with durable run lookup
-- supervised sandbox worker sessions and paper-session priming for native strategies
-- run history listing and filtering by mode, strategy id, and strategy version
-- run comparison API and control-room comparison UI
-- native vs reference benchmark provenance and artifact display
-- native run provenance carries dataset identity fingerprints for candle-backed inputs
-- run provenance now links native runs to sync checkpoints and rerun boundary identities
-- explicit rerun from stored rerun boundaries into backtest, sandbox, or paper execution with
-  match-or-drift tracking
-- guarded-live worker launch behind reconciliation, recovery, and configuration gates
-- venue-backed guarded-live order submission with persisted live run history
-- guarded-live worker order lifecycle sync for recovered/open venue orders, including partial-fill
-  and fill progression in local run state
-- guarded-live operator cancel/replace controls for active venue orders from the control room and API
-- guarded-live control state now persists live session ownership and a durable open-order snapshot,
-  and guarded-live resume now restores tracked venue order lifecycle state before falling back to
-  the persisted snapshot after restart or fault drills
-- guarded-live runtime now persists a venue session handoff with transport/session metadata so
-  maintenance keeps following the same venue-owned lifecycle after resume, and Binance now uses a
-  venue-push multi-stream websocket transport for that handoff
-- Binance push-session supervision now performs automatic listen-key failover and records broader
-  account-position, balance-update, order-list, trade-tick, aggregate-trade, book-ticker,
-  mini-ticker, depth, and kline coverage alongside execution events, full depth snapshot rebuilds,
-  order-book resync state, rebuild counts, full recovered bid/ask levels, channel-restore
-  timing/counts, channel-continuation timing/counts, persisted trade/aggregate-trade/book-ticker/
-  mini-ticker/kline snapshots, and top-of-book levels. Durable incidents now split generic ladder
-  gap/rebuild faults from venue-native ladder snapshot integrity faults such as crossed snapshots,
-  missing sides, and non-monotonic snapshot ladders, plus separate ladder bridge, ladder
-  sequence, and ladder snapshot-refresh rule faults
-- guarded-live handoff can now widen beyond Binance-native continuation into push-native multi-venue
-  market transports, using Binance public market websockets, Coinbase Advanced Trade authenticated
-  user/account order transport plus public heartbeats/ticker/trade/level2/candle channels, and
-  Kraken spot public heartbeat/ticker/trade/book/ohlc channels while preserving continuation state
-  and transport ownership metadata
-- guarded-live reconciliation, recovery, and live launch now use a dedicated configured live venue
-  instead of assuming the market-data provider, so supported venue-state and order-session wiring
-  can target Binance, Coinbase, or Kraken independently of candle sourcing
+- guarded-live kill switch, reconciliation, recovery, and resume control surfaces
+- gated live launch behind configuration, reconciliation, and recovery checks
+- venue-backed live order submission plus persisted live run history
+- tracked live order lifecycle sync back into local orders, fills, positions, and audit notes
+- operator cancel and replace actions for active live orders
+- persisted live-session ownership and durable open-order snapshots
+- venue-session handoff and continuation baseline for Binance, with supported continuation paths for
+  Coinbase Advanced Trade and Kraken public market transport
+- guarded-live incidents, delivery attempts, acknowledgment, escalation, remediation state, and
+  provider workflow sync
 
-### Control room
+### Control room baseline
 
-- strategy catalog grouped by runtime lane
-- reference catalog panel
-- market-data status with backfill, contiguous-gap, sync checkpoint, and recent failure summaries
-- launch forms for backtests and native sandbox worker sessions
-- launch form for guarded-live workers once live gates are clear
-- separate sandbox worker sessions and paper sessions with their own filters, stop controls, and rerun-boundary actions
-- separate guarded-live run history with stop controls
-- runtime alert and audit panel for stale sandbox heartbeats, worker failures, guarded-live
-  live-path alerts, persisted live-path alert history, durable incident events, outbound delivery
-  history, and recent merged runtime/guarded-live events
-- guarded-live panel with persisted kill-switch state, candidacy blockers, active guarded-live
-  alerts, guarded-live alert history, durable incident events, outbound delivery history,
-  reconciliation findings,
-  venue-state verification snapshots, runtime recovery state restored from verified venue snapshots,
-  live-owner visibility, venue-native session-restore state, durable order-book visibility,
-  venue session handoff supervision/failover coverage plus market/depth/kline event visibility,
-  order-book resync state, snapshot rebuild visibility, recovered bid/ask ladders, deeper channel
-  restore visibility, persisted market-channel continuation visibility, top-of-book visibility,
-  guarded-live resume controls, and guarded-live audit history
-- outbound incident delivery can now fan out to console, generic webhook, Slack webhook,
-  PagerDuty, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, Freshdesk, HappyFox, Zendesk, Zoho Desk, Help Scout, Kayako, Intercom, Front, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, OpsRamp, Zenduty, and Opsgenie targets with persisted delivery-attempt history, attempt counts, and
-  retry timing
-- durable guarded-live incidents now persist acknowledgment state, escalation state, next
-  escalation timing, operator actions for acknowledge/escalate workflows, and paging policy
-  identity/provider selection
-- durable guarded-live incidents now also persist external provider/reference state, provider
-  workflow state/reference, external sync timestamps, and paging status from external callbacks
-  plus local provider-native workflow actions
-- market-data guarded-live incidents now also persist remediation state/kind/runbook metadata and
-  can auto-request provider-owned `remediate` workflows, with the same remediation state exposed
-  through delivery history and operator controls. Incident-open auto remediation and manual
-  remediation requests now execute real recent-sync, backfill, candle-repair, guarded-live
-  channel-restore, and order-book rebuild jobs and then immediately re-evaluate guarded-live
-  incidents so recovered market-data faults can resolve in the same control-room loop. External
-  provider recovery callbacks can also sync remediation lifecycle state, richer provider recovery
-  payloads, and trigger the local verification pass before the same loop is refreshed. Guarded-live
-  refresh now also pull-syncs PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/SolarWindsServiceDesk/TOPdesk/InvGateServiceDesk/OpsRamp/Zenduty/Opsgenie incident bodies so provider-held workflow and
-  recovery metadata can reconcile remediation state authoritatively when callbacks lag. Those
-  payloads are now promoted into typed remediation recovery state with job/reference, channels,
-  symbols, timeframe, verification fields, and a provider-side status machine that tracks workflow
-  phase, job phase, sync state, last event, and attempt count. That recovery state now also keeps
-  provider-specific typed schemas for PagerDuty incidents, incident.io incidents, FireHydrant incidents, Rootly incidents, Blameless incidents, xMatters incidents, ServiceNow incidents, Squadcast incidents, BigPanda incidents, Grafana OnCall incidents, Splunk On-Call incidents, Jira Service Management incidents, PagerTree incidents, AlertOps incidents, SIGNL4 alerts, iLert alerts, Better Stack alerts, OnPage alerts, All Quiet alerts, Moogsoft alerts, Spike.sh alerts, DutyCalls alerts, IncidentHub alerts, Resolver alerts, OpenDuty alerts, Cabot alerts, HaloITSM alerts, incidentmanager.io alerts, OneUptime alerts, Squzy alerts, Crises Control alerts, Freshservice alerts, Freshdesk tickets, HappyFox tickets, Zendesk tickets, Zoho Desk tickets, Help Scout conversations, Kayako cases, Intercom conversations, Front conversations, ServiceDesk Plus alerts, SysAid alerts, BMC Helix alerts, SolarWinds Service Desk alerts, TOPdesk alerts, InvGate Service Desk alerts, OpsRamp alerts, Zenduty incidents, and Opsgenie alerts instead of only a
-  flattened generic payload, and each provider branch now carries its own native recovery phase
-  graph alongside the shared machine. Authoritative provider pull-sync now also promotes recovery
-  telemetry like progress, step, attempt count, provider run id, and last message into typed
-  recovery state. When configured, PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/OpsRamp/Zenduty/Opsgenie remediation-engine endpoints are also polled
-  directly so engine telemetry overrides stale copies embedded in incident bodies. When local verification closes the
-  incident, the provider-native remediation workflow is resolved back out through the same
-  bidirectional incident channel
-- durable guarded-live incident workflow now covers worker failure/staleness, risk breaches,
-  repeated live recovery loops, stale active-order sync faults, and market-data freshness policy
-  breaches such as stale sync, richer backfill-quality semantics, repeated sync failures, and
-  venue-specific upstream fault classifications, plus guarded-live venue-session channel
-  consistency, restore degradation, venue-specific book/kline consistency faults, exchange-specific
-  ladder integrity faults, deeper depth-ladder/candle-sequence semantics, and multi-candle
-  continuity faults, instead of only generic runtime control faults
-- side-by-side backtest comparison with narratives
+- single-screen React control room with strategy catalog, reference catalog, run launch, run history,
+  comparison, market-data status, alerts, incidents, delivery history, kill switch, and
+  reconciliation surfaces
+- separate histories for backtest, sandbox, paper, and live modes
+- guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
+- operator surfaces for replay-link alias governance and audit export administration
 
-## Partial or Fragile Areas
+## Partial Or Fragile Areas
 
-- sandbox runs are now supervised worker sessions that keep processing newly arrived candles with persisted heartbeat and restart recovery, while paper runs remain snapshot-primed sessions
-- operator visibility now persists guarded-live live-path alert history, durable incident events,
-  and outbound delivery attempts with bounded retry/backoff state, but it is not yet a full
-  external incident-management system
-- incident workflow now includes operator acknowledgment, retry suppression, manual escalation, and
-  auto escalation after ack-timeout or retry exhaustion, while market-data incidents also support
-  explicit remediation requests, and incidents now carry a persisted paging policy id/provider plus
-  provider-workflow state, but provider-managed policy ownership is still limited
-- external paging workflows can now sync `triggered`, `acknowledged`, `escalated`, and `resolved`
-  events back into local incident state, and local acknowledge/escalate actions can now push
-  provider-native workflow updates back out, but the integration is still not a full
-  provider-managed ownership workflow
-- guarded-live reconciliation and runtime recovery now depend on configured venue credentials, and
-  recovery/live resume currently restores tracked venue order lifecycle state before falling back to
-  persisted control-plane state, but it still does not revive broader venue-native stream or market
-  session coverage beyond Binance multi-stream
-  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline events plus exchange-backed
-  ticker/trade/ohlcv restore, persisted market-channel continuation, and the current Binance/
-  Coinbase authenticated user-plus-market continuation and Kraken push-market continuation layer
-- guarded-live order sync now persists lifecycle progression, a durable open-order snapshot, and
-  session ownership for resume, but it still does not restore a full exchange session lifecycle
-- custom strategy registration exists, but registration metadata is process-local rather than durable
-- run persistence is durable, but the schema is still payload-centric and not yet optimized for rich experiment querying
-- native run provenance now pins dataset identity and supports explicit rerun, but deterministic
-  promotion gates and normalized rerun queries are not complete
-- decision-engine support exists only as an interface and template strategy, not as a production research lane
+- custom strategy registration exists, but registration metadata is still process-local rather than a
+  durable strategy registry
+- run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
+  payload-centric persistence
+- the control room exposes a large amount of capability, but it is still effectively a monolithic
+  single-screen application rather than a clearly productized operations UI
+- sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator
+  workflows are still weaker than the underlying backend capabilities
+- guarded-live recovery restores meaningful control-plane and order-lifecycle state, but it does not
+  yet resume a full venue-native session lifecycle in all cases
+- incident delivery and provider sync are broad, but provider-owned policy management and external
+  incident ownership remain incomplete
+- deployment guidance, backups, secret governance, and runbooks are not yet product-grade
+- the LLM lane still stops at `DecisionEnginePort`, template strategy shapes, and trace-capable
+  envelopes
 
 ## Not Implemented Yet
 
-- full external incident-management workflow such as provider-managed ownership beyond the current
-  PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/OpsRamp/Zenduty/Opsgenie-native bidirectional paths, richer escalation ladders, richer destinations,
-  and more advanced retry policies
-- operator alerts for wider market-data freshness policies and broader risk surfaces beyond the
-  current guarded-live worker-failure, stale-runtime, market-data-freshness, risk-breach,
-  recovery-loop, and stale order-sync coverage
-- full live order lifecycle management beyond cancel/replace, including venue-native amend flows
-- broader venue-native session continuation beyond Binance multi-stream
-  account/order/trade/aggregate-trade/book-ticker/mini-ticker/depth/kline streaming and
-  exchange-backed ticker/trade/ohlcv restore plus persisted market-channel continuation
-- live-worker restart recovery that resumes an actual venue-backed execution session lifecycle
-- prompt versioning, raw trace persistence, and replay harness for LLM decisions
-
-## Priority Basis
-
-- If `current-state`, `roadmap`, and `blueprint` disagree on program names or remaining-work order, fix that documentation drift first under Documentation and Operational Discipline.
-- Otherwise follow this execution order: Research Core, then Operations Core, then Safe Execution, then Intelligence Research.
+- durable custom strategy registration lifecycle and promotion workflow
+- normalized experiment storage for common query, artifact, and export paths
+- full venue-native amend flows and broader live order lifecycle management
+- complete restart recovery for venue-native live session lifecycles
+- operator-grade deployment/runbook package
+- prompt versioning, raw trace persistence, replay harness, and fallback/review controls for LLM
+  decision research
+- multi-user workflows, RBAC, and organization features
 
 ## Immediate Next Priorities
 
-1. Complete Research Core reproducibility and dataset lineage so repeated runs can be proven equivalent.
-2. Complete Research Core experiment workflow features such as durable strategy lifecycle, tags, presets, and richer exports.
-3. Continue Operations Core operator delivery from the current console/webhook/Slack/PagerDuty/incident.io/FireHydrant/Rootly/Blameless/xMatters/ServiceNow/Squadcast/BigPanda/Grafana OnCall/Splunk On-Call/Jira Service Management/PagerTree/AlertOps/SIGNL4/iLert/BetterStack/OnPage/AllQuiet/Moogsoft/SpikeSh/DutyCalls/IncidentHub/Resolver/OpenDuty/Cabot/HaloITSM/incidentmanager.io/OneUptime/Squzy/CrisesControl/Freshservice/Freshdesk/HappyFox/Zendesk/ZohoDesk/HelpScout/ServiceDeskPlus/SysAid/BMCHelix/OpsRamp/Zenduty/Opsgenie plus bidirectional provider workflow sync into richer multi-provider incident-management and wider audit coverage.
-4. Continue Safe Execution guarded-live controls from the current Binance-plus-Coinbase-authenticated-plus-Kraken push-native session supervision into wider live-path audit coverage and broader venue-native session management.
-5. Keep the Intelligence Research lane isolated until trace storage, fallback, and replay tooling exist.
+1. Harden deterministic research claims around dataset identity, rerun validation, and lineage gaps.
+2. Finish the Experiment OS around durable strategy lifecycle, normalized experiment queries, and
+   artifact/export posture.
+3. Productize the control room around active-session operations, clearer operator workflows, and
+   decomposed UI surfaces.
+4. Complete guarded-live safety around fuller venue lifecycle handling, runbooks, and deployment
+   discipline.
+5. Keep the LLM lane isolated until trace, replay, and fallback infrastructure are real features.
+
+## Supporting Docs
+
+- [Product Position](product-position.md)
+- [Roadmap Overview](../roadmap/README.md)
+- [Next Wave Plan](../roadmap/next-wave-plan.md)
+- [Architecture](../architecture.md)
+- [Blueprint](../blueprint/README.md)
