@@ -19904,6 +19904,73 @@ function RunSurfaceCollectionQueryBuilder({
     () => Object.keys(activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey),
     [activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey],
   );
+  const activePredicateRefReplayApplyConflictSimulationFieldPicks = useMemo(() => {
+    if (!activePredicateRefReplayApplyConflictSimulationReview) {
+      return {
+        byGroupKey: {} as Record<string, Array<{
+          decisionKey: string;
+          key: string;
+          label: string;
+          section: PredicateRefReplayApplyConflictDiffItem["section"];
+          source: "local" | "remote";
+        }>>,
+        global: [] as Array<{
+          decisionKey: string;
+          key: string;
+          label: string;
+          section: PredicateRefReplayApplyConflictDiffItem["section"];
+          source: "local" | "remote";
+        }>,
+      };
+    }
+    const parameterGroupKeyByParameterKey = Object.fromEntries(
+      selectedRefTemplateParameterGroups.flatMap((group) =>
+        group.parameters.map((parameter) => [parameter.key, group.key] as const)),
+    );
+    const allItems = [
+      ...activePredicateRefReplayApplyConflictSimulationReview.summaryDiffs,
+      ...activePredicateRefReplayApplyConflictSimulationReview.rowDiffs,
+      ...activePredicateRefReplayApplyConflictSimulationReview.selectionSnapshotDiffs,
+      ...activePredicateRefReplayApplyConflictSimulationReview.bindingSnapshotDiffs,
+    ].filter((item) => item.editable);
+    const byGroupKey: Record<string, Array<{
+      decisionKey: string;
+      key: string;
+      label: string;
+      section: PredicateRefReplayApplyConflictDiffItem["section"];
+      source: "local" | "remote";
+    }>> = {};
+    const global: Array<{
+      decisionKey: string;
+      key: string;
+      label: string;
+      section: PredicateRefReplayApplyConflictDiffItem["section"];
+      source: "local" | "remote";
+    }> = [];
+    allItems.forEach((item) => {
+      const source = activePredicateRefReplayApplyConflictSimulationReview.selectedSources[item.decisionKey] ?? "local";
+      const relatedGroupKey = item.relatedGroupKey ?? parameterGroupKeyByParameterKey[item.key] ?? null;
+      const annotation = {
+        decisionKey: item.decisionKey,
+        key: item.key,
+        label: item.label,
+        section: item.section,
+        source,
+      };
+      if (relatedGroupKey) {
+        byGroupKey[relatedGroupKey] = [...(byGroupKey[relatedGroupKey] ?? []), annotation];
+        return;
+      }
+      global.push(annotation);
+    });
+    return {
+      byGroupKey,
+      global,
+    };
+  }, [
+    activePredicateRefReplayApplyConflictSimulationReview,
+    selectedRefTemplateParameterGroups,
+  ]);
   const doesTemplateGroupMatchVisibilityRule = useCallback(
     (
       group: {
@@ -23542,6 +23609,25 @@ function RunSurfaceCollectionQueryBuilder({
                                   activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey[groupKey] ?? groupKey)
                                 .join(", ") || "no groups"}.`}
                             </p>
+                            {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length ? (
+                              <div className="run-surface-query-builder-trace-chip-list">
+                                {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.slice(0, 4).map((pick) => (
+                                  <span
+                                    className={`run-surface-query-builder-trace-chip${
+                                      pick.source === "remote" ? " is-active" : ""
+                                    }`}
+                                    key={`collision-override-global-pick:${pick.decisionKey}`}
+                                  >
+                                    {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                  </span>
+                                ))}
+                                {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length > 4 ? (
+                                  <span className="run-surface-query-builder-trace-chip">
+                                    {`+${activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length - 4} more reviewed picks`}
+                                  </span>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div className="run-surface-query-builder-actions">
                               <button
                                 className="ghost-button"
@@ -23586,6 +23672,29 @@ function RunSurfaceCollectionQueryBuilder({
                                     <p>
                                       {`${diff.currentStatus} · ${diff.currentBundleLabel} → ${diff.simulatedStatus} · ${diff.simulatedBundleLabel}`}
                                     </p>
+                                    {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]?.length ? (
+                                      <div className="run-surface-query-builder-trace-chip-list">
+                                        {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]
+                                          .slice(0, 4)
+                                          .map((pick) => (
+                                            <span
+                                              className={`run-surface-query-builder-trace-chip${
+                                                pick.source === "remote" ? " is-active" : ""
+                                              }`}
+                                              key={`simulation-diff-pick:${diff.groupKey}:${pick.decisionKey}`}
+                                            >
+                                              {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                            </span>
+                                          ))}
+                                        {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey].length > 4 ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {`+${
+                                              activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey].length - 4
+                                            } more reviewed picks`}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
                                   </div>
                                 ))}
                               </div>
@@ -23726,6 +23835,11 @@ function RunSurfaceCollectionQueryBuilder({
                                     {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
                                       <p className="run-note">
                                         {`Tracing dependency edge ${activeSimulatedPredicateRefSolverReplayFilteredEdge.label} across replay steps.`}
+                                      </p>
+                                    ) : null}
+                                    {activeSimulatedPredicateRefSolverReplayFilteredActions.length ? (
+                                      <p className="run-note">
+                                        {`Reviewed collision field picks are annotated on any replay group touched by the current simulation override.`}
                                       </p>
                                     ) : null}
                                     {simulatedPredicateRefReplayPromotionPreviewRows.length ? (
@@ -24603,7 +24717,13 @@ function RunSurfaceCollectionQueryBuilder({
                                             }`}
                                             key={`solver-replay:${group.key}`}
                                           >
-                                            {`${group.label}: ${resolvedBundle?.label ?? "unresolved"}`}
+                                            {`${group.label}: ${resolvedBundle?.label ?? "unresolved"}${
+                                              activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key]?.length
+                                                ? ` · ${
+                                                    activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[group.key].length
+                                                  } reviewed picks`
+                                                : ""
+                                            }`}
                                           </span>
                                         );
                                       })}
@@ -24648,6 +24768,29 @@ function RunSurfaceCollectionQueryBuilder({
                                                     {edge.label}
                                                   </span>
                                                 ))}
+                                              </div>
+                                            ) : null}
+                                            {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey]?.length ? (
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey]
+                                                  .slice(0, 4)
+                                                  .map((pick) => (
+                                                    <span
+                                                      className={`run-surface-query-builder-trace-chip${
+                                                        pick.source === "remote" ? " is-active" : ""
+                                                      }`}
+                                                      key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:review-pick:${pick.decisionKey}`}
+                                                    >
+                                                      {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                                    </span>
+                                                  ))}
+                                                {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey].length > 4 ? (
+                                                  <span className="run-surface-query-builder-trace-chip">
+                                                    {`+${
+                                                      activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey].length - 4
+                                                    } more reviewed picks`}
+                                                  </span>
+                                                ) : null}
                                               </div>
                                             ) : null}
                                           </div>
