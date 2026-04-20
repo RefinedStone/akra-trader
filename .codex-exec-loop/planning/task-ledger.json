@@ -5947,18 +5947,54 @@
       "direction_id": "experiment-os",
       "title": "Add governance for shared replay links with audit trail, indirection, and redaction",
       "description": "Build the next replay-link governance pass on top of compact copy/share deep links by adding operator-visible audit trail coverage for copy/share usage, defining whether replay links should support short-link style indirection instead of only inline payloads, and enforcing a privacy-safe redaction policy for replay intent fields so shared links become attributable, governable artifacts rather than opaque payloads.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 23,
-      "priority_reason": "The latest main-session reply says commit c30fc56 finished compact replay deep links and copy/share controls, and directly names the remaining work: link copy/share audit trail, short-link style indirection, and privacy-safe redaction policy. Promote this broader governance task to `ready` as the clearest next executable queue head now that the ergonomics pass is done.",
+      "priority_reason": "Completed in main session commit c9bc22b, which added shared replay-link governance modes for portable versus indirect sharing, privacy redaction policies, alias-registry-backed short links, audit trail capture for copy/share success and cancel or failure events, session persistence for governance choices, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-copy-share-ui-and-compact-encoding-for-replay-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:51:00Z",
+      "updated_at": "2026-04-20T10:56:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os operator trust around shared replay links by turning compact copy/share payloads into governed artifacts with attribution, optional indirection boundaries, and explicit privacy rules suitable for broader operator handoff."
+    },
+    {
+      "id": "planning-experiment-os-sync-replay-link-governance-and-alias-registry-across-tabs",
+      "direction_id": "experiment-os",
+      "title": "Sync replay link governance state and alias registry across tabs",
+      "description": "Extend the newly shipped replay-link governance model beyond one tab's session or local browser scope by synchronizing governance selections, replay-link audit visibility, and indirect alias-registry updates across concurrent tabs, so replay short links and governance context stay coherent when the operator inspects or shares the same template in parallel.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply says replay-link audit and alias indirection now work only in local browser storage or session scope and explicitly calls out missing cross-tab sync. This is the clearest immediate follow-up because it builds directly on the just-shipped browser-resident governance and alias model without requiring a broader cross-device backend contract first.",
+      "depends_on": [
+        "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:57:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-link governance from one-tab ergonomics into operator-trustable multi-tab behavior, which keeps shared replay state attributable and consistent during parallel investigation without yet committing to account-level link infrastructure."
+    },
+    {
+      "id": "planning-experiment-os-back-replay-short-links-with-portable-resolution-and-retention-controls",
+      "direction_id": "experiment-os",
+      "title": "Back replay short links with portable resolution and retention controls",
+      "description": "Move indirect replay links beyond a browser-local alias registry by defining a portable short-link resolution contract and an operator-facing retention policy surface, so replay links can resolve across devices while governance makes link lifetime, persistence, and cleanup explicit instead of remaining an implicit local browser behavior.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply explicitly names cross-device short-link resolution and retention policy UI as remaining gaps, but both require a broader persistence boundary and lifecycle choice than the immediate browser-scoped follow-up. Keep this proposed behind the now-executable cross-tab sync pass.",
+      "depends_on": [
+        "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:58:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os replay-link governance from browser-scoped sharing into a portable operator artifact with explicit retention semantics, which is necessary before short-link handoff can be trusted across devices or longer-lived sessions."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
