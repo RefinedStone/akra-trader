@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, and the latest main-session reply now explicitly calls out dedicated collection-element schema discovery as a remaining gap. Keep this proposed behind the newly promoted nested collection-of-collection quantifier pass so discovery endpoints can describe a less transitional collection contract instead of freezing the first object-collection iteration.",
+      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply narrows the immediate contract gap to richer collection element schema advertising and parameterized collection-schema discovery inside the existing typed-query schema. Keep this broader discovery-API pass proposed behind that lower-level contract work so new endpoints can reuse a less transitional collection model.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:31:00Z",
+      "updated_at": "2026-04-20T01:54:59Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4558,18 +4558,54 @@
       "direction_id": "experiment-os",
       "title": "Support quantified predicates across nested collection-of-collection paths",
       "description": "Extend the new collection wrapper model so typed query expressions can quantify through collection elements that themselves contain nested collections, preserving same-element evaluation at each quantifier boundary and exposing the deeper collection shape through `x-akra-query-schema` without route-local helper flattening.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 45,
-      "priority_reason": "The latest main-session reply says collection path plus same-element boolean evaluation now ships for nested object collections, but nested collection-of-collection quantification is still missing. Promote that direct continuation as the next queue head ahead of dedicated collection schema discovery, parameterized reusable predicates, macro expansion, or optimizer work.",
+      "priority_reason": "Completed in main session commit 69327bf, which extended quantified predicates across nested collection-of-collection paths by flattening intermediate dict/list/tuple/set nodes down to leaf collections, adding expression-only root-value filters for scalar leaves, updating `x-akra-query-schema` collection semantics, and verifying with `python -m py_compile`, targeted pytest batches, typed-query regression coverage, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-generalize-quantified-predicates-to-nested-object-collections"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:31:00Z",
+      "updated_at": "2026-04-21T04:45:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os typed query evolution moving along the concrete remaining collection-expression gap by letting quantifiers compose across multiple nested collection boundaries instead of stopping after one object-collection hop."
+    },
+    {
+      "id": "planning-experiment-os-add-collection-shape-validation-and-schema-discovery-to-typed-query",
+      "direction_id": "experiment-os",
+      "title": "Add collection shape validation and dedicated schema discovery to typed queries",
+      "description": "Extend the nested collection query contract so `x-akra-query-schema` and runtime validation can describe and enforce collection-path shape at each hop, including dedicated schema discovery for nested collection elements and path-level rejection when callers bind quantifiers or scalar predicates against incompatible collection structure.",
+      "status": "done",
+      "base_priority": 90,
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit a966018, which added collection path-spec validation, schema-checked filter keys for collection nodes, `collection_schemas` discovery in `x-akra-query-schema`, and typed-query regression coverage for the hardened collection contract.",
+      "depends_on": [
+        "planning-experiment-os-nest-quantified-predicates-across-collection-of-collections"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:54:59Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Strengthens experiment-os typed query trust by making the newly generalized nested collection contract discoverable and shape-safe, so operators and clients can target deeper collection paths without relying on trial-and-error against partially inferred schema."
+    },
+    {
+      "id": "planning-experiment-os-advertise-element-and-parameterized-collection-schemas-in-typed-query-discovery",
+      "direction_id": "experiment-os",
+      "title": "Advertise element and parameterized collection schemas in typed query discovery",
+      "description": "Deepen the new typed-query collection contract by exposing machine-readable element schemas for collection items and a parameterized collection-schema layer that can describe reusable collection query shapes beyond the current allowed-key list, so clients can discover field types and build valid nested collection filters without hand-maintained route knowledge.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 39,
+      "priority_reason": "The latest main-session reply explicitly says the remaining next step after collection shape validation is richer collection query contract advertising: element schema detail and parameterized collection schema support are both still missing, while collection path aliases are a later convenience layer. Promote this as the next queue head because it is an executable continuation of the just-shipped `collection_schemas` work and does not need extra operator product judgment.",
+      "depends_on": [
+        "planning-experiment-os-add-collection-shape-validation-and-schema-discovery-to-typed-query"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:54:59Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os typed query discoverability by turning collection filtering from key-level validation into a richer advertised schema contract that clients can inspect and bind against safely."
     },
     {
       "id": "planning-experiment-os-normalize-and-optimize-typed-query-expression-trees",
@@ -4592,20 +4628,38 @@
     {
       "id": "planning-experiment-os-add-parameterized-predicate-templates-to-typed-query-expressions",
       "direction_id": "experiment-os",
-      "title": "Add parameterized predicate templates to typed query expressions",
-      "description": "Build on the new reusable predicate registry by allowing predicate definitions to declare parameters and typed argument binding, so repeated expression shapes can be reused with caller-supplied values instead of cloning near-identical predicate trees for each threshold or identifier.",
+      "title": "Add parameterized predicate templates and collection bindings to typed query expressions",
+      "description": "Build on the new reusable predicate registry by allowing predicate definitions to declare parameters, typed argument binding, and collection-aware quantifier slots, so repeated expression shapes can be reused with caller-supplied values instead of cloning near-identical predicate trees for each threshold, identifier, or nested collection predicate.",
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly names parameterized reusable predicates as unfinished, but nested collection-of-collection quantification is the more direct continuation immediately after collection object support shipped. Keep parameterization proposed behind that deeper collection pass so template binding targets the fuller quantifier model rather than another intermediate shape.",
+      "priority_reason": "Parameterized predicate templates are still a valid typed-query follow-up, but the latest main-session reply narrows the immediate continuation to parameterized collection schema discovery rather than template binding itself. Keep predicate templates proposed behind the new element-schema and collection-schema advertising pass so template binding can target a richer, machine-discoverable collection contract instead of another partial intermediate shape.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:31:00Z",
+      "updated_at": "2026-04-20T01:54:59Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from reusable fixed predicates toward template-like expression reuse, which can reduce duplication once the broader quantified collection contract is stable."
+    },
+    {
+      "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
+      "direction_id": "experiment-os",
+      "title": "Add collection path aliases and shortcodes to the typed query contract",
+      "description": "Introduce discoverable aliases or shortcode bindings for verbose collection paths so clients can reference common nested collection filters more ergonomically once the richer collection schema contract is in place, without weakening explicit validation or schema discovery.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 3,
+      "priority_reason": "The latest main-session reply lists collection path alias or shortcode support as a remaining convenience layer, but unlike element schema and parameterized collection-schema advertising it is not the contract-critical next step. Keep it proposed behind the richer schema pass so any alias surface maps onto a settled collection discovery model.",
+      "depends_on": [
+        "planning-experiment-os-advertise-element-and-parameterized-collection-schemas-in-typed-query-discovery"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T01:54:59Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Improves experiment-os typed query ergonomics by layering reusable path shorthand on top of the validated collection schema contract, making common nested filters easier to author after the discovery model is stable."
     },
     {
       "id": "planning-experiment-os-add-expression-macro-expansion-to-typed-query-trees",
