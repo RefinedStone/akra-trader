@@ -3116,6 +3116,8 @@ const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY = "akra-trader-run-surface-replay-history";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION = 1;
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_KEY = "akra-trader-run-surface-replay-intent";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_VERSION = 1;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES = 12;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-run-surface-replay-history-tab-id";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY = "akra-trader-run-surface-replay-history-sync-audit";
@@ -17119,6 +17121,21 @@ type PredicateRefReplayApplySyncGovernanceState = {
   version: number;
 };
 
+type RunSurfaceCollectionQueryBuilderReplayIntentState = {
+  previewSelection: {
+    diffItemKey: string | null;
+    groupKey: string | null;
+    traceKey: string | null;
+  };
+  replayActionTypeFilter: "all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle";
+  replayEdgeFilter: "all" | string;
+  replayGroupFilter: "all" | string;
+  replayIndex: number;
+  replayScope: "all" | string;
+  templateId: string;
+  version: number;
+};
+
 type PredicateRefReplayApplyConflictState = {
   conflicts: PredicateRefReplayApplyConflictEntry[];
   tabId: string;
@@ -17270,6 +17287,87 @@ function persistRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
     window.sessionStorage.setItem(
       RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_KEY,
       JSON.stringify(nextState),
+    );
+  } catch {
+    return;
+  }
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayIntent(
+  templateId: string | null | undefined,
+): (Omit<RunSurfaceCollectionQueryBuilderReplayIntentState, "templateId" | "version">) | null {
+  if (typeof window === "undefined" || !templateId) {
+    return null;
+  }
+  try {
+    const raw = window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+    const parsed = JSON.parse(raw) as Partial<RunSurfaceCollectionQueryBuilderReplayIntentState> | null;
+    if (
+      !parsed
+      || parsed.version !== RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_VERSION
+      || parsed.templateId !== templateId
+    ) {
+      return null;
+    }
+    return {
+      previewSelection: {
+        diffItemKey: typeof parsed.previewSelection?.diffItemKey === "string"
+          ? parsed.previewSelection.diffItemKey
+          : null,
+        groupKey: typeof parsed.previewSelection?.groupKey === "string"
+          ? parsed.previewSelection.groupKey
+          : null,
+        traceKey: typeof parsed.previewSelection?.traceKey === "string"
+          ? parsed.previewSelection.traceKey
+          : null,
+      },
+      replayActionTypeFilter:
+        parsed.replayActionTypeFilter === "manual_anchor"
+        || parsed.replayActionTypeFilter === "dependency_selection"
+        || parsed.replayActionTypeFilter === "direct_auto_selection"
+        || parsed.replayActionTypeFilter === "conflict_blocked"
+        || parsed.replayActionTypeFilter === "idle"
+          ? parsed.replayActionTypeFilter
+          : "all",
+      replayEdgeFilter:
+        parsed.replayEdgeFilter === "all"
+        || typeof parsed.replayEdgeFilter === "string"
+          ? parsed.replayEdgeFilter
+          : "all",
+      replayGroupFilter:
+        parsed.replayGroupFilter === "all"
+        || typeof parsed.replayGroupFilter === "string"
+          ? parsed.replayGroupFilter
+          : "all",
+      replayIndex:
+        typeof parsed.replayIndex === "number" && Number.isFinite(parsed.replayIndex)
+          ? Math.max(0, Math.floor(parsed.replayIndex))
+          : 0,
+      replayScope:
+        parsed.replayScope === "all"
+        || typeof parsed.replayScope === "string"
+          ? parsed.replayScope
+          : "all",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function persistRunSurfaceCollectionQueryBuilderReplayIntent(state: Omit<RunSurfaceCollectionQueryBuilderReplayIntentState, "version">) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        version: RUN_SURFACE_QUERY_BUILDER_REPLAY_INTENT_STORAGE_VERSION,
+      } satisfies RunSurfaceCollectionQueryBuilderReplayIntentState),
     );
   } catch {
     return;
@@ -19814,10 +19912,12 @@ function RunSurfaceCollectionQueryBuilder({
   const [focusedRuntimeCandidateSampleKey, setFocusedRuntimeCandidateSampleKey] =
     useState<string | null>(null);
   const [clauseReevaluationPreviewSelection, setClauseReevaluationPreviewSelection] =
-    useState<{ diffItemKey: string | null; traceKey: string | null }>({
+    useState<{ diffItemKey: string | null; groupKey: string | null; traceKey: string | null }>({
       diffItemKey: null,
+      groupKey: null,
       traceKey: null,
     });
+  const lastHydratedReplayIntentTemplateIdRef = useRef<string | null>(null);
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -20082,6 +20182,7 @@ function RunSurfaceCollectionQueryBuilder({
     (
       clause: HydratedRunSurfaceCollectionQueryBuilderState | null,
       originTraceKey?: string | null,
+      previewGroupKey?: string | null,
     ) => {
       if (!clause) {
         return;
@@ -20092,6 +20193,7 @@ function RunSurfaceCollectionQueryBuilder({
       setPinnedRuntimeCandidateClauseOriginKey(originTraceKey ?? null);
       setClauseReevaluationPreviewSelection({
         diffItemKey: null,
+        groupKey: previewGroupKey ?? null,
         traceKey: originTraceKey ?? null,
       });
       setEditorFromClause(clause);
@@ -21614,6 +21716,22 @@ function RunSurfaceCollectionQueryBuilder({
     [
       activePredicateRefReplayApplyConflictSimulationFocusedItem,
       simulatedCoordinationGroups,
+    ],
+  );
+  const activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+      ?? clauseReevaluationPreviewSelection.groupKey
+      ?? (
+        bundleCoordinationSimulationReplayGroupFilter !== "all"
+          ? bundleCoordinationSimulationReplayGroupFilter
+          : null
+      )
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+      bundleCoordinationSimulationReplayGroupFilter,
+      clauseReevaluationPreviewSelection.groupKey,
     ],
   );
   const doesTemplateGroupMatchVisibilityRule = useCallback(
@@ -24053,11 +24171,15 @@ function RunSurfaceCollectionQueryBuilder({
   );
   const focusRuntimeCandidateReplayTrace = useCallback((params: {
     diffItemKey?: string | null;
+    groupKey?: string | null;
     sampleKey?: string | null;
     stepIndex: number;
     traceKey: string;
   }) => {
-    const { diffItemKey = null, sampleKey = null, stepIndex, traceKey } = params;
+    const { diffItemKey = null, groupKey = null, sampleKey = null, stepIndex, traceKey } = params;
+    if (groupKey) {
+      setBundleCoordinationSimulationReplayGroupFilter(groupKey);
+    }
     setBundleCoordinationSimulationReplayIndex(stepIndex >= 0 ? stepIndex : 0);
     setRuntimeCandidateTraceDrillthroughByKey((current) => ({
       ...current,
@@ -24065,6 +24187,7 @@ function RunSurfaceCollectionQueryBuilder({
     }));
     setClauseReevaluationPreviewSelection({
       diffItemKey,
+      groupKey,
       traceKey,
     });
     if (sampleKey) {
@@ -24142,7 +24265,7 @@ function RunSurfaceCollectionQueryBuilder({
     ) {
       return;
     }
-    const preferredGroupKey = activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+    const preferredGroupKey = activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey
       ?? (
         bundleCoordinationSimulationReplayGroupFilter !== "all"
         && simulatedCoordinationGroups.some((group) => group.key === bundleCoordinationSimulationReplayGroupFilter)
@@ -24183,7 +24306,7 @@ function RunSurfaceCollectionQueryBuilder({
     }
     setBundleCoordinationSimulationReplayIndex(nextIndex >= 0 ? nextIndex : 0);
   }, [
-    activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+    activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey,
     activePredicateRefReplayApplyConflictSimulationGroupKeys,
     activePredicateRefReplayApplyConflictSimulationReview,
     activePredicateRefReplayApplyConflictSimulationSelectionSignature,
@@ -24399,6 +24522,7 @@ function RunSurfaceCollectionQueryBuilder({
           editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
           focusableDiffSampleKeysByItemKey: Record<string, string | null>;
           focusableSampleKeys: string[];
+          groupKey: string;
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -24457,6 +24581,7 @@ function RunSurfaceCollectionQueryBuilder({
                 originalSamplesByKey.has(item.key) ? [item.key] : []),
             ),
           ),
+          groupKey: activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
           drillthroughKey,
           key: `${drillthroughKey}:simulation_projection`,
           matchedCandidateLabel:
@@ -24487,6 +24612,7 @@ function RunSurfaceCollectionQueryBuilder({
           editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
           focusableDiffSampleKeysByItemKey: Record<string, string | null>;
           focusableSampleKeys: string[];
+          groupKey: string;
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -24576,6 +24702,7 @@ function RunSurfaceCollectionQueryBuilder({
       if (clauseReevaluationPreviewSelection.traceKey || clauseReevaluationPreviewSelection.diffItemKey) {
         setClauseReevaluationPreviewSelection({
           diffItemKey: null,
+          groupKey: null,
           traceKey: null,
         });
       }
@@ -24601,6 +24728,7 @@ function RunSurfaceCollectionQueryBuilder({
         if (matchingDiffItem) {
           return {
             diffItemKey: matchingDiffItem.key,
+            groupKey: trace.groupKey,
             traceKey: trace.drillthroughKey,
           } as const;
         }
@@ -24610,6 +24738,7 @@ function RunSurfaceCollectionQueryBuilder({
         ) {
           return {
             diffItemKey: null,
+            groupKey: trace.groupKey,
             traceKey: trace.drillthroughKey,
           } as const;
         }
@@ -24650,6 +24779,7 @@ function RunSurfaceCollectionQueryBuilder({
       }
       return {
         diffItemKey: bestMatch.matchingDiffItem?.key ?? null,
+        groupKey: bestMatch.trace.groupKey,
         traceKey: bestMatch.trace.drillthroughKey,
       } as const;
     };
@@ -24664,9 +24794,10 @@ function RunSurfaceCollectionQueryBuilder({
       ?? (
         pinnedRuntimeCandidateClauseOriginKey
           ? {
-              diffItemKey: null,
-              traceKey: pinnedRuntimeCandidateClauseOriginKey,
-            } as const
+            diffItemKey: null,
+            groupKey: pinnedRuntimeCandidateClauseOriginKey === currentTrace?.drillthroughKey ? currentTrace?.groupKey ?? null : null,
+            traceKey: pinnedRuntimeCandidateClauseOriginKey,
+          } as const
           : null
       );
     const resolvedSelection =
@@ -24680,15 +24811,19 @@ function RunSurfaceCollectionQueryBuilder({
         editorMatchedSelection
           ? {
               diffItemKey: null,
+              groupKey: editorMatchedSelection.groupKey,
               traceKey: editorMatchedSelection.drillthroughKey,
             } as const
           : null
       )
       ?? {
         diffItemKey: null,
+        groupKey: projectedTraces[0].groupKey,
         traceKey: projectedTraces[0].drillthroughKey,
-      } as const;
+    } as const;
     if (
+      resolvedSelection.groupKey !== clauseReevaluationPreviewSelection.groupKey
+      ||
       resolvedSelection.traceKey !== clauseReevaluationPreviewSelection.traceKey
       || resolvedSelection.diffItemKey !== clauseReevaluationPreviewSelection.diffItemKey
     ) {
@@ -24728,6 +24863,60 @@ function RunSurfaceCollectionQueryBuilder({
   }, [
     clauseReevaluationPreviewSelection,
     simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
+  ]);
+  useEffect(() => {
+    const templateId = selectedRefTemplate?.id ?? null;
+    if (!templateId) {
+      lastHydratedReplayIntentTemplateIdRef.current = null;
+      return;
+    }
+    if (lastHydratedReplayIntentTemplateIdRef.current === templateId) {
+      return;
+    }
+    lastHydratedReplayIntentTemplateIdRef.current = templateId;
+    const persistedIntent = loadRunSurfaceCollectionQueryBuilderReplayIntent(templateId);
+    if (!persistedIntent) {
+      setBundleCoordinationSimulationScope("all");
+      setBundleCoordinationSimulationReplayIndex(0);
+      setBundleCoordinationSimulationReplayGroupFilter("all");
+      setBundleCoordinationSimulationReplayActionTypeFilter("all");
+      setBundleCoordinationSimulationReplayEdgeFilter("all");
+      setClauseReevaluationPreviewSelection({
+        diffItemKey: null,
+        groupKey: null,
+        traceKey: null,
+      });
+      return;
+    }
+    setBundleCoordinationSimulationScope(persistedIntent.replayScope);
+    setBundleCoordinationSimulationReplayIndex(persistedIntent.replayIndex);
+    setBundleCoordinationSimulationReplayGroupFilter(persistedIntent.replayGroupFilter);
+    setBundleCoordinationSimulationReplayActionTypeFilter(persistedIntent.replayActionTypeFilter);
+    setBundleCoordinationSimulationReplayEdgeFilter(persistedIntent.replayEdgeFilter);
+    setClauseReevaluationPreviewSelection(persistedIntent.previewSelection);
+  }, [selectedRefTemplate?.id]);
+  useEffect(() => {
+    const templateId = selectedRefTemplate?.id ?? null;
+    if (!templateId) {
+      return;
+    }
+    persistRunSurfaceCollectionQueryBuilderReplayIntent({
+      previewSelection: clauseReevaluationPreviewSelection,
+      replayActionTypeFilter: bundleCoordinationSimulationReplayActionTypeFilter,
+      replayEdgeFilter: bundleCoordinationSimulationReplayEdgeFilter,
+      replayGroupFilter: bundleCoordinationSimulationReplayGroupFilter,
+      replayIndex: bundleCoordinationSimulationReplayIndex,
+      replayScope: bundleCoordinationSimulationScope,
+      templateId,
+    });
+  }, [
+    bundleCoordinationSimulationReplayActionTypeFilter,
+    bundleCoordinationSimulationReplayEdgeFilter,
+    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationReplayIndex,
+    bundleCoordinationSimulationScope,
+    clauseReevaluationPreviewSelection,
+    selectedRefTemplate?.id,
   ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
@@ -27249,6 +27438,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                               focusRuntimeCandidateClauseEditor(
                                                                 candidateTrace.editorClause,
                                                                 drillthroughKey,
+                                                                activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
                                                               )
                                                             }
                                                             type="button"
@@ -27577,7 +27767,7 @@ function RunSurfaceCollectionQueryBuilder({
                                 {simulatedPredicateRefGroupBundleDiffs.map((diff) => (
                                   <div
                                     className={`run-surface-query-builder-trace-step is-${
-                                      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === diff.groupKey
+                                      activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === diff.groupKey
                                         ? "success"
                                         : "info"
                                     }`}
@@ -27592,7 +27782,7 @@ function RunSurfaceCollectionQueryBuilder({
                                         <span className={`run-surface-query-builder-trace-chip${
                                           predicateRefReplayApplyConflictFocusedDecision?.conflictId
                                             === activePredicateRefReplayApplyConflictSimulationReview?.conflict.conflictId
-                                          && activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === diff.groupKey
+                                          && activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === diff.groupKey
                                             ? " is-active"
                                             : ""
                                         }`}>
@@ -27724,6 +27914,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                   onClick={() =>
                                                     focusRuntimeCandidateReplayTrace({
                                                       diffItemKey: null,
+                                                      groupKey: trace.groupKey,
                                                       sampleKey: trace.primarySampleKey,
                                                       stepIndex: trace.stepIndex,
                                                       traceKey: trace.drillthroughKey,
@@ -27735,11 +27926,18 @@ function RunSurfaceCollectionQueryBuilder({
                                                 {trace.editorClause ? (
                                                   <button
                                                     className="ghost-button"
-                                                    onClick={() =>
+                                                    onClick={() => {
+                                                      setClauseReevaluationPreviewSelection({
+                                                        diffItemKey: null,
+                                                        groupKey: trace.groupKey,
+                                                        traceKey: trace.drillthroughKey,
+                                                      });
                                                       focusRuntimeCandidateClauseEditor(
                                                         trace.editorClause,
                                                         trace.drillthroughKey,
-                                                      )}
+                                                        trace.groupKey,
+                                                      );
+                                                    }}
                                                     type="button"
                                                   >
                                                     Load clause into editor
@@ -27783,6 +27981,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                             onClick={() =>
                                                               focusRuntimeCandidateReplayTrace({
                                                                 diffItemKey: item.key,
+                                                                groupKey: trace.groupKey,
                                                                 sampleKey: trace.focusableDiffSampleKeysByItemKey[item.key],
                                                                 stepIndex: trace.stepIndex,
                                                                 traceKey: trace.drillthroughKey,
@@ -27798,11 +27997,13 @@ function RunSurfaceCollectionQueryBuilder({
                                                             onClick={() => {
                                                               setClauseReevaluationPreviewSelection({
                                                                 diffItemKey: item.key,
+                                                                groupKey: trace.groupKey,
                                                                 traceKey: trace.drillthroughKey,
                                                               });
                                                               focusRuntimeCandidateClauseEditor(
                                                                 trace.editorClause,
                                                                 trace.drillthroughKey,
+                                                                trace.groupKey,
                                                               );
                                                             }}
                                                             type="button"
@@ -28964,7 +29165,7 @@ function RunSurfaceCollectionQueryBuilder({
                                         return (
                                           <span
                                             className={`run-surface-query-builder-trace-chip${
-                                              activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === group.key
+                                              activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === group.key
                                               || bundleCoordinationSimulationReplayGroupFilter === "all"
                                               || bundleCoordinationSimulationReplayGroupFilter === group.key
                                                 ? " is-active"
@@ -29001,7 +29202,7 @@ function RunSurfaceCollectionQueryBuilder({
                                               activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet.has(
                                                 activeSimulatedPredicateRefSolverReplayIndex,
                                               )
-                                              && activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === action.groupKey
+                                              && activePredicateRefReplayApplyConflictSimulationPrimaryFocusGroupKey === action.groupKey
                                                 ? "success"
                                                 : action.type === "conflict_blocked"
                                                 ? "warning"
@@ -29265,6 +29466,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                                         focusRuntimeCandidateClauseEditor(
                                                                           candidateTrace.editorClause,
                                                                           drillthroughKey,
+                                                                          action.groupKey,
                                                                         )
                                                                       }
                                                                       type="button"
