@@ -18153,7 +18153,7 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [selectedRefTemplate],
   );
-  const simulatedCoordinationGroups = useMemo(
+  const simulatedCoordinationGroups = useMemo<ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>>(
     () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
     [selectedRefTemplateParameterGroups],
   );
@@ -18322,6 +18322,53 @@ function RunSurfaceCollectionQueryBuilder({
           if (parameterValue?.trim()) {
             next[parameter.key] = parameterValue;
           }
+        });
+        return next;
+      });
+    },
+    [],
+  );
+  const applyPredicateRefGroupPresetBundles = useCallback(
+    (
+      templateId: string,
+      selections: Array<{
+        group: {
+          key: string;
+          parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+        };
+        bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState | null;
+      }>,
+    ) => {
+      if (!selections.length) {
+        return;
+      }
+      setPredicateRefGroupBundleSelections((current) => {
+        const next = { ...current };
+        selections.forEach(({ group, bundle }) => {
+          next[`${templateId}:${group.key}`] = bundle?.key ?? "";
+        });
+        return next;
+      });
+      setPredicateRefDraftBindings((current) => {
+        const next = { ...current };
+        selections.forEach(({ group, bundle }) => {
+          group.parameters.forEach((parameter) => {
+            delete next[parameter.key];
+          });
+          if (!bundle) {
+            return;
+          }
+          group.parameters.forEach((parameter) => {
+            const bindingPreset = bundle.parameterBindingPresets[parameter.key]?.trim();
+            if (bindingPreset) {
+              next[parameter.key] = toRunSurfaceCollectionQueryBindingReferenceValue(bindingPreset);
+              return;
+            }
+            const parameterValue = bundle.parameterValues[parameter.key];
+            if (parameterValue?.trim()) {
+              next[parameter.key] = parameterValue;
+            }
+          });
         });
         return next;
       });
@@ -19222,6 +19269,74 @@ function RunSurfaceCollectionQueryBuilder({
       bundleCoordinationSimulationReplayEdgeFilter,
     ],
   );
+  const simulatedPredicateRefReplayPromotionDraft = useMemo(() => {
+    type PromotionGroup = ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>[number];
+    const targetSelections = new Map<string, {
+      group: PromotionGroup;
+      bundlesByKey: Map<string, RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState>;
+    }>();
+    activeSimulatedPredicateRefSolverReplayFilteredActions.forEach((action) => {
+      action.dependencyEdges.forEach((edge) => {
+        if (
+          bundleCoordinationSimulationReplayEdgeFilter !== "all"
+          && edge.key !== bundleCoordinationSimulationReplayEdgeFilter
+        ) {
+          return;
+        }
+        const group = simulatedCoordinationGroups.find((candidate) => candidate.key === edge.targetGroupKey);
+        if (!group) {
+          return;
+        }
+        const bundle =
+          getSortedTemplateGroupPresetBundles(group.presetBundles).find(
+            (candidate) => candidate.key === edge.targetBundleKey,
+          ) ?? null;
+        if (!bundle) {
+          return;
+        }
+        const existing = targetSelections.get(group.key);
+        if (existing) {
+          existing.bundlesByKey.set(bundle.key, bundle);
+          return;
+        }
+        targetSelections.set(group.key, {
+          group,
+          bundlesByKey: new Map([[bundle.key, bundle]]),
+        });
+      });
+    });
+    const promotableSelections: Array<{
+      group: PromotionGroup;
+      bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState;
+    }> = [];
+    const conflicts: Array<{
+      groupLabel: string;
+      bundleLabels: string[];
+    }> = [];
+    targetSelections.forEach(({ group, bundlesByKey }) => {
+      const bundles = Array.from(bundlesByKey.values());
+      if (bundles.length === 1) {
+        promotableSelections.push({
+          group,
+          bundle: bundles[0],
+        });
+        return;
+      }
+      conflicts.push({
+        groupLabel: group.label,
+        bundleLabels: bundles.map((bundle) => bundle.label),
+      });
+    });
+    return {
+      promotableSelections,
+      conflicts,
+    };
+  }, [
+    activeSimulatedPredicateRefSolverReplayFilteredActions,
+    bundleCoordinationSimulationReplayEdgeFilter,
+    getSortedTemplateGroupPresetBundles,
+    simulatedCoordinationGroups,
+  ]);
   useEffect(() => {
     if (
       bundleCoordinationSimulationReplayActionTypeFilter !== "all"
@@ -21557,6 +21672,28 @@ function RunSurfaceCollectionQueryBuilder({
                                     </select>
                                   </label>
                                 </div>
+                                <div className="run-surface-query-builder-actions">
+                                  <button
+                                    className="ghost-button"
+                                    disabled={
+                                      !selectedRefTemplate
+                                      || !simulatedPredicateRefReplayPromotionDraft.promotableSelections.length
+                                      || simulatedPredicateRefReplayPromotionDraft.conflicts.length > 0
+                                    }
+                                    onClick={() => {
+                                      if (!selectedRefTemplate || !simulatedPredicateRefReplayPromotionDraft.promotableSelections.length) {
+                                        return;
+                                      }
+                                      applyPredicateRefGroupPresetBundles(
+                                        selectedRefTemplate.id,
+                                        simulatedPredicateRefReplayPromotionDraft.promotableSelections,
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    Promote filtered edges to manual draft
+                                  </button>
+                                </div>
                                 <input
                                   className="run-surface-query-builder-trace-slider"
                                   max={Math.max(0, simulatedPredicateRefSolverReplay.length - 1)}
@@ -21584,6 +21721,20 @@ function RunSurfaceCollectionQueryBuilder({
                                     {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
                                       <p className="run-note">
                                         {`Tracing dependency edge ${activeSimulatedPredicateRefSolverReplayFilteredEdge.label} across replay steps.`}
+                                      </p>
+                                    ) : null}
+                                    {simulatedPredicateRefReplayPromotionDraft.promotableSelections.length ? (
+                                      <p className="run-note">
+                                        {`Manual draft promotion will apply ${simulatedPredicateRefReplayPromotionDraft.promotableSelections
+                                          .map((entry) => `${entry.group.label} → ${entry.bundle.label}`)
+                                          .join(", ")}.`}
+                                      </p>
+                                    ) : null}
+                                    {simulatedPredicateRefReplayPromotionDraft.conflicts.length ? (
+                                      <p className="run-note">
+                                        {`Promotion is blocked by conflicting target bundles in ${simulatedPredicateRefReplayPromotionDraft.conflicts
+                                          .map((conflict) => `${conflict.groupLabel} (${conflict.bundleLabels.join(", ")})`)
+                                          .join("; ")}.`}
                                       </p>
                                     ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
