@@ -21260,10 +21260,44 @@ function RunSurfaceCollectionQueryBuilder({
   const simulatedPredicateRefSolverReplayAttributionByGroupKey = useMemo(
     () => Object.fromEntries(
       simulatedCoordinationGroups.map((group) => {
+        const formatResolvedBundleLabel = (bundleKey: string) => {
+          if (!bundleKey) {
+            return "Unresolved";
+          }
+          return (
+            getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === bundleKey)?.label
+            ?? bundleKey
+          );
+        };
+        const buildEdgeRoleLabel = (
+          edges: Array<{
+            key: string;
+            label: string;
+            sourceGroupKey: string;
+            targetGroupKey: string;
+          }>,
+        ) => {
+          const hasSourceEdge = edges.some((edge) => edge.sourceGroupKey === group.key);
+          const hasTargetEdge = edges.some((edge) => edge.targetGroupKey === group.key);
+          if (hasSourceEdge && hasTargetEdge) {
+            return "Bridge edge";
+          }
+          if (hasSourceEdge) {
+            return "Outbound dependency edge";
+          }
+          if (hasTargetEdge) {
+            return "Inbound dependency edge";
+          }
+          return "Related dependency edge";
+        };
         let previousBundleKey = "";
         const chain: Array<{
+          causalLabel: string;
           detail: string;
+          edgeLabels: string[];
+          edgeRoleLabel: string | null;
           kind: "selection_change" | "group_action" | "dependency_edge";
+          stateTransitionLabel: string | null;
           stepIndex: number;
           stepLabel: string;
           type: string | null;
@@ -21279,37 +21313,49 @@ function RunSurfaceCollectionQueryBuilder({
           const edgeAction = matchingActions.find((action) =>
             action.dependencyEdges.some((edge) =>
               edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key));
+          const relatedEdges = (directAction ?? edgeAction)?.dependencyEdges.filter((edge) =>
+            edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key) ?? [];
+          const edgeRoleLabel = relatedEdges.length ? buildEdgeRoleLabel(relatedEdges) : null;
           const selectionChanged = resolvedBundleKey !== previousBundleKey;
-          const resolvedBundle =
-            getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === resolvedBundleKey)
-            ?? null;
           if (selectionChanged) {
+            const previousBundleLabel = formatResolvedBundleLabel(previousBundleKey);
+            const nextBundleLabel = formatResolvedBundleLabel(resolvedBundleKey);
             chain.push({
-              detail: resolvedBundle
-                ? `${group.label} switched to ${resolvedBundle.label} during ${step.title.toLowerCase()}.`
+              causalLabel: "State transition",
+              detail: resolvedBundleKey
+                ? `${group.label} switched from ${previousBundleLabel} to ${nextBundleLabel} during ${step.title.toLowerCase()}.`
                 : `${group.label} became unresolved during ${step.title.toLowerCase()}.`,
+              edgeLabels: relatedEdges.map((edge) => edge.label),
+              edgeRoleLabel,
               kind: "selection_change",
+              stateTransitionLabel: `${previousBundleLabel} -> ${nextBundleLabel}`,
               stepIndex,
               stepLabel: `Replay step ${stepIndex + 1}`,
               type: directAction?.type ?? edgeAction?.type ?? null,
             });
           } else if (directAction) {
             chain.push({
+              causalLabel: edgeRoleLabel ? `${edgeRoleLabel} action` : "Group action",
               detail: directAction.detail,
+              edgeLabels: relatedEdges.map((edge) => edge.label),
+              edgeRoleLabel,
               kind: "group_action",
+              stateTransitionLabel: null,
               stepIndex,
               stepLabel: `Replay step ${stepIndex + 1}`,
               type: directAction.type,
             });
           } else if (edgeAction) {
-            const edgeLabels = edgeAction.dependencyEdges
-              .filter((edge) => edge.sourceGroupKey === group.key || edge.targetGroupKey === group.key)
-              .map((edge) => edge.label);
+            const edgeLabels = relatedEdges.map((edge) => edge.label);
             chain.push({
+              causalLabel: edgeRoleLabel ?? "Dependency edge",
               detail: edgeLabels.length
                 ? `${group.label} participates in ${edgeLabels.join(", ")} during ${step.title.toLowerCase()}.`
                 : edgeAction.detail,
+              edgeLabels,
+              edgeRoleLabel,
               kind: "dependency_edge",
+              stateTransitionLabel: null,
               stepIndex,
               stepLabel: `Replay step ${stepIndex + 1}`,
               type: edgeAction.type,
@@ -21322,9 +21368,9 @@ function RunSurfaceCollectionQueryBuilder({
           chain,
           chainSummary:
             chain.length > 1
-              ? `${chain.length} replay steps · ${chain[0]?.stepLabel ?? "Replay"} → ${chain[chain.length - 1]?.stepLabel ?? "Replay"}`
+              ? `${chain.length} replay steps · ${chain[0]?.causalLabel ?? chain[0]?.stepLabel ?? "Replay"} → ${chain[chain.length - 1]?.causalLabel ?? chain[chain.length - 1]?.stepLabel ?? "Replay"}`
               : chain.length === 1
-                ? `1 replay step · ${chain[0]?.stepLabel ?? "Replay"}`
+                ? `1 replay step · ${chain[0]?.causalLabel ?? chain[0]?.stepLabel ?? "Replay"}`
                 : "No replay attribution",
           detail: firstAttribution?.detail ?? null,
           stepIndex: firstAttribution?.stepIndex ?? -1,
@@ -21367,6 +21413,19 @@ function RunSurfaceCollectionQueryBuilder({
     [
       activePredicateRefReplayApplyConflictSimulationFocusedChain,
       activeSimulatedPredicateRefSolverReplayIndex,
+    ],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedChainEntry = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationFocusedChainPosition >= 0
+        ? activePredicateRefReplayApplyConflictSimulationFocusedChain[
+            activePredicateRefReplayApplyConflictSimulationFocusedChainPosition
+          ] ?? null
+        : null
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedChain,
+      activePredicateRefReplayApplyConflictSimulationFocusedChainPosition,
     ],
   );
   useEffect(() => {
@@ -24023,7 +24082,34 @@ function RunSurfaceCollectionQueryBuilder({
                                       key={`focused-causal-step:${entry.stepIndex}:${index}`}
                                     >
                                       <strong>{`${entry.stepLabel}${entry.type ? ` · ${entry.type.replaceAll("_", " ")}` : ""}`}</strong>
+                                      <div className="run-surface-query-builder-trace-chip-list">
+                                        <span className="run-surface-query-builder-trace-chip is-active">
+                                          {entry.causalLabel}
+                                        </span>
+                                        {entry.stateTransitionLabel ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {entry.stateTransitionLabel}
+                                          </span>
+                                        ) : null}
+                                        {entry.edgeRoleLabel ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {entry.edgeRoleLabel}
+                                          </span>
+                                        ) : null}
+                                      </div>
                                       <p>{entry.detail}</p>
+                                      {entry.edgeLabels.length ? (
+                                        <div className="run-surface-query-builder-trace-chip-list">
+                                          {entry.edgeLabels.map((edgeLabel) => (
+                                            <span
+                                              className="run-surface-query-builder-trace-chip"
+                                              key={`focused-causal-edge:${entry.stepIndex}:${edgeLabel}`}
+                                            >
+                                              {edgeLabel}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : null}
                                       <div className="run-surface-query-builder-actions">
                                         <button
                                           className="ghost-button"
@@ -24106,6 +24192,20 @@ function RunSurfaceCollectionQueryBuilder({
                                           </span>
                                         ) : null}
                                         <span className="run-surface-query-builder-trace-chip">
+                                          {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain[0]?.causalLabel
+                                            ?? "Replay attribution"}
+                                        </span>
+                                        {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain[0]?.stateTransitionLabel ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain[0]?.stateTransitionLabel}
+                                          </span>
+                                        ) : null}
+                                        {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain[0]?.edgeRoleLabel ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chain[0]?.edgeRoleLabel}
+                                          </span>
+                                        ) : null}
+                                        <span className="run-surface-query-builder-trace-chip">
                                           {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey]?.chainSummary
                                             ?? "No replay attribution"}
                                         </span>
@@ -24129,7 +24229,7 @@ function RunSurfaceCollectionQueryBuilder({
                                               onClick={() => setBundleCoordinationSimulationReplayIndex(entry.stepIndex)}
                                               type="button"
                                             >
-                                              {entry.stepLabel}
+                                              {`${entry.stepLabel} · ${entry.causalLabel}`}
                                             </button>
                                           ))}
                                         {simulatedPredicateRefSolverReplayAttributionByGroupKey[diff.groupKey].chain.length > 4 ? (
@@ -24222,6 +24322,21 @@ function RunSurfaceCollectionQueryBuilder({
                                         ? `Focused chain step ${activePredicateRefReplayApplyConflictSimulationFocusedChainPosition + 1}/${activePredicateRefReplayApplyConflictSimulationFocusedChain.length}`
                                         : "Current replay step is outside the focused reviewed field chain"}
                                     </span>
+                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.causalLabel ? (
+                                      <span className="run-surface-query-builder-trace-chip is-active">
+                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.causalLabel}
+                                      </span>
+                                    ) : null}
+                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.stateTransitionLabel ? (
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.stateTransitionLabel}
+                                      </span>
+                                    ) : null}
+                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.edgeRoleLabel ? (
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.edgeRoleLabel}
+                                      </span>
+                                    ) : null}
                                   </div>
                                 ) : null}
                                 <div className="run-surface-query-builder-actions">
@@ -25317,6 +25432,21 @@ function RunSurfaceCollectionQueryBuilder({
                                                     activePredicateRefReplayApplyConflictSimulationFocusedChainPosition + 1
                                                   }/${activePredicateRefReplayApplyConflictSimulationFocusedChain.length}`}
                                                 </span>
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.causalLabel ? (
+                                                  <span className="run-surface-query-builder-trace-chip is-active">
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.causalLabel}
+                                                  </span>
+                                                ) : null}
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.stateTransitionLabel ? (
+                                                  <span className="run-surface-query-builder-trace-chip">
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.stateTransitionLabel}
+                                                  </span>
+                                                ) : null}
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.edgeRoleLabel ? (
+                                                  <span className="run-surface-query-builder-trace-chip">
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.edgeRoleLabel}
+                                                  </span>
+                                                ) : null}
                                               </div>
                                             ) : null}
                                             {action.dependencyEdges.length ? (
@@ -25332,6 +25462,21 @@ function RunSurfaceCollectionQueryBuilder({
                                                     key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:${edge.key}`}
                                                   >
                                                     {edge.label}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : null}
+                                            {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry?.edgeLabels.length
+                                            && activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet.has(
+                                              activeSimulatedPredicateRefSolverReplayIndex,
+                                            ) ? (
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.edgeLabels.map((edgeLabel) => (
+                                                  <span
+                                                    className="run-surface-query-builder-trace-chip"
+                                                    key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-edge:${edgeLabel}`}
+                                                  >
+                                                    {edgeLabel}
                                                   </span>
                                                 ))}
                                               </div>
