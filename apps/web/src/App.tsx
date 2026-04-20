@@ -18258,6 +18258,26 @@ function RunSurfaceCollectionQueryBuilder({
     [],
   );
   const coordinatedPredicateRefGroupBundleState = useMemo(() => {
+    type AggregatedDependencyRequest = {
+      bundleKey: string;
+      bundleLabel: string;
+      targetPriority: number;
+      hasManualSource: boolean;
+      maxSourcePriority: number;
+      sourceLabels: string[];
+    };
+    type PolicyTraceStep = {
+      key: string;
+      title: string;
+      detail: string;
+      tone: "info" | "success" | "warning" | "muted";
+    };
+    type PolicyTrace = {
+      summary: string;
+      statusLabel: string;
+      tone: PolicyTraceStep["tone"];
+      steps: PolicyTraceStep[];
+    };
     if (!selectedRefTemplate) {
       return {
         autoSelectionsBySelectionKey: {} as Record<string, string>,
@@ -18286,6 +18306,7 @@ function RunSurfaceCollectionQueryBuilder({
           maxSourcePriority: number;
           sourceLabels: string[];
         }>>,
+        policyTraceByGroupKey: {} as Record<string, PolicyTrace>,
       };
     }
     type DependencyRequest = {
@@ -18370,14 +18391,7 @@ function RunSurfaceCollectionQueryBuilder({
     };
     const aggregateDependencyRequests = (requests: DependencyRequest[]) =>
       Object.values(
-        requests.reduce<Record<string, {
-          bundleKey: string;
-          bundleLabel: string;
-          targetPriority: number;
-          hasManualSource: boolean;
-          maxSourcePriority: number;
-          sourceLabels: string[];
-        }>>((accumulator, request) => {
+        requests.reduce<Record<string, AggregatedDependencyRequest>>((accumulator, request) => {
           const existing = accumulator[request.bundleKey];
           const sourceLabel = `${request.sourceGroupLabel} → ${request.sourceBundleLabel}`;
           if (existing) {
@@ -18400,14 +18414,7 @@ function RunSurfaceCollectionQueryBuilder({
         }, {}),
       );
     const sortAggregatedDependencyRequests = (
-      summaries: Array<{
-        bundleKey: string;
-        bundleLabel: string;
-        targetPriority: number;
-        hasManualSource: boolean;
-        maxSourcePriority: number;
-        sourceLabels: string[];
-      }>,
+      summaries: AggregatedDependencyRequest[],
       policy: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"],
       stickyBundleKey: string,
     ) => [...summaries].sort((left, right) => {
@@ -18519,6 +18526,196 @@ function RunSurfaceCollectionQueryBuilder({
           : [];
       }),
     );
+    const policyTraceByGroupKey = Object.fromEntries(
+      selectedRefTemplateParameterGroups.map((group) => {
+        const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
+        const manualBundleKey = manualSelectionsByGroupKey[group.key] ?? "";
+        const manualBundle = getGroupBundle(group.key, manualBundleKey);
+        const resolvedBundleKey = resolvedSelectionsByGroupKey[group.key] ?? "";
+        const resolvedBundle = getGroupBundle(group.key, resolvedBundleKey);
+        const stickyBundleKey = predicateRefGroupAutoBundleSelections[selectionKey] ?? "";
+        const dependencyRequests = dependencyRequestsByGroupKey[group.key] ?? [];
+        const aggregatedDependencyRequests = sortAggregatedDependencyRequests(
+          aggregateDependencyRequests(dependencyRequests),
+          group.coordinationPolicy,
+          stickyBundleKey,
+        );
+        const matchingAutoBundles = getSortedTemplateGroupPresetBundles(group.presetBundles).flatMap((bundle) => {
+          if (!doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings)) {
+            return [];
+          }
+          const unmetDependencies = bundle.dependencies.flatMap((dependency) => {
+            if (resolvedSelectionsByGroupKey[dependency.groupKey] === dependency.bundleKey) {
+              return [];
+            }
+            const targetGroup = groupMap.get(dependency.groupKey);
+            const targetBundle = getGroupBundle(dependency.groupKey, dependency.bundleKey);
+            return [
+              `${targetGroup?.label ?? dependency.groupKey} → ${targetBundle?.label ?? dependency.bundleKey}`,
+            ];
+          });
+          return [{
+            bundle,
+            unmetDependencies,
+          }];
+        });
+        const selectedByDependency = Boolean(
+          resolvedBundleKey && aggregatedDependencyRequests.some((request) => request.bundleKey === resolvedBundleKey),
+        );
+        const selectedAutoBundleEntry =
+          matchingAutoBundles.find(({ bundle }) => bundle.key === resolvedBundleKey)
+          ?? null;
+        const blockedAutoBundles = matchingAutoBundles.filter(
+          ({ unmetDependencies }) => unmetDependencies.length > 0,
+        );
+        const unmetDependencies = unmetDependenciesByGroupKey[group.key] ?? [];
+        let statusLabel = "Idle";
+        let tone: PolicyTrace["tone"] = "muted";
+        let summary = "No coordinated bundle is active for this group right now.";
+        if (manualBundle) {
+          statusLabel = "Manual";
+          tone = "success";
+          summary = `${manualBundle.label} is pinned manually and overrides auto coordination for this group.`;
+        } else if (resolvedBundle && selectedByDependency) {
+          statusLabel = "Resolved";
+          tone = "success";
+          summary = `${resolvedBundle.label} was selected from incoming dependency requests.`;
+        } else if (resolvedBundle && selectedAutoBundleEntry) {
+          statusLabel = "Auto";
+          tone = "success";
+          summary = `${resolvedBundle.label} auto-selected via ${selectedAutoBundleEntry.bundle.autoSelectRule.replaceAll("_", " ")}.`;
+        } else if (
+          aggregatedDependencyRequests.length > 1
+          && group.coordinationPolicy === "manual_resolution"
+        ) {
+          statusLabel = "Blocked";
+          tone = "warning";
+          summary = "Conflicting dependency requests require manual resolution before this group can choose a bundle.";
+        } else if (blockedAutoBundles.length) {
+          statusLabel = "Blocked";
+          tone = "warning";
+          summary = "Auto-select candidates are currently blocked by unresolved dependencies.";
+        } else if (aggregatedDependencyRequests.length) {
+          statusLabel = "Pending";
+          tone = "info";
+          summary = "Dependency requests are present, but this group is still waiting for a coordinated decision.";
+        }
+        const policyDetailParts = [
+          `Uses ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(group.coordinationPolicy)}.`,
+        ];
+        if (group.coordinationPolicy === "sticky_auto_selection" && stickyBundleKey) {
+          const stickyBundle = getGroupBundle(group.key, stickyBundleKey);
+          if (stickyBundle) {
+            policyDetailParts.push(`Current sticky preference is ${stickyBundle.label}.`);
+          }
+        }
+        const steps: PolicyTraceStep[] = [{
+          key: `${group.key}:policy`,
+          title: "Coordination policy",
+          detail: policyDetailParts.join(" "),
+          tone: "info",
+        }];
+        if (manualBundle) {
+          steps.push({
+            key: `${group.key}:manual`,
+            title: "Manual override",
+            detail: `${manualBundle.label} is manually selected, so dependency and auto-selection rules are treated as advisory until you clear the override.`,
+            tone: "success",
+          });
+        }
+        if (aggregatedDependencyRequests.length) {
+          steps.push({
+            key: `${group.key}:requests`,
+            title: aggregatedDependencyRequests.length > 1
+              ? "Incoming dependency requests"
+              : "Incoming dependency request",
+            detail: aggregatedDependencyRequests
+              .map((request) => {
+                const detailParts = [
+                  `from ${request.sourceLabels.join(", ")}`,
+                  `target P${request.targetPriority}`,
+                  `source P${request.maxSourcePriority}`,
+                ];
+                if (request.hasManualSource) {
+                  detailParts.push("includes manual source");
+                }
+                return `${request.bundleLabel} (${detailParts.join(" · ")})`;
+              })
+              .join("; "),
+            tone: aggregatedDependencyRequests.length > 1 ? "warning" : "info",
+          });
+        }
+        if (aggregatedDependencyRequests.length > 1) {
+          if (group.coordinationPolicy === "manual_resolution" && !manualBundle && !resolvedBundle) {
+            steps.push({
+              key: `${group.key}:conflict`,
+              title: "Conflict resolution",
+              detail: "Multiple bundles were requested for this group, and the current policy requires an explicit manual choice before coordination can continue.",
+              tone: "warning",
+            });
+          } else if (resolvedBundle) {
+            steps.push({
+              key: `${group.key}:conflict`,
+              title: "Conflict resolution",
+              detail: `${resolvedBundle.label} won the conflict under ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(group.coordinationPolicy)}.`,
+              tone: "success",
+            });
+          }
+        } else if (!manualBundle && resolvedBundle && selectedByDependency && aggregatedDependencyRequests[0]) {
+          steps.push({
+            key: `${group.key}:dependency-selection`,
+            title: "Dependency-driven selection",
+            detail: `${resolvedBundle.label} satisfied the active request from ${aggregatedDependencyRequests[0].sourceLabels.join(", ")}.`,
+            tone: "success",
+          });
+        }
+        if (!manualBundle && resolvedBundle && selectedAutoBundleEntry && !selectedByDependency) {
+          steps.push({
+            key: `${group.key}:auto-selection`,
+            title: "Direct auto-selection",
+            detail: `${resolvedBundle.label} matched ${selectedAutoBundleEntry.bundle.autoSelectRule.replaceAll("_", " ")} with priority P${selectedAutoBundleEntry.bundle.priority}.`,
+            tone: "success",
+          });
+        }
+        if (blockedAutoBundles.length) {
+          steps.push({
+            key: `${group.key}:blocked-auto`,
+            title: "Blocked auto candidates",
+            detail: blockedAutoBundles
+              .map(
+                ({ bundle, unmetDependencies: bundleUnmetDependencies }) =>
+                  `${bundle.label} (${bundle.autoSelectRule.replaceAll("_", " ")}) is waiting on ${bundleUnmetDependencies.join(", ")}`,
+              )
+              .join("; "),
+            tone: "warning",
+          });
+        }
+        if (unmetDependencies.length) {
+          steps.push({
+            key: `${group.key}:unmet`,
+            title: "Unmet dependencies",
+            detail: `Waiting on ${unmetDependencies
+              .map((dependency) => `${dependency.groupLabel} → ${dependency.bundleLabel}`)
+              .join(", ")}.`,
+            tone: "warning",
+          });
+        }
+        if (tone === "muted" && steps.length === 1) {
+          steps.push({
+            key: `${group.key}:idle`,
+            title: "Idle state",
+            detail: "No incoming dependency requests or matching auto-select rules are currently activating this group.",
+            tone: "muted",
+          });
+        }
+        return [group.key, {
+          summary,
+          statusLabel,
+          tone,
+          steps,
+        }];
+      }),
+    );
     return {
       autoSelectionsBySelectionKey: Object.fromEntries(
         Object.entries(autoSelectionsByGroupKey).map(([groupKey, bundleKey]) => [
@@ -18530,6 +18727,7 @@ function RunSurfaceCollectionQueryBuilder({
       dependencyRequestsByGroupKey,
       unmetDependenciesByGroupKey,
       conflictRequestsByGroupKey,
+      policyTraceByGroupKey,
     };
   }, [
     doesTemplateGroupBundleMatchAutoSelectRule,
@@ -20640,6 +20838,8 @@ function RunSurfaceCollectionQueryBuilder({
                       coordinatedPredicateRefGroupBundleState.conflictRequestsByGroupKey[parameterGroup.key] ?? [];
                     const unmetDependencies =
                       coordinatedPredicateRefGroupBundleState.unmetDependenciesByGroupKey[parameterGroup.key] ?? [];
+                    const policyTrace =
+                      coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey[parameterGroup.key] ?? null;
                     return (
                       <div className="run-surface-query-builder-section" key={groupViewKey}>
                         <div className="run-surface-query-builder-card-head">
@@ -20738,6 +20938,28 @@ function RunSurfaceCollectionQueryBuilder({
                               .join(", ")}
                             .
                           </p>
+                        ) : null}
+                        {parameterGroup.presetBundles.length && policyTrace ? (
+                          <div className="run-surface-query-builder-trace-panel">
+                            <div className="run-surface-query-builder-card-head">
+                              <strong>Policy explanation trace</strong>
+                              <span className={`run-surface-query-builder-trace-status is-${policyTrace.tone}`}>
+                                {policyTrace.statusLabel}
+                              </span>
+                            </div>
+                            <p className="run-note">{policyTrace.summary}</p>
+                            <div className="run-surface-query-builder-trace-list">
+                              {policyTrace.steps.map((step) => (
+                                <div
+                                  className={`run-surface-query-builder-trace-step is-${step.tone}`}
+                                  key={step.key}
+                                >
+                                  <strong>{step.title}</strong>
+                                  <p>{step.detail}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         ) : null}
                         {isGroupContentVisible ? (
                           <div className="run-surface-query-builder-parameter-grid">
