@@ -5444,18 +5444,36 @@
       "direction_id": "experiment-os",
       "title": "Trace replay explanation provenance back to template clause and binding source locations",
       "description": "Finish the replay explanation provenance chain by linking each reviewed field-pick predicate reason or bundle-rule explanation back to the exact template subtree clause or predicate-template binding that produced it, so operators can inspect AST-level source location and authored condition context instead of stopping at derived reason text.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is the last explanation-provenance step: bundle rule and parameter-level reason text now render, but the UI still cannot trace those reasons back to the exact template subtree clause or predicate template binding at AST-level source location. That is the clearest executable next task after commit 01c7077.",
+      "priority_reason": "Completed in main session commit 18dc115, which traced replay explanation provenance through template clause and binding source locations, added clause and binding-source `Explanation provenance` detail to reviewed-field causal-chain steps plus compact active-step provenance, and verified the UI with `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-link-reviewed-field-picks-to-parameter-level-predicate-reasons-and-bundle-rules"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T08:10:00Z",
+      "updated_at": "2026-04-20T07:37:58Z",
       "source_turn_id": null,
-      "direction_relation_note": "Completes experiment-os replay-apply explanation trust by turning derived rule and predicate narratives into traceable authored evidence, so operators can verify not only why a replay edge fired but exactly where that reason originated in the template AST."
+      "direction_relation_note": "Completes the clause-location provenance layer for experiment-os replay-apply explanation trust, so derived rule and predicate narratives now point back to authored template clauses and binding source locations instead of stopping at derived reason text."
+    },
+    {
+      "id": "planning-experiment-os-trace-evaluation-level-provenance-to-matched-predicate-branches-and-comparisons",
+      "direction_id": "experiment-os",
+      "title": "Trace evaluation-level provenance to matched predicate branches and parameter comparisons",
+      "description": "Deepen replay explanation provenance beyond clause and binding source locations by showing which predicate branch, parameter comparison, or equivalent evaluation-level AST fragment actually produced the truthy match for each reviewed-field explanation, so operators can inspect not just authored source locations but the exact semantic test that fired.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is deeper AST semantics: clause and binding-source provenance now ship, but the UI still cannot show which predicate branch or parameter comparison produced the truthy evaluation. That is the clearest executable next task after commit 18dc115.",
+      "depends_on": [
+        "planning-experiment-os-trace-replay-explanation-provenance-back-to-template-clause-and-binding-locations"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T07:37:58Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from authored source-location provenance into evaluation semantics, so operators can verify the exact predicate branch or comparison that made a clause match rather than only the clause that contained it."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
