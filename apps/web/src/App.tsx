@@ -554,6 +554,62 @@ type RunSurfaceSubresourceContract = RunSurfaceSharedContract & {
   contract_kind: "run_subresource";
   schema_detail: Record<string, unknown>;
 };
+type RunSurfaceCollectionQueryContract = RunSurfaceSharedContract & {
+  contract_kind: "query_collection_schema";
+  schema_detail: Record<string, unknown>;
+};
+type RunSurfaceCollectionQueryParameterDomain = {
+  key: string | null;
+  source: string | null;
+  values: string[];
+  enumSource: {
+    kind: string | null;
+    surfaceKey: string | null;
+    path: string[];
+  } | null;
+};
+type RunSurfaceCollectionQueryParameter = {
+  key: string;
+  kind: string;
+  description: string;
+  examples: string[];
+  domain: RunSurfaceCollectionQueryParameterDomain | null;
+};
+type RunSurfaceCollectionQueryElementField = {
+  key: string;
+  queryExposed: boolean;
+  valueType: string;
+  valuePath: string[];
+  valueRoot: boolean;
+  title: string | null;
+  description: string | null;
+  operators: {
+    key: string;
+    label: string;
+    description: string;
+    valueShape: string;
+  }[];
+};
+type RunSurfaceCollectionQuerySchema = {
+  path: string[];
+  pathTemplate: string[];
+  label: string;
+  collectionKind: string;
+  itemKind: string;
+  filterKeys: string[];
+  description: string;
+  parameters: RunSurfaceCollectionQueryParameter[];
+  elementSchema: RunSurfaceCollectionQueryElementField[];
+};
+type RunSurfaceCollectionQueryParameterDomainDescriptor = {
+  parameterKey: string;
+  parameterKind: string;
+  collectionLabel: string;
+  collectionPath: string[];
+  collectionPathTemplate: string[];
+  domain: RunSurfaceCollectionQueryParameterDomain | null;
+  surfaceKey: string;
+};
 
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
@@ -15098,6 +15154,162 @@ function getRunSurfaceSubresourceContracts(capabilities?: RunSurfaceCapabilities
   );
 }
 
+function getRunSurfaceCollectionQueryContracts(capabilities?: RunSurfaceCapabilities | null) {
+  return getRunSurfaceSharedContracts(capabilities).filter(
+    (contract): contract is RunSurfaceCollectionQueryContract =>
+      contract.contract_kind === "query_collection_schema",
+  );
+}
+
+function getCollectionQueryStringArray(value: unknown) {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+}
+
+function getCollectionQueryRecordArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is Record<string, unknown> => typeof item === "object" && item !== null)
+    : [];
+}
+
+function getRunSurfaceCollectionQuerySchemas(
+  contract: RunSurfaceCollectionQueryContract | null | undefined,
+): RunSurfaceCollectionQuerySchema[] {
+  if (!contract) {
+    return [];
+  }
+  return getCollectionQueryRecordArray(contract.schema_detail.collection_schemas).map((schema) => ({
+    path: getCollectionQueryStringArray(schema.path),
+    pathTemplate: getCollectionQueryStringArray(schema.path_template),
+    label: typeof schema.label === "string" ? schema.label : "Collection",
+    collectionKind: typeof schema.collection_kind === "string" ? schema.collection_kind : "collection",
+    itemKind: typeof schema.item_kind === "string" ? schema.item_kind : "item",
+    filterKeys: getCollectionQueryStringArray(schema.filter_keys),
+    description: typeof schema.description === "string" ? schema.description : "",
+    parameters: getCollectionQueryRecordArray(schema.parameters).map((parameter) => {
+      const domainRecord =
+        typeof parameter.domain === "object" && parameter.domain !== null
+          ? (parameter.domain as Record<string, unknown>)
+          : null;
+      const enumSourceRecord =
+        domainRecord && typeof domainRecord.enum_source === "object" && domainRecord.enum_source !== null
+          ? (domainRecord.enum_source as Record<string, unknown>)
+          : null;
+      return {
+        key: typeof parameter.key === "string" ? parameter.key : "",
+        kind: typeof parameter.kind === "string" ? parameter.kind : "",
+        description: typeof parameter.description === "string" ? parameter.description : "",
+        examples: getCollectionQueryStringArray(parameter.examples),
+        domain: domainRecord
+          ? {
+              key: typeof domainRecord.key === "string" ? domainRecord.key : null,
+              source: typeof domainRecord.source === "string" ? domainRecord.source : null,
+              values: getCollectionQueryStringArray(domainRecord.values),
+              enumSource: enumSourceRecord
+                ? {
+                    kind: typeof enumSourceRecord.kind === "string" ? enumSourceRecord.kind : null,
+                    surfaceKey:
+                      typeof enumSourceRecord.surface_key === "string" ? enumSourceRecord.surface_key : null,
+                    path: getCollectionQueryStringArray(enumSourceRecord.path),
+                  }
+                : null,
+            }
+          : null,
+      };
+    }),
+    elementSchema: getCollectionQueryRecordArray(schema.element_schema).map((field) => ({
+      key: typeof field.key === "string" ? field.key : "",
+      queryExposed: field.query_exposed === true,
+      valueType: typeof field.value_type === "string" ? field.value_type : "string",
+      valuePath: getCollectionQueryStringArray(field.value_path),
+      valueRoot: field.value_root === true,
+      title: typeof field.title === "string" ? field.title : null,
+      description: typeof field.description === "string" ? field.description : null,
+      operators: getCollectionQueryRecordArray(field.operators).map((operator) => ({
+        key: typeof operator.key === "string" ? operator.key : "",
+        label: typeof operator.label === "string" ? operator.label : "",
+        description: typeof operator.description === "string" ? operator.description : "",
+        valueShape: typeof operator.value_shape === "string" ? operator.value_shape : "scalar",
+      })),
+    })),
+  }));
+}
+
+function getRunSurfaceCollectionQueryParameterDomains(
+  contract: RunSurfaceCollectionQueryContract | null | undefined,
+): RunSurfaceCollectionQueryParameterDomainDescriptor[] {
+  if (!contract) {
+    return [];
+  }
+  return getCollectionQueryRecordArray(contract.schema_detail.parameter_domains).map((parameterDomain) => {
+    const domainRecord =
+      typeof parameterDomain.domain === "object" && parameterDomain.domain !== null
+        ? (parameterDomain.domain as Record<string, unknown>)
+        : null;
+    const enumSourceRecord =
+      domainRecord && typeof domainRecord.enum_source === "object" && domainRecord.enum_source !== null
+        ? (domainRecord.enum_source as Record<string, unknown>)
+        : null;
+    return {
+      parameterKey: typeof parameterDomain.parameter_key === "string" ? parameterDomain.parameter_key : "",
+      parameterKind: typeof parameterDomain.parameter_kind === "string" ? parameterDomain.parameter_kind : "",
+      collectionLabel: typeof parameterDomain.collection_label === "string" ? parameterDomain.collection_label : "",
+      collectionPath: getCollectionQueryStringArray(parameterDomain.collection_path),
+      collectionPathTemplate: getCollectionQueryStringArray(parameterDomain.collection_path_template),
+      surfaceKey: typeof parameterDomain.surface_key === "string" ? parameterDomain.surface_key : "",
+      domain: domainRecord
+        ? {
+            key: typeof domainRecord.key === "string" ? domainRecord.key : null,
+            source: typeof domainRecord.source === "string" ? domainRecord.source : null,
+            values: getCollectionQueryStringArray(domainRecord.values),
+            enumSource: enumSourceRecord
+              ? {
+                  kind: typeof enumSourceRecord.kind === "string" ? enumSourceRecord.kind : null,
+                  surfaceKey:
+                    typeof enumSourceRecord.surface_key === "string" ? enumSourceRecord.surface_key : null,
+                  path: getCollectionQueryStringArray(enumSourceRecord.path),
+                }
+              : null,
+          }
+        : null,
+    };
+  });
+}
+
+function getCollectionQuerySchemaId(schema: RunSurfaceCollectionQuerySchema) {
+  return schema.pathTemplate.join(".");
+}
+
+function resolveCollectionQueryPath(
+  template: string[],
+  parameterValues: Record<string, string>,
+) {
+  return template.map((segment) => {
+    const match = segment.match(/^\{(.+)\}$/);
+    if (!match) {
+      return segment;
+    }
+    return parameterValues[match[1]] || segment;
+  });
+}
+
+function coerceCollectionQueryBuilderValue(rawValue: string, valueType: string) {
+  if (valueType === "integer") {
+    const parsed = Number.parseInt(rawValue, 10);
+    return Number.isNaN(parsed) ? rawValue : parsed;
+  }
+  if (valueType === "number") {
+    const parsed = Number.parseFloat(rawValue);
+    return Number.isNaN(parsed) ? rawValue : parsed;
+  }
+  if (valueType.startsWith("list[")) {
+    return rawValue
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+  return rawValue;
+}
+
 function getRunSurfaceCapabilityFamily(
   capabilities: RunSurfaceCapabilities | null | undefined,
   familyKey: RunSurfaceCapabilityFamilyKey,
@@ -15264,6 +15476,323 @@ function RunListComparisonBoundaryNote({
   );
 }
 
+function RunSurfaceCollectionQueryBuilder({
+  contracts,
+  compact = false,
+}: {
+  contracts: RunSurfaceCollectionQueryContract[];
+  compact?: boolean;
+}) {
+  const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
+  const activeContract = useMemo(
+    () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
+    [activeContractKey, contracts],
+  );
+  const collectionSchemas = useMemo(
+    () => getRunSurfaceCollectionQuerySchemas(activeContract),
+    [activeContract],
+  );
+  const parameterDomains = useMemo(
+    () => getRunSurfaceCollectionQueryParameterDomains(activeContract),
+    [activeContract],
+  );
+  const [activeSchemaId, setActiveSchemaId] = useState<string>("");
+  const activeSchema = useMemo(
+    () => collectionSchemas.find((schema) => getCollectionQuerySchemaId(schema) === activeSchemaId) ?? collectionSchemas[0] ?? null,
+    [activeSchemaId, collectionSchemas],
+  );
+  const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
+  const [quantifier, setQuantifier] = useState<"any" | "all" | "none">("any");
+  const [activeFieldKey, setActiveFieldKey] = useState<string>("");
+  const activeField = useMemo(
+    () => activeSchema?.elementSchema.find((field) => field.key === activeFieldKey) ?? activeSchema?.elementSchema[0] ?? null,
+    [activeFieldKey, activeSchema],
+  );
+  const [activeOperatorKey, setActiveOperatorKey] = useState<string>("");
+  const activeOperator = useMemo(
+    () => activeField?.operators.find((operator) => operator.key === activeOperatorKey) ?? activeField?.operators[0] ?? null,
+    [activeField, activeOperatorKey],
+  );
+  const [builderValue, setBuilderValue] = useState<string>("");
+
+  useEffect(() => {
+    if (!contracts.length) {
+      setActiveContractKey("");
+      return;
+    }
+    if (!contracts.some((contract) => contract.contract_key === activeContractKey)) {
+      setActiveContractKey(contracts[0].contract_key);
+    }
+  }, [activeContractKey, contracts]);
+
+  useEffect(() => {
+    if (!activeSchema) {
+      setActiveSchemaId("");
+      return;
+    }
+    const schemaId = getCollectionQuerySchemaId(activeSchema);
+    if (!collectionSchemas.some((schema) => getCollectionQuerySchemaId(schema) === activeSchemaId)) {
+      setActiveSchemaId(schemaId);
+    }
+  }, [activeSchema, activeSchemaId, collectionSchemas]);
+
+  useEffect(() => {
+    if (!activeSchema) {
+      setParameterValues({});
+      return;
+    }
+    setParameterValues((current) => {
+      const next: Record<string, string> = {};
+      activeSchema.parameters.forEach((parameter) => {
+        const optionValues = parameter.domain?.values.length
+          ? parameter.domain.values
+          : parameter.examples;
+        if (current[parameter.key] && optionValues.includes(current[parameter.key])) {
+          next[parameter.key] = current[parameter.key];
+          return;
+        }
+        if (optionValues[0]) {
+          next[parameter.key] = optionValues[0];
+          return;
+        }
+        if (current[parameter.key]) {
+          next[parameter.key] = current[parameter.key];
+        }
+      });
+      return next;
+    });
+  }, [activeSchema]);
+
+  useEffect(() => {
+    if (!activeField) {
+      setActiveFieldKey("");
+      return;
+    }
+    if (!activeSchema?.elementSchema.some((field) => field.key === activeFieldKey)) {
+      setActiveFieldKey(activeField.key);
+    }
+  }, [activeField, activeFieldKey, activeSchema]);
+
+  useEffect(() => {
+    if (!activeOperator) {
+      setActiveOperatorKey("");
+      return;
+    }
+    if (!activeField?.operators.some((operator) => operator.key === activeOperatorKey)) {
+      setActiveOperatorKey(activeOperator.key);
+    }
+  }, [activeField, activeOperator, activeOperatorKey]);
+
+  const resolvedCollectionPath = useMemo(
+    () => (activeSchema ? resolveCollectionQueryPath(activeSchema.pathTemplate, parameterValues) : []),
+    [activeSchema, parameterValues],
+  );
+
+  const filterExpressionPreview = useMemo(() => {
+    if (!activeSchema || !activeField || !activeOperator) {
+      return "";
+    }
+    return JSON.stringify(
+      {
+        collection: {
+          path: resolvedCollectionPath,
+          quantifier,
+        },
+        conditions: [
+          {
+            key: activeField.key,
+            operator: activeOperator.key,
+            value: coerceCollectionQueryBuilderValue(builderValue, activeField.valueType),
+          },
+        ],
+      },
+      null,
+      2,
+    );
+  }, [activeField, activeOperator, activeSchema, builderValue, quantifier, resolvedCollectionPath]);
+
+  if (!contracts.length || !activeContract || !activeSchema) {
+    return null;
+  }
+
+  return (
+    <div className={`run-surface-query-builder ${compact ? "compact" : ""}`.trim()}>
+      <div className="run-surface-query-builder-head">
+        <div>
+          <span>Collection query builder</span>
+          <strong>{activeContract.title}</strong>
+        </div>
+        {contracts.length > 1 ? (
+          <label className="run-surface-query-builder-control">
+            <span>Contract</span>
+            <select
+              value={activeContract.contract_key}
+              onChange={(event) => setActiveContractKey(event.target.value)}
+            >
+              {contracts.map((contract) => (
+                <option key={contract.contract_key} value={contract.contract_key}>
+                  {contract.title}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <span className="meta-pill subtle">{activeContract.contract_key}</span>
+        )}
+      </div>
+      <p className="run-note">{activeContract.summary}</p>
+      <div className="run-surface-query-builder-grid">
+        <div className="run-surface-query-builder-card">
+          <div className="run-surface-query-builder-card-head">
+            <strong>Builder</strong>
+            <span>{activeSchema.collectionKind}</span>
+          </div>
+          <div className="run-surface-query-builder-form">
+            <label className="run-surface-query-builder-control">
+              <span>Collection path</span>
+              <select
+                value={getCollectionQuerySchemaId(activeSchema)}
+                onChange={(event) => setActiveSchemaId(event.target.value)}
+              >
+                {collectionSchemas.map((schema) => (
+                  <option key={getCollectionQuerySchemaId(schema)} value={getCollectionQuerySchemaId(schema)}>
+                    {schema.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {activeSchema.parameters.length ? (
+              <div className="run-surface-query-builder-parameter-grid">
+                {activeSchema.parameters.map((parameter) => {
+                  const optionValues = parameter.domain?.values.length
+                    ? parameter.domain.values
+                    : parameter.examples;
+                  const enumSource = parameter.domain?.enumSource;
+                  return (
+                    <label className="run-surface-query-builder-control" key={parameter.key}>
+                      <span>{parameter.key}</span>
+                      <select
+                        value={parameterValues[parameter.key] ?? ""}
+                        onChange={(event) =>
+                          setParameterValues((current) => ({
+                            ...current,
+                            [parameter.key]: event.target.value,
+                          }))}
+                      >
+                        {optionValues.map((value) => (
+                          <option key={value} value={value}>
+                            {value}
+                          </option>
+                        ))}
+                      </select>
+                      <small>
+                        {parameter.description}
+                        {enumSource
+                          ? ` Enum source: ${enumSource.kind ?? "enum"} @ ${(enumSource.path ?? []).join(".")}`
+                          : ""}
+                      </small>
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
+            <div className="run-surface-query-builder-inline-grid">
+              <label className="run-surface-query-builder-control">
+                <span>Quantifier</span>
+                <select
+                  value={quantifier}
+                  onChange={(event) => setQuantifier(event.target.value as "any" | "all" | "none")}
+                >
+                  <option value="any">any</option>
+                  <option value="all">all</option>
+                  <option value="none">none</option>
+                </select>
+              </label>
+              <label className="run-surface-query-builder-control">
+                <span>Field</span>
+                <select
+                  value={activeField?.key ?? ""}
+                  onChange={(event) => setActiveFieldKey(event.target.value)}
+                >
+                  {activeSchema.elementSchema.map((field) => (
+                    <option key={field.key} value={field.key}>
+                      {field.key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="run-surface-query-builder-control">
+                <span>Operator</span>
+                <select
+                  value={activeOperator?.key ?? ""}
+                  onChange={(event) => setActiveOperatorKey(event.target.value)}
+                >
+                  {(activeField?.operators ?? []).map((operator) => (
+                    <option key={operator.key} value={operator.key}>
+                      {operator.key}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <label className="run-surface-query-builder-control">
+              <span>Value</span>
+              <input
+                type="text"
+                value={builderValue}
+                onChange={(event) => setBuilderValue(event.target.value)}
+                placeholder={activeField?.valueType === "string" ? "type a value" : activeField?.valueType}
+              />
+              <small>
+                {activeField?.description ?? "Typed from collection element schema."}
+              </small>
+            </label>
+          </div>
+        </div>
+        <div className="run-surface-query-builder-card">
+          <div className="run-surface-query-builder-card-head">
+            <strong>Resolved metadata</strong>
+            <span>{activeSchema.itemKind}</span>
+          </div>
+          <p className="run-note">
+            Resolved path: <code>{resolvedCollectionPath.join(".")}</code>
+          </p>
+          {parameterDomains.length ? (
+            <div className="run-surface-query-builder-domain-list">
+              {parameterDomains.map((parameterDomain) => (
+                <div className="run-surface-query-builder-domain-card" key={`${parameterDomain.surfaceKey}:${parameterDomain.parameterKey}`}>
+                  <strong>{parameterDomain.parameterKey}</strong>
+                  <p className="run-note">
+                    {parameterDomain.collectionLabel} · {parameterDomain.parameterKind}
+                  </p>
+                  {parameterDomain.domain?.source ? (
+                    <p className="run-note">Domain source: {parameterDomain.domain.source}</p>
+                  ) : null}
+                  {parameterDomain.domain?.enumSource ? (
+                    <p className="run-note">
+                      Enum source: {parameterDomain.domain.enumSource.kind ?? "enum"} @ {parameterDomain.domain.enumSource.path.join(".")}
+                    </p>
+                  ) : null}
+                  <div className="run-surface-family-chip-row">
+                    {parameterDomain.domain?.values.map((value) => (
+                      <span className="run-surface-family-chip" key={`${parameterDomain.parameterKey}:${value}`}>
+                        {value}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="run-note">No parameter domains are declared for this collection path.</p>
+          )}
+          <pre className="run-surface-query-builder-preview">{filterExpressionPreview}</pre>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function RunSurfaceCapabilityDiscoveryPanel({
   capabilities,
   compact = false,
@@ -15286,6 +15815,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
     ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.";
   const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v13";
   const runSubresourceSharedContracts = getRunSurfaceSubresourceContracts(capabilities);
+  const collectionQueryContracts = getRunSurfaceCollectionQueryContracts(capabilities);
 
   return (
     <section className={`run-surface-capability-panel ${compact ? "compact" : ""}`.trim()}>
@@ -15297,6 +15827,9 @@ function RunSurfaceCapabilityDiscoveryPanel({
         </div>
         <span className="meta-pill subtle">{schemaVersion}</span>
       </div>
+      {collectionQueryContracts.length ? (
+        <RunSurfaceCollectionQueryBuilder contracts={collectionQueryContracts} compact={compact} />
+      ) : null}
       {sharedContracts.length ? (
         <div className="run-surface-family-section">
           <span>Shared contracts</span>
