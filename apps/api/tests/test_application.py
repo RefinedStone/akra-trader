@@ -14038,6 +14038,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert run_issue_text_spec.value_root is True
   assert run_issue_text_spec.query_exposed is False
   assert bindings_by_key["run_list"].filter_param_specs[-1].operators[0].key == "contains_all"
+  assert bindings_by_key["run_list"].collection_path_specs[0].path == ("orders",)
+  assert bindings_by_key["run_list"].collection_path_specs[0].filter_keys == ("order_status", "order_type")
+  assert bindings_by_key["run_list"].collection_path_specs[1].path == (
+    "provenance",
+    "market_data_by_symbol",
+    "issues",
+  )
+  assert bindings_by_key["run_list"].collection_path_specs[1].item_kind == "issue_text"
   assert bindings_by_key["run_list"].sort_field_specs[0].default_direction == "desc"
   assert bindings_by_key["run_list"].sort_field_specs[-1].key == "metrics.trade_count"
   nested_run_metric_sort = next(

@@ -22989,6 +22989,7 @@ class StandaloneSurfaceRuntimeBinding:
   filter_keys: tuple[str, ...] = ()
   filter_param_specs: tuple["StandaloneSurfaceFilterParamSpec", ...] = ()
   sort_field_specs: tuple["StandaloneSurfaceSortFieldSpec", ...] = ()
+  collection_path_specs: tuple["StandaloneSurfaceCollectionPathSpec", ...] = ()
   path_param_keys: tuple[str, ...] = ()
   header_keys: tuple[str, ...] = ()
   request_payload_kind: str | None = None
@@ -23042,6 +23043,16 @@ class StandaloneSurfaceFilterParamSpec:
   value_path: tuple[str, ...] = ()
   query_exposed: bool = True
   value_root: bool = False
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceCollectionPathSpec:
+  path: tuple[str, ...]
+  label: str
+  collection_kind: str
+  item_kind: str
+  filter_keys: tuple[str, ...]
+  description: str = ""
 
 
 @dataclass(frozen=True)
@@ -24595,6 +24606,24 @@ def list_standalone_surface_runtime_bindings(
           ),
         ),
         value_path=("provenance", "experiment", "tags"),
+      ),
+    ),
+    collection_path_specs=(
+      StandaloneSurfaceCollectionPathSpec(
+        path=("orders",),
+        label="Run orders",
+        collection_kind="object_collection",
+        item_kind="order",
+        filter_keys=("order_status", "order_type"),
+        description="Evaluates predicates against individual run order objects.",
+      ),
+      StandaloneSurfaceCollectionPathSpec(
+        path=("provenance", "market_data_by_symbol", "issues"),
+        label="Market-data issues",
+        collection_kind="nested_collection",
+        item_kind="issue_text",
+        filter_keys=("issue_text",),
+        description="Evaluates predicates against flattened issue strings across market-data lineage entries.",
       ),
     ),
     sort_field_specs=(

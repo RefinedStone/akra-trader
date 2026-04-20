@@ -367,6 +367,17 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["collection_nodes"]["field"] == "collection"
   assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["quantifier"] == "any|all|none"
   assert "flattening nested collection-of-collection paths" in run_query_schema["expression_trees"]["collection_nodes"]["semantics"]
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["path"] == ["orders"]
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["filter_keys"] == [
+    "order_status",
+    "order_type",
+  ]
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["path"] == [
+    "provenance",
+    "market_data_by_symbol",
+    "issues",
+  ]
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["item_kind"] == "issue_text"
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]
@@ -1036,6 +1047,38 @@ def test_run_query_contract_supports_nested_collection_of_collection_paths(tmp_p
       ]
     )
     assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
+
+
+def test_run_query_contract_rejects_unknown_collection_shape_paths(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+      },
+    )
+    assert response.status_code == 200
+
+    filter_expression = {
+      "collection": {
+        "path": "provenance.market_data_by_symbol.unknown_branch",
+        "quantifier": "any",
+      },
+      "logic": "and",
+      "conditions": [
+        {"key": "issue_text", "operator": "prefix", "value": "gap:"},
+      ],
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[("filter_expr", json.dumps(filter_expression))],
+    )
+
+    assert response.status_code == 400
+    assert "Unsupported filter expression collection path" in response.json()["detail"]
 
 
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:

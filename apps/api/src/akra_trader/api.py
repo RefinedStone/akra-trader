@@ -30,6 +30,7 @@ from akra_trader.application import StandaloneSurfaceFilterParamSpec
 from akra_trader.application import StandaloneSurfaceSortTerm
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.application import StandaloneSurfaceFilterExpressionNode
+from akra_trader.application import StandaloneSurfaceCollectionPathSpec
 from akra_trader.bootstrap import Container
 
 
@@ -254,6 +255,17 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
           },
           "semantics": "Evaluates the node against collection elements, flattening nested collection-of-collection paths, and folds the results with the declared quantifier.",
         },
+        "collection_schemas": [
+          {
+            "path": list(spec.path),
+            "label": spec.label,
+            "collection_kind": spec.collection_kind,
+            "item_kind": spec.item_kind,
+            "filter_keys": list(spec.filter_keys),
+            "description": spec.description,
+          }
+          for spec in binding.collection_path_specs
+        ],
         "condition_shape": {
           "key": "<filter_key>",
           "operator": "<operator>",
@@ -426,12 +438,15 @@ def _parse_runtime_filter_expression_condition(
   raw_condition: Any,
   *,
   filter_specs_by_key: dict[str, StandaloneSurfaceFilterParamSpec],
+  allowed_filter_keys: set[str] | None = None,
 ) -> StandaloneSurfaceFilterCondition:
   if not isinstance(raw_condition, dict):
     raise ValueError("Filter expression conditions must be objects.")
   filter_key = raw_condition.get("key")
   if not isinstance(filter_key, str) or not filter_key:
     raise ValueError("Filter expression conditions must declare a filter key.")
+  if allowed_filter_keys is not None and filter_key not in allowed_filter_keys:
+    raise ValueError(f"Filter key {filter_key} is not allowed in this collection expression scope.")
   spec = filter_specs_by_key.get(filter_key)
   if spec is None:
     raise ValueError(f"Unsupported filter key in filter expression: {filter_key}")
@@ -466,12 +481,40 @@ def _parse_runtime_filter_expression_condition(
   )
 
 
+def _normalize_collection_schema_path(raw_path: Any) -> tuple[str, ...]:
+  if isinstance(raw_path, str):
+    return tuple(
+      segment
+      for segment in raw_path.split(".")
+      if segment
+    )
+  if isinstance(raw_path, list) and all(isinstance(segment, str) and segment for segment in raw_path):
+    return tuple(raw_path)
+  raise ValueError("Filter expression collection paths must be a dotted string or list of path segments.")
+
+
+def _resolve_collection_path_schema(
+  collection_path: tuple[str, ...],
+  *,
+  collection_specs_by_path: dict[tuple[str, ...], StandaloneSurfaceCollectionPathSpec],
+) -> StandaloneSurfaceCollectionPathSpec:
+  collection_spec = collection_specs_by_path.get(collection_path)
+  if collection_spec is None:
+    raise ValueError(
+      "Unsupported filter expression collection path: "
+      + ".".join(collection_path)
+    )
+  return collection_spec
+
+
 def _parse_runtime_filter_expression_node(
   raw_node: Any,
   *,
   filter_specs_by_key: dict[str, StandaloneSurfaceFilterParamSpec],
   predicate_registry: dict[str, Any],
+  collection_specs_by_path: dict[tuple[str, ...], StandaloneSurfaceCollectionPathSpec],
   active_predicate_refs: tuple[str, ...] = (),
+  active_collection_filter_keys: set[str] | None = None,
 ) -> StandaloneSurfaceFilterExpressionNode:
   if not isinstance(raw_node, dict):
     raise ValueError("Filter expression nodes must be objects.")
@@ -488,7 +531,9 @@ def _parse_runtime_filter_expression_node(
       referenced_node,
       filter_specs_by_key=filter_specs_by_key,
       predicate_registry=predicate_registry,
+      collection_specs_by_path=collection_specs_by_path,
       active_predicate_refs=(*active_predicate_refs, predicate_ref),
+      active_collection_filter_keys=active_collection_filter_keys,
     )
     if bool(raw_node.get("negated", False)):
       return StandaloneSurfaceFilterExpressionNode(
@@ -496,6 +541,8 @@ def _parse_runtime_filter_expression_node(
         conditions=resolved.conditions,
         children=resolved.children,
         negated=not resolved.negated,
+        collection_path=resolved.collection_path,
+        collection_quantifier=resolved.collection_quantifier,
       )
     return resolved
   logic = raw_node.get("logic", "and")
@@ -503,21 +550,17 @@ def _parse_runtime_filter_expression_node(
     raise ValueError("Filter expression logic must be either `and` or `or`.")
   collection_path: tuple[str, ...] = ()
   collection_quantifier: str | None = None
+  node_allowed_filter_keys = active_collection_filter_keys
   raw_collection = raw_node.get("collection")
   if raw_collection is not None:
     if not isinstance(raw_collection, dict):
       raise ValueError("Filter expression collection nodes must declare an object `collection` field.")
-    raw_collection_path = raw_collection.get("path")
-    if isinstance(raw_collection_path, str):
-      collection_path = tuple(
-        segment
-        for segment in raw_collection_path.split(".")
-        if segment
-      )
-    elif isinstance(raw_collection_path, list) and all(isinstance(segment, str) and segment for segment in raw_collection_path):
-      collection_path = tuple(raw_collection_path)
-    else:
-      raise ValueError("Filter expression collection paths must be a dotted string or list of path segments.")
+    collection_path = _normalize_collection_schema_path(raw_collection.get("path"))
+    collection_spec = _resolve_collection_path_schema(
+      collection_path,
+      collection_specs_by_path=collection_specs_by_path,
+    )
+    node_allowed_filter_keys = set(collection_spec.filter_keys)
     raw_collection_quantifier = raw_collection.get("quantifier")
     if not isinstance(raw_collection_quantifier, str) or raw_collection_quantifier not in {"any", "all", "none"}:
       raise ValueError("Filter expression collection quantifier must be one of `any`, `all`, or `none`.")
@@ -532,6 +575,7 @@ def _parse_runtime_filter_expression_node(
     _parse_runtime_filter_expression_condition(
       raw_condition,
       filter_specs_by_key=filter_specs_by_key,
+      allowed_filter_keys=node_allowed_filter_keys,
     )
     for raw_condition in raw_conditions
   )
@@ -540,7 +584,9 @@ def _parse_runtime_filter_expression_node(
       raw_child,
       filter_specs_by_key=filter_specs_by_key,
       predicate_registry=predicate_registry,
+      collection_specs_by_path=collection_specs_by_path,
       active_predicate_refs=active_predicate_refs,
+      active_collection_filter_keys=node_allowed_filter_keys,
     )
     for raw_child in raw_children
   )
@@ -567,6 +613,10 @@ def _build_runtime_filter_expression(
     parsed_expression = json.loads(raw_expression)
   except json.JSONDecodeError as exc:
     raise ValueError("Filter expression must be valid JSON.") from exc
+  collection_specs_by_path = {
+    spec.path: spec
+    for spec in binding.collection_path_specs
+  }
   predicate_registry: dict[str, Any] = {}
   root_expression = parsed_expression
   if isinstance(parsed_expression, dict) and "predicates" in parsed_expression:
@@ -589,6 +639,7 @@ def _build_runtime_filter_expression(
       for spec in binding.filter_param_specs
     },
     predicate_registry=predicate_registry,
+    collection_specs_by_path=collection_specs_by_path,
   )
 
 
@@ -776,15 +827,19 @@ def create_router(container: Container) -> APIRouter:
         _, dump_kwargs = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
         request_payload = request_model.model_dump(**dump_kwargs)
       request_context = kwargs.get("request")
+      try:
+        filters = _build_runtime_query_filters(
+          binding,
+          kwargs=kwargs,
+          request=request_context,
+        )
+      except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
       return dispatch_standalone_binding(
         binding=binding,
         app=kwargs["app"],
         run_id=kwargs.get("run_id"),
-        filters=_build_runtime_query_filters(
-          binding,
-          kwargs=kwargs,
-          request=request_context,
-        ),
+        filters=filters,
         path_params=(
           {key: kwargs[key] for key in binding.path_param_keys}
           if binding.path_param_keys
