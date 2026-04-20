@@ -16,6 +16,9 @@ This wave introduces the first routing skeleton:
 - `App.tsx` now delegates active route composition to `WorkspaceRouteContent.tsx`
 - shared control-room types/constants moved into `apps/web/src/controlRoomDefinitions.ts`
 - transport helpers moved into `apps/web/src/controlRoomApi.ts`
+- run-surface capability contracts and comparison-boundary helpers now live in
+  `apps/web/src/runSurfaceCapabilities.tsx`
+- the query-builder feature now has its own package under `apps/web/src/features/query-builder/*`
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -60,16 +63,19 @@ where routing and presentation structure are decided.
 - route composition
   - keep overview, research, runtime ops, and guarded-live panel grouping in `src/routes/*`
 - remaining giant feature body
-  - dense feature JSX still lives mostly in `App.tsx`
-  - top-level control-room type/constant and API helper context no longer lives inline in that file
-  - next waves should split those panels into feature-owned modules behind each route
+  - dense feature JSX still lives mostly in `App.tsx`, but query-builder no longer does
+  - top-level control-room type/constant, transport, and run-surface contract context no longer
+    lives inline in that file
+  - next waves should split comparison/history and run-panel bodies into feature-owned modules behind
+    each route
 
 ## Remaining Pressure Points
 
-- `App.tsx` still owns too much feature state and JSX.
+- `App.tsx` is materially smaller, but it still owns too much feature state and JSX.
 - route modules now own panel grouping, but they do not yet own their own data loading or feature-local state.
-- shared types/constants and API helpers now have their own modules, but feature-local clients and
-  dense rendering logic are still mixed into the control-room file.
+- shared types/constants, transport helpers, and run-surface capability helpers now have their own
+  modules, but comparison/history and run-panel rendering logic are still mixed into the control-room
+  file.
 - comparison/history tooling is still large enough to deserve its own subsystem.
 
 ## Done Criteria For This Track
@@ -78,4 +84,5 @@ where routing and presentation structure are decided.
 - shell layout can change without touching dense feature logic
 - workspace panel grouping can change without rewriting route selection branches in `App.tsx`
 - new workspace-level navigation changes happen under `src/app/*`
+- query-builder feature logic can evolve without reopening `App.tsx`
 - next feature splits can move one workspace at a time without redefining routing

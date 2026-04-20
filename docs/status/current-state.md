@@ -103,8 +103,12 @@ It is not yet a finished live trading product:
 - workspace-level panel grouping now lives under `apps/web/src/routes/*`
 - shared control-room type/constant definitions now live in `apps/web/src/controlRoomDefinitions.ts`
 - shared control-room transport helpers now live in `apps/web/src/controlRoomApi.ts`
-- dense feature content is still mostly in one large control-room file, but shell/routing concerns
-  and route-level panel selection are no longer defined inline with all feature rendering
+- run-surface capability and comparison-boundary helpers now live in
+  `apps/web/src/runSurfaceCapabilities.tsx`
+- query-builder feature logic now lives under `apps/web/src/features/query-builder/*`
+- dense feature content is still mostly in one large control-room file, but shell/routing concerns,
+  route-level panel selection, run-surface capability helpers, and query-builder rendering are no
+  longer defined inline with the remaining control-room body
 - separate histories for backtest, sandbox, paper, and live modes
 - guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
 - operator surfaces for replay-link alias governance and audit export administration
@@ -117,8 +121,9 @@ It is not yet a finished live trading product:
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to
   be extracted out of `App.tsx`
-- the top-level control-room file no longer owns its full type/constant and API helper context, but
-  it still owns too much feature-local state and dense rendering logic
+- the top-level control-room file no longer owns its full type/constant, API helper, run-surface
+  helper, or query-builder context, but it still owns too much feature-local state and dense
+  rendering logic
 - standalone surface binding catalogs are isolated from the executor now, but the catalog module is
   still broad and should split further by bounded flow
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator
