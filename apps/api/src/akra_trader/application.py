@@ -22994,11 +22994,31 @@ class StandaloneSurfaceRuntimeBinding:
 
 
 @dataclass(frozen=True)
+class StandaloneSurfaceFilterConstraintSpec:
+  min_length: int | None = None
+  max_length: int | None = None
+  ge: float | None = None
+  le: float | None = None
+  pattern: str | None = None
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceFilterOpenAPISpec:
+  alias: str | None = None
+  title: str | None = None
+  description: str | None = None
+  deprecated: bool = False
+  examples: tuple[Any, ...] = ()
+
+
+@dataclass(frozen=True)
 class StandaloneSurfaceFilterParamSpec:
   key: str
   annotation: Any
   default: Any = None
   default_factory: Callable[[], Any] | None = None
+  constraints: StandaloneSurfaceFilterConstraintSpec | None = None
+  openapi: StandaloneSurfaceFilterOpenAPISpec | None = None
 
 
 def _serialize_run_order_subresource_item(
@@ -23161,7 +23181,17 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="market_data_status",
     filter_keys=("timeframe",),
     filter_param_specs=(
-      StandaloneSurfaceFilterParamSpec("timeframe", str, default="5m"),
+      StandaloneSurfaceFilterParamSpec(
+        "timeframe",
+        str,
+        default="5m",
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=2, max_length=10),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Timeframe",
+          description="Candlestick timeframe to inspect in market-data status.",
+          examples=("5m",),
+        ),
+      ),
     ),
   )
   operator_visibility_binding = StandaloneSurfaceRuntimeBinding(
@@ -23189,9 +23219,39 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="strategy_catalog_discovery",
     filter_keys=("lane", "lifecycle_stage", "version"),
     filter_param_specs=(
-      StandaloneSurfaceFilterParamSpec("lane", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("lifecycle_stage", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("version", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec(
+        "lane",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Lane",
+          description="Filter strategies by runtime lane.",
+          examples=("native",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "lifecycle_stage",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Lifecycle stage",
+          description="Filter strategies by lifecycle stage.",
+          examples=("active",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "version",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Version",
+          description="Filter strategies by declared version string.",
+          examples=("1.0.0",),
+        ),
+      ),
     ),
   )
   reference_discovery_binding = StandaloneSurfaceRuntimeBinding(
@@ -23211,9 +23271,39 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="preset_catalog_discovery",
     filter_keys=("strategy_id", "timeframe", "lifecycle_stage"),
     filter_param_specs=(
-      StandaloneSurfaceFilterParamSpec("strategy_id", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("timeframe", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("lifecycle_stage", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec(
+        "strategy_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Strategy ID",
+          description="Filter presets by strategy identifier.",
+          examples=("ma_cross_v1",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "timeframe",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=2, max_length=10),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Timeframe",
+          description="Filter presets by configured timeframe.",
+          examples=("5m",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "lifecycle_stage",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Lifecycle stage",
+          description="Filter presets by lifecycle stage.",
+          examples=("draft",),
+        ),
+      ),
     ),
   )
   preset_create_binding = StandaloneSurfaceRuntimeBinding(
@@ -23305,14 +23395,91 @@ def list_standalone_surface_runtime_bindings(
       "tag",
     ),
     filter_param_specs=(
-      StandaloneSurfaceFilterParamSpec("mode", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("strategy_id", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("strategy_version", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("rerun_boundary_id", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("preset_id", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("benchmark_family", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("dataset_identity", str | None, default=None),
-      StandaloneSurfaceFilterParamSpec("tag", list[str], default_factory=list),
+      StandaloneSurfaceFilterParamSpec(
+        "mode",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Run mode",
+          description="Filter runs by execution mode.",
+          examples=("backtest",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "strategy_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Strategy ID",
+          description="Filter runs by strategy identifier.",
+          examples=("ma_cross_v1",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "strategy_version",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Strategy version",
+          description="Filter runs by strategy version.",
+          examples=("1.0.0",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "rerun_boundary_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Rerun boundary ID",
+          description="Filter runs by rerun boundary identifier.",
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "preset_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Preset ID",
+          description="Filter runs by preset identifier.",
+          examples=("core_5m",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "benchmark_family",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Benchmark family",
+          description="Filter runs by benchmark family tag.",
+          examples=("native_validation",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "dataset_identity",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Dataset identity",
+          description="Filter runs by dataset identity.",
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "tag",
+        list[str],
+        default_factory=list,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Tags",
+          description="Filter runs by experiment tags.",
+          examples=(["baseline"],),
+        ),
+      ),
     ),
   )
   run_compare_binding = StandaloneSurfaceRuntimeBinding(
@@ -23324,8 +23491,27 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="run_compare",
     filter_keys=("run_id", "intent"),
     filter_param_specs=(
-      StandaloneSurfaceFilterParamSpec("run_id", list[str], default_factory=list),
-      StandaloneSurfaceFilterParamSpec("intent", str | None, default=None),
+      StandaloneSurfaceFilterParamSpec(
+        "run_id",
+        list[str],
+        default_factory=list,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Run IDs",
+          description="Run identifiers to include in the comparison set.",
+          examples=(["run-001", "run-002"],),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "intent",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Comparison intent",
+          description="Narrative intent used for run comparison scoring.",
+          examples=("strategy_tuning",),
+        ),
+      ),
     ),
   )
   run_backtest_launch_binding = StandaloneSurfaceRuntimeBinding(

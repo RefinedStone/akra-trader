@@ -56,6 +56,12 @@ def build_client(
   return TestClient(create_app(settings))
 
 
+def _first_non_null_schema_branch(schema: dict) -> dict:
+  if "anyOf" not in schema:
+    return schema
+  return next(branch for branch in schema["anyOf"] if branch.get("type") != "null")
+
+
 def create_preset(
   client: TestClient,
   *,
@@ -295,6 +301,38 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "x_akra_incident_sync_token",
     "app",
   )
+
+
+def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  openapi = client.app.openapi()
+
+  runs_params = {
+    param["name"]: param
+    for param in openapi["paths"]["/api/runs"]["get"]["parameters"]
+  }
+  assert runs_params["strategy_id"]["description"] == "Filter runs by strategy identifier."
+  assert runs_params["strategy_id"]["schema"]["title"] == "Strategy ID"
+  assert _first_non_null_schema_branch(runs_params["strategy_id"]["schema"])["minLength"] == 1
+  assert runs_params["tag"]["description"] == "Filter runs by experiment tags."
+  assert runs_params["tag"]["schema"]["title"] == "Tags"
+
+  compare_params = {
+    param["name"]: param
+    for param in openapi["paths"]["/api/runs/compare"]["get"]["parameters"]
+  }
+  assert compare_params["run_id"]["description"] == "Run identifiers to include in the comparison set."
+  assert _first_non_null_schema_branch(compare_params["intent"]["schema"])["minLength"] == 1
+  assert compare_params["intent"]["schema"]["title"] == "Comparison intent"
+
+  market_data_params = {
+    param["name"]: param
+    for param in openapi["paths"]["/api/market-data/status"]["get"]["parameters"]
+  }
+  assert market_data_params["timeframe"]["description"] == (
+    "Candlestick timeframe to inspect in market-data status."
+  )
+  assert market_data_params["timeframe"]["schema"]["minLength"] == 2
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:

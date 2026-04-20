@@ -149,9 +149,34 @@ def _build_header_alias(header_key: str) -> str:
 
 
 def _build_query_default(spec: StandaloneSurfaceFilterParamSpec) -> Any:
+  kwargs: dict[str, Any] = {}
+  if spec.constraints is not None:
+    constraint_values = (
+      ("min_length", spec.constraints.min_length),
+      ("max_length", spec.constraints.max_length),
+      ("ge", spec.constraints.ge),
+      ("le", spec.constraints.le),
+      ("pattern", spec.constraints.pattern),
+    )
+    for key, value in constraint_values:
+      if value is not None:
+        kwargs[key] = value
+  if spec.openapi is not None:
+    openapi_values = (
+      ("alias", spec.openapi.alias),
+      ("title", spec.openapi.title),
+      ("description", spec.openapi.description),
+    )
+    for key, value in openapi_values:
+      if value is not None:
+        kwargs[key] = value
+    if spec.openapi.examples:
+      kwargs["examples"] = list(spec.openapi.examples)
+    if spec.openapi.deprecated:
+      kwargs["deprecated"] = True
   if spec.default_factory is not None:
-    return Query(default_factory=spec.default_factory)
-  return Query(default=spec.default)
+    return Query(default_factory=spec.default_factory, **kwargs)
+  return Query(default=spec.default, **kwargs)
 
 
 def create_router(container: Container) -> APIRouter:
