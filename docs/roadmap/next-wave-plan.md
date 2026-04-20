@@ -9,7 +9,8 @@ point rather than a future task.
 
 Status:
 
-- in progress now
+- materially complete, with architecture reset docs now added for backend, frontend, and staged
+  execution
 
 Goal:
 
@@ -19,6 +20,13 @@ Exit criteria:
 
 - README, status, roadmap, blueprint, and directions no longer disagree on current progress
 - sandbox, worker, and guarded-live terms are used consistently
+
+Completed baseline now in place:
+
+- architecture contract docs now describe executable backend/frontend split targets
+- ports are split under `port_contracts/*` with compatibility re-exports
+- frontend workspace routing and shell composition moved under `apps/web/src/app/*`
+- incident-delivery dispatch now uses a registry layer instead of only large condition chains
 
 ## Wave 1: Deterministic Research Baseline
 

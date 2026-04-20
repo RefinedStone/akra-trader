@@ -21,6 +21,9 @@ import {
   AkraTouchFeedbackEnvelope,
   triggerAkraTouchFeedbackBridge,
 } from "./touchFeedback";
+import { WorkspaceShell } from "./app/WorkspaceShell";
+import { buildControlWorkspaceDescriptors, ControlWorkspaceDescriptor, ControlStripMetric } from "./app/workspaces";
+import { useWorkspaceRoute } from "./app/useWorkspaceRoute";
 
 type ParameterSchema = Record<
   string,
@@ -5657,24 +5660,6 @@ function normalizeRunFormPreset(
   };
 }
 
-type ControlWorkspaceId = "overview" | "research" | "runtime" | "live";
-
-type ControlWorkspaceDescriptor = {
-  id: ControlWorkspaceId;
-  kicker: string;
-  label: string;
-  description: string;
-  summary: string;
-  sections: string[];
-};
-
-type ControlStripMetric = {
-  label: string;
-  value: string;
-  detail: string;
-  tone?: "research" | "runtime" | "live" | "warning";
-};
-
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -5688,7 +5673,7 @@ export default function App() {
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
-  const [activeWorkspace, setActiveWorkspace] = useState<ControlWorkspaceId>("overview");
+  const { activeWorkspace, navigateToWorkspace } = useWorkspaceRoute();
   const [guardedLiveReason, setGuardedLiveReason] = useState("operator_safety_drill");
   const [liveOrderReplacementDrafts, setLiveOrderReplacementDrafts] = useState<
     Record<string, LiveOrderReplacementDraft>
@@ -6962,50 +6947,20 @@ export default function App() {
   );
 
   const workspaceDescriptors = useMemo<ControlWorkspaceDescriptor[]>(
-    () => [
-      {
-        id: "overview",
-        kicker: "Mission control",
-        label: "Overview",
-        description:
-          "Start here to assess control posture, then move into the lane that needs action. This surface stays intentionally short and decision-oriented.",
-        summary: `${totalTrackedRunCount} tracked runs · ${strategies.length} strategies · ${operatorSummary?.alertCount ?? 0} active alerts`,
-        sections: ["Control posture", "Workspace routing", "Catalog health"],
-      },
-      {
-        id: "research",
-        kicker: "Backtests and presets",
-        label: "Research",
-        description:
-          "Use this lane for experiment design, preset management, reference review, and benchmark comparison without runtime noise.",
-        summary: `${backtests.length} backtests · ${presets.length} presets · ${references.length} references`,
-        sections: ["Launch a run", "Scenario presets", "Third-party references", "Recent backtests"],
-      },
-      {
-        id: "runtime",
-        kicker: "Sandbox and paper",
-        label: "Runtime Ops",
-        description:
-          "Monitor data freshness, sandbox and paper execution, and operator incident pressure in one operational workspace.",
-        summary: `${sandboxRuns.length} sandbox · ${paperRuns.length} paper · ${marketStatus?.instruments.length ?? 0} instruments`,
-        sections: [
-          "Start sandbox worker",
-          "Market data status",
-          "Runtime alerts and audit",
-          "Sandbox runs",
-          "Paper runs",
-        ],
-      },
-      {
-        id: "live",
-        kicker: "Guarded execution",
-        label: "Guarded Live",
-        description:
-          "Reserve this workspace for live ownership, reconciliation, recovery, and manual order intervention. Nothing exploratory belongs here.",
-        summary: `Kill switch ${guardedLive?.kill_switch.state ?? "n/a"} · ${guardedLiveSummary?.blockerCount ?? 0} blockers · ${liveRuns.length} live runs`,
-        sections: ["Start live worker", "Kill switch and reconciliation", "Guarded live runs"],
-      },
-    ],
+    () => buildControlWorkspaceDescriptors({
+      alertCount: operatorSummary?.alertCount ?? 0,
+      backtestsCount: backtests.length,
+      blockerCount: guardedLiveSummary?.blockerCount ?? 0,
+      instrumentsCount: marketStatus?.instruments.length ?? 0,
+      killSwitchState: guardedLive?.kill_switch.state ?? "n/a",
+      liveRunsCount: liveRuns.length,
+      paperRunsCount: paperRuns.length,
+      presetsCount: presets.length,
+      referencesCount: references.length,
+      sandboxRunsCount: sandboxRuns.length,
+      strategiesCount: strategies.length,
+      totalTrackedRunCount,
+    }),
     [
       backtests.length,
       guardedLive?.kill_switch.state,
@@ -7516,98 +7471,16 @@ export default function App() {
   }
 
   return (
-    <div className="shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">Akra Trader / Hexagonal Control Room</p>
-          <h1>One control room, split into research, runtime ops, and guarded live workspaces.</h1>
-          <p className="hero-copy">
-            The backend already exposes research, runtime, and guarded-live surfaces. The frontend
-            now routes operators through focused lanes instead of one endless dashboard scroll.
-          </p>
-        </div>
-        <aside className="hero-panel">
-          <span className="status-indicator" />
-          <strong>{statusText}</strong>
-          <p>API base: {apiBase}</p>
-          <p>Active workspace: {activeWorkspaceDescriptor.label}</p>
-        </aside>
-      </header>
-
-      <main className="workspace-shell">
-        <section className="control-strip" aria-label="System metrics">
-          {controlStripMetrics.map((metric) => (
-            <article
-              className={`control-metric-card ${metric.tone ? `is-${metric.tone}` : ""}`.trim()}
-              key={metric.label}
-            >
-              <span>{metric.label}</span>
-              <strong>{metric.value}</strong>
-              <small>{metric.detail}</small>
-            </article>
-          ))}
-        </section>
-
-        <nav className="workspace-nav" aria-label="Control room workspaces">
-          {workspaceDescriptors.map((workspace) => (
-            <button
-              aria-pressed={activeWorkspace === workspace.id}
-              className={`workspace-tab ${activeWorkspace === workspace.id ? "is-active" : ""}`.trim()}
-              key={workspace.id}
-              onClick={() => setActiveWorkspace(workspace.id)}
-              type="button"
-            >
-              <span className="workspace-tab-kicker">{workspace.kicker}</span>
-              <strong>{workspace.label}</strong>
-              <span className="workspace-tab-summary">{workspace.summary}</span>
-            </button>
-          ))}
-        </nav>
-
-        <section className="panel panel-wide workspace-intro-panel">
-          <div className="workspace-intro-head">
-            <div>
-              <p className="kicker">{activeWorkspaceDescriptor.kicker}</p>
-              <h2>{activeWorkspaceDescriptor.label}</h2>
-            </div>
-            <button className="ghost-button" onClick={() => void loadAll()} type="button">
-              Refresh data
-            </button>
-          </div>
-          <div className="workspace-intro-grid">
-            <div className="workspace-intro-copy">
-              <p>{activeWorkspaceDescriptor.description}</p>
-              <strong>{activeWorkspaceDescriptor.summary}</strong>
-            </div>
-            <div className="workspace-chip-row" aria-label="Workspace surfaces">
-              {activeWorkspaceDescriptor.sections.map((section) => (
-                <span className="workspace-chip" key={section}>
-                  {section}
-                </span>
-              ))}
-            </div>
-          </div>
-          {activeWorkspace === "overview" ? (
-            <div className="workspace-route-grid">
-              {workspaceDescriptors
-                .filter((workspace) => workspace.id !== "overview")
-                .map((workspace) => (
-                  <button
-                    className="workspace-route-card"
-                    key={workspace.id}
-                    onClick={() => setActiveWorkspace(workspace.id)}
-                    type="button"
-                  >
-                    <span>{workspace.kicker}</span>
-                    <strong>{workspace.label}</strong>
-                    <p>{workspace.description}</p>
-                    <small>{workspace.summary}</small>
-                  </button>
-                ))}
-            </div>
-          ) : null}
-        </section>
-
+    <WorkspaceShell
+      activeWorkspace={activeWorkspace}
+      activeWorkspaceDescriptor={activeWorkspaceDescriptor}
+      apiBase={apiBase}
+      controlStripMetrics={controlStripMetrics}
+      onNavigate={navigateToWorkspace}
+      onRefresh={() => void loadAll()}
+      statusText={statusText}
+      workspaceDescriptors={workspaceDescriptors}
+    >
         <div className="workspace-panel-grid">
           {activeWorkspace === "overview" ? (
             <section className="panel panel-wide">
@@ -9721,8 +9594,7 @@ export default function App() {
             />
           ) : null}
         </div>
-      </main>
-    </div>
+    </WorkspaceShell>
   );
 }
 

@@ -14,9 +14,12 @@ longer-horizon blueprint.
 3. [Roadmap Overview](roadmap/README.md)
 4. [Roadmap: Next Wave Plan](roadmap/next-wave-plan.md)
 5. [Architecture](architecture.md)
-6. [Blueprint](blueprint/README.md)
-7. [Operations: Runbooks Overview](operations/runbooks-overview.md)
-8. [ADR Index](adr/README.md)
+6. [Backend Architecture Target](architecture-backend-target.md)
+7. [Frontend Architecture Target](architecture-frontend-target.md)
+8. [Architecture Refactor Stages](architecture-refactor-stages.md)
+9. [Blueprint](blueprint/README.md)
+10. [Operations: Runbooks Overview](operations/runbooks-overview.md)
+11. [ADR Index](adr/README.md)
 
 ## Document Roles
 
@@ -36,7 +39,13 @@ longer-horizon blueprint.
 ### Architecture
 
 - `architecture.md`
-  - the current architectural shape, boundaries, and runtime model
+  - current boundary rules and the live refactor baseline
+- `architecture-backend-target.md`
+  - backend target structure, boundary rules, and first-wave move map
+- `architecture-frontend-target.md`
+  - frontend target structure, route/shell split, and remaining pressure points
+- `architecture-refactor-stages.md`
+  - staged execution order and exit criteria for the architecture reset
 
 ### Blueprint
 

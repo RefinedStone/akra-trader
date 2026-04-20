@@ -4,134 +4,64 @@ Updated for the repository state as of April 21, 2026.
 
 ## Core Rule
 
-Domain and application code do not know about FastAPI, SQLAlchemy, ccxt, Freqtrade, or any
-incident-delivery provider internals.
+The repository must be understandable in smaller units than it is today.
 
-## Current System Shape
+- domain and application code must not know about FastAPI, SQLAlchemy, ccxt, Freqtrade, or
+  provider-specific transport details
+- route/shell code must not own dense feature logic forever
+- provider/plugin dispatch must not grow through giant condition chains
 
-The repository is organized around a small set of stable boundaries:
+## Current Refactor Baseline
 
-- domain models and pure services
-- application orchestration
-- ports for external systems
-- adapters for storage, market data, references, venue state, and operator delivery
-- runtime services for execution flow, supervision, and mode handling
+The first architecture-reset wave is now partially implemented:
 
-## Layers
+- port contracts are split under `apps/api/src/akra_trader/port_contracts/*`
+- `apps/api/src/akra_trader/ports.py` is now a compatibility re-export layer
+- shared application fallback adapters and comparison policy moved under
+  `apps/api/src/akra_trader/application_support/*`
+- incident-delivery aliasing and provider dispatch now flow through
+  `apps/api/src/akra_trader/adapters/operator_delivery_registry.py`
+- frontend workspace routing and shell layout now live under `apps/web/src/app/*`
 
-### Domain
+The product is still not fully decomposed. `application.py`, `operator_delivery.py`, and
+`App.tsx` remain the main pressure points.
 
-- market models such as candle, order, fill, position, trade, and run config
-- strategy models such as metadata, lifecycle, decision context, execution plan, and decision
-  envelope
-- pure services for order application, equity generation, and performance summaries
+## Target Documents
 
-### Application
+- [Backend Architecture Target](architecture-backend-target.md)
+- [Frontend Architecture Target](architecture-frontend-target.md)
+- [Architecture Refactor Stages](architecture-refactor-stages.md)
 
-- strategy listing and registration
-- preset, comparison, rerun, and run-query orchestration
-- sandbox worker supervision
-- guarded-live kill switch, reconciliation, recovery, and incident orchestration
-- operator visibility and delivery coordination
+## Current Stable Boundaries
 
-### Ports
+- `domain/*`
+  - pure models and pure services
+- `runtime.py`
+  - execution-loop primitives and state helpers
+- `port_contracts/*`
+  - split external-system contracts by concern
+- `ports.py`
+  - compatibility shim only
+- `adapters/*`
+  - infrastructure and provider implementations
+- `application.py`
+  - temporary orchestration facade that still needs decomposition
+- `apps/web/src/app/*`
+  - workspace route state, shell composition, and workspace metadata
 
-- `MarketDataPort`
-- `RunRepositoryPort`
-- `GuardedLiveStatePort`
-- `VenueStatePort`
-- `StrategyCatalogPort`
-- `DecisionEnginePort`
-- `ReferenceCatalogPort`
+## Pressure Points Still Open
 
-## Runtime Core
+- `application.py` still mixes too many use cases in one module
+- `operator_delivery.py` still contains too many provider implementation bodies in one file
+- `domain/models.py` is broader than one bounded feature area should be
+- `App.tsx` still holds too much feature state and JSX even after shell extraction
+- standalone query-contract helpers still need their own dedicated modules
 
-The native runtime is already decomposed into explicit services:
+## Operational Rule
 
-- `DataEngine`
-  - loads candles and market lineage through `MarketDataPort`
-- `ExecutionEngine`
-  - applies reviewed decisions to orders, fills, positions, and equity
-- `RiskEngine`
-  - validates execution intent and blocks invalid actions
-- `StateCache`
-  - tracks current cash, position, and marked price within a run
-- `RunSupervisor`
-  - owns run status transitions and mode notes
-- `ExecutionModeService`
-  - normalizes mode names and lifecycle notes across backtest, sandbox, paper, and live concepts
+New work should reinforce the split, not re-expand the monoliths.
 
-## Strategy Lanes
-
-### Native lane
-
-- executed fully by the platform runtime
-
-### Reference lane
-
-- catalog entries point at third-party strategy files under `reference/NostalgiaForInfinity`
-- execution is delegated through an external Freqtrade command
-- benchmark provenance is stored alongside native runs
-
-### Decision-engine lane
-
-- modeled behind `DecisionEnginePort`
-- intentionally kept isolated until trace, replay, and fallback infrastructure exists
-
-## Persistence And Provenance
-
-Run persistence already stores:
-
-- config and status
-- metrics
-- orders, fills, positions, and equity
-- notes and audit-oriented provenance
-- strategy snapshots and parameter snapshots
-- market-data lineage, dataset identity fingerprints, and rerun boundaries
-
-This is enough for durable research history and guarded-live control-plane state, but it is not yet
-the final normalized experiment model.
-
-## Execution Modes
-
-### Backtest
-
-- completes immediately and persists as a historical run
-
-### Sandbox
-
-- native worker session seeded from a priming window
-- continues processing new candle closes
-- persists heartbeat, processed-candle progress, and recovery history
-
-### Paper
-
-- separate mode and history bucket
-- kept distinct from sandbox worker semantics
-
-### Guarded live
-
-- launch is blocked behind kill switch, reconciliation, recovery, and venue configuration gates
-- venue-backed order submission exists
-- cancel and replace controls exist
-- live-session ownership, open-order snapshots, incidents, and audit-oriented control state are
-  persisted separately from ordinary run history
-
-## Market Data And Operator Surfaces
-
-- ccxt-backed market-data adapters support Binance, Coinbase, and Kraken
-- status surfaces already expose checkpoints, gaps, lag, backfill, and failure history
-- operator visibility merges sandbox runtime health and guarded-live incident state
-- incident delivery supports console, webhooks, Slack, and a large provider matrix
-
-The detailed provider matrix lives outside this architecture document:
-
-- [Operator Delivery Matrix](reference/operator-delivery-matrix.md)
-
-## Main Architectural Pressure Points
-
-- run persistence is still too payload-centric for some experiment and export paths
-- custom strategy registration is not yet a durable registry
-- the web control room is feature-rich but monolithic
-- guarded-live venue lifecycle handling is partial rather than complete
-- the intelligence lane is still only a contract and template layer
+- add new protocols under `port_contracts/*`
+- add new provider routing through the registry layer
+- add new workspace-level navigation under `apps/web/src/app/*`
+- prefer support/use-case modules over adding more policy to `application.py`

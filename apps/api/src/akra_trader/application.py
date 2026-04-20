@@ -188,6 +188,18 @@ from akra_trader.domain.models import StrategyParameterSnapshot
 from akra_trader.domain.models import StrategyRegistration
 from akra_trader.domain.models import StrategySnapshot
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
+from akra_trader.application_support import COMPARISON_INTENT_COPY
+from akra_trader.application_support import COMPARISON_INTENT_DEFAULT
+from akra_trader.application_support import COMPARISON_INTENT_WEIGHTS
+from akra_trader.application_support import COMPARISON_METRICS
+from akra_trader.application_support import COMPARISON_METRIC_COPY
+from akra_trader.application_support import NoopOperatorAlertDeliveryAdapter
+from akra_trader.application_support import UnavailableVenueExecutionAdapter
+from akra_trader.application_support import UnavailableVenueStateAdapter
+from akra_trader.application_support import _EphemeralExperimentPresetCatalog
+from akra_trader.application_support import _EphemeralGuardedLiveStateStore
+from akra_trader.application_support import _IncidentPagingPolicy
+from akra_trader.application_support import _IncidentRemediationPlan
 from akra_trader.domain.services import apply_signal
 from akra_trader.domain.services import build_equity_point
 from akra_trader.domain.services import summarize_performance
@@ -209,216 +221,6 @@ from akra_trader.runtime import RunSupervisor
 from akra_trader.runtime import StateCache
 from akra_trader.runtime import candles_to_frame
 
-
-COMPARISON_METRICS: tuple[tuple[str, str, str, bool], ...] = (
-  ("total_return_pct", "Total return", "pct", True),
-  ("max_drawdown_pct", "Max drawdown", "pct", False),
-  ("win_rate_pct", "Win rate", "pct", True),
-  ("trade_count", "Trades", "count", True),
-)
-
-COMPARISON_INTENT_DEFAULT = "benchmark_validation"
-COMPARISON_INTENT_WEIGHTS: dict[str, dict[str, float]] = {
-  "benchmark_validation": {
-    "return": 0.8,
-    "drawdown": 1.5,
-    "win_rate": 0.7,
-    "trade_count": 0.12,
-    "semantic_kind_bonus": 1.2,
-    "semantic_execution_bonus": 0.8,
-    "semantic_source_bonus": 0.8,
-    "semantic_parameter_contract_bonus": 0.4,
-    "semantic_vocabulary_unit_bonus": 0.28,
-    "provenance_richness_unit_bonus": 0.24,
-    "native_reference_bonus": 8.0,
-    "reference_bonus": 3.0,
-    "status_bonus": 1.5,
-    "benchmark_story_bonus": 1.5,
-    "reference_floor": 1.0,
-  },
-  "execution_regression": {
-    "return": 0.9,
-    "drawdown": 1.9,
-    "win_rate": 1.0,
-    "trade_count": 0.4,
-    "semantic_kind_bonus": 0.8,
-    "semantic_execution_bonus": 0.6,
-    "semantic_source_bonus": 0.4,
-    "semantic_parameter_contract_bonus": 0.3,
-    "semantic_vocabulary_unit_bonus": 0.18,
-    "provenance_richness_unit_bonus": 0.2,
-    "native_reference_bonus": 3.0,
-    "reference_bonus": 1.0,
-    "status_bonus": 3.0,
-    "benchmark_story_bonus": 0.8,
-    "reference_floor": 1.0,
-  },
-  "strategy_tuning": {
-    "return": 2.0,
-    "drawdown": 0.7,
-    "win_rate": 1.3,
-    "trade_count": 0.35,
-    "semantic_kind_bonus": 1.0,
-    "semantic_execution_bonus": 0.7,
-    "semantic_source_bonus": 0.6,
-    "semantic_parameter_contract_bonus": 0.5,
-    "semantic_vocabulary_unit_bonus": 0.38,
-    "provenance_richness_unit_bonus": 0.12,
-    "native_reference_bonus": 1.5,
-    "reference_bonus": 0.5,
-    "status_bonus": 0.8,
-    "benchmark_story_bonus": 0.4,
-    "reference_floor": 0.5,
-  },
-}
-
-
-@dataclass(frozen=True)
-class _IncidentPagingPolicy:
-  policy_id: str
-  provider: str | None
-  initial_targets: tuple[str, ...]
-  escalation_targets: tuple[str, ...]
-  resolution_targets: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class _IncidentRemediationPlan:
-  kind: str
-  owner: str
-  summary: str
-  detail: str
-  runbook: str
-
-COMPARISON_INTENT_COPY: dict[str, dict[str, str]] = {
-  "benchmark_validation": {
-    "title_prefix": "Benchmark validation",
-    "summary_prefix": "Validation view",
-    "partial_summary": (
-      "Benchmark validation falls back to persisted reference provenance because direct metric "
-      "deltas are partial."
-    ),
-    "lane_prefix": "Validation context",
-    "activity_prefix": "Validation signal",
-    "reference_prefix": "Benchmark evidence",
-  },
-  "execution_regression": {
-    "title_prefix": "Execution regression",
-    "summary_prefix": "Regression view",
-    "partial_summary": (
-      "Execution regression falls back to persisted reference provenance because direct execution "
-      "deltas are partial."
-    ),
-    "lane_prefix": "Regression context",
-    "activity_prefix": "Execution signal",
-    "reference_prefix": "Reference baseline",
-  },
-  "strategy_tuning": {
-    "title_prefix": "Strategy tuning",
-    "summary_prefix": "Tuning view",
-    "partial_summary": (
-      "Strategy tuning falls back to benchmark provenance because direct optimization deltas are partial."
-    ),
-    "lane_prefix": "Tuning context",
-    "activity_prefix": "Tuning signal",
-    "reference_prefix": "Benchmark backdrop",
-  },
-}
-
-COMPARISON_METRIC_COPY: dict[str, dict[str, dict[str, str]]] = {
-  "benchmark_validation": {
-    "total_return_pct": {
-      "annotation": "Validation read: return drift versus the selected benchmark baseline.",
-      "positive_delta": "above benchmark",
-      "negative_delta": "below benchmark",
-      "baseline": "benchmark baseline",
-      "missing": "benchmark delta unavailable",
-    },
-    "max_drawdown_pct": {
-      "annotation": "Validation read: downside drift versus the benchmark risk envelope.",
-      "positive_delta": "deeper than benchmark",
-      "negative_delta": "tighter than benchmark",
-      "baseline": "benchmark baseline",
-      "missing": "benchmark drawdown delta unavailable",
-    },
-    "win_rate_pct": {
-      "annotation": "Validation read: hit-rate drift versus the benchmark baseline.",
-      "positive_delta": "above benchmark",
-      "negative_delta": "below benchmark",
-      "baseline": "benchmark baseline",
-      "missing": "benchmark hit-rate delta unavailable",
-    },
-    "trade_count": {
-      "annotation": "Validation read: participation and pacing drift versus the benchmark.",
-      "positive_delta": "above benchmark",
-      "negative_delta": "below benchmark",
-      "baseline": "benchmark baseline",
-      "missing": "benchmark activity delta unavailable",
-    },
-  },
-  "execution_regression": {
-    "total_return_pct": {
-      "annotation": "Regression read: return movement is treated as execution drift.",
-      "positive_delta": "return lift",
-      "negative_delta": "return regression",
-      "baseline": "regression baseline",
-      "missing": "return regression unavailable",
-    },
-    "max_drawdown_pct": {
-      "annotation": "Regression read: higher drawdown is treated as risk regression.",
-      "positive_delta": "extra drawdown",
-      "negative_delta": "risk improvement",
-      "baseline": "regression baseline",
-      "missing": "drawdown regression unavailable",
-    },
-    "win_rate_pct": {
-      "annotation": "Regression read: hit-rate movement is treated as execution drift.",
-      "positive_delta": "hit-rate lift",
-      "negative_delta": "hit-rate regression",
-      "baseline": "regression baseline",
-      "missing": "hit-rate regression unavailable",
-    },
-    "trade_count": {
-      "annotation": "Regression read: trade-flow changes point to execution behavior drift.",
-      "positive_delta": "extra activity",
-      "negative_delta": "reduced activity",
-      "baseline": "regression baseline",
-      "missing": "activity regression unavailable",
-    },
-  },
-  "strategy_tuning": {
-    "total_return_pct": {
-      "annotation": "Tuning read: return deltas show optimization edge versus the baseline.",
-      "positive_delta": "tuning edge",
-      "negative_delta": "tuning gap",
-      "baseline": "tuning baseline",
-      "missing": "tuning delta unavailable",
-    },
-    "max_drawdown_pct": {
-      "annotation": "Tuning read: lower drawdown marks a cleaner optimization tradeoff.",
-      "positive_delta": "drawdown penalty",
-      "negative_delta": "drawdown improvement",
-      "baseline": "tuning baseline",
-      "missing": "drawdown tuning delta unavailable",
-    },
-    "win_rate_pct": {
-      "annotation": "Tuning read: hit-rate deltas show signal-quality tradeoffs.",
-      "positive_delta": "hit-rate edge",
-      "negative_delta": "hit-rate gap",
-      "baseline": "tuning baseline",
-      "missing": "hit-rate tuning delta unavailable",
-    },
-    "trade_count": {
-      "annotation": "Tuning read: trade-count changes expose activity tradeoffs in the variant.",
-      "positive_delta": "activity expansion",
-      "negative_delta": "activity reduction",
-      "baseline": "tuning baseline",
-      "missing": "activity tuning delta unavailable",
-    },
-  },
-}
-
-
 class TradingApplication:
   _sandbox_worker_kind = "sandbox_native_worker"
   _guarded_live_worker_kind = "guarded_live_native_worker"
@@ -430,173 +232,6 @@ class TradingApplication:
   _guarded_live_loss_breach_pct = 20.0
   _guarded_live_gross_open_risk_ratio = 1.1
   _guarded_live_recovery_alert_threshold = 2
-
-  class _EphemeralGuardedLiveStateStore(GuardedLiveStatePort):
-    def __init__(self) -> None:
-      self._state = GuardedLiveState()
-
-    def load_state(self) -> GuardedLiveState:
-      return self._state
-
-    def save_state(self, state: GuardedLiveState) -> GuardedLiveState:
-      self._state = state
-      return state
-
-  class _EphemeralExperimentPresetCatalog(ExperimentPresetCatalogPort):
-    def __init__(self) -> None:
-      self._presets: dict[str, ExperimentPreset] = {}
-
-    def list_presets(
-      self,
-      *,
-      strategy_id: str | None = None,
-      timeframe: str | None = None,
-      lifecycle_stage: str | None = None,
-    ) -> list[ExperimentPreset]:
-      presets = list(reversed(tuple(self._presets.values())))
-      if strategy_id is not None:
-        presets = [
-          preset
-          for preset in presets
-          if preset.strategy_id is None or preset.strategy_id == strategy_id
-        ]
-      if timeframe is not None:
-        presets = [
-          preset
-          for preset in presets
-          if preset.timeframe is None or preset.timeframe == timeframe
-        ]
-      if lifecycle_stage is not None:
-        presets = [
-          preset
-          for preset in presets
-          if preset.lifecycle.stage == lifecycle_stage
-        ]
-      return presets
-
-    def get_preset(self, preset_id: str) -> ExperimentPreset | None:
-      return self._presets.get(preset_id)
-
-    def save_preset(self, preset: ExperimentPreset) -> ExperimentPreset:
-      self._presets[preset.preset_id] = preset
-      return preset
-
-  class _UnavailableVenueStateAdapter(VenueStatePort):
-    def __init__(self, clock: Callable[[], datetime]) -> None:
-      self._clock = clock
-
-    def capture_snapshot(self) -> GuardedLiveVenueStateSnapshot:
-      return GuardedLiveVenueStateSnapshot(
-        provider="unconfigured",
-        venue="unconfigured",
-        verification_state="unavailable",
-        captured_at=self._clock(),
-        issues=("venue_state_port_unconfigured",),
-      )
-
-  class _UnavailableVenueExecutionAdapter(VenueExecutionPort):
-    def describe_capability(self) -> tuple[bool, tuple[str, ...]]:
-      return False, ("venue_execution_port_unconfigured",)
-
-    def restore_session(
-      self,
-      *,
-      symbol: str,
-      owned_order_ids: tuple[str, ...],
-    ) -> GuardedLiveVenueSessionRestore:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def handoff_session(
-      self,
-      *,
-      symbol: str,
-      timeframe: str,
-      owner_run_id: str,
-      owner_session_id: str | None,
-      owned_order_ids: tuple[str, ...],
-    ) -> GuardedLiveVenueSessionHandoff:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def sync_session(
-      self,
-      *,
-      handoff: GuardedLiveVenueSessionHandoff,
-      order_ids: tuple[str, ...],
-    ) -> GuardedLiveVenueSessionSync:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def release_session(
-      self,
-      *,
-      handoff: GuardedLiveVenueSessionHandoff,
-    ) -> GuardedLiveVenueSessionHandoff:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def submit_market_order(
-      self,
-      request: GuardedLiveVenueOrderRequest,
-    ) -> GuardedLiveVenueOrderResult:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def submit_limit_order(
-      self,
-      request: GuardedLiveVenueOrderRequest,
-    ) -> GuardedLiveVenueOrderResult:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def cancel_order(
-      self,
-      *,
-      symbol: str,
-      order_id: str,
-    ) -> GuardedLiveVenueOrderResult:
-      raise RuntimeError("Venue execution port is not configured.")
-
-    def sync_order_states(
-      self,
-      *,
-      symbol: str,
-      order_ids: tuple[str, ...],
-    ) -> tuple[GuardedLiveVenueOrderResult, ...]:
-      raise RuntimeError("Venue execution port is not configured.")
-
-  class _NoopOperatorAlertDeliveryAdapter(OperatorAlertDeliveryPort):
-    def list_targets(self) -> tuple[str, ...]:
-      return ()
-
-    def list_supported_workflow_providers(self) -> tuple[str, ...]:
-      return ()
-
-    def deliver(
-      self,
-      *,
-      incident: OperatorIncidentEvent,
-      targets: tuple[str, ...] | None = None,
-      attempt_number: int = 1,
-      phase: str = "initial",
-    ) -> tuple[OperatorIncidentDelivery, ...]:
-      return ()
-
-    def sync_incident_workflow(
-      self,
-      *,
-      incident: OperatorIncidentEvent,
-      provider: str,
-      action: str,
-      actor: str,
-      detail: str,
-      payload: dict[str, Any] | None = None,
-      attempt_number: int = 1,
-    ) -> tuple[OperatorIncidentDelivery, ...]:
-      return ()
-
-    def pull_incident_workflow_state(
-      self,
-      *,
-      incident: OperatorIncidentEvent,
-      provider: str,
-    ) -> OperatorIncidentProviderPullSync | None:
-      return None
 
   def __init__(
     self,
@@ -644,13 +279,13 @@ class TradingApplication:
     self._market_data = market_data
     self._strategies = strategies
     self._references = references
-    self._presets = presets or self._EphemeralExperimentPresetCatalog()
+    self._presets = presets or _EphemeralExperimentPresetCatalog()
     self._runs = runs
-    self._guarded_live_state = guarded_live_state or self._EphemeralGuardedLiveStateStore()
-    self._venue_state = venue_state or self._UnavailableVenueStateAdapter(self._clock)
-    self._venue_execution = venue_execution or self._UnavailableVenueExecutionAdapter()
+    self._guarded_live_state = guarded_live_state or _EphemeralGuardedLiveStateStore()
+    self._venue_state = venue_state or UnavailableVenueStateAdapter(self._clock)
+    self._venue_execution = venue_execution or UnavailableVenueExecutionAdapter()
     self._operator_alert_delivery = (
-      operator_alert_delivery or self._NoopOperatorAlertDeliveryAdapter()
+      operator_alert_delivery or NoopOperatorAlertDeliveryAdapter()
     )
     self._freqtrade_reference = freqtrade_reference
     self._mode_service = mode_service or ExecutionModeService()
@@ -23842,7 +23477,7 @@ def _resolve_run_action_unavailability_reason(run: RunRecord, action_key: str) -
   if action_key == "stop_run":
     if run.config.mode not in {RunMode.SANDBOX, RunMode.PAPER, RunMode.LIVE}:
       return "Only sandbox, paper, or live runs can be stopped by the operator."
-    if run.status != RunStatus.RUNNING:
+    if run.status not in {RunStatus.RUNNING, RunStatus.FAILED}:
       return f"Run status {run.status.value} is not stoppable."
     return None
   raise ValueError(f"Unsupported run action availability key: {action_key}")

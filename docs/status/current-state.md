@@ -22,7 +22,7 @@ It is not yet a finished live trading product:
 
 - custom strategy registration is still process-local
 - experiment storage remains payload-centric in key paths
-- control-room UX is still monolithic and operator workflows are not fully productized
+- control-room UX now has route-aware shell boundaries, but feature logic is still too monolithic
 - guarded-live venue lifecycle handling is real but not complete
 - LLM research infrastructure remains an interface skeleton
 
@@ -40,6 +40,8 @@ It is not yet a finished live trading product:
 ### Research core
 
 - FastAPI backend with explicit domain, application, adapter, and runtime boundaries
+- split port contracts under `port_contracts/*` with `ports.py` kept as a compatibility shim
+- shared application fallback adapters and comparison policy moved into `application_support/*`
 - durable run storage through `SqlAlchemyRunRepository`
 - repo-local SQLite defaults with configurable Postgres support
 - native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,
@@ -82,12 +84,15 @@ It is not yet a finished live trading product:
   Coinbase Advanced Trade and Kraken public market transport
 - guarded-live incidents, delivery attempts, acknowledgment, escalation, remediation state, and
   provider workflow sync
+- incident-delivery alias normalization and provider dispatch now flow through an explicit registry
+  layer instead of only large condition chains
 
 ### Control room baseline
 
-- single-screen React control room with strategy catalog, reference catalog, run launch, run history,
-  comparison, market-data status, alerts, incidents, delivery history, kill switch, and
-  reconciliation surfaces
+- route-aware React control-room shell with dedicated workspace routing metadata and shell layout
+  modules under `apps/web/src/app/*`
+- dense feature content is still mostly in one large control-room file, but shell/routing concerns
+  are no longer defined inline with all feature rendering
 - separate histories for backtest, sandbox, paper, and live modes
 - guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
 - operator surfaces for replay-link alias governance and audit export administration
@@ -98,10 +103,12 @@ It is not yet a finished live trading product:
   durable strategy registry
 - run storage is durable, but experiment querying and artifact retrieval still lean too heavily on
   payload-centric persistence
-- the control room exposes a large amount of capability, but it is still effectively a monolithic
-  single-screen application rather than a clearly productized operations UI
+- the control room now has route and shell boundaries, but workspace feature modules still need to
+  be extracted out of `App.tsx`
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator
   workflows are still weaker than the underlying backend capabilities
+- `application.py` and `operator_delivery.py` are smaller and more structured than before, but both
+  still need further decomposition into dedicated use-case and provider modules
 - guarded-live recovery restores meaningful control-plane and order-lifecycle state, but it does not
   yet resume a full venue-native session lifecycle in all cases
 - incident delivery and provider sync are broad, but provider-owned policy management and external
