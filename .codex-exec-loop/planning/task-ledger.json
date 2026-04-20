@@ -4976,36 +4976,36 @@
       "direction_id": "experiment-os",
       "title": "Add policy explanation trace panel for subtree bundle coordination",
       "description": "Build on the shipped group-level conflict policy resolver by exposing a dedicated explanation trace panel that shows how bundle dependencies, candidate conflicts, selected policy rules, and manual-resolution holds produced the final coordinated bundle choices, so operators can inspect why a conflict was auto-resolved or left for manual review instead of only seeing the resulting state inline.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 9,
-      "priority_reason": "The latest main-session reply explicitly names policy-specific explanation trace in a separate panel as unfinished work, and it is the clearest immediate executable follow-up after conflict policies shipped because it reuses the new policy contract while closing the operator-visibility gap around why each coordinated choice happened.",
+      "priority_reason": "Completed in main session commit c679b6f, which added a dedicated subtree bundle coordination trace panel with per-group coordination policy, dependency request, conflict resolution, auto-selection, blocked-candidate, and unmet-dependency steps rendered from actual resolver results, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-user-defined-conflict-resolution-policy-for-subtree-bundle-coordination"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:25:00Z",
+      "updated_at": "2026-04-20T21:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os subtree bundle trust by turning newly policy-governed coordination into an inspectable operator workflow, which helps validate auto-resolution behavior before more global or transactional resolver strategies are added."
     },
     {
       "id": "planning-experiment-os-add-global-conflict-policy-optimization-for-subtree-bundle-coordination",
       "direction_id": "experiment-os",
-      "title": "Add global conflict policy optimization for subtree bundle coordination",
-      "description": "Extend the now-shipped group-level conflict policy model beyond local cross-group resolution so the dependency graph can be optimized holistically under a global policy, allowing coordinated bundle choice to consider the full graph rather than settling conflicts only from one local group-resolution pass at a time.",
-      "status": "proposed",
+      "title": "Add global explanation and policy simulation layer for subtree bundle coordination",
+      "description": "Build on the shipped group-level trace panel by adding a global explanation layer that summarizes the dependency graph across groups and, where useful, a policy simulation view, so operators can inspect whole-graph coordination outcomes in one place instead of piecing them together from per-group traces only.",
+      "status": "ready",
       "base_priority": 87,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply still calls out a global policy layer as unfinished, but it is a broader resolver-shape expansion than the more immediate explanation-trace panel. Keep it proposed until the operator-facing trace makes the current policy contract observable and easier to validate before global optimization semantics are introduced.",
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply says the remaining gap is a global explanation layer beyond the new per-group trace panel, specifically naming cross-group trace and policy simulation as missing. This is now the clearest immediate executable follow-up because the operator can proceed directly from the shipped local trace into a whole-graph summary without waiting for broader transactional coordination changes.",
       "depends_on": [
-        "planning-experiment-os-add-user-defined-conflict-resolution-policy-for-subtree-bundle-coordination"
+        "planning-experiment-os-add-policy-explanation-trace-panel-for-subtree-bundle-coordination"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:25:00Z",
+      "updated_at": "2026-04-20T21:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os subtree bundle coordination from group-level policy application toward whole-graph optimization, which is the larger remaining coordination step once policy behavior and operator explainability are established."
+      "direction_relation_note": "Extends experiment-os subtree bundle trust from group-local explainability into whole-graph operator understanding, so coordination policy can be validated across the full dependency graph before more ambitious resolver or transactional semantics are introduced."
     },
     {
       "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
