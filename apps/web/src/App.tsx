@@ -3087,6 +3087,9 @@ const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION = 1;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_KEY = "akra-trader-run-surface-replay-history-governance";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_VERSION = 1;
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_KEY = "akra-trader-run-surface-replay-history-conflicts";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_VERSION = 1;
+const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICT_ENTRIES = 8;
 const COMPARISON_RUN_ID_SEARCH_PARAM = "compare_run_id";
 const COMPARISON_INTENT_SEARCH_PARAM = "compare_intent";
 const COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM = "compare_focus_run_id";
@@ -15850,14 +15853,33 @@ type PredicateRefReplayApplyHistoryTabIdentity = {
 };
 
 type PredicateRefReplayApplySyncMode = "live" | "audit_only" | "mute_remote";
-type PredicateRefReplayApplySyncAuditFilter = "all" | "local" | "remote" | "apply" | "restore";
+type PredicateRefReplayApplySyncAuditFilter = "all" | "local" | "remote" | "apply" | "restore" | "conflict";
+type PredicateRefReplayApplyConflictPolicy = "prefer_local" | "prefer_remote" | "require_review";
+
+type PredicateRefReplayApplyConflictEntry = {
+  conflictId: string;
+  detectedAt: string;
+  entryId: string;
+  localEntry: PredicateRefReplayApplyHistoryEntry;
+  remoteEntry: PredicateRefReplayApplyHistoryEntry;
+  sourceTabId: string;
+  sourceTabLabel: string;
+  templateId: string;
+  templateLabel: string;
+};
 
 type PredicateRefReplayApplySyncAuditEntry = {
   at: string;
   auditId: string;
   detail: string;
   entryId: string;
-  kind: "local_apply" | "local_restore" | "remote_apply" | "remote_restore";
+  kind:
+    | "local_apply"
+    | "local_restore"
+    | "remote_apply"
+    | "remote_restore"
+    | "conflict_detected"
+    | "conflict_resolved";
   sourceTabId: string;
   sourceTabLabel: string;
   templateId: string;
@@ -15872,7 +15894,14 @@ type PredicateRefReplayApplySyncAuditTrailState = {
 
 type PredicateRefReplayApplySyncGovernanceState = {
   auditFilter: PredicateRefReplayApplySyncAuditFilter;
+  conflictPolicy: PredicateRefReplayApplyConflictPolicy;
   syncMode: PredicateRefReplayApplySyncMode;
+  tabId: string;
+  version: number;
+};
+
+type PredicateRefReplayApplyConflictState = {
+  conflicts: PredicateRefReplayApplyConflictEntry[];
   tabId: string;
   version: number;
 };
@@ -15941,11 +15970,13 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
   tabId: string,
 ): {
   auditFilter: PredicateRefReplayApplySyncAuditFilter;
+  conflictPolicy: PredicateRefReplayApplyConflictPolicy;
   syncMode: PredicateRefReplayApplySyncMode;
 } {
   if (typeof window === "undefined") {
     return {
       auditFilter: "all",
+      conflictPolicy: "require_review",
       syncMode: "live",
     };
   }
@@ -15954,6 +15985,7 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
     if (!raw) {
       return {
         auditFilter: "all",
+        conflictPolicy: "require_review",
         syncMode: "live",
       };
     }
@@ -15965,6 +15997,7 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
     ) {
       return {
         auditFilter: "all",
+        conflictPolicy: "require_review",
         syncMode: "live",
       };
     }
@@ -15973,9 +16006,15 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
         parsed.auditFilter === "local"
         || parsed.auditFilter === "remote"
         || parsed.auditFilter === "apply"
+        || parsed.auditFilter === "conflict"
         || parsed.auditFilter === "restore"
           ? parsed.auditFilter
           : "all",
+      conflictPolicy:
+        parsed.conflictPolicy === "prefer_local"
+        || parsed.conflictPolicy === "prefer_remote"
+          ? parsed.conflictPolicy
+          : "require_review",
       syncMode:
         parsed.syncMode === "audit_only" || parsed.syncMode === "mute_remote"
           ? parsed.syncMode
@@ -15984,6 +16023,7 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
   } catch {
     return {
       auditFilter: "all",
+      conflictPolicy: "require_review",
       syncMode: "live",
     };
   }
@@ -15993,6 +16033,7 @@ function persistRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
   tabId: string,
   state: {
     auditFilter: PredicateRefReplayApplySyncAuditFilter;
+    conflictPolicy: PredicateRefReplayApplyConflictPolicy;
     syncMode: PredicateRefReplayApplySyncMode;
   },
 ) {
@@ -16004,6 +16045,7 @@ function persistRunSurfaceCollectionQueryBuilderReplayApplySyncGovernanceState(
       version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_GOVERNANCE_SESSION_VERSION,
       tabId,
       auditFilter: state.auditFilter,
+      conflictPolicy: state.conflictPolicy,
       syncMode: state.syncMode,
     };
     window.sessionStorage.setItem(
@@ -16020,6 +16062,13 @@ function buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId() {
     return crypto.randomUUID();
   }
   return `replay-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayApplyConflictId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `replay-conflict-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
 function limitPredicateRefReplayApplySyncAuditEntries(entries: PredicateRefReplayApplySyncAuditEntry[]) {
@@ -16042,6 +16091,37 @@ function mergePredicateRefReplayApplySyncAuditEntries(
   return limitPredicateRefReplayApplySyncAuditEntries(merged);
 }
 
+function limitPredicateRefReplayApplyConflictEntries(
+  entries: PredicateRefReplayApplyConflictEntry[],
+) {
+  return entries.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICT_ENTRIES);
+}
+
+function serializeComparablePredicateRefReplayApplyHistoryEntry(entry: PredicateRefReplayApplyHistoryEntry) {
+  return JSON.stringify({
+    appliedAt: entry.appliedAt,
+    approvedCount: entry.approvedCount,
+    changedCurrentCount: entry.changedCurrentCount,
+    id: entry.id,
+    lastRestoredAt: entry.lastRestoredAt ?? null,
+    lastRestoredByTabId: entry.lastRestoredByTabId ?? null,
+    matchesSimulationCount: entry.matchesSimulationCount,
+    rollbackSnapshot: entry.rollbackSnapshot,
+    rows: entry.rows,
+    sourceTabId: entry.sourceTabId ?? null,
+    templateId: entry.templateId,
+    templateLabel: entry.templateLabel,
+  });
+}
+
+function arePredicateRefReplayApplyHistoryEntriesEquivalent(
+  left: PredicateRefReplayApplyHistoryEntry,
+  right: PredicateRefReplayApplyHistoryEntry,
+) {
+  return serializeComparablePredicateRefReplayApplyHistoryEntry(left)
+    === serializeComparablePredicateRefReplayApplyHistoryEntry(right);
+}
+
 function normalizePredicateRefReplayApplySyncAuditEntry(value: unknown): PredicateRefReplayApplySyncAuditEntry | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -16060,7 +16140,16 @@ function normalizePredicateRefReplayApplySyncAuditEntry(value: unknown): Predica
   ) {
     return null;
   }
-  if (!["local_apply", "local_restore", "remote_apply", "remote_restore"].includes(record.kind)) {
+  if (
+    ![
+      "local_apply",
+      "local_restore",
+      "remote_apply",
+      "remote_restore",
+      "conflict_detected",
+      "conflict_resolved",
+    ].includes(record.kind)
+  ) {
     return null;
   }
   return {
@@ -16074,6 +16163,40 @@ function normalizePredicateRefReplayApplySyncAuditEntry(value: unknown): Predica
     templateId: record.templateId,
     templateLabel: record.templateLabel,
   } as PredicateRefReplayApplySyncAuditEntry;
+}
+
+function normalizePredicateRefReplayApplyConflictEntry(value: unknown): PredicateRefReplayApplyConflictEntry | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.conflictId !== "string"
+    || typeof record.detectedAt !== "string"
+    || typeof record.entryId !== "string"
+    || typeof record.sourceTabId !== "string"
+    || typeof record.sourceTabLabel !== "string"
+    || typeof record.templateId !== "string"
+    || typeof record.templateLabel !== "string"
+  ) {
+    return null;
+  }
+  const localEntry = normalizePredicateRefReplayApplyHistoryEntry(record.localEntry);
+  const remoteEntry = normalizePredicateRefReplayApplyHistoryEntry(record.remoteEntry);
+  if (!localEntry || !remoteEntry) {
+    return null;
+  }
+  return {
+    conflictId: record.conflictId,
+    detectedAt: record.detectedAt,
+    entryId: record.entryId,
+    localEntry,
+    remoteEntry,
+    sourceTabId: record.sourceTabId,
+    sourceTabLabel: record.sourceTabLabel,
+    templateId: record.templateId,
+    templateLabel: record.templateLabel,
+  };
 }
 
 function loadRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
@@ -16122,6 +16245,59 @@ function persistRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
     };
     window.sessionStorage.setItem(
       RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY,
+      JSON.stringify(nextState),
+    );
+  } catch {
+    return;
+  }
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayApplyConflicts(
+  tabId: string,
+): PredicateRefReplayApplyConflictEntry[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.sessionStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as Partial<PredicateRefReplayApplyConflictState> | null;
+    if (
+      !parsed
+      || parsed.version !== RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_VERSION
+      || typeof parsed.tabId !== "string"
+      || parsed.tabId !== tabId
+      || !Array.isArray(parsed.conflicts)
+    ) {
+      return [];
+    }
+    return limitPredicateRefReplayApplyConflictEntries(
+      parsed.conflicts
+        .map((entry) => normalizePredicateRefReplayApplyConflictEntry(entry))
+        .filter((entry): entry is PredicateRefReplayApplyConflictEntry => entry !== null),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function persistRunSurfaceCollectionQueryBuilderReplayApplyConflicts(
+  tabId: string,
+  conflicts: PredicateRefReplayApplyConflictEntry[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const nextState: PredicateRefReplayApplyConflictState = {
+      version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_VERSION,
+      tabId,
+      conflicts: limitPredicateRefReplayApplyConflictEntries(conflicts),
+    };
+    window.sessionStorage.setItem(
+      RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICTS_SESSION_KEY,
       JSON.stringify(nextState),
     );
   } catch {
@@ -17754,6 +17930,11 @@ function RunSurfaceCollectionQueryBuilder({
   const predicateRefReplayApplySyncModeRef = useRef<PredicateRefReplayApplySyncMode>(
     initialPredicateRefReplayApplyGovernanceState.syncMode,
   );
+  const [predicateRefReplayApplyConflictPolicy, setPredicateRefReplayApplyConflictPolicy] =
+    useState<PredicateRefReplayApplyConflictPolicy>(initialPredicateRefReplayApplyGovernanceState.conflictPolicy);
+  const predicateRefReplayApplyConflictPolicyRef = useRef<PredicateRefReplayApplyConflictPolicy>(
+    initialPredicateRefReplayApplyGovernanceState.conflictPolicy,
+  );
   const [predicateRefReplayApplySyncAuditFilter, setPredicateRefReplayApplySyncAuditFilter] =
     useState<PredicateRefReplayApplySyncAuditFilter>(initialPredicateRefReplayApplyGovernanceState.auditFilter);
   const lastPersistedPredicateRefReplayApplyHistoryRef = useRef<string | null>(
@@ -17764,6 +17945,11 @@ function RunSurfaceCollectionQueryBuilder({
   const [predicateRefReplayApplySyncAuditTrail, setPredicateRefReplayApplySyncAuditTrail] =
     useState<PredicateRefReplayApplySyncAuditEntry[]>(() =>
       loadRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
+        predicateRefReplayApplyHistoryTabIdentity.tabId,
+      ));
+  const [predicateRefReplayApplyConflicts, setPredicateRefReplayApplyConflicts] =
+    useState<PredicateRefReplayApplyConflictEntry[]>(() =>
+      loadRunSurfaceCollectionQueryBuilderReplayApplyConflicts(
         predicateRefReplayApplyHistoryTabIdentity.tabId,
       ));
   const activeContract = useMemo(
@@ -18719,10 +18905,10 @@ function RunSurfaceCollectionQueryBuilder({
   const visibleSelectedRefTemplateReplayApplySyncAuditTrail = useMemo(
     () => selectedRefTemplateReplayApplySyncAuditTrail.filter((entry) => {
       if (predicateRefReplayApplySyncAuditFilter === "local") {
-        return entry.kind.startsWith("local_");
+        return entry.sourceTabId === predicateRefReplayApplyHistoryTabIdentity.tabId;
       }
       if (predicateRefReplayApplySyncAuditFilter === "remote") {
-        return entry.kind.startsWith("remote_");
+        return entry.sourceTabId !== predicateRefReplayApplyHistoryTabIdentity.tabId;
       }
       if (predicateRefReplayApplySyncAuditFilter === "apply") {
         return entry.kind.endsWith("_apply");
@@ -18730,9 +18916,24 @@ function RunSurfaceCollectionQueryBuilder({
       if (predicateRefReplayApplySyncAuditFilter === "restore") {
         return entry.kind.endsWith("_restore");
       }
+      if (predicateRefReplayApplySyncAuditFilter === "conflict") {
+        return entry.kind.includes("conflict");
+      }
       return true;
     }),
-    [predicateRefReplayApplySyncAuditFilter, selectedRefTemplateReplayApplySyncAuditTrail],
+    [
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+      predicateRefReplayApplySyncAuditFilter,
+      selectedRefTemplateReplayApplySyncAuditTrail,
+    ],
+  );
+  const selectedRefTemplateReplayApplyConflicts = useMemo(
+    () => (
+      selectedRefTemplate
+        ? predicateRefReplayApplyConflicts.filter((entry) => entry.templateId === selectedRefTemplate.id)
+        : predicateRefReplayApplyConflicts
+    ),
+    [predicateRefReplayApplyConflicts, selectedRefTemplate],
   );
   useEffect(() => {
     predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
@@ -18740,6 +18941,9 @@ function RunSurfaceCollectionQueryBuilder({
   useEffect(() => {
     predicateRefReplayApplySyncModeRef.current = predicateRefReplayApplySyncMode;
   }, [predicateRefReplayApplySyncMode]);
+  useEffect(() => {
+    predicateRefReplayApplyConflictPolicyRef.current = predicateRefReplayApplyConflictPolicy;
+  }, [predicateRefReplayApplyConflictPolicy]);
   const appendPredicateRefReplayApplySyncAuditEntry = useCallback(
     (entry: PredicateRefReplayApplySyncAuditEntry) => {
       setPredicateRefReplayApplySyncAuditTrail((current) =>
@@ -18748,18 +18952,69 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const resolvePredicateRefReplayApplyConflict = useCallback(
+    (
+      conflict: PredicateRefReplayApplyConflictEntry,
+      resolution: "local" | "remote",
+    ) => {
+      if (resolution === "remote") {
+        setPredicateRefReplayApplyHistory((current) => {
+          const next = mergePredicateRefReplayApplyHistoryEntries(
+            current.filter((entry) => entry.id !== conflict.entryId),
+            [conflict.remoteEntry],
+          );
+          predicateRefReplayApplyHistoryRef.current = next;
+          return next;
+        });
+      }
+      setPredicateRefReplayApplyConflicts((current) =>
+        current.filter((entry) => entry.conflictId !== conflict.conflictId),
+      );
+      appendPredicateRefReplayApplySyncAuditEntry({
+        at: new Date().toISOString(),
+        auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+        detail:
+          resolution === "remote"
+            ? `${predicateRefReplayApplyHistoryTabIdentity.label} accepted the remote replay history override from ${conflict.sourceTabLabel}.`
+            : `${predicateRefReplayApplyHistoryTabIdentity.label} kept the local replay history version over ${conflict.sourceTabLabel}.`,
+        entryId: conflict.entryId,
+        kind: "conflict_resolved",
+        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        templateId: conflict.templateId,
+        templateLabel: conflict.templateLabel,
+      });
+    },
+    [
+      appendPredicateRefReplayApplySyncAuditEntry,
+      predicateRefReplayApplyHistoryTabIdentity.label,
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+    ],
+  );
   useEffect(() => {
-    const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(
-      loadRunSurfaceCollectionQueryBuilderReplayApplyHistory(),
-      predicateRefReplayApplyHistory,
+    const conflictedEntryIds = new Set(
+      predicateRefReplayApplyConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => entry.entryId),
     );
+    const persistedEntries = loadRunSurfaceCollectionQueryBuilderReplayApplyHistory();
+    const persistedById = new Map<string, PredicateRefReplayApplyHistoryEntry>(
+      persistedEntries.map((entry: PredicateRefReplayApplyHistoryEntry) => [entry.id, entry] as const),
+    );
+    predicateRefReplayApplyHistory.forEach((entry: PredicateRefReplayApplyHistoryEntry) => {
+      if (conflictedEntryIds.has(entry.id)) {
+        return;
+      }
+      persistedById.set(entry.id, entry);
+    });
+    const mergedEntries = Array.from(persistedById.values())
+      .sort((left, right) => Date.parse(right.appliedAt) - Date.parse(left.appliedAt))
+      .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES);
     const serialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
     if (serialized === lastPersistedPredicateRefReplayApplyHistoryRef.current) {
       return;
     }
     persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
     lastPersistedPredicateRefReplayApplyHistoryRef.current = serialized;
-  }, [predicateRefReplayApplyHistory]);
+  }, [predicateRefReplayApplyConflicts, predicateRefReplayApplyHistory]);
   useEffect(() => {
     persistRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
       predicateRefReplayApplyHistoryTabIdentity.tabId,
@@ -18771,14 +19026,22 @@ function RunSurfaceCollectionQueryBuilder({
       predicateRefReplayApplyHistoryTabIdentity.tabId,
       {
         auditFilter: predicateRefReplayApplySyncAuditFilter,
+        conflictPolicy: predicateRefReplayApplyConflictPolicy,
         syncMode: predicateRefReplayApplySyncMode,
       },
     );
   }, [
     predicateRefReplayApplyHistoryTabIdentity.tabId,
     predicateRefReplayApplySyncAuditFilter,
+    predicateRefReplayApplyConflictPolicy,
     predicateRefReplayApplySyncMode,
   ]);
+  useEffect(() => {
+    persistRunSurfaceCollectionQueryBuilderReplayApplyConflicts(
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+      predicateRefReplayApplyConflicts,
+    );
+  }, [predicateRefReplayApplyConflicts, predicateRefReplayApplyHistoryTabIdentity.tabId]);
   useEffect(() => {
     if (typeof window === "undefined") {
       return undefined;
@@ -18789,52 +19052,93 @@ function RunSurfaceCollectionQueryBuilder({
       }
       const remoteEntries = parseRunSurfaceCollectionQueryBuilderReplayApplyHistoryValue(event.newValue);
       const currentEntries = predicateRefReplayApplyHistoryRef.current;
-      const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(currentEntries, remoteEntries);
-      const currentSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(currentEntries);
-      const mergedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
       const currentEntryById = new Map(
-        currentEntries.map((entry) => [entry.id, entry] as const),
+        currentEntries.map((entry: PredicateRefReplayApplyHistoryEntry) => [entry.id, entry] as const),
       );
-      const nextAuditEntries = remoteEntries.flatMap((remoteEntry: PredicateRefReplayApplyHistoryEntry) => {
+      const remoteConflicts = remoteEntries.flatMap((remoteEntry: PredicateRefReplayApplyHistoryEntry) => {
         const currentEntry = currentEntryById.get(remoteEntry.id) ?? null;
-        if (!currentEntry) {
+        if (currentEntry && !arePredicateRefReplayApplyHistoryEntriesEquivalent(currentEntry, remoteEntry)) {
           return [{
-            at: remoteEntry.appliedAt,
-            auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
-            detail:
-              predicateRefReplayApplySyncModeRef.current === "audit_only"
-                ? `${remoteEntry.sourceTabLabel ?? "Remote tab"} applied ${remoteEntry.approvedCount} replay rows, but this tab is in audit-only mode.`
-                : `${remoteEntry.sourceTabLabel ?? "Remote tab"} applied ${remoteEntry.approvedCount} replay rows.`,
+            conflictId: buildRunSurfaceCollectionQueryBuilderReplayApplyConflictId(),
+            detectedAt: new Date().toISOString(),
             entryId: remoteEntry.id,
-            kind: "remote_apply",
-            sourceTabId: remoteEntry.sourceTabId ?? "unknown",
-            sourceTabLabel: remoteEntry.sourceTabLabel ?? "Remote tab",
+            localEntry: currentEntry,
+            remoteEntry,
+            sourceTabId: remoteEntry.lastRestoredByTabId ?? remoteEntry.sourceTabId ?? "unknown",
+            sourceTabLabel: remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab",
             templateId: remoteEntry.templateId,
             templateLabel: remoteEntry.templateLabel,
-          } satisfies PredicateRefReplayApplySyncAuditEntry];
-        }
-        const currentRestoredAt = currentEntry.lastRestoredAt ? Date.parse(currentEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
-        const remoteRestoredAt = remoteEntry.lastRestoredAt ? Date.parse(remoteEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
-        if (remoteRestoredAt > currentRestoredAt && remoteEntry.lastRestoredAt) {
-          return [{
-            at: remoteEntry.lastRestoredAt,
-            auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
-            detail:
-              predicateRefReplayApplySyncModeRef.current === "audit_only"
-                ? `${remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab"} restored a replay snapshot, but this tab is in audit-only mode.`
-                : `${remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab"} restored a replay snapshot.`,
-            entryId: remoteEntry.id,
-            kind: "remote_restore",
-            sourceTabId:
-              remoteEntry.lastRestoredByTabId ?? remoteEntry.sourceTabId ?? "unknown",
-            sourceTabLabel:
-              remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab",
-            templateId: remoteEntry.templateId,
-            templateLabel: remoteEntry.templateLabel,
-          } satisfies PredicateRefReplayApplySyncAuditEntry];
+          } satisfies PredicateRefReplayApplyConflictEntry];
         }
         return [];
       });
+      const conflictingEntryIds = new Set(
+        remoteConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => entry.entryId),
+      );
+      const nonConflictingRemoteEntries = remoteEntries.filter(
+        (entry: PredicateRefReplayApplyHistoryEntry) => !conflictingEntryIds.has(entry.id),
+      );
+      const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(currentEntries, nonConflictingRemoteEntries);
+      const currentSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(currentEntries);
+      const mergedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
+      const nextAuditEntries = [
+        ...nonConflictingRemoteEntries.flatMap((remoteEntry: PredicateRefReplayApplyHistoryEntry) => {
+          const currentEntry = currentEntryById.get(remoteEntry.id) ?? null;
+          if (!currentEntry) {
+            return [{
+              at: remoteEntry.appliedAt,
+              auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+              detail:
+                predicateRefReplayApplySyncModeRef.current === "audit_only"
+                  ? `${remoteEntry.sourceTabLabel ?? "Remote tab"} applied ${remoteEntry.approvedCount} replay rows, but this tab is in audit-only mode.`
+                  : `${remoteEntry.sourceTabLabel ?? "Remote tab"} applied ${remoteEntry.approvedCount} replay rows.`,
+              entryId: remoteEntry.id,
+              kind: "remote_apply",
+              sourceTabId: remoteEntry.sourceTabId ?? "unknown",
+              sourceTabLabel: remoteEntry.sourceTabLabel ?? "Remote tab",
+              templateId: remoteEntry.templateId,
+              templateLabel: remoteEntry.templateLabel,
+            } satisfies PredicateRefReplayApplySyncAuditEntry];
+          }
+          const currentRestoredAt = currentEntry.lastRestoredAt ? Date.parse(currentEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+          const remoteRestoredAt = remoteEntry.lastRestoredAt ? Date.parse(remoteEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+          if (remoteRestoredAt > currentRestoredAt && remoteEntry.lastRestoredAt) {
+            return [{
+              at: remoteEntry.lastRestoredAt,
+              auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+              detail:
+                predicateRefReplayApplySyncModeRef.current === "audit_only"
+                  ? `${remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab"} restored a replay snapshot, but this tab is in audit-only mode.`
+                  : `${remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab"} restored a replay snapshot.`,
+              entryId: remoteEntry.id,
+              kind: "remote_restore",
+              sourceTabId:
+                remoteEntry.lastRestoredByTabId ?? remoteEntry.sourceTabId ?? "unknown",
+              sourceTabLabel:
+                remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab",
+              templateId: remoteEntry.templateId,
+              templateLabel: remoteEntry.templateLabel,
+            } satisfies PredicateRefReplayApplySyncAuditEntry];
+          }
+          return [];
+        }),
+        ...remoteConflicts.map((conflict: PredicateRefReplayApplyConflictEntry) => ({
+          at: conflict.detectedAt,
+          auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+          detail:
+            predicateRefReplayApplyConflictPolicyRef.current === "prefer_remote"
+              ? `${conflict.sourceTabLabel} collided with a local replay override and policy chose remote.`
+              : predicateRefReplayApplyConflictPolicyRef.current === "prefer_local"
+                ? `${conflict.sourceTabLabel} collided with a local replay override and policy kept local.`
+                : `${conflict.sourceTabLabel} collided with a local replay override and is waiting for review.`,
+          entryId: conflict.entryId,
+          kind: "conflict_detected",
+          sourceTabId: conflict.sourceTabId,
+          sourceTabLabel: conflict.sourceTabLabel,
+          templateId: conflict.templateId,
+          templateLabel: conflict.templateLabel,
+        } satisfies PredicateRefReplayApplySyncAuditEntry)),
+      ];
       if (predicateRefReplayApplySyncModeRef.current === "mute_remote") {
         return;
       }
@@ -18842,6 +19146,40 @@ function RunSurfaceCollectionQueryBuilder({
         setPredicateRefReplayApplySyncAuditTrail((current) =>
           mergePredicateRefReplayApplySyncAuditEntries(current, nextAuditEntries),
         );
+      }
+      if (remoteConflicts.length) {
+        if (predicateRefReplayApplyConflictPolicyRef.current === "require_review") {
+          setPredicateRefReplayApplyConflicts((current) => {
+            const nextByEntryId = new Map(
+              current.map((entry: PredicateRefReplayApplyConflictEntry) => [entry.entryId, entry] as const),
+            );
+            remoteConflicts.forEach((conflict: PredicateRefReplayApplyConflictEntry) => {
+              nextByEntryId.set(conflict.entryId, conflict);
+            });
+            return limitPredicateRefReplayApplyConflictEntries(Array.from(nextByEntryId.values()));
+          });
+        } else if (predicateRefReplayApplyConflictPolicyRef.current === "prefer_remote") {
+          setPredicateRefReplayApplyConflicts((current) =>
+            current.filter((entry: PredicateRefReplayApplyConflictEntry) =>
+              !remoteConflicts.some((conflict: PredicateRefReplayApplyConflictEntry) => conflict.entryId === entry.entryId),
+            ),
+          );
+          const resolvedEntries = mergePredicateRefReplayApplyHistoryEntries(
+            mergedEntries,
+            remoteConflicts.map((conflict: PredicateRefReplayApplyConflictEntry) => conflict.remoteEntry),
+          );
+          const resolvedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(resolvedEntries);
+          predicateRefReplayApplyHistoryRef.current = resolvedEntries;
+          setPredicateRefReplayApplyHistory(resolvedEntries);
+          lastPersistedPredicateRefReplayApplyHistoryRef.current = resolvedSerialized;
+          return;
+        } else {
+          setPredicateRefReplayApplyConflicts((current) =>
+            current.filter((entry: PredicateRefReplayApplyConflictEntry) =>
+              !remoteConflicts.some((conflict: PredicateRefReplayApplyConflictEntry) => conflict.entryId === entry.entryId),
+            ),
+          );
+        }
       }
       if (
         predicateRefReplayApplySyncModeRef.current === "audit_only"
@@ -18862,14 +19200,99 @@ function RunSurfaceCollectionQueryBuilder({
     }
     const storageEntries = loadRunSurfaceCollectionQueryBuilderReplayApplyHistory();
     setPredicateRefReplayApplyHistory((current) => {
-      const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(current, storageEntries);
-      predicateRefReplayApplyHistoryRef.current = mergedEntries;
-      return serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries)
+      const currentEntryById = new Map(
+        current.map((entry: PredicateRefReplayApplyHistoryEntry) => [entry.id, entry] as const),
+      );
+      const storageConflicts = storageEntries.flatMap((entry: PredicateRefReplayApplyHistoryEntry) => {
+        const currentEntry = currentEntryById.get(entry.id) ?? null;
+        if (!currentEntry || arePredicateRefReplayApplyHistoryEntriesEquivalent(currentEntry, entry)) {
+          return [];
+        }
+        return [{
+          conflictId: buildRunSurfaceCollectionQueryBuilderReplayApplyConflictId(),
+          detectedAt: new Date().toISOString(),
+          entryId: entry.id,
+          localEntry: currentEntry,
+          remoteEntry: entry,
+          sourceTabId: entry.lastRestoredByTabId ?? entry.sourceTabId ?? "unknown",
+          sourceTabLabel: entry.lastRestoredByTabLabel ?? entry.sourceTabLabel ?? "Remote tab",
+          templateId: entry.templateId,
+          templateLabel: entry.templateLabel,
+        } satisfies PredicateRefReplayApplyConflictEntry];
+      });
+      if (storageConflicts.length && predicateRefReplayApplyConflictPolicyRef.current === "require_review") {
+        setPredicateRefReplayApplyConflicts((currentConflicts) => {
+          const nextByEntryId = new Map(
+            currentConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => [entry.entryId, entry] as const),
+          );
+          storageConflicts.forEach((conflict: PredicateRefReplayApplyConflictEntry) => {
+            nextByEntryId.set(conflict.entryId, conflict);
+          });
+          return limitPredicateRefReplayApplyConflictEntries(Array.from(nextByEntryId.values()));
+        });
+      }
+      const nonConflictingStorageEntries = storageEntries.filter((entry: PredicateRefReplayApplyHistoryEntry) =>
+        !storageConflicts.some((conflict: PredicateRefReplayApplyConflictEntry) => conflict.entryId === entry.id),
+      );
+      const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(current, nonConflictingStorageEntries);
+      const resolvedEntries =
+        storageConflicts.length && predicateRefReplayApplyConflictPolicyRef.current === "prefer_remote"
+          ? mergePredicateRefReplayApplyHistoryEntries(
+              mergedEntries,
+              storageConflicts.map((conflict: PredicateRefReplayApplyConflictEntry) => conflict.remoteEntry),
+            )
+          : mergedEntries;
+      predicateRefReplayApplyHistoryRef.current = resolvedEntries;
+      return serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(resolvedEntries)
         === serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(current)
         ? current
-        : mergedEntries;
+        : resolvedEntries;
     });
   }, [predicateRefReplayApplySyncMode]);
+  useEffect(() => {
+    if (
+      predicateRefReplayApplyConflictPolicy === "require_review"
+      || !predicateRefReplayApplyConflicts.length
+    ) {
+      return;
+    }
+    const nextConflicts = [...predicateRefReplayApplyConflicts];
+    setPredicateRefReplayApplyConflicts([]);
+    if (predicateRefReplayApplyConflictPolicy === "prefer_remote") {
+      setPredicateRefReplayApplyHistory((current) => {
+        const resolvedEntries = mergePredicateRefReplayApplyHistoryEntries(
+          current.filter((entry) => !nextConflicts.some((conflict) => conflict.entryId === entry.id)),
+          nextConflicts.map((conflict) => conflict.remoteEntry),
+        );
+        predicateRefReplayApplyHistoryRef.current = resolvedEntries;
+        return resolvedEntries;
+      });
+    }
+    setPredicateRefReplayApplySyncAuditTrail((current) =>
+      mergePredicateRefReplayApplySyncAuditEntries(
+        current,
+        nextConflicts.map((conflict) => ({
+          at: new Date().toISOString(),
+          auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+          detail:
+            predicateRefReplayApplyConflictPolicy === "prefer_remote"
+              ? `${predicateRefReplayApplyHistoryTabIdentity.label} auto-resolved a pending collision in favor of remote.`
+              : `${predicateRefReplayApplyHistoryTabIdentity.label} auto-resolved a pending collision in favor of local.`,
+          entryId: conflict.entryId,
+          kind: "conflict_resolved",
+          sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+          sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+          templateId: conflict.templateId,
+          templateLabel: conflict.templateLabel,
+        })),
+      ),
+    );
+  }, [
+    predicateRefReplayApplyConflictPolicy,
+    predicateRefReplayApplyConflicts,
+    predicateRefReplayApplyHistoryTabIdentity.label,
+    predicateRefReplayApplyHistoryTabIdentity.tabId,
+  ]);
   const simulatedCoordinationGroups = useMemo<ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>>(
     () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
     [selectedRefTemplateParameterGroups],
@@ -22945,7 +23368,28 @@ function RunSurfaceCollectionQueryBuilder({
                                                 ? "Apply and restore events from other tabs merge into this tab."
                                                 : predicateRefReplayApplySyncMode === "audit_only"
                                                   ? "Remote tab events are logged but do not change this tab history."
-                                                  : "Remote tab replay history updates are ignored in this tab."}
+                                              : "Remote tab replay history updates are ignored in this tab."}
+                                            </small>
+                                          </label>
+                                          <label className="run-surface-query-builder-control">
+                                            <span>Conflict policy</span>
+                                            <select
+                                              value={predicateRefReplayApplyConflictPolicy}
+                                              onChange={(event) =>
+                                                setPredicateRefReplayApplyConflictPolicy(
+                                                  event.target.value as PredicateRefReplayApplyConflictPolicy,
+                                                )}
+                                            >
+                                              <option value="require_review">Require review</option>
+                                              <option value="prefer_local">Prefer local</option>
+                                              <option value="prefer_remote">Prefer remote</option>
+                                            </select>
+                                            <small>
+                                              {predicateRefReplayApplyConflictPolicy === "require_review"
+                                                ? "Override collisions stay pending until you explicitly resolve them."
+                                                : predicateRefReplayApplyConflictPolicy === "prefer_local"
+                                                  ? "Conflicting remote overrides are logged but local history wins."
+                                                  : "Conflicting remote overrides replace local history automatically."}
                                             </small>
                                           </label>
                                           <label className="run-surface-query-builder-control">
@@ -22962,6 +23406,7 @@ function RunSurfaceCollectionQueryBuilder({
                                               <option value="remote">Remote only</option>
                                               <option value="apply">Apply only</option>
                                               <option value="restore">Restore only</option>
+                                              <option value="conflict">Conflict only</option>
                                             </select>
                                             <small>
                                               {visibleSelectedRefTemplateReplayApplySyncAuditTrail.length
@@ -22984,6 +23429,64 @@ function RunSurfaceCollectionQueryBuilder({
                                           Each confirmed replay apply stores a rollback snapshot of the affected manual bundle
                                           selections and draft bindings for this template.
                                         </p>
+                                        {selectedRefTemplateReplayApplyConflicts.length ? (
+                                          <div className="run-surface-query-builder-trace-panel is-nested">
+                                            <div className="run-surface-query-builder-card-head">
+                                              <strong>Pending override collisions</strong>
+                                              <span>{`${selectedRefTemplateReplayApplyConflicts.length} pending`}</span>
+                                            </div>
+                                            <p className="run-note">
+                                              Remote replay history updates collided with a local override for the same entry id.
+                                              Resolve each collision to decide which version stays active in this tab.
+                                            </p>
+                                            <div className="run-surface-query-builder-trace-list">
+                                              {selectedRefTemplateReplayApplyConflicts.map((conflict) => (
+                                                <div
+                                                  className="run-surface-query-builder-trace-step is-warning"
+                                                  key={conflict.conflictId}
+                                                >
+                                                  <strong>{conflict.templateLabel}</strong>
+                                                  <p>
+                                                    {`Detected ${formatRelativeTimestampLabel(conflict.detectedAt)} from ${conflict.sourceTabLabel}.`}
+                                                  </p>
+                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {`Local · ${conflict.localEntry.approvedCount} rows · ${conflict.localEntry.sourceTabLabel ?? predicateRefReplayApplyHistoryTabIdentity.label}`}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                      {`Remote · ${conflict.remoteEntry.approvedCount} rows · ${conflict.sourceTabLabel}`}
+                                                    </span>
+                                                  </div>
+                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                    {conflict.remoteEntry.rows.map((row) => (
+                                                      <span className="run-surface-query-builder-trace-chip" key={`${conflict.conflictId}:${row.groupKey}`}>
+                                                        {`${row.groupLabel}: ${row.promotedBundleLabel}`}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                  <div className="run-surface-query-builder-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() =>
+                                                        resolvePredicateRefReplayApplyConflict(conflict, "local")}
+                                                      type="button"
+                                                    >
+                                                      Keep local version
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() =>
+                                                        resolvePredicateRefReplayApplyConflict(conflict, "remote")}
+                                                      type="button"
+                                                    >
+                                                      Apply remote version
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : null}
                                         {selectedRefTemplateReplayApplySyncAuditTrail.length ? (
                                           <div className="run-surface-query-builder-trace-panel is-nested">
                                             <div className="run-surface-query-builder-card-head">
