@@ -29,6 +29,7 @@ from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import ComparisonEligibilityContract
 from akra_trader.domain.models import default_comparison_eligibility_contract
 from akra_trader.domain.models import ReplayIntentAliasAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
@@ -718,6 +719,7 @@ class TradingApplication:
     self._replay_intent_alias_signing_secret = self._load_or_create_replay_intent_alias_signing_secret()
     self._replay_intent_alias_records: dict[str, ReplayIntentAliasRecord] = {}
     self._replay_intent_alias_audit_records: dict[str, ReplayIntentAliasAuditRecord] = {}
+    self._replay_intent_alias_audit_export_artifacts: dict[str, ReplayIntentAliasAuditExportArtifactRecord] = {}
     self._replay_intent_alias_audit_export_jobs: dict[str, ReplayIntentAliasAuditExportJobRecord] = {}
     self._replay_intent_alias_audit_export_job_audit_records: dict[str, ReplayIntentAliasAuditExportJobAuditRecord] = {}
 
@@ -1398,6 +1400,49 @@ class TradingApplication:
     )
     return self._save_replay_intent_alias_audit_record(audit_record)
 
+  def _save_replay_intent_alias_audit_export_artifact_record(
+    self,
+    record: ReplayIntentAliasAuditExportArtifactRecord,
+  ) -> ReplayIntentAliasAuditExportArtifactRecord:
+    save_artifact = getattr(self._runs, "save_replay_intent_alias_audit_export_artifact", None)
+    if callable(save_artifact):
+      return save_artifact(record)
+    self._replay_intent_alias_audit_export_artifacts[record.artifact_id] = record
+    return record
+
+  def _load_replay_intent_alias_audit_export_artifact_record(
+    self,
+    artifact_id: str,
+  ) -> ReplayIntentAliasAuditExportArtifactRecord | None:
+    get_artifact = getattr(self._runs, "get_replay_intent_alias_audit_export_artifact", None)
+    if callable(get_artifact):
+      return get_artifact(artifact_id)
+    return self._replay_intent_alias_audit_export_artifacts.get(artifact_id)
+
+  def _delete_replay_intent_alias_audit_export_artifact_records(self, artifact_ids: tuple[str, ...]) -> int:
+    delete_artifacts = getattr(self._runs, "delete_replay_intent_alias_audit_export_artifacts", None)
+    if callable(delete_artifacts):
+      return int(delete_artifacts(artifact_ids))
+    deleted_count = 0
+    for artifact_id in artifact_ids:
+      if artifact_id in self._replay_intent_alias_audit_export_artifacts:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_artifacts[artifact_id]
+    return deleted_count
+
+  def _prune_replay_intent_alias_audit_export_artifact_records(self) -> int:
+    current_time = self._clock()
+    prune_artifacts = getattr(self._runs, "prune_replay_intent_alias_audit_export_artifacts", None)
+    if callable(prune_artifacts):
+      return int(prune_artifacts(current_time))
+    original_count = len(self._replay_intent_alias_audit_export_artifacts)
+    self._replay_intent_alias_audit_export_artifacts = {
+      artifact_id: record
+      for artifact_id, record in self._replay_intent_alias_audit_export_artifacts.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._replay_intent_alias_audit_export_artifacts)
+
   def _save_replay_intent_alias_audit_export_job_record(
     self,
     record: ReplayIntentAliasAuditExportJobRecord,
@@ -1444,6 +1489,17 @@ class TradingApplication:
     }
     return original_count - len(self._replay_intent_alias_audit_export_jobs)
 
+  def _delete_replay_intent_alias_audit_export_job_records(self, job_ids: tuple[str, ...]) -> int:
+    delete_jobs = getattr(self._runs, "delete_replay_intent_alias_audit_export_jobs", None)
+    if callable(delete_jobs):
+      return int(delete_jobs(job_ids))
+    deleted_count = 0
+    for job_id in job_ids:
+      if job_id in self._replay_intent_alias_audit_export_jobs:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_jobs[job_id]
+    return deleted_count
+
   def _save_replay_intent_alias_audit_export_job_audit_record(
     self,
     record: ReplayIntentAliasAuditExportJobAuditRecord,
@@ -1473,6 +1529,17 @@ class TradingApplication:
         reverse=True,
       )
     )
+
+  def _delete_replay_intent_alias_audit_export_job_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    delete_audits = getattr(self._runs, "delete_replay_intent_alias_audit_export_job_audit_records", None)
+    if callable(delete_audits):
+      return int(delete_audits(audit_ids))
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._replay_intent_alias_audit_export_job_audit_records:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_job_audit_records[audit_id]
+    return deleted_count
 
   def _prune_replay_intent_alias_audit_export_job_audit_records(self) -> int:
     current_time = self._clock()
@@ -1697,7 +1764,9 @@ class TradingApplication:
     requested_by_tab_id: str | None = None,
     requested_by_tab_label: str | None = None,
   ) -> ReplayIntentAliasAuditExportJobRecord:
+    self._prune_replay_intent_alias_audit_export_artifact_records()
     self._prune_replay_intent_alias_audit_export_job_records()
+    self._prune_replay_intent_alias_audit_export_job_audit_records()
     export_payload = self.export_replay_intent_alias_audits(
       export_format=export_format,
       alias_id=alias_id,
@@ -1708,12 +1777,29 @@ class TradingApplication:
       search=search,
     )
     created_at = self._clock()
-    record = ReplayIntentAliasAuditExportJobRecord(
+    artifact_id = uuid4().hex[:12]
+    artifact_record = ReplayIntentAliasAuditExportArtifactRecord(
+      artifact_id=artifact_id,
       job_id=uuid4().hex[:12],
-      export_format=export_payload["format"],
       filename=export_payload["filename"],
       content_type=export_payload["content_type"],
       content=export_payload["content"],
+      created_at=created_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=created_at,
+      ),
+      byte_length=len(export_payload["content"].encode("utf-8")),
+    )
+    job_id = uuid4().hex[:12]
+    saved_artifact = self._save_replay_intent_alias_audit_export_artifact_record(
+      replace(artifact_record, job_id=job_id)
+    )
+    record = ReplayIntentAliasAuditExportJobRecord(
+      job_id=job_id,
+      export_format=export_payload["format"],
+      filename=export_payload["filename"],
+      content_type=export_payload["content_type"],
       record_count=int(export_payload["record_count"]),
       status="completed",
       created_at=created_at,
@@ -1741,6 +1827,8 @@ class TradingApplication:
         "source_tab_id": source_tab_id,
         "search": search,
       },
+      artifact_id=saved_artifact.artifact_id,
+      content_length=saved_artifact.byte_length,
     )
     saved_record = self._save_replay_intent_alias_audit_export_job_record(record)
     self._record_replay_intent_alias_audit_export_job_event(
@@ -1750,6 +1838,26 @@ class TradingApplication:
       source_tab_label=requested_by_tab_label,
     )
     return saved_record
+
+  @classmethod
+  def _matches_replay_intent_alias_audit_export_job_search(
+    cls,
+    record: ReplayIntentAliasAuditExportJobRecord,
+    search: str | None,
+  ) -> bool:
+    if not isinstance(search, str) or not search.strip():
+      return True
+    needle = search.strip().lower()
+    haystacks = (
+      record.job_id,
+      record.filename,
+      record.export_format,
+      record.status,
+      record.template_key or "",
+      record.requested_by_tab_id or "",
+      record.requested_by_tab_label or "",
+    )
+    return any(needle in value.lower() for value in haystacks if value)
 
   def list_replay_intent_alias_audit_export_jobs(
     self,
@@ -1761,7 +1869,9 @@ class TradingApplication:
     search: str | None = None,
     limit: int = 100,
   ) -> tuple[ReplayIntentAliasAuditExportJobRecord, ...]:
+    self._prune_replay_intent_alias_audit_export_artifact_records()
     self._prune_replay_intent_alias_audit_export_job_records()
+    self._prune_replay_intent_alias_audit_export_job_audit_records()
     normalized_template_key = template_key.strip() if isinstance(template_key, str) and template_key.strip() else None
     normalized_export_format = export_format.strip().lower() if isinstance(export_format, str) and export_format.strip() else None
     normalized_status = status.strip().lower() if isinstance(status, str) and status.strip() else None
@@ -1782,22 +1892,7 @@ class TradingApplication:
         normalized_requested_by_tab_id is None
         or record.requested_by_tab_id == normalized_requested_by_tab_id
       )
-      and (
-        search_value is None
-        or any(
-          search_value in value.lower()
-          for value in (
-            record.job_id,
-            record.filename,
-            record.export_format,
-            record.status,
-            record.template_key or "",
-            record.requested_by_tab_id or "",
-            record.requested_by_tab_label or "",
-          )
-          if value
-        )
-      )
+      and self._matches_replay_intent_alias_audit_export_job_search(record, search_value)
     ]
     return tuple(filtered[:normalized_limit])
 
@@ -1805,6 +1900,7 @@ class TradingApplication:
     self,
     job_id: str,
   ) -> ReplayIntentAliasAuditExportJobRecord:
+    self._prune_replay_intent_alias_audit_export_artifact_records()
     self._prune_replay_intent_alias_audit_export_job_records()
     normalized_job_id = job_id.strip()
     if not normalized_job_id:
@@ -1816,13 +1912,36 @@ class TradingApplication:
       raise LookupError("Replay alias audit export job has expired.")
     return record
 
+  def get_replay_intent_alias_audit_export_artifact(
+    self,
+    artifact_id: str,
+  ) -> ReplayIntentAliasAuditExportArtifactRecord:
+    self._prune_replay_intent_alias_audit_export_artifact_records()
+    normalized_artifact_id = artifact_id.strip()
+    if not normalized_artifact_id:
+      raise LookupError("Replay alias audit export artifact not found.")
+    record = self._load_replay_intent_alias_audit_export_artifact_record(normalized_artifact_id)
+    if record is None:
+      raise LookupError("Replay alias audit export artifact not found.")
+    if record.expires_at is not None and record.expires_at <= self._clock():
+      raise LookupError("Replay alias audit export artifact has expired.")
+    return record
+
   def download_replay_intent_alias_audit_export_job(
     self,
     job_id: str,
-  ) -> ReplayIntentAliasAuditExportJobRecord:
+  ) -> dict[str, Any]:
     record = self.get_replay_intent_alias_audit_export_job(job_id)
+    artifact_content = record.content
+    if record.artifact_id:
+      artifact_record = self.get_replay_intent_alias_audit_export_artifact(record.artifact_id)
+      artifact_content = artifact_record.content
     self._record_replay_intent_alias_audit_export_job_event(record=record, action="downloaded")
-    return record
+    return serialize_replay_intent_alias_audit_export_job_record(
+      record,
+      include_content=True,
+      content=artifact_content,
+    )
 
   def list_replay_intent_alias_audit_export_job_history(
     self,
@@ -1831,6 +1950,64 @@ class TradingApplication:
     record = self.get_replay_intent_alias_audit_export_job(job_id)
     self._prune_replay_intent_alias_audit_export_job_audit_records()
     return self._list_replay_intent_alias_audit_export_job_audit_records(record.job_id)
+
+  def prune_replay_intent_alias_audit_export_jobs(
+    self,
+    *,
+    template_key: str | None = None,
+    export_format: str | None = None,
+    status: str | None = None,
+    requested_by_tab_id: str | None = None,
+    search: str | None = None,
+    created_before: datetime | None = None,
+    prune_mode: str = "expired",
+  ) -> dict[str, Any]:
+    normalized_mode = prune_mode if prune_mode in {"expired", "matched"} else "expired"
+    if normalized_mode == "expired":
+      deleted_artifact_count = self._prune_replay_intent_alias_audit_export_artifact_records()
+      deleted_job_count = self._prune_replay_intent_alias_audit_export_job_records()
+      deleted_history_count = self._prune_replay_intent_alias_audit_export_job_audit_records()
+      return {
+        "deleted_artifact_count": deleted_artifact_count,
+        "deleted_history_count": deleted_history_count,
+        "deleted_job_count": deleted_job_count,
+        "mode": "expired",
+      }
+    candidate_records = self.list_replay_intent_alias_audit_export_jobs(
+      template_key=template_key,
+      export_format=export_format,
+      status=status,
+      requested_by_tab_id=requested_by_tab_id,
+      search=search,
+      limit=500,
+    )
+    deleted_records = [
+      record
+      for record in candidate_records
+      if created_before is None or record.created_at <= created_before
+    ]
+    deleted_job_ids = tuple(record.job_id for record in deleted_records)
+    deleted_artifact_ids = tuple(
+      record.artifact_id
+      for record in deleted_records
+      if isinstance(record.artifact_id, str) and record.artifact_id
+    )
+    deleted_history_ids = tuple(
+      audit_record.audit_id
+      for audit_record in self._list_replay_intent_alias_audit_export_job_audit_records()
+      if audit_record.job_id in deleted_job_ids
+    )
+    deleted_artifact_count = self._delete_replay_intent_alias_audit_export_artifact_records(deleted_artifact_ids)
+    deleted_history_count = self._delete_replay_intent_alias_audit_export_job_audit_records(deleted_history_ids)
+    deleted_job_count = self._delete_replay_intent_alias_audit_export_job_records(deleted_job_ids)
+    return {
+      "deleted_artifact_count": deleted_artifact_count,
+      "deleted_artifact_ids": list(deleted_artifact_ids),
+      "deleted_history_count": deleted_history_count,
+      "deleted_job_count": deleted_job_count,
+      "deleted_job_ids": list(deleted_job_ids),
+      "mode": "matched",
+    }
 
   def prune_replay_intent_alias_audits(
     self,
@@ -24703,6 +24880,7 @@ def serialize_replay_intent_alias_audit_export_job_record(
   record: ReplayIntentAliasAuditExportJobRecord,
   *,
   include_content: bool = False,
+  content: str | None = None,
 ) -> dict[str, Any]:
   payload = {
     "job_id": record.job_id,
@@ -24718,9 +24896,11 @@ def serialize_replay_intent_alias_audit_export_job_record(
     "requested_by_tab_id": record.requested_by_tab_id,
     "requested_by_tab_label": record.requested_by_tab_label,
     "filters": deepcopy(record.filters),
+    "artifact_id": record.artifact_id,
+    "content_length": record.content_length,
   }
   if include_content:
-    payload["content"] = record.content
+    payload["content"] = content if content is not None else record.content
   return payload
 
 
@@ -25231,6 +25411,17 @@ def list_standalone_surface_runtime_bindings(
     binding_kind="replay_link_audit_export_job_history",
     header_keys=("x_akra_replay_audit_admin_token",),
     path_param_keys=("job_id",),
+  )
+  replay_alias_audit_export_job_prune_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export_job_prune",
+    route_path="/replay-links/audits/export-jobs/prune",
+    route_name="prune_replay_link_alias_audit_export_jobs",
+    response_title="Prune replay link alias audit export jobs",
+    scope="app",
+    binding_kind="replay_link_audit_export_job_prune",
+    methods=("POST",),
+    header_keys=("x_akra_replay_audit_admin_token",),
+    request_payload_kind="replay_link_audit_export_job_prune",
   )
   replay_alias_audit_prune_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="replay_link_audit_prune",
@@ -26532,6 +26723,7 @@ def list_standalone_surface_runtime_bindings(
     replay_alias_audit_export_job_list_binding,
     replay_alias_audit_export_job_download_binding,
     replay_alias_audit_export_job_history_binding,
+    replay_alias_audit_export_job_prune_binding,
     replay_alias_audit_prune_binding,
     replay_alias_revoke_binding,
     market_data_status_binding,
@@ -26696,10 +26888,7 @@ def execute_standalone_surface_binding(
       resolved_headers.get("x_akra_replay_audit_admin_token"),
       scope="read",
     )
-    return serialize_replay_intent_alias_audit_export_job_record(
-      app.download_replay_intent_alias_audit_export_job(resolved_path_params["job_id"]),
-      include_content=True,
-    )
+    return app.download_replay_intent_alias_audit_export_job(resolved_path_params["job_id"])
   if binding.binding_kind == "replay_link_audit_export_job_history":
     app.require_replay_alias_audit_admin_token(
       resolved_headers.get("x_akra_replay_audit_admin_token"),
@@ -26709,6 +26898,20 @@ def execute_standalone_surface_binding(
     return serialize_replay_intent_alias_audit_export_job_history(
       export_job,
       app.list_replay_intent_alias_audit_export_job_history(resolved_path_params["job_id"]),
+    )
+  if binding.binding_kind == "replay_link_audit_export_job_prune":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="write",
+    )
+    return app.prune_replay_intent_alias_audit_export_jobs(
+      template_key=resolved_payload.get("template_key"),
+      export_format=resolved_payload.get("format"),
+      status=resolved_payload.get("status"),
+      requested_by_tab_id=resolved_payload.get("requested_by_tab_id"),
+      search=resolved_payload.get("search"),
+      created_before=resolved_payload.get("created_before"),
+      prune_mode=resolved_payload.get("prune_mode", "expired"),
     )
   if binding.binding_kind == "replay_link_audit_prune":
     app.require_replay_alias_audit_admin_token(

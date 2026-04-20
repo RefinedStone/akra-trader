@@ -4225,6 +4225,38 @@ async function getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob
   );
 }
 
+async function pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs(params: {
+  adminToken?: string;
+  createdBefore?: string;
+  exportFormat?: string;
+  pruneMode: "expired" | "matched";
+  requestedByTabId?: string;
+  search?: string;
+  status?: string;
+  templateKey?: string;
+}) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobPrunePayload>(
+    "/replay-links/audits/export-jobs/prune",
+    {
+      method: "POST",
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+      body: JSON.stringify({
+        prune_mode: params.pruneMode,
+        ...(params.templateKey?.trim() ? { template_key: params.templateKey.trim() } : {}),
+        ...(params.exportFormat?.trim() && params.exportFormat !== "all"
+          ? { format: params.exportFormat.trim() }
+          : {}),
+        ...(params.status?.trim() && params.status !== "all" ? { status: params.status.trim() } : {}),
+        ...(params.requestedByTabId?.trim() ? { requested_by_tab_id: params.requestedByTabId.trim() } : {}),
+        ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+        ...(params.createdBefore?.trim() ? { created_before: params.createdBefore.trim() } : {}),
+      }),
+    },
+  );
+}
+
 const defaultRunForm = {
   strategy_id: "ma_cross_v1",
   symbol: "BTC/USDT",
@@ -17559,9 +17591,11 @@ type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload = {
 };
 
 type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry = {
+  artifact_id: string | null;
   completed_at: string | null;
   content_type: string;
   created_at: string;
+  content_length: number;
   expires_at: string | null;
   export_format: "json" | "csv" | string;
   filename: string;
@@ -17600,6 +17634,15 @@ type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry 
 type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload = {
   history: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry[];
   job: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobPrunePayload = {
+  deleted_artifact_count: number;
+  deleted_artifact_ids?: string[];
+  deleted_history_count: number;
+  deleted_job_count: number;
+  deleted_job_ids?: string[];
+  mode: "expired" | "matched" | string;
 };
 
 type RunSurfaceCollectionQueryBuilderReplayLinkAliasState = {
@@ -24822,6 +24865,51 @@ function RunSurfaceCollectionQueryBuilder({
     replayIntentServerAuditReadToken,
     replayIntentServerAuditWriteToken,
   ]);
+  const pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecords = useCallback(async (
+    pruneMode: "expired" | "matched",
+  ) => {
+    const adminToken = replayIntentServerAuditWriteToken.trim() || replayIntentServerAuditReadToken.trim();
+    setReplayIntentServerAuditExportJobLoading(true);
+    setReplayIntentServerAuditExportJobStatus(null);
+    try {
+      const payload = await pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs({
+        adminToken,
+        createdBefore: replayIntentServerAuditRecordedBefore,
+        exportFormat: "all",
+        pruneMode,
+        requestedByTabId: replayIntentServerAuditSourceTabFilter,
+        search: replayIntentServerAuditSearch,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      setReplayIntentServerAuditExportJobHistory(null);
+      setReplayIntentServerAuditExportJobStatus({
+        message:
+          pruneMode === "expired"
+            ? `Pruned ${payload.deleted_job_count} expired export job${payload.deleted_job_count === 1 ? "" : "s"}, ${payload.deleted_artifact_count} retained artifact${payload.deleted_artifact_count === 1 ? "" : "s"}, and ${payload.deleted_history_count} history record${payload.deleted_history_count === 1 ? "" : "s"}.`
+            : `Pruned ${payload.deleted_job_count} matched export job${payload.deleted_job_count === 1 ? "" : "s"}, ${payload.deleted_artifact_count} retained artifact${payload.deleted_artifact_count === 1 ? "" : "s"}, and ${payload.deleted_history_count} history record${payload.deleted_history_count === 1 ? "" : "s"}.`,
+        tone: payload.deleted_job_count || payload.deleted_artifact_count || payload.deleted_history_count ? "success" : "muted",
+      });
+      await loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs({
+        adminToken,
+        silent: true,
+      });
+    } catch (error) {
+      setReplayIntentServerAuditExportJobStatus({
+        message: error instanceof Error ? error.message : "Failed to prune server replay audit export jobs.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditExportJobLoading(false);
+    }
+  }, [
+    loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRecordedBefore,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
   const copyRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = useCallback(async () => {
     if (!currentReplayIntentGovernancePayloadValue) {
       setReplayIntentGovernanceStatus({
@@ -30823,6 +30911,26 @@ function RunSurfaceCollectionQueryBuilder({
                             >
                               {replayIntentServerAuditExportJobLoading ? "Loading…" : "Load export jobs"}
                             </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditExportJobLoading}
+                              onClick={() => {
+                                void pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecords("expired");
+                              }}
+                              type="button"
+                            >
+                              Prune expired jobs
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditExportJobLoading}
+                              onClick={() => {
+                                void pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecords("matched");
+                              }}
+                              type="button"
+                            >
+                              Prune matched jobs
+                            </button>
                           </div>
                           {replayIntentServerAuditExportJobs.length ? (
                             <div className="run-surface-query-builder-trace-list">
@@ -30842,9 +30950,17 @@ function RunSurfaceCollectionQueryBuilder({
                                     <span className="run-surface-query-builder-trace-chip">
                                       {`${job.record_count} record${job.record_count === 1 ? "" : "s"}`}
                                     </span>
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {`${job.content_length} bytes`}
+                                    </span>
                                     {job.template_key ? (
                                       <span className="run-surface-query-builder-trace-chip">
                                         {job.template_key}
+                                      </span>
+                                    ) : null}
+                                    {job.artifact_id ? (
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {`artifact ${job.artifact_id.slice(0, 8)}`}
                                       </span>
                                     ) : null}
                                   </div>

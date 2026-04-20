@@ -20,6 +20,7 @@ from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import ReplayIntentAliasAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportArtifactRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
 from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
@@ -187,6 +188,7 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._runs: OrderedDict[str, RunRecord] = OrderedDict()
     self._replay_intent_alias_records: OrderedDict[str, ReplayIntentAliasRecord] = OrderedDict()
     self._replay_intent_alias_audit_records: OrderedDict[str, ReplayIntentAliasAuditRecord] = OrderedDict()
+    self._replay_intent_alias_audit_export_artifacts: OrderedDict[str, ReplayIntentAliasAuditExportArtifactRecord] = OrderedDict()
     self._replay_intent_alias_audit_export_jobs: OrderedDict[str, ReplayIntentAliasAuditExportJobRecord] = OrderedDict()
     self._replay_intent_alias_audit_export_job_audit_records: OrderedDict[str, ReplayIntentAliasAuditExportJobAuditRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
@@ -303,6 +305,39 @@ class InMemoryRunRepository(RunRepositoryPort):
     )
     return original_count - len(self._replay_intent_alias_audit_records)
 
+  def save_replay_intent_alias_audit_export_artifact(
+    self,
+    record: ReplayIntentAliasAuditExportArtifactRecord,
+  ) -> ReplayIntentAliasAuditExportArtifactRecord:
+    self._replay_intent_alias_audit_export_artifacts[record.artifact_id] = record
+    return record
+
+  def get_replay_intent_alias_audit_export_artifact(
+    self,
+    artifact_id: str,
+  ) -> ReplayIntentAliasAuditExportArtifactRecord | None:
+    return self._replay_intent_alias_audit_export_artifacts.get(artifact_id)
+
+  def delete_replay_intent_alias_audit_export_artifacts(self, artifact_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for artifact_id in artifact_ids:
+      if artifact_id in self._replay_intent_alias_audit_export_artifacts:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_artifacts[artifact_id]
+    return deleted_count
+
+  def prune_replay_intent_alias_audit_export_artifacts(self, current_time: datetime) -> int:
+    original_count = len(self._replay_intent_alias_audit_export_artifacts)
+    self._replay_intent_alias_audit_export_artifacts = OrderedDict(
+      (
+        artifact_id,
+        record,
+      )
+      for artifact_id, record in self._replay_intent_alias_audit_export_artifacts.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._replay_intent_alias_audit_export_artifacts)
+
   def save_replay_intent_alias_audit_export_job(
     self,
     record: ReplayIntentAliasAuditExportJobRecord,
@@ -339,6 +374,14 @@ class InMemoryRunRepository(RunRepositoryPort):
     )
     return original_count - len(self._replay_intent_alias_audit_export_jobs)
 
+  def delete_replay_intent_alias_audit_export_jobs(self, job_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for job_id in job_ids:
+      if job_id in self._replay_intent_alias_audit_export_jobs:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_jobs[job_id]
+    return deleted_count
+
   def save_replay_intent_alias_audit_export_job_audit_record(
     self,
     record: ReplayIntentAliasAuditExportJobAuditRecord,
@@ -362,6 +405,14 @@ class InMemoryRunRepository(RunRepositoryPort):
         reverse=True,
       )
     )
+
+  def delete_replay_intent_alias_audit_export_job_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._replay_intent_alias_audit_export_job_audit_records:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_export_job_audit_records[audit_id]
+    return deleted_count
 
   def prune_replay_intent_alias_audit_export_job_audit_records(self, current_time: datetime) -> int:
     original_count = len(self._replay_intent_alias_audit_export_job_audit_records)

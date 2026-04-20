@@ -733,7 +733,6 @@ class ReplayIntentAliasAuditExportJobRecord:
   export_format: str
   filename: str
   content_type: str
-  content: str
   record_count: int
   status: str
   created_at: datetime
@@ -743,6 +742,21 @@ class ReplayIntentAliasAuditExportJobRecord:
   requested_by_tab_id: str | None = None
   requested_by_tab_label: str | None = None
   filters: dict[str, Any] = field(default_factory=dict)
+  artifact_id: str | None = None
+  content_length: int = 0
+  content: str = ""
+
+
+@dataclass(frozen=True)
+class ReplayIntentAliasAuditExportArtifactRecord:
+  artifact_id: str
+  job_id: str
+  filename: str
+  content_type: str
+  content: str
+  created_at: datetime
+  expires_at: datetime | None = None
+  byte_length: int = 0
 
 
 @dataclass(frozen=True)

@@ -379,6 +379,11 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "x_akra_replay_audit_admin_token",
     "app",
   )
+  assert tuple(inspect.signature(routes["prune_replay_link_alias_audit_export_jobs"].endpoint).parameters) == (
+    "request",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
   assert tuple(inspect.signature(routes["prune_replay_link_alias_audits"].endpoint).parameters) == (
     "request",
     "x_akra_replay_audit_admin_token",
@@ -761,6 +766,21 @@ def test_replay_link_alias_audit_export_job_endpoints_support_creation_and_histo
     "created",
   ]
 
+  prune_response = client.post(
+    "/api/replay-links/audits/export-jobs/prune",
+    json={
+      "prune_mode": "matched",
+      "template_key": "template_export_jobs",
+      "format": "csv",
+    },
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert prune_response.status_code == 200
+  prune_payload = prune_response.json()
+  assert prune_payload["deleted_job_count"] == 1
+  assert prune_payload["deleted_artifact_count"] == 1
+  assert prune_payload["deleted_history_count"] == 2
+
 
 def test_replay_link_alias_audit_export_job_endpoints_require_scoped_tokens(tmp_path: Path) -> None:
   client = build_client(
@@ -804,6 +824,20 @@ def test_replay_link_alias_audit_export_job_endpoints_require_scoped_tokens(tmp_
     headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
   )
   assert history_response.status_code == 200
+
+  forbidden_prune_response = client.post(
+    "/api/replay-links/audits/export-jobs/prune",
+    json={"prune_mode": "expired"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert forbidden_prune_response.status_code == 403
+
+  write_prune_response = client.post(
+    "/api/replay-links/audits/export-jobs/prune",
+    json={"prune_mode": "expired"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert write_prune_response.status_code == 200
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:

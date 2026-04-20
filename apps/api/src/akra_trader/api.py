@@ -182,11 +182,22 @@ class ReplayLinkAliasAuditExportJobCreateRequest(BaseModel):
   requested_by_tab_label: str | None = None
 
 
+class ReplayLinkAliasAuditExportJobPruneRequest(BaseModel):
+  prune_mode: str = "expired"
+  template_key: str | None = None
+  format: str | None = None
+  status: str | None = None
+  requested_by_tab_id: str | None = None
+  search: str | None = None
+  created_before: datetime | None = None
+
+
 REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_alias_create": (ReplayLinkAliasCreateRequest, {}),
   "replay_link_alias_revoke": (ReplayLinkAliasRevokeRequest, {}),
   "replay_link_audit_prune": (ReplayLinkAliasAuditPruneRequest, {}),
   "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
+  "replay_link_audit_export_job_prune": (ReplayLinkAliasAuditExportJobPruneRequest, {}),
   "preset_create": (ExperimentPresetRequest, {}),
   "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
   "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),
