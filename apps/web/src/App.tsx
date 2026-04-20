@@ -16189,6 +16189,217 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(
   return `${sample.runId}:${sample.candidatePath}`;
 }
 
+function normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().replace(/\s+/g, " ");
+}
+
+function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSymbolVariants(symbolKey: string) {
+  const trimmed = symbolKey.trim();
+  if (!trimmed) {
+    return [];
+  }
+  const bareSymbol = trimmed.includes(":")
+    ? trimmed.split(":").slice(1).join(":")
+    : trimmed;
+  const rawVariants = new Set<string>([
+    trimmed,
+    trimmed.replace(":", " "),
+    bareSymbol,
+    bareSymbol.replace("/", "-"),
+    bareSymbol.replace("/", " "),
+    bareSymbol.replace("/", ""),
+  ]);
+  return Array.from(rawVariants)
+    .map((value) => normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(value))
+    .filter(Boolean);
+}
+
+function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(value: unknown): string[] {
+  const collected = new Set<string>();
+  const visit = (candidate: unknown) => {
+    if (candidate === null || candidate === undefined || candidate === "") {
+      return;
+    }
+    if (typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean") {
+      const normalized = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(String(candidate));
+      if (normalized) {
+        collected.add(normalized);
+      }
+      return;
+    }
+    if (Array.isArray(candidate)) {
+      candidate.forEach((item) => visit(item));
+      return;
+    }
+    if (typeof candidate === "object") {
+      Object.entries(candidate as Record<string, unknown>).forEach(([key, nestedValue]) => {
+        const formattedKey = formatBenchmarkArtifactSummaryLabel(key);
+        const normalizedKey = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(formattedKey);
+        if (normalizedKey) {
+          collected.add(normalizedKey);
+        }
+        if (
+          typeof nestedValue === "string"
+          || typeof nestedValue === "number"
+          || typeof nestedValue === "boolean"
+        ) {
+          const joined = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+            `${formattedKey} ${nestedValue}`,
+          );
+          if (joined) {
+            collected.add(joined);
+          }
+        }
+        visit(nestedValue);
+      });
+    }
+  };
+  visit(value);
+  return Array.from(collected);
+}
+
+function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntries(
+  artifact: BenchmarkArtifact,
+) {
+  return Object.entries(artifact.summary)
+    .map(([summaryKey, rawValue]) => {
+      const visibleText = formatBenchmarkArtifactSummaryValue(summaryKey, rawValue);
+      if (!visibleText) {
+        return null;
+      }
+      const searchableTexts = [
+        normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(visibleText),
+        normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+          formatBenchmarkArtifactSummaryLabel(summaryKey),
+        ),
+        ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
+      ].filter(Boolean);
+      return {
+        hoverKey: buildComparisonProvenanceArtifactSummaryHoverKey(artifact.path, summaryKey),
+        kind: "summary" as const,
+        labelKey: summaryKey,
+        searchableTexts,
+        visibleText,
+      };
+    })
+    .filter((entry): entry is {
+      hoverKey: string;
+      kind: "summary";
+      labelKey: string;
+      searchableTexts: string[];
+      visibleText: string;
+    } => entry !== null);
+}
+
+function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntries(
+  artifact: BenchmarkArtifact,
+) {
+  return Object.entries(artifact.sections ?? {})
+    .flatMap(([sectionKey, sectionValue]) => {
+      if (!sectionValue || typeof sectionValue !== "object" || Array.isArray(sectionValue)) {
+        return [];
+      }
+      const sectionEntries = Object.entries(sectionValue)
+        .map(([lineKey, rawValue]) => {
+          const inlineValue = formatBenchmarkArtifactSectionValue(rawValue);
+          if (inlineValue === null) {
+            return null;
+          }
+          const visibleText = `${formatBenchmarkArtifactSummaryLabel(lineKey)}: ${inlineValue}`;
+          const searchableTexts = [
+            normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(visibleText),
+            normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+              formatBenchmarkArtifactSectionLabel(sectionKey),
+            ),
+            normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+              formatBenchmarkArtifactSummaryLabel(lineKey),
+            ),
+            ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
+          ].filter(Boolean);
+          return {
+            kind: "section_line" as const,
+            labelKey: lineKey,
+            searchableTexts,
+            sectionKey,
+            visibleText,
+          };
+        })
+        .filter((entry): entry is {
+          kind: "section_line";
+          labelKey: string;
+          searchableTexts: string[];
+          sectionKey: string;
+          visibleText: string;
+        } => entry !== null);
+      return sectionEntries.map((entry, lineIndex) => ({
+        ...entry,
+        hoverKey: buildComparisonProvenanceArtifactSectionLineHoverKey(
+          artifact.path,
+          sectionKey,
+          lineIndex,
+        ),
+      }));
+    });
+}
+
+function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
+  candidateValue: string;
+  entry: {
+    kind: "section_line" | "summary";
+    labelKey: string;
+    searchableTexts: string[];
+    sectionKey?: string;
+    visibleText: string;
+  };
+  symbolVariants: string[];
+}) {
+  const { candidateValue, entry, symbolVariants } = params;
+  const normalizedCandidateValue =
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(candidateValue);
+  if (!normalizedCandidateValue) {
+    return null;
+  }
+  const normalizedVisibleText =
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(entry.visibleText);
+  const issueMatchesVisibleText = normalizedVisibleText.includes(normalizedCandidateValue);
+  const issueMatchesSearchableText = entry.searchableTexts.some((text) =>
+    text.includes(normalizedCandidateValue)
+  );
+  if (!issueMatchesVisibleText && !issueMatchesSearchableText) {
+    return null;
+  }
+  const symbolMatchesVisibleText =
+    !symbolVariants.length
+    || symbolVariants.some((variant) => normalizedVisibleText.includes(variant));
+  const symbolMatchesSearchableText =
+    !symbolVariants.length
+    || entry.searchableTexts.some((text) =>
+      symbolVariants.some((variant) => text.includes(variant))
+    );
+  if (!symbolMatchesVisibleText && !symbolMatchesSearchableText) {
+    return null;
+  }
+  let score = 0;
+  score += issueMatchesVisibleText ? 6 : 3;
+  score += symbolMatchesVisibleText ? 4 : 2;
+  if (entry.kind === "section_line") {
+    score += 3;
+  }
+  const normalizedSectionKey = entry.sectionKey
+    ? normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(entry.sectionKey)
+    : "";
+  const normalizedLabelKey = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+    entry.labelKey,
+  );
+  if (/issue|context|signal|market|pair/.test(normalizedSectionKey)) {
+    score += 2;
+  }
+  if (/issue|pair|symbol|headline|context|label/.test(normalizedLabelKey)) {
+    score += 1;
+  }
+  return score;
+}
+
 function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params: {
   candidateValueRaw: unknown;
   resolvedParameterValues: Record<string, string>;
@@ -16209,46 +16420,33 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params:
     return [];
   }
   const symbolKey = resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "";
-  const candidateValueLower = candidateValue.toLowerCase();
-  const symbolKeyLower = symbolKey.toLowerCase();
-  const hoverKeys = new Set<string>();
-  run.provenance.benchmark_artifacts.forEach((artifact) => {
-    const artifactContext = [
-      artifact.kind,
-      artifact.label,
-      artifact.path,
-      artifact.summary_source_path ?? "",
-    ]
-      .join(" ")
-      .toLowerCase();
-    const matchesArtifactText = (value: string) => {
-      const normalizedValue = value.trim().toLowerCase();
-      if (!normalizedValue.includes(candidateValueLower)) {
-        return false;
-      }
-      if (!symbolKeyLower) {
-        return true;
-      }
-      return normalizedValue.includes(symbolKeyLower) || artifactContext.includes(symbolKeyLower);
-    };
-    formatBenchmarkArtifactSummaryEntries(artifact.summary).forEach(([summaryKey, summaryValue]) => {
-      if (!matchesArtifactText(summaryValue ?? "")) {
-        return;
-      }
-      hoverKeys.add(buildComparisonProvenanceArtifactSummaryHoverKey(artifact.path, summaryKey));
-    });
-    formatBenchmarkArtifactSectionEntries(artifact.sections ?? {}).forEach(([sectionKey, lines]) => {
-      lines.forEach((line, lineIndex) => {
-        if (!matchesArtifactText(line)) {
-          return;
-        }
-        hoverKeys.add(
-          buildComparisonProvenanceArtifactSectionLineHoverKey(artifact.path, sectionKey, lineIndex),
-        );
+  const symbolVariants =
+    buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSymbolVariants(symbolKey);
+  const scoredMatches = run.provenance.benchmark_artifacts.flatMap((artifact) => {
+    const artifactEntries = [
+      ...buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntries(artifact),
+      ...buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntries(artifact),
+    ];
+    return artifactEntries.flatMap((entry) => {
+      const score = scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch({
+        candidateValue,
+        entry,
+        symbolVariants,
       });
+      return score === null ? [] : [{ hoverKey: entry.hoverKey, score }];
     });
   });
-  return Array.from(hoverKeys);
+  if (!scoredMatches.length) {
+    return [];
+  }
+  const bestScore = scoredMatches.reduce((maximum, entry) => Math.max(maximum, entry.score), 0);
+  return Array.from(
+    new Set(
+      scoredMatches
+        .filter((entry) => entry.score === bestScore)
+        .map((entry) => entry.hoverKey),
+    ),
+  );
 }
 
 function buildRunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItems(
