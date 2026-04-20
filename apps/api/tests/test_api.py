@@ -5,6 +5,7 @@ from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 import inspect
+import json
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -355,6 +356,9 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
 
   run_query_schema = openapi["paths"]["/api/runs"]["get"]["x-akra-query-schema"]
   assert run_query_schema["grouped_filters"]["param_pattern"] == "group__<group_key>__<filter_key>__<operator>"
+  assert run_query_schema["expression_trees"]["param"] == "filter_expr"
+  assert run_query_schema["expression_trees"]["logic_values"] == ["and", "or"]
+  assert run_query_schema["expression_trees"]["supports_negation"] is True
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]
@@ -392,6 +396,13 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
     if param["name"] == "sort"
   )
   assert run_sort_param["description"] == "Sort fields in `<field>` or `<field>:<direction>` format."
+  filter_expr_param = next(
+    param for param in openapi["paths"]["/api/runs"]["get"]["parameters"]
+    if param["name"] == "filter_expr"
+  )
+  assert filter_expr_param["description"] == (
+    "JSON boolean expression tree using `logic`, `conditions`, `children`, and optional `negated` fields."
+  )
   assert _first_non_null_schema_branch(runs_params["trade_count"]["schema"])["minimum"] == 0
   assert runs_params["total_return_pct"]["schema"]["title"] == "Total return %"
 
@@ -662,6 +673,83 @@ def test_run_query_contract_applies_grouped_filter_expressions(tmp_path: Path) -
         ("group__return_band__trade_count__ge", "2"),
         ("group__volume_band__trade_count__ge", "5"),
         ("group__volume_band__total_return_pct__ge", "15"),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_run_ids = [item["config"]["run_id"] for item in payload]
+    assert returned_run_ids == sorted([run_ids[0], run_ids[1]])
+    assert run_ids[2] not in returned_run_ids
+    assert run_ids[3] not in returned_run_ids
+
+
+def test_run_query_contract_applies_nested_boolean_filter_expression_tree(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    run_ids: list[str] = []
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      run_ids.append(response.json()["config"]["run_id"])
+
+    app = client.app.state.container.app
+    metric_overrides = {
+      run_ids[0]: {"total_return_pct": 25.0, "trade_count": 3},
+      run_ids[1]: {"total_return_pct": 18.0, "trade_count": 5},
+      run_ids[2]: {"total_return_pct": 9.0, "trade_count": 1},
+      run_ids[3]: {"total_return_pct": 30.0, "trade_count": 1},
+    }
+    for run_id, metrics in metric_overrides.items():
+      run = app.get_run(run_id)
+      assert run is not None
+      run.metrics.update(metrics)
+      app._runs.save_run(run)
+
+    filter_expression = {
+      "logic": "and",
+      "children": [
+        {
+          "logic": "or",
+          "children": [
+            {
+              "logic": "and",
+              "conditions": [
+                {"key": "total_return_pct", "operator": "ge", "value": 20},
+                {"key": "trade_count", "operator": "ge", "value": 2},
+              ],
+            },
+            {
+              "logic": "and",
+              "conditions": [
+                {"key": "trade_count", "operator": "ge", "value": 5},
+                {"key": "total_return_pct", "operator": "ge", "value": 15},
+              ],
+            },
+          ],
+        },
+        {
+          "logic": "and",
+          "negated": True,
+          "conditions": [
+            {"key": "total_return_pct", "operator": "ge", "value": 30},
+            {"key": "trade_count", "operator": "le", "value": 1},
+          ],
+        },
+      ],
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("filter_expr", json.dumps(filter_expression)),
         ("sort", "config.run_id:asc"),
       ],
     )

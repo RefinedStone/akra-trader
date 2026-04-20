@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC
 from datetime import datetime
 import inspect
+import json
 from numbers import Number
 import re
 from types import UnionType
@@ -28,6 +29,7 @@ from akra_trader.application import execute_standalone_surface_binding
 from akra_trader.application import StandaloneSurfaceFilterParamSpec
 from akra_trader.application import StandaloneSurfaceSortTerm
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
+from akra_trader.application import StandaloneSurfaceFilterExpressionNode
 from akra_trader.bootstrap import Container
 
 
@@ -202,6 +204,25 @@ def _build_sort_query_default(binding: StandaloneSurfaceRuntimeBinding) -> Any:
   )
 
 
+def _build_filter_expression_query_default() -> Any:
+  return Query(
+    default=None,
+    title="Filter expression",
+    description=(
+      "JSON boolean expression tree using `logic`, `conditions`, `children`, and optional `negated` fields."
+    ),
+    examples=[
+      (
+        '{"logic":"or","children":['
+        '{"logic":"and","conditions":[{"key":"total_return_pct","operator":"ge","value":20},'
+        '{"key":"trade_count","operator":"ge","value":2}]},'
+        '{"logic":"and","conditions":[{"key":"trade_count","operator":"ge","value":5},'
+        '{"key":"total_return_pct","operator":"ge","value":15}]}]}'
+      ),
+    ],
+  )
+
+
 def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict[str, Any] | None:
   if not binding.filter_param_specs and not binding.sort_field_specs:
     return None
@@ -210,6 +231,23 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
       "grouped_filters": {
         "param_pattern": "group__<group_key>__<filter_key>__<operator>",
         "semantics": "Ungrouped filters are ANDed together. Grouped filters are ANDed within a group and ORed across groups.",
+      },
+      "expression_trees": {
+        "param": "filter_expr",
+        "format": "json",
+        "supports_negation": True,
+        "logic_values": ["and", "or"],
+        "condition_shape": {
+          "key": "<filter_key>",
+          "operator": "<operator>",
+          "value": "<typed value>",
+        },
+        "node_shape": {
+          "logic": "and|or",
+          "conditions": ["<condition>", "..."],
+          "children": ["<node>", "..."],
+          "negated": "boolean",
+        },
       },
       "filters": [
         {
@@ -272,17 +310,28 @@ def _resolve_filter_scalar_annotation(annotation: Any) -> Any:
 
 def _coerce_filter_scalar_value(annotation: Any, raw_value: str) -> Any:
   resolved_annotation = _resolve_filter_scalar_annotation(annotation)
+  if raw_value is None:
+    return None
   if resolved_annotation is int:
+    if isinstance(raw_value, bool):
+      raise ValueError("Boolean values are not valid integers for this filter.")
     return int(raw_value)
   if resolved_annotation is float:
+    if isinstance(raw_value, bool):
+      raise ValueError("Boolean values are not valid numbers for this filter.")
     return float(raw_value)
   if resolved_annotation is datetime:
-    normalized_value = raw_value.replace("Z", "+00:00")
-    parsed = datetime.fromisoformat(normalized_value)
+    if isinstance(raw_value, datetime):
+      parsed = raw_value
+    else:
+      normalized_value = str(raw_value).replace("Z", "+00:00")
+      parsed = datetime.fromisoformat(normalized_value)
     if parsed.tzinfo is None:
       return parsed.replace(tzinfo=UTC)
     return parsed.astimezone(UTC)
-  return raw_value
+  if isinstance(raw_value, str):
+    return raw_value
+  return str(raw_value)
 
 
 def _validate_filter_query_value(
@@ -328,6 +377,124 @@ def _coerce_filter_query_values(
   coerced_value = _coerce_filter_scalar_value(spec.annotation, values[-1])
   _validate_filter_query_value(spec, coerced_value)
   return coerced_value
+
+
+def _coerce_filter_expression_value(
+  spec: StandaloneSurfaceFilterParamSpec,
+  *,
+  value_shape: str,
+  raw_value: Any,
+) -> Any:
+  if value_shape == "list":
+    raw_values = list(raw_value) if isinstance(raw_value, (list, tuple, set)) else [raw_value]
+    coerced_values = [
+      _coerce_filter_scalar_value(spec.annotation, value)
+      for value in raw_values
+    ]
+    _validate_filter_query_value(spec, coerced_values)
+    return coerced_values
+  coerced_value = _coerce_filter_scalar_value(spec.annotation, raw_value)
+  _validate_filter_query_value(spec, coerced_value)
+  return coerced_value
+
+
+def _parse_runtime_filter_expression_condition(
+  raw_condition: Any,
+  *,
+  filter_specs_by_key: dict[str, StandaloneSurfaceFilterParamSpec],
+) -> StandaloneSurfaceFilterCondition:
+  if not isinstance(raw_condition, dict):
+    raise ValueError("Filter expression conditions must be objects.")
+  filter_key = raw_condition.get("key")
+  if not isinstance(filter_key, str) or not filter_key:
+    raise ValueError("Filter expression conditions must declare a filter key.")
+  spec = filter_specs_by_key.get(filter_key)
+  if spec is None:
+    raise ValueError(f"Unsupported filter key in filter expression: {filter_key}")
+  operator_key = raw_condition.get("operator")
+  if not isinstance(operator_key, str) or not operator_key:
+    if spec.operators:
+      operator_key = spec.operators[0].key
+    else:
+      operator_key = "eq"
+  operator_specs = {
+    operator.key: operator
+    for operator in spec.operators
+  }
+  operator_spec = operator_specs.get(operator_key)
+  if operator_spec is None:
+    raise ValueError(f"Unsupported filter operator for {filter_key}: {operator_key}")
+  if "value" not in raw_condition:
+    raise ValueError(f"Filter expression conditions must declare a value for {filter_key}.")
+  return StandaloneSurfaceFilterCondition(
+    key=filter_key,
+    operator=operator_key,
+    value=_coerce_filter_expression_value(
+      spec,
+      value_shape=operator_spec.value_shape,
+      raw_value=raw_condition["value"],
+    ),
+  )
+
+
+def _parse_runtime_filter_expression_node(
+  raw_node: Any,
+  *,
+  filter_specs_by_key: dict[str, StandaloneSurfaceFilterParamSpec],
+) -> StandaloneSurfaceFilterExpressionNode:
+  if not isinstance(raw_node, dict):
+    raise ValueError("Filter expression nodes must be objects.")
+  logic = raw_node.get("logic", "and")
+  if not isinstance(logic, str) or logic.lower() not in {"and", "or"}:
+    raise ValueError("Filter expression logic must be either `and` or `or`.")
+  raw_conditions = raw_node.get("conditions", [])
+  if not isinstance(raw_conditions, list):
+    raise ValueError("Filter expression `conditions` must be a list.")
+  raw_children = raw_node.get("children", [])
+  if not isinstance(raw_children, list):
+    raise ValueError("Filter expression `children` must be a list.")
+  conditions = tuple(
+    _parse_runtime_filter_expression_condition(
+      raw_condition,
+      filter_specs_by_key=filter_specs_by_key,
+    )
+    for raw_condition in raw_conditions
+  )
+  children = tuple(
+    _parse_runtime_filter_expression_node(
+      raw_child,
+      filter_specs_by_key=filter_specs_by_key,
+    )
+    for raw_child in raw_children
+  )
+  if not conditions and not children:
+    raise ValueError("Filter expression nodes must declare conditions or children.")
+  return StandaloneSurfaceFilterExpressionNode(
+    logic=logic.lower(),
+    conditions=conditions,
+    children=children,
+    negated=bool(raw_node.get("negated", False)),
+  )
+
+
+def _build_runtime_filter_expression(
+  binding: StandaloneSurfaceRuntimeBinding,
+  *,
+  raw_expression: str | None,
+) -> StandaloneSurfaceFilterExpressionNode | None:
+  if not raw_expression:
+    return None
+  try:
+    parsed_expression = json.loads(raw_expression)
+  except json.JSONDecodeError as exc:
+    raise ValueError("Filter expression must be valid JSON.") from exc
+  return _parse_runtime_filter_expression_node(
+    parsed_expression,
+    filter_specs_by_key={
+      spec.key: spec
+      for spec in binding.filter_param_specs
+    },
+  )
 
 
 def _parse_grouped_filter_query_key(
@@ -377,6 +544,12 @@ def _build_runtime_query_filters(
     spec.key: kwargs[spec.key]
     for spec in binding.filter_param_specs
   }
+  filter_expression = _build_runtime_filter_expression(
+    binding,
+    raw_expression=kwargs.get("filter_expr"),
+  )
+  if filter_expression is not None:
+    filters["__filter_expression__"] = filter_expression
   conditions: list[StandaloneSurfaceFilterCondition] = []
   if request is not None:
     query_params = request.query_params
@@ -550,6 +723,15 @@ def create_router(container: Container) -> APIRouter:
           "request",
           inspect.Parameter.POSITIONAL_OR_KEYWORD,
           annotation=Request,
+        )
+      )
+    if binding.filter_param_specs:
+      parameters.append(
+        inspect.Parameter(
+          "filter_expr",
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=str | None,
+          default=_build_filter_expression_query_default(),
         )
       )
     for filter_spec in binding.filter_param_specs:

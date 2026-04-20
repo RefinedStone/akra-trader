@@ -23051,6 +23051,14 @@ class StandaloneSurfaceFilterCondition:
 
 
 @dataclass(frozen=True)
+class StandaloneSurfaceFilterExpressionNode:
+  logic: str = "and"
+  conditions: tuple[StandaloneSurfaceFilterCondition, ...] = ()
+  children: tuple["StandaloneSurfaceFilterExpressionNode", ...] = ()
+  negated: bool = False
+
+
+@dataclass(frozen=True)
 class StandaloneSurfaceSortTerm:
   key: str
   direction: str = "asc"
@@ -23148,6 +23156,17 @@ def _extract_runtime_sort_terms(
     for term in value
     if isinstance(term, StandaloneSurfaceSortTerm)
   )
+
+
+def _extract_runtime_filter_expression(
+  filters: dict[str, Any] | None,
+) -> StandaloneSurfaceFilterExpressionNode | None:
+  if not filters:
+    return None
+  value = filters.get("__filter_expression__")
+  if isinstance(value, StandaloneSurfaceFilterExpressionNode):
+    return value
+  return None
 
 
 def _normalize_runtime_sort_value(value: Any) -> tuple[int, Any]:
@@ -23315,6 +23334,62 @@ def _evaluate_runtime_filter_conditions(
   return True
 
 
+def _evaluate_runtime_filter_expression(
+  item: Any,
+  expression: StandaloneSurfaceFilterExpressionNode,
+  *,
+  filter_getters: dict[str, Callable[[Any], Any]],
+) -> bool | None:
+  term_results: list[bool | None] = []
+  for condition in expression.conditions:
+    getter = filter_getters.get(condition.key)
+    if getter is None:
+      term_results.append(None)
+      continue
+    candidate_value = getter(item)
+    if candidate_value is _RUNTIME_QUERY_MISSING:
+      term_results.append(None)
+      continue
+    term_results.append(
+      _evaluate_runtime_filter_condition(
+        candidate_value,
+        operator=condition.operator,
+        operand=condition.value,
+      )
+    )
+  for child in expression.children:
+    term_results.append(
+      _evaluate_runtime_filter_expression(
+        item,
+        child,
+        filter_getters=filter_getters,
+      )
+    )
+  if not term_results:
+    result: bool | None = True
+  elif expression.logic == "and":
+    if any(term is False for term in term_results):
+      result = False
+    elif any(term is True for term in term_results):
+      result = True
+    else:
+      result = None
+  elif expression.logic == "or":
+    if any(term is True for term in term_results):
+      result = True
+    elif any(term is False for term in term_results):
+      result = False
+    else:
+      result = None
+  else:
+    raise ValueError(f"Unsupported filter expression logic: {expression.logic}")
+  if expression.negated:
+    if result is None:
+      return None
+    return not result
+  return result
+
+
 def _apply_runtime_query_contract(
   items: list[Any],
   *,
@@ -23325,6 +23400,7 @@ def _apply_runtime_query_contract(
   sort_getter_overrides: dict[str, Callable[[Any], Any]] | None = None,
 ) -> list[Any]:
   conditions = _extract_runtime_filter_conditions(filters)
+  expression = _extract_runtime_filter_expression(filters)
   sort_terms = _extract_runtime_sort_terms(filters)
   filter_getters = _build_runtime_filter_getters(
     filter_specs,
@@ -23335,7 +23411,7 @@ def _apply_runtime_query_contract(
     overrides=sort_getter_overrides,
   )
   resolved = list(items)
-  if conditions:
+  if conditions or expression is not None:
     ungrouped_conditions = tuple(
       condition
       for condition in conditions
@@ -23365,6 +23441,13 @@ def _apply_runtime_query_contract(
           )
           for group_conditions in grouped_conditions.values()
         )
+      ) and (
+        expression is None
+        or _evaluate_runtime_filter_expression(
+          item,
+          expression,
+          filter_getters=filter_getters,
+        ) is not False
       )
     ]
   for term in reversed(sort_terms):
@@ -23452,6 +23535,7 @@ def _apply_runtime_query_to_comparison(
     filter_specs=binding.filter_param_specs,
     sort_specs=binding.sort_field_specs,
     filter_getter_overrides={
+      "intent": lambda narrative: comparison.intent,
       "narrative_score": lambda narrative: narrative.insight_score,
     },
     sort_getter_overrides={
