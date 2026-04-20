@@ -5678,18 +5678,36 @@
       "direction_id": "experiment-os",
       "title": "Carry direct candidate identity bindings in provenance artifacts for replay selection",
       "description": "Build on the shipped source-location metadata by extending provenance artifact payloads to carry a direct candidate-to-artifact binding identity, so replay selection can reopen the exact candidate or candidate set from artifact payload data itself instead of still translating through source-path and line metadata.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 27,
-      "priority_reason": "The latest main-session reply says commit 484eef4 completed source-location metadata, but the direct remaining next step is still carrying candidate-to-artifact binding ids in the payload itself. That is executable now and is the clearest queue head because it removes the last source-location-to-identity translation layer from replay selection.",
+      "priority_reason": "Completed in main session commit 82f022c, which added direct `candidate_bindings` to provenance `source_locations`, emitted symbol-scoped `market_data_issue` bindings from the freqtrade adapter, taught replay selection to prefer exact `candidate_value + symbol_key` matches before symbol-scoped fallback scoring, and verified the change with py_compile, targeted pytest, web typecheck, diff checks, commit, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-carry-source-location-metadata-in-provenance-artifacts-for-replay-selection"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T09:20:00Z",
+      "updated_at": "2026-04-20T09:35:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from structured source-location matching into direct provenance-owned candidate identity, so replay selection can bind artifact evidence to the exact replay entity without any remaining metadata translation step."
+      "direction_relation_note": "Completed the next experiment-os replay provenance pass by carrying direct candidate bindings into artifact payloads and prioritizing them in replay selection, which now leaves producer-owned stable candidate identity as the clearest follow-up for eliminating the remaining symbol-scoped or string-derived ambiguity."
+    },
+    {
+      "id": "planning-experiment-os-emit-stable-candidate-ids-from-artifact-producers-for-replay-selection",
+      "direction_id": "experiment-os",
+      "title": "Emit stable candidate ids from artifact producers for replay selection",
+      "description": "Build on the shipped direct `candidate_bindings` payload by having provenance artifact producers emit stable candidate ids or source-side binding ids for each referenced candidate, so replay selection can reopen the exact runtime entity without falling back to symbol-scoped bindings or artifact-text-derived candidate values.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 28,
+      "priority_reason": "The latest main-session reply says commit 82f022c completed direct `candidate_bindings`, but also identifies the remaining executable next step: artifact producers still mostly emit symbol-scoped bindings and only recover exact candidate identity when artifact strings are parseable. Having producers send stable candidate ids or source-side binding ids directly is now the clearest queue head because it closes the last precision gap in provenance-to-replay candidate ownership.",
+      "depends_on": [
+        "planning-experiment-os-carry-direct-candidate-identity-binding-in-provenance-artifacts-for-replay-selection"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T09:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust from direct but partly symbol-scoped bindings into producer-owned stable candidate identity, so artifact evidence can select the exact replay candidate without residual parsing or scope-based ambiguity."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
