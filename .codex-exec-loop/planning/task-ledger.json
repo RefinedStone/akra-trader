@@ -5318,36 +5318,54 @@
       "direction_id": "experiment-os",
       "title": "Annotate replay step diffs with reviewed collision field picks",
       "description": "Extend the new collision-review simulation override flow by marking replay-step diff entries with which reviewed local or remote field picks produced each simulated change, so operators can inspect causality directly inside the solver replay timeline instead of mentally mapping from the review draft to step-level diff rows.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 16,
-      "priority_reason": "The latest main-session reply says the next missing synchronization is field-level traceability inside replay step diffs: reviewed merges now rerun as simulation overrides and align the replay timeline, but the field-by-field picks still are not annotated directly on the replay steps. That is the clearest executable next task because it deepens the same workflow without requiring a new product contract.",
+      "priority_reason": "Completed in main session commit 575cffc, which annotated solver replay diffs, action timeline cards, and group snapshot chips with reviewed collision field picks, surfaced global reviewed picks in the simulation override panel, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-sync-collision-review-with-simulation-override-timeline"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:50:19Z",
+      "updated_at": "2026-04-20T06:52:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os replay-apply trust by turning synchronized collision-review simulation from coarse group alignment into step-level causal annotation, so operators can see exactly which reviewed field picks drove each replay diff."
     },
     {
       "id": "planning-experiment-os-backpropagate-simulation-results-into-collision-review-rows",
       "direction_id": "experiment-os",
-      "title": "Backpropagate simulation results into replay collision review rows",
-      "description": "Build the bidirectional trace layer after replay-step annotation by injecting simulation outcomes, such as resolved group status, changed bindings, or step outcomes, back into the conflict review rows themselves, so operators can compare chosen field picks and resulting simulated effects without bouncing between separate review and replay panels.",
-      "status": "proposed",
+      "title": "Link replay field-pick annotations back to conflict review rows",
+      "description": "Build the first bidirectional trace loop after replay-step annotation by letting reviewed-pick chips in replay diffs, group snapshots, or action cards jump back to the matching conflict review field row and restore the relevant review focus state, so operators can move from simulated effects to the authored pick without manual scanning.",
+      "status": "ready",
       "base_priority": 87,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply explicitly names reverse synchronization from simulation back into conflict review rows as remaining work, but the exact contract for which simulation outcomes should project into the review table is still broader than the direct replay-step annotation follow-up. Keep this proposed behind the more immediate one-way traceability pass.",
+      "priority_reason": "The latest main-session reply says the immediate remaining gap is bidirectional annotation: replay step and diff chips now show reviewed field picks, but operators still cannot click those annotations to return to the matching conflict review field row. That navigation handoff is the clearest next executable task because it extends the shipped annotation UI without opening the broader in-replay edit contract yet.",
       "depends_on": [
         "planning-experiment-os-annotate-replay-step-diff-from-reviewed-collision-field-picks"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:50:20Z",
+      "updated_at": "2026-04-20T06:52:01Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os replay-apply review from synchronized forward trace into a bidirectional review loop, where simulated consequences can be read back in the same conflict rows that authored the reviewed merge."
+      "direction_relation_note": "Pushes experiment-os replay-apply review from one-way replay annotation into a bidirectional trace loop, where operators can jump directly from simulated effects back to the exact conflict review row that authored the reviewed pick."
+    },
+    {
+      "id": "planning-experiment-os-edit-reviewed-field-pick-source-from-replay-annotations",
+      "direction_id": "experiment-os",
+      "title": "Let replay annotations change reviewed field-pick source inline",
+      "description": "Extend the new bidirectional replay annotation flow by allowing operators to flip a reviewed field pick between local and remote directly from the replay step or diff annotation surface, then propagate that edit back through the collision review draft and refreshed simulation trace so replay no longer stays read-only once the row-link handoff exists.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 9,
+      "priority_reason": "The latest main-session reply also names direct source changes from replay steps as a remaining follow-up, but that is a broader interaction contract than simple row-link navigation because it requires write-back into conflict review draft state and trace recomputation. Keep it proposed behind the cheaper bidirectional jump pass.",
+      "depends_on": [
+        "planning-experiment-os-backpropagate-simulation-results-into-collision-review-rows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:52:02Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply trust from bidirectional inspection into direct in-context editing, so operators can revise reviewed field-pick sources from the exact replay annotation that reveals an undesired simulated effect."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
