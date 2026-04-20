@@ -5696,18 +5696,54 @@
       "direction_id": "experiment-os",
       "title": "Emit stable candidate ids from artifact producers for replay selection",
       "description": "Build on the shipped direct `candidate_bindings` payload by having provenance artifact producers emit stable candidate ids or source-side binding ids for each referenced candidate, so replay selection can reopen the exact runtime entity without falling back to symbol-scoped bindings or artifact-text-derived candidate values.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 28,
-      "priority_reason": "The latest main-session reply says commit 82f022c completed direct `candidate_bindings`, but also identifies the remaining executable next step: artifact producers still mostly emit symbol-scoped bindings and only recover exact candidate identity when artifact strings are parseable. Having producers send stable candidate ids or source-side binding ids directly is now the clearest queue head because it closes the last precision gap in provenance-to-replay candidate ownership.",
+      "priority_reason": "Completed in main session commit d544fbb, which extended provenance artifact producer `candidate_bindings` to carry stable `candidate_id` values, aligned the web runtime sample path to compute the same id for `candidateReplayId`, made replay selection prefer exact `candidate_id` matches before symbol or value fallback, and verified the change with py_compile, targeted pytest, web typecheck, diff checks, commit, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-carry-direct-candidate-identity-binding-in-provenance-artifacts-for-replay-selection"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T09:40:00Z",
+      "updated_at": "2026-04-20T09:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from direct but partly symbol-scoped bindings into producer-owned stable candidate identity, so artifact evidence can select the exact replay candidate without residual parsing or scope-based ambiguity."
+      "direction_relation_note": "Completed the next experiment-os replay provenance pass by replacing symbol-scoped fallback-first selection with stable candidate ids shared across producer output and replay lookup, which now leaves a stricter source contract where artifact producers preserve the runtime candidate's canonical id instead of recomputing it by duplicated normalization rules."
+    },
+    {
+      "id": "planning-experiment-os-preserve-canonical-runtime-candidate-ids-in-provenance-artifacts",
+      "direction_id": "experiment-os",
+      "title": "Preserve canonical runtime candidate ids in provenance artifacts",
+      "description": "Replace the current duplicated normalization rule for stable replay candidate ids by having the artifact source preserve and emit the runtime candidate's canonical id directly, so provenance-to-replay selection depends on one source-of-truth identity contract instead of parallel producer and frontend reconstruction.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 29,
+      "priority_reason": "Completed in main session commit 932b2f9, which changed provenance artifact `candidate_id` values to preserve canonical replay ids as JSON arrays using canonical symbol plus exact candidate text, aligned the frontend runtime sample binding to the same canonical form, verified with `python -m py_compile`, three targeted `pytest` cases, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-emit-stable-candidate-ids-from-artifact-producers-for-replay-selection"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the next experiment-os replay identity pass by preserving canonical replay candidate ids in provenance artifacts and frontend bindings, which now leaves the stricter upstream contract where runtime producers supply their own native canonical candidate or entity ids instead of synthesizing them from canonical symbol plus exact artifact text."
+    },
+    {
+      "id": "planning-experiment-os-promote-native-runtime-candidate-ids-into-provenance-contracts",
+      "direction_id": "experiment-os",
+      "title": "Promote native runtime candidate ids into provenance contracts",
+      "description": "Replace the remaining synthesized replay candidate id shape with an upstream runtime contract that carries canonical candidate or entity ids directly from the evaluator or source runtime into provenance artifacts and replay samples, so candidate identity stops depending on canonical-symbol plus exact-text reconstruction even when that reconstruction is now stable.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 30,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is making id sources more native: backend and frontend now preserve stable canonical ids, but upstream runtime still does not provide its own canonical candidate or entity id contract. That source-owned identity contract is the clearest executable next task because it removes the last synthesized-id layer from experiment provenance and replay binding.",
+      "depends_on": [
+        "planning-experiment-os-preserve-canonical-runtime-candidate-ids-in-provenance-artifacts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay identity trust from preserved canonical ids into a fully native runtime identity contract, so provenance artifacts and replay lookup consume evaluator-owned candidate or entity ids instead of a downstream canonicalized surrogate."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
