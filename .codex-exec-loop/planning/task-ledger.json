@@ -5138,36 +5138,54 @@
       "direction_id": "experiment-os",
       "title": "Require an explicit final summary modal before applying approved replay draft",
       "description": "Add the next safety layer after row-level replay approval by opening a final summary modal that aggregates approved versus rejected rows, highlights the exact approved deltas still differing from current and simulated state, and requires explicit confirmation before the approved replay draft is promoted into manual override state.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
-      "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply explicitly says the next missing safety layer after commit 78d42ed is an explicit final summary modal before apply. This is the clearest executable queue head because the 3-way review, diff-only narrowing, and row-level approve or reject states already exist and now need one last aggregated confirmation surface before mutation.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 6091ea8, which replaced direct apply from the approval panel with a required `Final replay apply summary` modal, showed every approved row in a Current/Simulated/Draft 3-way recap before mutation, revealed rows hidden by diff-only review in the last checkpoint, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-three-way-approval-flow-for-staged-replay-apply"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:05:00Z",
+      "updated_at": "2026-04-21T05:50:55Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os operator trust by turning row-level replay approvals into a deliberate final pre-apply checkpoint, so the operator confirms the exact approved mutation set in one modal instead of inferring the final outcome from dispersed row state."
+      "direction_relation_note": "Completed the final pre-apply checkpoint for replay-derived staged mutation, so operators now see one last aggregate Current/Simulated/Draft summary of all approved rows before manual override state is actually mutated."
     },
     {
       "id": "planning-experiment-os-preserve-applied-replay-drafts-in-an-undo-stack",
       "direction_id": "experiment-os",
-      "title": "Preserve applied replay drafts in an undo stack",
-      "description": "Capture the pre-apply manual override state and applied replay-draft mutation set in a reversible undo stack so operators can roll back an approved replay apply after confirmation, instead of treating staged replay promotion as a one-way mutation.",
-      "status": "proposed",
+      "title": "Capture replay apply rollback state and confirmation history",
+      "description": "Add the next post-apply safety layer by recording the pre-apply manual override baseline together with an operator-visible confirmation history of the approved replay mutation set, so each apply can be audited immediately and rolled back instead of disappearing as a one-way staged promotion.",
+      "status": "done",
       "base_priority": 86,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply also names undo-stack preservation as a remaining safety layer, but it still needs a product choice about scope such as in-memory versus durable history, stack depth, and whether undo should restore only manual override state or also row approval metadata. Keep it proposed behind the now-clear final summary modal.",
+      "dynamic_priority_delta": 10,
+      "priority_reason": "Completed in main session commit 235fbdd, which attached rollback snapshots and confirmation history to replay apply, surfaced a replay apply history panel with per-entry restore actions plus a latest rollback shortcut, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-final-summary-modal-before-approved-replay-draft-apply"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:05:00Z",
+      "updated_at": "2026-04-21T06:15:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os replay-derived mutation flows reversible after the new approval and final-summary layers land, which would strengthen operator recovery and reduce the cost of approving the wrong staged draft."
+      "direction_relation_note": "Completed the first post-apply replay safety layer by making approved replay mutations immediately auditable and reversible within the active query-builder session, which now leaves durable cross-reload persistence as the clearest follow-up."
+    },
+    {
+      "id": "planning-experiment-os-persist-replay-apply-rollback-history-across-reload",
+      "direction_id": "experiment-os",
+      "title": "Persist replay apply rollback snapshots and confirmation history across reload",
+      "description": "Lift the newly shipped replay apply rollback snapshots and confirmation history out of transient query-builder state into the persisted storage layer, so replay apply audit entries and restore points survive reloads or reopened sessions instead of resetting with the mounted UI state.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply explicitly says rollback snapshots and confirmation history now work only inside the current session and that persistence is the remaining gap. That makes durable storage for replay apply history the immediate executable next task after commit 235fbdd, with no extra operator decision needed.",
+      "depends_on": [
+        "planning-experiment-os-preserve-applied-replay-drafts-in-an-undo-stack"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T06:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os operator trust from session-local replay rollback safety into durable cross-reload recovery, ensuring replay apply audit and restore history behaves like the rest of the persisted control-room workspace state."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
