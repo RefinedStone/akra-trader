@@ -5570,18 +5570,36 @@
       "direction_id": "experiment-os",
       "title": "Sync replay candidate drill-through back from provenance rows and clause editor state",
       "description": "Build on the shipped drill-through cross-links by letting provenance issue or order rows reselect the same replay candidate trace and by auto-syncing clause editor changes into the active candidate drill-through filter state, so operators can move bidirectionally between source context and replay evidence without manual re-selection or stale clause filters.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply says the remaining gap after commit e4d51b3 is deeper source sync: operators can jump from replay candidates to run context and the clause editor, but provenance rows still cannot reverse-select the originating candidate trace and clause editor edits do not yet auto-sync the candidate drill-through filter. That is now the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 4ee7c9b, which made provenance row and clause editor state reverse-open matching replay candidate traces, marked linked drill-through state across active replay and focused causal chain surfaces, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-cross-link-replay-candidate-drillthrough-to-run-provenance-and-clause-editor"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T09:05:00Z",
+      "updated_at": "2026-04-20T20:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from one-way drill-through links into true bidirectional source synchronization, so provenance inspection and clause editing keep the active candidate evidence context aligned."
+      "direction_relation_note": "Completed the linked-state source sync pass for experiment-os replay explanation trust by letting provenance and clause editor context reopen matching candidate traces automatically, which now leaves exact source-pinned candidate selection and incremental clause-diff coherence as the next replay sync gap."
+    },
+    {
+      "id": "planning-experiment-os-pin-concrete-replay-candidates-from-source-selection-and-clause-diffs",
+      "direction_id": "experiment-os",
+      "title": "Pin concrete replay candidates from provenance selection and clause draft diffs",
+      "description": "Deepen the new replay source sync by letting provenance rows lock the exact concrete candidate back into the active drill-through row selection and by reflecting partial clause editor draft changes into candidate trace diff state incrementally, so linked replay evidence stays pinned to the operator's exact source choice instead of only reopening a matching trace with coarse linked highlighting.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 22,
+      "priority_reason": "The latest main-session reply says the remaining deeper source sync gap after commit 4ee7c9b is twofold: provenance rows still do not pin the chosen concrete candidate as the active drill-through row, and clause editor partial edits are not yet reflected incrementally at candidate trace diff level. That is now the clearest executable next task.",
+      "depends_on": [
+        "planning-experiment-os-sync-replay-candidate-drillthrough-back-from-provenance-and-editor-state"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust from linked trace reopening into exact source-pinned replay evidence and live clause-diff coherence, so provenance inspection and clause drafting keep the active candidate row itself aligned."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
