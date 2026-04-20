@@ -17215,6 +17215,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<"all" | string>("all");
   const [bundleCoordinationSimulationPolicy, setBundleCoordinationSimulationPolicy] =
     useState<RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"] | "current">("current");
+  const [bundleCoordinationSimulationReplayIndex, setBundleCoordinationSimulationReplayIndex] =
+    useState(0);
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18165,6 +18167,16 @@ function RunSurfaceCollectionQueryBuilder({
     bundleCoordinationSimulationScope,
     simulatedCoordinationGroups,
   ]);
+  useEffect(() => {
+    setBundleCoordinationSimulationReplayIndex(0);
+  }, [
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationScope,
+    predicateRefDraftBindings,
+    predicateRefGroupBundleSelections,
+    predicateRefGroupAutoBundleSelections,
+    selectedRefTemplate?.id,
+  ]);
   const getSortedTemplateGroupPresetBundles = useCallback(
     (bundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[]) =>
       sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(bundles),
@@ -18318,6 +18330,20 @@ function RunSurfaceCollectionQueryBuilder({
         unmetDependencyCount: number;
       };
     };
+    type SolverReplayAction = {
+      groupKey: string;
+      groupLabel: string;
+      type: "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle";
+      detail: string;
+    };
+    type SolverReplayStep = {
+      key: string;
+      title: string;
+      summary: string;
+      actions: SolverReplayAction[];
+      resolvedSelectionsByGroupKey: Record<string, string>;
+      autoSelectionsByGroupKey: Record<string, string>;
+    };
     if (!selectedRefTemplate) {
       return {
         autoSelectionsBySelectionKey: {} as Record<string, string>,
@@ -18362,6 +18388,7 @@ function RunSurfaceCollectionQueryBuilder({
             unmetDependencyCount: 0,
           },
         } as GlobalPolicyTrace,
+        solverReplay: [] as SolverReplayStep[],
       };
     }
     type DependencyRequest = {
@@ -18505,10 +18532,33 @@ function RunSurfaceCollectionQueryBuilder({
     );
     const resolvedSelectionsByGroupKey = { ...manualSelectionsByGroupKey };
     const autoSelectionsByGroupKey: Record<string, string> = {};
+    const solverReplay: SolverReplayStep[] = [{
+      key: "seed",
+      title: "Manual seed",
+      summary: Object.keys(manualSelectionsByGroupKey).length
+        ? `Seeded the solver with ${Object.keys(manualSelectionsByGroupKey).length} manual bundle selection${Object.keys(manualSelectionsByGroupKey).length === 1 ? "" : "s"}.`
+        : "No manual bundle anchors were present when the solver started.",
+      actions: selectedRefTemplateParameterGroups.flatMap((group) => {
+        const manualBundleKey = manualSelectionsByGroupKey[group.key];
+        const manualBundle = manualBundleKey ? getGroupBundle(group.key, manualBundleKey) : null;
+        return manualBundle
+          ? [{
+              groupKey: group.key,
+              groupLabel: group.label,
+              type: "manual_anchor" as const,
+              detail: `${manualBundle.label} is pinned manually before coordination begins.`,
+            }]
+          : [];
+      }),
+      resolvedSelectionsByGroupKey: { ...resolvedSelectionsByGroupKey },
+      autoSelectionsByGroupKey: {},
+    }];
+    let iterationIndex = 0;
     let changed = true;
     while (changed) {
       changed = false;
       const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey, true);
+      const iterationActions: SolverReplayAction[] = [];
       selectedRefTemplateParameterGroups.forEach((group) => {
         if (resolvedSelectionsByGroupKey[group.key]) {
           return;
@@ -18523,12 +18573,24 @@ function RunSurfaceCollectionQueryBuilder({
           stickyBundleKey,
         );
         if (sortedDependencyRequests.length > 1 && coordinationPolicy === "manual_resolution") {
+          iterationActions.push({
+            groupKey: group.key,
+            groupLabel: group.label,
+            type: "conflict_blocked",
+            detail: `${sortedDependencyRequests.map((request) => request.bundleLabel).join(", ")} conflict under manual resolution, so this group stays unresolved.`,
+          });
           return;
         }
         const dependencyDrivenBundle = sortedDependencyRequests[0] ?? null;
         if (dependencyDrivenBundle) {
           resolvedSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
           autoSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
+          iterationActions.push({
+            groupKey: group.key,
+            groupLabel: group.label,
+            type: "dependency_selection",
+            detail: `${dependencyDrivenBundle.bundleLabel} won from ${dependencyDrivenBundle.sourceLabels.join(", ")} under ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(coordinationPolicy)}.`,
+          });
           changed = true;
           return;
         }
@@ -18541,9 +18603,36 @@ function RunSurfaceCollectionQueryBuilder({
         if (directAutoBundle) {
           resolvedSelectionsByGroupKey[group.key] = directAutoBundle.key;
           autoSelectionsByGroupKey[group.key] = directAutoBundle.key;
+          iterationActions.push({
+            groupKey: group.key,
+            groupLabel: group.label,
+            type: "direct_auto_selection",
+            detail: `${directAutoBundle.label} matched ${directAutoBundle.autoSelectRule.replaceAll("_", " ")} and all dependencies were already satisfied.`,
+          });
           changed = true;
+          return;
         }
+        if (dependencyRequestsByGroupKey[group.key]?.length || aggregatedDependencyRequests.length) {
+          return;
+        }
+        iterationActions.push({
+          groupKey: group.key,
+          groupLabel: group.label,
+          type: "idle",
+          detail: "No dependency request or valid auto-select candidate changed this group in this pass.",
+        });
       });
+      solverReplay.push({
+        key: `iteration:${iterationIndex}`,
+        title: `Iteration ${iterationIndex + 1}`,
+        summary: iterationActions.length
+          ? `${iterationActions.filter((action) => action.type !== "idle").length || iterationActions.length} coordination event${(iterationActions.filter((action) => action.type !== "idle").length || iterationActions.length) === 1 ? "" : "s"} recorded in this pass.`
+          : "No further changes were produced in this pass.",
+        actions: iterationActions,
+        resolvedSelectionsByGroupKey: { ...resolvedSelectionsByGroupKey },
+        autoSelectionsByGroupKey: { ...autoSelectionsByGroupKey },
+      });
+      iterationIndex += 1;
     }
     const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey);
     const conflictRequestsByGroupKey = Object.fromEntries(
@@ -18892,6 +18981,7 @@ function RunSurfaceCollectionQueryBuilder({
       conflictRequestsByGroupKey,
       policyTraceByGroupKey,
       globalPolicyTrace,
+      solverReplay,
     };
   }, [
     doesTemplateGroupBundleMatchAutoSelectRule,
@@ -18934,6 +19024,13 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [bundleCoordinationSimulationOverrides, computeCoordinatedPredicateRefGroupBundleState],
   );
+  const simulatedPredicateRefSolverReplay = simulatedPredicateRefGroupBundleState?.solverReplay ?? [];
+  const activeSimulatedPredicateRefSolverReplayIndex = simulatedPredicateRefSolverReplay.length
+    ? Math.min(bundleCoordinationSimulationReplayIndex, simulatedPredicateRefSolverReplay.length - 1)
+    : 0;
+  const activeSimulatedPredicateRefSolverReplayStep = simulatedPredicateRefSolverReplay.length
+    ? simulatedPredicateRefSolverReplay[activeSimulatedPredicateRefSolverReplayIndex]
+    : null;
   const simulatedPredicateRefGroupBundleDiffs = useMemo(() => {
     if (!simulatedPredicateRefGroupBundleState) {
       return [];
@@ -21169,6 +21266,92 @@ function RunSurfaceCollectionQueryBuilder({
                                 This policy would not change the currently resolved bundle choices for the simulated scope.
                               </p>
                             )}
+                            {simulatedPredicateRefSolverReplay.length ? (
+                              <div className="run-surface-query-builder-trace-panel is-nested">
+                                <div className="run-surface-query-builder-card-head">
+                                  <strong>Solver explanation replay</strong>
+                                  <span className="run-surface-query-builder-trace-status is-info">
+                                    {`${activeSimulatedPredicateRefSolverReplayIndex + 1}/${simulatedPredicateRefSolverReplay.length}`}
+                                  </span>
+                                </div>
+                                <div className="run-surface-query-builder-actions">
+                                  <button
+                                    className="ghost-button"
+                                    disabled={activeSimulatedPredicateRefSolverReplayIndex <= 0}
+                                    onClick={() =>
+                                      setBundleCoordinationSimulationReplayIndex((current) => Math.max(0, current - 1))}
+                                    type="button"
+                                  >
+                                    Previous step
+                                  </button>
+                                  <button
+                                    className="ghost-button"
+                                    disabled={activeSimulatedPredicateRefSolverReplayIndex >= simulatedPredicateRefSolverReplay.length - 1}
+                                    onClick={() =>
+                                      setBundleCoordinationSimulationReplayIndex((current) =>
+                                        Math.min(simulatedPredicateRefSolverReplay.length - 1, current + 1))}
+                                    type="button"
+                                  >
+                                    Next step
+                                  </button>
+                                </div>
+                                <input
+                                  className="run-surface-query-builder-trace-slider"
+                                  max={Math.max(0, simulatedPredicateRefSolverReplay.length - 1)}
+                                  min={0}
+                                  onChange={(event) => setBundleCoordinationSimulationReplayIndex(Number(event.target.value))}
+                                  type="range"
+                                  value={activeSimulatedPredicateRefSolverReplayIndex}
+                                />
+                                {activeSimulatedPredicateRefSolverReplayStep ? (
+                                  <>
+                                    <p className="run-note">
+                                      <strong>{activeSimulatedPredicateRefSolverReplayStep.title}</strong>
+                                      {` · ${activeSimulatedPredicateRefSolverReplayStep.summary}`}
+                                    </p>
+                                    <div className="run-surface-query-builder-trace-chip-list">
+                                      {simulatedCoordinationGroups.map((group) => {
+                                        const resolvedBundleKey =
+                                          activeSimulatedPredicateRefSolverReplayStep.resolvedSelectionsByGroupKey[group.key] ?? "";
+                                        const resolvedBundle =
+                                          getSortedTemplateGroupPresetBundles(group.presetBundles).find(
+                                            (bundle) => bundle.key === resolvedBundleKey,
+                                          ) ?? null;
+                                        return (
+                                          <span className="run-surface-query-builder-trace-chip" key={`solver-replay:${group.key}`}>
+                                            {`${group.label}: ${resolvedBundle?.label ?? "unresolved"}`}
+                                          </span>
+                                        );
+                                      })}
+                                    </div>
+                                    <div className="run-surface-query-builder-trace-list">
+                                      {activeSimulatedPredicateRefSolverReplayStep.actions.length ? (
+                                        activeSimulatedPredicateRefSolverReplayStep.actions.map((action) => (
+                                          <div
+                                            className={`run-surface-query-builder-trace-step is-${
+                                              action.type === "conflict_blocked"
+                                                ? "warning"
+                                                : action.type === "idle"
+                                                  ? "muted"
+                                                  : "success"
+                                            }`}
+                                            key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:${action.type}`}
+                                          >
+                                            <strong>{`${action.groupLabel} · ${action.type.replaceAll("_", " ")}`}</strong>
+                                            <p>{action.detail}</p>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="run-surface-query-builder-trace-step is-muted">
+                                          <strong>No state changes</strong>
+                                          <p>This replay step did not produce any new coordination actions.</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <div className="run-surface-query-builder-trace-list">
                               {simulatedPredicateRefGroupBundleState.globalPolicyTrace.steps.map((step) => (
                                 <div

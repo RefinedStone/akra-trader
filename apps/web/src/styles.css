@@ -461,6 +461,10 @@ select {
   align-content: start;
 }
 
+.run-surface-query-builder-trace-panel.is-nested {
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .run-surface-query-builder-trace-grid {
   display: grid;
   gap: 10px;
@@ -484,6 +488,11 @@ select {
   font-size: 0.62rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+}
+
+.run-surface-query-builder-trace-slider {
+  width: 100%;
+  accent-color: rgba(88, 217, 255, 0.88);
 }
 
 .run-surface-query-builder-trace-status {
