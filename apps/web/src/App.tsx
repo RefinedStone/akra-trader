@@ -16324,6 +16324,7 @@ function buildPredicateRefReplayApplyConflictMergedEntry(
 function buildPredicateRefReplayApplyConflictReview(
   conflict: PredicateRefReplayApplyConflictEntry,
   localTabLabel: string,
+  parameterGroupKeyByParameterKey: Record<string, string> = {},
 ): PredicateRefReplayApplyConflictReview {
   const summaryDiffs: PredicateRefReplayApplyConflictDiffItem[] = [];
   const pushSummaryDiff = (
@@ -16464,6 +16465,7 @@ function buildPredicateRefReplayApplyConflictReview(
         label: parameterKey,
         localValue: formatPredicateRefReplayApplyHistorySnapshotValue(localValue),
         remoteValue: formatPredicateRefReplayApplyHistorySnapshotValue(remoteValue),
+        relatedGroupKey: parameterGroupKeyByParameterKey[parameterKey] ?? null,
         section: "binding_snapshot",
       } satisfies PredicateRefReplayApplyConflictDiffItem];
     });
@@ -19316,49 +19318,57 @@ function RunSurfaceCollectionQueryBuilder({
     [predicateRefReplayApplyConflicts, selectedRefTemplate],
   );
   const selectedRefTemplateReplayApplyConflictReviews = useMemo<PredicateRefReplayApplyConflictDraftReview[]>(
-    () => selectedRefTemplateReplayApplyConflicts.map((conflict) => {
-      const review = buildPredicateRefReplayApplyConflictReview(
-        conflict,
-        predicateRefReplayApplyHistoryTabIdentity.label,
+    () => {
+      const parameterGroupKeyByParameterKey = Object.fromEntries(
+        selectedRefTemplateParameterGroups.flatMap((group) =>
+          group.parameters.map((parameter) => [parameter.key, group.key] as const)),
       );
-      const editableItems = [
-        ...review.summaryDiffs,
-        ...review.rowDiffs,
-        ...review.selectionSnapshotDiffs,
-        ...review.bindingSnapshotDiffs,
-      ].filter((item) => item.editable);
-      const storedDraftSources = predicateRefReplayApplyConflictDraftSourcesById[conflict.conflictId] ?? {};
-      const selectedSources = Object.fromEntries(
-        editableItems.map((item) => [item.decisionKey, storedDraftSources[item.decisionKey] ?? "local"]),
-      ) as Record<string, "local" | "remote">;
-      const mergedEntry = buildPredicateRefReplayApplyConflictMergedEntry(conflict, selectedSources);
-      const selectedRemoteCount = Object.values(selectedSources).filter((source) => source === "remote").length;
-      const hasRemoteSelection = selectedRemoteCount > 0;
-      const hasMixedSelection = hasRemoteSelection && selectedRemoteCount < editableItems.length;
-      const mergedPreview = buildPredicateRefReplayApplyConflictResolutionPreview(
-        conflict,
-        mergedEntry,
-        "merged",
-        hasRemoteSelection
-          ? hasMixedSelection
-            ? `Applies a partial reviewed merge with ${selectedRemoteCount} remote field selections and ${editableItems.length - selectedRemoteCount} local field selections.`
-            : `Applies the fully reviewed remote version across all ${editableItems.length} editable field differences.`
-          : "Keeps the local version because no remote field selections are currently staged.",
-      );
-      return {
-        ...review,
-        editableDiffCount: editableItems.length,
-        hasMixedSelection,
-        hasRemoteSelection,
-        mergedEntry,
-        mergedPreview,
-        selectedRemoteCount,
-        selectedSources,
-      };
-    }),
+      return selectedRefTemplateReplayApplyConflicts.map((conflict) => {
+        const review = buildPredicateRefReplayApplyConflictReview(
+          conflict,
+          predicateRefReplayApplyHistoryTabIdentity.label,
+          parameterGroupKeyByParameterKey,
+        );
+        const editableItems = [
+          ...review.summaryDiffs,
+          ...review.rowDiffs,
+          ...review.selectionSnapshotDiffs,
+          ...review.bindingSnapshotDiffs,
+        ].filter((item) => item.editable);
+        const storedDraftSources = predicateRefReplayApplyConflictDraftSourcesById[conflict.conflictId] ?? {};
+        const selectedSources = Object.fromEntries(
+          editableItems.map((item) => [item.decisionKey, storedDraftSources[item.decisionKey] ?? "local"]),
+        ) as Record<string, "local" | "remote">;
+        const mergedEntry = buildPredicateRefReplayApplyConflictMergedEntry(conflict, selectedSources);
+        const selectedRemoteCount = Object.values(selectedSources).filter((source) => source === "remote").length;
+        const hasRemoteSelection = selectedRemoteCount > 0;
+        const hasMixedSelection = hasRemoteSelection && selectedRemoteCount < editableItems.length;
+        const mergedPreview = buildPredicateRefReplayApplyConflictResolutionPreview(
+          conflict,
+          mergedEntry,
+          "merged",
+          hasRemoteSelection
+            ? hasMixedSelection
+              ? `Applies a partial reviewed merge with ${selectedRemoteCount} remote field selections and ${editableItems.length - selectedRemoteCount} local field selections.`
+              : `Applies the fully reviewed remote version across all ${editableItems.length} editable field differences.`
+            : "Keeps the local version because no remote field selections are currently staged.",
+        );
+        return {
+          ...review,
+          editableDiffCount: editableItems.length,
+          hasMixedSelection,
+          hasRemoteSelection,
+          mergedEntry,
+          mergedPreview,
+          selectedRemoteCount,
+          selectedSources,
+        };
+      });
+    },
     [
       predicateRefReplayApplyConflictDraftSourcesById,
       predicateRefReplayApplyHistoryTabIdentity.label,
+      selectedRefTemplateParameterGroups,
       selectedRefTemplateReplayApplyConflicts,
     ],
   );
@@ -19408,6 +19418,12 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const setPredicateRefReplayApplyConflictFocusedDecisionState = useCallback(
+    (conflictId: string, decisionKey: string) => {
+      setPredicateRefReplayApplyConflictFocusedDecision({ conflictId, decisionKey });
+    },
+    [],
+  );
   const resetPredicateRefReplayApplyConflictDraftSource = useCallback((conflictId: string) => {
     setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
       if (!current[conflictId]) {
@@ -19420,7 +19436,7 @@ function RunSurfaceCollectionQueryBuilder({
   }, []);
   const focusPredicateRefReplayApplyConflictDecision = useCallback(
     (conflictId: string, decisionKey: string) => {
-      setPredicateRefReplayApplyConflictFocusedDecision({ conflictId, decisionKey });
+      setPredicateRefReplayApplyConflictFocusedDecisionState(conflictId, decisionKey);
       const refKey = `${conflictId}:${decisionKey}`;
       requestAnimationFrame(() => {
         const node = predicateRefReplayApplyConflictRowRefs.current[refKey];
@@ -19436,13 +19452,17 @@ function RunSurfaceCollectionQueryBuilder({
         });
       });
     },
-    [],
+    [setPredicateRefReplayApplyConflictFocusedDecisionState],
   );
   const togglePredicateRefReplayApplyConflictSimulationFieldPickSource = useCallback(
     (decisionKey: string) => {
       if (!activePredicateRefReplayApplyConflictSimulationReview) {
         return;
       }
+      setPredicateRefReplayApplyConflictFocusedDecisionState(
+        activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+        decisionKey,
+      );
       const currentSource =
         activePredicateRefReplayApplyConflictSimulationReview.selectedSources[decisionKey] ?? "local";
       setPredicateRefReplayApplyConflictDraftSource(
@@ -19453,6 +19473,7 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [
       activePredicateRefReplayApplyConflictSimulationReview,
+      setPredicateRefReplayApplyConflictFocusedDecisionState,
       setPredicateRefReplayApplyConflictDraftSource,
     ],
   );
@@ -19964,6 +19985,43 @@ function RunSurfaceCollectionQueryBuilder({
     () => Object.keys(activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey),
     [activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey],
   );
+  const activePredicateRefReplayApplyConflictSimulationDiffItems = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationReview
+        ? [
+            ...activePredicateRefReplayApplyConflictSimulationReview.summaryDiffs,
+            ...activePredicateRefReplayApplyConflictSimulationReview.rowDiffs,
+            ...activePredicateRefReplayApplyConflictSimulationReview.selectionSnapshotDiffs,
+            ...activePredicateRefReplayApplyConflictSimulationReview.bindingSnapshotDiffs,
+          ]
+        : []
+    ),
+    [activePredicateRefReplayApplyConflictSimulationReview],
+  );
+  const activePredicateRefReplayApplyConflictSimulationDiffItemByDecisionKey = useMemo(
+    () => Object.fromEntries(
+      activePredicateRefReplayApplyConflictSimulationDiffItems.map((item) => [item.decisionKey, item] as const),
+    ),
+    [activePredicateRefReplayApplyConflictSimulationDiffItems],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedItem = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationReview
+      && predicateRefReplayApplyConflictFocusedDecision?.conflictId
+        === activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId
+        ? (
+            activePredicateRefReplayApplyConflictSimulationDiffItemByDecisionKey[
+              predicateRefReplayApplyConflictFocusedDecision.decisionKey
+            ] ?? null
+          )
+        : null
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationDiffItemByDecisionKey,
+      activePredicateRefReplayApplyConflictSimulationReview,
+      predicateRefReplayApplyConflictFocusedDecision,
+    ],
+  );
   const activePredicateRefReplayApplyConflictSimulationFieldPicks = useMemo(() => {
     if (!activePredicateRefReplayApplyConflictSimulationReview) {
       return {
@@ -20031,6 +20089,20 @@ function RunSurfaceCollectionQueryBuilder({
     activePredicateRefReplayApplyConflictSimulationReview,
     selectedRefTemplateParameterGroups,
   ]);
+  const activePredicateRefReplayApplyConflictSimulationFocusedGroupKey = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationFocusedItem?.relatedGroupKey
+      && simulatedCoordinationGroups.some(
+        (group) => group.key === activePredicateRefReplayApplyConflictSimulationFocusedItem.relatedGroupKey,
+      )
+        ? activePredicateRefReplayApplyConflictSimulationFocusedItem.relatedGroupKey
+        : null
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedItem,
+      simulatedCoordinationGroups,
+    ],
+  );
   const doesTemplateGroupMatchVisibilityRule = useCallback(
     (
       group: {
@@ -21185,6 +21257,45 @@ function RunSurfaceCollectionQueryBuilder({
       bundleCoordinationSimulationReplayEdgeFilter,
     ],
   );
+  const simulatedPredicateRefSolverReplayAttributionByGroupKey = useMemo(
+    () => Object.fromEntries(
+      simulatedCoordinationGroups.map((group) => {
+        let previousBundleKey = "";
+        let attributedStepIndex = -1;
+        let attributedActionType: string | null = null;
+        let attributedDetail: string | null = null;
+        for (let stepIndex = 0; stepIndex < simulatedPredicateRefSolverReplay.length; stepIndex += 1) {
+          const step = simulatedPredicateRefSolverReplay[stepIndex];
+          const resolvedBundleKey = step.resolvedSelectionsByGroupKey[group.key] ?? "";
+          const matchingActions = step.actions.filter((action) => action.groupKey === group.key);
+          const attributedAction = matchingActions.find((action) => action.type !== "idle")
+            ?? matchingActions[0]
+            ?? null;
+          const selectionChanged = resolvedBundleKey !== previousBundleKey;
+          if (selectionChanged || attributedAction) {
+            attributedStepIndex = stepIndex;
+            attributedActionType = attributedAction?.type ?? null;
+            attributedDetail = attributedAction?.detail ?? step.summary;
+            break;
+          }
+          previousBundleKey = resolvedBundleKey;
+        }
+        return [group.key, {
+          detail: attributedDetail,
+          stepIndex: attributedStepIndex,
+          stepLabel:
+            attributedStepIndex >= 0
+              ? `Replay step ${attributedStepIndex + 1}`
+              : "No replay attribution",
+          type: attributedActionType,
+        }] as const;
+      }),
+    ),
+    [
+      simulatedCoordinationGroups,
+      simulatedPredicateRefSolverReplay,
+    ],
+  );
   useEffect(() => {
     if (
       !predicateRefReplayApplyConflictSimulationConflictId
@@ -21211,15 +21322,21 @@ function RunSurfaceCollectionQueryBuilder({
       setBundleCoordinationSimulationReplayActionTypeFilter("all");
       setBundleCoordinationSimulationReplayEdgeFilter("all");
       setBundleCoordinationSimulationPolicy((current) => current === "current" ? "manual_resolution" : current);
-      const matchingReplayStepIndex = simulatedPredicateRefSolverReplay.findIndex((step) =>
-        step.actions.some((action) => action.groupKey === groupKey));
+      const matchingReplayStepIndex =
+        simulatedPredicateRefSolverReplayAttributionByGroupKey[groupKey]?.stepIndex
+        ?? simulatedPredicateRefSolverReplay.findIndex((step) =>
+          step.actions.some((action) => action.groupKey === groupKey));
       setBundleCoordinationSimulationReplayIndex(matchingReplayStepIndex >= 0 ? matchingReplayStepIndex : 0);
       bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
         behavior: "smooth",
         block: "start",
       });
     },
-    [simulatedCoordinationGroups, simulatedPredicateRefSolverReplay],
+    [
+      simulatedCoordinationGroups,
+      simulatedPredicateRefSolverReplay,
+      simulatedPredicateRefSolverReplayAttributionByGroupKey,
+    ],
   );
   useEffect(() => {
     if (!activePredicateRefReplayApplyConflictSimulationGroupKeys.length) {
@@ -21269,24 +21386,52 @@ function RunSurfaceCollectionQueryBuilder({
   useEffect(() => {
     if (
       !activePredicateRefReplayApplyConflictSimulationReview
-      || !activePredicateRefReplayApplyConflictSimulationGroupKeys.length
       || !simulatedPredicateRefSolverReplay.length
     ) {
       return;
     }
-    const preferredGroupKey =
-      bundleCoordinationSimulationReplayGroupFilter !== "all"
-      && activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(bundleCoordinationSimulationReplayGroupFilter)
-        ? bundleCoordinationSimulationReplayGroupFilter
-        : activePredicateRefReplayApplyConflictSimulationGroupKeys[0];
-    const nextIndex = simulatedPredicateRefSolverReplay.findIndex((step) =>
+    const preferredGroupKey = activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+      ?? (
+        bundleCoordinationSimulationReplayGroupFilter !== "all"
+        && simulatedCoordinationGroups.some((group) => group.key === bundleCoordinationSimulationReplayGroupFilter)
+          ? bundleCoordinationSimulationReplayGroupFilter
+          : activePredicateRefReplayApplyConflictSimulationGroupKeys[0] ?? null
+      );
+    if (!preferredGroupKey) {
+      return;
+    }
+    if (bundleCoordinationSimulationReplayGroupFilter !== preferredGroupKey) {
+      setBundleCoordinationSimulationReplayGroupFilter(preferredGroupKey);
+    }
+    if (activePredicateRefReplayApplyConflictSimulationFocusedGroupKey) {
+      if (bundleCoordinationSimulationReplayActionTypeFilter !== "all") {
+        setBundleCoordinationSimulationReplayActionTypeFilter("all");
+      }
+      if (bundleCoordinationSimulationReplayEdgeFilter !== "all") {
+        setBundleCoordinationSimulationReplayEdgeFilter("all");
+      }
+    }
+    const attributedReplayStep = simulatedPredicateRefSolverReplayAttributionByGroupKey[preferredGroupKey] ?? null;
+    const nextIndex = attributedReplayStep?.stepIndex ?? simulatedPredicateRefSolverReplay.findIndex((step) =>
       step.actions.some((action) => action.groupKey === preferredGroupKey));
+    if (nextIndex < 0) {
+      return;
+    }
+    if (nextIndex === activeSimulatedPredicateRefSolverReplayIndex) {
+      return;
+    }
     setBundleCoordinationSimulationReplayIndex(nextIndex >= 0 ? nextIndex : 0);
   }, [
+    activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
     activePredicateRefReplayApplyConflictSimulationGroupKeys,
     activePredicateRefReplayApplyConflictSimulationReview,
     activePredicateRefReplayApplyConflictSimulationSelectionSignature,
+    activeSimulatedPredicateRefSolverReplayIndex,
+    bundleCoordinationSimulationReplayActionTypeFilter,
+    bundleCoordinationSimulationReplayEdgeFilter,
     bundleCoordinationSimulationReplayGroupFilter,
+    simulatedCoordinationGroups,
+    simulatedPredicateRefSolverReplayAttributionByGroupKey,
     simulatedPredicateRefSolverReplay,
   ]);
   useEffect(() => {
@@ -21485,6 +21630,7 @@ function RunSurfaceCollectionQueryBuilder({
       return [];
     }
     return simulatedCoordinationGroups.flatMap((group) => {
+      const replayAttribution = simulatedPredicateRefSolverReplayAttributionByGroupKey[group.key] ?? null;
       const currentTrace =
         coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey[group.key] ?? null;
       const simulatedTrace =
@@ -21506,6 +21652,10 @@ function RunSurfaceCollectionQueryBuilder({
         getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === simulatedBundleKey)
         ?? null;
       return [{
+        attributedReplayDetail: replayAttribution?.detail ?? null,
+        attributedReplayStepIndex: replayAttribution?.stepIndex ?? -1,
+        attributedReplayStepLabel: replayAttribution?.stepLabel ?? "No replay attribution",
+        attributedReplayType: replayAttribution?.type ?? null,
         groupKey: group.key,
         groupLabel: group.label,
         currentStatus: currentTrace?.statusLabel ?? "Idle",
@@ -21520,6 +21670,7 @@ function RunSurfaceCollectionQueryBuilder({
     getSortedTemplateGroupPresetBundles,
     simulatedCoordinationGroups,
     simulatedPredicateRefGroupBundleState,
+    simulatedPredicateRefSolverReplayAttributionByGroupKey,
   ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
@@ -23786,11 +23937,39 @@ function RunSurfaceCollectionQueryBuilder({
                             {simulatedPredicateRefGroupBundleDiffs.length ? (
                               <div className="run-surface-query-builder-trace-list">
                                 {simulatedPredicateRefGroupBundleDiffs.map((diff) => (
-                                  <div className="run-surface-query-builder-trace-step is-info" key={`simulation-diff:${diff.groupKey}`}>
+                                  <div
+                                    className={`run-surface-query-builder-trace-step is-${
+                                      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === diff.groupKey
+                                        ? "success"
+                                        : "info"
+                                    }`}
+                                    key={`simulation-diff:${diff.groupKey}`}
+                                  >
                                     <strong>{diff.groupLabel}</strong>
                                     <p>
                                       {`${diff.currentStatus} · ${diff.currentBundleLabel} → ${diff.simulatedStatus} · ${diff.simulatedBundleLabel}`}
                                     </p>
+                                    {diff.attributedReplayStepIndex >= 0 ? (
+                                      <div className="run-surface-query-builder-trace-chip-list">
+                                        <span className={`run-surface-query-builder-trace-chip${
+                                          predicateRefReplayApplyConflictFocusedDecision?.conflictId
+                                            === activePredicateRefReplayApplyConflictSimulationReview?.conflict.conflictId
+                                          && activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === diff.groupKey
+                                            ? " is-active"
+                                            : ""
+                                        }`}>
+                                          {diff.attributedReplayStepLabel}
+                                        </span>
+                                        {diff.attributedReplayType ? (
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {diff.attributedReplayType.replaceAll("_", " ")}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    ) : null}
+                                    {diff.attributedReplayDetail ? (
+                                      <p className="run-note">{diff.attributedReplayDetail}</p>
+                                    ) : null}
                                     {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]?.length ? (
                                       <div className="run-surface-query-builder-trace-chip-list">
                                         {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]
@@ -24518,6 +24697,16 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     ] = node;
                                                                   }}
                                                                   key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
+                                                                  onClick={() =>
+                                                                    setPredicateRefReplayApplyConflictFocusedDecisionState(
+                                                                      review.conflict.conflictId,
+                                                                      item.decisionKey,
+                                                                    )}
+                                                                  onFocusCapture={() =>
+                                                                    setPredicateRefReplayApplyConflictFocusedDecisionState(
+                                                                      review.conflict.conflictId,
+                                                                      item.decisionKey,
+                                                                    )}
                                                                   tabIndex={-1}
                                                                 >
                                                                   <strong>{item.label}</strong>
@@ -24548,24 +24737,34 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       <>
                                                                         <button
                                                                           className={`ghost-button${selectedSource === "local" ? " is-active" : ""}`}
-                                                                          onClick={() =>
+                                                                          onClick={() => {
+                                                                            setPredicateRefReplayApplyConflictFocusedDecisionState(
+                                                                              review.conflict.conflictId,
+                                                                              item.decisionKey,
+                                                                            );
                                                                             setPredicateRefReplayApplyConflictDraftSource(
                                                                               review.conflict.conflictId,
                                                                               item.decisionKey,
                                                                               "local",
-                                                                            )}
+                                                                            );
+                                                                          }}
                                                                           type="button"
                                                                         >
                                                                           Keep local field
                                                                         </button>
                                                                         <button
                                                                           className={`ghost-button${selectedSource === "remote" ? " is-active" : ""}`}
-                                                                          onClick={() =>
+                                                                          onClick={() => {
+                                                                            setPredicateRefReplayApplyConflictFocusedDecisionState(
+                                                                              review.conflict.conflictId,
+                                                                              item.decisionKey,
+                                                                            );
                                                                             setPredicateRefReplayApplyConflictDraftSource(
                                                                               review.conflict.conflictId,
                                                                               item.decisionKey,
                                                                               "remote",
-                                                                            )}
+                                                                            );
+                                                                          }}
                                                                           type="button"
                                                                         >
                                                                           Accept remote field
@@ -24873,7 +25072,8 @@ function RunSurfaceCollectionQueryBuilder({
                                         return (
                                           <span
                                             className={`run-surface-query-builder-trace-chip${
-                                              bundleCoordinationSimulationReplayGroupFilter === "all"
+                                              activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === group.key
+                                              || bundleCoordinationSimulationReplayGroupFilter === "all"
                                               || bundleCoordinationSimulationReplayGroupFilter === group.key
                                                 ? " is-active"
                                                 : " is-muted"
@@ -24906,7 +25106,9 @@ function RunSurfaceCollectionQueryBuilder({
                                         activeSimulatedPredicateRefSolverReplayFilteredActions.map((action) => (
                                           <div
                                             className={`run-surface-query-builder-trace-step is-${
-                                              action.type === "conflict_blocked"
+                                              activePredicateRefReplayApplyConflictSimulationFocusedGroupKey === action.groupKey
+                                                ? "success"
+                                                : action.type === "conflict_blocked"
                                                 ? "warning"
                                                 : action.type === "idle"
                                                   ? "muted"
