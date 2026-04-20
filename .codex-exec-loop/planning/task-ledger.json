@@ -5012,18 +5012,36 @@
       "direction_id": "experiment-os",
       "title": "Add solver explanation replay to subtree policy simulation",
       "description": "Deepen the new subtree bundle policy simulation layer so overridden runs can replay the full solver explanation across the dependency graph, not just report final diffs, giving operators a simulated causal trace for why groups changed, conflicted, or stayed blocked under a candidate policy.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply says the remaining deeper execution gap is solver explanation replay across the full dependency graph. This is now the clearest immediate follow-up because the new global simulation UI already exists, and the next executable step is to make simulated outcomes explainable before adding mutating apply flows.",
+      "priority_reason": "Completed in main session commit 0340f70, which added solver explanation replay to subtree policy simulation with replay-step snapshots, action logs, step summaries, previous/next navigation, and slider playback, then verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-global-conflict-policy-optimization-for-subtree-bundle-coordination"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:10:00Z",
+      "updated_at": "2026-04-20T22:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Builds experiment-os subtree coordination trust from global policy what-if summaries into fully replayable simulated solver reasoning, so operators can inspect why a policy override would reshape the graph before any state-changing promotion workflow is introduced."
+    },
+    {
+      "id": "planning-experiment-os-add-group-level-step-filtering-to-subtree-solver-replay",
+      "direction_id": "experiment-os",
+      "title": "Add group-level step filtering to subtree solver replay",
+      "description": "Extend the newly shipped subtree policy simulation replay so operators can filter replay steps by affected group, conflict path, or action class, making longer solver traces navigable without losing the whole-graph explanation layer that now exists.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply explicitly says the remaining deeper control gap after solver explanation replay is group-level step filtering. This is the clearest immediate executable follow-up because replay playback now exists and needs better navigation before the UI adds any state-changing apply workflow.",
+      "depends_on": [
+        "planning-experiment-os-add-solver-explanation-replay-for-subtree-policy-simulation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os subtree coordination explainability by making solver replay traces scannable at the group and action level, so operators can isolate relevant causal paths before promotion or draft-apply workflows are introduced."
     },
     {
       "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
@@ -5033,13 +5051,13 @@
       "status": "proposed",
       "base_priority": 87,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply also calls out promoting simulation results into actual selection state as unfinished work. That follow-up remains valid, but it should stay behind the new solver explanation replay layer so operators can inspect simulated causal paths before the UI gains a state-changing apply action.",
+      "priority_reason": "The latest main-session reply also calls out promoting replay steps into an actual manual selection draft as unfinished work. That follow-up remains valid, but it should stay behind the new group-filterable replay layer so operators can narrow and trust simulated causal paths before the UI gains a state-changing apply action.",
       "depends_on": [
-        "planning-experiment-os-add-solver-explanation-replay-for-subtree-policy-simulation"
+        "planning-experiment-os-add-group-level-step-filtering-to-subtree-solver-replay"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:10:00Z",
+      "updated_at": "2026-04-20T22:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os subtree template composition from inspectable simulation into deliberate state-changing promotion semantics, so coordinated multi-group bundle changes can be applied atomically only after the simulated graph behavior is explainable."
     },
