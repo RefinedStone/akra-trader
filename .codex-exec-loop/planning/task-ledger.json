@@ -5767,37 +5767,73 @@
       "id": "planning-experiment-os-generalize-upstream-runtime-id-preservation-across-artifact-producers",
       "direction_id": "experiment-os",
       "title": "Generalize upstream runtime id preservation across artifact producers",
-      "description": "Extend the newly shipped freqtrade-specific `runtime_candidate_id` preservation into a shared producer contract that can recognize and carry explicit upstream-native candidate or entity ids from other artifact producers and multiple row-schema field variants, so provenance binding preserves true source-owned runtime identity consistently instead of only for one producer shape.",
-      "status": "ready",
+      "description": "Extend the newly shipped freqtrade-specific `runtime_candidate_id` preservation into a shared producer contract that can recognize and carry explicit upstream-native candidate or entity ids from other artifact producers and multiple row-schema field variants, so provenance binding preserves true source-owned runtime identity consistently instead of only for one producer shape. This is now completed by lifting the alias-recognition rules into the shared artifact contract and switching the freqtrade adapter to consume the common helper.",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 32,
-      "priority_reason": "The latest main-session reply says the freqtrade producer now preserves explicit native ids, but other artifact producers and broader upstream id-field schemas are not yet covered. That shared contract expansion is the clearest executable next task because the runtime-binding and replay consumer path already honor `runtime_candidate_id`; the remaining gap is producer breadth and schema generalization.",
+      "priority_reason": "Completed in main session commit 4d2c0c2, which moved upstream runtime-candidate id alias recognition into the shared `BenchmarkArtifact` contract helper, updated the freqtrade adapter to use that helper, verified with `python -m py_compile`, three targeted `pytest` cases, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-preserve-upstream-native-runtime-ids-from-artifact-producers"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:41:00Z",
+      "updated_at": "2026-04-20T10:55:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay identity trust from a single freqtrade producer integration into a durable cross-producer provenance contract, so native runtime ids survive artifact production regardless of which upstream artifact schema supplied them."
+      "direction_relation_note": "Completed the shared-contract generalization pass for experiment-os replay identity by moving upstream runtime-id alias handling out of the freqtrade adapter and into the common artifact contract, which now leaves only broader producer adoption when additional artifact producers start emitting benchmark/source-location bindings."
+    },
+    {
+      "id": "planning-experiment-os-adopt-shared-runtime-id-contract-in-additional-artifact-producers",
+      "direction_id": "experiment-os",
+      "title": "Adopt shared runtime id contracts in additional artifact producers",
+      "description": "Now that upstream runtime id alias handling lives in the shared `BenchmarkArtifact` helper, apply that contract to any additional artifact producers that emit benchmark artifacts or source-location bindings beyond freqtrade, so new producer integrations preserve native runtime candidate ids by default instead of reintroducing adapter-local alias parsing.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply says the shared contract is generalized but only freqtrade currently uses it. This follow-up is real, but it remains producer-adoption work that depends on other artifact producers or new benchmark binding integrations becoming active, so keep it proposed rather than forcing speculative implementation.",
+      "depends_on": [
+        "planning-experiment-os-generalize-upstream-runtime-id-preservation-across-artifact-producers"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os replay identity contracts from drifting back into producer-local logic by making future benchmark-artifact producers adopt the shared runtime-id helper once those producer paths exist."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
       "direction_id": "experiment-os",
       "title": "Project clause re-evaluation preview into replay timeline step diffs",
       "description": "Build on the shipped clause re-evaluation preview by threading its changed candidate rows, matched-count delta, and run-outcome delta directly into the active replay timeline step diff view, so operators can inspect draft clause impact in the same causal timeline surface instead of comparing the preview card and timeline separately.",
-      "status": "proposed",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 23,
-      "priority_reason": "The latest main-session reply explicitly calls out replay timeline step-diff integration as the other remaining gap after commit 4202468, but it is secondary to restoring exact artifact-level candidate ownership across provenance and replay surfaces. Keep it proposed behind the more direct bidirectional-selection task.",
+      "priority_reason": "Completed in main session commit 692ce2b, which projected clause re-evaluation preview data into replay timeline changed-group diff cards, added a shared reevaluation projection helper for focused chain and active replay steps, and verified the UI pass with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-direct-candidate-focus-sync-and-re-evaluation-preview"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T08:40:02Z",
+      "updated_at": "2026-04-20T11:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Deepens experiment-os clause-draft trust by collapsing re-evaluation preview and replay-timeline diff evidence into one causal surface, but it fits best after artifact-level focused-candidate selection is durable."
+      "direction_relation_note": "Completed the replay-surface integration pass for experiment-os clause-draft trust by collapsing re-evaluation preview and replay-timeline diff evidence into one causal surface instead of leaving them as separate comparison contexts."
+    },
+    {
+      "id": "planning-experiment-os-make-re-evaluation-preview-panels-drive-candidate-drillthrough-and-editor-focus",
+      "direction_id": "experiment-os",
+      "title": "Make clause re-evaluation preview panels drive candidate drill-through and clause editor focus",
+      "description": "Build on the shipped replay timeline diff projection by turning clause re-evaluation preview items into interactive controls that reopen the exact concrete candidate drill-through and refocus the relevant clause editor context, so operators can move directly from changed-candidate preview evidence into concrete replay inspection or clause authoring without manual reselection.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply explicitly says the remaining gap after commit 692ce2b is the interaction layer: preview panels are readable, but clicking them does not yet reopen concrete candidate drill-through or clause editor focus. Promote this to `ready` as the clearest executable next task for builtin next-task automation.",
+      "depends_on": [
+        "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os replay and clause-authoring trust by making projected re-evaluation preview evidence actionable, not just visible, so operators can jump straight into the exact candidate and clause context implicated by a draft change."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
