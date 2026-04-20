@@ -23204,6 +23204,57 @@ def list_standalone_surface_runtime_bindings(
     methods=("POST",),
     request_payload_kind="preset_create",
   )
+  preset_item_get_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_item_get",
+    route_path="/presets/{preset_id}",
+    route_name="get_preset",
+    response_title="Get preset",
+    scope="app",
+    binding_kind="preset_catalog_item_get",
+    path_param_keys=("preset_id",),
+  )
+  preset_item_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_item_update",
+    route_path="/presets/{preset_id}",
+    route_name="update_preset",
+    response_title="Update preset",
+    scope="app",
+    binding_kind="preset_catalog_item_update",
+    methods=("PATCH",),
+    path_param_keys=("preset_id",),
+    request_payload_kind="preset_update",
+  )
+  preset_revision_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_revision_list",
+    route_path="/presets/{preset_id}/revisions",
+    route_name="list_preset_revisions",
+    response_title="List preset revisions",
+    scope="app",
+    binding_kind="preset_catalog_revision_list",
+    path_param_keys=("preset_id",),
+  )
+  preset_revision_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_revision_restore",
+    route_path="/presets/{preset_id}/revisions/{revision_id}/restore",
+    route_name="restore_preset_revision",
+    response_title="Restore preset revision",
+    scope="app",
+    binding_kind="preset_catalog_revision_restore",
+    methods=("POST",),
+    path_param_keys=("preset_id", "revision_id"),
+    request_payload_kind="preset_revision_restore",
+  )
+  preset_lifecycle_apply_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="preset_catalog_lifecycle_apply",
+    route_path="/presets/{preset_id}/lifecycle",
+    route_name="apply_preset_lifecycle_action",
+    response_title="Apply preset lifecycle action",
+    scope="app",
+    binding_kind="preset_catalog_lifecycle_apply",
+    methods=("POST",),
+    path_param_keys=("preset_id",),
+    request_payload_kind="preset_lifecycle_action",
+  )
   strategy_register_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="strategy_catalog_register",
     route_path="/strategies/register",
@@ -23308,6 +23359,55 @@ def list_standalone_surface_runtime_bindings(
     methods=("POST",),
     request_payload_kind="guarded_live_action",
   )
+  stop_sandbox_run_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_stop_sandbox",
+    route_path="/runs/sandbox/{run_id}/stop",
+    route_name="stop_sandbox_run",
+    response_title="Stop sandbox run",
+    scope="run",
+    binding_kind="run_stop_sandbox",
+    methods=("POST",),
+  )
+  stop_paper_run_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_stop_paper",
+    route_path="/runs/paper/{run_id}/stop",
+    route_name="stop_paper_run",
+    response_title="Stop paper run",
+    scope="run",
+    binding_kind="run_stop_paper",
+    methods=("POST",),
+  )
+  stop_live_run_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_stop_live",
+    route_path="/runs/live/{run_id}/stop",
+    route_name="stop_live_run",
+    response_title="Stop live run",
+    scope="run",
+    binding_kind="run_stop_live",
+    methods=("POST",),
+  )
+  cancel_live_order_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_live_order_cancel",
+    route_path="/runs/live/{run_id}/orders/{order_id}/cancel",
+    route_name="cancel_live_order",
+    response_title="Cancel live order",
+    scope="run",
+    binding_kind="run_live_order_cancel",
+    methods=("POST",),
+    path_param_keys=("order_id",),
+    request_payload_kind="guarded_live_action",
+  )
+  replace_live_order_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_live_order_replace",
+    route_path="/runs/live/{run_id}/orders/{order_id}/replace",
+    route_name="replace_live_order",
+    response_title="Replace live order",
+    scope="run",
+    binding_kind="run_live_order_replace",
+    methods=("POST",),
+    path_param_keys=("order_id",),
+    request_payload_kind="guarded_live_order_replace",
+  )
   run_subresource_bindings = tuple(
     StandaloneSurfaceRuntimeBinding(
       surface_key=f"run_subresource:{binding.contract.subresource_key}",
@@ -23330,6 +23430,11 @@ def list_standalone_surface_runtime_bindings(
     reference_discovery_binding,
     preset_discovery_binding,
     preset_create_binding,
+    preset_item_get_binding,
+    preset_item_update_binding,
+    preset_revision_list_binding,
+    preset_revision_restore_binding,
+    preset_lifecycle_apply_binding,
     strategy_register_binding,
     operator_incident_external_sync_binding,
     guarded_live_kill_switch_engage_binding,
@@ -23340,6 +23445,11 @@ def list_standalone_surface_runtime_bindings(
     guarded_live_incident_remediate_binding,
     guarded_live_incident_escalate_binding,
     guarded_live_resume_binding,
+    stop_sandbox_run_binding,
+    stop_paper_run_binding,
+    stop_live_run_binding,
+    cancel_live_order_binding,
+    replace_live_order_binding,
     *run_subresource_bindings,
   )
 
@@ -23408,6 +23518,47 @@ def execute_standalone_surface_binding(
       tags=resolved_payload.get("tags") or [],
       parameters=resolved_payload.get("parameters") or {},
       benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_preset(preset)
+  if binding.binding_kind == "preset_catalog_item_get":
+    preset = app.get_preset(
+      preset_id=resolved_path_params["preset_id"],
+    )
+    return serialize_preset(preset)
+  if binding.binding_kind == "preset_catalog_item_update":
+    changes = {
+      key: value
+      for key, value in resolved_payload.items()
+      if key not in {"actor", "reason"}
+    }
+    preset = app.update_preset(
+      preset_id=resolved_path_params["preset_id"],
+      changes=changes,
+      actor=resolved_payload.get("actor", "operator"),
+      reason=resolved_payload.get("reason", "manual_preset_edit"),
+    )
+    return serialize_preset(preset)
+  if binding.binding_kind == "preset_catalog_revision_list":
+    return [
+      serialize_preset_revision(revision)
+      for revision in app.list_preset_revisions(
+        preset_id=resolved_path_params["preset_id"],
+      )
+    ]
+  if binding.binding_kind == "preset_catalog_revision_restore":
+    preset = app.restore_preset_revision(
+      preset_id=resolved_path_params["preset_id"],
+      revision_id=resolved_path_params["revision_id"],
+      actor=resolved_payload.get("actor", "operator"),
+      reason=resolved_payload.get("reason", "manual_preset_revision_restore"),
+    )
+    return serialize_preset(preset)
+  if binding.binding_kind == "preset_catalog_lifecycle_apply":
+    preset = app.apply_preset_lifecycle_action(
+      preset_id=resolved_path_params["preset_id"],
+      action=resolved_payload["action"],
+      actor=resolved_payload.get("actor", "operator"),
+      reason=resolved_payload.get("reason", "manual_preset_lifecycle_action"),
     )
     return serialize_preset(preset)
   if binding.binding_kind == "strategy_catalog_register":
@@ -23488,6 +23639,49 @@ def execute_standalone_surface_binding(
     )
   if binding.binding_kind == "guarded_live_resume":
     run = app.resume_guarded_live_run(
+      actor=resolved_payload["actor"],
+      reason=resolved_payload["reason"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_stop_sandbox":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.stop_sandbox_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_stop_paper":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.stop_paper_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_stop_live":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.stop_live_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_live_order_cancel":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.cancel_live_order(
+      run_id=run_id,
+      order_id=resolved_path_params["order_id"],
+      actor=resolved_payload["actor"],
+      reason=resolved_payload["reason"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_live_order_replace":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.replace_live_order(
+      run_id=run_id,
+      order_id=resolved_path_params["order_id"],
+      price=resolved_payload["price"],
+      quantity=resolved_payload.get("quantity"),
       actor=resolved_payload["actor"],
       reason=resolved_payload["reason"],
     )

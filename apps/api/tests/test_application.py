@@ -13936,6 +13936,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "reference_catalog_discovery",
     "preset_catalog_discovery",
     "preset_catalog_create",
+    "preset_catalog_item_get",
+    "preset_catalog_item_update",
+    "preset_catalog_revision_list",
+    "preset_catalog_revision_restore",
+    "preset_catalog_lifecycle_apply",
     "strategy_catalog_register",
     "operator_incident_external_sync",
     "guarded_live_kill_switch_engage",
@@ -13946,6 +13951,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "guarded_live_incident_remediate",
     "guarded_live_incident_escalate",
     "guarded_live_resume",
+    "run_stop_sandbox",
+    "run_stop_paper",
+    "run_stop_live",
+    "run_live_order_cancel",
+    "run_live_order_replace",
     "run_subresource:orders",
     "run_subresource:positions",
     "run_subresource:metrics",
@@ -13961,9 +13971,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
   assert bindings_by_key["preset_catalog_create"].methods == ("POST",)
+  assert bindings_by_key["preset_catalog_item_get"].path_param_keys == ("preset_id",)
+  assert bindings_by_key["preset_catalog_item_update"].methods == ("PATCH",)
+  assert bindings_by_key["preset_catalog_revision_restore"].path_param_keys == ("preset_id", "revision_id")
   assert bindings_by_key["strategy_catalog_register"].methods == ("POST",)
   assert bindings_by_key["operator_incident_external_sync"].header_keys == ("x_akra_incident_sync_token",)
   assert bindings_by_key["guarded_live_incident_acknowledge"].path_param_keys == ("event_id",)
+  assert bindings_by_key["run_stop_sandbox"].methods == ("POST",)
+  assert bindings_by_key["run_live_order_cancel"].path_param_keys == ("order_id",)
   assert bindings_by_key["run_subresource:orders"].scope == "run"
   assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
 
@@ -13980,6 +13995,61 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
       "parameters": {"short_window": 8, "long_window": 21},
       "benchmark_family": "trend",
     },
+  )
+  fetched_preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_item_get"],
+    app=app,
+    path_params={"preset_id": "swing_1h"},
+  )
+  updated_preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_item_update"],
+    app=app,
+    path_params={"preset_id": "swing_1h"},
+    request_payload={
+      "description": "updated bundle",
+      "parameters": {"short_window": 9, "long_window": 34},
+      "actor": "operator",
+      "reason": "refresh_bundle",
+    },
+  )
+  lifecycle_preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_lifecycle_apply"],
+    app=app,
+    path_params={"preset_id": "swing_1h"},
+    request_payload={
+      "action": "promote",
+      "actor": "operator",
+      "reason": "ready_for_review",
+    },
+  )
+  preset_revisions_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_revision_list"],
+    app=app,
+    path_params={"preset_id": "swing_1h"},
+  )
+  restored_preset_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["preset_catalog_revision_restore"],
+    app=app,
+    path_params={"preset_id": "swing_1h", "revision_id": "swing_1h:r0001"},
+    request_payload={
+      "actor": "operator",
+      "reason": "revert_bundle",
+    },
+  )
+  sandbox_run = app.start_sandbox_run(
+    strategy_id="ma_cross_v1",
+    symbol="ETH/USDT",
+    timeframe="5m",
+    initial_cash=10_000,
+    fee_rate=0.001,
+    slippage_bps=3,
+    parameters={},
+    replay_bars=24,
+  )
+  stopped_sandbox_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_stop_sandbox"],
+    app=app,
+    run_id=sandbox_run.config.run_id,
   )
   health_payload = serialize_standalone_surface_response(
     binding=bindings_by_key["health_status"],
@@ -14033,6 +14103,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
 
   assert created_preset_payload["preset_id"] == "swing_1h"
+  assert fetched_preset_payload["preset_id"] == "swing_1h"
+  assert updated_preset_payload["parameters"] == {"short_window": 9, "long_window": 34}
+  assert lifecycle_preset_payload["lifecycle"]["stage"] == "benchmark_candidate"
+  assert [item["revision_id"] for item in preset_revisions_payload[:2]] == ["swing_1h:r0002", "swing_1h:r0001"]
+  assert restored_preset_payload["parameters"] == {"short_window": 8, "long_window": 21}
+  assert stopped_sandbox_payload["status"] == "stopped"
   assert health_payload == {"status": "ok"}
   assert capabilities_payload["discovery"]["shared_contracts"]
   assert market_data_payload["provider"] == "seeded"
