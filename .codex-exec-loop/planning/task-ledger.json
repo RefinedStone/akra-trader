@@ -5426,18 +5426,36 @@
       "direction_id": "experiment-os",
       "title": "Link reviewed field picks to parameter-level predicate reasons and bundle rule explanations",
       "description": "Build on the completed fine-grained replay-chain labels by attaching the stronger semantic causality that still remains missing: show why a reviewed field pick activated a specific dependency edge or state transition by connecting chain steps to parameter-level predicate reasons, bundle rule explanations, or equivalent rule-evaluation context instead of stopping at edge-role and transition labels.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is stronger semantic causality: reviewed field picks now show edge roles and state transitions, but the UI still does not directly explain why a pick activated that edge, such as parameter-level predicate reasons or bundle rule explanations. That is the clearest executable next task after commit fb1b1f3.",
+      "priority_reason": "Completed in main session commit 01c7077, which extended reviewed field-pick replay chains and active step cards with bundle rule explanations plus parameter-level predicate reasons, exposed binding snapshot parameter metadata and draft binding context, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-label-fine-grained-causes-within-reviewed-field-pick-replay-chains"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T07:55:00Z",
+      "updated_at": "2026-04-20T08:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os replay-apply trust from labeled chain mechanics into operator-usable rule semantics, so reviewed field decisions can be explained in terms of the predicates or bundle rules that actually caused each replay edge to fire."
+    },
+    {
+      "id": "planning-experiment-os-trace-replay-explanation-provenance-back-to-template-clause-and-binding-locations",
+      "direction_id": "experiment-os",
+      "title": "Trace replay explanation provenance back to template clause and binding source locations",
+      "description": "Finish the replay explanation provenance chain by linking each reviewed field-pick predicate reason or bundle-rule explanation back to the exact template subtree clause or predicate-template binding that produced it, so operators can inspect AST-level source location and authored condition context instead of stopping at derived reason text.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is the last explanation-provenance step: bundle rule and parameter-level reason text now render, but the UI still cannot trace those reasons back to the exact template subtree clause or predicate template binding at AST-level source location. That is the clearest executable next task after commit 01c7077.",
+      "depends_on": [
+        "planning-experiment-os-link-reviewed-field-picks-to-parameter-level-predicate-reasons-and-bundle-rules"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completes experiment-os replay-apply explanation trust by turning derived rule and predicate narratives into traceable authored evidence, so operators can verify not only why a replay edge fired but exactly where that reason originated in the template AST."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
