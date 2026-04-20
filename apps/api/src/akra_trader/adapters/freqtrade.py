@@ -1347,8 +1347,13 @@ class FreqtradeReferenceAdapter:
       if key in seen:
         return
       seen.add(key)
+      candidate_id = self._build_artifact_candidate_binding_id(
+        symbol_key=normalized_symbol,
+        candidate_value=normalized_value,
+      )
       bindings.append({
         "binding_kind": "market_data_issue",
+        "candidate_id": candidate_id,
         "candidate_path_template": "provenance.market_data_by_symbol.{symbol_key}.issues",
         "candidate_value": normalized_value,
         "symbol_key": normalized_symbol,
@@ -1455,6 +1460,20 @@ class FreqtradeReferenceAdapter:
     bare_symbol = symbol_key.replace("/", " ")
     normalized_bare_symbol = self._normalize_artifact_source_search_text(bare_symbol)
     return bool(normalized_bare_symbol and normalized_bare_symbol in normalized_candidate)
+
+  def _build_artifact_candidate_binding_id(
+    self,
+    *,
+    symbol_key: str,
+    candidate_value: str | None,
+  ) -> str | None:
+    if candidate_value is None:
+      return None
+    normalized_symbol = self._normalize_artifact_source_search_text(symbol_key)
+    normalized_value = self._normalize_artifact_source_search_text(candidate_value)
+    if not normalized_symbol or not normalized_value:
+      return None
+    return f"market_data_issue:{normalized_symbol}:{normalized_value}"
 
   def _collect_artifact_source_search_texts(
     self,

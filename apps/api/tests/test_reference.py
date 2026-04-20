@@ -246,13 +246,20 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert "42" in root_artifact.source_locations["summary"]["trade_count"]["searchable_texts"]
   assert root_artifact.source_locations["sections"]["pair_metrics"][0]["line_key"] == "count"
   assert root_artifact.source_locations["sections"]["pair_metrics"][0]["line_index"] == 0
-  best_pair_binding = next(
+  best_pair_bindings = [
     binding
     for binding in root_artifact.source_locations["sections"]["pair_metrics"][2]["candidate_bindings"]
     if binding["symbol_key"] == "BTC/USDT"
+  ]
+  assert any(binding["binding_kind"] == "market_data_issue" for binding in best_pair_bindings)
+  assert any(
+    binding["candidate_id"] == "market_data_issue:btc usdt:btc usdt"
+    for binding in best_pair_bindings
   )
-  assert best_pair_binding["binding_kind"] == "market_data_issue"
-  assert best_pair_binding["candidate_path_template"] == "provenance.market_data_by_symbol.{symbol_key}.issues"
+  assert all(
+    binding["candidate_path_template"] == "provenance.market_data_by_symbol.{symbol_key}.issues"
+    for binding in best_pair_bindings
+  )
   assert root_artifact.sections["strategy_comparison"]["count"] == 2
   assert root_artifact.sections["pair_metrics"]["best"]["label"] == "BTC/USDT"
   assert root_artifact.sections["exit_reason_metrics"]["preview"][0]["label"] == "roi"
@@ -281,13 +288,20 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert "42" in snapshot_artifact.source_locations["summary"]["trade_count"]["searchable_texts"]
   assert snapshot_artifact.source_locations["sections"]["pair_metrics"][0]["line_key"] == "count"
   assert snapshot_artifact.source_locations["sections"]["pair_metrics"][0]["line_index"] == 0
-  snapshot_best_pair_binding = next(
+  snapshot_best_pair_bindings = [
     binding
     for binding in snapshot_artifact.source_locations["sections"]["pair_metrics"][2]["candidate_bindings"]
     if binding["symbol_key"] == "BTC/USDT"
+  ]
+  assert any(binding["binding_kind"] == "market_data_issue" for binding in snapshot_best_pair_bindings)
+  assert any(
+    binding["candidate_id"] == "market_data_issue:btc usdt:btc usdt"
+    for binding in snapshot_best_pair_bindings
   )
-  assert snapshot_best_pair_binding["binding_kind"] == "market_data_issue"
-  assert snapshot_best_pair_binding["candidate_path_template"] == "provenance.market_data_by_symbol.{symbol_key}.issues"
+  assert all(
+    binding["candidate_path_template"] == "provenance.market_data_by_symbol.{symbol_key}.issues"
+    for binding in snapshot_best_pair_bindings
+  )
   assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 42
   assert snapshot_artifact.sections["enter_tag_metrics"]["preview"][0]["label"] == "dip_buy"
   assert snapshot_artifact.sections["periodic_breakdown"]["day"]["worst"]["profit_total_abs"] == -25.0

@@ -188,6 +188,7 @@ type BenchmarkArtifact = {
       {
         candidate_bindings?: Array<{
           binding_kind?: string | null;
+          candidate_id?: string | null;
           candidate_path_template?: string | null;
           candidate_value?: string | null;
           symbol_key?: string | null;
@@ -202,6 +203,7 @@ type BenchmarkArtifact = {
       Array<{
         candidate_bindings?: Array<{
           binding_kind?: string | null;
+          candidate_id?: string | null;
           candidate_path_template?: string | null;
           candidate_value?: string | null;
           symbol_key?: string | null;
@@ -16146,6 +16148,11 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
         resolvedPath,
         run,
       });
+      const candidateReplayId = buildRunSurfaceCollectionQueryRuntimeCandidateReplayId({
+        candidateValueRaw,
+        resolvedParameterValues,
+        resolvedPath,
+      });
       const orderRecord =
         collectionItem.value && typeof collectionItem.value === "object" && !Array.isArray(collectionItem.value)
           ? (collectionItem.value as Record<string, unknown>)
@@ -16175,6 +16182,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
             : null;
       allValues.push({
         candidatePath,
+        candidateReplayId,
         candidateValue,
         detail: candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
           ? `${candidatePath} has no ${accessorLabel} value in the current run payload.`
@@ -16314,6 +16322,34 @@ function normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbol
     : trimmed;
 }
 
+function buildRunSurfaceCollectionQueryRuntimeCandidateReplayId(params: {
+  candidateValueRaw: unknown;
+  resolvedParameterValues: Record<string, string>;
+  resolvedPath: string[];
+}) {
+  const { candidateValueRaw, resolvedParameterValues, resolvedPath } = params;
+  if (
+    resolvedPath[0] !== "provenance"
+    || resolvedPath[1] !== "market_data_by_symbol"
+    || resolvedPath[3] !== "issues"
+    || typeof candidateValueRaw !== "string"
+  ) {
+    return null;
+  }
+  const normalizedSymbol = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(
+      resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "",
+    ),
+  );
+  const normalizedValue = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+    candidateValueRaw,
+  );
+  if (!normalizedSymbol || !normalizedValue) {
+    return null;
+  }
+  return `market_data_issue:${normalizedSymbol}:${normalizedValue}`;
+}
+
 function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindings(value: unknown) {
   if (!Array.isArray(value)) {
     return [];
@@ -16327,6 +16363,8 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindin
       return {
         bindingKind:
           typeof record.binding_kind === "string" ? record.binding_kind : null,
+        candidateId:
+          typeof record.candidate_id === "string" ? record.candidate_id : null,
         candidatePathTemplate:
           typeof record.candidate_path_template === "string" ? record.candidate_path_template : null,
         candidateValue:
@@ -16337,6 +16375,7 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindin
     })
     .filter((entry): entry is {
       bindingKind: string | null;
+      candidateId: string | null;
       candidatePathTemplate: string | null;
       candidateValue: string | null;
       symbolKey: string | null;
@@ -16383,6 +16422,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntri
     .filter((entry): entry is {
       candidateBindings: Array<{
         bindingKind: string | null;
+        candidateId: string | null;
         candidatePathTemplate: string | null;
         candidateValue: string | null;
         symbolKey: string | null;
@@ -16458,6 +16498,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
           .filter((entry): entry is {
             candidateBindings: Array<{
               bindingKind: string | null;
+              candidateId: string | null;
               candidatePathTemplate: string | null;
               candidateValue: string | null;
               symbolKey: string | null;
@@ -16493,6 +16534,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
           return {
             candidateBindings: [] as Array<{
               bindingKind: string | null;
+              candidateId: string | null;
               candidatePathTemplate: string | null;
               candidateValue: string | null;
               symbolKey: string | null;
@@ -16507,6 +16549,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
         .filter((entry): entry is {
           candidateBindings: Array<{
             bindingKind: string | null;
+            candidateId: string | null;
             candidatePathTemplate: string | null;
             candidateValue: string | null;
             symbolKey: string | null;
@@ -16533,6 +16576,7 @@ function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
   entry: {
     candidateBindings?: Array<{
       bindingKind: string | null;
+      candidateId: string | null;
       candidatePathTemplate: string | null;
       candidateValue: string | null;
       symbolKey: string | null;
@@ -16595,17 +16639,22 @@ function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
 function doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch(params: {
   binding: {
     bindingKind: string | null;
+    candidateId: string | null;
     candidatePathTemplate: string | null;
     candidateValue: string | null;
     symbolKey: string | null;
   };
+  candidateReplayId: string | null;
   candidateValue: string;
   resolvedPath: string[];
   symbolKey: string;
 }) {
-  const { binding, candidateValue, resolvedPath, symbolKey } = params;
+  const { binding, candidateReplayId, candidateValue, resolvedPath, symbolKey } = params;
   if (binding.bindingKind !== "market_data_issue") {
     return false;
+  }
+  if (binding.candidateId && candidateReplayId) {
+    return binding.candidateId === candidateReplayId;
   }
   if (binding.candidatePathTemplate !== "provenance.market_data_by_symbol.{symbol_key}.issues") {
     return false;
@@ -16652,6 +16701,11 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params:
   if (!candidateValue) {
     return [];
   }
+  const candidateReplayId = buildRunSurfaceCollectionQueryRuntimeCandidateReplayId({
+    candidateValueRaw,
+    resolvedParameterValues,
+    resolvedPath,
+  });
   const symbolKey = resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "";
   const symbolVariants =
     buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSymbolVariants(symbolKey);
@@ -16664,6 +16718,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params:
       const hasExactBinding = (entry.candidateBindings ?? []).some((binding) =>
         doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch({
           binding,
+          candidateReplayId,
           candidateValue,
           resolvedPath,
           symbolKey,
@@ -16681,6 +16736,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params:
       (entry.candidateBindings ?? []).some((binding) =>
         doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch({
           binding,
+          candidateReplayId,
           candidateValue,
           resolvedPath,
           symbolKey,
@@ -19444,6 +19500,7 @@ type RunSurfaceCollectionQueryBuilderApplyPayload = {
 
 type RunSurfaceCollectionQueryRuntimeCandidateSample = {
   candidatePath: string;
+  candidateReplayId: string | null;
   candidateValue: string;
   detail: string;
   result: boolean;
