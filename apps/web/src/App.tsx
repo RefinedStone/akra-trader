@@ -21533,6 +21533,132 @@ function RunSurfaceCollectionQueryBuilder({
             ],
           ));
       };
+      const collectTemplateEvaluationProvenance = (
+        child: RunSurfaceCollectionQueryBuilderChildState,
+        targetBindingKeys: string[],
+        pathSegments: string[],
+        templateKey: string,
+        visitedTemplateKeys: string[],
+      ): {
+        matchedPredicateBranches: Array<{ location: string; detail: string }>;
+        parameterComparisons: Array<{ location: string; detail: string }>;
+      } => {
+        const buildChildPathSegment = (
+          nestedChild: RunSurfaceCollectionQueryBuilderChildState,
+          index: number,
+        ) => (
+          nestedChild.kind === "clause"
+            ? `clause_${index + 1}`
+            : nestedChild.kind === "predicate_ref"
+              ? `predicate_ref_${index + 1}`
+              : `group_${index + 1}`
+        );
+        if (child.kind === "clause") {
+          const field = contracts
+            .flatMap((contract) => getRunSurfaceCollectionQuerySchemas(contract))
+            .flatMap((schema) => schema.elementSchema)
+            .find((candidate) => candidate.key === child.clause.fieldKey) ?? null;
+          const operator = field?.operators.find((candidate) => candidate.key === child.clause.operatorKey) ?? null;
+          const matchedPathBindings = Object.entries(child.clause.parameterBindingKeys)
+            .filter(([, bindingKey]) => targetBindingKeys.includes(bindingKey));
+          const parameterComparisons = [
+            ...matchedPathBindings.map(([parameterKey, bindingKey]) => ({
+              location: `${templateKey}.node.${pathSegments.join(".")}`,
+              detail:
+                `${field?.title ?? child.clause.fieldKey} reads collection path segment ${parameterKey} from $${bindingKey}. `
+                + `Clause comparison: ${formatRunSurfaceCollectionQueryBuilderClauseSummary(child.clause, contracts)}.`,
+            })),
+            ...(
+              targetBindingKeys.includes(child.clause.valueBindingKey)
+                ? [{
+                    location: `${templateKey}.node.${pathSegments.join(".")}`,
+                    detail:
+                      `${field?.title ?? child.clause.fieldKey} ${operator?.label ?? child.clause.operatorKey} compares against $${child.clause.valueBindingKey}. `
+                      + `Clause comparison: ${formatRunSurfaceCollectionQueryBuilderClauseSummary(child.clause, contracts)}.`,
+                  }]
+                : []
+            ),
+          ];
+          return {
+            matchedPredicateBranches: [],
+            parameterComparisons,
+          };
+        }
+        if (child.kind === "predicate_ref") {
+          const matchedParameterBindings = Object.entries(child.bindings)
+            .flatMap(([bindingKey, value]) => {
+              const referenceKey = fromRunSurfaceCollectionQueryBindingReferenceValue(value);
+              return targetBindingKeys.includes(referenceKey)
+                ? [[bindingKey, referenceKey] as const]
+                : [];
+            });
+          if (!matchedParameterBindings.length) {
+            return {
+              matchedPredicateBranches: [],
+              parameterComparisons: [],
+            };
+          }
+          const matchedPredicateBranches = [{
+            location: `${templateKey}.node.${pathSegments.join(".")}`,
+            detail:
+              `${child.predicateKey} activates because ${matchedParameterBindings
+                .map(([bindingKey, referenceKey]) => `${bindingKey} -> $${referenceKey}`)
+                .join(" · ")}.`,
+          }];
+          if (visitedTemplateKeys.includes(child.predicateKey)) {
+            return {
+              matchedPredicateBranches,
+              parameterComparisons: [],
+            };
+          }
+          const referencedTemplate = predicateTemplates.find((template) => template.key === child.predicateKey) ?? null;
+          if (!referencedTemplate) {
+            return {
+              matchedPredicateBranches,
+              parameterComparisons: [],
+            };
+          }
+          const nestedEvaluation = collectTemplateEvaluationProvenance(
+            referencedTemplate.node,
+            matchedParameterBindings.map(([bindingKey]) => bindingKey),
+            ["root"],
+            `${selectedRefTemplate.key}.predicate_templates.${child.predicateKey}.template`,
+            [...visitedTemplateKeys, child.predicateKey],
+          );
+          return {
+            matchedPredicateBranches: [
+              ...matchedPredicateBranches,
+              ...nestedEvaluation.matchedPredicateBranches,
+            ],
+            parameterComparisons: nestedEvaluation.parameterComparisons,
+          };
+        }
+        return child.children.reduce<{
+          matchedPredicateBranches: Array<{ location: string; detail: string }>;
+          parameterComparisons: Array<{ location: string; detail: string }>;
+        }>((accumulator, nestedChild, index) => {
+          const nestedEvaluation = collectTemplateEvaluationProvenance(
+            nestedChild,
+            targetBindingKeys,
+            [...pathSegments, buildChildPathSegment(nestedChild, index)],
+            templateKey,
+            visitedTemplateKeys,
+          );
+          return {
+            matchedPredicateBranches: [
+              ...accumulator.matchedPredicateBranches,
+              ...nestedEvaluation.matchedPredicateBranches,
+            ],
+            parameterComparisons: [
+              ...accumulator.parameterComparisons,
+              ...nestedEvaluation.parameterComparisons,
+            ],
+          };
+        }, {
+          matchedPredicateBranches: [],
+          parameterComparisons: [],
+        });
+      };
       const group =
         selectedRefTemplateParameterGroupByKey[activePredicateRefReplayApplyConflictSimulationFocusedGroupKey] ?? null;
       if (!group) {
@@ -21549,6 +21675,15 @@ function RunSurfaceCollectionQueryBuilder({
       const clauseSourceLocations = reviewedParameter
         ? collectTemplateClauseSourceLocations(selectedRefTemplate.node, reviewedParameter.key, ["root"])
         : [];
+      const evaluationProvenance = reviewedParameter
+        ? collectTemplateEvaluationProvenance(
+            selectedRefTemplate.node,
+            [reviewedParameter.key],
+            ["root"],
+            selectedRefTemplate.key,
+            [selectedRefTemplate.key],
+          )
+        : { matchedPredicateBranches: [], parameterComparisons: [] };
       const effectiveCoordinationPolicy =
         bundleCoordinationSimulationPolicyOverrides[group.key] ?? group.coordinationPolicy;
       return activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry) => {
@@ -21688,7 +21823,9 @@ function RunSurfaceCollectionQueryBuilder({
           bundleRuleTitle,
           clauseSourceLocations,
           bindingSourceLocations,
+          matchedPredicateBranches: evaluationProvenance.matchedPredicateBranches,
           parameterReasons,
+          parameterComparisons: evaluationProvenance.parameterComparisons,
         };
       });
     },
@@ -21702,6 +21839,7 @@ function RunSurfaceCollectionQueryBuilder({
       activePredicateRefReplayApplyConflictSimulationReview,
       bundleCoordinationSimulationPolicyOverrides,
       getSortedTemplateGroupPresetBundles,
+      predicateTemplates,
       selectedRefTemplate,
       selectedRefTemplateParameterGroupByKey,
       simulatedPredicateRefSolverReplay,
@@ -24474,6 +24612,52 @@ function RunSurfaceCollectionQueryBuilder({
                                           ) : null}
                                         </div>
                                       ) : null}
+                                      {entry.matchedPredicateBranches.length || entry.parameterComparisons.length ? (
+                                        <div className="run-surface-query-builder-trace-panel is-nested">
+                                          <div className="run-surface-query-builder-card-head">
+                                            <strong>Evaluation-level provenance</strong>
+                                            <span>{`${entry.matchedPredicateBranches.length + entry.parameterComparisons.length} matches`}</span>
+                                          </div>
+                                          {entry.matchedPredicateBranches.length ? (
+                                            <div className="run-surface-query-builder-trace-panel is-nested">
+                                              <div className="run-surface-query-builder-card-head">
+                                                <strong>Matched predicate branches</strong>
+                                                <span>{entry.matchedPredicateBranches.length}</span>
+                                              </div>
+                                              <div className="run-surface-query-builder-trace-list">
+                                                {entry.matchedPredicateBranches.map((match) => (
+                                                  <div
+                                                    className="run-surface-query-builder-trace-step is-success"
+                                                    key={`focused-causal-branch:${entry.stepIndex}:${match.location}:${match.detail}`}
+                                                  >
+                                                    <strong>{match.location}</strong>
+                                                    <p>{match.detail}</p>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : null}
+                                          {entry.parameterComparisons.length ? (
+                                            <div className="run-surface-query-builder-trace-panel is-nested">
+                                              <div className="run-surface-query-builder-card-head">
+                                                <strong>Parameter comparisons</strong>
+                                                <span>{entry.parameterComparisons.length}</span>
+                                              </div>
+                                              <div className="run-surface-query-builder-trace-list">
+                                                {entry.parameterComparisons.map((comparison) => (
+                                                  <div
+                                                    className="run-surface-query-builder-trace-step is-info"
+                                                    key={`focused-causal-comparison:${entry.stepIndex}:${comparison.location}:${comparison.detail}`}
+                                                  >
+                                                    <strong>{comparison.location}</strong>
+                                                    <p>{comparison.detail}</p>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      ) : null}
                                       <div className="run-surface-query-builder-actions">
                                         <button
                                           className="ghost-button"
@@ -25873,6 +26057,45 @@ function RunSurfaceCollectionQueryBuilder({
                                                             >
                                                               <strong>{sourceLocation.location}</strong>
                                                               <p>{sourceLocation.detail}</p>
+                                                            </div>
+                                                          ))}
+                                                      </div>
+                                                    ) : null}
+                                                  </div>
+                                                ) : null}
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.matchedPredicateBranches.length
+                                                || activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterComparisons.length ? (
+                                                  <div className="run-surface-query-builder-trace-panel is-nested">
+                                                    <div className="run-surface-query-builder-card-head">
+                                                      <strong>Evaluation-level provenance</strong>
+                                                      <span>Active replay step</span>
+                                                    </div>
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.matchedPredicateBranches.length ? (
+                                                      <div className="run-surface-query-builder-trace-list">
+                                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.matchedPredicateBranches
+                                                          .slice(0, 2)
+                                                          .map((match) => (
+                                                            <div
+                                                              className="run-surface-query-builder-trace-step is-success"
+                                                              key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-branch:${match.location}:${match.detail}`}
+                                                            >
+                                                              <strong>{match.location}</strong>
+                                                              <p>{match.detail}</p>
+                                                            </div>
+                                                          ))}
+                                                      </div>
+                                                    ) : null}
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterComparisons.length ? (
+                                                      <div className="run-surface-query-builder-trace-list">
+                                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterComparisons
+                                                          .slice(0, 3)
+                                                          .map((comparison) => (
+                                                            <div
+                                                              className="run-surface-query-builder-trace-step is-info"
+                                                              key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-comparison:${comparison.location}:${comparison.detail}`}
+                                                            >
+                                                              <strong>{comparison.location}</strong>
+                                                              <p>{comparison.detail}</p>
                                                             </div>
                                                           ))}
                                                       </div>
