@@ -414,6 +414,17 @@ select {
   word-break: break-word;
 }
 
+.run-surface-query-builder-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.run-surface-query-builder-active-state {
+  display: grid;
+  gap: 8px;
+}
+
 .strategy-column {
   padding: 18px;
   border-radius: 20px;
@@ -571,13 +582,109 @@ select {
   font-size: 0.84rem;
 }
 
-.filter-bar select {
+.filter-bar select,
+.filter-bar input {
   min-width: 180px;
   padding: 10px 12px;
   border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(3, 7, 13, 0.82);
   color: var(--text);
+}
+
+.run-filter-workbench {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(8, 14, 24, 0.76);
+}
+
+.run-filter-workbench-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.run-filter-workbench-actions,
+.run-filter-save-row,
+.run-filter-summary-chip-row,
+.run-filter-saved-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.run-filter-save-row {
+  flex: 1 1 320px;
+  justify-content: flex-end;
+}
+
+.run-filter-save-input {
+  min-width: min(100%, 260px);
+  flex: 1 1 220px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(3, 7, 13, 0.82);
+  color: var(--text);
+}
+
+.run-filter-summary-chip-row {
+  gap: 8px;
+}
+
+.run-filter-summary-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(88, 217, 255, 0.1);
+  color: rgba(214, 245, 255, 0.92);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.run-filter-saved-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.run-filter-saved-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.run-filter-saved-card.is-active {
+  border-color: rgba(88, 217, 255, 0.28);
+  box-shadow: 0 0 0 1px rgba(88, 217, 255, 0.14);
+}
+
+.run-filter-saved-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.run-filter-saved-card-head strong {
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 0.82rem;
+}
+
+.run-filter-saved-card-head span {
+  color: rgba(255, 255, 255, 0.54);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
 }
 
 .comparison-toolbar {

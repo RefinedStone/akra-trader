@@ -3044,6 +3044,7 @@ const MAX_COMPARISON_HISTORY_PANEL_ENTRIES = 12;
 const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 const CONTROL_ROOM_UI_STATE_VERSION = 4;
+const RUN_HISTORY_SAVED_FILTER_STORAGE_KEY_PREFIX = "akra-trader-run-history-saved-filters";
 const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
 const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
 const COMPARISON_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-comparison-history-tab-id";
@@ -3451,6 +3452,23 @@ type RunHistoryFilter = {
   benchmark_family: string;
   tag: string;
   dataset_identity: string;
+  filter_expr: string;
+  collection_query_label: string;
+};
+
+type RunHistorySurfaceKey = "backtest" | "sandbox" | "paper" | "live";
+
+type SavedRunHistoryFilterPreset = {
+  filter_id: string;
+  label: string;
+  filter: RunHistoryFilter;
+  created_at: string;
+  updated_at: string;
+};
+
+type SavedRunHistoryFilterPresetStateV1 = {
+  version: 1;
+  filters: SavedRunHistoryFilterPreset[];
 };
 
 type ComparisonIntent = "benchmark_validation" | "execution_regression" | "strategy_tuning";
@@ -4938,7 +4956,190 @@ const defaultRunHistoryFilter: RunHistoryFilter = {
   benchmark_family: "",
   tag: "",
   dataset_identity: "",
+  filter_expr: "",
+  collection_query_label: "",
 };
+
+function sanitizeRunHistoryFilter(filter: RunHistoryFilter): RunHistoryFilter {
+  return {
+    strategy_id: filter.strategy_id || ALL_FILTER_VALUE,
+    strategy_version: filter.strategy_version || ALL_FILTER_VALUE,
+    preset_id: filter.preset_id.trim(),
+    benchmark_family: filter.benchmark_family.trim(),
+    tag: filter.tag.trim(),
+    dataset_identity: filter.dataset_identity.trim(),
+    filter_expr: filter.filter_expr.trim(),
+    collection_query_label: filter.collection_query_label.trim(),
+  };
+}
+
+function cloneRunHistoryFilter(filter: RunHistoryFilter): RunHistoryFilter {
+  return sanitizeRunHistoryFilter({ ...filter });
+}
+
+function hasRunHistoryFilterCriteria(filter: RunHistoryFilter) {
+  const candidate = sanitizeRunHistoryFilter(filter);
+  return Boolean(
+    candidate.strategy_id !== ALL_FILTER_VALUE
+    || candidate.strategy_version !== ALL_FILTER_VALUE
+    || candidate.preset_id
+    || candidate.benchmark_family
+    || candidate.tag
+    || candidate.dataset_identity
+    || candidate.filter_expr,
+  );
+}
+
+function areRunHistoryFiltersEquivalent(left: RunHistoryFilter, right: RunHistoryFilter) {
+  const normalizedLeft = sanitizeRunHistoryFilter(left);
+  const normalizedRight = sanitizeRunHistoryFilter(right);
+  return (
+    normalizedLeft.strategy_id === normalizedRight.strategy_id
+    && normalizedLeft.strategy_version === normalizedRight.strategy_version
+    && normalizedLeft.preset_id === normalizedRight.preset_id
+    && normalizedLeft.benchmark_family === normalizedRight.benchmark_family
+    && normalizedLeft.tag === normalizedRight.tag
+    && normalizedLeft.dataset_identity === normalizedRight.dataset_identity
+    && normalizedLeft.filter_expr === normalizedRight.filter_expr
+  );
+}
+
+function buildRunHistorySavedFilterStorageKey(surfaceKey: RunHistorySurfaceKey) {
+  return `${RUN_HISTORY_SAVED_FILTER_STORAGE_KEY_PREFIX}:${surfaceKey}`;
+}
+
+function normalizeSavedRunHistoryFilterPreset(value: unknown): SavedRunHistoryFilterPreset | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<SavedRunHistoryFilterPreset>;
+  if (
+    typeof candidate.filter_id !== "string"
+    || typeof candidate.label !== "string"
+    || typeof candidate.created_at !== "string"
+    || typeof candidate.updated_at !== "string"
+    || !candidate.filter
+    || typeof candidate.filter !== "object"
+  ) {
+    return null;
+  }
+  const filterCandidate = candidate.filter as Partial<RunHistoryFilter>;
+  return {
+    filter_id: candidate.filter_id,
+    label: candidate.label,
+    created_at: candidate.created_at,
+    updated_at: candidate.updated_at,
+    filter: sanitizeRunHistoryFilter({
+      ...defaultRunHistoryFilter,
+      strategy_id:
+        typeof filterCandidate.strategy_id === "string"
+          ? filterCandidate.strategy_id
+          : defaultRunHistoryFilter.strategy_id,
+      strategy_version:
+        typeof filterCandidate.strategy_version === "string"
+          ? filterCandidate.strategy_version
+          : defaultRunHistoryFilter.strategy_version,
+      preset_id:
+        typeof filterCandidate.preset_id === "string"
+          ? filterCandidate.preset_id
+          : defaultRunHistoryFilter.preset_id,
+      benchmark_family:
+        typeof filterCandidate.benchmark_family === "string"
+          ? filterCandidate.benchmark_family
+          : defaultRunHistoryFilter.benchmark_family,
+      tag: typeof filterCandidate.tag === "string" ? filterCandidate.tag : defaultRunHistoryFilter.tag,
+      dataset_identity:
+        typeof filterCandidate.dataset_identity === "string"
+          ? filterCandidate.dataset_identity
+          : defaultRunHistoryFilter.dataset_identity,
+      filter_expr:
+        typeof filterCandidate.filter_expr === "string"
+          ? filterCandidate.filter_expr
+          : defaultRunHistoryFilter.filter_expr,
+      collection_query_label:
+        typeof filterCandidate.collection_query_label === "string"
+          ? filterCandidate.collection_query_label
+          : defaultRunHistoryFilter.collection_query_label,
+    }),
+  };
+}
+
+function loadSavedRunHistoryFilterPresets(surfaceKey: RunHistorySurfaceKey): SavedRunHistoryFilterPreset[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.localStorage.getItem(buildRunHistorySavedFilterStorageKey(surfaceKey));
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as Partial<SavedRunHistoryFilterPresetStateV1> | null;
+    if (parsed?.version !== 1 || !Array.isArray(parsed.filters)) {
+      return [];
+    }
+    return parsed.filters
+      .map((entry) => normalizeSavedRunHistoryFilterPreset(entry))
+      .filter((entry): entry is SavedRunHistoryFilterPreset => entry !== null);
+  } catch {
+    return [];
+  }
+}
+
+function persistSavedRunHistoryFilterPresets(
+  surfaceKey: RunHistorySurfaceKey,
+  presets: SavedRunHistoryFilterPreset[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      buildRunHistorySavedFilterStorageKey(surfaceKey),
+      JSON.stringify({
+        version: 1,
+        filters: presets.map((entry) => ({
+          ...entry,
+          filter: sanitizeRunHistoryFilter(entry.filter),
+        })),
+      } satisfies SavedRunHistoryFilterPresetStateV1),
+    );
+  } catch {
+    // Ignore localStorage failures for saved run-history filters.
+  }
+}
+
+function describeRunHistoryFilter(filter: RunHistoryFilter, presets: ExperimentPreset[], strategies: Strategy[]) {
+  const candidate = sanitizeRunHistoryFilter(filter);
+  const parts: string[] = [];
+  if (candidate.strategy_id !== ALL_FILTER_VALUE) {
+    const strategy = strategies.find((item) => item.strategy_id === candidate.strategy_id);
+    parts.push(`Strategy ${strategy?.name ?? candidate.strategy_id}`);
+  }
+  if (candidate.strategy_version !== ALL_FILTER_VALUE) {
+    parts.push(`Version ${candidate.strategy_version}`);
+  }
+  if (candidate.preset_id) {
+    const preset = presets.find((item) => item.preset_id === candidate.preset_id);
+    parts.push(`Preset ${preset?.name ?? candidate.preset_id}`);
+  }
+  if (candidate.benchmark_family) {
+    parts.push(`Benchmark ${candidate.benchmark_family}`);
+  }
+  if (candidate.tag) {
+    parts.push(`Tag ${candidate.tag}`);
+  }
+  if (candidate.dataset_identity) {
+    parts.push(`Dataset ${candidate.dataset_identity}`);
+  }
+  if (candidate.filter_expr) {
+    parts.push(
+      candidate.collection_query_label
+        ? `Collection ${candidate.collection_query_label}`
+        : "Collection expression",
+    );
+  }
+  return parts;
+}
 
 const DEFAULT_COMPARISON_INTENT: ComparisonIntent = "benchmark_validation";
 const comparisonIntentOptions: ComparisonIntent[] = [
@@ -8562,6 +8763,7 @@ export default function App() {
         </section>
 
         <RunSection
+          surfaceKey="backtest"
           title="Recent backtests"
           runs={backtests}
           presets={presets}
@@ -8748,6 +8950,7 @@ export default function App() {
           ]}
         />
         <RunSection
+          surfaceKey="sandbox"
           title="Sandbox runs"
           runs={sandboxRuns}
           presets={presets}
@@ -8770,6 +8973,7 @@ export default function App() {
           onStop={stopSandboxRun}
         />
         <RunSection
+          surfaceKey="paper"
           title="Paper runs"
           runs={paperRuns}
           presets={presets}
@@ -8792,6 +8996,7 @@ export default function App() {
           onStop={stopPaperRun}
         />
         <RunSection
+          surfaceKey="live"
           title="Guarded live runs"
           runs={liveRuns}
           presets={presets}
@@ -13180,23 +13385,27 @@ function isControlRoomUiStateV4(value: unknown): value is ControlRoomUiStateV4 {
 
 function buildRunsPath(mode: string, filter: RunHistoryFilter) {
   const params = new URLSearchParams({ mode });
-  if (filter.strategy_id !== ALL_FILTER_VALUE) {
-    params.set("strategy_id", filter.strategy_id);
+  const sanitizedFilter = sanitizeRunHistoryFilter(filter);
+  if (sanitizedFilter.strategy_id !== ALL_FILTER_VALUE) {
+    params.set("strategy_id", sanitizedFilter.strategy_id);
   }
-  if (filter.strategy_version !== ALL_FILTER_VALUE) {
-    params.set("strategy_version", filter.strategy_version);
+  if (sanitizedFilter.strategy_version !== ALL_FILTER_VALUE) {
+    params.set("strategy_version", sanitizedFilter.strategy_version);
   }
-  if (filter.preset_id.trim()) {
-    params.set("preset_id", filter.preset_id.trim());
+  if (sanitizedFilter.preset_id) {
+    params.set("preset_id", sanitizedFilter.preset_id);
   }
-  if (filter.benchmark_family.trim()) {
-    params.set("benchmark_family", filter.benchmark_family.trim());
+  if (sanitizedFilter.benchmark_family) {
+    params.set("benchmark_family", sanitizedFilter.benchmark_family);
   }
-  if (filter.tag.trim()) {
-    parseExperimentTags(filter.tag).forEach((tag) => params.append("tag", tag));
+  if (sanitizedFilter.tag) {
+    parseExperimentTags(sanitizedFilter.tag).forEach((tag) => params.append("tag", tag));
   }
-  if (filter.dataset_identity.trim()) {
-    params.set("dataset_identity", filter.dataset_identity.trim());
+  if (sanitizedFilter.dataset_identity) {
+    params.set("dataset_identity", sanitizedFilter.dataset_identity);
+  }
+  if (sanitizedFilter.filter_expr) {
+    params.set("filter_expr", sanitizedFilter.filter_expr);
   }
   return `/runs?${params.toString()}`;
 }
@@ -13209,49 +13418,53 @@ function buildRunComparisonPath(runIds: string[], intent: ComparisonIntent) {
 }
 
 function normalizeRunHistoryFilter(current: RunHistoryFilter, strategies: Strategy[]) {
+  const sanitizedCurrent = sanitizeRunHistoryFilter(current);
   const availableStrategyIds = new Set(strategies.map((strategy) => strategy.strategy_id));
   if (
-    current.strategy_id !== ALL_FILTER_VALUE &&
-    !availableStrategyIds.has(current.strategy_id)
+    sanitizedCurrent.strategy_id !== ALL_FILTER_VALUE &&
+    !availableStrategyIds.has(sanitizedCurrent.strategy_id)
   ) {
     return {
       ...defaultRunHistoryFilter,
-      preset_id: current.preset_id,
-      benchmark_family: current.benchmark_family,
-      tag: current.tag,
-      dataset_identity: current.dataset_identity,
+      preset_id: sanitizedCurrent.preset_id,
+      benchmark_family: sanitizedCurrent.benchmark_family,
+      tag: sanitizedCurrent.tag,
+      dataset_identity: sanitizedCurrent.dataset_identity,
+      filter_expr: sanitizedCurrent.filter_expr,
+      collection_query_label: sanitizedCurrent.collection_query_label,
     };
   }
-  const availableVersions = getStrategyVersionOptions(strategies, current.strategy_id);
+  const availableVersions = getStrategyVersionOptions(strategies, sanitizedCurrent.strategy_id);
   if (
-    current.strategy_version !== ALL_FILTER_VALUE &&
-    !availableVersions.includes(current.strategy_version)
+    sanitizedCurrent.strategy_version !== ALL_FILTER_VALUE &&
+    !availableVersions.includes(sanitizedCurrent.strategy_version)
   ) {
-    return { ...current, strategy_version: ALL_FILTER_VALUE };
+    return { ...sanitizedCurrent, strategy_version: ALL_FILTER_VALUE };
   }
-  return current;
+  return sanitizedCurrent;
 }
 
 function normalizeRunHistoryPresetFilter(
   current: RunHistoryFilter,
   presets: ExperimentPreset[],
 ) {
-  if (!current.preset_id) {
-    return current;
+  const sanitizedCurrent = sanitizeRunHistoryFilter(current);
+  if (!sanitizedCurrent.preset_id) {
+    return sanitizedCurrent;
   }
-  const matchingPreset = presets.find((preset) => preset.preset_id === current.preset_id);
+  const matchingPreset = presets.find((preset) => preset.preset_id === sanitizedCurrent.preset_id);
   if (
     matchingPreset &&
     (
-      current.strategy_id === ALL_FILTER_VALUE ||
+      sanitizedCurrent.strategy_id === ALL_FILTER_VALUE ||
       !matchingPreset.strategy_id ||
-      matchingPreset.strategy_id === current.strategy_id
+      matchingPreset.strategy_id === sanitizedCurrent.strategy_id
     )
   ) {
-    return current;
+    return sanitizedCurrent;
   }
   return {
-    ...current,
+    ...sanitizedCurrent,
     preset_id: "",
   };
 }
@@ -15476,12 +15689,31 @@ function RunListComparisonBoundaryNote({
   );
 }
 
+type RunSurfaceCollectionQueryBuilderApplyPayload = {
+  expression: string;
+  expressionLabel: string;
+  resolvedPath: string[];
+  quantifier: "any" | "all" | "none";
+  fieldKey: string;
+  operatorKey: string;
+};
+
 function RunSurfaceCollectionQueryBuilder({
   contracts,
   compact = false,
+  activeExpression,
+  activeExpressionLabel,
+  applyLabel = "Apply expression",
+  onApplyExpression,
+  onClearExpression,
 }: {
   contracts: RunSurfaceCollectionQueryContract[];
   compact?: boolean;
+  activeExpression?: string | null;
+  activeExpressionLabel?: string | null;
+  applyLabel?: string;
+  onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
+  onClearExpression?: (() => void) | null;
 }) {
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
   const activeContract = useMemo(
@@ -15588,6 +15820,18 @@ function RunSurfaceCollectionQueryBuilder({
     [activeSchema, parameterValues],
   );
 
+  const coercedBuilderValue = useMemo(
+    () => (activeField ? coerceCollectionQueryBuilderValue(builderValue, activeField.valueType) : builderValue),
+    [activeField, builderValue],
+  );
+
+  const expressionLabel = useMemo(() => {
+    if (!activeSchema || !activeField || !activeOperator) {
+      return "";
+    }
+    return `${activeSchema.label} · ${quantifier} ${activeField.title ?? activeField.key} ${activeOperator.label || activeOperator.key}`;
+  }, [activeField, activeOperator, activeSchema, quantifier]);
+
   const filterExpressionPreview = useMemo(() => {
     if (!activeSchema || !activeField || !activeOperator) {
       return "";
@@ -15602,14 +15846,16 @@ function RunSurfaceCollectionQueryBuilder({
           {
             key: activeField.key,
             operator: activeOperator.key,
-            value: coerceCollectionQueryBuilderValue(builderValue, activeField.valueType),
+            value: coercedBuilderValue,
           },
         ],
       },
       null,
       2,
     );
-  }, [activeField, activeOperator, activeSchema, builderValue, quantifier, resolvedCollectionPath]);
+  }, [activeField, activeOperator, activeSchema, coercedBuilderValue, quantifier, resolvedCollectionPath]);
+
+  const canApplyExpression = builderValue.trim().length > 0 && Boolean(filterExpressionPreview);
 
   if (!contracts.length || !activeContract || !activeSchema) {
     return null;
@@ -15786,6 +16032,43 @@ function RunSurfaceCollectionQueryBuilder({
           ) : (
             <p className="run-note">No parameter domains are declared for this collection path.</p>
           )}
+          {(onApplyExpression || onClearExpression) ? (
+            <div className="run-surface-query-builder-actions">
+              {onApplyExpression ? (
+                <button
+                  className="ghost-button"
+                  disabled={!canApplyExpression}
+                  onClick={() =>
+                    onApplyExpression({
+                      expression: filterExpressionPreview,
+                      expressionLabel,
+                      resolvedPath: resolvedCollectionPath,
+                      quantifier,
+                      fieldKey: activeField?.key ?? "",
+                      operatorKey: activeOperator?.key ?? "",
+                    })
+                  }
+                  type="button"
+                >
+                  {applyLabel}
+                </button>
+              ) : null}
+              {onClearExpression ? (
+                <button className="ghost-button" onClick={onClearExpression} type="button">
+                  Clear active filter
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+          {activeExpression ? (
+            <div className="run-surface-query-builder-active-state">
+              <div className="run-surface-query-builder-card-head">
+                <strong>Active filter</strong>
+                <span>{activeExpressionLabel ?? "collection expression"}</span>
+              </div>
+              <pre className="run-surface-query-builder-preview">{activeExpression}</pre>
+            </div>
+          ) : null}
           <pre className="run-surface-query-builder-preview">{filterExpressionPreview}</pre>
         </div>
       </div>
@@ -16197,6 +16480,7 @@ type RunOrderControls = {
 };
 
 function RunSection({
+  surfaceKey,
   title,
   runs,
   presets,
@@ -16209,6 +16493,7 @@ function RunSection({
   onStop,
   getOrderControls,
 }: {
+  surfaceKey: RunHistorySurfaceKey;
   title: string;
   runs: Run[];
   presets: ExperimentPreset[];
@@ -16225,14 +16510,95 @@ function RunSection({
   const runListCardRefs = useRef(new Map<string, HTMLElement>());
   const runListSubFocusRefs = useRef(new Map<string, HTMLElement>());
   const runListArtifactHoverRefs = useRef(new Map<string, HTMLElement>());
+  const [collectionBuilderOpen, setCollectionBuilderOpen] = useState(false);
+  const [savedFilterDraftName, setSavedFilterDraftName] = useState("");
+  const [savedFilters, setSavedFilters] = useState<SavedRunHistoryFilterPreset[]>(() =>
+    loadSavedRunHistoryFilterPresets(surfaceKey),
+  );
   const versionOptions = getStrategyVersionOptions(strategies, filter.strategy_id);
   const sharedRunListBoundaryContract = runSurfaceCapabilities?.comparison_eligibility_contract ?? null;
+  const collectionQueryContracts = useMemo(
+    () => getRunSurfaceCollectionQueryContracts(runSurfaceCapabilities),
+    [runSurfaceCapabilities],
+  );
   const presetOptions = presets.filter(
     (preset) =>
       !preset.strategy_id ||
       filter.strategy_id === ALL_FILTER_VALUE ||
       preset.strategy_id === filter.strategy_id,
   );
+  const filterSummaryParts = useMemo(
+    () => describeRunHistoryFilter(filter, presets, strategies),
+    [filter, presets, strategies],
+  );
+  const activeSavedFilterId = useMemo(
+    () =>
+      savedFilters.find((entry) => areRunHistoryFiltersEquivalent(entry.filter, filter))?.filter_id ?? null,
+    [filter, savedFilters],
+  );
+  useEffect(() => {
+    setSavedFilters(loadSavedRunHistoryFilterPresets(surfaceKey));
+  }, [surfaceKey]);
+  useEffect(() => {
+    persistSavedRunHistoryFilterPresets(surfaceKey, savedFilters);
+  }, [savedFilters, surfaceKey]);
+  const applyCollectionQueryExpression = (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => {
+    setFilter((current) => ({
+      ...current,
+      filter_expr: payload.expression,
+      collection_query_label:
+        payload.expressionLabel || `${payload.quantifier} ${payload.fieldKey} ${payload.operatorKey}`,
+    }));
+  };
+  const clearCollectionQueryExpression = () => {
+    setFilter((current) => ({
+      ...current,
+      filter_expr: "",
+      collection_query_label: "",
+    }));
+  };
+  const saveCurrentFilter = () => {
+    const trimmedName = savedFilterDraftName.trim();
+    if (!trimmedName || !hasRunHistoryFilterCriteria(filter)) {
+      return;
+    }
+    const snapshot = cloneRunHistoryFilter(filter);
+    const now = new Date().toISOString();
+    setSavedFilters((current) => {
+      const existing = current.find(
+        (entry) => entry.label.trim().toLowerCase() === trimmedName.toLowerCase(),
+      );
+      if (existing) {
+        return current.map((entry) =>
+          entry.filter_id === existing.filter_id
+            ? {
+                ...entry,
+                filter: snapshot,
+                label: trimmedName,
+                updated_at: now,
+              }
+            : entry,
+        );
+      }
+      return [
+        {
+          filter_id: `${surfaceKey}:${Date.now()}`,
+          label: trimmedName,
+          filter: snapshot,
+          created_at: now,
+          updated_at: now,
+        },
+        ...current,
+      ];
+    });
+    setSavedFilterDraftName("");
+  };
+  const applySavedFilter = (savedFilter: SavedRunHistoryFilterPreset) => {
+    setFilter(() => cloneRunHistoryFilter(savedFilter.filter));
+  };
+  const deleteSavedFilter = (filterId: string) => {
+    setSavedFilters((current) => current.filter((entry) => entry.filter_id !== filterId));
+  };
   const historySearchQueryNormalized = comparison?.historySearchQuery.trim().toLowerCase() ?? "";
   const filteredHistoryEntries = comparison
     ? comparison.visibleHistoryEntries.filter((entry) => {
@@ -16789,6 +17155,101 @@ function RunSection({
                 }
               />
             </label>
+          </div>
+          <div className="run-filter-workbench">
+            <div className="run-filter-workbench-head">
+              <div className="run-filter-workbench-actions">
+                {collectionQueryContracts.length ? (
+                  <button
+                    className={`ghost-button ${collectionBuilderOpen ? "is-active" : ""}`.trim()}
+                    onClick={() => setCollectionBuilderOpen((current) => !current)}
+                    type="button"
+                  >
+                    {collectionBuilderOpen ? "Hide collection builder" : "Collection builder"}
+                  </button>
+                ) : null}
+                {filter.filter_expr ? (
+                  <button className="ghost-button" onClick={clearCollectionQueryExpression} type="button">
+                    Clear collection filter
+                  </button>
+                ) : null}
+              </div>
+              <div className="run-filter-save-row">
+                <input
+                  className="run-filter-save-input"
+                  onChange={(event) => setSavedFilterDraftName(event.target.value)}
+                  placeholder="Save current filter as…"
+                  value={savedFilterDraftName}
+                />
+                <button
+                  className="ghost-button"
+                  disabled={!savedFilterDraftName.trim() || !hasRunHistoryFilterCriteria(filter)}
+                  onClick={saveCurrentFilter}
+                  type="button"
+                >
+                  Save filter
+                </button>
+              </div>
+            </div>
+            {filterSummaryParts.length ? (
+              <div className="run-filter-summary-chip-row">
+                {filterSummaryParts.map((part) => (
+                  <span className="run-filter-summary-chip" key={part}>
+                    {part}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <p className="run-note">No active run-history filters. Saved filters can capture both basic filters and collection expressions.</p>
+            )}
+            {savedFilters.length ? (
+              <div className="run-filter-saved-list">
+                {savedFilters.map((savedFilter) => {
+                  const summary = describeRunHistoryFilter(savedFilter.filter, presets, strategies);
+                  const isActive = savedFilter.filter_id === activeSavedFilterId;
+                  return (
+                    <article
+                      className={`run-filter-saved-card ${isActive ? "is-active" : ""}`.trim()}
+                      key={savedFilter.filter_id}
+                    >
+                      <div className="run-filter-saved-card-head">
+                        <strong>{savedFilter.label}</strong>
+                        <span>{formatRelativeTimestampLabel(savedFilter.updated_at)}</span>
+                      </div>
+                      <p className="run-note">
+                        {summary.length ? summary.join(" · ") : "All runs"}
+                      </p>
+                      <div className="run-filter-saved-card-actions">
+                        <button
+                          className={`ghost-button ${isActive ? "is-active" : ""}`.trim()}
+                          onClick={() => applySavedFilter(savedFilter)}
+                          type="button"
+                        >
+                          {isActive ? "Applied" : "Apply"}
+                        </button>
+                        <button
+                          className="ghost-button"
+                          onClick={() => deleteSavedFilter(savedFilter.filter_id)}
+                          type="button"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : null}
+            {collectionBuilderOpen && collectionQueryContracts.length ? (
+              <RunSurfaceCollectionQueryBuilder
+                activeExpression={filter.filter_expr}
+                activeExpressionLabel={filter.collection_query_label}
+                applyLabel="Apply to run list"
+                contracts={collectionQueryContracts}
+                onApplyExpression={applyCollectionQueryExpression}
+                onClearExpression={filter.filter_expr ? clearCollectionQueryExpression : null}
+              />
+            ) : null}
           </div>
           {comparison ? (
             <div className="comparison-toolbar">
