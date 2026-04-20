@@ -16258,6 +16258,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSymbolVariants(sy
 
 function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(value: unknown): string[] {
   const collected = new Set<string>();
+  const isMetadataKey = (key: string) => key.startsWith("__");
   const visit = (candidate: unknown) => {
     if (candidate === null || candidate === undefined || candidate === "") {
       return;
@@ -16275,6 +16276,9 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(valu
     }
     if (typeof candidate === "object") {
       Object.entries(candidate as Record<string, unknown>).forEach(([key, nestedValue]) => {
+        if (isMetadataKey(key)) {
+          return;
+        }
         const formattedKey = formatBenchmarkArtifactSummaryLabel(key);
         const normalizedKey = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(formattedKey);
         if (normalizedKey) {
@@ -43852,6 +43856,7 @@ function formatBenchmarkArtifactInlineValue(value: unknown): string {
   }
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>)
+      .filter(([key]) => !key.startsWith("__"))
       .map(([key, nestedValue]) => {
         const formattedValue = formatBenchmarkArtifactSummaryValue(key, nestedValue);
         if (formattedValue === null) {

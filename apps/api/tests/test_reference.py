@@ -87,6 +87,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
             "results_per_pair": [
               {
                 "key": "BTC/USDT",
+                "runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT",
                 "trades": 20,
                 "profit_total_pct": 12.3,
                 "profit_total_abs": 1234.5,
@@ -257,7 +258,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
     for binding in best_pair_bindings
   )
   assert any(
-    binding["runtime_candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
+    binding["runtime_candidate_id"] == "freqtrade:pair-metric:BTC/USDT"
     for binding in best_pair_bindings
   )
   assert all(
@@ -303,7 +304,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
     for binding in snapshot_best_pair_bindings
   )
   assert any(
-    binding["runtime_candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
+    binding["runtime_candidate_id"] == "freqtrade:pair-metric:BTC/USDT"
     for binding in snapshot_best_pair_bindings
   )
   assert all(

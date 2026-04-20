@@ -37,6 +37,14 @@ class PreparedCommand:
 
 
 class FreqtradeReferenceAdapter:
+  _ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY = "__runtime_candidate_id"
+  _ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS = (
+    "__runtime_candidate_id",
+    "runtime_candidate_id",
+    "native_runtime_candidate_id",
+    "native_candidate_id",
+  )
+
   def __init__(self, repo_root: Path, references: ReferenceCatalog) -> None:
     self._repo_root = repo_root
     self._references = references
@@ -1041,6 +1049,9 @@ class FreqtradeReferenceAdapter:
 
   def _summarize_metric_row(self, row: dict[str, Any]) -> dict[str, Any]:
     summary: dict[str, Any] = {}
+    runtime_candidate_id = self._extract_artifact_runtime_candidate_id(row)
+    if runtime_candidate_id is not None:
+      summary[self._ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY] = runtime_candidate_id
     self._set_summary_entry(
       summary,
       "label",
@@ -1336,21 +1347,27 @@ class FreqtradeReferenceAdapter:
       section_key=section_key,
     )
     bindings: list[dict[str, Any]] = []
-    seen: set[tuple[str, str | None]] = set()
+    seen: set[tuple[str, str | None, str | None, str | None]] = set()
 
-    def add(symbol_key: str, candidate_value: str | None, candidate_id: str | None = None) -> None:
+    def add(
+      symbol_key: str,
+      candidate_value: str | None,
+      candidate_id: str | None = None,
+      runtime_candidate_id: str | None = None,
+    ) -> None:
       normalized_symbol = self._normalize_artifact_candidate_binding_symbol_key(symbol_key)
       if not normalized_symbol:
         return
       normalized_value = candidate_value.strip() if isinstance(candidate_value, str) else None
-      key = (normalized_symbol, normalized_value)
+      normalized_runtime_candidate_id = runtime_candidate_id.strip() if isinstance(runtime_candidate_id, str) else None
+      key = (normalized_symbol, normalized_value, candidate_id, normalized_runtime_candidate_id)
       if key in seen:
         return
       seen.add(key)
       bindings.append({
         "binding_kind": "market_data_issue",
         "candidate_id": candidate_id,
-        "runtime_candidate_id": candidate_id,
+        "runtime_candidate_id": normalized_runtime_candidate_id,
         "candidate_path_template": "provenance.market_data_by_symbol.{symbol_key}.issues",
         "candidate_value": normalized_value,
         "symbol_key": normalized_symbol,
@@ -1368,6 +1385,7 @@ class FreqtradeReferenceAdapter:
               symbol_key=symbol_key,
               candidate_value=candidate_entry["candidate_id_source"],
             ) if candidate_entry["candidate_id_source"] is not None else None,
+            candidate_entry["runtime_candidate_id_source"],
           )
     return bindings
 
@@ -1380,8 +1398,14 @@ class FreqtradeReferenceAdapter:
   ) -> list[dict[str, str | None]]:
     collected: list[dict[str, str | None]] = []
     seen: set[str] = set()
+    runtime_candidate_id = self._extract_artifact_runtime_candidate_id(value)
 
-    def add(candidate: str | None, *, canonical: bool = False) -> None:
+    def add(
+      candidate: str | None,
+      *,
+      canonical: bool = False,
+      runtime_candidate_id_source: str | None = None,
+    ) -> None:
       if candidate is None:
         return
       normalized = candidate.strip()
@@ -1393,23 +1417,40 @@ class FreqtradeReferenceAdapter:
       seen.add(key)
       collected.append({
         "candidate_id_source": normalized if canonical else None,
+        "runtime_candidate_id_source": runtime_candidate_id_source.strip()
+        if isinstance(runtime_candidate_id_source, str) and runtime_candidate_id_source.strip()
+        else None,
         "value": normalized,
       })
 
     add(self._stringify_artifact_source_value(value))
 
     if isinstance(value, (str, int, float, bool)):
-      add(str(value), canonical=isinstance(value, str))
+      add(
+        str(value),
+        canonical=isinstance(value, str),
+        runtime_candidate_id_source=runtime_candidate_id if isinstance(value, str) else None,
+      )
     elif isinstance(value, dict):
       for nested_key, nested_value in value.items():
+        if self._is_artifact_metadata_key(str(nested_key)):
+          continue
         formatted_key = self._format_artifact_source_label(str(nested_key))
         if isinstance(nested_value, (str, int, float, bool)):
           add(f"{formatted_key}: {nested_value}")
-          add(str(nested_value), canonical=isinstance(nested_value, str))
+          add(
+            str(nested_value),
+            canonical=isinstance(nested_value, str),
+            runtime_candidate_id_source=runtime_candidate_id if isinstance(nested_value, str) else None,
+          )
     elif isinstance(value, (list, tuple, set)):
       for item in value:
         if isinstance(item, (str, int, float, bool)):
-          add(str(item), canonical=isinstance(item, str))
+          add(
+            str(item),
+            canonical=isinstance(item, str),
+            runtime_candidate_id_source=runtime_candidate_id if isinstance(item, str) else None,
+          )
 
     add(self._format_artifact_source_label(label_key))
     if section_key is not None:
@@ -1436,6 +1477,8 @@ class FreqtradeReferenceAdapter:
         return
       if isinstance(candidate, dict):
         for nested_key, nested_value in candidate.items():
+          if self._is_artifact_metadata_key(str(nested_key)):
+            continue
           if str(nested_key) in {"pair", "symbol", "label", "key"} and isinstance(nested_value, str):
             add(nested_value)
           visit(nested_value)
@@ -1524,6 +1567,8 @@ class FreqtradeReferenceAdapter:
         return
       if isinstance(candidate, dict):
         for nested_key, nested_value in candidate.items():
+          if self._is_artifact_metadata_key(str(nested_key)):
+            continue
           formatted_key = self._format_artifact_source_label(str(nested_key))
           add(formatted_key)
           if isinstance(nested_value, (str, int, float, bool)):
@@ -1556,6 +1601,7 @@ class FreqtradeReferenceAdapter:
       rendered = [
         f"{self._format_artifact_source_label(str(key))}={nested}"
         for key, nested_value in value.items()
+        if not self._is_artifact_metadata_key(str(key))
         if (nested := self._stringify_artifact_source_value(nested_value)) is not None
       ]
       return ", ".join(rendered) if rendered else None
@@ -1573,6 +1619,20 @@ class FreqtradeReferenceAdapter:
     normalized = FreqtradeReferenceAdapter._normalize_summary_value(key, value)
     if normalized is not None:
       summary[key] = normalized
+
+  @classmethod
+  def _extract_artifact_runtime_candidate_id(cls, value: Any) -> str | None:
+    if not isinstance(value, dict):
+      return None
+    for key in cls._ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS:
+      candidate_value = value.get(key)
+      if isinstance(candidate_value, str) and candidate_value.strip():
+        return candidate_value.strip()
+    return None
+
+  @classmethod
+  def _is_artifact_metadata_key(cls, key: str) -> bool:
+    return key in cls._ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS
 
   @staticmethod
   def _normalize_summary_value(key: str, value: Any) -> Any:
