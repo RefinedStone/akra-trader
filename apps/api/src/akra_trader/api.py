@@ -10,13 +10,16 @@ from fastapi import FastAPI
 from fastapi import Header
 from fastapi import HTTPException
 from fastapi import Query
+from fastapi import Request
 from pydantic import BaseModel
 from pydantic import Field
 
 from akra_trader.application import list_standalone_surface_runtime_bindings
+from akra_trader.application import StandaloneSurfaceFilterCondition
 from akra_trader.application import TradingApplication
 from akra_trader.application import execute_standalone_surface_binding
 from akra_trader.application import StandaloneSurfaceFilterParamSpec
+from akra_trader.application import StandaloneSurfaceSortTerm
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.bootstrap import Container
 
@@ -179,6 +182,19 @@ def _build_query_default(spec: StandaloneSurfaceFilterParamSpec) -> Any:
   return Query(default=spec.default, **kwargs)
 
 
+def _build_sort_query_default(binding: StandaloneSurfaceRuntimeBinding) -> Any:
+  examples = [
+    f"{field.key}:{field.default_direction}"
+    for field in binding.sort_field_specs
+  ]
+  return Query(
+    default_factory=list,
+    title="Sort",
+    description="Sort fields in `<field>` or `<field>:<direction>` format.",
+    examples=examples,
+  )
+
+
 def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict[str, Any] | None:
   if not binding.filter_param_specs and not binding.sort_field_specs:
     return None
@@ -210,6 +226,100 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
       ],
     }
   }
+
+
+def _coerce_filter_query_values(
+  spec: StandaloneSurfaceFilterParamSpec,
+  values: list[str],
+) -> Any:
+  origin = getattr(spec.annotation, "__origin__", None)
+  if origin in {list, tuple} or spec.annotation == list[str]:
+    return list(values)
+  if not values:
+    return None
+  return values[-1]
+
+
+def _has_meaningful_filter_value(value: Any) -> bool:
+  if value is None:
+    return False
+  if isinstance(value, str):
+    return bool(value)
+  if isinstance(value, (list, tuple, set, dict)):
+    return bool(value)
+  return True
+
+
+def _build_runtime_query_filters(
+  binding: StandaloneSurfaceRuntimeBinding,
+  *,
+  kwargs: dict[str, Any],
+  request: Request | None,
+) -> dict[str, Any] | None:
+  if not binding.filter_param_specs and not binding.sort_field_specs:
+    return None
+  filters = {
+    spec.key: kwargs[spec.key]
+    for spec in binding.filter_param_specs
+  }
+  conditions: list[StandaloneSurfaceFilterCondition] = []
+  if request is not None:
+    query_params = request.query_params
+    for spec in binding.filter_param_specs:
+      alias = spec.openapi.alias if spec.openapi and spec.openapi.alias else spec.key
+      supported_operators = {
+        operator.key
+        for operator in spec.operators
+      }
+      default_operator = spec.operators[0].key if spec.operators else "eq"
+      base_value = kwargs[spec.key]
+      if _has_meaningful_filter_value(base_value):
+        conditions.append(
+          StandaloneSurfaceFilterCondition(
+            key=spec.key,
+            operator=default_operator,
+            value=base_value,
+          )
+        )
+      for raw_key in query_params.keys():
+        if not raw_key.startswith(f"{alias}__"):
+          continue
+        operator_key = raw_key.split("__", 1)[1]
+        if operator_key not in supported_operators:
+          raise ValueError(f"Unsupported filter operator for {spec.key}: {operator_key}")
+        conditions.append(
+          StandaloneSurfaceFilterCondition(
+            key=spec.key,
+            operator=operator_key,
+            value=_coerce_filter_query_values(spec, query_params.getlist(raw_key)),
+          )
+        )
+    if conditions:
+      filters["__filter_conditions__"] = tuple(conditions)
+    if binding.sort_field_specs:
+      sort_terms: list[StandaloneSurfaceSortTerm] = []
+      allowed_sort_fields = {
+        field.key: field
+        for field in binding.sort_field_specs
+      }
+      for raw_sort in kwargs.get("sort", ()):
+        field_key, separator, direction = raw_sort.partition(":")
+        if field_key not in allowed_sort_fields:
+          raise ValueError(f"Unsupported sort field: {field_key}")
+        if not separator:
+          direction = allowed_sort_fields[field_key].default_direction
+        normalized_direction = direction.lower()
+        if normalized_direction not in {"asc", "desc"}:
+          raise ValueError(f"Unsupported sort direction for {field_key}: {direction}")
+        sort_terms.append(
+          StandaloneSurfaceSortTerm(
+            key=field_key,
+            direction=normalized_direction,
+          )
+        )
+      if sort_terms:
+        filters["__sort_terms__"] = tuple(sort_terms)
+  return filters
 
 
 def create_router(container: Container) -> APIRouter:
@@ -252,14 +362,15 @@ def create_router(container: Container) -> APIRouter:
         request_model = kwargs["request"]
         _, dump_kwargs = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
         request_payload = request_model.model_dump(**dump_kwargs)
+      request_context = kwargs.get("request")
       return dispatch_standalone_binding(
         binding=binding,
         app=kwargs["app"],
         run_id=kwargs.get("run_id"),
-        filters=(
-          {spec.key: kwargs[spec.key] for spec in binding.filter_param_specs}
-          if binding.filter_param_specs
-          else None
+        filters=_build_runtime_query_filters(
+          binding,
+          kwargs=kwargs,
+          request=request_context,
         ),
         path_params=(
           {key: kwargs[key] for key in binding.path_param_keys}
@@ -291,6 +402,14 @@ def create_router(container: Container) -> APIRouter:
           annotation=str,
         )
       )
+    if binding.filter_param_specs or binding.sort_field_specs:
+      parameters.append(
+        inspect.Parameter(
+          "request",
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=Request,
+        )
+      )
     for filter_spec in binding.filter_param_specs:
       parameters.append(
         inspect.Parameter(
@@ -298,6 +417,15 @@ def create_router(container: Container) -> APIRouter:
           inspect.Parameter.POSITIONAL_OR_KEYWORD,
           annotation=filter_spec.annotation,
           default=_build_query_default(filter_spec),
+        )
+      )
+    if binding.sort_field_specs:
+      parameters.append(
+        inspect.Parameter(
+          "sort",
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=list[str],
+          default=_build_sort_query_default(binding),
         )
       )
     if binding.request_payload_kind is not None:

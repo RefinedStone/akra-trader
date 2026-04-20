@@ -250,18 +250,23 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   }
 
   assert tuple(inspect.signature(routes["list_strategies"].endpoint).parameters) == (
+    "request",
     "lane",
     "lifecycle_stage",
     "version",
+    "sort",
     "app",
   )
   assert tuple(inspect.signature(routes["list_presets"].endpoint).parameters) == (
+    "request",
     "strategy_id",
     "timeframe",
     "lifecycle_stage",
+    "sort",
     "app",
   )
   assert tuple(inspect.signature(routes["list_runs"].endpoint).parameters) == (
+    "request",
     "mode",
     "strategy_id",
     "strategy_version",
@@ -270,14 +275,18 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "benchmark_family",
     "dataset_identity",
     "tag",
+    "sort",
     "app",
   )
   assert tuple(inspect.signature(routes["compare_runs"].endpoint).parameters) == (
+    "request",
     "run_id",
     "intent",
+    "sort",
     "app",
   )
   assert tuple(inspect.signature(routes["get_market_data_status"].endpoint).parameters) == (
+    "request",
     "timeframe",
     "app",
   )
@@ -330,6 +339,11 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert [operator["key"] for operator in tag_filter["operators"]] == ["contains_all", "contains_any"]
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
+  run_sort_param = next(
+    param for param in openapi["paths"]["/api/runs"]["get"]["parameters"]
+    if param["name"] == "sort"
+  )
+  assert run_sort_param["description"] == "Sort fields in `<field>` or `<field>:<direction>` format."
 
   compare_query_schema = openapi["paths"]["/api/runs/compare"]["get"]["x-akra-query-schema"]
   assert compare_query_schema["filters"][0]["operators"][0]["key"] == "include"
@@ -344,6 +358,104 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   )
   assert market_data_params["timeframe"]["schema"]["minLength"] == 2
   assert openapi["paths"]["/api/market-data/status"]["get"]["x-akra-query-schema"]["filters"][0]["operators"][0]["key"] == "eq"
+
+
+def test_strategy_query_contract_applies_prefix_filter_and_sort(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  response = client.get("/api/strategies?version__prefix=1.&sort=strategy_id:asc")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload
+  assert all(item["version"].startswith("1.") for item in payload)
+  assert [item["strategy_id"] for item in payload] == sorted(item["strategy_id"] for item in payload)
+
+
+def test_preset_query_contract_applies_operator_filter_and_sort(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  create_preset(client, name="First", preset_id="first", strategy_id="ma_cross_v1", timeframe="5m")
+  create_preset(client, name="Second", preset_id="second", strategy_id="ma_cross_v1", timeframe="5m")
+
+  response = client.get("/api/presets?strategy_id__eq=ma_cross_v1&sort=created_at:asc")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert [item["preset_id"] for item in payload[:2]] == ["first", "second"]
+
+
+def test_run_query_contract_applies_tag_operator_and_sort(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  baseline_run = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "BTC/USDT",
+      "timeframe": "5m",
+      "tags": ["baseline"],
+    },
+  ).json()
+  client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "tags": ["stress"],
+    },
+  )
+  second_baseline_run = client.post(
+    "/api/runs/backtests",
+    json={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "SOL/USDT",
+      "timeframe": "5m",
+      "tags": ["baseline", "review"],
+    },
+  ).json()
+
+  response = client.get("/api/runs?tag__contains_any=baseline&sort=started_at:asc")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert [item["config"]["run_id"] for item in payload[:2]] == [
+    baseline_run["config"]["run_id"],
+    second_baseline_run["config"]["run_id"],
+  ]
+
+
+def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  run_ids: list[str] = []
+  for short_window in (5, 8, 13):
+    response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "parameters": {"short_window": short_window, "long_window": 21},
+      },
+    )
+    assert response.status_code == 200
+    run_ids.append(response.json()["config"]["run_id"])
+
+  response = client.get(
+    "/api/runs/compare",
+    params=[
+      ("run_id", run_ids[0]),
+      ("run_id", run_ids[1]),
+      ("run_id", run_ids[2]),
+      ("intent", "strategy_tuning"),
+      ("sort", "narrative_score:asc"),
+    ],
+  )
+
+  assert response.status_code == 200
+  payload = response.json()
+  scores = [item["insight_score"] for item in payload["narratives"]]
+  assert scores == sorted(scores)
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:

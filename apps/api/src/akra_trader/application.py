@@ -23039,6 +23039,223 @@ class StandaloneSurfaceFilterParamSpec:
   operators: tuple[StandaloneSurfaceFilterOperatorSpec, ...] = ()
 
 
+@dataclass(frozen=True)
+class StandaloneSurfaceFilterCondition:
+  key: str
+  operator: str
+  value: Any
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceSortTerm:
+  key: str
+  direction: str = "asc"
+
+
+def _extract_runtime_filter_conditions(
+  filters: dict[str, Any] | None,
+) -> tuple[StandaloneSurfaceFilterCondition, ...]:
+  if not filters:
+    return ()
+  value = filters.get("__filter_conditions__")
+  if not isinstance(value, tuple):
+    return ()
+  return tuple(
+    condition
+    for condition in value
+    if isinstance(condition, StandaloneSurfaceFilterCondition)
+  )
+
+
+def _extract_runtime_sort_terms(
+  filters: dict[str, Any] | None,
+) -> tuple[StandaloneSurfaceSortTerm, ...]:
+  if not filters:
+    return ()
+  value = filters.get("__sort_terms__")
+  if not isinstance(value, tuple):
+    return ()
+  return tuple(
+    term
+    for term in value
+    if isinstance(term, StandaloneSurfaceSortTerm)
+  )
+
+
+def _normalize_runtime_sort_value(value: Any) -> tuple[int, Any]:
+  if value is None:
+    return (1, "")
+  enum_value = getattr(value, "value", None)
+  if isinstance(enum_value, (str, int, float)):
+    value = enum_value
+  if isinstance(value, datetime):
+    return (0, value)
+  if isinstance(value, str):
+    return (0, value.lower())
+  if isinstance(value, (tuple, list, set)):
+    return (0, tuple(str(item) for item in value))
+  return (0, value)
+
+
+def _evaluate_runtime_filter_condition(
+  candidate_value: Any,
+  *,
+  operator: str,
+  operand: Any,
+) -> bool:
+  if operator == "eq":
+    return candidate_value == operand
+  if operator == "prefix":
+    return isinstance(candidate_value, str) and isinstance(operand, str) and candidate_value.startswith(operand)
+  if operator == "contains_all":
+    candidate_values = set(candidate_value or ())
+    operand_values = set(operand or ())
+    return operand_values.issubset(candidate_values)
+  if operator == "contains_any":
+    candidate_values = set(candidate_value or ())
+    operand_values = set(operand or ())
+    return not candidate_values.isdisjoint(operand_values)
+  if operator == "include":
+    operand_values = tuple(operand or ())
+    return candidate_value in operand_values
+  raise ValueError(f"Unsupported runtime filter operator: {operator}")
+
+
+def _apply_runtime_query_contract(
+  items: list[Any],
+  *,
+  filters: dict[str, Any] | None,
+  filter_getters: dict[str, Callable[[Any], Any]],
+  sort_getters: dict[str, Callable[[Any], Any]],
+) -> list[Any]:
+  conditions = _extract_runtime_filter_conditions(filters)
+  sort_terms = _extract_runtime_sort_terms(filters)
+  resolved = list(items)
+  if conditions:
+    resolved = [
+      item
+      for item in resolved
+      if all(
+        _evaluate_runtime_filter_condition(
+          filter_getters[condition.key](item),
+          operator=condition.operator,
+          operand=condition.value,
+        )
+        for condition in conditions
+        if condition.key in filter_getters
+      )
+    ]
+  for term in reversed(sort_terms):
+    getter = sort_getters.get(term.key)
+    if getter is None:
+      continue
+    resolved.sort(
+      key=lambda item: _normalize_runtime_sort_value(getter(item)),
+      reverse=term.direction == "desc",
+    )
+  return resolved
+
+
+def _run_effective_updated_at(run: RunRecord) -> datetime:
+  return run.ended_at or run.started_at
+
+
+def _apply_runtime_query_to_strategies(
+  strategies: list[StrategyMetadata],
+  filters: dict[str, Any] | None,
+) -> list[StrategyMetadata]:
+  return _apply_runtime_query_contract(
+    strategies,
+    filters=filters,
+    filter_getters={
+      "lane": lambda strategy: strategy.runtime,
+      "lifecycle_stage": lambda strategy: strategy.lifecycle.stage,
+      "version": lambda strategy: strategy.version,
+    },
+    sort_getters={
+      "strategy_id": lambda strategy: strategy.strategy_id,
+      "runtime": lambda strategy: strategy.runtime,
+      "registered_at": lambda strategy: strategy.lifecycle.registered_at,
+    },
+  )
+
+
+def _apply_runtime_query_to_presets(
+  presets: list[ExperimentPreset],
+  filters: dict[str, Any] | None,
+) -> list[ExperimentPreset]:
+  return _apply_runtime_query_contract(
+    presets,
+    filters=filters,
+    filter_getters={
+      "strategy_id": lambda preset: preset.strategy_id,
+      "timeframe": lambda preset: preset.timeframe,
+      "lifecycle_stage": lambda preset: preset.lifecycle.stage,
+    },
+    sort_getters={
+      "updated_at": lambda preset: preset.updated_at,
+      "created_at": lambda preset: preset.created_at,
+      "preset_id": lambda preset: preset.preset_id,
+    },
+  )
+
+
+def _apply_runtime_query_to_runs(
+  runs: list[RunRecord],
+  filters: dict[str, Any] | None,
+) -> list[RunRecord]:
+  return _apply_runtime_query_contract(
+    runs,
+    filters=filters,
+    filter_getters={
+      "mode": lambda run: run.config.mode.value,
+      "strategy_id": lambda run: run.config.strategy_id,
+      "strategy_version": lambda run: run.config.strategy_version,
+      "rerun_boundary_id": lambda run: run.provenance.rerun_boundary_id,
+      "preset_id": lambda run: run.provenance.experiment.preset_id,
+      "benchmark_family": lambda run: run.provenance.experiment.benchmark_family,
+      "dataset_identity": (
+        lambda run: run.provenance.market_data.dataset_identity
+        if run.provenance.market_data is not None
+        else None
+      ),
+      "tag": lambda run: run.provenance.experiment.tags,
+    },
+    sort_getters={
+      "updated_at": _run_effective_updated_at,
+      "started_at": lambda run: run.started_at,
+      "run_id": lambda run: run.config.run_id,
+    },
+  )
+
+
+def _apply_runtime_query_to_comparison(
+  comparison: RunComparison,
+  filters: dict[str, Any] | None,
+) -> RunComparison:
+  sort_terms = _extract_runtime_sort_terms(filters)
+  if not sort_terms:
+    return comparison
+  narratives = list(comparison.narratives)
+  run_order_index = {
+    run_id: index
+    for index, run_id in enumerate(comparison.requested_run_ids)
+  }
+  for term in reversed(sort_terms):
+    if term.key == "narrative_score":
+      narratives.sort(
+        key=lambda narrative: _normalize_runtime_sort_value(narrative.insight_score),
+        reverse=term.direction == "desc",
+      )
+      continue
+    if term.key == "run_id_order":
+      narratives.sort(
+        key=lambda narrative: run_order_index.get(narrative.run_id, len(run_order_index)),
+        reverse=term.direction == "desc",
+      )
+  return replace(comparison, narratives=tuple(narratives))
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -24057,10 +24274,13 @@ def execute_standalone_surface_binding(
   if binding.binding_kind == "strategy_catalog_discovery":
     return [
       serialize_strategy(strategy)
-      for strategy in app.list_strategies(
-        lane=resolved_filters.get("lane"),
-        lifecycle_stage=resolved_filters.get("lifecycle_stage"),
-        version=resolved_filters.get("version"),
+      for strategy in _apply_runtime_query_to_strategies(
+        app.list_strategies(
+          lane=resolved_filters.get("lane"),
+          lifecycle_stage=resolved_filters.get("lifecycle_stage"),
+          version=resolved_filters.get("version"),
+        ),
+        resolved_filters,
       )
     ]
   if binding.binding_kind == "reference_catalog_discovery":
@@ -24068,10 +24288,13 @@ def execute_standalone_surface_binding(
   if binding.binding_kind == "preset_catalog_discovery":
     return [
       serialize_preset(preset)
-      for preset in app.list_presets(
-        strategy_id=resolved_filters.get("strategy_id"),
-        timeframe=resolved_filters.get("timeframe"),
-        lifecycle_stage=resolved_filters.get("lifecycle_stage"),
+      for preset in _apply_runtime_query_to_presets(
+        app.list_presets(
+          strategy_id=resolved_filters.get("strategy_id"),
+          timeframe=resolved_filters.get("timeframe"),
+          lifecycle_stage=resolved_filters.get("lifecycle_stage"),
+        ),
+        resolved_filters,
       )
     ]
   if binding.binding_kind == "preset_catalog_create":
@@ -24137,21 +24360,27 @@ def execute_standalone_surface_binding(
   if binding.binding_kind == "run_list":
     return [
       serialize_run(run, capabilities=app.get_run_surface_capabilities())
-      for run in app.list_runs(
-        mode=resolved_filters.get("mode"),
-        strategy_id=resolved_filters.get("strategy_id"),
-        strategy_version=resolved_filters.get("strategy_version"),
-        rerun_boundary_id=resolved_filters.get("rerun_boundary_id"),
-        preset_id=resolved_filters.get("preset_id"),
-        benchmark_family=resolved_filters.get("benchmark_family"),
-        dataset_identity=resolved_filters.get("dataset_identity"),
-        tags=resolved_filters.get("tag") or [],
+      for run in _apply_runtime_query_to_runs(
+        app.list_runs(
+          mode=resolved_filters.get("mode"),
+          strategy_id=resolved_filters.get("strategy_id"),
+          strategy_version=resolved_filters.get("strategy_version"),
+          rerun_boundary_id=resolved_filters.get("rerun_boundary_id"),
+          preset_id=resolved_filters.get("preset_id"),
+          benchmark_family=resolved_filters.get("benchmark_family"),
+          dataset_identity=resolved_filters.get("dataset_identity"),
+          tags=resolved_filters.get("tag") or [],
+        ),
+        resolved_filters,
       )
     ]
   if binding.binding_kind == "run_compare":
-    comparison = app.compare_runs(
-      run_ids=resolved_filters.get("run_id") or [],
-      intent=resolved_filters.get("intent"),
+    comparison = _apply_runtime_query_to_comparison(
+      app.compare_runs(
+        run_ids=resolved_filters.get("run_id") or [],
+        intent=resolved_filters.get("intent"),
+      ),
+      resolved_filters,
     )
     return serialize_run_comparison(
       comparison,
