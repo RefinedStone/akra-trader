@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import inspect
 from typing import Any
 
 from fastapi import APIRouter
@@ -126,6 +127,27 @@ class ExternalIncidentSyncRequest(BaseModel):
   escalation_level: int | None = Field(default=None, ge=1)
   payload: dict[str, Any] = Field(default_factory=dict)
 
+
+REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
+  "preset_create": (ExperimentPresetRequest, {}),
+  "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
+  "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),
+  "preset_lifecycle_action": (ExperimentPresetLifecycleActionRequest, {}),
+  "strategy_register": (StrategyRegistrationRequest, {}),
+  "backtest_launch": (BacktestRequest, {}),
+  "sandbox_launch": (SandboxRunRequest, {}),
+  "paper_launch": (SandboxRunRequest, {}),
+  "live_launch": (LiveRunRequest, {}),
+  "external_incident_sync": (ExternalIncidentSyncRequest, {}),
+  "guarded_live_action": (GuardedLiveActionRequest, {}),
+  "guarded_live_order_replace": (GuardedLiveOrderReplaceRequest, {}),
+}
+
+
+def _build_header_alias(header_key: str) -> str:
+  return "-".join(part.capitalize() for part in header_key.split("_"))
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -160,23 +182,79 @@ def create_router(container: Container) -> APIRouter:
       raise HTTPException(status_code=400, detail=str(exc)) from exc
 
   def build_standalone_surface_route_handler(binding: StandaloneSurfaceRuntimeBinding):
-    if binding.scope == "app":
-      def get_app_surface(
-        app: TradingApplication = Depends(get_app),
-      ) -> dict[str, Any]:
-        return dispatch_standalone_binding(binding=binding, app=app)
+    def handle_surface(**kwargs: Any) -> dict[str, Any]:
+      request_payload = None
+      if binding.request_payload_kind is not None:
+        request_model = kwargs["request"]
+        _, dump_kwargs = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
+        request_payload = request_model.model_dump(**dump_kwargs)
+      return dispatch_standalone_binding(
+        binding=binding,
+        app=kwargs["app"],
+        run_id=kwargs.get("run_id"),
+        path_params=(
+          {key: kwargs[key] for key in binding.path_param_keys}
+          if binding.path_param_keys
+          else None
+        ),
+        headers=(
+          {key: kwargs.get(key) for key in binding.header_keys}
+          if binding.header_keys
+          else None
+        ),
+        request_payload=request_payload,
+      )
 
-      get_app_surface.__name__ = binding.route_name
-      return get_app_surface
+    parameters: list[inspect.Parameter] = []
+    if binding.scope == "run":
+      parameters.append(
+        inspect.Parameter(
+          "run_id",
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=str,
+        )
+      )
+    for path_param_key in binding.path_param_keys:
+      parameters.append(
+        inspect.Parameter(
+          path_param_key,
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=str,
+        )
+      )
+    if binding.request_payload_kind is not None:
+      request_model, _ = REQUEST_PAYLOAD_MODELS[binding.request_payload_kind]
+      parameters.append(
+        inspect.Parameter(
+          "request",
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=request_model,
+        )
+      )
+    for header_key in binding.header_keys:
+      parameters.append(
+        inspect.Parameter(
+          header_key,
+          inspect.Parameter.POSITIONAL_OR_KEYWORD,
+          annotation=str | None,
+          default=Header(default=None, alias=_build_header_alias(header_key)),
+        )
+      )
+    parameters.append(
+      inspect.Parameter(
+        "app",
+        inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=TradingApplication,
+        default=Depends(get_app),
+      )
+    )
 
-    def get_run_surface(
-      run_id: str,
-      app: TradingApplication = Depends(get_app),
-    ) -> dict[str, Any]:
-      return dispatch_standalone_binding(binding=binding, app=app, run_id=run_id)
-
-    get_run_surface.__name__ = binding.route_name
-    return get_run_surface
+    handle_surface.__name__ = binding.route_name
+    handle_surface.__signature__ = inspect.Signature(
+      parameters=parameters,
+      return_annotation=Any,
+    )
+    return handle_surface
 
   @router.get("/strategies")
   def list_strategies(
@@ -218,118 +296,6 @@ def create_router(container: Container) -> APIRouter:
         "timeframe": timeframe,
         "lifecycle_stage": lifecycle_stage,
       },
-    )
-
-  @router.post("/presets")
-  def create_preset(
-    request: ExperimentPresetRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_create",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.get("/presets/{preset_id}")
-  def get_preset(
-    preset_id: str,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_item_get",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"preset_id": preset_id},
-    )
-
-  @router.patch("/presets/{preset_id}")
-  def update_preset(
-    preset_id: str,
-    request: ExperimentPresetUpdateRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_item_update",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"preset_id": preset_id},
-      request_payload=request.model_dump(exclude_unset=True),
-    )
-
-  @router.get("/presets/{preset_id}/revisions")
-  def list_preset_revisions(
-    preset_id: str,
-    app: TradingApplication = Depends(get_app),
-  ) -> list[dict[str, Any]]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_revision_list",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"preset_id": preset_id},
-    )
-
-  @router.post("/presets/{preset_id}/revisions/{revision_id}/restore")
-  def restore_preset_revision(
-    preset_id: str,
-    revision_id: str,
-    request: ExperimentPresetRevisionRestoreRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_revision_restore",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"preset_id": preset_id, "revision_id": revision_id},
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/presets/{preset_id}/lifecycle")
-  def apply_preset_lifecycle_action(
-    preset_id: str,
-    request: ExperimentPresetLifecycleActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "preset_catalog_lifecycle_apply",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"preset_id": preset_id},
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/strategies/register")
-  def register_strategy(
-    request: StrategyRegistrationRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "strategy_catalog_register",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
     )
 
   @router.get("/runs")
@@ -379,153 +345,8 @@ def create_router(container: Container) -> APIRouter:
       filters={"run_id": run_id, "intent": intent},
     )
 
-  @router.post("/runs/backtests")
-  def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_backtest_launch",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/backtests")
-  def rerun_backtest_from_boundary(
-    rerun_boundary_id: str,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_rerun_backtest",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"rerun_boundary_id": rerun_boundary_id},
-    )
-
-  @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/sandbox")
-  def rerun_sandbox_from_boundary(
-    rerun_boundary_id: str,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_rerun_sandbox",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"rerun_boundary_id": rerun_boundary_id},
-    )
-
-  @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/paper")
-  def rerun_paper_from_boundary(
-    rerun_boundary_id: str,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_rerun_paper",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      path_params={"rerun_boundary_id": rerun_boundary_id},
-    )
-
-  @router.post("/runs/sandbox")
-  def start_sandbox_run(
-    request: SandboxRunRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_sandbox_launch",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/runs/paper")
-  def start_paper_run(
-    request: SandboxRunRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_paper_launch",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/runs/live")
-  def start_live_run(
-    request: LiveRunRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_live_launch",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/runs/live/{run_id}/orders/{order_id}/cancel")
-  def cancel_live_order(
-    run_id: str,
-    order_id: str,
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_live_order_cancel",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      run_id=run_id,
-      path_params={"order_id": order_id},
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/runs/live/{run_id}/orders/{order_id}/replace")
-  def replace_live_order(
-    run_id: str,
-    order_id: str,
-    request: GuardedLiveOrderReplaceRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "run_live_order_replace",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      run_id=run_id,
-      path_params={"order_id": order_id},
-      request_payload=request.model_dump(),
-    )
-
   for binding in list_standalone_surface_runtime_bindings(get_app().get_run_surface_capabilities()):
-    if (
-      binding.filter_keys
-      or binding.request_payload_kind is not None
-      or binding.path_param_keys
-      or binding.header_keys
-    ):
+    if binding.filter_keys:
       continue
     router.add_api_route(
       binding.route_path,
@@ -545,149 +366,6 @@ def create_router(container: Container) -> APIRouter:
       binding=binding,
       app=app,
       filters={"timeframe": timeframe},
-    )
-
-  @router.post("/operator/incidents/external-sync")
-  def sync_external_incident(
-    request: ExternalIncidentSyncRequest,
-    x_akra_incident_sync_token: str | None = Header(default=None, alias="X-Akra-Incident-Sync-Token"),
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "operator_incident_external_sync",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-      headers={"x_akra_incident_sync_token": x_akra_incident_sync_token},
-    )
-
-  @router.post("/guarded-live/kill-switch/engage")
-  def engage_guarded_live_kill_switch(
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_kill_switch_engage",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/guarded-live/kill-switch/release")
-  def release_guarded_live_kill_switch(
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_kill_switch_release",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/guarded-live/reconciliation")
-  def run_guarded_live_reconciliation(
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_reconciliation",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/guarded-live/recovery")
-  def recover_guarded_live_runtime_state(
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_recovery",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-    )
-
-  @router.post("/guarded-live/incidents/{event_id}/acknowledge")
-  def acknowledge_guarded_live_incident(
-    event_id: str,
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_incident_acknowledge",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-      path_params={"event_id": event_id},
-    )
-
-  @router.post("/guarded-live/incidents/{event_id}/remediate")
-  def remediate_guarded_live_incident(
-    event_id: str,
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_incident_remediate",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-      path_params={"event_id": event_id},
-    )
-
-  @router.post("/guarded-live/incidents/{event_id}/escalate")
-  def escalate_guarded_live_incident(
-    event_id: str,
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_incident_escalate",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
-      path_params={"event_id": event_id},
-    )
-
-  @router.post("/guarded-live/resume")
-  def resume_guarded_live_run(
-    request: GuardedLiveActionRequest,
-    app: TradingApplication = Depends(get_app),
-  ) -> dict[str, Any]:
-    binding = get_standalone_surface_runtime_binding(
-      "guarded_live_resume",
-      app.get_run_surface_capabilities(),
-    )
-    return dispatch_standalone_binding(
-      binding=binding,
-      app=app,
-      request_payload=request.model_dump(),
     )
 
   return router

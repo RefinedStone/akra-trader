@@ -4,6 +4,7 @@ from dataclasses import replace
 from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
+import inspect
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -232,6 +233,36 @@ def test_register_strategy_endpoint_returns_import_catalog_semantics(tmp_path: P
   assert "locally registered module" in payload["catalog_semantics"]["execution_model"]
   assert "Imported from a locally registered module path." in payload["catalog_semantics"]["operator_notes"]
   assert payload["lifecycle"]["registered_at"] is not None
+
+
+def test_complex_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  routes = {
+    route.name: route
+    for route in client.app.router.routes
+    if getattr(route, "name", None)
+  }
+
+  assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
+  assert tuple(inspect.signature(routes["update_preset"].endpoint).parameters) == ("preset_id", "request", "app")
+  assert tuple(inspect.signature(routes["restore_preset_revision"].endpoint).parameters) == (
+    "preset_id",
+    "revision_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["run_backtest"].endpoint).parameters) == ("request", "app")
+  assert tuple(inspect.signature(routes["cancel_live_order"].endpoint).parameters) == (
+    "run_id",
+    "order_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["sync_external_incident"].endpoint).parameters) == (
+    "request",
+    "x_akra_incident_sync_token",
+    "app",
+  )
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:
