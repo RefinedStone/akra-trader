@@ -21,6 +21,9 @@ This is not fully complete yet. The current wave introduces the first executable
 - core workflow provider methods for PagerDuty, Opsgenie, incident.io, FireHydrant, and Rootly now
   live in `adapters/operator_delivery_core_providers.py`
 
+Use [LLM Sensitivity](architecture-llm-sensitivity.md) for the repository-wide rule that one
+backend flow should be understandable from one entrypoint and a few direct collaborators.
+
 ## Target Structure
 
 - `domain/`

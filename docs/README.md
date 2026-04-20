@@ -14,12 +14,13 @@ longer-horizon blueprint.
 3. [Roadmap Overview](roadmap/README.md)
 4. [Roadmap: Next Wave Plan](roadmap/next-wave-plan.md)
 5. [Architecture](architecture.md)
-6. [Backend Architecture Target](architecture-backend-target.md)
-7. [Frontend Architecture Target](architecture-frontend-target.md)
-8. [Architecture Refactor Stages](architecture-refactor-stages.md)
-9. [Blueprint](blueprint/README.md)
-10. [Operations: Runbooks Overview](operations/runbooks-overview.md)
-11. [ADR Index](adr/README.md)
+6. [LLM Sensitivity](architecture-llm-sensitivity.md)
+7. [Backend Architecture Target](architecture-backend-target.md)
+8. [Frontend Architecture Target](architecture-frontend-target.md)
+9. [Architecture Refactor Stages](architecture-refactor-stages.md)
+10. [Blueprint](blueprint/README.md)
+11. [Operations: Runbooks Overview](operations/runbooks-overview.md)
+12. [ADR Index](adr/README.md)
 
 ## Document Roles
 
@@ -40,6 +41,8 @@ longer-horizon blueprint.
 
 - `architecture.md`
   - current boundary rules and the live refactor baseline
+- `architecture-llm-sensitivity.md`
+  - the practical definition of LLM sensitivity, anti-patterns, and review questions
 - `architecture-backend-target.md`
   - backend target structure, boundary rules, and first-wave move map
 - `architecture-frontend-target.md`

@@ -11,6 +11,8 @@ For frontend work, LLM sensitivity means one operator flow should be understanda
 entrypoint and a few nearby collaborators, without reopening `App.tsx` or unrelated workspace
 panels.
 
+Use [LLM Sensitivity](architecture-llm-sensitivity.md) for the stronger repository-wide definition.
+
 This wave introduces the first routing skeleton:
 
 - workspace route state moved into `apps/web/src/app/useWorkspaceRoute.ts`

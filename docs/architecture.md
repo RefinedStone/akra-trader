@@ -30,6 +30,9 @@ This is a structure rule, not a prompt trick.
 The goal is not only smaller files. The goal is bounded reading context, so both humans and agents
 can modify one behavior without reopening the rest of the product.
 
+Use [LLM Sensitivity](architecture-llm-sensitivity.md) for the full definition, anti-patterns,
+review questions, and repository-specific examples.
+
 ## Current Refactor Baseline
 
 The first architecture-reset wave is now partially implemented:
@@ -47,6 +50,7 @@ The product is still not fully decomposed. `application.py`, `operator_delivery.
 
 ## Target Documents
 
+- [LLM Sensitivity](architecture-llm-sensitivity.md)
 - [Backend Architecture Target](architecture-backend-target.md)
 - [Frontend Architecture Target](architecture-frontend-target.md)
 - [Architecture Refactor Stages](architecture-refactor-stages.md)

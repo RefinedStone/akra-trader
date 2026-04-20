@@ -173,4 +173,5 @@ It is not yet a finished live trading product:
 - [Roadmap Overview](../roadmap/README.md)
 - [Next Wave Plan](../roadmap/next-wave-plan.md)
 - [Architecture](../architecture.md)
+- [LLM Sensitivity](../architecture-llm-sensitivity.md)
 - [Blueprint](../blueprint/README.md)
