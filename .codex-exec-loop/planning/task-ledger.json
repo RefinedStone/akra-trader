@@ -5750,18 +5750,36 @@
       "direction_id": "experiment-os",
       "title": "Preserve upstream native runtime ids from artifact producers",
       "description": "Now that provenance contracts and replay selection explicitly carry `runtime_candidate_id`, upgrade the runtime or artifact producer path so that field preserves the source runtime's own candidate or entity id instead of reusing the canonical symbol-plus-text identity, allowing provenance and replay binding to consume true upstream-native ids without another contract change.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 31,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is upstream-native identity: the contract now has official `runtime_candidate_id`, but artifact producers still fill it with the same canonical text or symbol-derived value. That producer-side native-id preservation step is the clearest executable next task because the contract and replay consumer are already prepared for it.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit e9d5cbe, which preserved explicit upstream-native runtime ids from freqtrade artifact producer rows into hidden summary metadata, carried that value through provenance `runtime_candidate_id` extraction without exposing it in artifact UI/search surfaces, verified with `python -m py_compile`, three targeted `pytest` cases, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-promote-native-runtime-candidate-ids-into-provenance-contracts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:25:00Z",
+      "updated_at": "2026-04-20T10:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay identity trust from a contract-level runtime id placeholder into a true source-owned identity path, so provenance artifacts and replay binding finally preserve evaluator or producer native ids rather than a canonical surrogate duplicated into a new field."
+      "direction_relation_note": "Completed the first producer-side native-id preservation pass for experiment-os replay identity by keeping freqtrade's upstream runtime ids intact through provenance binding and replay selection, which now leaves the broader shared contract work of applying the same preservation rules across other artifact producers and heterogeneous upstream id-field schemas."
+    },
+    {
+      "id": "planning-experiment-os-generalize-upstream-runtime-id-preservation-across-artifact-producers",
+      "direction_id": "experiment-os",
+      "title": "Generalize upstream runtime id preservation across artifact producers",
+      "description": "Extend the newly shipped freqtrade-specific `runtime_candidate_id` preservation into a shared producer contract that can recognize and carry explicit upstream-native candidate or entity ids from other artifact producers and multiple row-schema field variants, so provenance binding preserves true source-owned runtime identity consistently instead of only for one producer shape.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 32,
+      "priority_reason": "The latest main-session reply says the freqtrade producer now preserves explicit native ids, but other artifact producers and broader upstream id-field schemas are not yet covered. That shared contract expansion is the clearest executable next task because the runtime-binding and replay consumer path already honor `runtime_candidate_id`; the remaining gap is producer breadth and schema generalization.",
+      "depends_on": [
+        "planning-experiment-os-preserve-upstream-native-runtime-ids-from-artifact-producers"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:41:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay identity trust from a single freqtrade producer integration into a durable cross-producer provenance contract, so native runtime ids survive artifact production regardless of which upstream artifact schema supplied them."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
