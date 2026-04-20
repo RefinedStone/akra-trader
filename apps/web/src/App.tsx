@@ -21543,6 +21543,14 @@ function RunSurfaceCollectionQueryBuilder({
       ): {
         matchedPredicateBranches: Array<{ location: string; detail: string }>;
         parameterComparisons: Array<{ location: string; detail: string }>;
+        runtimeCandidateTraces: Array<{
+          candidateAccessor: string;
+          candidatePath: string;
+          comparedValue: string;
+          detail: string;
+          location: string;
+          result: boolean;
+        }>;
         shortCircuitTraces: Array<{ location: string; detail: string }>;
         truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
         result: boolean;
@@ -21559,6 +21567,12 @@ function RunSurfaceCollectionQueryBuilder({
         );
         if (child.kind === "clause") {
           const clauseLocation = `${templateKey}.node.${pathSegments.join(".")}`;
+          const activeContract =
+            contracts.find((contract) => contract.contract_key === child.clause.contractKey) ?? null;
+          const activeSchema =
+            getRunSurfaceCollectionQuerySchemas(activeContract).find(
+              (schema) => getCollectionQuerySchemaId(schema) === child.clause.schemaId,
+            ) ?? null;
           const field = contracts
             .flatMap((contract) => getRunSurfaceCollectionQuerySchemas(contract))
             .flatMap((schema) => schema.elementSchema)
@@ -21601,9 +21615,52 @@ function RunSurfaceCollectionQueryBuilder({
                 : []
             ),
           ];
+          const resolvedParameterValues = activeSchema
+            ? Object.fromEntries(
+                activeSchema.parameters.map((parameter) => {
+                  const bindingKey = child.clause.parameterBindingKeys[parameter.key]?.trim() ?? "";
+                  return [
+                    parameter.key,
+                    bindingKey
+                      ? (bindingContextByKey[bindingKey] ?? `$${bindingKey}`)
+                      : (child.clause.parameterValues[parameter.key] ?? ""),
+                  ] as const;
+                }),
+              )
+            : child.clause.parameterValues;
+          const resolvedCandidatePath = activeSchema
+            ? resolveCollectionQueryPath(activeSchema.pathTemplate, resolvedParameterValues)
+            : [];
+          const candidatePath = resolvedCandidatePath.length
+            ? `${resolvedCandidatePath.join(".")}[*]`
+            : `${child.clause.schemaId || "collection"}[*]`;
+          const candidateAccessor = field
+            ? (
+                field.valueRoot
+                  ? `${activeSchema?.itemKind ?? "candidate"} value`
+                  : `${activeSchema?.itemKind ?? "candidate"}.${field.valuePath.join(".") || field.key}`
+              )
+            : "candidate value";
+          const comparedValue = child.clause.valueBindingKey
+            ? (bindingContextByKey[child.clause.valueBindingKey] ?? `$${child.clause.valueBindingKey}`)
+            : (child.clause.builderValue || "(blank)");
+          const runtimeCandidateTraces = [{
+            candidateAccessor,
+            candidatePath,
+            comparedValue,
+            detail:
+              `${child.clause.quantifier.toUpperCase()} evaluates ${candidateAccessor} from ${candidatePath} `
+              + `${operator?.label ?? child.clause.operatorKey} ${comparedValue}. `
+              + (comparisonNotes.length
+                ? `Resolved inputs: ${comparisonNotes.join(" · ")}`
+                : "No reviewed binding reached the candidate inputs for this clause."),
+            location: clauseLocation,
+            result: directMatch,
+          }];
           return {
             matchedPredicateBranches: [],
             parameterComparisons,
+            runtimeCandidateTraces,
             shortCircuitTraces: [],
             truthTableRows: [{
               location: clauseLocation,
@@ -21629,6 +21686,14 @@ function RunSurfaceCollectionQueryBuilder({
             return {
               matchedPredicateBranches: [],
               parameterComparisons: [],
+              runtimeCandidateTraces: [{
+                candidateAccessor: child.predicateKey,
+                candidatePath: predicateLocation,
+                comparedValue: "No matching binding",
+                detail: "Predicate reference has no reviewed binding flowing into its runtime parameters.",
+                location: predicateLocation,
+                result: false,
+              }],
               shortCircuitTraces: [],
               truthTableRows: [{
                 location: predicateLocation,
@@ -21657,6 +21722,14 @@ function RunSurfaceCollectionQueryBuilder({
             return {
               matchedPredicateBranches,
               parameterComparisons: [],
+              runtimeCandidateTraces: [{
+                candidateAccessor: child.predicateKey,
+                candidatePath: predicateLocation,
+                comparedValue: "Cycle guard",
+                detail: "Predicate reference matched but nested runtime candidate replay stopped at a cycle guard.",
+                location: predicateLocation,
+                result: true,
+              }],
               shortCircuitTraces: [{
                 location: predicateLocation,
                 detail: `Stopped recursion at ${child.predicateKey} to avoid a predicate template cycle.`,
@@ -21675,6 +21748,14 @@ function RunSurfaceCollectionQueryBuilder({
             return {
               matchedPredicateBranches,
               parameterComparisons: [],
+              runtimeCandidateTraces: [{
+                candidateAccessor: child.predicateKey,
+                candidatePath: predicateLocation,
+                comparedValue: "Template missing",
+                detail: "Predicate reference matched and no nested template definition was available for runtime candidate replay.",
+                location: predicateLocation,
+                result: true,
+              }],
               shortCircuitTraces: [],
               truthTableRows: [{
                 location: predicateLocation,
@@ -21700,6 +21781,24 @@ function RunSurfaceCollectionQueryBuilder({
               ...nestedEvaluation.matchedPredicateBranches,
             ],
             parameterComparisons: nestedEvaluation.parameterComparisons,
+            runtimeCandidateTraces: [
+              {
+                candidateAccessor: child.predicateKey,
+                candidatePath: predicateLocation,
+                comparedValue: matchedParameterBindings
+                  .map(([bindingKey, referenceKey]) =>
+                    `${bindingKey}=${bindingContextByKey[referenceKey] ?? `$${referenceKey}`}`)
+                  .join(" · "),
+                detail:
+                  `${child.predicateKey} receives runtime bindings ${matchedParameterBindings
+                    .map(([bindingKey, referenceKey]) =>
+                      `${bindingKey} <- $${referenceKey} (${bindingContextByKey[referenceKey] ?? "$" + referenceKey})`)
+                    .join(" · ")}.`,
+                location: predicateLocation,
+                result: predicateResult,
+              },
+              ...nestedEvaluation.runtimeCandidateTraces,
+            ],
             shortCircuitTraces: nestedEvaluation.shortCircuitTraces,
             truthTableRows: [
               {
@@ -21722,6 +21821,14 @@ function RunSurfaceCollectionQueryBuilder({
           evaluation: {
             matchedPredicateBranches: Array<{ location: string; detail: string }>;
             parameterComparisons: Array<{ location: string; detail: string }>;
+            runtimeCandidateTraces: Array<{
+              candidateAccessor: string;
+              candidatePath: string;
+              comparedValue: string;
+              detail: string;
+              location: string;
+              result: boolean;
+            }>;
             shortCircuitTraces: Array<{ location: string; detail: string }>;
             truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
             result: boolean;
@@ -21769,6 +21876,14 @@ function RunSurfaceCollectionQueryBuilder({
         return evaluatedChildren.reduce<{
           matchedPredicateBranches: Array<{ location: string; detail: string }>;
           parameterComparisons: Array<{ location: string; detail: string }>;
+          runtimeCandidateTraces: Array<{
+            candidateAccessor: string;
+            candidatePath: string;
+            comparedValue: string;
+            detail: string;
+            location: string;
+            result: boolean;
+          }>;
           shortCircuitTraces: Array<{ location: string; detail: string }>;
           truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
           result: boolean;
@@ -21781,6 +21896,10 @@ function RunSurfaceCollectionQueryBuilder({
             parameterComparisons: [
               ...accumulator.parameterComparisons,
               ...nestedChild.evaluation.parameterComparisons,
+            ],
+            runtimeCandidateTraces: [
+              ...accumulator.runtimeCandidateTraces,
+              ...nestedChild.evaluation.runtimeCandidateTraces,
             ],
             shortCircuitTraces: [
               ...accumulator.shortCircuitTraces,
@@ -21795,6 +21914,16 @@ function RunSurfaceCollectionQueryBuilder({
         }, {
           matchedPredicateBranches: [],
           parameterComparisons: [],
+          runtimeCandidateTraces: [{
+            candidateAccessor: `${child.logic.toUpperCase()} subgroup`,
+            candidatePath: `${templateKey}.node.${pathSegments.join(".")}`,
+            comparedValue: stopReason ?? "all child branches evaluated",
+            detail:
+              `${child.logic.toUpperCase()} subgroup ${child.negated ? "negates " : ""}combines child runtime candidate rows. `
+              + (stopReason ? `Resolution stopped early because ${stopReason}.` : "Every child candidate row was evaluated."),
+            location: `${templateKey}.node.${pathSegments.join(".")}`,
+            result: resolvedGroupResult,
+          }],
           shortCircuitTraces: [
             ...skippedChildren.map((skippedChild) => ({
               location: `${templateKey}.node.${[...pathSegments, skippedChild.pathSegment].join(".")}`,
@@ -21840,7 +21969,14 @@ function RunSurfaceCollectionQueryBuilder({
             selectedRefTemplate.key,
             [selectedRefTemplate.key],
           )
-        : { matchedPredicateBranches: [], parameterComparisons: [], shortCircuitTraces: [], truthTableRows: [], result: false };
+        : {
+            matchedPredicateBranches: [],
+            parameterComparisons: [],
+            runtimeCandidateTraces: [],
+            shortCircuitTraces: [],
+            truthTableRows: [],
+            result: false,
+          };
       const effectiveCoordinationPolicy =
         bundleCoordinationSimulationPolicyOverrides[group.key] ?? group.coordinationPolicy;
       return activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry) => {
@@ -21983,6 +22119,7 @@ function RunSurfaceCollectionQueryBuilder({
           matchedPredicateBranches: evaluationProvenance.matchedPredicateBranches,
           parameterReasons,
           parameterComparisons: evaluationProvenance.parameterComparisons,
+          runtimeCandidateTraces: evaluationProvenance.runtimeCandidateTraces,
           shortCircuitTraces: evaluationProvenance.shortCircuitTraces,
           truthTableRows: evaluationProvenance.truthTableRows,
         };
@@ -24777,6 +24914,36 @@ function RunSurfaceCollectionQueryBuilder({
                                             <strong>Evaluation-level provenance</strong>
                                             <span>{`${entry.matchedPredicateBranches.length + entry.parameterComparisons.length} matches`}</span>
                                           </div>
+                                          {entry.runtimeCandidateTraces.length ? (
+                                            <div className="run-surface-query-builder-trace-panel is-nested">
+                                              <div className="run-surface-query-builder-card-head">
+                                                <strong>Runtime candidate traces</strong>
+                                                <span>{entry.runtimeCandidateTraces.length}</span>
+                                              </div>
+                                              <div className="run-surface-query-builder-trace-list">
+                                                {entry.runtimeCandidateTraces.map((candidateTrace) => (
+                                                  <div
+                                                    className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
+                                                    key={`focused-causal-candidate:${entry.stepIndex}:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
+                                                  >
+                                                    <strong>{candidateTrace.candidateAccessor}</strong>
+                                                    <p>{candidateTrace.detail}</p>
+                                                    <div className="run-surface-query-builder-trace-chip-list">
+                                                      <span className="run-surface-query-builder-trace-chip">
+                                                        {candidateTrace.candidatePath}
+                                                      </span>
+                                                      <span className="run-surface-query-builder-trace-chip">
+                                                        {candidateTrace.comparedValue}
+                                                      </span>
+                                                      <span className={`run-surface-query-builder-trace-chip${candidateTrace.result ? " is-active" : ""}`}>
+                                                        {candidateTrace.result ? "matched" : "not matched"}
+                                                      </span>
+                                                    </div>
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            </div>
+                                          ) : null}
                                           {entry.truthTableRows.length ? (
                                             <div className="run-surface-query-builder-trace-panel is-nested">
                                               <div className="run-surface-query-builder-card-head">
@@ -26268,7 +26435,8 @@ function RunSurfaceCollectionQueryBuilder({
                                                     ) : null}
                                                   </div>
                                                 ) : null}
-                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.truthTableRows.length
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.runtimeCandidateTraces.length
+                                                || activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.truthTableRows.length
                                                 || activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.shortCircuitTraces.length
                                                 || activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.matchedPredicateBranches.length
                                                 || activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterComparisons.length ? (
@@ -26277,6 +26445,21 @@ function RunSurfaceCollectionQueryBuilder({
                                                       <strong>Evaluation-level provenance</strong>
                                                       <span>Active replay step</span>
                                                     </div>
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.runtimeCandidateTraces.length ? (
+                                                      <div className="run-surface-query-builder-trace-list">
+                                                        {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.runtimeCandidateTraces
+                                                          .slice(0, 3)
+                                                          .map((candidateTrace) => (
+                                                            <div
+                                                              className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
+                                                              key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
+                                                            >
+                                                              <strong>{candidateTrace.candidateAccessor}</strong>
+                                                              <p>{candidateTrace.detail}</p>
+                                                            </div>
+                                                          ))}
+                                                      </div>
+                                                    ) : null}
                                                     {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.truthTableRows.length ? (
                                                       <div className="run-surface-query-builder-trace-list">
                                                         {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.truthTableRows
