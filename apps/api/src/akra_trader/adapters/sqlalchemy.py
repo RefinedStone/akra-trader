@@ -22,6 +22,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import ExperimentPreset
+from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.ports import ExperimentPresetCatalogPort
@@ -61,6 +62,22 @@ experiment_presets = Table(
   Column("updated_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
+replay_intent_alias_records = Table(
+  "replay_intent_alias_records",
+  metadata,
+  Column("alias_id", String, primary_key=True),
+  Column("template_key", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("revoked_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+replay_intent_alias_state = Table(
+  "replay_intent_alias_state",
+  metadata,
+  Column("state_key", String, primary_key=True),
+  Column("payload", JSON, nullable=False),
+)
 
 
 def _build_engine(database_url: str) -> Engine:
@@ -79,6 +96,7 @@ def _build_engine(database_url: str) -> Engine:
 class SqlAlchemyRunRepository(RunRepositoryPort):
   _terminal_statuses = {RunStatus.COMPLETED, RunStatus.STOPPED, RunStatus.FAILED}
   _adapter = TypeAdapter(RunRecord)
+  _replay_alias_adapter = TypeAdapter(ReplayIntentAliasRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -184,6 +202,76 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       run.ended_at = datetime.now(UTC)
     return self.save_run(run)
 
+  def save_replay_intent_alias(self, record: ReplayIntentAliasRecord) -> ReplayIntentAliasRecord:
+    payload = self._replay_alias_adapter.dump_python(record, mode="json")
+    row = {
+      "alias_id": record.alias_id,
+      "template_key": record.template_key,
+      "created_at": record.created_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "revoked_at": record.revoked_at.isoformat() if record.revoked_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_records.c.alias_id).where(
+          replay_intent_alias_records.c.alias_id == record.alias_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(replay_intent_alias_records).values(**row))
+      else:
+        connection.execute(
+          update(replay_intent_alias_records)
+          .where(replay_intent_alias_records.c.alias_id == record.alias_id)
+          .values(**row)
+        )
+    return record
+
+  def get_replay_intent_alias(self, alias_id: str) -> ReplayIntentAliasRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(replay_intent_alias_records.c.payload).where(
+          replay_intent_alias_records.c.alias_id == alias_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._replay_alias_adapter.validate_python(row["payload"])
+
+  def load_replay_intent_alias_signing_secret(self) -> str | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(replay_intent_alias_state.c.payload).where(
+          replay_intent_alias_state.c.state_key == "signing_secret"
+        )
+      ).mappings().first()
+    if row is None or not isinstance(row["payload"], dict):
+      return None
+    secret = row["payload"].get("secret")
+    return secret if isinstance(secret, str) and secret else None
+
+  def save_replay_intent_alias_signing_secret(self, secret: str) -> str:
+    row = {
+      "state_key": "signing_secret",
+      "payload": {"secret": secret},
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_state.c.state_key).where(
+          replay_intent_alias_state.c.state_key == "signing_secret"
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(replay_intent_alias_state).values(**row))
+      else:
+        connection.execute(
+          update(replay_intent_alias_state)
+          .where(replay_intent_alias_state.c.state_key == "signing_secret")
+          .values(**row)
+        )
+    return secret
+
   def _build_row(self, run: RunRecord) -> dict:
     payload = self._adapter.dump_python(run, mode="json")
     return {
@@ -234,8 +322,18 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_run_records_preset_id", "preset_id"),
         ("ix_run_records_benchmark_family", "benchmark_family"),
         ("ix_run_record_tags_tag", "tag"),
+        ("ix_replay_intent_alias_records_template_key", "template_key"),
+        ("ix_replay_intent_alias_records_created_at", "created_at"),
+        ("ix_replay_intent_alias_records_expires_at", "expires_at"),
+        ("ix_replay_intent_alias_records_revoked_at", "revoked_at"),
       ):
-        table_name = "run_record_tags" if index_name == "ix_run_record_tags_tag" else "run_records"
+        table_name = (
+          "run_record_tags"
+          if index_name == "ix_run_record_tags_tag"
+          else "replay_intent_alias_records"
+            if index_name.startswith("ix_replay_intent_alias_records_")
+            else "run_records"
+        )
         connection.exec_driver_sql(
           f"CREATE INDEX IF NOT EXISTS {index_name} ON {table_name} ({column_name})"
         )

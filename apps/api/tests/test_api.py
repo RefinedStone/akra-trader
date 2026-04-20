@@ -395,6 +395,49 @@ def test_replay_link_alias_endpoints_resolve_and_revoke(tmp_path: Path) -> None:
   assert "revoked" in revoked_resolve_response.json()["detail"]
 
 
+def test_replay_link_alias_registry_survives_restart(tmp_path: Path) -> None:
+  database_path = tmp_path / "runs.sqlite3"
+  client = build_client(database_path)
+
+  create_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_a",
+      "template_label": "Template A",
+      "intent": {
+        "replayScope": "all",
+        "replayIndex": 4,
+      },
+      "redaction_policy": "full",
+      "retention_policy": "7d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+
+  assert create_response.status_code == 200
+  alias_token = create_response.json()["alias_token"]
+
+  restarted_client = build_client(database_path)
+  resolve_response = restarted_client.get(f"/api/replay-links/aliases/{alias_token}")
+
+  assert resolve_response.status_code == 200
+  assert resolve_response.json()["intent"]["replayIndex"] == 4
+
+  revoke_response = restarted_client.post(
+    f"/api/replay-links/aliases/{alias_token}/revoke",
+    json={"source_tab_id": "tab_remote", "source_tab_label": "Remote tab"},
+  )
+
+  assert revoke_response.status_code == 200
+
+  second_restart_client = build_client(database_path)
+  revoked_resolve_response = second_restart_client.get(f"/api/replay-links/aliases/{alias_token}")
+
+  assert revoked_resolve_response.status_code == 404
+  assert "revoked" in revoked_resolve_response.json()["detail"]
+
+
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   openapi = client.app.openapi()

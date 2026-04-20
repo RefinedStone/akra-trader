@@ -19,6 +19,7 @@ from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
+from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
 from akra_trader.domain.models import StrategyCatalogSemantics
@@ -181,6 +182,8 @@ class SeededMarketDataAdapter(MarketDataPort):
 class InMemoryRunRepository(RunRepositoryPort):
   def __init__(self) -> None:
     self._runs: OrderedDict[str, RunRecord] = OrderedDict()
+    self._replay_intent_alias_records: OrderedDict[str, ReplayIntentAliasRecord] = OrderedDict()
+    self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
     self._runs[run.config.run_id] = run
@@ -242,6 +245,20 @@ class InMemoryRunRepository(RunRepositoryPort):
     if status in {RunStatus.COMPLETED, RunStatus.STOPPED, RunStatus.FAILED}:
       run.ended_at = datetime.now(UTC)
     return run
+
+  def save_replay_intent_alias(self, record: ReplayIntentAliasRecord) -> ReplayIntentAliasRecord:
+    self._replay_intent_alias_records[record.alias_id] = record
+    return record
+
+  def get_replay_intent_alias(self, alias_id: str) -> ReplayIntentAliasRecord | None:
+    return self._replay_intent_alias_records.get(alias_id)
+
+  def load_replay_intent_alias_signing_secret(self) -> str | None:
+    return self._replay_intent_alias_signing_secret
+
+  def save_replay_intent_alias_signing_secret(self, secret: str) -> str:
+    self._replay_intent_alias_signing_secret = secret
+    return secret
 
 
 class InMemoryExperimentPresetCatalog(ExperimentPresetCatalogPort):

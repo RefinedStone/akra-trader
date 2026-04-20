@@ -14424,6 +14424,53 @@ def test_replay_link_alias_bindings_create_resolve_and_revoke(tmp_path: Path) ->
     )
 
 
+def test_replay_link_alias_records_survive_application_restart(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  created_alias = app.create_replay_intent_alias(
+    template_key="template_a",
+    template_label="Template A",
+    intent={"replayScope": "all", "replayIndex": 3},
+    redaction_policy="full",
+    retention_policy="7d",
+    source_tab_id="tab_local",
+    source_tab_label="Local tab",
+  )
+  alias_token = f"{created_alias.alias_id}.{created_alias.signature}"
+
+  restarted = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  resolved_alias = restarted.resolve_replay_intent_alias(alias_token)
+  assert resolved_alias.alias_id == created_alias.alias_id
+
+  restarted.revoke_replay_intent_alias(
+    alias_token,
+    source_tab_id="tab_remote",
+    source_tab_label="Remote tab",
+  )
+
+  second_restart = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+  )
+
+  with pytest.raises(LookupError, match="revoked"):
+    second_restart.resolve_replay_intent_alias(alias_token)
+
+
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   repo_root = Path(__file__).resolve().parents[3]
   references = build_references()

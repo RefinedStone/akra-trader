@@ -706,7 +706,7 @@ class TradingApplication:
       operator_alert_incident_escalation_backoff_multiplier,
       1.0,
     )
-    self._replay_intent_alias_signing_secret = uuid4().hex
+    self._replay_intent_alias_signing_secret = self._load_or_create_replay_intent_alias_signing_secret()
     self._replay_intent_alias_records: dict[str, ReplayIntentAliasRecord] = {}
 
   def list_strategies(
@@ -1238,6 +1238,39 @@ class TradingApplication:
     ).hexdigest()
     return digest[:18]
 
+  def _load_or_create_replay_intent_alias_signing_secret(self) -> str:
+    load_secret = getattr(self._runs, "load_replay_intent_alias_signing_secret", None)
+    save_secret = getattr(self._runs, "save_replay_intent_alias_signing_secret", None)
+    if callable(load_secret):
+      existing_secret = load_secret()
+      if isinstance(existing_secret, str) and existing_secret.strip():
+        return existing_secret.strip()
+    next_secret = uuid4().hex
+    if callable(save_secret):
+      persisted_secret = save_secret(next_secret)
+      if isinstance(persisted_secret, str) and persisted_secret.strip():
+        return persisted_secret.strip()
+    return next_secret
+
+  def _save_replay_intent_alias_record(
+    self,
+    record: ReplayIntentAliasRecord,
+  ) -> ReplayIntentAliasRecord:
+    save_alias = getattr(self._runs, "save_replay_intent_alias", None)
+    if callable(save_alias):
+      return save_alias(record)
+    self._replay_intent_alias_records[record.alias_id] = record
+    return record
+
+  def _load_replay_intent_alias_record(
+    self,
+    alias_id: str,
+  ) -> ReplayIntentAliasRecord | None:
+    get_alias = getattr(self._runs, "get_replay_intent_alias", None)
+    if callable(get_alias):
+      return get_alias(alias_id)
+    return self._replay_intent_alias_records.get(alias_id)
+
   def _prune_replay_intent_alias_records(self) -> None:
     current_time = self._clock()
     self._replay_intent_alias_records = {
@@ -1252,9 +1285,9 @@ class TradingApplication:
     *,
     require_active: bool = True,
   ) -> ReplayIntentAliasRecord:
-    self._prune_replay_intent_alias_records()
     alias_id, supplied_signature = self._parse_replay_intent_alias_token(alias_token)
-    record = self._replay_intent_alias_records.get(alias_id)
+    self._prune_replay_intent_alias_records()
+    record = self._load_replay_intent_alias_record(alias_id)
     if record is None:
       raise LookupError("Replay link alias not found.")
     expected_signature = self._build_replay_intent_alias_signature(
@@ -1275,7 +1308,6 @@ class TradingApplication:
       if record.revoked_at is not None:
         raise LookupError("Replay link alias has been revoked.")
       if record.expires_at is not None and record.expires_at <= self._clock():
-        self._replay_intent_alias_records.pop(alias_id, None)
         raise LookupError("Replay link alias has expired.")
     return record
 
@@ -1329,8 +1361,7 @@ class TradingApplication:
         else None
       ),
     )
-    self._replay_intent_alias_records[record.alias_id] = record
-    self._prune_replay_intent_alias_records()
+    self._save_replay_intent_alias_record(record)
     return record
 
   def resolve_replay_intent_alias(self, alias_token: str) -> ReplayIntentAliasRecord:
@@ -1356,8 +1387,7 @@ class TradingApplication:
         else None
       ),
     )
-    self._replay_intent_alias_records[record.alias_id] = revoked_record
-    return revoked_record
+    return self._save_replay_intent_alias_record(revoked_record)
 
   def get_market_data_status(self, timeframe: str) -> MarketDataStatus:
     return self._market_data.get_status(timeframe)
