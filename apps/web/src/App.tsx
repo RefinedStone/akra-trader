@@ -7778,128 +7778,134 @@ export default function App() {
                   </div>
                 </>
               ) : null}
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Instrument</th>
-                    <th>Timeframe</th>
-                    <th>Sync</th>
-                    <th>Candles</th>
-                    <th>Target</th>
-                    <th>Count</th>
-                    <th>Quality</th>
-                    <th>Lag</th>
-                    <th>Latest</th>
-                    <th>Checkpoint</th>
-                    <th>Failures</th>
-                    <th>Issues</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {marketStatus.instruments.map((instrument) => (
-                    <tr key={instrument.instrument_id}>
-                      <td>{instrument.instrument_id}</td>
-                      <td>{instrument.timeframe}</td>
-                      <td>{instrument.sync_status}</td>
-                      <td>{instrument.candle_count}</td>
-                      <td>{instrument.backfill_target_candles ?? "n/a"}</td>
-                      <td>
-                        <BackfillCountStatus instrument={instrument} />
-                      </td>
-                      <td>
-                        {(() => {
-                          const rowKey = instrumentGapRowKey(instrument);
-                          const gapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
-                            buildGapWindowKey(gapWindow),
-                          );
-                          const expanded = Boolean(expandedGapRows[rowKey]);
-                          return (
-                            <BackfillQualityStatus
-                              expanded={expanded}
-                              gapWindowPickerOpen={activeGapWindowPickerRowKey === rowKey}
-                              instrument={instrument}
-                              onChangeGapWindowSelections={(nextSelectedGapWindowKeys) => {
-                                setExpandedGapWindowSelections((current) => {
-                                  const nextSelectedWindows = gapWindowKeys.filter((candidate) =>
-                                    nextSelectedGapWindowKeys.includes(candidate),
-                                  );
-                                  if (!nextSelectedWindows.length) {
-                                    return current;
-                                  }
-                                  const currentSelectedWindows = resolveGapWindowSelectionList(
-                                    gapWindowKeys,
-                                    current[rowKey] ?? null,
-                                  );
-                                  if (isSameGapWindowSelectionList(currentSelectedWindows, nextSelectedWindows)) {
-                                    return current;
-                                  }
-                                  return {
-                                    ...current,
-                                    [rowKey]: nextSelectedWindows,
-                                  };
-                                });
-                              }}
-                              onSelectAllGapWindows={() => {
-                                if (!gapWindowKeys.length) {
-                                  return;
-                                }
-                                setExpandedGapWindowSelections((current) => ({
-                                  ...current,
-                                  [rowKey]: gapWindowKeys,
-                                }));
-                              }}
-                              onToggle={() => {
-                                const nextExpanded = !expanded;
-                                if (!nextExpanded && activeGapWindowPickerRowKey === rowKey) {
-                                  setActiveGapWindowPickerRowKey(null);
-                                }
-                                setExpandedGapRows((current) => toggleExpandedGapRow(current, rowKey));
-                                setExpandedGapWindowSelections((current) => {
-                                  if (current[rowKey]?.length) {
-                                    return current;
-                                  }
-                                  return gapWindowKeys.length
-                                    ? { ...current, [rowKey]: gapWindowKeys }
-                                    : current;
-                                });
-                              }}
-                              onToggleGapWindowPicker={() => {
-                                if (!gapWindowKeys.length) {
-                                  return;
-                                }
-                                if (!expanded) {
-                                  setExpandedGapRows((current) =>
-                                    current[rowKey] ? current : { ...current, [rowKey]: true },
-                                  );
-                                }
-                                setExpandedGapWindowSelections((current) => {
-                                  if (current[rowKey]?.length) {
-                                    return current;
-                                  }
-                                  return { ...current, [rowKey]: gapWindowKeys };
-                                });
-                                setActiveGapWindowPickerRowKey((current) =>
-                                  current === rowKey ? null : rowKey,
-                                );
-                              }}
-                              selectedGapWindowKeys={expandedGapWindowSelections[rowKey] ?? null}
-                            />
-                          );
-                        })()}
-                      </td>
-                      <td>{instrument.lag_seconds ?? "n/a"}</td>
-                      <td>{instrument.last_timestamp ?? "n/a"}</td>
-                      <td>
-                        <SyncCheckpointStatus instrument={instrument} />
-                      </td>
-                      <td>
-                        <SyncFailureStatus instrument={instrument} />
-                      </td>
-                      <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
+              <PanelDisclosure
+                defaultOpen={false}
+                summary={`${marketStatus.instruments.length} instruments across ${marketStatus.provider} / ${marketStatus.venue}.`}
+                title="Instrument sync ledger"
+              >
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Instrument</th>
+                      <th>Timeframe</th>
+                      <th>Sync</th>
+                      <th>Candles</th>
+                      <th>Target</th>
+                      <th>Count</th>
+                      <th>Quality</th>
+                      <th>Lag</th>
+                      <th>Latest</th>
+                      <th>Checkpoint</th>
+                      <th>Failures</th>
+                      <th>Issues</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {marketStatus.instruments.map((instrument) => (
+                      <tr key={instrument.instrument_id}>
+                        <td>{instrument.instrument_id}</td>
+                        <td>{instrument.timeframe}</td>
+                        <td>{instrument.sync_status}</td>
+                        <td>{instrument.candle_count}</td>
+                        <td>{instrument.backfill_target_candles ?? "n/a"}</td>
+                        <td>
+                          <BackfillCountStatus instrument={instrument} />
+                        </td>
+                        <td>
+                          {(() => {
+                            const rowKey = instrumentGapRowKey(instrument);
+                            const gapWindowKeys = instrument.backfill_gap_windows.map((gapWindow) =>
+                              buildGapWindowKey(gapWindow),
+                            );
+                            const expanded = Boolean(expandedGapRows[rowKey]);
+                            return (
+                              <BackfillQualityStatus
+                                expanded={expanded}
+                                gapWindowPickerOpen={activeGapWindowPickerRowKey === rowKey}
+                                instrument={instrument}
+                                onChangeGapWindowSelections={(nextSelectedGapWindowKeys) => {
+                                  setExpandedGapWindowSelections((current) => {
+                                    const nextSelectedWindows = gapWindowKeys.filter((candidate) =>
+                                      nextSelectedGapWindowKeys.includes(candidate),
+                                    );
+                                    if (!nextSelectedWindows.length) {
+                                      return current;
+                                    }
+                                    const currentSelectedWindows = resolveGapWindowSelectionList(
+                                      gapWindowKeys,
+                                      current[rowKey] ?? null,
+                                    );
+                                    if (isSameGapWindowSelectionList(currentSelectedWindows, nextSelectedWindows)) {
+                                      return current;
+                                    }
+                                    return {
+                                      ...current,
+                                      [rowKey]: nextSelectedWindows,
+                                    };
+                                  });
+                                }}
+                                onSelectAllGapWindows={() => {
+                                  if (!gapWindowKeys.length) {
+                                    return;
+                                  }
+                                  setExpandedGapWindowSelections((current) => ({
+                                    ...current,
+                                    [rowKey]: gapWindowKeys,
+                                  }));
+                                }}
+                                onToggle={() => {
+                                  const nextExpanded = !expanded;
+                                  if (!nextExpanded && activeGapWindowPickerRowKey === rowKey) {
+                                    setActiveGapWindowPickerRowKey(null);
+                                  }
+                                  setExpandedGapRows((current) => toggleExpandedGapRow(current, rowKey));
+                                  setExpandedGapWindowSelections((current) => {
+                                    if (current[rowKey]?.length) {
+                                      return current;
+                                    }
+                                    return gapWindowKeys.length
+                                      ? { ...current, [rowKey]: gapWindowKeys }
+                                      : current;
+                                  });
+                                }}
+                                onToggleGapWindowPicker={() => {
+                                  if (!gapWindowKeys.length) {
+                                    return;
+                                  }
+                                  if (!expanded) {
+                                    setExpandedGapRows((current) =>
+                                      current[rowKey] ? current : { ...current, [rowKey]: true },
+                                    );
+                                  }
+                                  setExpandedGapWindowSelections((current) => {
+                                    if (current[rowKey]?.length) {
+                                      return current;
+                                    }
+                                    return { ...current, [rowKey]: gapWindowKeys };
+                                  });
+                                  setActiveGapWindowPickerRowKey((current) =>
+                                    current === rowKey ? null : rowKey,
+                                  );
+                                }}
+                                selectedGapWindowKeys={expandedGapWindowSelections[rowKey] ?? null}
+                              />
+                            );
+                          })()}
+                        </td>
+                        <td>{instrument.lag_seconds ?? "n/a"}</td>
+                        <td>{instrument.last_timestamp ?? "n/a"}</td>
+                        <td>
+                          <SyncCheckpointStatus instrument={instrument} />
+                        </td>
+                        <td>
+                          <SyncFailureStatus instrument={instrument} />
+                        </td>
+                        <td>{instrument.issues.length ? instrument.issues.join(", ") : "ok"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </PanelDisclosure>
             </div>
           ) : (
             <p>No data status loaded.</p>
@@ -7945,75 +7951,84 @@ export default function App() {
                   </div>
                 </>
               ) : null}
-              <div className="status-grid-two-column">
-                <div>
-                  <h3>Active alerts</h3>
-                  {operatorVisibility.alerts.length ? (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>Severity</th>
-                          <th>Category</th>
-                          <th>Summary</th>
-                          <th>Detected</th>
-                          <th>Run</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {operatorVisibility.alerts.map((alert) => (
-                          <tr key={alert.alert_id}>
-                            <td>{alert.severity}</td>
-                            <td>{alert.category}</td>
-                            <td>
-                              <strong>{alert.summary}</strong>
-                              <p className="run-lineage-symbol-copy">{alert.detail}</p>
-                              <p className="run-lineage-symbol-copy">
-                                Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
-                              </p>
-                            </td>
-                            <td>{formatTimestamp(alert.detected_at)}</td>
-                            <td>{alert.run_id ?? "n/a"}</td>
+              <PanelDisclosure
+                defaultOpen={true}
+                summary={`${operatorVisibility.alerts.length} active alerts · ${operatorVisibility.audit_events.length} recent audit events.`}
+                title="Active alerts and audit"
+              >
+                <div className="status-grid-two-column">
+                  <div>
+                    <h3>Active alerts</h3>
+                    {operatorVisibility.alerts.length ? (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Severity</th>
+                            <th>Category</th>
+                            <th>Summary</th>
+                            <th>Detected</th>
+                            <th>Run</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="empty-state">No active runtime alerts.</p>
-                  )}
-                </div>
-                <div>
-                  <h3>Recent audit</h3>
-                  {operatorVisibility.audit_events.length ? (
-                    <table className="data-table">
-                      <thead>
-                        <tr>
-                          <th>When</th>
-                          <th>Actor</th>
-                          <th>Kind</th>
-                          <th>Summary</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {operatorVisibility.audit_events.slice(0, 8).map((event) => (
-                          <tr key={event.event_id}>
-                            <td>{formatTimestamp(event.timestamp)}</td>
-                            <td>{event.actor}</td>
-                            <td>{event.kind}</td>
-                            <td>
-                              <strong>{event.summary}</strong>
-                              <p className="run-lineage-symbol-copy">{event.detail}</p>
-                            </td>
+                        </thead>
+                        <tbody>
+                          {operatorVisibility.alerts.map((alert) => (
+                            <tr key={alert.alert_id}>
+                              <td>{alert.severity}</td>
+                              <td>{alert.category}</td>
+                              <td>
+                                <strong>{alert.summary}</strong>
+                                <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                                <p className="run-lineage-symbol-copy">
+                                  Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                                </p>
+                              </td>
+                              <td>{formatTimestamp(alert.detected_at)}</td>
+                              <td>{alert.run_id ?? "n/a"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="empty-state">No active runtime alerts.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h3>Recent audit</h3>
+                    {operatorVisibility.audit_events.length ? (
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>When</th>
+                            <th>Actor</th>
+                            <th>Kind</th>
+                            <th>Summary</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  ) : (
-                    <p className="empty-state">No runtime audit events recorded.</p>
-                  )}
+                        </thead>
+                        <tbody>
+                          {operatorVisibility.audit_events.slice(0, 8).map((event) => (
+                            <tr key={event.event_id}>
+                              <td>{formatTimestamp(event.timestamp)}</td>
+                              <td>{event.actor}</td>
+                              <td>{event.kind}</td>
+                              <td>
+                                <strong>{event.summary}</strong>
+                                <p className="run-lineage-symbol-copy">{event.detail}</p>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <p className="empty-state">No runtime audit events recorded.</p>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div>
-                <h3>Incident events</h3>
+              </PanelDisclosure>
+              <PanelDisclosure
+                defaultOpen={false}
+                summary={`${operatorVisibility.incident_events.length} persisted incident events with delivery and remediation metadata.`}
+                title="Incident events"
+              >
                 {operatorVisibility.incident_events.length ? (
                   <table className="data-table">
                     <thead>
@@ -8150,9 +8165,12 @@ export default function App() {
                 ) : (
                   <p className="empty-state">No persisted incident events recorded.</p>
                 )}
-              </div>
-              <div>
-                <h3>Alert history</h3>
+              </PanelDisclosure>
+              <PanelDisclosure
+                defaultOpen={false}
+                summary={`${operatorVisibility.alert_history.length} historical alert rows.`}
+                title="Alert history"
+              >
                 {operatorVisibility.alert_history.length ? (
                   <table className="data-table">
                     <thead>
@@ -8185,9 +8203,12 @@ export default function App() {
                 ) : (
                   <p className="empty-state">No persisted live-path alert history recorded.</p>
                 )}
-              </div>
-              <div>
-                <h3>Delivery history</h3>
+              </PanelDisclosure>
+              <PanelDisclosure
+                defaultOpen={false}
+                summary={`${operatorVisibility.delivery_history.length} outbound delivery attempts.`}
+                title="Delivery history"
+              >
                 {operatorVisibility.delivery_history.length ? (
                   <table className="data-table">
                     <thead>
@@ -8201,35 +8222,35 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                        {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
-                          <tr key={`delivery-${record.delivery_id}`}>
-                            <td>{formatTimestamp(record.attempted_at)}</td>
-                            <td>{record.target}</td>
-                            <td>{record.status}</td>
-                            <td>{record.attempt_number}</td>
-                            <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
-                            <td>
-                              <strong>{record.incident_kind}</strong>
-                              <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
-                              {record.provider_action ? (
-                                <p className="run-lineage-symbol-copy">
-                                  Provider action: {record.provider_action}
-                                </p>
-                              ) : null}
+                      {operatorVisibility.delivery_history.slice(0, 8).map((record) => (
+                        <tr key={`delivery-${record.delivery_id}`}>
+                          <td>{formatTimestamp(record.attempted_at)}</td>
+                          <td>{record.target}</td>
+                          <td>{record.status}</td>
+                          <td>{record.attempt_number}</td>
+                          <td>{formatTimestamp(record.next_retry_at ?? null)}</td>
+                          <td>
+                            <strong>{record.incident_kind}</strong>
+                            <p className="run-lineage-symbol-copy">Phase: {record.phase}</p>
+                            {record.provider_action ? (
                               <p className="run-lineage-symbol-copy">
-                                External: {record.external_provider ?? "n/a"}
-                                {record.external_reference ? ` (${record.external_reference})` : ""}
+                                Provider action: {record.provider_action}
                               </p>
-                              <p className="run-lineage-symbol-copy">{record.detail}</p>
-                            </td>
-                          </tr>
-                        ))}
+                            ) : null}
+                            <p className="run-lineage-symbol-copy">
+                              External: {record.external_provider ?? "n/a"}
+                              {record.external_reference ? ` (${record.external_reference})` : ""}
+                            </p>
+                            <p className="run-lineage-symbol-copy">{record.detail}</p>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 ) : (
                   <p className="empty-state">No outbound delivery attempts recorded.</p>
                 )}
-              </div>
+              </PanelDisclosure>
             </div>
           ) : (
             <p>No operator visibility loaded.</p>
@@ -8321,8 +8342,13 @@ export default function App() {
                   Release kill switch
                 </button>
               </div>
-              <div className="status-grid-two-column">
-                <div>
+              <div className="panel-disclosure-grid">
+                <PanelDisclosure
+                  defaultOpen={true}
+                  summary={`${guardedLive.kill_switch.state} kill switch · ${guardedLive.blockers.length} blockers · owner ${guardedLive.ownership.state}.`}
+                  title="Control guardrails"
+                >
+                  <div className="panel-disclosure-stack">
                   <h3>Current guardrails</h3>
                   <table className="data-table">
                     <tbody>
@@ -8447,8 +8473,14 @@ export default function App() {
                   ) : (
                     <p className="empty-state">No guarded-live blockers recorded.</p>
                   )}
-                </div>
-                <div>
+                  </div>
+                </PanelDisclosure>
+                <PanelDisclosure
+                  defaultOpen={false}
+                  summary={`${guardedLive.reconciliation.findings.length} findings · ${guardedLive.incident_events.length} incidents · ${guardedLive.order_book.open_orders.length} durable orders.`}
+                  title="Venue state, recovery, and incidents"
+                >
+                  <div className="panel-disclosure-stack panel-disclosure-scroll">
                   <h3>Reconciliation findings</h3>
                   {guardedLive.reconciliation.findings.length ? (
                     <table className="data-table">
@@ -9419,7 +9451,8 @@ export default function App() {
                   ) : (
                     <p className="empty-state">No guarded-live audit events recorded.</p>
                   )}
-                </div>
+                  </div>
+                </PanelDisclosure>
               </div>
             </div>
           ) : (
@@ -9690,6 +9723,40 @@ export default function App() {
         </div>
       </main>
     </div>
+  );
+}
+
+function PanelDisclosure({
+  children,
+  defaultOpen = false,
+  summary,
+  title,
+}: {
+  children: ReactNode;
+  defaultOpen?: boolean;
+  summary?: string;
+  title: string;
+}) {
+  const bodyId = useId();
+  const [open, setOpen] = useState(defaultOpen);
+
+  return (
+    <details
+      className={`panel-disclosure ${open ? "is-open" : ""}`.trim()}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={open}
+    >
+      <summary aria-controls={bodyId} className="panel-disclosure-summary">
+        <div className="panel-disclosure-summary-copy">
+          <strong>{title}</strong>
+          {summary ? <p>{summary}</p> : null}
+        </div>
+        <span className="panel-disclosure-state">{open ? "Collapse" : "Expand"}</span>
+      </summary>
+      <div className="panel-disclosure-body" id={bodyId}>
+        {children}
+      </div>
+    </details>
   );
 }
 

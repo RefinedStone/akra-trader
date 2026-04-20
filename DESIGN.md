@@ -1,129 +1,84 @@
-# Akra Trader Control Room
+# ▲ 111,956,000 BTC/KRW +1.76%
 
-## Visual Theme & Atmosphere
+## Mission
+Create implementation-ready, token-driven UI guidance for ▲ 111,956,000 BTC/KRW +1.76% that is optimized for consistency, accessibility, and fast delivery across dashboard web app.
 
-- Operator-first trading workstation, not a marketing landing page.
-- Inspired by the confidence of Coinbase and the disciplined information architecture of Linear as surfaced through `awesome-design-md` / `getdesign.md`.
-- The product should feel calm, high-trust, and dense without becoming chaotic.
-- Dark charcoal surfaces and cobalt accents are the base. Amber and ember are reserved for warnings, risk, and actions that deserve attention.
-- The interface should reward fast scanning. Large surfaces are acceptable only when they are grouped by task and given a clear heading.
+## Brand
+- Product/brand: ▲ 111,956,000 BTC/KRW +1.76%
+- URL: https://www.upbit.com/exchange?code=CRIX.UPBIT.KRW-BTC
+- Audience: authenticated users and operators
+- Product surface: dashboard web app
 
-## Product Layout Rules
+## Style Foundations
+- Visual style: clean, functional, implementation-oriented
+- Main font style: `font.family.primary=Roboto`, `font.family.stack=Roboto, Noto Sans KR, sans-serif, AppleSDGothicNeo-Regular, Malgun Gothic, Dotum, sans-serif`, `font.size.base=12px`, `font.weight.base=400`, `font.lineHeight.base=normal`
+- Typography scale: `font.size.xs=11px`, `font.size.sm=12px`, `font.size.md=14px`, `font.size.lg=15px`, `font.size.xl=16px`, `font.size.2xl=34px`
+- Color palette: `color.text.primary=#333333`, `color.text.secondary=#dd3c44`, `color.text.tertiary=#0062df`, `color.text.inverse=#1375ec`, `color.surface.base=#000000`, `color.surface.muted=#e9ecf1`, `color.surface.raised=#edeef1`
+- Spacing scale: `space.1=2px`, `space.2=4px`, `space.3=6px`, `space.4=8px`, `space.5=9px`, `space.6=10px`, `space.7=16px`, `space.8=17px`
+- Radius/shadow/motion tokens: `radius.xs=4px`
 
-- The control room must be segmented into workspaces:
-  - `Overview`
-  - `Research`
-  - `Runtime Ops`
-  - `Guarded Live`
-- Do not put the full product on one endless page.
-- Each workspace should expose one clear purpose and only the panels needed for that purpose.
-- Navigation between workspaces should stay visible while scrolling.
-- Primary status should appear high on the page in compact summary cards before any detailed tables.
+## Dashboard Structure
+- The control room must stay segmented into `Overview`, `Research`, `Runtime Ops`, and `Guarded Live`.
+- Each workspace must expose summary metrics first and detailed operational content second.
+- Long operational detail should default to collapsed disclosure panels instead of open full-page stacks.
+- Dense data is allowed, but it must stay inside clearly bordered cards or disclosures with visible headings.
+- Workspace navigation should remain visible and should clearly show the active surface.
 
-## Color Palette & Roles
+## Readability Rules
+- Long identifiers, payloads, and status copy must wrap without overflowing their container.
+- Body copy should use the primary font stack. Monospace should be limited to timestamps, IDs, and compact metadata.
+- Large tables should prefer compact density, but they must remain readable on smaller widths.
+- Metric tiles and cards should expose a short label, one primary value, and one supporting line only.
+- Interactive controls should preserve visible borders on light surfaces.
 
-- App background: `#07111a`
-- Elevated background: `#0c1824`
-- Primary panel: `rgba(12, 20, 31, 0.9)`
-- Strong panel: `rgba(16, 27, 40, 0.96)`
-- Border: `rgba(130, 160, 194, 0.16)`
-- Strong border: `rgba(115, 149, 205, 0.28)`
-- Primary text: `#f5f7fb`
-- Secondary text: `#90a1b5`
-- Accent blue: `#4f80ff`
-- Accent cyan: `#78d4ff`
-- Success: `#5ad7a4`
-- Warning: `#f6b94f`
-- Danger: `#ff8d7a`
+## Accessibility
+- Target: WCAG 2.2 AA
+- Keyboard-first interactions required.
+- Focus-visible rules required.
+- Contrast constraints required.
 
-## Typography
+## Writing Tone
+Concise, confident, implementation-focused.
 
-- Use a clean, modern sans with low drama for primary UI copy.
-- Headings should feel crisp and slightly compressed, but not playful.
-- Monospace is for metadata, system labels, timestamps, and identifiers only.
-- Heading hierarchy should be obvious:
-  - Page title: strong and direct
-  - Workspace title: prominent but smaller than the page title
-  - Panel title: compact and functional
+## Rules: Do
+- Use semantic tokens, not raw hex values, in component guidance.
+- Every component must define states for default, hover, focus-visible, active, disabled, loading, and error.
+- Component behavior should specify responsive and edge-case handling.
+- Interactive components must document keyboard, pointer, and touch behavior.
+- Accessibility acceptance criteria must be testable in implementation.
 
-## Components
+## Rules: Don't
+- Do not allow low-contrast text or hidden focus indicators.
+- Do not introduce one-off spacing or typography exceptions.
+- Do not use ambiguous labels or non-descriptive actions.
+- Do not ship component guidance without explicit state rules.
 
-### Hero
+## Guideline Authoring Workflow
+1. Restate design intent in one sentence.
+2. Define foundations and semantic tokens.
+3. Define component anatomy, variants, interactions, and state behavior.
+4. Add accessibility acceptance criteria with pass/fail checks.
+5. Add anti-patterns, migration notes, and edge-case handling.
+6. End with a QA checklist.
 
-- Short and functional.
-- Explain the product in one clear sentence.
-- The hero should include live status context, not decorative filler.
+## Required Output Structure
+- Context and goals.
+- Design tokens and foundations.
+- Component-level rules (anatomy, variants, states, responsive behavior).
+- Accessibility requirements and testable acceptance criteria.
+- Content and tone standards with examples.
+- Anti-patterns and prohibited implementations.
+- QA checklist.
 
-### Workspace Navigation
+## Component Rule Expectations
+- Include keyboard, pointer, and touch behavior.
+- Include spacing and typography token requirements.
+- Include long-content, overflow, and empty-state handling.
+- Include known page component density: links (298), tables (37), buttons (16), lists (15), inputs (7), cards (6), navigation (3).
 
-- Use large segmented navigation cards or tabs.
-- Each workspace item should communicate:
-  - name
-  - purpose
-  - current state summary
-- Active workspace should be obvious through border, background, and accent treatment.
 
-### Summary Cards
-
-- Put core metrics in compact cards near the top.
-- Each card should expose:
-  - label
-  - one strong value
-  - one short supporting detail
-- Do not overload cards with mini tables.
-
-### Panels
-
-- Panels should look deliberate and modular.
-- Wide panels are allowed for data tables and run-history surfaces.
-- Avoid stacking too many wide panels in a single workspace when the surrounding context is unrelated.
-
-### Buttons
-
-- Primary actions should use blue emphasis.
-- Secondary actions should be subdued ghost buttons.
-- Dangerous or high-risk actions should not look identical to routine actions.
-
-## Content Density Rules
-
-- Dense data is acceptable inside runtime and live panels.
-- Density must come from structure, not from dumping every surface into one scroll.
-- Always separate:
-  - research actions
-  - runtime monitoring
-  - guarded-live intervention
-- If a panel exists mainly for reference, it should live behind the workspace where it is used.
-
-## Motion & Interaction
-
-- Use restrained transitions for hover, focus, and active state changes.
-- Prefer subtle elevation and border changes over flashy animation.
-- Sticky navigation is encouraged when it improves orientation.
-
-## Do
-
-- Keep the experience task-based.
-- Use strong headings and short supporting copy.
-- Make risk states visually distinct.
-- Give operators a fast path to the next relevant workspace.
-- Preserve data density where the domain requires it.
-
-## Do Not
-
-- Do not recreate a long single-page dashboard.
-- Do not use accent colors as decoration without meaning.
-- Do not mix research and live controls in the same visual block.
-- Do not let giant tables become the only navigation mechanism.
-- Do not introduce purple-heavy branding or generic SaaS gradients.
-
-## Responsive Behavior
-
-- Desktop should use multi-column panel layouts.
-- Tablet and mobile should collapse to single-column or two-column navigation without losing workspace segmentation.
-- Sticky workspace navigation can relax on smaller screens if it impedes content.
-
-## Agent Prompt Guide
-
-- When editing this frontend, optimize first for operator clarity and reduced scroll depth.
-- Preserve the existing domain surfaces, but reorganize them into cleaner workspaces instead of removing capability.
-- Prefer a restrained fintech control-room aesthetic over decorative dashboard patterns.
+## Quality Gates
+- Every non-negotiable rule must use "must".
+- Every recommendation should use "should".
+- Every accessibility rule must be testable in implementation.
+- Teams should prefer system consistency over local visual exceptions.
