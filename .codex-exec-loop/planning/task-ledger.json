@@ -6055,18 +6055,36 @@
       "direction_id": "experiment-os",
       "title": "Persist server replay alias registry and revocation history across restarts",
       "description": "Move the newly shipped server-backed replay alias store out of application memory into durable persistence, and retain server-side alias issue, resolve, and revoke history strongly enough that alias validity and revocation audit survive process restart instead of resetting with the API process.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 21,
-      "priority_reason": "The latest main-session reply says the remaining gap is durable backing: alias resolution and revocation now work through server endpoints, but the alias store is still application-memory only and lacks persistent registry plus server-side audit or revocation history after restart. That is the clearest executable next task and should become the next queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit d8c590f, which moved replay alias records and signing-secret state into repository-backed persistence, made alias create or resolve or revoke prefer durable storage with in-memory fallback only when unsupported, added restart persistence coverage in targeted API and application pytest cases, and verified with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-server-backed-replay-alias-resolution-and-revocation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:05:00Z",
+      "updated_at": "2026-04-20T12:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os replay-link governance from server-mediated alias resolution into a durable system-of-record with restart-safe alias validity, revocation evidence, and operator-trustworthy history."
+      "direction_relation_note": "Completed the durability pass for server-mediated replay aliases by making alias validity and revocation evidence survive API restarts, which now leaves broader server-side governance such as retained audit history, pruning policy, and operator-facing revocation inspection as the next trust gap."
+    },
+    {
+      "id": "planning-experiment-os-add-server-side-audit-retention-and-revocation-history-for-replay-aliases",
+      "direction_id": "experiment-os",
+      "title": "Add server-side audit retention and revocation history for replay aliases",
+      "description": "Build the next replay-alias governance pass on top of restart-safe persistence by preserving alias issue or resolve or revoke audit records server-side, defining retention-backed pruning behavior, and exposing an operator-usable revocation or audit history endpoint so replay link governance remains inspectable and enforceable beyond bare alias resolution state.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 22,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is server-side governance breadth: alias registry and revoke state now survive restart, but the server still does not preserve the alias audit trail itself or offer retention-aligned pruning and revocation audit inspection. That is the clearest executable next task and should become the next queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-persist-server-replay-alias-registry-and-revocation-history"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os replay-link governance beyond durable alias validity into a true server-side audit contract with retained evidence, cleanup policy, and operator-visible revocation history."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
