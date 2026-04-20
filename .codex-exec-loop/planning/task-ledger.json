@@ -5300,18 +5300,54 @@
       "direction_id": "experiment-os",
       "title": "Re-run collision-reviewed field selections as simulation overrides and sync them with solver replay timeline",
       "description": "Deepen replay apply collision review beyond static trace links by letting the operator's field-level reviewed-merge selection execute as a simulation what-if override, then keep that collision review and solver replay on one synchronized step timeline so the chosen resolution can be inspected causally instead of only as a final preview.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply explicitly says the remaining gap is deeper simulation integration: diff items can now jump into simulation trace and partial merge can apply, but reviewed field selections still cannot be rerun as simulation what-if overrides or synchronized with solver replay on the same step timeline. That makes this the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 25ce1a2, which reran reviewed collision merges as simulation overrides, surfaced collision draft override-source and picked-field counts in the simulation panel, synchronized solver replay timeline scope and ordering to the reviewed groups, and verified the result with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-partial-accept-and-simulation-trace-links-for-replay-apply-collisions"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:50:00Z",
+      "updated_at": "2026-04-20T06:50:18Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay-apply trust from trace-linked partial review into full causal validation, so operators can test a reviewed collision merge as an actual simulation override and follow it through the same replay timeline before approval."
+      "direction_relation_note": "Completed the simulation-override and shared-timeline synchronization pass for replay-apply collision review, which now leaves deeper per-step trace annotation and reverse synchronization back into the review rows as the next trust gaps."
+    },
+    {
+      "id": "planning-experiment-os-annotate-replay-step-diff-from-reviewed-collision-field-picks",
+      "direction_id": "experiment-os",
+      "title": "Annotate replay step diffs with reviewed collision field picks",
+      "description": "Extend the new collision-review simulation override flow by marking replay-step diff entries with which reviewed local or remote field picks produced each simulated change, so operators can inspect causality directly inside the solver replay timeline instead of mentally mapping from the review draft to step-level diff rows.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "The latest main-session reply says the next missing synchronization is field-level traceability inside replay step diffs: reviewed merges now rerun as simulation overrides and align the replay timeline, but the field-by-field picks still are not annotated directly on the replay steps. That is the clearest executable next task because it deepens the same workflow without requiring a new product contract.",
+      "depends_on": [
+        "planning-experiment-os-sync-collision-review-with-simulation-override-timeline"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:50:19Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os replay-apply trust by turning synchronized collision-review simulation from coarse group alignment into step-level causal annotation, so operators can see exactly which reviewed field picks drove each replay diff."
+    },
+    {
+      "id": "planning-experiment-os-backpropagate-simulation-results-into-collision-review-rows",
+      "direction_id": "experiment-os",
+      "title": "Backpropagate simulation results into replay collision review rows",
+      "description": "Build the bidirectional trace layer after replay-step annotation by injecting simulation outcomes, such as resolved group status, changed bindings, or step outcomes, back into the conflict review rows themselves, so operators can compare chosen field picks and resulting simulated effects without bouncing between separate review and replay panels.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply explicitly names reverse synchronization from simulation back into conflict review rows as remaining work, but the exact contract for which simulation outcomes should project into the review table is still broader than the direct replay-step annotation follow-up. Keep this proposed behind the more immediate one-way traceability pass.",
+      "depends_on": [
+        "planning-experiment-os-annotate-replay-step-diff-from-reviewed-collision-field-picks"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:50:20Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os replay-apply review from synchronized forward trace into a bidirectional review loop, where simulated consequences can be read back in the same conflict rows that authored the reviewed merge."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
