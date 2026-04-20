@@ -393,6 +393,16 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["item_kind"] == "issue_text"
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["key"] == "symbol_key"
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["kind"] == "dynamic_map_key"
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["domain"] == {
+    "key": "market_data_symbol_key",
+    "source": "run.provenance.market_data_by_symbol",
+    "values": [],
+    "enum_source": {
+      "kind": "dynamic_map_keys",
+      "surface_key": "run_list",
+      "path": ["provenance", "market_data_by_symbol"],
+    },
+  }
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["element_schema"][0]["key"] == "issue_text"
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["element_schema"][0]["value_root"] is True
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
@@ -1366,7 +1376,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level "
     "enforcement rules."
   )
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v11"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v12"
   assert shared_contracts["schema:run-surface-capabilities"]["schema_detail"] == {
     "comparison_eligibility_group_order": [
       "eligible_metrics",
@@ -1377,6 +1387,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     "family_order": [
       "comparison_eligibility",
       "strategy_schema",
+      "collection_query",
       "provenance_semantics",
       "execution_controls",
     ],
@@ -1391,6 +1402,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
   }
   assert shared_contracts["query_collection:run_list"]["contract_kind"] == "query_collection_schema"
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["surface_key"] == "run_list"
+  assert shared_contracts["query_collection:run_list"]["related_family_keys"] == ["collection_query"]
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["expression_param"] == "filter_expr"
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["path_template"] == [
     "provenance",
@@ -1402,7 +1414,27 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
     "values": [],
+    "enum_source": {
+      "kind": "dynamic_map_keys",
+      "surface_key": "run_list",
+      "path": ["provenance", "market_data_by_symbol"],
+    },
   }
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["parameter_domains"][0]["domain"] == {
+    "key": "market_data_symbol_key",
+    "source": "run.provenance.market_data_by_symbol",
+    "values": [],
+    "enum_source": {
+      "kind": "dynamic_map_keys",
+      "surface_key": "run_list",
+      "path": ["provenance", "market_data_by_symbol"],
+    },
+  }
+  assert shared_contracts["family:collection_query"]["contract_kind"] == "capability_family"
+  assert shared_contracts["family:collection_query"]["policy"]["policy_key"] == "typed_collection_query_discovery"
+  assert shared_contracts["family:collection_query"]["surface_rules"][2]["surface_key"] == (
+    "collection_parameter_domain_pickers"
+  )
   assert shared_contracts["family:strategy_schema"]["contract_kind"] == "capability_family"
   assert shared_contracts["family:strategy_schema"]["discovery_flow"] == (
     "Strategy catalog and preset editor schema hints."

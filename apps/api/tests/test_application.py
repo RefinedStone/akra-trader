@@ -13837,10 +13837,11 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v11"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v12"
   assert shared_contracts["schema:run-surface-capabilities"]["related_family_keys"] == [
     "comparison_eligibility",
     "strategy_schema",
+    "collection_query",
     "provenance_semantics",
     "execution_controls",
   ]
@@ -13854,6 +13855,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     "family_order": [
       "comparison_eligibility",
       "strategy_schema",
+      "collection_query",
       "provenance_semantics",
       "execution_controls",
     ],
@@ -13899,6 +13901,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     "route_name": "get_run_orders",
   }
   assert shared_contracts["query_collection:run_list"]["contract_kind"] == "query_collection_schema"
+  assert shared_contracts["query_collection:run_list"]["related_family_keys"] == ["collection_query"]
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["surface_key"] == "run_list"
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["expression_param"] == "filter_expr"
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["path_template"] == [
@@ -13911,7 +13914,26 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
     "values": [],
+    "enum_source": {
+      "kind": "dynamic_map_keys",
+      "surface_key": "run_list",
+      "path": ["provenance", "market_data_by_symbol"],
+    },
   }
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["parameter_domains"][0]["domain"] == {
+    "key": "market_data_symbol_key",
+    "source": "run.provenance.market_data_by_symbol",
+    "values": [],
+    "enum_source": {
+      "kind": "dynamic_map_keys",
+      "surface_key": "run_list",
+      "path": ["provenance", "market_data_by_symbol"],
+    },
+  }
+  assert shared_contracts["family:collection_query"]["contract_kind"] == "capability_family"
+  assert shared_contracts["family:collection_query"]["policy"]["policy_key"] == (
+    "typed_collection_query_discovery"
+  )
 
 
 def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresources(tmp_path: Path) -> None:
@@ -14072,6 +14094,17 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_list"].collection_path_specs[1].item_kind == "issue_text"
   assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].key == "symbol_key"
   assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].kind == "dynamic_map_key"
+  assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].domain_key == "market_data_symbol_key"
+  assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].domain_source == (
+    "run.provenance.market_data_by_symbol"
+  )
+  assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].enum_source_kind == (
+    "dynamic_map_keys"
+  )
+  assert bindings_by_key["run_list"].collection_path_specs[1].parameters[0].enum_source_path == (
+    "provenance",
+    "market_data_by_symbol",
+  )
   assert bindings_by_key["run_list"].sort_field_specs[0].default_direction == "desc"
   assert bindings_by_key["run_list"].sort_field_specs[-1].key == "metrics.trade_count"
   nested_run_metric_sort = next(
@@ -15132,10 +15165,11 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     for contract in capabilities.shared_contracts
   }
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v11"
+  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v12"
   assert shared_contracts["schema:run-surface-capabilities"].schema_detail["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",
+    "collection_query",
     "provenance_semantics",
     "execution_controls",
   )

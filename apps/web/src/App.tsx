@@ -507,6 +507,7 @@ type RunSurfaceCapabilitySurfaceRule = NonNullable<RunSurfaceSharedContract["sur
 type RunSurfaceCapabilityFamilyKey =
   | "comparison_eligibility"
   | "strategy_schema"
+  | "collection_query"
   | "provenance_semantics"
   | "execution_controls";
 type RunSurfaceCapabilitySurfaceKey =
@@ -516,6 +517,9 @@ type RunSurfaceCapabilitySurfaceKey =
   | "strategy_catalog_cards"
   | "preset_parameter_editor"
   | "preset_revision_semantic_diffs"
+  | "collection_query_discovery_panels"
+  | "collection_expression_builders"
+  | "collection_parameter_domain_pickers"
   | "run_strategy_snapshot"
   | "reference_provenance_panels"
   | "benchmark_artifact_summaries"
@@ -14349,6 +14353,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_GROUP_ORDER: RunListBoundaryGroupKey[] = [
 const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILY_ORDER: RunSurfaceCapabilityFamilyKey[] = [
   "comparison_eligibility",
   "strategy_schema",
+  "collection_query",
   "provenance_semantics",
   "execution_controls",
 ];
@@ -14390,18 +14395,20 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       contract_kind: "schema_metadata",
       title: "Run-surface capability contract",
       summary:
-        "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
+        "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
       source_of_truth: "run_surface_capabilities.discovery",
-      version: "run-surface-capabilities.v10",
+      version: "run-surface-capabilities.v12",
       related_family_keys: [
         "comparison_eligibility",
         "strategy_schema",
+        "collection_query",
         "provenance_semantics",
         "execution_controls",
       ],
       member_keys: [
         "family:comparison_eligibility",
         "family:strategy_schema",
+        "family:collection_query",
         "family:provenance_semantics",
         "family:execution_controls",
         "group:eligible_metrics",
@@ -14415,6 +14422,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
         run_subresource_contract_keys: DEFAULT_RUN_SURFACE_SUBRESOURCE_CONTRACTS.map(
           (contract) => `subresource:${contract.subresource_key}`,
         ),
+        collection_query_contract_keys: ["query_collection:run_list"],
       },
     },
     {
@@ -14456,6 +14464,20 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       ],
     },
     {
+      contract_key: "family:collection_query",
+      contract_kind: "capability_family",
+      title: "Collection query discovery",
+      summary: "Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+      source_of_truth: "standalone_surface_runtime_bindings.collection_path_specs",
+      version: null,
+      related_family_keys: ["collection_query"],
+      member_keys: [
+        "collection_query_discovery_panels",
+        "collection_expression_builders",
+        "collection_parameter_domain_pickers",
+      ],
+    },
+    {
       contract_key: "family:execution_controls",
       contract_kind: "capability_family",
       title: "Execution control gating",
@@ -14468,6 +14490,27 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
         "compare_selection_workflow",
         "order_replace_cancel_actions",
       ],
+    },
+    {
+      contract_key: "query_collection:run_list",
+      contract_kind: "query_collection_schema",
+      title: "Run list collection query schema",
+      summary: "Advertises typed collection expression schemas, element fields, and parameter domain metadata for the `run_list` surface.",
+      source_of_truth: "standalone_surface_runtime_bindings.collection_path_specs",
+      version: null,
+      related_family_keys: ["collection_query"],
+      member_keys: [
+        "collection:orders",
+        "collection:provenance.market_data_by_symbol.{symbol_key}.issues",
+        "parameter_domain:symbol_key",
+      ],
+      schema_detail: {
+        surface_key: "run_list",
+        route_path: "/runs",
+        expression_param: "filter_expr",
+        collection_schemas: [],
+        parameter_domains: [],
+      },
     },
     {
       contract_key: "subresource:orders",
@@ -14631,6 +14674,70 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilityFamily[] = [
     ],
   },
   {
+    family_key: "collection_query",
+    title: "Collection query discovery",
+    summary: "Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+    ui_surfaces: [
+      "Collection query discovery panels",
+      "Collection expression builders",
+      "Collection parameter domain pickers",
+    ],
+    schema_sources: [
+      "Collection path schemas",
+      "Collection element filter schemas",
+      "Collection parameter domain metadata",
+    ],
+    discovery_flow: "Typed query discovery panels and collection expression builders.",
+    policy: {
+      applies_to: ["collection_schema", "parameter_domains", "query_builders"],
+      policy_key: "typed_collection_query_discovery",
+      policy_mode: "schema_contract",
+      source_of_truth: "standalone_surface_runtime_bindings.collection_path_specs",
+    },
+    enforcement: {
+      enforcement_points: [
+        "collection_schema_discovery",
+        "parameter_domain_rendering",
+        "collection_shape_validation",
+      ],
+      fallback_behavior: "fallback_to_raw_filter_expression_authoring_when_collection_query_metadata_is_missing",
+      level: "advisory",
+      source_of_truth: "typed_query_collection_schemas",
+    },
+    surface_rules: [
+      {
+        rule_key: "collection_query_schema_panel",
+        surface_key: "collection_query_discovery_panels",
+        surface_label: "Collection query discovery panels",
+        enforcement_point: "collection_schema_discovery",
+        enforcement_mode: "collection_schema_advertisement",
+        level: "advisory",
+        fallback_behavior: "omit_collection_query_contract_detail_when_discovery_metadata_is_missing",
+        source_of_truth: "standalone_surface_runtime_bindings.collection_path_specs",
+      },
+      {
+        rule_key: "collection_expression_builder_schema",
+        surface_key: "collection_expression_builders",
+        surface_label: "Collection expression builders",
+        enforcement_point: "collection_shape_validation",
+        enforcement_mode: "shape_validated_builder_contract",
+        level: "advisory",
+        fallback_behavior: "allow_raw_collection_paths_without_builder_guidance",
+        source_of_truth: "typed_query_collection_schema_validation",
+      },
+      {
+        rule_key: "collection_parameter_domain_enum_source",
+        surface_key: "collection_parameter_domain_pickers",
+        surface_label: "Collection parameter domain pickers",
+        enforcement_point: "parameter_domain_rendering",
+        enforcement_mode: "domain_and_enum_source_annotation",
+        level: "advisory",
+        fallback_behavior: "render_parameter_domains_without_enum_source_hints",
+        source_of_truth: "collection_query_parameter_domains",
+      },
+    ],
+  },
+  {
     family_key: "provenance_semantics",
     title: "Run provenance semantics",
     summary: "Carries semantic run context into snapshot, provenance, artifact, and comparison drill-back surfaces.",
@@ -14785,9 +14892,9 @@ function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | nu
     title: schemaContract?.title ?? "Run-surface capability contract",
     summary:
       schemaContract?.summary
-      ?? "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
+      ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
     source_of_truth: schemaContract?.source_of_truth ?? "run_surface_capabilities.discovery",
-    version: schemaContract?.version ?? "run-surface-capabilities.v10",
+    version: schemaContract?.version ?? "run-surface-capabilities.v12",
     discovery_flow: schemaContract?.discovery_flow ?? null,
     related_family_keys: schemaContract?.related_family_keys?.length
       ? schemaContract.related_family_keys
@@ -14821,6 +14928,11 @@ function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | nu
         DEFAULT_RUN_SURFACE_SUBRESOURCE_CONTRACTS.map(
           (contract) => `subresource:${contract.subresource_key}`,
         ),
+      ),
+      collection_query_contract_keys: getRunSurfaceSchemaDetailStringArray(
+        schemaContract?.schema_detail,
+        "collection_query_contract_keys",
+        ["query_collection:run_list"],
       ),
     },
   };
@@ -14881,7 +14993,13 @@ function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | nu
       };
     },
   );
-  return [normalizedSchema, ...familyContracts, ...subresourceContracts];
+  const extraSharedContracts = (discovery.shared_contracts ?? []).filter(
+    (contract) =>
+      contract.contract_key !== "schema:run-surface-capabilities"
+      && contract.contract_kind !== "capability_family"
+      && contract.contract_kind !== "run_subresource",
+  );
+  return [normalizedSchema, ...familyContracts, ...extraSharedContracts, ...subresourceContracts];
 }
 
 function getRunSurfaceCapabilitySchemaContract(
@@ -15106,8 +15224,8 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const schemaTitle = schemaContract?.title ?? "Run-surface capability contract";
   const schemaSummary =
     schemaContract?.summary
-    ?? "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.";
-  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v10";
+    ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.";
+  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v12";
   const runSubresourceSharedContracts = getRunSurfaceSubresourceContracts(capabilities);
 
   return (

@@ -671,7 +671,7 @@ RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
   "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
 )
-RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v11"
+RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v12"
 RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
   "eligible_metrics",
   "supporting_identity",
@@ -681,6 +681,7 @@ RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
 RUN_SURFACE_CAPABILITY_FAMILY_ORDER = (
   "comparison_eligibility",
   "strategy_schema",
+  "collection_query",
   "provenance_semantics",
   "execution_controls",
 )
@@ -844,6 +845,74 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
           level="advisory",
           fallback_behavior="render_generic_revision_value_deltas",
           source_of_truth="strategy_catalog_semantics",
+        ),
+      ),
+    ),
+    RunSurfaceSharedContract(
+      contract_key="family:collection_query",
+      contract_kind="capability_family",
+      title="Collection query discovery",
+      summary="Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+      source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
+      discovery_flow="Typed query discovery panels and collection expression builders.",
+      related_family_keys=("collection_query",),
+      member_keys=(
+        "collection_query_discovery_panels",
+        "collection_expression_builders",
+        "collection_parameter_domain_pickers",
+      ),
+      ui_surfaces=(
+        "Collection query discovery panels",
+        "Collection expression builders",
+        "Collection parameter domain pickers",
+      ),
+      schema_sources=(
+        "Collection path schemas",
+        "Collection element filter schemas",
+        "Collection parameter domain metadata",
+      ),
+      policy=RunSurfaceCapabilities.Policy(
+        applies_to=("collection_schema", "parameter_domains", "query_builders"),
+        policy_key="typed_collection_query_discovery",
+        policy_mode="schema_contract",
+        source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
+      ),
+      enforcement=RunSurfaceCapabilities.Enforcement(
+        enforcement_points=("collection_schema_discovery", "parameter_domain_rendering", "collection_shape_validation"),
+        fallback_behavior="fallback_to_raw_filter_expression_authoring_when_collection_query_metadata_is_missing",
+        level="advisory",
+        source_of_truth="typed_query_collection_schemas",
+      ),
+      surface_rules=(
+        RunSurfaceCapabilities.SurfaceRule(
+          rule_key="collection_query_schema_panel",
+          surface_key="collection_query_discovery_panels",
+          surface_label="Collection query discovery panels",
+          enforcement_point="collection_schema_discovery",
+          enforcement_mode="collection_schema_advertisement",
+          level="advisory",
+          fallback_behavior="omit_collection_query_contract_detail_when_discovery_metadata_is_missing",
+          source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
+        ),
+        RunSurfaceCapabilities.SurfaceRule(
+          rule_key="collection_expression_builder_schema",
+          surface_key="collection_expression_builders",
+          surface_label="Collection expression builders",
+          enforcement_point="collection_shape_validation",
+          enforcement_mode="shape_validated_builder_contract",
+          level="advisory",
+          fallback_behavior="allow_raw_collection_paths_without_builder_guidance",
+          source_of_truth="typed_query_collection_schema_validation",
+        ),
+        RunSurfaceCapabilities.SurfaceRule(
+          rule_key="collection_parameter_domain_enum_source",
+          surface_key="collection_parameter_domain_pickers",
+          surface_label="Collection parameter domain pickers",
+          enforcement_point="parameter_domain_rendering",
+          enforcement_mode="domain_and_enum_source_annotation",
+          level="advisory",
+          fallback_behavior="render_parameter_domains_without_enum_source_hints",
+          source_of_truth="collection_query_parameter_domains",
         ),
       ),
     ),

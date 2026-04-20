@@ -23070,6 +23070,9 @@ class StandaloneSurfaceCollectionPathParameterSpec:
   domain_key: str = ""
   domain_source: str = ""
   domain_values: tuple[str, ...] = ()
+  enum_source_kind: str = ""
+  enum_source_surface_key: str = ""
+  enum_source_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -24651,6 +24654,9 @@ def list_standalone_surface_runtime_bindings(
             examples=("binance:BTC/USDT",),
             domain_key="market_data_symbol_key",
             domain_source="run.provenance.market_data_by_symbol",
+            enum_source_kind="dynamic_map_keys",
+            enum_source_surface_key="run_list",
+            enum_source_path=("provenance", "market_data_by_symbol"),
           ),
         ),
       ),
@@ -25622,7 +25628,29 @@ def serialize_collection_path_parameter_spec(
       "source": spec.domain_source or None,
       "values": list(spec.domain_values),
     }
+    if spec.enum_source_kind or spec.enum_source_surface_key or spec.enum_source_path:
+      payload["domain"]["enum_source"] = {
+        "kind": spec.enum_source_kind or None,
+        "surface_key": spec.enum_source_surface_key or None,
+        "path": list(spec.enum_source_path),
+      }
   return payload
+
+
+def serialize_collection_path_parameter_domain(
+  binding: StandaloneSurfaceRuntimeBinding,
+  collection_spec: StandaloneSurfaceCollectionPathSpec,
+  parameter_spec: StandaloneSurfaceCollectionPathParameterSpec,
+) -> dict[str, Any]:
+  return {
+    "parameter_key": parameter_spec.key,
+    "parameter_kind": parameter_spec.kind,
+    "collection_label": collection_spec.label,
+    "collection_path": list(collection_spec.path),
+    "collection_path_template": list(collection_spec.path_template or collection_spec.path),
+    "domain": serialize_collection_path_parameter_spec(parameter_spec).get("domain"),
+    "surface_key": binding.surface_key,
+  }
 
 
 def serialize_collection_path_spec(
@@ -25661,6 +25689,12 @@ def list_collection_query_shared_contracts(
   for binding in list_standalone_surface_runtime_bindings(resolved_capabilities):
     if not binding.collection_path_specs:
       continue
+    parameter_domains = [
+      serialize_collection_path_parameter_domain(binding, spec, parameter)
+      for spec in binding.collection_path_specs
+      for parameter in spec.parameters
+      if parameter.domain_key or parameter.domain_source or parameter.domain_values
+    ]
     contracts.append(
       RunSurfaceSharedContract(
         contract_key=f"query_collection:{binding.surface_key}",
@@ -25671,9 +25705,16 @@ def list_collection_query_shared_contracts(
           f"for the `{binding.surface_key}` surface."
         ),
         source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
+        related_family_keys=("collection_query",),
         member_keys=tuple(
-          f"collection:{'.'.join(spec.path_template or spec.path)}"
-          for spec in binding.collection_path_specs
+          [
+            f"collection:{'.'.join(spec.path_template or spec.path)}"
+            for spec in binding.collection_path_specs
+          ]
+          + [
+            f"parameter_domain:{domain['parameter_key']}"
+            for domain in parameter_domains
+          ]
         ),
         schema_detail={
           "surface_key": binding.surface_key,
@@ -25683,6 +25724,7 @@ def list_collection_query_shared_contracts(
             serialize_collection_path_spec(binding, spec)
             for spec in binding.collection_path_specs
           ],
+          "parameter_domains": parameter_domains,
         },
       )
     )
