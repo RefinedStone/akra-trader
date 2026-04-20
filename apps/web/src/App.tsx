@@ -15505,6 +15505,29 @@ function resolveCollectionQueryPath(
   });
 }
 
+function resolveCollectionQueryTemplateValues(
+  template: string[],
+  resolvedPath: string[],
+) {
+  if (template.length !== resolvedPath.length) {
+    return null;
+  }
+  const values: Record<string, string> = {};
+  for (let index = 0; index < template.length; index += 1) {
+    const templateSegment = template[index];
+    const resolvedSegment = resolvedPath[index];
+    const match = templateSegment.match(/^\{(.+)\}$/);
+    if (match) {
+      values[match[1]] = resolvedSegment;
+      continue;
+    }
+    if (templateSegment !== resolvedSegment) {
+      return null;
+    }
+  }
+  return values;
+}
+
 function coerceCollectionQueryBuilderValue(rawValue: string, valueType: string) {
   if (valueType === "integer") {
     const parsed = Number.parseInt(rawValue, 10);
@@ -15521,6 +15544,111 @@ function coerceCollectionQueryBuilderValue(rawValue: string, valueType: string) 
       .filter(Boolean);
   }
   return rawValue;
+}
+
+function formatCollectionQueryBuilderValue(rawValue: unknown, valueType: string) {
+  if (rawValue === null || rawValue === undefined) {
+    return "";
+  }
+  if (valueType.startsWith("list[")) {
+    if (Array.isArray(rawValue)) {
+      return rawValue.map((value) => String(value)).join(", ");
+    }
+    return String(rawValue);
+  }
+  if (typeof rawValue === "string") {
+    return rawValue;
+  }
+  if (typeof rawValue === "number" || typeof rawValue === "boolean") {
+    return String(rawValue);
+  }
+  try {
+    return JSON.stringify(rawValue);
+  } catch {
+    return String(rawValue);
+  }
+}
+
+type HydratedRunSurfaceCollectionQueryBuilderState = {
+  contractKey: string;
+  schemaId: string;
+  parameterValues: Record<string, string>;
+  quantifier: "any" | "all" | "none";
+  fieldKey: string;
+  operatorKey: string;
+  builderValue: string;
+};
+
+function parseRunSurfaceCollectionQueryBuilderState(
+  rawExpression: string | null | undefined,
+  contracts: RunSurfaceCollectionQueryContract[],
+): HydratedRunSurfaceCollectionQueryBuilderState | null {
+  const trimmedExpression = rawExpression?.trim();
+  if (!trimmedExpression) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmedExpression) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const record = parsed as Record<string, unknown>;
+    const collectionRecord =
+      record.collection && typeof record.collection === "object" && !Array.isArray(record.collection)
+        ? (record.collection as Record<string, unknown>)
+        : null;
+    const conditionRecords = Array.isArray(record.conditions)
+      ? record.conditions.filter(
+          (condition): condition is Record<string, unknown> =>
+            Boolean(condition) && typeof condition === "object" && !Array.isArray(condition),
+        )
+      : [];
+    if (!collectionRecord || conditionRecords.length !== 1) {
+      return null;
+    }
+    const resolvedPath = getCollectionQueryStringArray(collectionRecord.path);
+    const quantifier =
+      collectionRecord.quantifier === "all"
+      || collectionRecord.quantifier === "none"
+      || collectionRecord.quantifier === "any"
+        ? collectionRecord.quantifier
+        : "any";
+    const condition = conditionRecords[0];
+    const fieldKey = typeof condition.key === "string" ? condition.key : "";
+    const operatorKey = typeof condition.operator === "string" ? condition.operator : "";
+    if (!resolvedPath.length || !fieldKey || !operatorKey) {
+      return null;
+    }
+    for (const contract of contracts) {
+      const schemas = getRunSurfaceCollectionQuerySchemas(contract);
+      for (const schema of schemas) {
+        const parameterValues = resolveCollectionQueryTemplateValues(schema.pathTemplate, resolvedPath);
+        if (!parameterValues) {
+          continue;
+        }
+        const field = schema.elementSchema.find((candidate) => candidate.key === fieldKey);
+        if (!field) {
+          continue;
+        }
+        const operator = field.operators.find((candidate) => candidate.key === operatorKey);
+        if (!operator) {
+          continue;
+        }
+        return {
+          contractKey: contract.contract_key,
+          schemaId: getCollectionQuerySchemaId(schema),
+          parameterValues,
+          quantifier,
+          fieldKey,
+          operatorKey,
+          builderValue: formatCollectionQueryBuilderValue(condition.value, field.valueType),
+        };
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 function getRunSurfaceCapabilityFamily(
@@ -15716,6 +15844,9 @@ function RunSurfaceCollectionQueryBuilder({
   onClearExpression?: (() => void) | null;
 }) {
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
+  const lastHydratedExpressionRef = useRef<string | null>(null);
+  const [pendingHydratedState, setPendingHydratedState] =
+    useState<HydratedRunSurfaceCollectionQueryBuilderState | null>(null);
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -15815,6 +15946,61 @@ function RunSurfaceCollectionQueryBuilder({
     }
   }, [activeField, activeOperator, activeOperatorKey]);
 
+  useEffect(() => {
+    const normalizedExpression = activeExpression?.trim() ?? "";
+    if (!normalizedExpression) {
+      lastHydratedExpressionRef.current = null;
+      setPendingHydratedState(null);
+      return;
+    }
+    if (normalizedExpression === lastHydratedExpressionRef.current) {
+      return;
+    }
+    const hydratedState = parseRunSurfaceCollectionQueryBuilderState(normalizedExpression, contracts);
+    if (!hydratedState) {
+      lastHydratedExpressionRef.current = normalizedExpression;
+      setPendingHydratedState(null);
+      return;
+    }
+    lastHydratedExpressionRef.current = normalizedExpression;
+    setActiveContractKey(hydratedState.contractKey);
+    setPendingHydratedState(hydratedState);
+  }, [activeExpression, contracts]);
+
+  useEffect(() => {
+    if (!pendingHydratedState) {
+      return;
+    }
+    if (activeContract?.contract_key !== pendingHydratedState.contractKey) {
+      return;
+    }
+    if (activeSchemaId !== pendingHydratedState.schemaId) {
+      setActiveSchemaId(pendingHydratedState.schemaId);
+      return;
+    }
+    setParameterValues((current) => {
+      const keys = new Set([
+        ...Object.keys(current),
+        ...Object.keys(pendingHydratedState.parameterValues),
+      ]);
+      let changed = false;
+      const next: Record<string, string> = {};
+      keys.forEach((key) => {
+        const nextValue = pendingHydratedState.parameterValues[key] ?? "";
+        next[key] = nextValue;
+        if ((current[key] ?? "") !== nextValue) {
+          changed = true;
+        }
+      });
+      return changed ? next : current;
+    });
+    setQuantifier(pendingHydratedState.quantifier);
+    setActiveFieldKey(pendingHydratedState.fieldKey);
+    setActiveOperatorKey(pendingHydratedState.operatorKey);
+    setBuilderValue(pendingHydratedState.builderValue);
+    setPendingHydratedState(null);
+  }, [activeContract?.contract_key, activeSchemaId, pendingHydratedState]);
+
   const resolvedCollectionPath = useMemo(
     () => (activeSchema ? resolveCollectionQueryPath(activeSchema.pathTemplate, parameterValues) : []),
     [activeSchema, parameterValues],
@@ -15910,9 +16096,12 @@ function RunSurfaceCollectionQueryBuilder({
             {activeSchema.parameters.length ? (
               <div className="run-surface-query-builder-parameter-grid">
                 {activeSchema.parameters.map((parameter) => {
-                  const optionValues = parameter.domain?.values.length
-                    ? parameter.domain.values
-                    : parameter.examples;
+                  const optionValues = Array.from(
+                    new Set([
+                      ...(parameter.domain?.values.length ? parameter.domain.values : parameter.examples),
+                      parameterValues[parameter.key] ?? "",
+                    ].filter(Boolean)),
+                  );
                   const enumSource = parameter.domain?.enumSource;
                   return (
                     <label className="run-surface-query-builder-control" key={parameter.key}>
