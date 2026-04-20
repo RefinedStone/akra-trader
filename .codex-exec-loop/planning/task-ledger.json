@@ -5983,18 +5983,36 @@
       "direction_id": "experiment-os",
       "title": "Add conflict review and per-tab opt-out policy for replay link governance sync",
       "description": "Build on the shipped cross-tab replay-link governance sync by detecting concurrent redaction or share-mode changes across tabs, surfacing a reviewable conflict state for competing governance updates, and defining per-tab opt-out behavior so one tab can stop inheriting remote governance changes without losing auditability.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 25,
-      "priority_reason": "The latest main-session reply says cross-tab sync and merge are now complete, and directly calls out the remaining governance conflict layer: concurrent tabs can still race on different redaction or share-mode changes and there is no conflict review or per-tab opt-out policy yet. That is the clearest executable next task because it extends the just-shipped sync model without requiring a broader backend portability contract first.",
+      "priority_reason": "Completed in main session commit 65cfd9c, which added per-tab replay-link `Sync mode` controls for live sync, review-only, and ignore-remote behavior, surfaced pending governance conflicts with explicit keep-local or apply-remote resolution, kept review deferrals session-scoped so the same remote update does not immediately reappear, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-sync-replay-link-governance-and-alias-registry-across-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:06:00Z",
+      "updated_at": "2026-04-20T11:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Deepens experiment-os replay-link governance trust by turning cross-tab propagation into an operator-reviewed policy surface, so conflicting governance changes can be reconciled deliberately and tabs can opt out of remote policy inheritance when needed."
+      "direction_relation_note": "Completed the next replay-link governance sync pass by making cross-tab policy changes reviewable and optionally local-only per tab, which now leaves richer governance audit history, diff explanation, and cross-device resolution semantics as the clearest remaining governance follow-up."
+    },
+    {
+      "id": "planning-experiment-os-extend-replay-link-governance-audit-with-diffs-and-cross-device-resolution",
+      "direction_id": "experiment-os",
+      "title": "Extend replay link governance audit with change diffs and cross-device resolution",
+      "description": "Build on the shipped replay-link governance conflict review by adding a dedicated governance-change audit trail, field-level explanations for what changed in share mode or redaction policy, and a clearer cross-device policy resolution contract so governance decisions remain inspectable beyond one tab session and travel cleanly across browser contexts.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 26,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is governance audit expansion: replay-link governance sync now has conflict review and per-tab opt-out, but it still lacks dedicated governance change audit history, field-level diff explanation, and cross-device policy resolution. That is the clearest executable next task because it extends the just-shipped governance review surface directly without requiring a broader unrelated product choice first.",
+      "depends_on": [
+        "planning-experiment-os-add-conflict-review-and-per-tab-opt-out-for-replay-link-governance-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:21:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os replay-link governance trust by turning resolved and synced governance mutations into a more durable audit artifact with concrete policy-change explanations and a path toward portable cross-device reconciliation."
     },
     {
       "id": "planning-experiment-os-back-replay-short-links-with-portable-resolution-and-retention-controls",
@@ -6004,13 +6022,13 @@
       "status": "proposed",
       "base_priority": 86,
       "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply still leaves cross-device short-link resolution and retention policy UI unresolved, but now the more direct executable gap is conflict-aware governance for concurrent cross-tab mode changes and per-tab opt-out behavior. Keep portable short-link backing proposed behind that sync-governance conflict layer because portability still needs a broader persistence and lifecycle choice.",
+      "priority_reason": "The latest main-session reply narrows the immediate follow-up to governance audit expansion, including dedicated change history, field-level diff explanation, and cross-device policy resolution. Portable short-link backing still matters, but keep it proposed behind that audit pass because persistence and retention semantics should follow the stronger governance-resolution contract instead of preceding it.",
       "depends_on": [
         "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:07:00Z",
+      "updated_at": "2026-04-20T11:22:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Pushes experiment-os replay-link governance from browser-scoped sharing into a portable operator artifact with explicit retention semantics, which is necessary before short-link handoff can be trusted across devices or longer-lived sessions."
     },
