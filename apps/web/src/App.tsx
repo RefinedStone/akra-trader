@@ -17211,6 +17211,10 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, string>>({});
   const [predicateRefGroupAutoBundleSelections, setPredicateRefGroupAutoBundleSelections] =
     useState<Record<string, string>>({});
+  const [bundleCoordinationSimulationScope, setBundleCoordinationSimulationScope] =
+    useState<"all" | string>("all");
+  const [bundleCoordinationSimulationPolicy, setBundleCoordinationSimulationPolicy] =
+    useState<RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"] | "current">("current");
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18141,6 +18145,26 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [selectedRefTemplate],
   );
+  const simulatedCoordinationGroups = useMemo(
+    () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
+    [selectedRefTemplateParameterGroups],
+  );
+  useEffect(() => {
+    if (!simulatedCoordinationGroups.length) {
+      setBundleCoordinationSimulationScope("all");
+      setBundleCoordinationSimulationPolicy("current");
+      return;
+    }
+    if (
+      bundleCoordinationSimulationScope !== "all"
+      && !simulatedCoordinationGroups.some((group) => group.key === bundleCoordinationSimulationScope)
+    ) {
+      setBundleCoordinationSimulationScope("all");
+    }
+  }, [
+    bundleCoordinationSimulationScope,
+    simulatedCoordinationGroups,
+  ]);
   const getSortedTemplateGroupPresetBundles = useCallback(
     (bundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[]) =>
       sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(bundles),
@@ -18257,7 +18281,12 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
-  const coordinatedPredicateRefGroupBundleState = useMemo(() => {
+  const computeCoordinatedPredicateRefGroupBundleState = useCallback((
+    policyOverridesByGroupKey: Record<
+      string,
+      RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"]
+    > = {},
+  ) => {
     type AggregatedDependencyRequest = {
       bundleKey: string;
       bundleLabel: string;
@@ -18277,6 +18306,17 @@ function RunSurfaceCollectionQueryBuilder({
       statusLabel: string;
       tone: PolicyTraceStep["tone"];
       steps: PolicyTraceStep[];
+    };
+    type GlobalPolicyTrace = PolicyTrace & {
+      counts: {
+        groupCount: number;
+        manualCount: number;
+        autoCount: number;
+        blockedCount: number;
+        conflictCount: number;
+        dependencyRequestCount: number;
+        unmetDependencyCount: number;
+      };
     };
     if (!selectedRefTemplate) {
       return {
@@ -18307,6 +18347,21 @@ function RunSurfaceCollectionQueryBuilder({
           sourceLabels: string[];
         }>>,
         policyTraceByGroupKey: {} as Record<string, PolicyTrace>,
+        globalPolicyTrace: {
+          summary: "No predicate template is selected.",
+          statusLabel: "Idle",
+          tone: "muted" as const,
+          steps: [],
+          counts: {
+            groupCount: 0,
+            manualCount: 0,
+            autoCount: 0,
+            blockedCount: 0,
+            conflictCount: 0,
+            dependencyRequestCount: 0,
+            unmetDependencyCount: 0,
+          },
+        } as GlobalPolicyTrace,
       };
     }
     type DependencyRequest = {
@@ -18330,6 +18385,9 @@ function RunSurfaceCollectionQueryBuilder({
       getSortedTemplateGroupPresetBundles(groupMap.get(groupKey)?.presetBundles ?? []).find(
         (bundle) => bundle.key === bundleKey,
       ) ?? null;
+    const getCoordinationPolicy = (
+      group: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState,
+    ) => policyOverridesByGroupKey[group.key] ?? group.coordinationPolicy;
     const buildDependencyRequests = (
       resolvedSelectionsByGroupKey: Record<string, string>,
       includePredictedAutoCandidates = false,
@@ -18455,15 +18513,16 @@ function RunSurfaceCollectionQueryBuilder({
         if (resolvedSelectionsByGroupKey[group.key]) {
           return;
         }
+        const coordinationPolicy = getCoordinationPolicy(group);
         const dependencyRequests = dependencyRequestsByGroupKey[group.key] ?? [];
         const aggregatedDependencyRequests = aggregateDependencyRequests(dependencyRequests);
         const stickyBundleKey = predicateRefGroupAutoBundleSelections[`${selectedRefTemplate.id}:${group.key}`] ?? "";
         const sortedDependencyRequests = sortAggregatedDependencyRequests(
           aggregatedDependencyRequests,
-          group.coordinationPolicy,
+          coordinationPolicy,
           stickyBundleKey,
         );
-        if (sortedDependencyRequests.length > 1 && group.coordinationPolicy === "manual_resolution") {
+        if (sortedDependencyRequests.length > 1 && coordinationPolicy === "manual_resolution") {
           return;
         }
         const dependencyDrivenBundle = sortedDependencyRequests[0] ?? null;
@@ -18489,13 +18548,14 @@ function RunSurfaceCollectionQueryBuilder({
     const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey);
     const conflictRequestsByGroupKey = Object.fromEntries(
       selectedRefTemplateParameterGroups.flatMap((group) => {
+        const coordinationPolicy = getCoordinationPolicy(group);
         const aggregatedDependencyRequests = aggregateDependencyRequests(
           dependencyRequestsByGroupKey[group.key] ?? [],
         );
         return aggregatedDependencyRequests.length > 1
           ? [[group.key, sortAggregatedDependencyRequests(
               aggregatedDependencyRequests,
-              group.coordinationPolicy,
+              coordinationPolicy,
               predicateRefGroupAutoBundleSelections[`${selectedRefTemplate.id}:${group.key}`] ?? "",
             )]]
           : [];
@@ -18526,9 +18586,16 @@ function RunSurfaceCollectionQueryBuilder({
           : [];
       }),
     );
-    const policyTraceByGroupKey = Object.fromEntries(
-      selectedRefTemplateParameterGroups.map((group) => {
+    const policyTraceEntries: Array<[string, PolicyTrace]> = [];
+    const globalManualGroups: string[] = [];
+    const globalDependencyGroups: string[] = [];
+    const globalAutoGroups: string[] = [];
+    const globalBlockedGroups: string[] = [];
+    const globalConflictGroups: string[] = [];
+    const globalIdleGroups: string[] = [];
+    selectedRefTemplateParameterGroups.forEach((group) => {
         const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
+        const coordinationPolicy = getCoordinationPolicy(group);
         const manualBundleKey = manualSelectionsByGroupKey[group.key] ?? "";
         const manualBundle = getGroupBundle(group.key, manualBundleKey);
         const resolvedBundleKey = resolvedSelectionsByGroupKey[group.key] ?? "";
@@ -18537,7 +18604,7 @@ function RunSurfaceCollectionQueryBuilder({
         const dependencyRequests = dependencyRequestsByGroupKey[group.key] ?? [];
         const aggregatedDependencyRequests = sortAggregatedDependencyRequests(
           aggregateDependencyRequests(dependencyRequests),
-          group.coordinationPolicy,
+          coordinationPolicy,
           stickyBundleKey,
         );
         const matchingAutoBundles = getSortedTemplateGroupPresetBundles(group.presetBundles).flatMap((bundle) => {
@@ -18586,7 +18653,7 @@ function RunSurfaceCollectionQueryBuilder({
           summary = `${resolvedBundle.label} auto-selected via ${selectedAutoBundleEntry.bundle.autoSelectRule.replaceAll("_", " ")}.`;
         } else if (
           aggregatedDependencyRequests.length > 1
-          && group.coordinationPolicy === "manual_resolution"
+          && coordinationPolicy === "manual_resolution"
         ) {
           statusLabel = "Blocked";
           tone = "warning";
@@ -18601,9 +18668,9 @@ function RunSurfaceCollectionQueryBuilder({
           summary = "Dependency requests are present, but this group is still waiting for a coordinated decision.";
         }
         const policyDetailParts = [
-          `Uses ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(group.coordinationPolicy)}.`,
+          `Uses ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(coordinationPolicy)}.`,
         ];
-        if (group.coordinationPolicy === "sticky_auto_selection" && stickyBundleKey) {
+        if (coordinationPolicy === "sticky_auto_selection" && stickyBundleKey) {
           const stickyBundle = getGroupBundle(group.key, stickyBundleKey);
           if (stickyBundle) {
             policyDetailParts.push(`Current sticky preference is ${stickyBundle.label}.`);
@@ -18646,7 +18713,7 @@ function RunSurfaceCollectionQueryBuilder({
           });
         }
         if (aggregatedDependencyRequests.length > 1) {
-          if (group.coordinationPolicy === "manual_resolution" && !manualBundle && !resolvedBundle) {
+          if (coordinationPolicy === "manual_resolution" && !manualBundle && !resolvedBundle) {
             steps.push({
               key: `${group.key}:conflict`,
               title: "Conflict resolution",
@@ -18657,7 +18724,7 @@ function RunSurfaceCollectionQueryBuilder({
             steps.push({
               key: `${group.key}:conflict`,
               title: "Conflict resolution",
-              detail: `${resolvedBundle.label} won the conflict under ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(group.coordinationPolicy)}.`,
+              detail: `${resolvedBundle.label} won the conflict under ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(coordinationPolicy)}.`,
               tone: "success",
             });
           }
@@ -18708,14 +18775,110 @@ function RunSurfaceCollectionQueryBuilder({
             tone: "muted",
           });
         }
-        return [group.key, {
+        if (manualBundle) {
+          globalManualGroups.push(group.label);
+        } else if (resolvedBundle && selectedByDependency) {
+          globalDependencyGroups.push(`${group.label} → ${resolvedBundle.label}`);
+        } else if (resolvedBundle && selectedAutoBundleEntry) {
+          globalAutoGroups.push(`${group.label} → ${resolvedBundle.label}`);
+        } else if (tone === "warning") {
+          globalBlockedGroups.push(group.label);
+        } else if (tone === "muted") {
+          globalIdleGroups.push(group.label);
+        }
+        if (aggregatedDependencyRequests.length > 1) {
+          globalConflictGroups.push(group.label);
+        }
+        policyTraceEntries.push([group.key, {
           summary,
           statusLabel,
           tone,
           steps,
-        }];
-      }),
-    );
+        }]);
+      });
+    const policyTraceByGroupKey = Object.fromEntries(policyTraceEntries);
+    const globalPolicyTraceSteps: PolicyTraceStep[] = [];
+    if (globalManualGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:manual",
+        title: "Manual anchors",
+        detail: `${globalManualGroups.join(", ")} currently pin their bundle choices manually, anchoring the coordination graph.`,
+        tone: "success",
+      });
+    }
+    if (globalDependencyGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:dependencies",
+        title: "Dependency-driven chain",
+        detail: globalDependencyGroups.join("; "),
+        tone: "info",
+      });
+    }
+    if (globalAutoGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:auto",
+        title: "Direct auto selections",
+        detail: globalAutoGroups.join("; "),
+        tone: "success",
+      });
+    }
+    if (globalConflictGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:conflicts",
+        title: "Conflict hotspots",
+        detail: `${globalConflictGroups.join(", ")} received competing bundle requests during coordination.`,
+        tone: "warning",
+      });
+    }
+    if (globalBlockedGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:blocked",
+        title: "Blocked groups",
+        detail: `${globalBlockedGroups.join(", ")} are blocked by unresolved dependencies or manual-resolution requirements.`,
+        tone: "warning",
+      });
+    }
+    if (globalIdleGroups.length) {
+      globalPolicyTraceSteps.push({
+        key: "global:idle",
+        title: "Idle groups",
+        detail: `${globalIdleGroups.join(", ")} are not currently activated by dependency or auto-selection rules.`,
+        tone: "muted",
+      });
+    }
+    const globalPolicyTrace: GlobalPolicyTrace = {
+      summary: globalBlockedGroups.length
+        ? `Coordination currently has ${globalBlockedGroups.length} blocked group${globalBlockedGroups.length === 1 ? "" : "s"} across ${selectedRefTemplateParameterGroups.length} template group${selectedRefTemplateParameterGroups.length === 1 ? "" : "s"}.`
+        : globalDependencyGroups.length || globalAutoGroups.length || globalManualGroups.length
+          ? `Coordination resolved ${Object.keys(resolvedSelectionsByGroupKey).length} group bundle${Object.keys(resolvedSelectionsByGroupKey).length === 1 ? "" : "s"} across the current dependency graph.`
+          : "No coordination activity is currently running across this template graph.",
+      statusLabel: globalBlockedGroups.length
+        ? "Blocked"
+        : globalDependencyGroups.length || globalAutoGroups.length || globalManualGroups.length
+          ? "Active"
+          : "Idle",
+      tone: globalBlockedGroups.length
+        ? "warning"
+        : globalDependencyGroups.length || globalAutoGroups.length || globalManualGroups.length
+          ? "info"
+          : "muted",
+      steps: globalPolicyTraceSteps,
+      counts: {
+        groupCount: selectedRefTemplateParameterGroups.length,
+        manualCount: globalManualGroups.length,
+        autoCount: globalDependencyGroups.length + globalAutoGroups.length,
+        blockedCount: globalBlockedGroups.length,
+        conflictCount: globalConflictGroups.length,
+        dependencyRequestCount: Object.values(dependencyRequestsByGroupKey).reduce(
+          (total, requests) => total + requests.length,
+          0,
+        ),
+        unmetDependencyCount: Object.values(unmetDependenciesByGroupKey).reduce(
+          (total, dependencies) => total + dependencies.length,
+          0,
+        ),
+      },
+    };
     return {
       autoSelectionsBySelectionKey: Object.fromEntries(
         Object.entries(autoSelectionsByGroupKey).map(([groupKey, bundleKey]) => [
@@ -18728,6 +18891,7 @@ function RunSurfaceCollectionQueryBuilder({
       unmetDependenciesByGroupKey,
       conflictRequestsByGroupKey,
       policyTraceByGroupKey,
+      globalPolicyTrace,
     };
   }, [
     doesTemplateGroupBundleMatchAutoSelectRule,
@@ -18737,6 +18901,79 @@ function RunSurfaceCollectionQueryBuilder({
     predicateRefGroupBundleSelections,
     selectedRefTemplate,
     selectedRefTemplateParameterGroups,
+  ]);
+  const coordinatedPredicateRefGroupBundleState = useMemo(
+    () => computeCoordinatedPredicateRefGroupBundleState(),
+    [computeCoordinatedPredicateRefGroupBundleState],
+  );
+  const bundleCoordinationSimulationOverrides = useMemo(() => {
+    if (
+      bundleCoordinationSimulationPolicy === "current"
+      || !simulatedCoordinationGroups.length
+    ) {
+      return {};
+    }
+    if (bundleCoordinationSimulationScope === "all") {
+      return Object.fromEntries(
+        simulatedCoordinationGroups.map((group) => [group.key, bundleCoordinationSimulationPolicy]),
+      );
+    }
+    return simulatedCoordinationGroups.some((group) => group.key === bundleCoordinationSimulationScope)
+      ? { [bundleCoordinationSimulationScope]: bundleCoordinationSimulationPolicy }
+      : {};
+  }, [
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationScope,
+    simulatedCoordinationGroups,
+  ]);
+  const simulatedPredicateRefGroupBundleState = useMemo(
+    () => (
+      Object.keys(bundleCoordinationSimulationOverrides).length
+        ? computeCoordinatedPredicateRefGroupBundleState(bundleCoordinationSimulationOverrides)
+        : null
+    ),
+    [bundleCoordinationSimulationOverrides, computeCoordinatedPredicateRefGroupBundleState],
+  );
+  const simulatedPredicateRefGroupBundleDiffs = useMemo(() => {
+    if (!simulatedPredicateRefGroupBundleState) {
+      return [];
+    }
+    return simulatedCoordinationGroups.flatMap((group) => {
+      const currentTrace =
+        coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey[group.key] ?? null;
+      const simulatedTrace =
+        simulatedPredicateRefGroupBundleState.policyTraceByGroupKey[group.key] ?? null;
+      const currentBundleKey =
+        coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey[group.key] ?? "";
+      const simulatedBundleKey =
+        simulatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey[group.key] ?? "";
+      if (
+        currentBundleKey === simulatedBundleKey
+        && currentTrace?.statusLabel === simulatedTrace?.statusLabel
+      ) {
+        return [];
+      }
+      const currentBundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === currentBundleKey)
+        ?? null;
+      const simulatedBundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) => bundle.key === simulatedBundleKey)
+        ?? null;
+      return [{
+        groupKey: group.key,
+        groupLabel: group.label,
+        currentStatus: currentTrace?.statusLabel ?? "Idle",
+        simulatedStatus: simulatedTrace?.statusLabel ?? "Idle",
+        currentBundleLabel: currentBundle?.label ?? "No bundle",
+        simulatedBundleLabel: simulatedBundle?.label ?? "No bundle",
+      }];
+    });
+  }, [
+    coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey,
+    coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey,
+    getSortedTemplateGroupPresetBundles,
+    simulatedCoordinationGroups,
+    simulatedPredicateRefGroupBundleState,
   ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
@@ -20815,6 +21052,139 @@ function RunSurfaceCollectionQueryBuilder({
               ) : null}
               {selectedRefTemplate?.parameters.length ? (
                 <div className="run-surface-query-builder-domain-list">
+                  {simulatedCoordinationGroups.length ? (
+                    <div className="run-surface-query-builder-trace-grid">
+                      <div className="run-surface-query-builder-trace-panel is-global">
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>Coordination graph explanation</strong>
+                          <span className={`run-surface-query-builder-trace-status is-${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.tone}`}>
+                            {coordinatedPredicateRefGroupBundleState.globalPolicyTrace.statusLabel}
+                          </span>
+                        </div>
+                        <p className="run-note">{coordinatedPredicateRefGroupBundleState.globalPolicyTrace.summary}</p>
+                        <div className="run-surface-query-builder-trace-chip-list">
+                          <span className="run-surface-query-builder-trace-chip">
+                            {`${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.counts.groupCount} groups`}
+                          </span>
+                          <span className="run-surface-query-builder-trace-chip">
+                            {`${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.counts.manualCount} manual`}
+                          </span>
+                          <span className="run-surface-query-builder-trace-chip">
+                            {`${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.counts.autoCount} auto`}
+                          </span>
+                          <span className="run-surface-query-builder-trace-chip">
+                            {`${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.counts.conflictCount} conflicts`}
+                          </span>
+                          <span className="run-surface-query-builder-trace-chip">
+                            {`${coordinatedPredicateRefGroupBundleState.globalPolicyTrace.counts.unmetDependencyCount} unmet deps`}
+                          </span>
+                        </div>
+                        <div className="run-surface-query-builder-trace-list">
+                          {coordinatedPredicateRefGroupBundleState.globalPolicyTrace.steps.map((step) => (
+                            <div
+                              className={`run-surface-query-builder-trace-step is-${step.tone}`}
+                              key={step.key}
+                            >
+                              <strong>{step.title}</strong>
+                              <p>{step.detail}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="run-surface-query-builder-trace-panel is-global">
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>Policy simulation</strong>
+                          <span className={`run-surface-query-builder-trace-status is-${simulatedPredicateRefGroupBundleState?.globalPolicyTrace.tone ?? "muted"}`}>
+                            {simulatedPredicateRefGroupBundleState?.globalPolicyTrace.statusLabel ?? "Current"}
+                          </span>
+                        </div>
+                        <div className="run-surface-query-builder-inline-grid">
+                          <label className="run-surface-query-builder-control">
+                            <span>Simulation scope</span>
+                            <select
+                              value={bundleCoordinationSimulationScope}
+                              onChange={(event) => setBundleCoordinationSimulationScope(event.target.value)}
+                            >
+                              <option value="all">All groups</option>
+                              {simulatedCoordinationGroups.map((group) => (
+                                <option key={`simulation-scope:${group.key}`} value={group.key}>
+                                  {group.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          <label className="run-surface-query-builder-control">
+                            <span>Simulated policy</span>
+                            <select
+                              value={bundleCoordinationSimulationPolicy}
+                              onChange={(event) =>
+                                setBundleCoordinationSimulationPolicy(
+                                  event.target.value as RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"] | "current",
+                                )}
+                            >
+                              <option value="current">Current behavior</option>
+                              <option value="manual_source_priority">Prefer manual source</option>
+                              <option value="highest_source_priority">Highest source priority</option>
+                              <option value="sticky_auto_selection">Keep current auto choice</option>
+                              <option value="manual_resolution">Require manual resolution</option>
+                            </select>
+                          </label>
+                        </div>
+                        <p className="run-note">
+                          {simulatedPredicateRefGroupBundleState
+                            ? (
+                                bundleCoordinationSimulationScope === "all"
+                                  ? "Simulating this policy across the whole coordination graph."
+                                  : `Simulating this policy for ${simulatedCoordinationGroups.find((group) => group.key === bundleCoordinationSimulationScope)?.label ?? "the selected group"} while leaving other groups unchanged.`
+                              )
+                            : "Pick a policy to see how the coordination graph would change without altering the current live selections."}
+                        </p>
+                        {simulatedPredicateRefGroupBundleState ? (
+                          <>
+                            <p className="run-note">{simulatedPredicateRefGroupBundleState.globalPolicyTrace.summary}</p>
+                            <div className="run-surface-query-builder-trace-chip-list">
+                              <span className="run-surface-query-builder-trace-chip">
+                                {`${simulatedPredicateRefGroupBundleDiffs.length} changed groups`}
+                              </span>
+                              <span className="run-surface-query-builder-trace-chip">
+                                {`${simulatedPredicateRefGroupBundleState.globalPolicyTrace.counts.conflictCount} simulated conflicts`}
+                              </span>
+                              <span className="run-surface-query-builder-trace-chip">
+                                {`${simulatedPredicateRefGroupBundleState.globalPolicyTrace.counts.unmetDependencyCount} simulated unmet deps`}
+                              </span>
+                            </div>
+                            {simulatedPredicateRefGroupBundleDiffs.length ? (
+                              <div className="run-surface-query-builder-trace-list">
+                                {simulatedPredicateRefGroupBundleDiffs.map((diff) => (
+                                  <div className="run-surface-query-builder-trace-step is-info" key={`simulation-diff:${diff.groupKey}`}>
+                                    <strong>{diff.groupLabel}</strong>
+                                    <p>
+                                      {`${diff.currentStatus} · ${diff.currentBundleLabel} → ${diff.simulatedStatus} · ${diff.simulatedBundleLabel}`}
+                                    </p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="run-note">
+                                This policy would not change the currently resolved bundle choices for the simulated scope.
+                              </p>
+                            )}
+                            <div className="run-surface-query-builder-trace-list">
+                              {simulatedPredicateRefGroupBundleState.globalPolicyTrace.steps.map((step) => (
+                                <div
+                                  className={`run-surface-query-builder-trace-step is-${step.tone}`}
+                                  key={`simulation-step:${step.key}`}
+                                >
+                                  <strong>{step.title}</strong>
+                                  <p>{step.detail}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   {selectedRefTemplateParameterGroups.map((parameterGroup) => {
                     const groupViewKey = `ref:${selectedRefTemplate.id}:${parameterGroup.key}`;
                     const isExpanded = isTemplateGroupExpanded(groupViewKey, parameterGroup.collapsedByDefault);

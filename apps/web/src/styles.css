@@ -457,6 +457,35 @@ select {
   background: rgba(4, 10, 20, 0.42);
 }
 
+.run-surface-query-builder-trace-panel.is-global {
+  align-content: start;
+}
+
+.run-surface-query-builder-trace-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.run-surface-query-builder-trace-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-surface-query-builder-trace-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.76);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .run-surface-query-builder-trace-status {
   display: inline-flex;
   align-items: center;
