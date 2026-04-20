@@ -4776,18 +4776,38 @@
       "direction_id": "experiment-os",
       "title": "Add parameterized predicate templates and collection bindings to typed query expressions",
       "description": "Build on the new reusable predicate registry by allowing predicate definitions to declare parameters, typed argument binding, and collection-aware quantifier slots, so repeated expression shapes can be reused with caller-supplied values instead of cloning near-identical predicate trees for each threshold, identifier, or nested collection predicate.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 39,
-      "priority_reason": "The latest main-session reply says subtree promotion and root negation are complete and directly names predicate parameterization as the remaining advanced expression-authoring gap. That makes parameterized predicate templates the clearest automatic next queued task, with macro-level reuse kept as the later layer on top of the same reusable expression foundation.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 17ec03d, which added parameterized `predicate_templates`, `predicate_ref` bindings, template-bound collection `path_template` plus `bindings`, binding-aware condition values, strict bound collection lookup, OpenAPI `x-akra-query-schema` updates, targeted pytest coverage, `python -m py_compile`, and pushed the change to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:17:23Z",
+      "updated_at": "2026-04-20T03:26:18Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from reusable fixed predicates toward template-like expression reuse, which can reduce duplication once the broader quantified collection contract is stable."
+    },
+    {
+      "id": "planning-experiment-os-publish-parameterized-predicate-template-discovery-and-builder-authoring",
+      "direction_id": "experiment-os",
+      "title": "Publish parameterized predicate template discovery and query-builder authoring",
+      "description": "Extend the shared typed-query or collection-query discovery contract and the collection query builder so consumers can discover available `predicate_templates`, parameter and collection binding slots, and any binding-domain metadata, then author or edit parameterized predicate instances with binding pickers directly in the UI instead of hand-writing `filter_expr` JSON.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 41,
+      "priority_reason": "The latest main-session reply says the runtime parser and OpenAPI schema are now wired, and explicitly calls out the remaining gap as discovery plus consumer-layer support so the query builder can author parameterized predicate templates and offer binding pickers. That makes shared discovery publication plus builder integration the clearest automatic next queued task.",
+      "depends_on": [
+        "planning-experiment-os-add-parameterized-predicate-templates-to-typed-query-expressions",
+        "planning-experiment-os-complete-collection-query-expression-editor-for-subtree-promotion-and-root-negation",
+        "planning-experiment-os-expand-collection-query-capabilities-with-enum-sources-and-dedicated-family"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T03:26:18Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Moves experiment-os from backend-only parameterized predicate support into discoverable and operator-usable authoring flows, so typed-query reuse becomes an actual consumer contract instead of a capability hidden behind raw JSON."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
