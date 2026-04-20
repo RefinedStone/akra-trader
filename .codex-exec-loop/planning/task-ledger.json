@@ -5372,18 +5372,36 @@
       "direction_id": "experiment-os",
       "title": "Deepen bidirectional replay-review sync with timeline refocus and diff attribution refresh",
       "description": "Build on the completed inline replay edit flow by making conflict review row changes and review-focus transitions re-place the replay timeline on the most relevant step for the updated selection, while also recomputing step-level diff attribution or annotation context so replay focus stays causally aligned with the latest reviewed picks instead of only jumping to a stale or coarse step match.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 85,
       "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply says the remaining executable gap is deeper bidirectional synchronization: review-row changes still do not finely re-place replay timeline focus or recalculate step-level diff attribution from the latest reviewed picks. That follow-up is now the clearest executable next task after inline replay editing shipped, so it should become the queue head.",
+      "priority_reason": "Completed in main session commit 69af08a, which made conflict review row clicks and field-source flips claim active focus, refocused replay timeline state by related group, refreshed binding snapshot attribution so review-side and binding review selections stay synced with simulation trace context, annotated changed-group diff cards with replay-step attribution, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-edit-reviewed-field-pick-source-from-replay-annotations"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T07:10:00Z",
+      "updated_at": "2026-04-20T07:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply review from linked inspection and inline editing into full bidirectional synchronization, so review-row focus, replay-step placement, and per-step attribution stay aligned as operators revise picks and inspect simulated consequences."
+      "direction_relation_note": "Completed the deeper bidirectional replay-review sync pass by keeping review-row focus, replay-step placement, binding diff attribution, and changed-group replay-step links aligned as operators revise picks, which now leaves multi-step causal-chain explanation as the clearest remaining trust gap."
+    },
+    {
+      "id": "planning-experiment-os-trace-multi-step-causal-chain-for-reviewed-field-picks",
+      "direction_id": "experiment-os",
+      "title": "Trace multi-step causal chains for reviewed field picks across replay timeline",
+      "description": "Extend the newly completed replay-review sync so a reviewed field pick that influences more than one replay step is expanded into an explicit step-level causal chain, with linked trace context that shows the sequence of affected replay steps or actions instead of collapsing attribution to only the currently focused or nearest matching step.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 13,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is finer step-level recalculation: review-side focus and source changes now realign the relevant group and replay-step attribution, but a single field pick can still influence multiple replay steps without a dedicated causal-chain trace. That is the clearest executable next task after commit 69af08a.",
+      "depends_on": [
+        "planning-experiment-os-auto-focus-replay-timeline-from-collision-review-row-selection"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T07:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply trust from refreshed single-step alignment into full multi-step causal explanation, so operators can inspect how one reviewed field decision propagates through several replay actions before accepting or revising the merge."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
