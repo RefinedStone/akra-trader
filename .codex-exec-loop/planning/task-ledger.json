@@ -5498,18 +5498,36 @@
       "direction_id": "experiment-os",
       "title": "Add runtime candidate-level evaluation traces to replay explanations",
       "description": "Build on the shipped step-level truth table and short-circuit replay explanation UI by tracing each comparison back to the actual runtime collection candidate value that was evaluated, so operators can see which concrete candidate field values made a predicate true or false instead of reading only reviewed-binding provenance or template-level relevance traces.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply says the shipped truth-table and short-circuit trace still stops at provenance relevance: operators cannot yet inspect the actual collection candidate values that each comparison evaluated or read a fully data-backed evaluation trace. That is now the clearest executable next task after commit beb2424.",
+      "priority_reason": "Completed in main session commit 79f86f6, which added runtime candidate traces to replay explanations by surfacing resolved collection candidate paths, candidate accessors, compared operand values, and quantifier or operator evaluation wording across focused causal chains and active replay steps, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-step-level-truth-table-and-short-circuit-evaluation-traces-to-replay-explanations"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T08:06:00Z",
+      "updated_at": "2026-04-20T08:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from reviewed-binding truth-table provenance into concrete runtime data evaluation, so replay explanations can show not only which clause path mattered but exactly which candidate values made each comparison resolve true or false."
+      "direction_relation_note": "Completed the candidate-level replay explanation pass for experiment-os by making runtime collection candidate paths, accessors, and compared operand values visible step by step, which now leaves true data-backed replay from run payload items as the next trust gap."
+    },
+    {
+      "id": "planning-experiment-os-replay-concrete-runtime-candidate-values-from-run-payloads",
+      "direction_id": "experiment-os",
+      "title": "Replay concrete runtime candidate values from run payloads",
+      "description": "Build on the shipped runtime candidate trace UI by reading actual candidate collection item values from replay or run payloads and threading them into comparison traces, so replay explanations show which concrete runtime values made each predicate evaluate true or false instead of stopping at schema or path or binding-derived candidate context.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says the remaining gap after commit 79f86f6 is actual data-backed candidate replay: current traces show schema or path or binding-derived candidate context, but they still do not read real run-payload collection item values to explain why each comparison resolved true or false. That is now the clearest executable next task.",
+      "depends_on": [
+        "planning-experiment-os-add-runtime-candidate-level-evaluation-traces-to-replay-explanations"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:21:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from candidate-path visibility into true data-backed runtime evaluation, so operators can inspect the concrete run-payload values that made each predicate comparison pass or fail."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
