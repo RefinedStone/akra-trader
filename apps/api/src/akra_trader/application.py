@@ -25616,6 +25616,11 @@ def serialize_standalone_filter_param_spec(
 def serialize_collection_path_parameter_spec(
   spec: StandaloneSurfaceCollectionPathParameterSpec,
 ) -> dict[str, Any]:
+  hydrated_domain_values = list(spec.domain_values) if spec.domain_values else (
+    list(dict.fromkeys(spec.examples))
+    if spec.enum_source_kind and spec.examples
+    else []
+  )
   payload = {
     "key": spec.key,
     "kind": spec.kind,
@@ -25626,7 +25631,7 @@ def serialize_collection_path_parameter_spec(
     payload["domain"] = {
       "key": spec.domain_key or None,
       "source": spec.domain_source or None,
-      "values": list(spec.domain_values),
+      "values": hydrated_domain_values,
     }
     if spec.enum_source_kind or spec.enum_source_surface_key or spec.enum_source_path:
       payload["domain"]["enum_source"] = {

@@ -396,7 +396,7 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["domain"] == {
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
-    "values": [],
+    "values": ["binance:BTC/USDT"],
     "enum_source": {
       "kind": "dynamic_map_keys",
       "surface_key": "run_list",
@@ -1376,7 +1376,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
     "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level "
     "enforcement rules."
   )
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v12"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v13"
   assert shared_contracts["schema:run-surface-capabilities"]["schema_detail"] == {
     "comparison_eligibility_group_order": [
       "eligible_metrics",
@@ -1413,7 +1413,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["parameters"][0]["domain"] == {
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
-    "values": [],
+    "values": ["binance:BTC/USDT"],
     "enum_source": {
       "kind": "dynamic_map_keys",
       "surface_key": "run_list",
@@ -1423,7 +1423,7 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["parameter_domains"][0]["domain"] == {
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
-    "values": [],
+    "values": ["binance:BTC/USDT"],
     "enum_source": {
       "kind": "dynamic_map_keys",
       "surface_key": "run_list",

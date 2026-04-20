@@ -671,7 +671,7 @@ RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
   "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
 )
-RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v12"
+RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v13"
 RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
   "eligible_metrics",
   "supporting_identity",

@@ -14397,7 +14397,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       summary:
         "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
       source_of_truth: "run_surface_capabilities.discovery",
-      version: "run-surface-capabilities.v12",
+      version: "run-surface-capabilities.v13",
       related_family_keys: [
         "comparison_eligibility",
         "strategy_schema",
@@ -14508,8 +14508,67 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
         surface_key: "run_list",
         route_path: "/runs",
         expression_param: "filter_expr",
-        collection_schemas: [],
-        parameter_domains: [],
+        collection_schemas: [
+          {
+            path: ["orders"],
+            path_template: ["orders"],
+            label: "Run orders",
+            collection_kind: "object_collection",
+            item_kind: "order",
+            filter_keys: ["order_status", "order_type"],
+            description: "Evaluates predicates against individual run order objects.",
+            parameters: [],
+            element_schema: [],
+          },
+          {
+            path: ["provenance", "market_data_by_symbol", "issues"],
+            path_template: ["provenance", "market_data_by_symbol", "{symbol_key}", "issues"],
+            label: "Market-data issues",
+            collection_kind: "nested_collection",
+            item_kind: "issue_text",
+            filter_keys: ["issue_text"],
+            description: "Evaluates predicates against flattened issue strings across market-data lineage entries.",
+            parameters: [
+              {
+                key: "symbol_key",
+                kind: "dynamic_map_key",
+                description: "Symbol-keyed lineage entry inside `market_data_by_symbol`.",
+                examples: ["binance:BTC/USDT"],
+                domain: {
+                  key: "market_data_symbol_key",
+                  source: "run.provenance.market_data_by_symbol",
+                  values: ["binance:BTC/USDT"],
+                  enum_source: {
+                    kind: "dynamic_map_keys",
+                    surface_key: "run_list",
+                    path: ["provenance", "market_data_by_symbol"],
+                  },
+                },
+              },
+            ],
+            element_schema: [],
+          },
+        ],
+        parameter_domains: [
+          {
+            parameter_key: "symbol_key",
+            parameter_kind: "dynamic_map_key",
+            collection_label: "Market-data issues",
+            collection_path: ["provenance", "market_data_by_symbol", "issues"],
+            collection_path_template: ["provenance", "market_data_by_symbol", "{symbol_key}", "issues"],
+            surface_key: "run_list",
+            domain: {
+              key: "market_data_symbol_key",
+              source: "run.provenance.market_data_by_symbol",
+              values: ["binance:BTC/USDT"],
+              enum_source: {
+                kind: "dynamic_map_keys",
+                surface_key: "run_list",
+                path: ["provenance", "market_data_by_symbol"],
+              },
+            },
+          },
+        ],
       },
     },
     {
@@ -14894,7 +14953,7 @@ function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | nu
       schemaContract?.summary
       ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
     source_of_truth: schemaContract?.source_of_truth ?? "run_surface_capabilities.discovery",
-    version: schemaContract?.version ?? "run-surface-capabilities.v12",
+    version: schemaContract?.version ?? "run-surface-capabilities.v13",
     discovery_flow: schemaContract?.discovery_flow ?? null,
     related_family_keys: schemaContract?.related_family_keys?.length
       ? schemaContract.related_family_keys
@@ -15225,7 +15284,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const schemaSummary =
     schemaContract?.summary
     ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.";
-  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v12";
+  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v13";
   const runSubresourceSharedContracts = getRunSurfaceSubresourceContracts(capabilities);
 
   return (

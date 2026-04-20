@@ -13837,7 +13837,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v12"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v13"
   assert shared_contracts["schema:run-surface-capabilities"]["related_family_keys"] == [
     "comparison_eligibility",
     "strategy_schema",
@@ -13913,7 +13913,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["parameters"][0]["domain"] == {
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
-    "values": [],
+    "values": ["binance:BTC/USDT"],
     "enum_source": {
       "kind": "dynamic_map_keys",
       "surface_key": "run_list",
@@ -13923,7 +13923,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["parameter_domains"][0]["domain"] == {
     "key": "market_data_symbol_key",
     "source": "run.provenance.market_data_by_symbol",
-    "values": [],
+    "values": ["binance:BTC/USDT"],
     "enum_source": {
       "kind": "dynamic_map_keys",
       "surface_key": "run_list",
@@ -15165,7 +15165,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     for contract in capabilities.shared_contracts
   }
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v12"
+  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v13"
   assert shared_contracts["schema:run-surface-capabilities"].schema_detail["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",
