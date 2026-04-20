@@ -4078,6 +4078,50 @@ async function pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits(param
   );
 }
 
+async function exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits(params: {
+  adminToken?: string;
+  action?: string;
+  aliasId?: string;
+  exportFormat: "json" | "csv";
+  retentionPolicy?: string;
+  search?: string;
+  sourceTabId?: string;
+  templateKey?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params.aliasId?.trim()) {
+    searchParams.set("alias_id", params.aliasId.trim());
+  }
+  if (params.templateKey?.trim()) {
+    searchParams.set("template_key", params.templateKey.trim());
+  }
+  if (params.action?.trim() && params.action !== "all") {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.retentionPolicy?.trim() && params.retentionPolicy !== "all") {
+    searchParams.set("retention_policy", params.retentionPolicy.trim());
+  }
+  if (params.sourceTabId?.trim()) {
+    searchParams.set("source_tab_id", params.sourceTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  searchParams.set("format", params.exportFormat);
+  return fetchJson<{
+    content: string;
+    content_type: string;
+    exported_at: string;
+    filename: string;
+    format: "json" | "csv";
+    record_count: number;
+  }>(`/replay-links/audits/export?${searchParams.toString()}`, {
+    headers: params.adminToken?.trim()
+      ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+      : undefined,
+  });
+}
+
 const defaultRunForm = {
   strategy_id: "ma_cross_v1",
   symbol: "BTC/USDT",
@@ -24408,6 +24452,56 @@ function RunSurfaceCollectionQueryBuilder({
     replayIntentServerAuditTemplateFilter,
     replayIntentServerAuditWriteToken,
   ]);
+  const exportRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords = useCallback(async (
+    exportFormat: "json" | "csv",
+  ) => {
+    const adminToken = replayIntentServerAuditReadToken.trim() || replayIntentServerAuditWriteToken.trim();
+    setReplayIntentServerAuditLoading(true);
+    setReplayIntentServerAuditStatus(null);
+    try {
+      const payload = await exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits({
+        adminToken,
+        action: replayIntentServerAuditActionFilter,
+        aliasId: replayIntentServerAuditAliasFilter,
+        exportFormat,
+        retentionPolicy: replayIntentServerAuditRetentionFilter,
+        search: replayIntentServerAuditSearch,
+        sourceTabId: replayIntentServerAuditSourceTabFilter,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      if (typeof window !== "undefined") {
+        const blob = new Blob([payload.content], { type: payload.content_type });
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = payload.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+      }
+      setReplayIntentServerAuditStatus({
+        message: `Exported ${payload.record_count} server replay alias audit record${payload.record_count === 1 ? "" : "s"} as ${payload.format.toUpperCase()}.`,
+        tone: payload.record_count ? "success" : "muted",
+      });
+    } catch (error) {
+      setReplayIntentServerAuditStatus({
+        message: error instanceof Error ? error.message : "Failed to export server replay alias audits.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditLoading(false);
+    }
+  }, [
+    replayIntentServerAuditActionFilter,
+    replayIntentServerAuditAliasFilter,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRetentionFilter,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
   const copyRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = useCallback(async () => {
     if (!currentReplayIntentGovernancePayloadValue) {
       setReplayIntentGovernanceStatus({
@@ -30281,6 +30375,26 @@ function RunSurfaceCollectionQueryBuilder({
                               type="button"
                             >
                               Prune matched audits
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditLoading}
+                              onClick={() => {
+                                void exportRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords("json");
+                              }}
+                              type="button"
+                            >
+                              Export JSON
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditLoading}
+                              onClick={() => {
+                                void exportRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords("csv");
+                              }}
+                              type="button"
+                            >
+                              Export CSV
                             </button>
                           </div>
                           {replayIntentServerAuditItems.length ? (

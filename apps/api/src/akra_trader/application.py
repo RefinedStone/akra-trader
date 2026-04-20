@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 from copy import deepcopy
 from dataclasses import asdict
 from dataclasses import dataclass
@@ -8,6 +9,7 @@ from datetime import UTC
 from datetime import datetime
 from datetime import timedelta
 import hashlib
+import io
 import json
 from numbers import Number
 import re
@@ -1433,7 +1435,7 @@ class TradingApplication:
     retention_policy: str | None = None,
     source_tab_id: str | None = None,
     search: str | None = None,
-    limit: int = 100,
+    limit: int | None = 100,
   ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
     self._prune_replay_intent_alias_audit_records()
     normalized_alias_id = alias_id.strip() if isinstance(alias_id, str) and alias_id.strip() else None
@@ -1449,7 +1451,7 @@ class TradingApplication:
     normalized_source_tab_id = (
       source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None
     )
-    normalized_limit = max(1, min(limit, 500))
+    normalized_limit = None if limit is None else max(1, min(limit, 5_000))
     filtered = [
       record
       for record in self._list_replay_intent_alias_audit_records(normalized_alias_id)
@@ -1465,7 +1467,94 @@ class TradingApplication:
       )
       and self._matches_replay_intent_alias_audit_search(record, search)
     ]
-    return tuple(filtered[:normalized_limit])
+    return tuple(filtered if normalized_limit is None else filtered[:normalized_limit])
+
+  def export_replay_intent_alias_audits(
+    self,
+    *,
+    export_format: str = "json",
+    alias_id: str | None = None,
+    template_key: str | None = None,
+    action: str | None = None,
+    retention_policy: str | None = None,
+    source_tab_id: str | None = None,
+    search: str | None = None,
+  ) -> dict[str, Any]:
+    normalized_format = export_format.strip().lower() if isinstance(export_format, str) else "json"
+    if normalized_format not in {"json", "csv"}:
+      raise ValueError("Unsupported replay alias audit export format")
+    audit_records = self.list_replay_intent_alias_audits(
+      alias_id=alias_id,
+      template_key=template_key,
+      action=action,
+      retention_policy=retention_policy,
+      source_tab_id=source_tab_id,
+      search=search,
+      limit=None,
+    )
+    serialized_items = [
+      serialize_replay_intent_alias_audit_record(record)
+      for record in audit_records
+    ]
+    exported_at = self._clock().isoformat()
+    normalized_template_key = template_key.strip() if isinstance(template_key, str) and template_key.strip() else "all"
+    base_filename = f"replay-alias-audits-{normalized_template_key}"
+    if normalized_format == "json":
+      content = json.dumps(
+        {
+          "exported_at": exported_at,
+          "filters": {
+            "alias_id": alias_id,
+            "template_key": template_key,
+            "action": action,
+            "retention_policy": retention_policy,
+            "source_tab_id": source_tab_id,
+            "search": search,
+          },
+          "total": len(serialized_items),
+          "items": serialized_items,
+        },
+        indent=2,
+        sort_keys=True,
+      )
+      return {
+        "content": content,
+        "content_type": "application/json",
+        "exported_at": exported_at,
+        "filename": f"{base_filename}.json",
+        "format": "json",
+        "record_count": len(serialized_items),
+      }
+    buffer = io.StringIO()
+    fieldnames = (
+      "audit_id",
+      "alias_id",
+      "action",
+      "template_key",
+      "template_label",
+      "redaction_policy",
+      "retention_policy",
+      "source_tab_id",
+      "source_tab_label",
+      "detail",
+      "recorded_at",
+      "expires_at",
+      "alias_created_at",
+      "alias_expires_at",
+      "alias_revoked_at",
+    )
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    for item in serialized_items:
+      writer.writerow({fieldname: item.get(fieldname) for fieldname in fieldnames})
+    return {
+      "content": buffer.getvalue(),
+      "content_type": "text/csv; charset=utf-8",
+      "exported_at": exported_at,
+      "filename": f"{base_filename}.csv",
+      "format": "csv",
+      "record_count": len(serialized_items),
+    }
 
   def prune_replay_intent_alias_audits(
     self,
@@ -24602,6 +24691,95 @@ def list_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  replay_alias_audit_export_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export",
+    route_path="/replay-links/audits/export",
+    route_name="export_replay_link_alias_audits",
+    response_title="Export replay link alias audits",
+    scope="app",
+    binding_kind="replay_link_audit_export",
+    header_keys=("x_akra_replay_audit_admin_token",),
+    filter_keys=("alias_id", "template_key", "action", "retention_policy", "source_tab_id", "search", "format"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "alias_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Alias ID",
+          description="Filter replay alias audit export by alias identifier.",
+          examples=("abc123def4",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "template_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Template key",
+          description="Filter replay alias audit export by template key.",
+          examples=("template_a",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Audit action",
+          description="Filter replay alias audit export by action kind.",
+          examples=("revoked",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "retention_policy",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Retention policy",
+          description="Filter replay alias audit export by retention policy.",
+          examples=("7d",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "source_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Source tab ID",
+          description="Filter replay alias audit export by source tab identity.",
+          examples=("tab_local",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search replay alias audit export ids, template labels, source tabs, and detail text.",
+          examples=("Remote tab",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "format",
+        str,
+        default="json",
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=3, max_length=4),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Export format",
+          description="Replay alias audit export format.",
+          examples=("json", "csv"),
+        ),
+      ),
+    ),
+  )
   replay_alias_audit_prune_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="replay_link_audit_prune",
     route_path="/replay-links/audits/prune",
@@ -25897,6 +26075,7 @@ def list_standalone_surface_runtime_bindings(
     replay_alias_resolve_binding,
     replay_alias_history_binding,
     replay_alias_audit_list_binding,
+    replay_alias_audit_export_binding,
     replay_alias_audit_prune_binding,
     replay_alias_revoke_binding,
     market_data_status_binding,
@@ -26008,6 +26187,20 @@ def execute_standalone_surface_binding(
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 100),
       )
+    )
+  if binding.binding_kind == "replay_link_audit_export":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="read",
+    )
+    return app.export_replay_intent_alias_audits(
+      export_format=resolved_filters.get("format", "json"),
+      alias_id=resolved_filters.get("alias_id"),
+      template_key=resolved_filters.get("template_key"),
+      action=resolved_filters.get("action"),
+      retention_policy=resolved_filters.get("retention_policy"),
+      source_tab_id=resolved_filters.get("source_tab_id"),
+      search=resolved_filters.get("search"),
     )
   if binding.binding_kind == "replay_link_audit_prune":
     app.require_replay_alias_audit_admin_token(

@@ -339,6 +339,19 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "x_akra_replay_audit_admin_token",
     "app",
   )
+  assert tuple(inspect.signature(routes["export_replay_link_alias_audits"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "alias_id",
+    "template_key",
+    "action",
+    "retention_policy",
+    "source_tab_id",
+    "search",
+    "format",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
   assert tuple(inspect.signature(routes["prune_replay_link_alias_audits"].endpoint).parameters) == (
     "request",
     "x_akra_replay_audit_admin_token",
@@ -602,6 +615,56 @@ def test_replay_link_alias_audit_admin_endpoints_require_scoped_tokens(tmp_path:
     headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
   )
   assert write_prune_response.status_code == 200
+
+
+def test_replay_link_alias_audit_export_endpoint_supports_json_and_csv(tmp_path: Path) -> None:
+  client = build_client(
+    tmp_path / "runs.sqlite3",
+    replay_alias_audit_admin_read_token="read-token",
+  )
+
+  created_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_export",
+      "template_label": "Template Export",
+      "intent": {"replayScope": "all", "replayIndex": 7},
+      "redaction_policy": "summary_only",
+      "retention_policy": "30d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+  assert created_response.status_code == 200
+  alias_token = created_response.json()["alias_token"]
+  assert client.get(f"/api/replay-links/aliases/{alias_token}").status_code == 200
+
+  forbidden_response = client.get("/api/replay-links/audits/export")
+  assert forbidden_response.status_code == 403
+
+  json_export_response = client.get(
+    "/api/replay-links/audits/export",
+    params={"template_key": "template_export", "format": "json"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert json_export_response.status_code == 200
+  json_export_payload = json_export_response.json()
+  assert json_export_payload["format"] == "json"
+  assert json_export_payload["filename"].endswith(".json")
+  assert json_export_payload["record_count"] == 2
+  assert "\"template_key\": \"template_export\"" in json_export_payload["content"]
+
+  csv_export_response = client.get(
+    "/api/replay-links/audits/export",
+    params={"template_key": "template_export", "format": "csv"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert csv_export_response.status_code == 200
+  csv_export_payload = csv_export_response.json()
+  assert csv_export_payload["format"] == "csv"
+  assert csv_export_payload["filename"].endswith(".csv")
+  assert csv_export_payload["record_count"] == 2
+  assert "audit_id,alias_id,action" in csv_export_payload["content"]
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
