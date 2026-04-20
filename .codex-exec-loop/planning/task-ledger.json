@@ -5858,18 +5858,54 @@
       "direction_id": "experiment-os",
       "title": "Finish preview selection priority and auto-scroll polish",
       "description": "Polish the remaining clause re-evaluation preview sync edge cases by auto-scrolling the preview panel back to the selected diff row after clause draft recalculation and by reinterpreting preview selection with explicit priority rules when provenance or run selection changes underneath it, so the synchronized replay and provenance workflow stays predictable through both editor-driven and provenance-driven context shifts.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 24,
-      "priority_reason": "The latest main-session reply says the reverse-sync feature shipped in commit 28e8afc, and explicitly identifies the remaining executable follow-up: auto-scroll the preview panel to the preserved selected diff row after draft edits, and define priority-based preview selection reinterpretation when provenance selection changes. Promote this as the next `ready` queue head for builtin next-task automation.",
+      "priority_reason": "Completed in main session commit 620a72e, which finished preview selection priority reinterpretation around focused candidates, run/provenance selection, pinned clause origin, existing selection, and editor clause fallback, added auto-scroll anchoring for selected preview trace and diff rows during projection refresh, synced preview candidate focus back into run/provenance selection, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-complete-preview-driven-reverse-sync-into-provenance-selection-and-stable-diff-refresh"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T12:05:00Z",
+      "updated_at": "2026-04-20T10:11:16Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os replay and clause-authoring trust by making synchronized preview selection behavior deterministic and visibly anchored even when draft recalculation or provenance-side reselection changes the surrounding context."
+    },
+    {
+      "id": "planning-experiment-os-unify-preview-selection-with-primary-explanation-focus-and-persisted-intent",
+      "direction_id": "experiment-os",
+      "title": "Unify preview selection with primary explanation focus and persisted replay intent",
+      "description": "Build the next preview/explanation integration layer by letting the currently selected clause preview row directly promote the primary replay explanation focus, and by binding simulation step filter plus preview selection into one persisted intent model so explanation focus, preview selection, and filtered replay context reopen as one coherent inspection state instead of drifting apart.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 25,
+      "priority_reason": "Completed in main session commit 5e7d5b5, which unified preview selection with primary explanation focus, persisted replay scope and step plus group and action and edge filters as one template-scoped replay intent, kept clause-editor returns on the same preview group intent, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-finish-preview-selection-priority-and-auto-scroll-polish"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust by turning stable preview-row selection into the primary explanation anchor and by making replay filter context plus preview focus persist as one operator intent instead of loosely coupled UI state."
+    },
+    {
+      "id": "planning-experiment-os-share-unified-replay-intent-across-history-and-tabs",
+      "direction_id": "experiment-os",
+      "title": "Share unified replay preview intent across browser history and tabs",
+      "description": "Extend the newly unified preview-selection and explanation-focus intent beyond localStorage-only persistence by wiring the same replay intent contract into browser history or deep-link restoration and cross-tab synchronization, so replay scope, selected preview group, trace or diff row focus, and replay filters remain coherent when operators navigate with back or forward, reopen shared links, or inspect the same control room in parallel tabs.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply says commit 5e7d5b5 finished local replay-intent persistence and unified UI focus, and directly identifies the remaining executable gap: the same preview or explanation intent still is not shared through browser history deep-links or cross-tab synchronized replay intent. Promote this broader sharing pass as the next `ready` queue head for builtin next-task automation.",
+      "depends_on": [
+        "planning-experiment-os-unify-preview-selection-with-primary-explanation-focus-and-persisted-intent"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:20:01Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay inspection trust from one-tab durable focus into navigable and multi-tab-coherent operator state, which is the next step if unified preview intent is meant to survive real control-room analysis workflows."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
