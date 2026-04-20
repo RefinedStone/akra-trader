@@ -5588,18 +5588,72 @@
       "direction_id": "experiment-os",
       "title": "Pin concrete replay candidates from provenance selection and clause draft diffs",
       "description": "Deepen the new replay source sync by letting provenance rows lock the exact concrete candidate back into the active drill-through row selection and by reflecting partial clause editor draft changes into candidate trace diff state incrementally, so linked replay evidence stays pinned to the operator's exact source choice instead of only reopening a matching trace with coarse linked highlighting.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 22,
-      "priority_reason": "The latest main-session reply says the remaining deeper source sync gap after commit 4ee7c9b is twofold: provenance rows still do not pin the chosen concrete candidate as the active drill-through row, and clause editor partial edits are not yet reflected incrementally at candidate trace diff level. That is now the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 30dcac5, which pinned matching concrete candidate rows from provenance or order selection into drill-through ordering, added `pinned candidates` trace summaries, locked clause-loaded traces to draft origin, surfaced `Clause draft diff` metadata for quantifier, field, operator, value, and path segment edits, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-sync-replay-candidate-drillthrough-back-from-provenance-and-editor-state"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:40:00Z",
+      "updated_at": "2026-04-20T20:55:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from linked trace reopening into exact source-pinned replay evidence and live clause-diff coherence, so provenance inspection and clause drafting keep the active candidate row itself aligned."
+      "direction_relation_note": "Completed the concrete replay-source pinning pass for experiment-os by keeping provenance-linked candidate rows and clause-draft-origin traces visibly aligned, which now leaves direct row focus control and candidate-set re-evaluation preview as the next deeper sync gap."
+    },
+    {
+      "id": "planning-experiment-os-add-direct-candidate-focus-sync-and-re-evaluation-preview",
+      "direction_id": "experiment-os",
+      "title": "Add direct concrete candidate focus sync and clause re-evaluation preview",
+      "description": "Deepen replay candidate sync beyond pinned matches by letting provenance-side selection choose the exact concrete candidate row as the active drill-through focus and by previewing how clause draft diffs would re-evaluate the candidate set before commit, so operators can inspect both the currently selected row and the pending candidate-set impact from one synchronized surface.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 23,
+      "priority_reason": "Completed in main session commit 4202468, which added direct concrete candidate focus sync so narrowed run-context selection and `Open ...` jumps keep the same `Focused candidate` pinned and prioritized, added clause re-evaluation preview with matched-count, run-outcome, and changed-row comparison against the current draft, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-pin-concrete-replay-candidates-from-source-selection-and-clause-diffs"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:40:02Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the next replay candidate-sync trust pass for experiment-os by turning pinned matches into exact focused-candidate ownership and by previewing clause draft re-evaluation impact before commit, which now leaves artifact-level provenance hover persistence and timeline-diff integration as the narrower follow-up gaps."
+    },
+    {
+      "id": "planning-experiment-os-persist-provenance-candidate-hover-as-artifact-selection-for-replay-sync",
+      "direction_id": "experiment-os",
+      "title": "Persist provenance candidate hover as artifact-level replay selection",
+      "description": "Build on the shipped focused-candidate sync by promoting provenance-side concrete candidate hover into its own durable artifact-level selection state that reopens and preserves the same replay drill-through focus, so operators can move bidirectionally between provenance evidence and replay rows without losing the exact candidate they were inspecting.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply says the remaining deeper bidirectional sync gap after commit 4202468 is that provenance-side concrete candidate hover is not yet stored as its own artifact-level selection. That is the clearest directly executable follow-up for the next queued task.",
+      "depends_on": [
+        "planning-experiment-os-add-direct-candidate-focus-sync-and-re-evaluation-preview"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:40:02Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust from synchronized focused-candidate rows into a stronger artifact-selection contract, so provenance evidence and replay drill-through can share one exact candidate-selection state instead of only transient hover context."
+    },
+    {
+      "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
+      "direction_id": "experiment-os",
+      "title": "Project clause re-evaluation preview into replay timeline step diffs",
+      "description": "Build on the shipped clause re-evaluation preview by threading its changed candidate rows, matched-count delta, and run-outcome delta directly into the active replay timeline step diff view, so operators can inspect draft clause impact in the same causal timeline surface instead of comparing the preview card and timeline separately.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 23,
+      "priority_reason": "The latest main-session reply explicitly calls out replay timeline step-diff integration as the other remaining gap after commit 4202468, but it is secondary to restoring exact artifact-level candidate ownership across provenance and replay surfaces. Keep it proposed behind the more direct bidirectional-selection task.",
+      "depends_on": [
+        "planning-experiment-os-add-direct-candidate-focus-sync-and-re-evaluation-preview"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:40:02Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os clause-draft trust by collapsing re-evaluation preview and replay-timeline diff evidence into one causal surface, but it fits best after artifact-level focused-candidate selection is durable."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
