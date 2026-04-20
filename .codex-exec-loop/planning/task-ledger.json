@@ -4814,18 +4814,36 @@
       "direction_id": "experiment-os",
       "title": "Add template default authoring and nested template-binding flows to the query builder",
       "description": "Extend the newly shipped parameterized predicate template builder so operators can author template default values and compose templates by binding one template into another through dedicated editing flows, keeping `predicate_templates`, `predicate_ref.bindings`, and hydrated builder state round-trippable without falling back to raw JSON edits.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 42,
-      "priority_reason": "The latest main-session reply says the just-pushed template discovery and binding work is complete and explicitly identifies the next template-authoring gaps as default value authoring and nested template-to-template binding flows. Those are concrete executable follow-ups, so this becomes the next automatic queue head.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 61f3a77, which added template-parameter `defaultValue` state and serialization, hydrated saved template defaults back into the builder, allowed nested template refs to bind outer template parameters, let template refs rely on parameter defaults when bindings are omitted, preserved outer binding keys through template parameter inference, surfaced defaults in the template registry card, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-publish-parameterized-predicate-template-discovery-and-builder-authoring"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:40:00Z",
+      "updated_at": "2026-04-20T19:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os typed-query reuse from first-pass template discovery and binding into fuller operator authoring, so reusable filter templates can capture defaults and compose other templates without dropping back to hand-written filter JSON."
+    },
+    {
+      "id": "planning-experiment-os-separate-subtree-draft-default-authoring-context-for-unsaved-template-promotion",
+      "direction_id": "experiment-os",
+      "title": "Separate subtree draft default authoring for unsaved template-promotion flows",
+      "description": "Polish the query builder's remaining template-authoring gap by giving unsaved subtree-promotion flows their own default-editing context, so default values can be authored consistently before a subtree is promoted into a saved template instead of only after it enters the saved-template or clause-template paths.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 43,
+      "priority_reason": "The latest main-session reply says template default authoring now works for saved-template and clause-template flows, but unsaved subtree promotion still lacks a separate default-editing context. That is the clearest directly executable follow-up, so promote it to the automatic queue head instead of repeating the completed template-binding task.",
+      "depends_on": [
+        "planning-experiment-os-add-template-default-authoring-and-nested-template-binding-flows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:00:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os typed-query authoring from saved-template default editing into the still-missing draft subtree promotion path, closing the remaining UI gap before template reuse can stay fully visual across the whole promotion workflow."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
