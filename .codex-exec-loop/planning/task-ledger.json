@@ -4378,18 +4378,36 @@
       "direction_id": "experiment-os",
       "title": "Generalize runtime binding for query and filter based explicit read routes",
       "description": "Build on the completed complex-mutation binding rollout by extending binding-driven route registration to the remaining read surfaces that still require explicit FastAPI functions because they carry query or filter specs, especially `list`, `compare`, and `status` style endpoints, so request parsing for query params and filtered reads converges on the same metadata-driven abstraction instead of stopping at body/path/header-driven mutations.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 35,
-      "priority_reason": "The latest main-session reply explicitly says the remaining unfinished work is generalizing query or filter based explicit read routes. Because that is a concrete executable follow-up rather than an operator-choice proposal, it should become the next builtin queue head after the complex mutation family rollout completed.",
+      "priority_reason": "Completed in main session commit 1ad1629, which added `filter_param_specs` to `StandaloneSurfaceRuntimeBinding`, moved query shapes for `/strategies`, `/presets`, `/runs`, `/runs/compare`, and `/market-data/status` into binding metadata, taught the API route builder to synthesize `Query` params from binding metadata, removed the remaining explicit read wrappers, and verified with `python -m py_compile`, targeted `pytest` groups, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-runtime-binding-abstraction-to-remaining-complex-mutation-families"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:35:00Z",
+      "updated_at": "2026-04-21T00:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Carries experiment-os runtime-binding generalization into the last explicit read-side pockets whose query and filter semantics still force bespoke route functions, keeping the API surface on a single contract-driven registration path."
+    },
+    {
+      "id": "planning-experiment-os-type-query-binding-metadata-and-openapi-fields",
+      "direction_id": "experiment-os",
+      "title": "Type query binding metadata with declarative constraints and OpenAPI fields",
+      "description": "Build on the completed query and filter read-route generalization by lifting query parameter constraints, aliases, and richer OpenAPI-facing field metadata into a typed declarative binding spec, so runtime route registration stays binding-driven even for constrained query params and generated API docs no longer depend on thin handwritten `Query(...)` details outside the binding contract.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 36,
+      "priority_reason": "The latest main-session reply says the remaining gap is deeper typing of binding metadata, specifically query parameter constraints, aliases, and richer OpenAPI field metadata. That is a concrete executable follow-up and should become the new queue head now that query or filter based explicit read routes have been fully generalized.",
+      "depends_on": [
+        "planning-experiment-os-generalize-runtime-binding-for-query-and-filter-based-explicit-read-routes"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Deepens experiment-os runtime-binding convergence by turning query-parameter behavior and generated API documentation into first-class binding metadata rather than leaving constraints and descriptive field semantics as ad hoc FastAPI details."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
@@ -4399,13 +4417,13 @@
       "status": "proposed",
       "base_priority": 87,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply identifies a narrower executable gap first: query or filter based explicit read routes. Keep this larger architectural pass proposed behind that concrete read-surface generalization.",
+      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply identifies a narrower executable gap first: typed declarative query-binding metadata for constraints, aliases, and richer OpenAPI fields. Keep this larger architectural pass proposed behind that concrete metadata-typing follow-up.",
       "depends_on": [
-        "planning-experiment-os-generalize-runtime-binding-for-query-and-filter-based-explicit-read-routes"
+        "planning-experiment-os-type-query-binding-metadata-and-openapi-fields"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:35:00Z",
+      "updated_at": "2026-04-21T00:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
     },
