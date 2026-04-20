@@ -368,16 +368,33 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["quantifier"] == "any|all|none"
   assert "flattening nested collection-of-collection paths" in run_query_schema["expression_trees"]["collection_nodes"]["semantics"]
   assert run_query_schema["expression_trees"]["collection_schemas"][0]["path"] == ["orders"]
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["path_template"] == ["orders"]
   assert run_query_schema["expression_trees"]["collection_schemas"][0]["filter_keys"] == [
     "order_status",
     "order_type",
   ]
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["element_schema"][0]["key"] == "order_status"
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["element_schema"][0]["value_path"] == [
+    "status",
+    "value",
+  ]
+  assert run_query_schema["expression_trees"]["collection_schemas"][0]["element_schema"][0]["query_exposed"] is False
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["path"] == [
     "provenance",
     "market_data_by_symbol",
     "issues",
   ]
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["path_template"] == [
+    "provenance",
+    "market_data_by_symbol",
+    "{symbol_key}",
+    "issues",
+  ]
   assert run_query_schema["expression_trees"]["collection_schemas"][1]["item_kind"] == "issue_text"
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["key"] == "symbol_key"
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["parameters"][0]["kind"] == "dynamic_map_key"
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["element_schema"][0]["key"] == "issue_text"
+  assert run_query_schema["expression_trees"]["collection_schemas"][1]["element_schema"][0]["value_root"] is True
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]

@@ -23053,6 +23053,16 @@ class StandaloneSurfaceCollectionPathSpec:
   item_kind: str
   filter_keys: tuple[str, ...]
   description: str = ""
+  path_template: tuple[str, ...] = ()
+  parameters: tuple["StandaloneSurfaceCollectionPathParameterSpec", ...] = ()
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceCollectionPathParameterSpec:
+  key: str
+  kind: str
+  description: str
+  examples: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -24616,6 +24626,7 @@ def list_standalone_surface_runtime_bindings(
         item_kind="order",
         filter_keys=("order_status", "order_type"),
         description="Evaluates predicates against individual run order objects.",
+        path_template=("orders",),
       ),
       StandaloneSurfaceCollectionPathSpec(
         path=("provenance", "market_data_by_symbol", "issues"),
@@ -24624,6 +24635,15 @@ def list_standalone_surface_runtime_bindings(
         item_kind="issue_text",
         filter_keys=("issue_text",),
         description="Evaluates predicates against flattened issue strings across market-data lineage entries.",
+        path_template=("provenance", "market_data_by_symbol", "{symbol_key}", "issues"),
+        parameters=(
+          StandaloneSurfaceCollectionPathParameterSpec(
+            key="symbol_key",
+            kind="dynamic_map_key",
+            description="Symbol-keyed lineage entry inside `market_data_by_symbol`.",
+            examples=("binance:BTC/USDT",),
+          ),
+        ),
       ),
     ),
     sort_field_specs=(
