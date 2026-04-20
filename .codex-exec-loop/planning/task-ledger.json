@@ -4922,36 +4922,36 @@
       "direction_id": "experiment-os",
       "title": "Add priority and conditional auto-selection for subtree group bundles",
       "description": "Build on the shipped group-level subtree preset bundles and visibility rules by adding deeper execution semantics inside each parameter group, including bundle priority ordering and conditional auto-selection rules that can choose the right bundle during preview and predicate-ref insertion without requiring only manual bundle picking.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 48,
-      "priority_reason": "The latest main-session reply explicitly says the remaining executable gap after authoring, preview, and ref insertion wiring is the deeper execution layer for group bundles, especially bundle priority and conditional bundle auto-selection. That is now the clearest next task to continue automatically.",
+      "priority_reason": "Completed in main session commit b929967, which added subtree group bundle priority plus conditional auto-selection authoring, serialization, consumer-side highest-priority rule application, and priority-ordered registry/picker UI, then passed `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-add-group-level-preset-bundles-and-visibility-rules-to-subtree-templates"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:40:00Z",
+      "updated_at": "2026-04-20T20:50:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os subtree template groups from manually applied bundle metadata into executable selection semantics, so grouped predicate templates can choose reusable parameter presets more intelligently at insertion time."
     },
     {
       "id": "planning-experiment-os-compose-subtree-group-bundles-across-groups",
       "direction_id": "experiment-os",
-      "title": "Compose subtree group preset bundles across groups",
-      "description": "Extend the new group bundle system beyond per-group execution by defining cross-group bundle composition rules, conflict resolution, and merge behavior so one subtree template can coordinate compatible bundle choices across multiple parameter groups without relying on isolated manual picks.",
-      "status": "proposed",
+      "title": "Coordinate subtree group bundles across dependencies and groups",
+      "description": "Extend the shipped group-local priority and conditional auto-selection model by defining bundle dependency rules, cross-group coordination, and conflict or merge behavior so one subtree template can automatically choose compatible bundles across multiple parameter groups instead of stopping at isolated per-group selection.",
+      "status": "ready",
       "base_priority": 88,
       "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply also calls out cross-group bundle composition as unfinished, but it should stay proposed behind bundle priority and conditional auto-selection because composition needs a firmer precedence and merge contract before it becomes the next automatic queue head.",
+      "priority_reason": "The latest main-session reply says the remaining executable gap after commit b929967 is the more complex auto-selection policy layer, specifically bundle dependencies and cross-group auto-selection coordination. With group-local priority and simple rules now shipped, this becomes the clearest next queue head to continue automatically.",
       "depends_on": [
         "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:40:00Z",
+      "updated_at": "2026-04-20T20:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os subtree template reuse from isolated group presets toward coordinated multi-group template behavior, which is necessary once grouped bundle selection starts carrying real execution semantics."
+      "direction_relation_note": "Pushes experiment-os subtree template reuse from isolated group-local auto-selection toward coordinated multi-group execution semantics, which is the next required layer once bundle priority and conditional selection ship."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
