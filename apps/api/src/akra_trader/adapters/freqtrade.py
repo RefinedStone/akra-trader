@@ -16,7 +16,10 @@ from zipfile import BadZipFile
 from zipfile import ZipFile
 
 from akra_trader.adapters.references import ReferenceCatalog
+from akra_trader.domain.models import BENCHMARK_ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY
 from akra_trader.domain.models import BenchmarkArtifact
+from akra_trader.domain.models import extract_benchmark_artifact_runtime_candidate_id
+from akra_trader.domain.models import is_benchmark_artifact_metadata_key
 from akra_trader.domain.models import MarketDataLineage
 from akra_trader.domain.models import ReferenceSource
 from akra_trader.domain.models import RunConfig
@@ -37,14 +40,6 @@ class PreparedCommand:
 
 
 class FreqtradeReferenceAdapter:
-  _ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY = "__runtime_candidate_id"
-  _ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS = (
-    "__runtime_candidate_id",
-    "runtime_candidate_id",
-    "native_runtime_candidate_id",
-    "native_candidate_id",
-  )
-
   def __init__(self, repo_root: Path, references: ReferenceCatalog) -> None:
     self._repo_root = repo_root
     self._references = references
@@ -1049,9 +1044,9 @@ class FreqtradeReferenceAdapter:
 
   def _summarize_metric_row(self, row: dict[str, Any]) -> dict[str, Any]:
     summary: dict[str, Any] = {}
-    runtime_candidate_id = self._extract_artifact_runtime_candidate_id(row)
+    runtime_candidate_id = extract_benchmark_artifact_runtime_candidate_id(row)
     if runtime_candidate_id is not None:
-      summary[self._ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY] = runtime_candidate_id
+      summary[BENCHMARK_ARTIFACT_RUNTIME_CANDIDATE_ID_METADATA_KEY] = runtime_candidate_id
     self._set_summary_entry(
       summary,
       "label",
@@ -1398,7 +1393,7 @@ class FreqtradeReferenceAdapter:
   ) -> list[dict[str, str | None]]:
     collected: list[dict[str, str | None]] = []
     seen: set[str] = set()
-    runtime_candidate_id = self._extract_artifact_runtime_candidate_id(value)
+    runtime_candidate_id = extract_benchmark_artifact_runtime_candidate_id(value)
 
     def add(
       candidate: str | None,
@@ -1433,7 +1428,7 @@ class FreqtradeReferenceAdapter:
       )
     elif isinstance(value, dict):
       for nested_key, nested_value in value.items():
-        if self._is_artifact_metadata_key(str(nested_key)):
+        if is_benchmark_artifact_metadata_key(str(nested_key)):
           continue
         formatted_key = self._format_artifact_source_label(str(nested_key))
         if isinstance(nested_value, (str, int, float, bool)):
@@ -1477,7 +1472,7 @@ class FreqtradeReferenceAdapter:
         return
       if isinstance(candidate, dict):
         for nested_key, nested_value in candidate.items():
-          if self._is_artifact_metadata_key(str(nested_key)):
+          if is_benchmark_artifact_metadata_key(str(nested_key)):
             continue
           if str(nested_key) in {"pair", "symbol", "label", "key"} and isinstance(nested_value, str):
             add(nested_value)
@@ -1567,7 +1562,7 @@ class FreqtradeReferenceAdapter:
         return
       if isinstance(candidate, dict):
         for nested_key, nested_value in candidate.items():
-          if self._is_artifact_metadata_key(str(nested_key)):
+          if is_benchmark_artifact_metadata_key(str(nested_key)):
             continue
           formatted_key = self._format_artifact_source_label(str(nested_key))
           add(formatted_key)
@@ -1601,7 +1596,7 @@ class FreqtradeReferenceAdapter:
       rendered = [
         f"{self._format_artifact_source_label(str(key))}={nested}"
         for key, nested_value in value.items()
-        if not self._is_artifact_metadata_key(str(key))
+        if not is_benchmark_artifact_metadata_key(str(key))
         if (nested := self._stringify_artifact_source_value(nested_value)) is not None
       ]
       return ", ".join(rendered) if rendered else None
@@ -1619,20 +1614,6 @@ class FreqtradeReferenceAdapter:
     normalized = FreqtradeReferenceAdapter._normalize_summary_value(key, value)
     if normalized is not None:
       summary[key] = normalized
-
-  @classmethod
-  def _extract_artifact_runtime_candidate_id(cls, value: Any) -> str | None:
-    if not isinstance(value, dict):
-      return None
-    for key in cls._ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS:
-      candidate_value = value.get(key)
-      if isinstance(candidate_value, str) and candidate_value.strip():
-        return candidate_value.strip()
-    return None
-
-  @classmethod
-  def _is_artifact_metadata_key(cls, key: str) -> bool:
-    return key in cls._ARTIFACT_RUNTIME_CANDIDATE_ID_SOURCE_KEYS
 
   @staticmethod
   def _normalize_summary_value(key: str, value: Any) -> Any:

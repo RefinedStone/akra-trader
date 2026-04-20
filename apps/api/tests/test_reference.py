@@ -10,6 +10,8 @@ import pandas as pd
 
 from akra_trader.adapters.freqtrade import FreqtradeReferenceAdapter
 from akra_trader.adapters.references import load_reference_catalog
+from akra_trader.domain.models import extract_benchmark_artifact_runtime_candidate_id
+from akra_trader.domain.models import is_benchmark_artifact_metadata_key
 
 
 def test_reference_adapter_builds_nfi_command() -> None:
@@ -45,6 +47,18 @@ def test_reference_adapter_builds_nfi_command() -> None:
   assert prepared.integration_mode == "external_runtime"
   assert any(path.endswith("user_data/backtest_results") for path in prepared.artifact_roots)
   assert any(path.endswith("user_data/logs") for path in prepared.artifact_roots)
+
+
+def test_benchmark_artifact_runtime_candidate_id_helpers_accept_multiple_source_keys() -> None:
+  assert extract_benchmark_artifact_runtime_candidate_id(
+    {"runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT"}
+  ) == "freqtrade:pair-metric:BTC/USDT"
+  assert extract_benchmark_artifact_runtime_candidate_id(
+    {"native_candidate_id": "nautilus:order-book-gap:BTC/USDT"}
+  ) == "nautilus:order-book-gap:BTC/USDT"
+  assert is_benchmark_artifact_metadata_key("__runtime_candidate_id") is True
+  assert is_benchmark_artifact_metadata_key("native_runtime_candidate_id") is True
+  assert is_benchmark_artifact_metadata_key("label") is False
 
 
 def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summary(tmp_path: Path) -> None:
@@ -87,7 +101,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
             "results_per_pair": [
               {
                 "key": "BTC/USDT",
-                "runtime_candidate_id": "freqtrade:pair-metric:BTC/USDT",
+                "native_candidate_id": "freqtrade:pair-metric:BTC/USDT",
                 "trades": 20,
                 "profit_total_pct": 12.3,
                 "profit_total_abs": 1234.5,
