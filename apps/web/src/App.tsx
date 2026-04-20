@@ -3123,6 +3123,7 @@ const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_KEY = "akra-trader-run
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_VERSION = 1;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY = "akra-trader-run-surface-replay-link-audit";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_VERSION = 1;
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_SIGNING_SECRET_STORAGE_KEY = "akra-trader-run-surface-replay-link-signing-secret";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_STORAGE_KEY = "akra-trader-run-surface-replay-link-governance-audit";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_STORAGE_VERSION = 1;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_KEY = "akra-trader-run-surface-replay-link-governance";
@@ -17182,14 +17183,17 @@ type RunSurfaceCollectionQueryBuilderReplayIntentBrowserState = {
 
 type RunSurfaceCollectionQueryBuilderReplayLinkShareMode = "portable" | "indirect";
 type RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy = "full" | "omit_preview" | "summary_only";
+type RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy = "1d" | "7d" | "30d" | "manual";
 
 type RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = {
   aliasId: string;
   createdAt: string;
   createdByTabId: string;
   createdByTabLabel: string;
+  expiresAt: string | null;
   intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot;
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  signature: string | null;
   templateKey: string;
   templateLabel: string;
 };
@@ -17223,6 +17227,7 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode = "live" | "op
 
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot = {
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
   shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   syncMode: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode;
 };
@@ -17230,6 +17235,7 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot = {
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditFieldKey =
   | "shareMode"
   | "redactionPolicy"
+  | "retentionPolicy"
   | "syncMode";
 
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditEntry = {
@@ -17262,6 +17268,7 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditState = {
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState = {
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
   reviewedConflictKeys: string[];
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
   shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   syncMode: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode;
   version: number;
@@ -17269,6 +17276,7 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState = {
 
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState = {
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
   shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   sourceTabId: string;
   sourceTabLabel: string;
@@ -17295,8 +17303,10 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry = {
   conflictKey: string;
   detectedAt: string;
   localRedactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  localRetentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
   localShareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   remoteRedactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  remoteRetentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
   remoteShareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   sourceTabId: string;
   sourceTabLabel: string;
@@ -17777,14 +17787,28 @@ function loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl(): {
     return null;
   }
   const params = new URL(window.location.href).searchParams;
-  const aliasId = params.get(REPLAY_INTENT_ALIAS_SEARCH_PARAM)?.trim() ?? "";
-  if (aliasId) {
-    const aliasEntry = loadRunSurfaceCollectionQueryBuilderReplayLinkAliases().find((entry) => entry.aliasId === aliasId) ?? null;
+  const aliasToken = parseRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+    params.get(REPLAY_INTENT_ALIAS_SEARCH_PARAM),
+  );
+  if (aliasToken?.aliasId) {
+    const aliasEntry =
+      loadRunSurfaceCollectionQueryBuilderReplayLinkAliases().find((entry) => entry.aliasId === aliasToken.aliasId)
+      ?? null;
     if (aliasEntry) {
-      return {
-        intent: aliasEntry.intent,
-        templateKey: aliasEntry.templateKey,
-      };
+      const recomputedSignature = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
+        aliasEntry,
+        loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret(),
+      );
+      const signatureMatches =
+        aliasEntry.signature
+          ? aliasToken.signature === aliasEntry.signature && aliasEntry.signature === recomputedSignature
+          : !aliasToken.signature;
+      if (signatureMatches) {
+        return {
+          intent: aliasEntry.intent,
+          templateKey: aliasEntry.templateKey,
+        };
+      }
     }
   }
   const compactIntent = decodeRunSurfaceCollectionQueryBuilderReplayIntentCompactValue(
@@ -17955,10 +17979,11 @@ function applyRunSurfaceCollectionQueryBuilderReplayIntentRedactionPolicy(
 }
 
 function buildRunSurfaceCollectionQueryBuilderReplayLinkAliasId() {
+  const randomSegment = Math.random().toString(36).slice(2, 10);
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
-    return crypto.randomUUID();
+    return crypto.randomUUID().replace(/-/g, "").slice(0, 10);
   }
-  return `replay-link-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `rl${randomSegment}`.slice(0, 10);
 }
 
 function buildRunSurfaceCollectionQueryBuilderReplayLinkAuditId() {
@@ -17966,6 +17991,135 @@ function buildRunSurfaceCollectionQueryBuilderReplayLinkAuditId() {
     return crypto.randomUUID();
   }
   return `replay-link-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy(
+  value: unknown,
+): RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy {
+  return value === "1d" || value === "7d" || value === "manual" ? value : "30d";
+}
+
+function getRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicyDurationMs(
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+) {
+  switch (retentionPolicy) {
+    case "1d":
+      return 24 * 60 * 60 * 1000;
+    case "7d":
+      return 7 * 24 * 60 * 60 * 1000;
+    case "30d":
+      return 30 * 24 * 60 * 60 * 1000;
+    case "manual":
+    default:
+      return null;
+  }
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkExpiry(
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+  createdAt: string,
+) {
+  const duration = getRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicyDurationMs(retentionPolicy);
+  if (!duration) {
+    return null;
+  }
+  const createdAtMs = Date.parse(createdAt);
+  if (!Number.isFinite(createdAtMs)) {
+    return null;
+  }
+  return new Date(createdAtMs + duration).toISOString();
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `replay-link-secret-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret() {
+  if (typeof window === "undefined") {
+    return "replay-link-secret";
+  }
+  try {
+    const existingSecret =
+      window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_SIGNING_SECRET_STORAGE_KEY)?.trim();
+    if (existingSecret) {
+      return existingSecret;
+    }
+    const nextSecret = buildRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret();
+    window.localStorage.setItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_SIGNING_SECRET_STORAGE_KEY, nextSecret);
+    return nextSecret;
+  } catch {
+    return "replay-link-secret";
+  }
+}
+
+function hashRunSurfaceCollectionQueryBuilderReplayLinkSignatureSegment(input: string) {
+  let hash = 2166136261;
+  for (let index = 0; index < input.length; index += 1) {
+    hash ^= input.charCodeAt(index);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignaturePayload(
+  entry: Pick<
+    RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry,
+    "aliasId" | "createdAt" | "expiresAt" | "intent" | "redactionPolicy" | "templateKey"
+  >,
+) {
+  return JSON.stringify({
+    a: entry.aliasId,
+    c: entry.createdAt,
+    e: entry.expiresAt,
+    i: entry.intent,
+    r: entry.redactionPolicy,
+    t: entry.templateKey,
+  });
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
+  entry: Pick<
+    RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry,
+    "aliasId" | "createdAt" | "expiresAt" | "intent" | "redactionPolicy" | "templateKey"
+  >,
+  signingSecret: string,
+) {
+  const payload = `${signingSecret}:${buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignaturePayload(entry)}`;
+  const primary = hashRunSurfaceCollectionQueryBuilderReplayLinkSignatureSegment(payload);
+  const secondary = hashRunSurfaceCollectionQueryBuilderReplayLinkSignatureSegment(
+    payload.split("").reverse().join(""),
+  );
+  return `${primary}${secondary}`.slice(0, 18);
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+  aliasId: string,
+  signature: string | null | undefined,
+) {
+  return signature?.trim() ? `${aliasId}.${signature.trim()}` : aliasId;
+}
+
+function parseRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+  value: string | null | undefined,
+) {
+  const token = value?.trim() ?? "";
+  if (!token) {
+    return null;
+  }
+  const lastSeparatorIndex = token.lastIndexOf(".");
+  if (lastSeparatorIndex <= 0) {
+    return {
+      aliasId: token,
+      signature: null,
+    };
+  }
+  return {
+    aliasId: token.slice(0, lastSeparatorIndex),
+    signature: token.slice(lastSeparatorIndex + 1) || null,
+  };
 }
 
 function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditId() {
@@ -17980,6 +18134,7 @@ function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot(
 ) {
   return {
     redactionPolicy: state.redactionPolicy,
+    retentionPolicy: state.retentionPolicy,
     shareMode: state.shareMode,
     syncMode: state.syncMode,
   } satisfies RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot;
@@ -17996,6 +18151,9 @@ function getRunSurfaceCollectionQueryBuilderReplayLinkGovernanceDiffKeys(
   if (fromState.redactionPolicy !== toState.redactionPolicy) {
     diffKeys.push("redactionPolicy");
   }
+  if (fromState.retentionPolicy !== toState.retentionPolicy) {
+    diffKeys.push("retentionPolicy");
+  }
   if (fromState.syncMode !== toState.syncMode) {
     diffKeys.push("syncMode");
   }
@@ -18011,6 +18169,14 @@ function formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue(
       return state.shareMode === "indirect" ? "Local alias link" : "Portable deep link";
     case "redactionPolicy":
       return state.redactionPolicy.replaceAll("_", " ");
+    case "retentionPolicy":
+      return state.retentionPolicy === "manual"
+        ? "Keep until cleared"
+        : state.retentionPolicy === "1d"
+          ? "1 day"
+          : state.retentionPolicy === "7d"
+            ? "7 days"
+            : "30 days";
     case "syncMode":
       return state.syncMode === "opt_out"
         ? "Ignore remote changes"
@@ -18078,6 +18244,9 @@ function decodeRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload(
           || parsed.governance.redactionPolicy === "summary_only"
             ? parsed.governance.redactionPolicy
             : "full",
+        retentionPolicy: normalizeRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy(
+          parsed.governance.retentionPolicy,
+        ),
         shareMode: parsed.governance.shareMode === "indirect" ? "indirect" : "portable",
         syncMode:
           parsed.governance.syncMode === "opt_out" || parsed.governance.syncMode === "review"
@@ -18124,9 +18293,17 @@ function loadRunSurfaceCollectionQueryBuilderReplayLinkAliasesFromStorageValue(
         entry
         && typeof entry.aliasId === "string"
         && typeof entry.createdAt === "string"
+        && (typeof entry.expiresAt === "string" || entry.expiresAt === null || entry.expiresAt === undefined)
+        && (typeof entry.signature === "string" || entry.signature === null || entry.signature === undefined)
         && typeof entry.templateKey === "string"
         && typeof entry.templateLabel === "string",
       ),
+    ).map((entry) => ({
+      ...entry,
+      expiresAt: typeof entry.expiresAt === "string" ? entry.expiresAt : null,
+      signature: typeof entry.signature === "string" ? entry.signature : null,
+    })).filter((entry) =>
+      !entry.expiresAt || Date.parse(entry.expiresAt) > Date.now(),
     );
   } catch {
     return [];
@@ -18276,6 +18453,7 @@ function loadRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState() {
   const defaultState = {
     redactionPolicy: "full" as const,
     reviewedConflictKeys: [] as string[],
+    retentionPolicy: "30d" as const,
     shareMode: "portable" as const,
     syncMode: "live" as const,
   };
@@ -18298,6 +18476,9 @@ function loadRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState() {
           .filter((value): value is string => typeof value === "string")
           .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_REVIEWED_CONFLICT_KEYS)
         : defaultState.reviewedConflictKeys,
+      retentionPolicy: normalizeRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy(
+        parsed?.retentionPolicy,
+      ),
       shareMode:
         parsed?.shareMode === "indirect"
           ? "indirect"
@@ -18316,6 +18497,7 @@ function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState(
   state: {
     redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
     reviewedConflictKeys: string[];
+    retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
     shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
     syncMode: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode;
   },
@@ -18352,6 +18534,27 @@ function mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
     .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_ENTRIES);
 }
 
+function pruneRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+  aliases: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[],
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+) {
+  const cutoffMs = getRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicyDurationMs(retentionPolicy);
+  const nowMs = Date.now();
+  return aliases.filter((entry) => {
+    if (entry.expiresAt && Date.parse(entry.expiresAt) <= nowMs) {
+      return false;
+    }
+    if (cutoffMs === null) {
+      return true;
+    }
+    const createdAtMs = Date.parse(entry.createdAt);
+    if (!Number.isFinite(createdAtMs)) {
+      return false;
+    }
+    return nowMs - createdAtMs <= cutoffMs;
+  });
+}
+
 function mergeRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
   current: RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[],
   incoming: RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[],
@@ -18367,6 +18570,21 @@ function mergeRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
     })
     .sort((left, right) => right.at.localeCompare(left.at))
     .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_ENTRIES);
+}
+
+function pruneRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
+  entries: RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[],
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+) {
+  const cutoffMs = getRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicyDurationMs(retentionPolicy);
+  if (cutoffMs === null) {
+    return entries;
+  }
+  const nowMs = Date.now();
+  return entries.filter((entry) => {
+    const entryMs = Date.parse(entry.at);
+    return Number.isFinite(entryMs) && nowMs - entryMs <= cutoffMs;
+  });
 }
 
 function mergeRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(
@@ -18386,9 +18604,25 @@ function mergeRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(
     .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_AUDIT_ENTRIES);
 }
 
+function pruneRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(
+  entries: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditEntry[],
+  retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+) {
+  const cutoffMs = getRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicyDurationMs(retentionPolicy);
+  if (cutoffMs === null) {
+    return entries;
+  }
+  const nowMs = Date.now();
+  return entries.filter((entry) => {
+    const entryMs = Date.parse(entry.at);
+    return Number.isFinite(entryMs) && nowMs - entryMs <= cutoffMs;
+  });
+}
+
 function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
   state: {
     redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
     shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
     sourceTabId: string;
     sourceTabLabel: string;
@@ -18425,7 +18659,7 @@ function limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceReviewedConfli
 function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictKey(
   state: Pick<
     RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState,
-    "redactionPolicy" | "shareMode" | "sourceTabId" | "updatedAt"
+    "redactionPolicy" | "retentionPolicy" | "shareMode" | "sourceTabId" | "updatedAt"
   >,
 ) {
   return [
@@ -18433,6 +18667,7 @@ function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictKey(
     state.updatedAt,
     state.shareMode,
     state.redactionPolicy,
+    state.retentionPolicy,
   ].join(":");
 }
 
@@ -18445,14 +18680,20 @@ function limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflicts(
 function areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
   left: {
     redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
     shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   },
   right: {
     redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    retentionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
     shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
   },
 ) {
-  return left.redactionPolicy === right.redactionPolicy && left.shareMode === right.shareMode;
+  return (
+    left.redactionPolicy === right.redactionPolicy
+    && left.retentionPolicy === right.retentionPolicy
+    && left.shareMode === right.shareMode
+  );
 }
 
 function readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
@@ -18477,6 +18718,9 @@ function readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
         parsed.redactionPolicy === "omit_preview" || parsed.redactionPolicy === "summary_only"
           ? parsed.redactionPolicy
           : "full",
+      retentionPolicy: normalizeRunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy(
+        parsed.retentionPolicy,
+      ),
       shareMode: parsed.shareMode === "indirect" ? "indirect" : "portable",
       sourceTabId: parsed.sourceTabId,
       sourceTabLabel: parsed.sourceTabLabel,
@@ -21082,6 +21326,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<RunSurfaceCollectionQueryBuilderReplayLinkShareMode>(initialReplayLinkGovernanceState.shareMode);
   const [replayIntentRedactionPolicy, setReplayIntentRedactionPolicy] =
     useState<RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy>(initialReplayLinkGovernanceState.redactionPolicy);
+  const [replayIntentRetentionPolicy, setReplayIntentRetentionPolicy] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy>(initialReplayLinkGovernanceState.retentionPolicy);
   const [replayIntentGovernanceSyncMode, setReplayIntentGovernanceSyncMode] =
     useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode>(initialReplayLinkGovernanceState.syncMode);
   const [replayIntentGovernanceConflicts, setReplayIntentGovernanceConflicts] =
@@ -21115,6 +21361,7 @@ function RunSurfaceCollectionQueryBuilder({
     );
   const replayIntentGovernancePreviousStateRef = useRef<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot>({
     redactionPolicy: initialReplayLinkGovernanceState.redactionPolicy,
+    retentionPolicy: initialReplayLinkGovernanceState.retentionPolicy,
     shareMode: initialReplayLinkGovernanceState.shareMode,
     syncMode: initialReplayLinkGovernanceState.syncMode,
   });
@@ -23026,12 +23273,14 @@ function RunSurfaceCollectionQueryBuilder({
   const currentReplayIntentGovernanceSnapshot = useMemo(
     () => buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot({
       redactionPolicy: replayIntentRedactionPolicy,
+      retentionPolicy: replayIntentRetentionPolicy,
       shareMode: replayIntentShareMode,
       syncMode: replayIntentGovernanceSyncMode,
     }),
     [
       replayIntentGovernanceSyncMode,
       replayIntentRedactionPolicy,
+      replayIntentRetentionPolicy,
       replayIntentShareMode,
     ],
   );
@@ -23070,6 +23319,7 @@ function RunSurfaceCollectionQueryBuilder({
       replayIntentGovernancePendingSourceRef.current = source;
       setReplayIntentShareMode(nextState.shareMode);
       setReplayIntentRedactionPolicy(nextState.redactionPolicy);
+      setReplayIntentRetentionPolicy(nextState.retentionPolicy);
       setReplayIntentGovernanceSyncMode(nextState.syncMode);
     },
     [],
@@ -23101,12 +23351,14 @@ function RunSurfaceCollectionQueryBuilder({
       const conflictKey = buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictKey(remoteGovernance);
       const remoteGovernanceSnapshot = buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot({
         redactionPolicy: remoteGovernance.redactionPolicy,
+        retentionPolicy: remoteGovernance.retentionPolicy,
         shareMode: remoteGovernance.shareMode,
         syncMode: replayIntentGovernanceSyncMode,
       });
       if (areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
         {
           redactionPolicy: replayIntentRedactionPolicy,
+          retentionPolicy: replayIntentRetentionPolicy,
           shareMode: replayIntentShareMode,
         },
         remoteGovernance,
@@ -23167,8 +23419,10 @@ function RunSurfaceCollectionQueryBuilder({
             conflictKey,
             detectedAt: new Date().toISOString(),
             localRedactionPolicy: replayIntentRedactionPolicy,
+            localRetentionPolicy: replayIntentRetentionPolicy,
             localShareMode: replayIntentShareMode,
             remoteRedactionPolicy: remoteGovernance.redactionPolicy,
+            remoteRetentionPolicy: remoteGovernance.retentionPolicy,
             remoteShareMode: remoteGovernance.shareMode,
             sourceTabId: remoteGovernance.sourceTabId,
             sourceTabLabel: remoteGovernance.sourceTabLabel,
@@ -23211,6 +23465,7 @@ function RunSurfaceCollectionQueryBuilder({
       replayIntentGovernanceReviewedConflictKeys,
       replayIntentGovernanceSyncMode,
       replayIntentRedactionPolicy,
+      replayIntentRetentionPolicy,
       replayIntentShareMode,
     ],
   );
@@ -23251,6 +23506,7 @@ function RunSurfaceCollectionQueryBuilder({
     persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState({
       redactionPolicy: replayIntentRedactionPolicy,
       reviewedConflictKeys: replayIntentGovernanceReviewedConflictKeys,
+      retentionPolicy: replayIntentRetentionPolicy,
       shareMode: replayIntentShareMode,
       syncMode: replayIntentGovernanceSyncMode,
     });
@@ -23258,11 +23514,13 @@ function RunSurfaceCollectionQueryBuilder({
     replayIntentGovernanceReviewedConflictKeys,
     replayIntentGovernanceSyncMode,
     replayIntentRedactionPolicy,
+    replayIntentRetentionPolicy,
     replayIntentShareMode,
   ]);
   useEffect(() => {
     persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState({
       redactionPolicy: replayIntentRedactionPolicy,
+      retentionPolicy: replayIntentRetentionPolicy,
       shareMode: replayIntentShareMode,
       sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
       sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
@@ -23271,17 +23529,33 @@ function RunSurfaceCollectionQueryBuilder({
     predicateRefReplayApplyHistoryTabIdentity.label,
     predicateRefReplayApplyHistoryTabIdentity.tabId,
     replayIntentRedactionPolicy,
+    replayIntentRetentionPolicy,
     replayIntentShareMode,
   ]);
   useEffect(() => {
-    persistRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(replayIntentLinkAuditTrail);
-  }, [replayIntentLinkAuditTrail]);
+    persistRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
+        replayIntentLinkAuditTrail,
+        replayIntentRetentionPolicy,
+      ),
+    );
+  }, [replayIntentLinkAuditTrail, replayIntentRetentionPolicy]);
   useEffect(() => {
-    persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(replayIntentGovernanceAuditTrail);
-  }, [replayIntentGovernanceAuditTrail]);
+    persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(
+        replayIntentGovernanceAuditTrail,
+        replayIntentRetentionPolicy,
+      ),
+    );
+  }, [replayIntentGovernanceAuditTrail, replayIntentRetentionPolicy]);
   useEffect(() => {
-    persistRunSurfaceCollectionQueryBuilderReplayLinkAliases(replayIntentLinkAliases);
-  }, [replayIntentLinkAliases]);
+    persistRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+        replayIntentLinkAliases,
+        replayIntentRetentionPolicy,
+      ),
+    );
+  }, [replayIntentLinkAliases, replayIntentRetentionPolicy]);
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -23334,10 +23608,12 @@ function RunSurfaceCollectionQueryBuilder({
         && !areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
           {
             redactionPolicy: replayIntentRedactionPolicy,
+            retentionPolicy: replayIntentRetentionPolicy,
             shareMode: replayIntentShareMode,
           },
           {
             redactionPolicy: entry.remoteRedactionPolicy,
+            retentionPolicy: entry.remoteRetentionPolicy,
             shareMode: entry.remoteShareMode,
           },
         ),
@@ -23346,8 +23622,20 @@ function RunSurfaceCollectionQueryBuilder({
   }, [
     replayIntentGovernanceReviewedConflictKeys,
     replayIntentRedactionPolicy,
+    replayIntentRetentionPolicy,
     replayIntentShareMode,
   ]);
+  useEffect(() => {
+    setReplayIntentLinkAliases((current) =>
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkAliases(current, replayIntentRetentionPolicy),
+    );
+    setReplayIntentLinkAuditTrail((current) =>
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(current, replayIntentRetentionPolicy),
+    );
+    setReplayIntentGovernanceAuditTrail((current) =>
+      pruneRunSurfaceCollectionQueryBuilderReplayLinkGovernanceAuditTrail(current, replayIntentRetentionPolicy),
+    );
+  }, [replayIntentRetentionPolicy]);
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -23401,6 +23689,7 @@ function RunSurfaceCollectionQueryBuilder({
     }
     const redactedIntent = redactedRunSurfaceCollectionQueryBuilderReplayIntent;
     let aliasId: string | null = null;
+    let aliasToken: string | null = null;
     let nextUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
       selectedRefTemplate.key,
       redactedIntent,
@@ -23411,16 +23700,31 @@ function RunSurfaceCollectionQueryBuilder({
     );
     if (replayIntentShareMode === "indirect") {
       aliasId = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasId();
+      const createdAt = new Date().toISOString();
+      const expiresAt = buildRunSurfaceCollectionQueryBuilderReplayLinkExpiry(
+        replayIntentRetentionPolicy,
+        createdAt,
+      );
       const nextAliasEntry: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry = {
         aliasId,
-        createdAt: new Date().toISOString(),
+        createdAt,
         createdByTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
         createdByTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        expiresAt,
         intent: redactedIntent,
         redactionPolicy: replayIntentRedactionPolicy,
+        signature: null,
         templateKey: selectedRefTemplate.key,
         templateLabel: selectedRefTemplate.key,
       };
+      nextAliasEntry.signature = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasSignature(
+        nextAliasEntry,
+        loadRunSurfaceCollectionQueryBuilderReplayLinkSigningSecret(),
+      );
+      aliasToken = buildRunSurfaceCollectionQueryBuilderReplayLinkAliasToken(
+        aliasId,
+        nextAliasEntry.signature,
+      );
       setReplayIntentLinkAliases((current) =>
         mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
           current,
@@ -23432,12 +23736,13 @@ function RunSurfaceCollectionQueryBuilder({
         redactedIntent,
         typeof window !== "undefined" ? window.location.href : undefined,
         {
-          aliasId,
+          aliasId: aliasToken,
         },
       );
     }
     return {
       aliasId,
+      aliasToken,
       compactLength: redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue?.length ?? 0,
       redactedIntent,
       url: typeof window !== "undefined"
@@ -23451,6 +23756,7 @@ function RunSurfaceCollectionQueryBuilder({
     redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue?.length,
     setReplayIntentLinkAliases,
     replayIntentRedactionPolicy,
+    replayIntentRetentionPolicy,
     replayIntentShareMode,
     selectedRefTemplate?.key,
   ]);
@@ -29111,6 +29417,21 @@ function RunSurfaceCollectionQueryBuilder({
                             </select>
                           </label>
                           <label className="run-surface-query-builder-control">
+                            <span>Retention</span>
+                            <select
+                              value={replayIntentRetentionPolicy}
+                              onChange={(event) =>
+                                setReplayIntentRetentionPolicy(
+                                  event.target.value as RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+                                )}
+                            >
+                              <option value="1d">1 day</option>
+                              <option value="7d">7 days</option>
+                              <option value="30d">30 days</option>
+                              <option value="manual">Keep until cleared</option>
+                            </select>
+                          </label>
+                          <label className="run-surface-query-builder-control">
                             <span>Sync mode</span>
                             <select
                               value={replayIntentGovernanceSyncMode}
@@ -29124,6 +29445,21 @@ function RunSurfaceCollectionQueryBuilder({
                               <option value="opt_out">Ignore remote changes</option>
                             </select>
                           </label>
+                          <button
+                            className="ghost-button"
+                            onClick={() => {
+                              setReplayIntentLinkAliases([]);
+                              setReplayIntentLinkAuditTrail([]);
+                              setReplayIntentGovernanceAuditTrail([]);
+                              setReplayIntentGovernanceStatus({
+                                message: "Cleared replay short links and governance history for this browser.",
+                                tone: "muted",
+                              });
+                            }}
+                            type="button"
+                          >
+                            Clear retained records
+                          </button>
                           <button
                             className="ghost-button"
                             onClick={() => {
@@ -29168,6 +29504,14 @@ function RunSurfaceCollectionQueryBuilder({
                               ? "Remote governance changes queue for review before this tab adopts them."
                               : "This tab keeps its own replay link governance and ignores remote tab updates."}
                         </p>
+                        <p className="run-note">
+                          {replayIntentRetentionPolicy === "manual"
+                            ? "Indirect short links and governance records stay until you explicitly clear them."
+                            : `Indirect short links, replay link audit, and governance audit older than ${formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue(
+                              "retentionPolicy",
+                              currentReplayIntentGovernanceSnapshot,
+                            ).toLowerCase()} are pruned automatically.`}
+                        </p>
                         <div className="run-surface-query-builder-trace-chip-list">
                           <span className="run-surface-query-builder-trace-chip is-active">
                             {`Current tab · ${predicateRefReplayApplyHistoryTabIdentity.label}`}
@@ -29206,24 +29550,46 @@ function RunSurfaceCollectionQueryBuilder({
                                 >
                                   <strong>{conflict.sourceTabLabel}</strong>
                                   <p>
-                                    {`Detected ${formatRelativeTimestampLabel(conflict.detectedAt)} · remote ${conflict.remoteShareMode} / ${conflict.remoteRedactionPolicy.replaceAll("_", " ")} · local ${conflict.localShareMode} / ${conflict.localRedactionPolicy.replaceAll("_", " ")}.`}
+                                    {`Detected ${formatRelativeTimestampLabel(conflict.detectedAt)} · remote ${conflict.remoteShareMode} / ${conflict.remoteRedactionPolicy.replaceAll("_", " ")} / ${formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue("retentionPolicy", {
+                                      redactionPolicy: conflict.remoteRedactionPolicy,
+                                      retentionPolicy: conflict.remoteRetentionPolicy,
+                                      shareMode: conflict.remoteShareMode,
+                                      syncMode: replayIntentGovernanceSyncMode,
+                                    })} · local ${conflict.localShareMode} / ${conflict.localRedactionPolicy.replaceAll("_", " ")} / ${formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue("retentionPolicy", {
+                                      redactionPolicy: conflict.localRedactionPolicy,
+                                      retentionPolicy: conflict.localRetentionPolicy,
+                                      shareMode: conflict.localShareMode,
+                                      syncMode: replayIntentGovernanceSyncMode,
+                                    })}.`}
                                   </p>
                                   <div className="run-surface-query-builder-trace-chip-list">
                                     <span className="run-surface-query-builder-trace-chip">
-                                      {`Local · ${conflict.localShareMode} · ${conflict.localRedactionPolicy.replaceAll("_", " ")}`}
+                                      {`Local · ${conflict.localShareMode} · ${conflict.localRedactionPolicy.replaceAll("_", " ")} · ${formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue("retentionPolicy", {
+                                        redactionPolicy: conflict.localRedactionPolicy,
+                                        retentionPolicy: conflict.localRetentionPolicy,
+                                        shareMode: conflict.localShareMode,
+                                        syncMode: replayIntentGovernanceSyncMode,
+                                      })}`}
                                     </span>
                                     <span className="run-surface-query-builder-trace-chip is-active">
-                                      {`Remote · ${conflict.remoteShareMode} · ${conflict.remoteRedactionPolicy.replaceAll("_", " ")}`}
+                                      {`Remote · ${conflict.remoteShareMode} · ${conflict.remoteRedactionPolicy.replaceAll("_", " ")} · ${formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue("retentionPolicy", {
+                                        redactionPolicy: conflict.remoteRedactionPolicy,
+                                        retentionPolicy: conflict.remoteRetentionPolicy,
+                                        shareMode: conflict.remoteShareMode,
+                                        syncMode: replayIntentGovernanceSyncMode,
+                                      })}`}
                                     </span>
                                     <span className="run-surface-query-builder-trace-chip">
                                       {`Diff · ${getRunSurfaceCollectionQueryBuilderReplayLinkGovernanceDiffKeys(
                                         {
                                           redactionPolicy: conflict.localRedactionPolicy,
+                                          retentionPolicy: conflict.localRetentionPolicy,
                                           shareMode: conflict.localShareMode,
                                           syncMode: replayIntentGovernanceSyncMode,
                                         },
                                         {
                                           redactionPolicy: conflict.remoteRedactionPolicy,
+                                          retentionPolicy: conflict.remoteRetentionPolicy,
                                           shareMode: conflict.remoteShareMode,
                                           syncMode: replayIntentGovernanceSyncMode,
                                         },
@@ -29232,6 +29598,8 @@ function RunSurfaceCollectionQueryBuilder({
                                           ? "share mode"
                                           : fieldKey === "redactionPolicy"
                                             ? "redaction"
+                                            : fieldKey === "retentionPolicy"
+                                              ? "retention"
                                             : "sync mode",
                                       ).join(", ")}`}
                                     </span>
@@ -29246,6 +29614,7 @@ function RunSurfaceCollectionQueryBuilder({
                                           diffKeys: getRunSurfaceCollectionQueryBuilderReplayLinkGovernanceDiffKeys(
                                             {
                                               redactionPolicy: conflict.remoteRedactionPolicy,
+                                              retentionPolicy: conflict.remoteRetentionPolicy,
                                               shareMode: conflict.remoteShareMode,
                                               syncMode: replayIntentGovernanceSyncMode,
                                             },
@@ -29253,6 +29622,7 @@ function RunSurfaceCollectionQueryBuilder({
                                           ),
                                           fromState: {
                                             redactionPolicy: conflict.remoteRedactionPolicy,
+                                            retentionPolicy: conflict.remoteRetentionPolicy,
                                             shareMode: conflict.remoteShareMode,
                                             syncMode: replayIntentGovernanceSyncMode,
                                           },
@@ -29278,6 +29648,7 @@ function RunSurfaceCollectionQueryBuilder({
                                       onClick={() => {
                                         applyReplayIntentGovernanceSnapshot({
                                           redactionPolicy: conflict.remoteRedactionPolicy,
+                                          retentionPolicy: conflict.remoteRetentionPolicy,
                                           shareMode: conflict.remoteShareMode,
                                           syncMode: replayIntentGovernanceSyncMode,
                                         }, {
@@ -29313,7 +29684,7 @@ function RunSurfaceCollectionQueryBuilder({
                           </div>
                           <p className="run-note">
                             Export the current replay link governance as a compact payload, then paste it into another
-                            device or browser to apply the same share mode, redaction, and sync policy there.
+                            device or browser to apply the same share mode, redaction, sync policy, and retention there.
                           </p>
                           <div className="run-surface-query-builder-actions">
                             <button
@@ -29371,7 +29742,13 @@ function RunSurfaceCollectionQueryBuilder({
                                   <div className="run-surface-query-builder-trace-chip-list">
                                     {entry.diffKeys.length ? entry.diffKeys.map((fieldKey) => (
                                       <span className="run-surface-query-builder-trace-chip" key={`${entry.id}:${fieldKey}`}>
-                                        {`${fieldKey === "shareMode" ? "Share mode" : fieldKey === "redactionPolicy" ? "Redaction" : "Sync mode"}: ${
+                                        {`${fieldKey === "shareMode"
+                                          ? "Share mode"
+                                          : fieldKey === "redactionPolicy"
+                                            ? "Redaction"
+                                            : fieldKey === "retentionPolicy"
+                                              ? "Retention"
+                                              : "Sync mode"}: ${
                                           formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue(fieldKey, entry.fromState)
                                         } → ${
                                           formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue(fieldKey, entry.toState)
