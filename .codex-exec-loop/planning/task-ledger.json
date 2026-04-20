@@ -5264,18 +5264,36 @@
       "direction_id": "experiment-os",
       "title": "Deepen replay apply history collision explanations with field-level diff and what-if review",
       "description": "Build on the shipped replay apply history collision governance by expanding collision review beyond coarse local or remote summaries: render field-level diffs for competing entry versions and connect candidate policy or resolution choices to a what-if review path, so operators can understand the exact override delta before resolving or changing conflict policy.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply explicitly says the remaining gap is conflict explanation depth: collision detection, policy, review, and resolution are shipped, but field-level collision diffing and policy-simulation-linked what-if review are still missing. That makes explanation depth the clearest executable next task with no extra operator decision required.",
+      "priority_reason": "Completed in main session commit 02d5d20, which expanded replay apply history collision review with field-level diff sections for summary field, replay row, rollback group snapshot, and draft binding snapshot, added what-if review panels for `Keep local version` and `Apply remote version`, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-conflict-aware-governance-for-replay-apply-history-overrides"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:27:33Z",
+      "updated_at": "2026-04-20T06:35:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay-apply trust from basic conflict governance into operator-usable conflict interpretation, so same-entry override races can be reviewed with precise deltas and simulated consequences before resolution."
+      "direction_relation_note": "Completed the replay-apply collision explanation pass by turning same-entry override review into field-level comparison plus choice-specific outcome preview, so operators can inspect local versus remote consequences before resolving the collision."
+    },
+    {
+      "id": "planning-experiment-os-add-partial-accept-and-simulation-trace-links-for-replay-apply-collisions",
+      "direction_id": "experiment-os",
+      "title": "Add partial-accept resolution and simulation trace links for replay apply collisions",
+      "description": "Build on the shipped field-level collision explanation and what-if review by letting operators accept collision changes at a finer field or section granularity and by linking each candidate resolution to a simulation trace that explains how the replay state would evolve, so collision handling moves beyond all-local versus all-remote decisions.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply explicitly names the next what-if depth gap: local-versus-remote review is now readable, but operators still cannot partially accept field-level changes or connect a candidate resolution to a simulation trace. That makes granular acceptance plus trace-linked review the clearest executable next task.",
+      "depends_on": [
+        "planning-experiment-os-deepen-conflict-explanations-for-replay-apply-history-collisions"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:35:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os replay-apply trust from field-level explanation into field-level resolution semantics, so operators can apply only the safe portions of a collision and understand downstream replay consequences before approval."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
