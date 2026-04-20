@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse are still valid follow-up work, but the latest main-session reply narrows the immediate contract gap further: nested sort behavior is still alias-based, arbitrary nested path discovery is not generalized, and grouped filter expressions are still missing. Keep discovery proposed behind that next contract-generalization pass so a dedicated endpoint does not advertise a shape that clients cannot yet express or execute fully.",
+      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining contract gap moved one step deeper: arbitrary nested paths and grouped OR or AND shipped, while nested grouped expressions or a more general boolean AST shape still do not. Keep discovery proposed behind that broader expression-model pass so discovery endpoints do not advertise a query surface that stops at one grouping level.",
       "depends_on": [
-        "planning-experiment-os-generalize-typed-query-to-arbitrary-nested-paths-and-grouped-filter-expressions"
+        "planning-experiment-os-extend-typed-query-to-nested-boolean-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:00:00Z",
+      "updated_at": "2026-04-21T03:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4486,18 +4486,36 @@
       "direction_id": "experiment-os",
       "title": "Generalize typed query to arbitrary nested paths and grouped filter expressions",
       "description": "Take the newly broadened typed query contract beyond declared nested sort aliases by supporting more arbitrary nested field discovery or execution paths plus grouped filter expression semantics, so experiment read surfaces can express richer boolean combinations and nested field access without route-local expansion each time a new path is needed.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 40,
-      "priority_reason": "The latest main-session reply says the next unfinished contract step is no longer datetime ranges or wider metrics, but generalizing nested sort and filter behavior: arbitrary nested field discovery or user-defined nested paths are still missing, and grouped filter expressions have not been added. That is now the clearest executable queue head before discovery endpoints publish the typed query surface more broadly.",
+      "priority_reason": "Completed in main session commit aab7a25, which generalized typed query filters to arbitrary nested `value_path` access plus grouped filter expression parsing and evaluation, exposed the grouped rules in `x-akra-query-schema`, and verified the change with `python -m py_compile`, targeted pytest groups, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-broaden-typed-query-contract-to-datetime-ranges-and-nested-sort-semantics"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T02:55:00Z",
+      "updated_at": "2026-04-21T03:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os queryability moving from a wider but still enumerated typed contract toward a more general nested and composable query model that other discovery and client surfaces can rely on without per-route alias growth."
+    },
+    {
+      "id": "planning-experiment-os-extend-typed-query-to-nested-boolean-expression-trees",
+      "direction_id": "experiment-os",
+      "title": "Extend typed query from grouped filters to nested boolean expression trees",
+      "description": "Build on the shipped arbitrary nested-path filters and one-level grouped OR or AND support by introducing a more general nested boolean query expression model, such as nested group composition or an explicit AST-shaped filter grammar, so experiment read surfaces can express deeper combinations without hard-coding each extra layer into flat query parameter names.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 41,
+      "priority_reason": "The latest main-session reply says the next unfinished work is the more complex query-expression hierarchy: nested grouped expression composition or a broader boolean AST shape is still missing after the arbitrary nested path and grouped filter pass. That is now the clearest executable queue head before capability discovery or wider contract reuse builds on the query model.",
+      "depends_on": [
+        "planning-experiment-os-generalize-typed-query-to-arbitrary-nested-paths-and-grouped-filter-expressions"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T03:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os queryability moving from grouped flat filters toward a genuinely composable query model that future discovery surfaces and broader runtime-binding reuse can treat as a stable contract instead of another route-local convention."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
@@ -4507,13 +4525,13 @@
       "status": "proposed",
       "base_priority": 87,
       "dynamic_priority_delta": 4,
-      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply narrows the next execution gap again: the broader typed query runtime shipped, yet nested path generalization and grouped filter expressions still need contract and evaluator work. Keep this larger architectural pass proposed behind that concrete query-model follow-up and the later discovery step.",
+      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply narrows the immediate gap again: arbitrary nested paths and grouped filters shipped, yet nested grouped expressions or a more general boolean AST still need contract and evaluator work. Keep this larger architectural pass proposed behind that concrete expression-model follow-up and the later discovery step.",
       "depends_on": [
         "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:05:00Z",
+      "updated_at": "2026-04-21T03:18:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
     },
