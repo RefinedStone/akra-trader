@@ -2861,8 +2861,7 @@
       "updated_at": "2026-04-19T11:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from showing strategy semantics as passive provenance into using them inside comparison explanations and metric context, which better supports promotion and benchmark interpretation."
-    }
-    ,
+    },
     {
       "id": "planning-experiment-os-apply-strategy-semantics-to-comparison-ranking-and-score-calculation",
       "direction_id": "experiment-os",
@@ -5912,36 +5911,54 @@
       "direction_id": "experiment-os",
       "title": "Externalize unified replay intent into URL deep links",
       "description": "Extend the now history-backed and cross-tab-synced replay intent contract into a shareable URL query or deep-link surface so replay scope, replay step, group or action or edge filters, and preview trace or diff selection can be copied, reopened, and handed to another browser context without depending on same-browser history state or local storage.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 25,
-      "priority_reason": "The latest main-session reply says commit e32b9b4 finished browser history plus cross-tab replay-intent sync and explicitly names URL query or deep-link sharing as the remaining executable shareable-surface gap. Promote that concrete external-sharing pass to `ready` so builtin next-task automation continues on the clearest follow-up instead of repeating the completed queue head.",
+      "priority_reason": "Completed in main session commit 179af73, which externalized unified replay intent into URL deep-link params for template, scope, step, group or action or edge filters, and preview trace or diff focus, restored that state on load and popstate, cleared current replay intent when history entries drop replay params, preserved comparison params separately, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-share-unified-replay-intent-across-history-and-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:28:54Z",
+      "updated_at": "2026-04-20T10:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay inspection trust from same-browser persistence into operator-shareable links, so the unified replay intent can move across sessions and devices as an explicit deep-link contract instead of stopping at local history and storage."
+      "direction_relation_note": "Completed the replay-intent shareability pass for experiment-os by making unified replay inspection state travel through explicit URL deep links instead of stopping at same-browser history and storage, which now leaves deep-link governance and ergonomics such as copy or share affordances, payload compaction, and explicit audit visibility as the next follow-ups."
+    },
+    {
+      "id": "planning-experiment-os-add-copy-share-ui-and-compact-encoding-for-replay-deep-links",
+      "direction_id": "experiment-os",
+      "title": "Add copy/share UI and compact encoding for replay deep links",
+      "description": "Build the first governance and ergonomics pass on top of the shipped replay deep-link contract by adding an explicit copy or share affordance and shrinking verbose replay-intent URL payloads through compact encoding, so operators can deliberately share replay focus without manually editing long query strings or hitting brittle URL-length growth as replay filters and preview focus get richer.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says URL deep links are shipped in commit 179af73 and names copy or share UI plus compact encoding as the remaining direct deep-link gap. Promote this combined executable pass to `ready` so the next queued task advances replay-link usability without waiting on a broader audit-panel design.",
+      "depends_on": [
+        "planning-experiment-os-externalize-unified-replay-intent-into-url-deep-links"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:41:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-link durability from raw URL persistence into operator-usable share flows and a more compact transport format, reducing friction and payload bloat as replay intent becomes a normal collaboration artifact."
     },
     {
       "id": "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync",
       "direction_id": "experiment-os",
-      "title": "Add audit and governance UI for replay intent sync",
-      "description": "Build an operator-facing audit and governance layer for replay intent synchronization itself, such as attribution for remote replay-intent changes, reviewable local-versus-remote updates, and per-tab or per-template sync controls, so cross-tab replay focus remains explainable and governable instead of silently hydrating from shared browser state.",
+      "title": "Add an explicit audit panel for replay intent changes",
+      "description": "Build an operator-facing audit surface for replay-intent changes across URL hydration, history navigation, and cross-tab sync so replay focus changes become reviewable and attributable instead of silently mutating the current inspection state; include enough governance cues to distinguish local edits from hydrated or synchronized intent changes without taking on the separate copy/share or compact-encoding work.",
       "status": "proposed",
       "base_priority": 88,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply keeps replay-intent sync audit or governance UI as a valid follow-up, but URL deep-link sharing is the more direct executable gap after e32b9b4. Keep governance proposed until the external deep-link contract lands or the operator decides how much replay-intent attribution and conflict control should mirror the heavier comparison-history audit model.",
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply narrows the remaining governance work to an explicit audit panel for replay-intent changes, but copy or share UI plus compact encoding is the more direct next executable follow-up after 179af73. Keep this audit-focused governance task proposed until the deep-link ergonomics pass lands or the operator explicitly prioritizes attribution first.",
       "depends_on": [
         "planning-experiment-os-share-unified-replay-intent-across-history-and-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:28:54Z",
+      "updated_at": "2026-04-20T10:42:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Deepens experiment-os operator trust around shared replay focus by making replay-intent propagation attributable and policy-aware if simple history or storage sync proves too opaque for daily multi-tab analysis."
+      "direction_relation_note": "Deepens experiment-os operator trust around shared replay focus by surfacing a durable, reviewable audit trail for replay-intent hydration and sync events once the core deep-link sharing ergonomics are in place."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
