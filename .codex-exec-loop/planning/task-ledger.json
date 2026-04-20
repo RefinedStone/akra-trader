@@ -4850,18 +4850,36 @@
       "direction_id": "experiment-os",
       "title": "Persist subtree-specific template authoring metadata beyond default values",
       "description": "Deepen the newly separated unsaved subtree template-promotion workflow so subtree draft authoring can keep its own binding preset state and subtree-specific parameter ordering or custom labels, instead of separating only default values while other authoring metadata still collapses back to the clause-level context.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 44,
-      "priority_reason": "The latest main-session reply says the default-authoring context split is complete and explicitly names the remaining gap: subtree draft binding presets and subtree-specific parameter ordering or custom labels still are not stored separately. That is now the clearest directly executable follow-up, so promote it to the automatic queue head.",
+      "priority_reason": "Completed in main session commit bc3b5dd, which persisted subtree-specific template authoring metadata beyond default values by separating subtree, clause, and template parameter metadata for `customLabel`, `bindingPreset`, and parameter order, restoring the richer metadata through subtree promotion and template hydration flows, and verifying with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-separate-subtree-draft-default-authoring-context-for-unsaved-template-promotion"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:10:00Z",
+      "updated_at": "2026-04-20T19:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os typed-query template authoring beyond default-value separation so subtree promotion workflows can preserve the rest of their authoring intent and remain visually editable without collapsing back into clause-level state."
+    },
+    {
+      "id": "planning-experiment-os-structure-subtree-template-authoring-metadata-for-groups-and-help-notes",
+      "direction_id": "experiment-os",
+      "title": "Structure subtree template authoring metadata for parameter groups and help notes",
+      "description": "Build on the newly persisted subtree-specific label, binding preset, and parameter ordering state by introducing a richer subtree authoring metadata model that can keep subtree-local parameter grouping and per-parameter help or note content through subtree promotion, saved template hydration, and template ref authoring, instead of stopping at flat metadata fields.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 45,
+      "priority_reason": "The latest main-session reply says the completed subtree metadata pass now preserves defaults, labels, binding presets, and order, and explicitly names the remaining gap: subtree-specific parameter grouping and per-parameter help or note metadata still are not modeled separately. That is the clearest directly executable follow-up, so promote it to the automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-persist-subtree-specific-template-authoring-metadata-beyond-default-values"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:26:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os typed-query template authoring from flat subtree-local metadata into a richer reusable authoring model, so subtree promotion and template reuse can preserve operator guidance and structure rather than only simple parameter fields."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
