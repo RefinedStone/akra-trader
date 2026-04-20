@@ -526,18 +526,54 @@
       "direction_id": "experiment-os",
       "title": "Expand collection query capabilities with enum-source metadata and a dedicated capability family",
       "description": "Build on the shipped shared collection-query contract by exposing richer parameter-domain enum source metadata and, where appropriate, splitting collection-query discovery into a more dedicated capability family so downstream consumers can discover valid values and bind against collection-query semantics without inferring them from a broader generic surface.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 38,
-      "priority_reason": "The latest main-session reply explicitly says the remaining continuation is to make collection query discovery more consumer-friendly by expanding parameter-domain enum sources and potentially separating a dedicated query-capability family. This is the clearest executable next task after commit af7fb4a completed the shared contract extraction.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit af26d73, which promoted collection query discovery into the `collection_query` capability family, added shared-contract `parameter_domains`, exposed enum-source metadata such as `dynamic_map_keys` plus source paths, aligned frontend fallback discovery, and verified with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, `git diff --check`, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-metadata-facet-discovery-api"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:21:00Z",
+      "updated_at": "2026-04-20T02:55:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os query discoverability by making the new shared collection-query contract easier for multiple consumers to adopt through richer parameter-value provenance and a more focused capability family boundary."
+    },
+    {
+      "id": "planning-experiment-os-hydrate-collection-query-enum-values-from-capability-metadata",
+      "direction_id": "experiment-os",
+      "title": "Hydrate collection query enum values from capability metadata",
+      "description": "Turn the newly advertised `parameter_domains` and enum-source metadata into actual resolved enum value hydration for collection-query consumers, so clients can fetch or materialize valid parameter values such as dynamic map keys directly from the shared `collection_query` capability contract instead of only seeing provenance hints.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 37,
+      "priority_reason": "The latest main-session reply says the clearest remaining executable gap is actual parameter-domain enum value hydration now that `collection_query` family discovery and enum-source hints shipped in commit af26d73. This is the best automatic next task because it converts the new metadata into directly consumable values without waiting on broader query-builder UX choices.",
+      "depends_on": [
+        "planning-experiment-os-expand-collection-query-capabilities-with-enum-sources-and-dedicated-family"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T02:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os query discoverability from capability hints into executable value hydration, making collection-query parameter domains directly consumable by downstream clients and future operator tooling."
+    },
+    {
+      "id": "planning-experiment-os-build-collection-query-builder-ui-from-capability-metadata",
+      "direction_id": "experiment-os",
+      "title": "Build collection query builder UI from capability metadata",
+      "description": "Use the shared `collection_query` capability family, collection schemas, and parameter-domain metadata to drive a dedicated collection query builder UI that can author valid filters from discovered field and parameter contracts instead of hand-maintained route knowledge.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply explicitly names a collection query builder UI that consumes the new metadata as the other major follow-up after commit af26d73. Keep it proposed behind enum-value hydration because the UI shape is broader and will land better once discovered parameter domains can resolve concrete values rather than only enum-source hints.",
+      "depends_on": [
+        "planning-experiment-os-hydrate-collection-query-enum-values-from-capability-metadata"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T02:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os operator tooling from schema discovery into direct filter-authoring UX, but sensibly follows the lower-level metadata hydration work that makes such a builder reliable."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
