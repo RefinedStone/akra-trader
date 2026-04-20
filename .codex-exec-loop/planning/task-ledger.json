@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply still calls out capability discovery and query-schema reuse as unfinished, but it also narrows the more immediate execution gap further: runtime support now exists for the current list and compare surfaces, while numeric range operators and richer multi-field sort coverage are still missing. Keep discovery proposed behind that broader runtime-query pass so a dedicated endpoint does not advertise semantics that only part of the read surface actually executes.",
+      "priority_reason": "The latest main-session reply still calls out capability discovery and query-schema reuse as unfinished, but it also leaves a new execution gap first: datetime range support, richer numeric metric families, and more complex nested sort semantics are not yet part of the typed query contract. Keep discovery proposed behind that broader contract-expansion pass so a dedicated endpoint does not advertise semantics that current read surfaces still cannot execute.",
       "depends_on": [
-        "planning-experiment-os-expand-typed-query-runtime-to-range-operators-and-multi-field-sort"
+        "planning-experiment-os-broaden-typed-query-contract-to-datetime-ranges-and-nested-sort-semantics"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T02:10:00Z",
+      "updated_at": "2026-04-21T02:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4450,18 +4450,36 @@
       "direction_id": "experiment-os",
       "title": "Expand typed query runtime coverage to numeric range operators and multi-field sort",
       "description": "Extend the newly connected typed query runtime beyond the current list and compare surface coverage by supporting numeric range-style operators and richer multi-field sort semantics in the declared query contract, so broader experiment read paths execute more of the machine-readable schema instead of stopping at the first operator and single-sort pass.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 38,
-      "priority_reason": "The latest main-session reply says the typed query contract now executes on current list and compare surfaces, but numeric range operators and richer multi-field sort are still missing. That is the clearest immediately executable next step before turning query schema reuse into a dedicated discovery endpoint or broader model.",
+      "priority_reason": "Completed in main session commit b710cef, which extended typed query runtime coverage to numeric range operators and actual multi-field sort execution across run list and compare narratives, validated API coercion and runtime evaluation changes with `python -m py_compile`, targeted pytest groups, and `git diff --check`, and pushed the change to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T02:10:00Z",
+      "updated_at": "2026-04-21T02:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from basic operator-aware runtime execution toward a broader typed contract that can support richer filtering and ordering semantics before dedicated discovery surfaces publish it as reusable API capability."
+    },
+    {
+      "id": "planning-experiment-os-broaden-typed-query-contract-to-datetime-ranges-and-nested-sort-semantics",
+      "direction_id": "experiment-os",
+      "title": "Broaden typed query contract to datetime ranges, wider metrics, and nested sort semantics",
+      "description": "Extend the newly shipped typed query runtime past the first numeric-range pass by adding datetime range operators, covering additional numeric metric families beyond the current run-list and compare fields, and defining or executing more complex nested sort semantics so the contract keeps scaling across experiment read surfaces instead of stalling at the initial metric set.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 39,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is broader query contract expansion: datetime range support, richer numeric metric families, and more complex nested sort semantics are still missing after commit b710cef. That is now the clearest immediately executable next task, and it should land before query discovery endpoints advertise a wider contract.",
+      "depends_on": [
+        "planning-experiment-os-expand-typed-query-runtime-to-range-operators-and-multi-field-sort"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T02:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os queryability moving from initial typed runtime execution toward a fuller contract that can express broader time filters, metric filtering families, and richer ordering semantics before discovery and broader binding reuse build on it."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
