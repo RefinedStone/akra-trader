@@ -13942,6 +13942,16 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "preset_catalog_revision_restore",
     "preset_catalog_lifecycle_apply",
     "strategy_catalog_register",
+    "run_list",
+    "run_compare",
+    "run_backtest_launch",
+    "run_backtest_item_get",
+    "run_rerun_backtest",
+    "run_rerun_sandbox",
+    "run_rerun_paper",
+    "run_sandbox_launch",
+    "run_paper_launch",
+    "run_live_launch",
     "operator_incident_external_sync",
     "guarded_live_kill_switch_engage",
     "guarded_live_kill_switch_release",
@@ -13975,6 +13985,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["preset_catalog_item_update"].methods == ("PATCH",)
   assert bindings_by_key["preset_catalog_revision_restore"].path_param_keys == ("preset_id", "revision_id")
   assert bindings_by_key["strategy_catalog_register"].methods == ("POST",)
+  assert bindings_by_key["run_list"].filter_keys[-1] == "tag"
+  assert bindings_by_key["run_compare"].filter_keys == ("run_id", "intent")
+  assert bindings_by_key["run_backtest_launch"].methods == ("POST",)
+  assert bindings_by_key["run_backtest_item_get"].route_path == "/runs/backtests/{run_id}"
+  assert bindings_by_key["run_rerun_backtest"].path_param_keys == ("rerun_boundary_id",)
+  assert bindings_by_key["run_live_launch"].request_payload_kind == "live_launch"
   assert bindings_by_key["operator_incident_external_sync"].header_keys == ("x_akra_incident_sync_token",)
   assert bindings_by_key["guarded_live_incident_acknowledge"].path_param_keys == ("event_id",)
   assert bindings_by_key["run_stop_sandbox"].methods == ("POST",)
@@ -13982,6 +13998,42 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_subresource:orders"].scope == "run"
   assert bindings_by_key["run_subresource:orders"].route_path == "/runs/{run_id}/orders"
 
+  launched_backtest_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_backtest_launch"],
+    app=app,
+    request_payload={
+      "strategy_id": "ma_cross_v1",
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "initial_cash": 12_000,
+      "fee_rate": 0.001,
+      "slippage_bps": 3,
+      "parameters": {"short_window": 13},
+    },
+  )
+  fetched_backtest_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_backtest_item_get"],
+    app=app,
+    run_id=launched_backtest_payload["config"]["run_id"],
+  )
+  run_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_list"],
+    app=app,
+    filters={"mode": "backtest", "strategy_id": "ma_cross_v1", "tag": []},
+  )
+  compare_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_compare"],
+    app=app,
+    filters={
+      "run_id": [run.config.run_id, launched_backtest_payload["config"]["run_id"]],
+      "intent": "strategy_tuning",
+    },
+  )
+  rerun_backtest_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["run_rerun_backtest"],
+    app=app,
+    path_params={"rerun_boundary_id": launched_backtest_payload["provenance"]["rerun_boundary_id"]},
+  )
   created_preset_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["preset_catalog_create"],
     app=app,
@@ -14102,6 +14154,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     request_payload={"actor": "operator", "reason": "drill_complete"},
   )
 
+  assert launched_backtest_payload["config"]["strategy_id"] == "ma_cross_v1"
+  assert fetched_backtest_payload["config"]["run_id"] == launched_backtest_payload["config"]["run_id"]
+  assert len(run_list_payload) >= 2
+  assert compare_payload["intent"] == "strategy_tuning"
+  assert compare_payload["baseline_run_id"] == run.config.run_id
+  assert rerun_backtest_payload["provenance"]["rerun_target_boundary_id"] == (
+    launched_backtest_payload["provenance"]["rerun_boundary_id"]
+  )
   assert created_preset_payload["preset_id"] == "swing_1h"
   assert fetched_preset_payload["preset_id"] == "swing_1h"
   assert updated_preset_payload["parameters"] == {"short_window": 9, "long_window": 34}

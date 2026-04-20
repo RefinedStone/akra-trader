@@ -23265,6 +23265,111 @@ def list_standalone_surface_runtime_bindings(
     methods=("POST",),
     request_payload_kind="strategy_register",
   )
+  run_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_list",
+    route_path="/runs",
+    route_name="list_runs",
+    response_title="List runs",
+    scope="app",
+    binding_kind="run_list",
+    filter_keys=(
+      "mode",
+      "strategy_id",
+      "strategy_version",
+      "rerun_boundary_id",
+      "preset_id",
+      "benchmark_family",
+      "dataset_identity",
+      "tag",
+    ),
+  )
+  run_compare_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_compare",
+    route_path="/runs/compare",
+    route_name="compare_runs",
+    response_title="Compare runs",
+    scope="app",
+    binding_kind="run_compare",
+    filter_keys=("run_id", "intent"),
+  )
+  run_backtest_launch_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_backtest_launch",
+    route_path="/runs/backtests",
+    route_name="run_backtest",
+    response_title="Run backtest",
+    scope="app",
+    binding_kind="run_backtest_launch",
+    methods=("POST",),
+    request_payload_kind="backtest_launch",
+  )
+  run_backtest_item_get_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_backtest_item_get",
+    route_path="/runs/backtests/{run_id}",
+    route_name="get_backtest_run",
+    response_title="Get backtest run",
+    scope="run",
+    binding_kind="run_backtest_item_get",
+  )
+  run_rerun_backtest_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_rerun_backtest",
+    route_path="/runs/rerun-boundaries/{rerun_boundary_id}/backtests",
+    route_name="rerun_backtest_from_boundary",
+    response_title="Rerun backtest from boundary",
+    scope="app",
+    binding_kind="run_rerun_backtest",
+    methods=("POST",),
+    path_param_keys=("rerun_boundary_id",),
+  )
+  run_rerun_sandbox_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_rerun_sandbox",
+    route_path="/runs/rerun-boundaries/{rerun_boundary_id}/sandbox",
+    route_name="rerun_sandbox_from_boundary",
+    response_title="Rerun sandbox from boundary",
+    scope="app",
+    binding_kind="run_rerun_sandbox",
+    methods=("POST",),
+    path_param_keys=("rerun_boundary_id",),
+  )
+  run_rerun_paper_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_rerun_paper",
+    route_path="/runs/rerun-boundaries/{rerun_boundary_id}/paper",
+    route_name="rerun_paper_from_boundary",
+    response_title="Rerun paper from boundary",
+    scope="app",
+    binding_kind="run_rerun_paper",
+    methods=("POST",),
+    path_param_keys=("rerun_boundary_id",),
+  )
+  run_sandbox_launch_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_sandbox_launch",
+    route_path="/runs/sandbox",
+    route_name="start_sandbox_run",
+    response_title="Start sandbox run",
+    scope="app",
+    binding_kind="run_sandbox_launch",
+    methods=("POST",),
+    request_payload_kind="sandbox_launch",
+  )
+  run_paper_launch_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_paper_launch",
+    route_path="/runs/paper",
+    route_name="start_paper_run",
+    response_title="Start paper run",
+    scope="app",
+    binding_kind="run_paper_launch",
+    methods=("POST",),
+    request_payload_kind="paper_launch",
+  )
+  run_live_launch_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="run_live_launch",
+    route_path="/runs/live",
+    route_name="start_live_run",
+    response_title="Start live run",
+    scope="app",
+    binding_kind="run_live_launch",
+    methods=("POST",),
+    request_payload_kind="live_launch",
+  )
   operator_incident_external_sync_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_incident_external_sync",
     route_path="/operator/incidents/external-sync",
@@ -23436,6 +23541,16 @@ def list_standalone_surface_runtime_bindings(
     preset_revision_restore_binding,
     preset_lifecycle_apply_binding,
     strategy_register_binding,
+    run_list_binding,
+    run_compare_binding,
+    run_backtest_launch_binding,
+    run_backtest_item_get_binding,
+    run_rerun_backtest_binding,
+    run_rerun_sandbox_binding,
+    run_rerun_paper_binding,
+    run_sandbox_launch_binding,
+    run_paper_launch_binding,
+    run_live_launch_binding,
     operator_incident_external_sync_binding,
     guarded_live_kill_switch_engage_binding,
     guarded_live_kill_switch_release_binding,
@@ -23568,6 +23683,113 @@ def execute_standalone_surface_binding(
       class_name=resolved_payload["class_name"],
     )
     return serialize_strategy(metadata)
+  if binding.binding_kind == "run_list":
+    return [
+      serialize_run(run, capabilities=app.get_run_surface_capabilities())
+      for run in app.list_runs(
+        mode=resolved_filters.get("mode"),
+        strategy_id=resolved_filters.get("strategy_id"),
+        strategy_version=resolved_filters.get("strategy_version"),
+        rerun_boundary_id=resolved_filters.get("rerun_boundary_id"),
+        preset_id=resolved_filters.get("preset_id"),
+        benchmark_family=resolved_filters.get("benchmark_family"),
+        dataset_identity=resolved_filters.get("dataset_identity"),
+        tags=resolved_filters.get("tag") or [],
+      )
+    ]
+  if binding.binding_kind == "run_compare":
+    comparison = app.compare_runs(
+      run_ids=resolved_filters.get("run_id") or [],
+      intent=resolved_filters.get("intent"),
+    )
+    return serialize_run_comparison(
+      comparison,
+      capabilities=app.get_run_surface_capabilities(),
+    )
+  if binding.binding_kind == "run_backtest_launch":
+    run = app.run_backtest(
+      strategy_id=resolved_payload["strategy_id"],
+      symbol=resolved_payload["symbol"],
+      timeframe=resolved_payload.get("timeframe", "5m"),
+      initial_cash=resolved_payload.get("initial_cash", 10_000),
+      fee_rate=resolved_payload.get("fee_rate", 0.001),
+      slippage_bps=resolved_payload.get("slippage_bps", 3),
+      parameters=resolved_payload.get("parameters") or {},
+      start_at=resolved_payload.get("start_at"),
+      end_at=resolved_payload.get("end_at"),
+      tags=resolved_payload.get("tags") or [],
+      preset_id=resolved_payload.get("preset_id"),
+      benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_backtest_item_get":
+    if run_id is None:
+      raise ValueError(f"Standalone surface {binding.surface_key} requires a run_id.")
+    run = app.get_run(run_id)
+    if run is None:
+      raise LookupError("Run not found")
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_rerun_backtest":
+    run = app.rerun_backtest_from_boundary(
+      rerun_boundary_id=resolved_path_params["rerun_boundary_id"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_rerun_sandbox":
+    run = app.rerun_sandbox_from_boundary(
+      rerun_boundary_id=resolved_path_params["rerun_boundary_id"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_rerun_paper":
+    run = app.rerun_paper_from_boundary(
+      rerun_boundary_id=resolved_path_params["rerun_boundary_id"],
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_sandbox_launch":
+    run = app.start_sandbox_run(
+      strategy_id=resolved_payload["strategy_id"],
+      symbol=resolved_payload["symbol"],
+      timeframe=resolved_payload.get("timeframe", "5m"),
+      initial_cash=resolved_payload.get("initial_cash", 10_000),
+      fee_rate=resolved_payload.get("fee_rate", 0.001),
+      slippage_bps=resolved_payload.get("slippage_bps", 3),
+      parameters=resolved_payload.get("parameters") or {},
+      replay_bars=resolved_payload.get("replay_bars", 96),
+      tags=resolved_payload.get("tags") or [],
+      preset_id=resolved_payload.get("preset_id"),
+      benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_paper_launch":
+    run = app.start_paper_run(
+      strategy_id=resolved_payload["strategy_id"],
+      symbol=resolved_payload["symbol"],
+      timeframe=resolved_payload.get("timeframe", "5m"),
+      initial_cash=resolved_payload.get("initial_cash", 10_000),
+      fee_rate=resolved_payload.get("fee_rate", 0.001),
+      slippage_bps=resolved_payload.get("slippage_bps", 3),
+      parameters=resolved_payload.get("parameters") or {},
+      replay_bars=resolved_payload.get("replay_bars", 96),
+      tags=resolved_payload.get("tags") or [],
+      preset_id=resolved_payload.get("preset_id"),
+      benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
+  if binding.binding_kind == "run_live_launch":
+    run = app.start_live_run(
+      strategy_id=resolved_payload["strategy_id"],
+      symbol=resolved_payload["symbol"],
+      timeframe=resolved_payload.get("timeframe", "5m"),
+      initial_cash=resolved_payload.get("initial_cash", 10_000),
+      fee_rate=resolved_payload.get("fee_rate", 0.001),
+      slippage_bps=resolved_payload.get("slippage_bps", 3),
+      parameters=resolved_payload.get("parameters") or {},
+      replay_bars=resolved_payload.get("replay_bars", 96),
+      operator_reason=resolved_payload.get("operator_reason", "guarded_live_launch"),
+      tags=resolved_payload.get("tags") or [],
+      preset_id=resolved_payload.get("preset_id"),
+      benchmark_family=resolved_payload.get("benchmark_family"),
+    )
+    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
   if binding.binding_kind == "operator_incident_external_sync":
     app.require_operator_alert_external_sync_token(
       resolved_headers.get("x_akra_incident_sync_token"),

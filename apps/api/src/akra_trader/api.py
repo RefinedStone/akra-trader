@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from datetime import datetime
 from typing import Any
 
@@ -17,12 +16,6 @@ from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import TradingApplication
 from akra_trader.application import execute_standalone_surface_binding
 from akra_trader.application import get_standalone_surface_runtime_binding
-from akra_trader.application import serialize_run_comparison
-from akra_trader.application import serialize_run
-from akra_trader.application import serialize_standalone_surface_response
-from akra_trader.application import serialize_strategy
-from akra_trader.application import serialize_preset
-from akra_trader.application import serialize_preset_revision
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
 from akra_trader.bootstrap import Container
 
@@ -139,18 +132,6 @@ def create_router(container: Container) -> APIRouter:
   def get_app() -> TradingApplication:
     return container.app
 
-  def serialize_run_response(run: Any, app: TradingApplication) -> dict[str, Any]:
-    return serialize_run(run, capabilities=app.get_run_surface_capabilities())
-
-  def serialize_run_comparison_response(
-    comparison: Any,
-    app: TradingApplication,
-  ) -> dict[str, Any]:
-    return serialize_run_comparison(
-      comparison,
-      capabilities=app.get_run_surface_capabilities(),
-    )
-
   def dispatch_standalone_binding(
     *,
     binding: StandaloneSurfaceRuntimeBinding,
@@ -208,7 +189,7 @@ def create_router(container: Container) -> APIRouter:
       "strategy_catalog_discovery",
       app.get_run_surface_capabilities(),
     )
-    return serialize_standalone_surface_response(
+    return dispatch_standalone_binding(
       binding=binding,
       app=app,
       filters={
@@ -229,7 +210,7 @@ def create_router(container: Container) -> APIRouter:
       "preset_catalog_discovery",
       app.get_run_surface_capabilities(),
     )
-    return serialize_standalone_surface_response(
+    return dispatch_standalone_binding(
       binding=binding,
       app=app,
       filters={
@@ -363,19 +344,24 @@ def create_router(container: Container) -> APIRouter:
     tag: list[str] = Query(default_factory=list),
     app: TradingApplication = Depends(get_app),
   ) -> list[dict[str, Any]]:
-    return [
-      serialize_run_response(run, app)
-      for run in app.list_runs(
-        mode=mode,
-        strategy_id=strategy_id,
-        strategy_version=strategy_version,
-        rerun_boundary_id=rerun_boundary_id,
-        preset_id=preset_id,
-        benchmark_family=benchmark_family,
-        dataset_identity=dataset_identity,
-        tags=tag,
-      )
-    ]
+    binding = get_standalone_surface_runtime_binding(
+      "run_list",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      filters={
+        "mode": mode,
+        "strategy_id": strategy_id,
+        "strategy_version": strategy_version,
+        "rerun_boundary_id": rerun_boundary_id,
+        "preset_id": preset_id,
+        "benchmark_family": benchmark_family,
+        "dataset_identity": dataset_identity,
+        "tag": tag,
+      },
+    )
 
   @router.get("/runs/compare")
   def compare_runs(
@@ -383,150 +369,117 @@ def create_router(container: Container) -> APIRouter:
     intent: str | None = None,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      comparison = app.compare_runs(run_ids=run_id, intent=intent)
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except LookupError as exc:
-      raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run_comparison_response(comparison, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_compare",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      filters={"run_id": run_id, "intent": intent},
+    )
 
   @router.post("/runs/backtests")
   def run_backtest(request: BacktestRequest, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    try:
-      run = app.run_backtest(
-        strategy_id=request.strategy_id,
-        symbol=request.symbol,
-        timeframe=request.timeframe,
-        initial_cash=request.initial_cash,
-        fee_rate=request.fee_rate,
-        slippage_bps=request.slippage_bps,
-        parameters=request.parameters,
-        start_at=request.start_at,
-        end_at=request.end_at,
-        tags=request.tags,
-        preset_id=request.preset_id,
-        benchmark_family=request.benchmark_family,
-      )
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
-
-  @router.get("/runs/backtests/{run_id}")
-  def get_backtest_run(run_id: str, app: TradingApplication = Depends(get_app)) -> dict[str, Any]:
-    run = app.get_run(run_id)
-    if run is None:
-      raise HTTPException(status_code=404, detail="Run not found")
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_backtest_launch",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/backtests")
   def rerun_backtest_from_boundary(
     rerun_boundary_id: str,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.rerun_backtest_from_boundary(rerun_boundary_id=rerun_boundary_id)
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except LookupError as exc:
-      raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_rerun_backtest",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      path_params={"rerun_boundary_id": rerun_boundary_id},
+    )
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/sandbox")
   def rerun_sandbox_from_boundary(
     rerun_boundary_id: str,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.rerun_sandbox_from_boundary(rerun_boundary_id=rerun_boundary_id)
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except LookupError as exc:
-      raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_rerun_sandbox",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      path_params={"rerun_boundary_id": rerun_boundary_id},
+    )
 
   @router.post("/runs/rerun-boundaries/{rerun_boundary_id}/paper")
   def rerun_paper_from_boundary(
     rerun_boundary_id: str,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.rerun_paper_from_boundary(rerun_boundary_id=rerun_boundary_id)
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except LookupError as exc:
-      raise HTTPException(status_code=404, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_rerun_paper",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      path_params={"rerun_boundary_id": rerun_boundary_id},
+    )
 
   @router.post("/runs/sandbox")
   def start_sandbox_run(
     request: SandboxRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.start_sandbox_run(
-        strategy_id=request.strategy_id,
-        symbol=request.symbol,
-        timeframe=request.timeframe,
-        initial_cash=request.initial_cash,
-        fee_rate=request.fee_rate,
-        slippage_bps=request.slippage_bps,
-        parameters=request.parameters,
-        replay_bars=request.replay_bars,
-        tags=request.tags,
-        preset_id=request.preset_id,
-        benchmark_family=request.benchmark_family,
-      )
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_sandbox_launch",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/runs/paper")
   def start_paper_run(
     request: SandboxRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.start_paper_run(
-        strategy_id=request.strategy_id,
-        symbol=request.symbol,
-        timeframe=request.timeframe,
-        initial_cash=request.initial_cash,
-        fee_rate=request.fee_rate,
-        slippage_bps=request.slippage_bps,
-        parameters=request.parameters,
-        replay_bars=request.replay_bars,
-        tags=request.tags,
-        preset_id=request.preset_id,
-        benchmark_family=request.benchmark_family,
-      )
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_paper_launch",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/runs/live")
   def start_live_run(
     request: LiveRunRequest,
     app: TradingApplication = Depends(get_app),
   ) -> dict[str, Any]:
-    try:
-      run = app.start_live_run(
-        strategy_id=request.strategy_id,
-        symbol=request.symbol,
-        timeframe=request.timeframe,
-        initial_cash=request.initial_cash,
-        fee_rate=request.fee_rate,
-        slippage_bps=request.slippage_bps,
-          parameters=request.parameters,
-          replay_bars=request.replay_bars,
-          operator_reason=request.operator_reason,
-          tags=request.tags,
-          preset_id=request.preset_id,
-          benchmark_family=request.benchmark_family,
-        )
-    except ValueError as exc:
-      raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return serialize_run_response(run, app)
+    binding = get_standalone_surface_runtime_binding(
+      "run_live_launch",
+      app.get_run_surface_capabilities(),
+    )
+    return dispatch_standalone_binding(
+      binding=binding,
+      app=app,
+      request_payload=request.model_dump(),
+    )
 
   @router.post("/runs/live/{run_id}/orders/{order_id}/cancel")
   def cancel_live_order(
@@ -588,7 +541,7 @@ def create_router(container: Container) -> APIRouter:
       "market_data_status",
       app.get_run_surface_capabilities(),
     )
-    return serialize_standalone_surface_response(
+    return dispatch_standalone_binding(
       binding=binding,
       app=app,
       filters={"timeframe": timeframe},
