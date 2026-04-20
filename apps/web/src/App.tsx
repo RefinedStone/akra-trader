@@ -189,6 +189,7 @@ type BenchmarkArtifact = {
         candidate_bindings?: Array<{
           binding_kind?: string | null;
           candidate_id?: string | null;
+          runtime_candidate_id?: string | null;
           candidate_path_template?: string | null;
           candidate_value?: string | null;
           symbol_key?: string | null;
@@ -204,6 +205,7 @@ type BenchmarkArtifact = {
         candidate_bindings?: Array<{
           binding_kind?: string | null;
           candidate_id?: string | null;
+          runtime_candidate_id?: string | null;
           candidate_path_template?: string | null;
           candidate_value?: string | null;
           symbol_key?: string | null;
@@ -16364,6 +16366,8 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindin
           typeof record.binding_kind === "string" ? record.binding_kind : null,
         candidateId:
           typeof record.candidate_id === "string" ? record.candidate_id : null,
+        runtimeCandidateId:
+          typeof record.runtime_candidate_id === "string" ? record.runtime_candidate_id : null,
         candidatePathTemplate:
           typeof record.candidate_path_template === "string" ? record.candidate_path_template : null,
         candidateValue:
@@ -16375,6 +16379,7 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindin
     .filter((entry): entry is {
       bindingKind: string | null;
       candidateId: string | null;
+      runtimeCandidateId: string | null;
       candidatePathTemplate: string | null;
       candidateValue: string | null;
       symbolKey: string | null;
@@ -16422,6 +16427,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntri
       candidateBindings: Array<{
         bindingKind: string | null;
         candidateId: string | null;
+        runtimeCandidateId: string | null;
         candidatePathTemplate: string | null;
         candidateValue: string | null;
         symbolKey: string | null;
@@ -16498,6 +16504,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
             candidateBindings: Array<{
               bindingKind: string | null;
               candidateId: string | null;
+              runtimeCandidateId: string | null;
               candidatePathTemplate: string | null;
               candidateValue: string | null;
               symbolKey: string | null;
@@ -16534,6 +16541,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
             candidateBindings: [] as Array<{
               bindingKind: string | null;
               candidateId: string | null;
+              runtimeCandidateId: string | null;
               candidatePathTemplate: string | null;
               candidateValue: string | null;
               symbolKey: string | null;
@@ -16549,6 +16557,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
           candidateBindings: Array<{
             bindingKind: string | null;
             candidateId: string | null;
+            runtimeCandidateId: string | null;
             candidatePathTemplate: string | null;
             candidateValue: string | null;
             symbolKey: string | null;
@@ -16576,6 +16585,7 @@ function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
     candidateBindings?: Array<{
       bindingKind: string | null;
       candidateId: string | null;
+      runtimeCandidateId: string | null;
       candidatePathTemplate: string | null;
       candidateValue: string | null;
       symbolKey: string | null;
@@ -16636,13 +16646,14 @@ function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
 }
 
 function doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch(params: {
-  binding: {
-    bindingKind: string | null;
-    candidateId: string | null;
-    candidatePathTemplate: string | null;
-    candidateValue: string | null;
-    symbolKey: string | null;
-  };
+    binding: {
+      bindingKind: string | null;
+      candidateId: string | null;
+      runtimeCandidateId: string | null;
+      candidatePathTemplate: string | null;
+      candidateValue: string | null;
+      symbolKey: string | null;
+    };
   candidateReplayId: string | null;
   candidateValue: string;
   resolvedPath: string[];
@@ -16651,6 +16662,9 @@ function doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch
   const { binding, candidateReplayId, candidateValue, resolvedPath, symbolKey } = params;
   if (binding.bindingKind !== "market_data_issue") {
     return false;
+  }
+  if (binding.runtimeCandidateId && candidateReplayId) {
+    return binding.runtimeCandidateId === candidateReplayId;
   }
   if (binding.candidateId && candidateReplayId) {
     return binding.candidateId === candidateReplayId;

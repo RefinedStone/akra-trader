@@ -1350,6 +1350,7 @@ class FreqtradeReferenceAdapter:
       bindings.append({
         "binding_kind": "market_data_issue",
         "candidate_id": candidate_id,
+        "runtime_candidate_id": candidate_id,
         "candidate_path_template": "provenance.market_data_by_symbol.{symbol_key}.issues",
         "candidate_value": normalized_value,
         "symbol_key": normalized_symbol,

@@ -256,6 +256,10 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
     binding["candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
     for binding in best_pair_bindings
   )
+  assert any(
+    binding["runtime_candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
+    for binding in best_pair_bindings
+  )
   assert all(
     binding["candidate_path_template"] == "provenance.market_data_by_symbol.{symbol_key}.issues"
     for binding in best_pair_bindings
@@ -296,6 +300,10 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert any(binding["binding_kind"] == "market_data_issue" for binding in snapshot_best_pair_bindings)
   assert any(
     binding["candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
+    for binding in snapshot_best_pair_bindings
+  )
+  assert any(
+    binding["runtime_candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
     for binding in snapshot_best_pair_bindings
   )
   assert all(
