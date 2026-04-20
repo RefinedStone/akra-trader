@@ -505,20 +505,39 @@
     {
       "id": "planning-experiment-os-metadata-facet-discovery-api",
       "direction_id": "experiment-os",
-      "title": "Add consumer-facing query discovery APIs for experiment metadata filters",
-      "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, tags, and typed query capabilities so control-room filters or other clients can discover durable metadata options and query semantics directly instead of relying on freeform input fields or route-local knowledge over stored run metadata.",
-      "status": "proposed",
+      "title": "Extract collection query capability discovery and parameter domain metadata",
+      "description": "Promote the newly advertised collection schemas into a reusable capability-discovery layer that can expose parameter enum or domain sources and shared collection-query contracts for multiple consumers, so typed-query clients do not need to scrape route-local OpenAPI fragments to understand parameterized collection paths or valid parameter values.",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply narrows the immediate contract gap to richer collection element schema advertising and parameterized collection-schema discovery inside the existing typed-query schema. Keep this broader discovery-API pass proposed behind that lower-level contract work so new endpoints can reuse a less transitional collection model.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit af7fb4a, which extracted collection query discovery into the shared `query_collection:run_list` contract, advertised collection and element schema plus parameter domain metadata together, reused the application serializer for discovery and OpenAPI query schema emission, and verified the change with `python -m py_compile`, targeted `pytest`, typed-query regression coverage, `git diff --check`, and push to `origin/main`.",
       "depends_on": [
-        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees",
+        "planning-experiment-os-advertise-element-and-parameterized-collection-schemas-in-typed-query-discovery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:54:59Z",
+      "updated_at": "2026-04-20T02:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
+      "direction_relation_note": "Supports the experiment-os goal of reusable, queryable experiment discovery by lifting typed collection-query semantics into a shared capability contract with parameter-domain metadata instead of leaving them embedded in one OpenAPI surface."
+    },
+    {
+      "id": "planning-experiment-os-expand-collection-query-capabilities-with-enum-sources-and-dedicated-family",
+      "direction_id": "experiment-os",
+      "title": "Expand collection query capabilities with enum-source metadata and a dedicated capability family",
+      "description": "Build on the shipped shared collection-query contract by exposing richer parameter-domain enum source metadata and, where appropriate, splitting collection-query discovery into a more dedicated capability family so downstream consumers can discover valid values and bind against collection-query semantics without inferring them from a broader generic surface.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 38,
+      "priority_reason": "The latest main-session reply explicitly says the remaining continuation is to make collection query discovery more consumer-friendly by expanding parameter-domain enum sources and potentially separating a dedicated query-capability family. This is the clearest executable next task after commit af7fb4a completed the shared contract extraction.",
+      "depends_on": [
+        "planning-experiment-os-metadata-facet-discovery-api"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T02:21:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os query discoverability by making the new shared collection-query contract easier for multiple consumers to adopt through richer parameter-value provenance and a more focused capability family boundary."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
@@ -4594,16 +4613,16 @@
       "direction_id": "experiment-os",
       "title": "Advertise element and parameterized collection schemas in typed query discovery",
       "description": "Deepen the new typed-query collection contract by exposing machine-readable element schemas for collection items and a parameterized collection-schema layer that can describe reusable collection query shapes beyond the current allowed-key list, so clients can discover field types and build valid nested collection filters without hand-maintained route knowledge.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 39,
-      "priority_reason": "The latest main-session reply explicitly says the remaining next step after collection shape validation is richer collection query contract advertising: element schema detail and parameterized collection schema support are both still missing, while collection path aliases are a later convenience layer. Promote this as the next queue head because it is an executable continuation of the just-shipped `collection_schemas` work and does not need extra operator product judgment.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 0ef9396, which taught typed query discovery to advertise collection `element_schema`, `path_template`, and `parameters`, reused typed filter definitions inside collection element contracts, exposed dynamic map parameters such as `symbol_key`, and verified the change with py_compile, targeted pytest, typed-query regression coverage, `git diff --check`, and push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-collection-shape-validation-and-schema-discovery-to-typed-query"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:54:59Z",
+      "updated_at": "2026-04-20T01:59:57Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os typed query discoverability by turning collection filtering from key-level validation into a richer advertised schema contract that clients can inspect and bind against safely."
     },
@@ -4651,13 +4670,13 @@
       "status": "proposed",
       "base_priority": 88,
       "dynamic_priority_delta": 3,
-      "priority_reason": "The latest main-session reply lists collection path alias or shortcode support as a remaining convenience layer, but unlike element schema and parameterized collection-schema advertising it is not the contract-critical next step. Keep it proposed behind the richer schema pass so any alias surface maps onto a settled collection discovery model.",
+      "priority_reason": "The latest main-session reply still lists consumer-friendly alias expansion for parameterized collection paths as a remaining follow-up, but it remains an ergonomics layer behind the new shared capability-contract and parameter-domain discovery work. Keep it proposed until the reusable collection-query contract settles.",
       "depends_on": [
         "planning-experiment-os-advertise-element-and-parameterized-collection-schemas-in-typed-query-discovery"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:54:59Z",
+      "updated_at": "2026-04-20T01:59:57Z",
       "source_turn_id": null,
       "direction_relation_note": "Improves experiment-os typed query ergonomics by layering reusable path shorthand on top of the validated collection schema contract, making common nested filters easier to author after the discovery model is stable."
     },
