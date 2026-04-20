@@ -6,6 +6,7 @@ import {
   PointerEvent,
   ReactNode,
   forwardRef,
+  useCallback,
   useEffect,
   useId,
   useLayoutEffect,
@@ -16867,7 +16868,9 @@ function RunSurfaceCollectionQueryBuilder({
   const [templateDraftKey, setTemplateDraftKey] = useState("");
   const [predicateRefDraftKey, setPredicateRefDraftKey] = useState("");
   const [predicateRefDraftBindings, setPredicateRefDraftBindings] = useState<Record<string, string>>({});
-  const [templateParameterDraftDefaults, setTemplateParameterDraftDefaults] = useState<Record<string, string>>({});
+  const [templateDraftAuthoringTarget, setTemplateDraftAuthoringTarget] = useState<"clause" | "subtree">("clause");
+  const [templateParameterDraftDefaultsByContext, setTemplateParameterDraftDefaultsByContext] =
+    useState<Record<string, Record<string, string>>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -17403,9 +17406,7 @@ function RunSurfaceCollectionQueryBuilder({
     const nextTemplate = buildTemplateStateFromNode(
       trimmedKey,
       selectedSubtreeNode,
-      editorTarget.kind === "template" && selectedTemplate && !selectedTemplateSupportsClauseEditing
-        ? editableTemplateParameters
-        : [],
+      subtreeEditableTemplateParameters,
     );
     if (editorTarget.kind === "template") {
       const previousTemplate = predicateTemplates.find((template) => template.id === editorTarget.templateId) ?? null;
@@ -17541,7 +17542,7 @@ function RunSurfaceCollectionQueryBuilder({
         current.map((template) =>
           template.id === editorTarget.templateId
             ? {
-                ...buildTemplateStateFromNode(trimmedKey, nextNode, editableTemplateParameters),
+                ...buildTemplateStateFromNode(trimmedKey, nextNode, clauseEditableTemplateParameters),
                 id: template.id,
               }
             : template,
@@ -17556,7 +17557,7 @@ function RunSurfaceCollectionQueryBuilder({
     }
     setPredicateTemplates((current) => [
       ...current,
-      buildTemplateStateFromNode(trimmedKey, nextNode, editableTemplateParameters),
+      buildTemplateStateFromNode(trimmedKey, nextNode, clauseEditableTemplateParameters),
     ]);
     setTemplateDraftKey("");
   };
@@ -17762,18 +17763,99 @@ function RunSurfaceCollectionQueryBuilder({
       selectedTemplateSupportsClauseEditing,
     ],
   );
-  const templateParameterEditorContextKey = useMemo(
+  const unsavedSubtreeTemplateParameterBaseParameters = useMemo(
+    () =>
+      expressionMode === "grouped" && selectedSubtreeNode
+        ? collectRunSurfaceCollectionQueryBuilderTemplateParameters(
+            selectedSubtreeNode,
+            contracts,
+            predicateTemplates,
+          )
+        : [],
+    [contracts, expressionMode, predicateTemplates, selectedSubtreeNode],
+  );
+  const clauseTemplateParameterContextKey = useMemo(
     () => (
       editorTarget.kind === "template"
-        ? `template:${selectedTemplate?.id ?? "unknown"}`
-        : "clause:draft"
+      && selectedTemplate
+      && selectedTemplateSupportsClauseEditing
+        ? `template:${selectedTemplate.id}`
+        : "template-draft:clause"
     ),
-    [editorTarget.kind, selectedTemplate?.id],
+    [editorTarget.kind, selectedTemplate, selectedTemplateSupportsClauseEditing],
+  );
+  const subtreeTemplateParameterContextKey = useMemo(
+    () => (
+      editorTarget.kind === "template"
+      && selectedTemplate
+      && !selectedTemplateSupportsClauseEditing
+        ? `template:${selectedTemplate.id}`
+        : `template-draft:subtree:${selectedGroupId}`
+    ),
+    [editorTarget.kind, selectedGroupId, selectedTemplate, selectedTemplateSupportsClauseEditing],
+  );
+  const templateParameterEditorContextKey = useMemo(
+    () => (
+      templateDraftAuthoringTarget === "subtree"
+        ? subtreeTemplateParameterContextKey
+        : clauseTemplateParameterContextKey
+    ),
+    [
+      clauseTemplateParameterContextKey,
+      subtreeTemplateParameterContextKey,
+      templateDraftAuthoringTarget,
+    ],
+  );
+  const applyTemplateParameterDraftDefaults = useCallback(
+    (
+      baseParameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[],
+      contextKey: string,
+    ) =>
+      baseParameters.map((parameter) => ({
+        ...parameter,
+        defaultValue:
+          templateParameterDraftDefaultsByContext[contextKey]?.[parameter.key]
+          ?? parameter.defaultValue
+          ?? "",
+      })),
+    [templateParameterDraftDefaultsByContext],
+  );
+  const clauseEditableTemplateParameters = useMemo<RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[]>(
+    () => applyTemplateParameterDraftDefaults(
+      clauseTemplateParameterBaseParameters,
+      clauseTemplateParameterContextKey,
+    ),
+    [
+      applyTemplateParameterDraftDefaults,
+      clauseTemplateParameterBaseParameters,
+      clauseTemplateParameterContextKey,
+    ],
+  );
+  const subtreeEditableTemplateParameters = useMemo<RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[]>(
+    () =>
+      applyTemplateParameterDraftDefaults(
+        editorTarget.kind === "template" && !selectedTemplateSupportsClauseEditing
+          ? subtreeTemplateParameterBaseParameters
+          : unsavedSubtreeTemplateParameterBaseParameters,
+        subtreeTemplateParameterContextKey,
+      ),
+    [
+      applyTemplateParameterDraftDefaults,
+      editorTarget.kind,
+      selectedTemplateSupportsClauseEditing,
+      subtreeTemplateParameterBaseParameters,
+      subtreeTemplateParameterContextKey,
+      unsavedSubtreeTemplateParameterBaseParameters,
+    ],
   );
   const templateParameterEditorBaseParameters = useMemo(
     () => (
-      editorTarget.kind === "template" && !selectedTemplateSupportsClauseEditing
-        ? subtreeTemplateParameterBaseParameters
+      templateDraftAuthoringTarget === "subtree"
+        ? (
+            editorTarget.kind === "template" && !selectedTemplateSupportsClauseEditing
+              ? subtreeTemplateParameterBaseParameters
+              : unsavedSubtreeTemplateParameterBaseParameters
+          )
         : clauseTemplateParameterBaseParameters
     ),
     [
@@ -17781,23 +17863,55 @@ function RunSurfaceCollectionQueryBuilder({
       editorTarget.kind,
       selectedTemplateSupportsClauseEditing,
       subtreeTemplateParameterBaseParameters,
+      templateDraftAuthoringTarget,
+      unsavedSubtreeTemplateParameterBaseParameters,
     ],
   );
   useEffect(() => {
-    setTemplateParameterDraftDefaults({});
-  }, [templateParameterEditorContextKey]);
-  const editableTemplateParameters = useMemo(
-    () =>
-      templateParameterEditorBaseParameters.map((parameter) => ({
-        ...parameter,
-        defaultValue:
-          templateParameterDraftDefaults[parameter.key]
-          ?? parameter.defaultValue
-          ?? "",
-      })),
-    [templateParameterDraftDefaults, templateParameterEditorBaseParameters],
+    if (editorTarget.kind === "template") {
+      setTemplateDraftAuthoringTarget(selectedTemplateSupportsClauseEditing ? "clause" : "subtree");
+      return;
+    }
+    if (expressionMode !== "grouped" || !selectedSubtreeNode) {
+      setTemplateDraftAuthoringTarget("clause");
+    }
+  }, [
+    editorTarget.kind,
+    expressionMode,
+    selectedSubtreeNode,
+    selectedTemplateSupportsClauseEditing,
+  ]);
+  const editableTemplateParameters = useMemo<RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[]>(
+    () => (
+      templateDraftAuthoringTarget === "subtree"
+        ? subtreeEditableTemplateParameters
+        : clauseEditableTemplateParameters
+    ),
+    [
+      clauseEditableTemplateParameters,
+      subtreeEditableTemplateParameters,
+      templateDraftAuthoringTarget,
+    ],
   );
-  const nestedTemplateBindingParameters = useMemo(
+  const canAuthorSubtreeTemplateDefaults = Boolean(
+    expressionMode === "grouped"
+    && selectedSubtreeNode
+    && editorTarget.kind !== "template",
+  );
+  const hasTemplateParameterAuthoringContext = Boolean(templateParameterEditorBaseParameters.length);
+  const updateTemplateParameterDraftDefault = useCallback(
+    (contextKey: string, parameterKey: string, value: string) => {
+      setTemplateParameterDraftDefaultsByContext((current) => ({
+        ...current,
+        [contextKey]: {
+          ...(current[contextKey] ?? {}),
+          [parameterKey]: value,
+        },
+      }));
+    },
+    [],
+  );
+  const nestedTemplateBindingParameters = useMemo<RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[]>(
     () => {
       if (editorTarget.kind === "template") {
         return editableTemplateParameters;
@@ -18295,12 +18409,35 @@ function RunSurfaceCollectionQueryBuilder({
                   </small>
                 </label>
               </div>
-              {editableTemplateParameters.length && (Boolean(trimmedTemplateDraftKey) || editorTarget.kind === "template") ? (
+              {hasTemplateParameterAuthoringContext && (Boolean(trimmedTemplateDraftKey) || editorTarget.kind === "template") ? (
                 <div className="run-surface-query-builder-section">
                   <div className="run-surface-query-builder-card-head">
                     <strong>Template parameter defaults</strong>
                     <span>{editableTemplateParameters.length}</span>
                   </div>
+                  {canAuthorSubtreeTemplateDefaults ? (
+                    <div className="run-surface-query-builder-mode-row">
+                      <button
+                        className={`run-surface-query-builder-mode-button ${templateDraftAuthoringTarget === "clause" ? "is-active" : ""}`.trim()}
+                        onClick={() => setTemplateDraftAuthoringTarget("clause")}
+                        type="button"
+                      >
+                        Clause draft defaults
+                      </button>
+                      <button
+                        className={`run-surface-query-builder-mode-button ${templateDraftAuthoringTarget === "subtree" ? "is-active" : ""}`.trim()}
+                        onClick={() => setTemplateDraftAuthoringTarget("subtree")}
+                        type="button"
+                      >
+                        Selected subtree defaults
+                      </button>
+                    </div>
+                  ) : null}
+                  <p className="run-note">
+                    {templateDraftAuthoringTarget === "subtree"
+                      ? `Editing unsaved defaults for ${selectedGroupLabel}. Saving a clause template will keep using clause draft defaults.`
+                      : "Editing clause-level template defaults for save/update flows."}
+                  </p>
                   <div className="run-surface-query-builder-parameter-grid">
                     {editableTemplateParameters.map((parameter) => (
                       <label className="run-surface-query-builder-control" key={`template-parameter:${parameter.key}`}>
@@ -18309,10 +18446,11 @@ function RunSurfaceCollectionQueryBuilder({
                           <select
                             value={parameter.defaultValue}
                             onChange={(event) =>
-                              setTemplateParameterDraftDefaults((current) => ({
-                                ...current,
-                                [parameter.key]: event.target.value,
-                              }))}
+                              updateTemplateParameterDraftDefault(
+                                templateParameterEditorContextKey,
+                                parameter.key,
+                                event.target.value,
+                              )}
                           >
                             <option value="">No default</option>
                             {Array.from(
@@ -18331,10 +18469,11 @@ function RunSurfaceCollectionQueryBuilder({
                             type="text"
                             value={parameter.defaultValue}
                             onChange={(event) =>
-                              setTemplateParameterDraftDefaults((current) => ({
-                                ...current,
-                                [parameter.key]: event.target.value,
-                              }))}
+                              updateTemplateParameterDraftDefault(
+                                templateParameterEditorContextKey,
+                                parameter.key,
+                                event.target.value,
+                              )}
                             placeholder={`Optional default (${parameter.valueType})`}
                           />
                         )}
