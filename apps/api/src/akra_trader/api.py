@@ -170,10 +170,23 @@ class ReplayLinkAliasAuditPruneRequest(BaseModel):
   include_manual: bool = False
 
 
+class ReplayLinkAliasAuditExportJobCreateRequest(BaseModel):
+  format: str = "json"
+  alias_id: str | None = None
+  template_key: str | None = None
+  action: str | None = None
+  retention_policy: str | None = None
+  source_tab_id: str | None = None
+  search: str | None = None
+  requested_by_tab_id: str | None = None
+  requested_by_tab_label: str | None = None
+
+
 REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_alias_create": (ReplayLinkAliasCreateRequest, {}),
   "replay_link_alias_revoke": (ReplayLinkAliasRevokeRequest, {}),
   "replay_link_audit_prune": (ReplayLinkAliasAuditPruneRequest, {}),
+  "replay_link_audit_export_job_create": (ReplayLinkAliasAuditExportJobCreateRequest, {}),
   "preset_create": (ExperimentPresetRequest, {}),
   "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
   "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),

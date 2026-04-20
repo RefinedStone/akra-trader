@@ -20,6 +20,8 @@ from akra_trader.domain.models import MarketDataRemediationResult
 from akra_trader.domain.models import MarketDataStatus
 from akra_trader.domain.models import MarketType
 from akra_trader.domain.models import ReplayIntentAliasAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -185,6 +187,8 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._runs: OrderedDict[str, RunRecord] = OrderedDict()
     self._replay_intent_alias_records: OrderedDict[str, ReplayIntentAliasRecord] = OrderedDict()
     self._replay_intent_alias_audit_records: OrderedDict[str, ReplayIntentAliasAuditRecord] = OrderedDict()
+    self._replay_intent_alias_audit_export_jobs: OrderedDict[str, ReplayIntentAliasAuditExportJobRecord] = OrderedDict()
+    self._replay_intent_alias_audit_export_job_audit_records: OrderedDict[str, ReplayIntentAliasAuditExportJobAuditRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -298,6 +302,78 @@ class InMemoryRunRepository(RunRepositoryPort):
       if record.expires_at is None or record.expires_at > current_time
     )
     return original_count - len(self._replay_intent_alias_audit_records)
+
+  def save_replay_intent_alias_audit_export_job(
+    self,
+    record: ReplayIntentAliasAuditExportJobRecord,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    self._replay_intent_alias_audit_export_jobs[record.job_id] = record
+    return record
+
+  def get_replay_intent_alias_audit_export_job(
+    self,
+    job_id: str,
+  ) -> ReplayIntentAliasAuditExportJobRecord | None:
+    return self._replay_intent_alias_audit_export_jobs.get(job_id)
+
+  def list_replay_intent_alias_audit_export_jobs(
+    self,
+  ) -> tuple[ReplayIntentAliasAuditExportJobRecord, ...]:
+    return tuple(
+      sorted(
+        self._replay_intent_alias_audit_export_jobs.values(),
+        key=lambda record: (record.created_at, record.job_id),
+        reverse=True,
+      )
+    )
+
+  def prune_replay_intent_alias_audit_export_jobs(self, current_time: datetime) -> int:
+    original_count = len(self._replay_intent_alias_audit_export_jobs)
+    self._replay_intent_alias_audit_export_jobs = OrderedDict(
+      (
+        job_id,
+        record,
+      )
+      for job_id, record in self._replay_intent_alias_audit_export_jobs.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._replay_intent_alias_audit_export_jobs)
+
+  def save_replay_intent_alias_audit_export_job_audit_record(
+    self,
+    record: ReplayIntentAliasAuditExportJobAuditRecord,
+  ) -> ReplayIntentAliasAuditExportJobAuditRecord:
+    self._replay_intent_alias_audit_export_job_audit_records[record.audit_id] = record
+    return record
+
+  def list_replay_intent_alias_audit_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ReplayIntentAliasAuditExportJobAuditRecord, ...]:
+    records = [
+      record
+      for record in self._replay_intent_alias_audit_export_job_audit_records.values()
+      if job_id is None or record.job_id == job_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def prune_replay_intent_alias_audit_export_job_audit_records(self, current_time: datetime) -> int:
+    original_count = len(self._replay_intent_alias_audit_export_job_audit_records)
+    self._replay_intent_alias_audit_export_job_audit_records = OrderedDict(
+      (
+        audit_id,
+        record,
+      )
+      for audit_id, record in self._replay_intent_alias_audit_export_job_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._replay_intent_alias_audit_export_job_audit_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

@@ -13999,6 +13999,10 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "replay_link_alias_history",
     "replay_link_audit_list",
     "replay_link_audit_export",
+    "replay_link_audit_export_job_create",
+    "replay_link_audit_export_job_list",
+    "replay_link_audit_export_job_download",
+    "replay_link_audit_export_job_history",
     "replay_link_audit_prune",
     "replay_link_alias_revoke",
     "market_data_status",
@@ -14055,6 +14059,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["replay_link_audit_export"].route_path == "/replay-links/audits/export"
   assert bindings_by_key["replay_link_audit_export"].header_keys == ("x_akra_replay_audit_admin_token",)
   assert bindings_by_key["replay_link_audit_export"].filter_param_specs[-1].key == "format"
+  assert bindings_by_key["replay_link_audit_export_job_create"].methods == ("POST",)
+  assert bindings_by_key["replay_link_audit_export_job_create"].request_payload_kind == "replay_link_audit_export_job_create"
+  assert bindings_by_key["replay_link_audit_export_job_list"].route_path == "/replay-links/audits/export-jobs"
+  assert bindings_by_key["replay_link_audit_export_job_list"].filter_param_specs[1].key == "format"
+  assert bindings_by_key["replay_link_audit_export_job_download"].path_param_keys == ("job_id",)
+  assert bindings_by_key["replay_link_audit_export_job_history"].route_path == "/replay-links/audits/export-jobs/{job_id}/history"
   assert bindings_by_key["replay_link_audit_prune"].header_keys == ("x_akra_replay_audit_admin_token",)
   assert bindings_by_key["replay_link_audit_prune"].request_payload_kind == "replay_link_audit_prune"
   assert bindings_by_key["replay_link_alias_revoke"].request_payload_kind == "replay_link_alias_revoke"
@@ -14634,6 +14644,49 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
   )
   assert prune_manual_payload["deleted_count"] == 1
 
+  export_job_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_create"],
+    app=app,
+    request_payload={
+      "format": "json",
+      "template_key": "template_a",
+      "requested_by_tab_id": "tab_export",
+      "requested_by_tab_label": "Export tab",
+    },
+    headers={"x_akra_replay_audit_admin_token": "write-token"},
+  )
+  assert export_job_payload["export_format"] == "json"
+  assert export_job_payload["record_count"] == 3
+
+  export_job_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_list"],
+    app=app,
+    filters={"template_key": "template_a", "format": "json", "limit": 10},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+  assert export_job_list_payload["total"] == 1
+  export_job_id = export_job_list_payload["items"][0]["job_id"]
+
+  download_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_download"],
+    app=app,
+    path_params={"job_id": export_job_id},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+  assert download_payload["content"]
+  assert download_payload["record_count"] == 3
+
+  export_job_history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_history"],
+    app=app,
+    path_params={"job_id": export_job_id},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+  assert [item["action"] for item in export_job_history_payload["history"]] == [
+    "downloaded",
+    "created",
+  ]
+
 
 def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: Path) -> None:
   app = TradingApplication(
@@ -14667,6 +14720,42 @@ def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: 
     binding=bindings_by_key["replay_link_audit_export"],
     app=app,
     filters={"format": "json"},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+
+  with pytest.raises(PermissionError, match="invalid replay alias audit admin token"):
+    execute_standalone_surface_binding(
+      binding=bindings_by_key["replay_link_audit_export_job_create"],
+      app=app,
+      request_payload={"format": "json"},
+      headers={"x_akra_replay_audit_admin_token": "read-token"},
+    )
+
+  created_export_job = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_create"],
+    app=app,
+    request_payload={"format": "json", "requested_by_tab_id": "tab_local"},
+    headers={"x_akra_replay_audit_admin_token": "write-token"},
+  )
+
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_list"],
+    app=app,
+    filters={"limit": 10},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_download"],
+    app=app,
+    path_params={"job_id": created_export_job["job_id"]},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_export_job_history"],
+    app=app,
+    path_params={"job_id": created_export_job["job_id"]},
     headers={"x_akra_replay_audit_admin_token": "read-token"},
   )
 

@@ -4122,6 +4122,109 @@ async function exportRunSurfaceCollectionQueryBuilderServerReplayLinkAudits(para
   });
 }
 
+async function createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob(params: {
+  adminToken?: string;
+  action?: string;
+  aliasId?: string;
+  exportFormat: "json" | "csv";
+  requestedByTabId?: string;
+  requestedByTabLabel?: string;
+  retentionPolicy?: string;
+  search?: string;
+  sourceTabId?: string;
+  templateKey?: string;
+}) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry>(
+    "/replay-links/audits/export-jobs",
+    {
+      method: "POST",
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+      body: JSON.stringify({
+        format: params.exportFormat,
+        ...(params.aliasId?.trim() ? { alias_id: params.aliasId.trim() } : {}),
+        ...(params.templateKey?.trim() ? { template_key: params.templateKey.trim() } : {}),
+        ...(params.action?.trim() && params.action !== "all" ? { action: params.action.trim() } : {}),
+        ...(params.retentionPolicy?.trim() && params.retentionPolicy !== "all"
+          ? { retention_policy: params.retentionPolicy.trim() }
+          : {}),
+        ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
+        ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+        ...(params.requestedByTabId?.trim() ? { requested_by_tab_id: params.requestedByTabId.trim() } : {}),
+        ...(params.requestedByTabLabel?.trim() ? { requested_by_tab_label: params.requestedByTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+async function listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs(params: {
+  adminToken?: string;
+  exportFormat?: string;
+  limit?: number;
+  requestedByTabId?: string;
+  search?: string;
+  status?: string;
+  templateKey?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params.templateKey?.trim()) {
+    searchParams.set("template_key", params.templateKey.trim());
+  }
+  if (params.exportFormat?.trim() && params.exportFormat !== "all") {
+    searchParams.set("format", params.exportFormat.trim());
+  }
+  if (params.status?.trim() && params.status !== "all") {
+    searchParams.set("status", params.status.trim());
+  }
+  if (params.requestedByTabId?.trim()) {
+    searchParams.set("requested_by_tab_id", params.requestedByTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 500))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobListPayload>(
+    `/replay-links/audits/export-jobs${suffix}`,
+    {
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+    },
+  );
+}
+
+async function downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob(params: {
+  adminToken?: string;
+  jobId: string;
+}) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobDownloadPayload>(
+    `/replay-links/audits/export-jobs/${encodeURIComponent(params.jobId)}/download`,
+    {
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+    },
+  );
+}
+
+async function getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory(params: {
+  adminToken?: string;
+  jobId: string;
+}) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload>(
+    `/replay-links/audits/export-jobs/${encodeURIComponent(params.jobId)}/history`,
+    {
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+    },
+  );
+}
+
 const defaultRunForm = {
   strategy_id: "ma_cross_v1",
   symbol: "BTC/USDT",
@@ -17455,6 +17558,50 @@ type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload = {
   mode: "expired" | "matched" | string;
 };
 
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry = {
+  completed_at: string | null;
+  content_type: string;
+  created_at: string;
+  expires_at: string | null;
+  export_format: "json" | "csv" | string;
+  filename: string;
+  filters: Record<string, unknown>;
+  job_id: string;
+  record_count: number;
+  requested_by_tab_id: string | null;
+  requested_by_tab_label: string | null;
+  status: string;
+  template_key: string | null;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobListPayload = {
+  items: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry[];
+  total: number;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobDownloadPayload =
+  RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry & {
+    content: string;
+  };
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry = {
+  action: string;
+  audit_id: string;
+  detail: string;
+  expires_at: string | null;
+  export_format: string | null;
+  job_id: string;
+  recorded_at: string;
+  source_tab_id: string | null;
+  source_tab_label: string | null;
+  template_key: string | null;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload = {
+  history: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryEntry[];
+  job: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry;
+};
+
 type RunSurfaceCollectionQueryBuilderReplayLinkAliasState = {
   aliases: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[];
   version: number;
@@ -21642,6 +21789,16 @@ function RunSurfaceCollectionQueryBuilder({
     tone: "error" | "muted" | "success";
   } | null>(null);
   const [replayIntentServerAuditLoading, setReplayIntentServerAuditLoading] = useState(false);
+  const [replayIntentServerAuditExportJobs, setReplayIntentServerAuditExportJobs] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobEntry[]>([]);
+  const [replayIntentServerAuditExportJobTotal, setReplayIntentServerAuditExportJobTotal] = useState(0);
+  const [replayIntentServerAuditExportJobStatus, setReplayIntentServerAuditExportJobStatus] = useState<{
+    message: string;
+    tone: "error" | "muted" | "success";
+  } | null>(null);
+  const [replayIntentServerAuditExportJobLoading, setReplayIntentServerAuditExportJobLoading] = useState(false);
+  const [replayIntentServerAuditExportJobHistory, setReplayIntentServerAuditExportJobHistory] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditExportJobHistoryPayload | null>(null);
   const [replayIntentLinkAuditTrail, setReplayIntentLinkAuditTrail] =
     useState<RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[]>(() =>
       loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(),
@@ -24500,6 +24657,169 @@ function RunSurfaceCollectionQueryBuilder({
     replayIntentServerAuditSearch,
     replayIntentServerAuditSourceTabFilter,
     replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
+  const loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs = useCallback(async (
+    options?: { adminToken?: string; silent?: boolean },
+  ) => {
+    const adminToken = (options?.adminToken ?? replayIntentServerAuditReadToken.trim())
+      || replayIntentServerAuditWriteToken.trim();
+    const normalizedLimit = Number.parseInt(replayIntentServerAuditLimit, 10);
+    setReplayIntentServerAuditExportJobLoading(true);
+    if (!options?.silent) {
+      setReplayIntentServerAuditExportJobStatus(null);
+    }
+    try {
+      const payload = await listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs({
+        adminToken,
+        exportFormat: "all",
+        limit: Number.isFinite(normalizedLimit) ? normalizedLimit : 25,
+        requestedByTabId: replayIntentServerAuditSourceTabFilter,
+        search: replayIntentServerAuditSearch,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      setReplayIntentServerAuditExportJobs(payload.items);
+      setReplayIntentServerAuditExportJobTotal(payload.total);
+      if (!options?.silent) {
+        setReplayIntentServerAuditExportJobStatus({
+          message: `Loaded ${payload.items.length} server export job${payload.items.length === 1 ? "" : "s"}.`,
+          tone: payload.items.length ? "success" : "muted",
+        });
+      }
+    } catch (error) {
+      setReplayIntentServerAuditExportJobStatus({
+        message: error instanceof Error ? error.message : "Failed to load server replay audit export jobs.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditExportJobLoading(false);
+    }
+  }, [
+    replayIntentServerAuditLimit,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
+  const createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecord = useCallback(async (
+    exportFormat: "json" | "csv",
+  ) => {
+    const adminToken = replayIntentServerAuditWriteToken.trim() || replayIntentServerAuditReadToken.trim();
+    setReplayIntentServerAuditExportJobLoading(true);
+    setReplayIntentServerAuditExportJobStatus(null);
+    try {
+      const payload = await createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob({
+        adminToken,
+        action: replayIntentServerAuditActionFilter,
+        aliasId: replayIntentServerAuditAliasFilter,
+        exportFormat,
+        requestedByTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        requestedByTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        retentionPolicy: replayIntentServerAuditRetentionFilter,
+        search: replayIntentServerAuditSearch,
+        sourceTabId: replayIntentServerAuditSourceTabFilter,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      setReplayIntentServerAuditExportJobStatus({
+        message: `Created ${payload.export_format.toUpperCase()} export job ${payload.job_id.slice(0, 8)} for ${payload.record_count} server audit record${payload.record_count === 1 ? "" : "s"}.`,
+        tone: payload.record_count ? "success" : "muted",
+      });
+      setReplayIntentServerAuditExportJobHistory(null);
+      await loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs({
+        adminToken,
+        silent: true,
+      });
+    } catch (error) {
+      setReplayIntentServerAuditExportJobStatus({
+        message: error instanceof Error ? error.message : "Failed to create server replay audit export job.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditExportJobLoading(false);
+    }
+  }, [
+    loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
+    predicateRefReplayApplyHistoryTabIdentity.label,
+    predicateRefReplayApplyHistoryTabIdentity.tabId,
+    replayIntentServerAuditActionFilter,
+    replayIntentServerAuditAliasFilter,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRetentionFilter,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
+  const downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecord = useCallback(async (
+    jobId: string,
+  ) => {
+    const adminToken = replayIntentServerAuditReadToken.trim() || replayIntentServerAuditWriteToken.trim();
+    setReplayIntentServerAuditExportJobLoading(true);
+    setReplayIntentServerAuditExportJobStatus(null);
+    try {
+      const payload = await downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob({
+        adminToken,
+        jobId,
+      });
+      if (typeof window !== "undefined") {
+        const blob = new Blob([payload.content], { type: payload.content_type });
+        const objectUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = payload.filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(objectUrl);
+      }
+      setReplayIntentServerAuditExportJobStatus({
+        message: `Downloaded export job ${payload.job_id.slice(0, 8)} as ${payload.export_format.toUpperCase()}.`,
+        tone: "success",
+      });
+      await loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs({
+        adminToken,
+        silent: true,
+      });
+    } catch (error) {
+      setReplayIntentServerAuditExportJobStatus({
+        message: error instanceof Error ? error.message : "Failed to download server replay audit export job.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditExportJobLoading(false);
+    }
+  }, [
+    loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditWriteToken,
+  ]);
+  const loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory = useCallback(async (
+    jobId: string,
+  ) => {
+    const adminToken = replayIntentServerAuditReadToken.trim() || replayIntentServerAuditWriteToken.trim();
+    setReplayIntentServerAuditExportJobLoading(true);
+    setReplayIntentServerAuditExportJobStatus(null);
+    try {
+      const payload = await getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory({
+        adminToken,
+        jobId,
+      });
+      setReplayIntentServerAuditExportJobHistory(payload);
+      setReplayIntentServerAuditExportJobStatus({
+        message: `Loaded ${payload.history.length} export job audit event${payload.history.length === 1 ? "" : "s"} for ${payload.job.filename}.`,
+        tone: payload.history.length ? "success" : "muted",
+      });
+    } catch (error) {
+      setReplayIntentServerAuditExportJobStatus({
+        message: error instanceof Error ? error.message : "Failed to load server replay audit export job history.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditExportJobLoading(false);
+    }
+  }, [
+    replayIntentServerAuditReadToken,
     replayIntentServerAuditWriteToken,
   ]);
   const copyRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = useCallback(async () => {
@@ -30454,6 +30774,160 @@ function RunSurfaceCollectionQueryBuilder({
                             </div>
                           ) : replayIntentServerAuditStatus ? (
                             <p className="empty-state">No server replay alias audits match the current admin filter.</p>
+                          ) : null}
+                        </div>
+                        <div className="run-surface-query-builder-trace-panel is-nested">
+                          <div className="run-surface-query-builder-card-head">
+                            <strong>Managed audit export jobs</strong>
+                            <span>{replayIntentServerAuditExportJobTotal
+                              ? `${replayIntentServerAuditExportJobTotal} loaded`
+                              : "Server snapshots"}</span>
+                          </div>
+                          <p className="run-note">
+                            Create persisted server-side export jobs from the current replay alias audit filters, then
+                            download their captured payloads and inspect created/downloaded history.
+                          </p>
+                          {replayIntentServerAuditExportJobStatus ? (
+                            <p className={`run-note run-surface-query-builder-note is-${replayIntentServerAuditExportJobStatus.tone}`}>
+                              {replayIntentServerAuditExportJobStatus.message}
+                            </p>
+                          ) : null}
+                          <div className="run-surface-query-builder-actions">
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditExportJobLoading}
+                              onClick={() => {
+                                void createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecord("json");
+                              }}
+                              type="button"
+                            >
+                              Create JSON job
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditExportJobLoading}
+                              onClick={() => {
+                                void createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecord("csv");
+                              }}
+                              type="button"
+                            >
+                              Create CSV job
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditExportJobLoading}
+                              onClick={() => {
+                                void loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs();
+                              }}
+                              type="button"
+                            >
+                              {replayIntentServerAuditExportJobLoading ? "Loading…" : "Load export jobs"}
+                            </button>
+                          </div>
+                          {replayIntentServerAuditExportJobs.length ? (
+                            <div className="run-surface-query-builder-trace-list">
+                              {replayIntentServerAuditExportJobs.map((job) => (
+                                <div
+                                  className="run-surface-query-builder-trace-step is-info"
+                                  key={`server-replay-audit-export-job:${job.job_id}`}
+                                >
+                                  <strong>{`${job.export_format.toUpperCase()} · ${job.filename}`}</strong>
+                                  <p>
+                                    {`${job.job_id.slice(0, 8)} · ${job.requested_by_tab_label ?? "Server"} · ${formatRelativeTimestampLabel(job.created_at)}`}
+                                  </p>
+                                  <div className="run-surface-query-builder-trace-chip-list">
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {job.status}
+                                    </span>
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {`${job.record_count} record${job.record_count === 1 ? "" : "s"}`}
+                                    </span>
+                                    {job.template_key ? (
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {job.template_key}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                  <p className="run-note">{`${job.content_type} · ${job.export_format.toUpperCase()} export`}</p>
+                                  {job.completed_at ? (
+                                    <p className="run-note">
+                                      {`Completed ${formatRelativeTimestampLabel(job.completed_at)}.`}
+                                    </p>
+                                  ) : null}
+                                  {job.expires_at ? (
+                                    <p className="run-note">
+                                      {`Expires ${formatRelativeTimestampLabel(job.expires_at)}.`}
+                                    </p>
+                                  ) : null}
+                                  <div className="run-surface-query-builder-actions">
+                                    <button
+                                      className="ghost-button"
+                                      disabled={replayIntentServerAuditExportJobLoading}
+                                      onClick={() => {
+                                        void downloadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobRecord(job.job_id);
+                                      }}
+                                      type="button"
+                                    >
+                                      Download job
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      disabled={replayIntentServerAuditExportJobLoading}
+                                      onClick={() => {
+                                        void loadRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory(job.job_id);
+                                      }}
+                                      type="button"
+                                    >
+                                      Load history
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : replayIntentServerAuditExportJobStatus ? (
+                            <p className="empty-state">No managed replay audit export jobs match the current admin filter.</p>
+                          ) : null}
+                          {replayIntentServerAuditExportJobHistory ? (
+                            <div className="run-surface-query-builder-trace-panel is-nested">
+                              <div className="run-surface-query-builder-card-head">
+                                <strong>Export job history</strong>
+                                <span>{replayIntentServerAuditExportJobHistory.job.filename}</span>
+                              </div>
+                              <p className="run-note">
+                                {`${replayIntentServerAuditExportJobHistory.job.job_id.slice(0, 8)} · ${replayIntentServerAuditExportJobHistory.history.length} event${replayIntentServerAuditExportJobHistory.history.length === 1 ? "" : "s"}`}
+                              </p>
+                              <div className="run-surface-query-builder-trace-list">
+                                {replayIntentServerAuditExportJobHistory.history.map((entry) => (
+                                  <div
+                                    className={`run-surface-query-builder-trace-step is-${
+                                      entry.action === "downloaded" ? "success" : "info"
+                                    }`}
+                                    key={`server-replay-audit-export-job-history:${entry.audit_id}`}
+                                  >
+                                    <strong>{entry.action.replaceAll("_", " ")}</strong>
+                                    <p>
+                                      {`${entry.source_tab_label ?? "Server"} · ${formatRelativeTimestampLabel(entry.recorded_at)}`}
+                                    </p>
+                                    <div className="run-surface-query-builder-trace-chip-list">
+                                      {entry.template_key ? (
+                                        <span className="run-surface-query-builder-trace-chip">
+                                          {entry.template_key}
+                                        </span>
+                                      ) : null}
+                                      {entry.export_format ? (
+                                        <span className="run-surface-query-builder-trace-chip">
+                                          {entry.export_format.toUpperCase()}
+                                        </span>
+                                      ) : null}
+                                      <span className="run-surface-query-builder-trace-chip">
+                                        {entry.audit_id.slice(0, 8)}
+                                      </span>
+                                    </div>
+                                    <p className="run-note">{entry.detail}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
                           ) : null}
                         </div>
                         {replayIntentGovernanceConflicts.length ? (

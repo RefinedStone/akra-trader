@@ -727,6 +727,38 @@ class ReplayIntentAliasAuditRecord:
   detail: str = ""
 
 
+@dataclass(frozen=True)
+class ReplayIntentAliasAuditExportJobRecord:
+  job_id: str
+  export_format: str
+  filename: str
+  content_type: str
+  content: str
+  record_count: int
+  status: str
+  created_at: datetime
+  completed_at: datetime | None = None
+  expires_at: datetime | None = None
+  template_key: str | None = None
+  requested_by_tab_id: str | None = None
+  requested_by_tab_label: str | None = None
+  filters: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ReplayIntentAliasAuditExportJobAuditRecord:
+  audit_id: str
+  job_id: str
+  action: str
+  recorded_at: datetime
+  expires_at: datetime | None = None
+  template_key: str | None = None
+  export_format: str | None = None
+  source_tab_id: str | None = None
+  source_tab_label: str | None = None
+  detail: str = ""
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "

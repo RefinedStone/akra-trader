@@ -23,6 +23,8 @@ from sqlalchemy.engine import make_url
 
 from akra_trader.domain.models import ExperimentPreset
 from akra_trader.domain.models import ReplayIntentAliasAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunRecord
 from akra_trader.domain.models import RunStatus
@@ -84,6 +86,28 @@ replay_intent_alias_audit_records = Table(
   Column("expires_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+replay_intent_alias_audit_export_jobs = Table(
+  "replay_intent_alias_audit_export_jobs",
+  metadata,
+  Column("job_id", String, primary_key=True),
+  Column("template_key", String, nullable=True, index=True),
+  Column("export_format", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("created_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("requested_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+replay_intent_alias_audit_export_job_audit_records = Table(
+  "replay_intent_alias_audit_export_job_audit_records",
+  metadata,
+  Column("audit_id", String, primary_key=True),
+  Column("job_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 replay_intent_alias_state = Table(
   "replay_intent_alias_state",
   metadata,
@@ -110,6 +134,8 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _adapter = TypeAdapter(RunRecord)
   _replay_alias_adapter = TypeAdapter(ReplayIntentAliasRecord)
   _replay_alias_audit_adapter = TypeAdapter(ReplayIntentAliasAuditRecord)
+  _replay_alias_audit_export_job_adapter = TypeAdapter(ReplayIntentAliasAuditExportJobRecord)
+  _replay_alias_audit_export_job_audit_adapter = TypeAdapter(ReplayIntentAliasAuditExportJobAuditRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -321,6 +347,132 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       )
     return result.rowcount or 0
 
+  def save_replay_intent_alias_audit_export_job(
+    self,
+    record: ReplayIntentAliasAuditExportJobRecord,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    payload = self._replay_alias_audit_export_job_adapter.dump_python(record, mode="json")
+    row = {
+      "job_id": record.job_id,
+      "template_key": record.template_key,
+      "export_format": record.export_format,
+      "status": record.status,
+      "created_at": record.created_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "requested_by_tab_id": record.requested_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_audit_export_jobs.c.job_id).where(
+          replay_intent_alias_audit_export_jobs.c.job_id == record.job_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(replay_intent_alias_audit_export_jobs).values(**row))
+      else:
+        connection.execute(
+          update(replay_intent_alias_audit_export_jobs)
+          .where(replay_intent_alias_audit_export_jobs.c.job_id == record.job_id)
+          .values(**row)
+        )
+    return record
+
+  def get_replay_intent_alias_audit_export_job(
+    self,
+    job_id: str,
+  ) -> ReplayIntentAliasAuditExportJobRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(replay_intent_alias_audit_export_jobs.c.payload).where(
+          replay_intent_alias_audit_export_jobs.c.job_id == job_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._replay_alias_audit_export_job_adapter.validate_python(row["payload"])
+
+  def list_replay_intent_alias_audit_export_jobs(
+    self,
+  ) -> tuple[ReplayIntentAliasAuditExportJobRecord, ...]:
+    statement = select(replay_intent_alias_audit_export_jobs.c.payload).order_by(
+      replay_intent_alias_audit_export_jobs.c.created_at.desc(),
+      replay_intent_alias_audit_export_jobs.c.job_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._replay_alias_audit_export_job_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_replay_intent_alias_audit_export_jobs(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(replay_intent_alias_audit_export_jobs).where(
+          replay_intent_alias_audit_export_jobs.c.expires_at.is_not(None),
+          replay_intent_alias_audit_export_jobs.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
+  def save_replay_intent_alias_audit_export_job_audit_record(
+    self,
+    record: ReplayIntentAliasAuditExportJobAuditRecord,
+  ) -> ReplayIntentAliasAuditExportJobAuditRecord:
+    payload = self._replay_alias_audit_export_job_audit_adapter.dump_python(record, mode="json")
+    row = {
+      "audit_id": record.audit_id,
+      "job_id": record.job_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(replay_intent_alias_audit_export_job_audit_records.c.audit_id).where(
+          replay_intent_alias_audit_export_job_audit_records.c.audit_id == record.audit_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(replay_intent_alias_audit_export_job_audit_records).values(**row))
+      else:
+        connection.execute(
+          update(replay_intent_alias_audit_export_job_audit_records)
+          .where(replay_intent_alias_audit_export_job_audit_records.c.audit_id == record.audit_id)
+          .values(**row)
+        )
+    return record
+
+  def list_replay_intent_alias_audit_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ReplayIntentAliasAuditExportJobAuditRecord, ...]:
+    statement = select(replay_intent_alias_audit_export_job_audit_records.c.payload)
+    if job_id is not None:
+      statement = statement.where(replay_intent_alias_audit_export_job_audit_records.c.job_id == job_id)
+    statement = statement.order_by(
+      replay_intent_alias_audit_export_job_audit_records.c.recorded_at.desc(),
+      replay_intent_alias_audit_export_job_audit_records.c.audit_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._replay_alias_audit_export_job_audit_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_replay_intent_alias_audit_export_job_audit_records(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(replay_intent_alias_audit_export_job_audit_records).where(
+          replay_intent_alias_audit_export_job_audit_records.c.expires_at.is_not(None),
+          replay_intent_alias_audit_export_job_audit_records.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     with self._engine.connect() as connection:
       row = connection.execute(
@@ -413,10 +565,24 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_replay_intent_alias_audit_records_action", "action"),
         ("ix_replay_intent_alias_audit_records_recorded_at", "recorded_at"),
         ("ix_replay_intent_alias_audit_records_expires_at", "expires_at"),
+        ("ix_replay_intent_alias_audit_export_jobs_template_key", "template_key"),
+        ("ix_replay_intent_alias_audit_export_jobs_export_format", "export_format"),
+        ("ix_replay_intent_alias_audit_export_jobs_status", "status"),
+        ("ix_replay_intent_alias_audit_export_jobs_created_at", "created_at"),
+        ("ix_replay_intent_alias_audit_export_jobs_expires_at", "expires_at"),
+        ("ix_replay_intent_alias_audit_export_jobs_requested_by_tab_id", "requested_by_tab_id"),
+        ("ix_replay_intent_alias_audit_export_job_audit_records_job_id", "job_id"),
+        ("ix_replay_intent_alias_audit_export_job_audit_records_action", "action"),
+        ("ix_replay_intent_alias_audit_export_job_audit_records_recorded_at", "recorded_at"),
+        ("ix_replay_intent_alias_audit_export_job_audit_records_expires_at", "expires_at"),
       ):
         table_name = (
           "run_record_tags"
           if index_name == "ix_run_record_tags_tag"
+          else "replay_intent_alias_audit_export_job_audit_records"
+            if index_name.startswith("ix_replay_intent_alias_audit_export_job_audit_records_")
+            else "replay_intent_alias_audit_export_jobs"
+            if index_name.startswith("ix_replay_intent_alias_audit_export_jobs_")
           else "replay_intent_alias_audit_records"
             if index_name.startswith("ix_replay_intent_alias_audit_records_")
             else "replay_intent_alias_records"

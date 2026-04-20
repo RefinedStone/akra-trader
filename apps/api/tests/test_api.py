@@ -352,6 +352,33 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "x_akra_replay_audit_admin_token",
     "app",
   )
+  assert tuple(inspect.signature(routes["create_replay_link_alias_audit_export_job"].endpoint).parameters) == (
+    "request",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_replay_link_alias_audit_export_jobs"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "template_key",
+    "format",
+    "status",
+    "requested_by_tab_id",
+    "search",
+    "limit",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["download_replay_link_alias_audit_export_job"].endpoint).parameters) == (
+    "job_id",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_replay_link_alias_audit_export_job_history"].endpoint).parameters) == (
+    "job_id",
+    "x_akra_replay_audit_admin_token",
+    "app",
+  )
   assert tuple(inspect.signature(routes["prune_replay_link_alias_audits"].endpoint).parameters) == (
     "request",
     "x_akra_replay_audit_admin_token",
@@ -665,6 +692,118 @@ def test_replay_link_alias_audit_export_endpoint_supports_json_and_csv(tmp_path:
   assert csv_export_payload["filename"].endswith(".csv")
   assert csv_export_payload["record_count"] == 2
   assert "audit_id,alias_id,action" in csv_export_payload["content"]
+
+
+def test_replay_link_alias_audit_export_job_endpoints_support_creation_and_history(tmp_path: Path) -> None:
+  client = build_client(
+    tmp_path / "runs.sqlite3",
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
+  )
+
+  created_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_export_jobs",
+      "template_label": "Template Export Jobs",
+      "intent": {"replayScope": "all", "replayIndex": 7},
+      "redaction_policy": "summary_only",
+      "retention_policy": "30d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+  assert created_response.status_code == 200
+  alias_token = created_response.json()["alias_token"]
+  assert client.get(f"/api/replay-links/aliases/{alias_token}").status_code == 200
+
+  create_job_response = client.post(
+    "/api/replay-links/audits/export-jobs",
+    json={
+      "format": "csv",
+      "template_key": "template_export_jobs",
+      "requested_by_tab_id": "tab_export",
+      "requested_by_tab_label": "Export tab",
+    },
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert create_job_response.status_code == 200
+  created_job = create_job_response.json()
+  assert created_job["export_format"] == "csv"
+  assert created_job["record_count"] == 2
+
+  list_jobs_response = client.get(
+    "/api/replay-links/audits/export-jobs",
+    params={"template_key": "template_export_jobs", "format": "csv", "limit": 10},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert list_jobs_response.status_code == 200
+  jobs_payload = list_jobs_response.json()
+  assert jobs_payload["total"] == 1
+  assert jobs_payload["items"][0]["job_id"] == created_job["job_id"]
+
+  download_response = client.get(
+    f"/api/replay-links/audits/export-jobs/{created_job['job_id']}/download",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert download_response.status_code == 200
+  download_payload = download_response.json()
+  assert download_payload["content"]
+  assert download_payload["filename"].endswith(".csv")
+
+  history_response = client.get(
+    f"/api/replay-links/audits/export-jobs/{created_job['job_id']}/history",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert history_response.status_code == 200
+  assert [item["action"] for item in history_response.json()["history"]] == [
+    "downloaded",
+    "created",
+  ]
+
+
+def test_replay_link_alias_audit_export_job_endpoints_require_scoped_tokens(tmp_path: Path) -> None:
+  client = build_client(
+    tmp_path / "runs.sqlite3",
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
+  )
+
+  forbidden_create_response = client.post(
+    "/api/replay-links/audits/export-jobs",
+    json={"format": "json"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert forbidden_create_response.status_code == 403
+
+  create_job_response = client.post(
+    "/api/replay-links/audits/export-jobs",
+    json={"format": "json"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert create_job_response.status_code == 200
+  job_id = create_job_response.json()["job_id"]
+
+  forbidden_list_response = client.get("/api/replay-links/audits/export-jobs")
+  assert forbidden_list_response.status_code == 403
+
+  read_list_response = client.get(
+    "/api/replay-links/audits/export-jobs",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert read_list_response.status_code == 200
+
+  download_response = client.get(
+    f"/api/replay-links/audits/export-jobs/{job_id}/download",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert download_response.status_code == 200
+
+  history_response = client.get(
+    f"/api/replay-links/audits/export-jobs/{job_id}/history",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert history_response.status_code == 200
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:

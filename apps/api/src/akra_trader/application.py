@@ -29,6 +29,8 @@ from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import ComparisonEligibilityContract
 from akra_trader.domain.models import default_comparison_eligibility_contract
 from akra_trader.domain.models import ReplayIntentAliasAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobAuditRecord
+from akra_trader.domain.models import ReplayIntentAliasAuditExportJobRecord
 from akra_trader.domain.models import ReplayIntentAliasRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
 from akra_trader.domain.models import GuardedLiveKillSwitch
@@ -716,6 +718,8 @@ class TradingApplication:
     self._replay_intent_alias_signing_secret = self._load_or_create_replay_intent_alias_signing_secret()
     self._replay_intent_alias_records: dict[str, ReplayIntentAliasRecord] = {}
     self._replay_intent_alias_audit_records: dict[str, ReplayIntentAliasAuditRecord] = {}
+    self._replay_intent_alias_audit_export_jobs: dict[str, ReplayIntentAliasAuditExportJobRecord] = {}
+    self._replay_intent_alias_audit_export_job_audit_records: dict[str, ReplayIntentAliasAuditExportJobAuditRecord] = {}
 
   def list_strategies(
     self,
@@ -1394,6 +1398,130 @@ class TradingApplication:
     )
     return self._save_replay_intent_alias_audit_record(audit_record)
 
+  def _save_replay_intent_alias_audit_export_job_record(
+    self,
+    record: ReplayIntentAliasAuditExportJobRecord,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    save_job = getattr(self._runs, "save_replay_intent_alias_audit_export_job", None)
+    if callable(save_job):
+      return save_job(record)
+    self._replay_intent_alias_audit_export_jobs[record.job_id] = record
+    return record
+
+  def _load_replay_intent_alias_audit_export_job_record(
+    self,
+    job_id: str,
+  ) -> ReplayIntentAliasAuditExportJobRecord | None:
+    get_job = getattr(self._runs, "get_replay_intent_alias_audit_export_job", None)
+    if callable(get_job):
+      return get_job(job_id)
+    return self._replay_intent_alias_audit_export_jobs.get(job_id)
+
+  def _list_replay_intent_alias_audit_export_job_records(
+    self,
+  ) -> tuple[ReplayIntentAliasAuditExportJobRecord, ...]:
+    list_jobs = getattr(self._runs, "list_replay_intent_alias_audit_export_jobs", None)
+    if callable(list_jobs):
+      return tuple(list_jobs())
+    return tuple(
+      sorted(
+        self._replay_intent_alias_audit_export_jobs.values(),
+        key=lambda record: (record.created_at, record.job_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_replay_intent_alias_audit_export_job_records(self) -> int:
+    current_time = self._clock()
+    prune_jobs = getattr(self._runs, "prune_replay_intent_alias_audit_export_jobs", None)
+    if callable(prune_jobs):
+      return int(prune_jobs(current_time))
+    original_count = len(self._replay_intent_alias_audit_export_jobs)
+    self._replay_intent_alias_audit_export_jobs = {
+      job_id: record
+      for job_id, record in self._replay_intent_alias_audit_export_jobs.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._replay_intent_alias_audit_export_jobs)
+
+  def _save_replay_intent_alias_audit_export_job_audit_record(
+    self,
+    record: ReplayIntentAliasAuditExportJobAuditRecord,
+  ) -> ReplayIntentAliasAuditExportJobAuditRecord:
+    save_audit = getattr(self._runs, "save_replay_intent_alias_audit_export_job_audit_record", None)
+    if callable(save_audit):
+      return save_audit(record)
+    self._replay_intent_alias_audit_export_job_audit_records[record.audit_id] = record
+    return record
+
+  def _list_replay_intent_alias_audit_export_job_audit_records(
+    self,
+    job_id: str | None = None,
+  ) -> tuple[ReplayIntentAliasAuditExportJobAuditRecord, ...]:
+    list_audits = getattr(self._runs, "list_replay_intent_alias_audit_export_job_audit_records", None)
+    if callable(list_audits):
+      return tuple(list_audits(job_id))
+    records = [
+      record
+      for record in self._replay_intent_alias_audit_export_job_audit_records.values()
+      if job_id is None or record.job_id == job_id
+    ]
+    return tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.audit_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_replay_intent_alias_audit_export_job_audit_records(self) -> int:
+    current_time = self._clock()
+    prune_audits = getattr(self._runs, "prune_replay_intent_alias_audit_export_job_audit_records", None)
+    if callable(prune_audits):
+      return int(prune_audits(current_time))
+    original_count = len(self._replay_intent_alias_audit_export_job_audit_records)
+    self._replay_intent_alias_audit_export_job_audit_records = {
+      audit_id: record
+      for audit_id, record in self._replay_intent_alias_audit_export_job_audit_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._replay_intent_alias_audit_export_job_audit_records)
+
+  def _record_replay_intent_alias_audit_export_job_event(
+    self,
+    *,
+    record: ReplayIntentAliasAuditExportJobRecord,
+    action: str,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ReplayIntentAliasAuditExportJobAuditRecord:
+    self._prune_replay_intent_alias_audit_export_job_audit_records()
+    recorded_at = self._clock()
+    audit_record = ReplayIntentAliasAuditExportJobAuditRecord(
+      audit_id=uuid4().hex[:12],
+      job_id=record.job_id,
+      action=action,
+      recorded_at=recorded_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=recorded_at,
+      ),
+      template_key=record.template_key,
+      export_format=record.export_format,
+      source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+      detail=(
+        "Replay alias audit export job created."
+        if action == "created"
+        else "Replay alias audit export job downloaded."
+      ),
+    )
+    return self._save_replay_intent_alias_audit_export_job_audit_record(audit_record)
+
   @staticmethod
   def _normalize_replay_intent_alias_audit_action(value: str | None) -> str | None:
     if not isinstance(value, str):
@@ -1555,6 +1683,154 @@ class TradingApplication:
       "format": "csv",
       "record_count": len(serialized_items),
     }
+
+  def create_replay_intent_alias_audit_export_job(
+    self,
+    *,
+    export_format: str = "json",
+    alias_id: str | None = None,
+    template_key: str | None = None,
+    action: str | None = None,
+    retention_policy: str | None = None,
+    source_tab_id: str | None = None,
+    search: str | None = None,
+    requested_by_tab_id: str | None = None,
+    requested_by_tab_label: str | None = None,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    self._prune_replay_intent_alias_audit_export_job_records()
+    export_payload = self.export_replay_intent_alias_audits(
+      export_format=export_format,
+      alias_id=alias_id,
+      template_key=template_key,
+      action=action,
+      retention_policy=retention_policy,
+      source_tab_id=source_tab_id,
+      search=search,
+    )
+    created_at = self._clock()
+    record = ReplayIntentAliasAuditExportJobRecord(
+      job_id=uuid4().hex[:12],
+      export_format=export_payload["format"],
+      filename=export_payload["filename"],
+      content_type=export_payload["content_type"],
+      content=export_payload["content"],
+      record_count=int(export_payload["record_count"]),
+      status="completed",
+      created_at=created_at,
+      completed_at=created_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="30d",
+        recorded_at=created_at,
+      ),
+      template_key=template_key.strip() if isinstance(template_key, str) and template_key.strip() else None,
+      requested_by_tab_id=(
+        requested_by_tab_id.strip()
+        if isinstance(requested_by_tab_id, str) and requested_by_tab_id.strip()
+        else None
+      ),
+      requested_by_tab_label=(
+        requested_by_tab_label.strip()
+        if isinstance(requested_by_tab_label, str) and requested_by_tab_label.strip()
+        else None
+      ),
+      filters={
+        "alias_id": alias_id,
+        "template_key": template_key,
+        "action": action,
+        "retention_policy": retention_policy,
+        "source_tab_id": source_tab_id,
+        "search": search,
+      },
+    )
+    saved_record = self._save_replay_intent_alias_audit_export_job_record(record)
+    self._record_replay_intent_alias_audit_export_job_event(
+      record=saved_record,
+      action="created",
+      source_tab_id=requested_by_tab_id,
+      source_tab_label=requested_by_tab_label,
+    )
+    return saved_record
+
+  def list_replay_intent_alias_audit_export_jobs(
+    self,
+    *,
+    template_key: str | None = None,
+    export_format: str | None = None,
+    status: str | None = None,
+    requested_by_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+  ) -> tuple[ReplayIntentAliasAuditExportJobRecord, ...]:
+    self._prune_replay_intent_alias_audit_export_job_records()
+    normalized_template_key = template_key.strip() if isinstance(template_key, str) and template_key.strip() else None
+    normalized_export_format = export_format.strip().lower() if isinstance(export_format, str) and export_format.strip() else None
+    normalized_status = status.strip().lower() if isinstance(status, str) and status.strip() else None
+    normalized_requested_by_tab_id = (
+      requested_by_tab_id.strip()
+      if isinstance(requested_by_tab_id, str) and requested_by_tab_id.strip()
+      else None
+    )
+    normalized_limit = max(1, min(limit, 500))
+    search_value = search.strip().lower() if isinstance(search, str) and search.strip() else None
+    filtered = [
+      record
+      for record in self._list_replay_intent_alias_audit_export_job_records()
+      if (normalized_template_key is None or record.template_key == normalized_template_key)
+      and (normalized_export_format is None or record.export_format == normalized_export_format)
+      and (normalized_status is None or record.status == normalized_status)
+      and (
+        normalized_requested_by_tab_id is None
+        or record.requested_by_tab_id == normalized_requested_by_tab_id
+      )
+      and (
+        search_value is None
+        or any(
+          search_value in value.lower()
+          for value in (
+            record.job_id,
+            record.filename,
+            record.export_format,
+            record.status,
+            record.template_key or "",
+            record.requested_by_tab_id or "",
+            record.requested_by_tab_label or "",
+          )
+          if value
+        )
+      )
+    ]
+    return tuple(filtered[:normalized_limit])
+
+  def get_replay_intent_alias_audit_export_job(
+    self,
+    job_id: str,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    self._prune_replay_intent_alias_audit_export_job_records()
+    normalized_job_id = job_id.strip()
+    if not normalized_job_id:
+      raise LookupError("Replay alias audit export job not found.")
+    record = self._load_replay_intent_alias_audit_export_job_record(normalized_job_id)
+    if record is None:
+      raise LookupError("Replay alias audit export job not found.")
+    if record.expires_at is not None and record.expires_at <= self._clock():
+      raise LookupError("Replay alias audit export job has expired.")
+    return record
+
+  def download_replay_intent_alias_audit_export_job(
+    self,
+    job_id: str,
+  ) -> ReplayIntentAliasAuditExportJobRecord:
+    record = self.get_replay_intent_alias_audit_export_job(job_id)
+    self._record_replay_intent_alias_audit_export_job_event(record=record, action="downloaded")
+    return record
+
+  def list_replay_intent_alias_audit_export_job_history(
+    self,
+    job_id: str,
+  ) -> tuple[ReplayIntentAliasAuditExportJobAuditRecord, ...]:
+    record = self.get_replay_intent_alias_audit_export_job(job_id)
+    self._prune_replay_intent_alias_audit_export_job_audit_records()
+    return self._list_replay_intent_alias_audit_export_job_audit_records(record.job_id)
 
   def prune_replay_intent_alias_audits(
     self,
@@ -24423,6 +24699,73 @@ def serialize_replay_intent_alias_audit_list(
   }
 
 
+def serialize_replay_intent_alias_audit_export_job_record(
+  record: ReplayIntentAliasAuditExportJobRecord,
+  *,
+  include_content: bool = False,
+) -> dict[str, Any]:
+  payload = {
+    "job_id": record.job_id,
+    "export_format": record.export_format,
+    "filename": record.filename,
+    "content_type": record.content_type,
+    "record_count": record.record_count,
+    "status": record.status,
+    "created_at": record.created_at.isoformat(),
+    "completed_at": record.completed_at.isoformat() if record.completed_at is not None else None,
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "template_key": record.template_key,
+    "requested_by_tab_id": record.requested_by_tab_id,
+    "requested_by_tab_label": record.requested_by_tab_label,
+    "filters": deepcopy(record.filters),
+  }
+  if include_content:
+    payload["content"] = record.content
+  return payload
+
+
+def serialize_replay_intent_alias_audit_export_job_audit_record(
+  record: ReplayIntentAliasAuditExportJobAuditRecord,
+) -> dict[str, Any]:
+  return {
+    "audit_id": record.audit_id,
+    "job_id": record.job_id,
+    "action": record.action,
+    "recorded_at": record.recorded_at.isoformat(),
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "template_key": record.template_key,
+    "export_format": record.export_format,
+    "source_tab_id": record.source_tab_id,
+    "source_tab_label": record.source_tab_label,
+    "detail": record.detail,
+  }
+
+
+def serialize_replay_intent_alias_audit_export_job_list(
+  records: tuple[ReplayIntentAliasAuditExportJobRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_replay_intent_alias_audit_export_job_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
+def serialize_replay_intent_alias_audit_export_job_history(
+  record: ReplayIntentAliasAuditExportJobRecord,
+  audit_records: tuple[ReplayIntentAliasAuditExportJobAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "job": serialize_replay_intent_alias_audit_export_job_record(record),
+    "history": [
+      serialize_replay_intent_alias_audit_export_job_audit_record(audit_record)
+      for audit_record in audit_records
+    ],
+  }
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -24779,6 +25122,115 @@ def list_standalone_surface_runtime_bindings(
         ),
       ),
     ),
+  )
+  replay_alias_audit_export_job_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export_job_create",
+    route_path="/replay-links/audits/export-jobs",
+    route_name="create_replay_link_alias_audit_export_job",
+    response_title="Create replay link alias audit export job",
+    scope="app",
+    binding_kind="replay_link_audit_export_job_create",
+    methods=("POST",),
+    header_keys=("x_akra_replay_audit_admin_token",),
+    request_payload_kind="replay_link_audit_export_job_create",
+  )
+  replay_alias_audit_export_job_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export_job_list",
+    route_path="/replay-links/audits/export-jobs",
+    route_name="list_replay_link_alias_audit_export_jobs",
+    response_title="List replay link alias audit export jobs",
+    scope="app",
+    binding_kind="replay_link_audit_export_job_list",
+    header_keys=("x_akra_replay_audit_admin_token",),
+    filter_keys=("template_key", "format", "status", "requested_by_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "template_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Template key",
+          description="Filter replay alias audit export jobs by template key.",
+          examples=("template_a",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "format",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=3, max_length=4),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Export format",
+          description="Filter replay alias audit export jobs by export format.",
+          examples=("json", "csv"),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Job status",
+          description="Filter replay alias audit export jobs by status.",
+          examples=("completed",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "requested_by_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Requested by tab ID",
+          description="Filter replay alias audit export jobs by requesting tab identity.",
+          examples=("tab_local",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search replay alias audit export job ids, filenames, formats, and requester labels.",
+          examples=("template_a",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=100,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=500),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of replay alias audit export jobs to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
+  replay_alias_audit_export_job_download_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export_job_download",
+    route_path="/replay-links/audits/export-jobs/{job_id}/download",
+    route_name="download_replay_link_alias_audit_export_job",
+    response_title="Download replay link alias audit export job",
+    scope="app",
+    binding_kind="replay_link_audit_export_job_download",
+    header_keys=("x_akra_replay_audit_admin_token",),
+    path_param_keys=("job_id",),
+  )
+  replay_alias_audit_export_job_history_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_export_job_history",
+    route_path="/replay-links/audits/export-jobs/{job_id}/history",
+    route_name="get_replay_link_alias_audit_export_job_history",
+    response_title="Replay link alias audit export job history",
+    scope="app",
+    binding_kind="replay_link_audit_export_job_history",
+    header_keys=("x_akra_replay_audit_admin_token",),
+    path_param_keys=("job_id",),
   )
   replay_alias_audit_prune_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="replay_link_audit_prune",
@@ -26076,6 +26528,10 @@ def list_standalone_surface_runtime_bindings(
     replay_alias_history_binding,
     replay_alias_audit_list_binding,
     replay_alias_audit_export_binding,
+    replay_alias_audit_export_job_create_binding,
+    replay_alias_audit_export_job_list_binding,
+    replay_alias_audit_export_job_download_binding,
+    replay_alias_audit_export_job_history_binding,
     replay_alias_audit_prune_binding,
     replay_alias_revoke_binding,
     market_data_status_binding,
@@ -26201,6 +26657,58 @@ def execute_standalone_surface_binding(
       retention_policy=resolved_filters.get("retention_policy"),
       source_tab_id=resolved_filters.get("source_tab_id"),
       search=resolved_filters.get("search"),
+    )
+  if binding.binding_kind == "replay_link_audit_export_job_create":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="write",
+    )
+    return serialize_replay_intent_alias_audit_export_job_record(
+      app.create_replay_intent_alias_audit_export_job(
+        export_format=resolved_payload.get("format", "json"),
+        alias_id=resolved_payload.get("alias_id"),
+        template_key=resolved_payload.get("template_key"),
+        action=resolved_payload.get("action"),
+        retention_policy=resolved_payload.get("retention_policy"),
+        source_tab_id=resolved_payload.get("source_tab_id"),
+        search=resolved_payload.get("search"),
+        requested_by_tab_id=resolved_payload.get("requested_by_tab_id"),
+        requested_by_tab_label=resolved_payload.get("requested_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "replay_link_audit_export_job_list":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="read",
+    )
+    return serialize_replay_intent_alias_audit_export_job_list(
+      app.list_replay_intent_alias_audit_export_jobs(
+        template_key=resolved_filters.get("template_key"),
+        export_format=resolved_filters.get("format"),
+        status=resolved_filters.get("status"),
+        requested_by_tab_id=resolved_filters.get("requested_by_tab_id"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 100),
+      )
+    )
+  if binding.binding_kind == "replay_link_audit_export_job_download":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="read",
+    )
+    return serialize_replay_intent_alias_audit_export_job_record(
+      app.download_replay_intent_alias_audit_export_job(resolved_path_params["job_id"]),
+      include_content=True,
+    )
+  if binding.binding_kind == "replay_link_audit_export_job_history":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="read",
+    )
+    export_job = app.get_replay_intent_alias_audit_export_job(resolved_path_params["job_id"])
+    return serialize_replay_intent_alias_audit_export_job_history(
+      export_job,
+      app.list_replay_intent_alias_audit_export_job_history(resolved_path_params["job_id"]),
     )
   if binding.binding_kind == "replay_link_audit_prune":
     app.require_replay_alias_audit_admin_token(
