@@ -15759,6 +15759,7 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState = {
   valueType: string;
   description: string | null;
   options: string[];
+  defaultValue: string;
 };
 
 type RunSurfaceCollectionQueryBuilderPredicateTemplateState = {
@@ -15788,6 +15789,36 @@ const RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID = "root";
 
 function buildRunSurfaceCollectionQueryBuilderEntityId(prefix: string) {
   return `${prefix}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isRunSurfaceCollectionQueryBindingReferenceValue(value: string) {
+  return value.startsWith("$") && value.length > 1;
+}
+
+function toRunSurfaceCollectionQueryBindingReferenceValue(bindingKey: string) {
+  return bindingKey ? `$${bindingKey}` : "";
+}
+
+function fromRunSurfaceCollectionQueryBindingReferenceValue(value: string) {
+  return isRunSurfaceCollectionQueryBindingReferenceValue(value) ? value.slice(1) : "";
+}
+
+function mergeRunSurfaceCollectionQueryBuilderTemplateParameters(
+  inferredParameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[],
+  existingParameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[] = [],
+) {
+  const existingParameterMap = new Map(
+    existingParameters.map((parameter) => [parameter.key, parameter] as const),
+  );
+  return inferredParameters.map((parameter) => {
+    const existing = existingParameterMap.get(parameter.key);
+    return existing
+      ? {
+          ...parameter,
+          defaultValue: existing.defaultValue,
+        }
+      : parameter;
+  });
 }
 
 function cloneRunSurfaceCollectionQueryBuilderChildState(
@@ -16114,7 +16145,7 @@ function parseRunSurfaceCollectionQueryBuilderChildState(
                 && !Array.isArray(value)
                 && typeof (value as Record<string, unknown>).binding === "string"
               ) {
-                return [[key, `$${(value as Record<string, string>).binding}`]];
+                return [[key, toRunSurfaceCollectionQueryBindingReferenceValue((value as Record<string, string>).binding)]];
               }
               return [];
             }),
@@ -16174,8 +16205,8 @@ function buildRunSurfaceCollectionQueryBuilderNodeFromChild(
           }
           return [[
             parameter.key,
-            value.startsWith("$")
-              ? { [expressionAuthoring.predicateTemplates.bindingReferenceField]: value.slice(1) }
+            isRunSurfaceCollectionQueryBindingReferenceValue(value)
+              ? { [expressionAuthoring.predicateTemplates.bindingReferenceField]: fromRunSurfaceCollectionQueryBindingReferenceValue(value) }
               : coerceCollectionQueryBuilderValue(value, parameter.valueType),
           ]];
         }),
@@ -16405,6 +16436,7 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
       valueType: "string",
       description: parameter.description || `Collection path binding for ${activeSchema.label}.`,
       options: parameter.domain?.values.length ? parameter.domain.values : parameter.examples,
+      defaultValue: "",
     });
   });
   if (clause.valueBindingKey.trim()) {
@@ -16414,6 +16446,7 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
       valueType: activeField?.valueType ?? "string",
       description: activeField?.description ?? "Bound condition value.",
       options: [],
+      defaultValue: "",
     });
   }
   return parameterMap;
@@ -16422,6 +16455,7 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
 function collectRunSurfaceCollectionQueryBuilderTemplateParameters(
   child: RunSurfaceCollectionQueryBuilderChildState,
   contracts: RunSurfaceCollectionQueryContract[],
+  predicateTemplates: RunSurfaceCollectionQueryBuilderPredicateTemplateState[] = [],
 ) {
   const parameterMap = new Map<string, RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState>();
   const collect = (node: RunSurfaceCollectionQueryBuilderChildState) => {
@@ -16433,6 +16467,29 @@ function collectRunSurfaceCollectionQueryBuilderTemplateParameters(
           }
         },
       );
+      return;
+    }
+    if (node.kind === "predicate_ref") {
+      const referencedTemplate =
+        predicateTemplates.find((template) => template.key === node.predicateKey) ?? null;
+      Object.entries(node.bindings).forEach(([parameterKey, rawValue]) => {
+        const bindingKey = fromRunSurfaceCollectionQueryBindingReferenceValue(rawValue);
+        if (!bindingKey || parameterMap.has(bindingKey)) {
+          return;
+        }
+        const referencedParameter =
+          referencedTemplate?.parameters.find((parameter) => parameter.key === parameterKey) ?? null;
+        parameterMap.set(bindingKey, {
+          key: bindingKey,
+          label: referencedParameter?.label ?? `${parameterKey} nested binding`,
+          valueType: referencedParameter?.valueType ?? "string",
+          description:
+            referencedParameter?.description
+            ?? `Nested template binding from ${node.predicateKey}.${parameterKey}.`,
+          options: referencedParameter?.options ?? [],
+          defaultValue: "",
+        });
+      });
       return;
     }
     if (node.kind === "group") {
@@ -16508,16 +16565,37 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
         {
           id: buildRunSurfaceCollectionQueryBuilderEntityId("template"),
           key: templateKey,
-          parameters: parameterKeys.map(
-            (parameterKey) =>
-              inferredParameterMap.get(parameterKey) ?? {
-                key: parameterKey,
-                label: parameterKey,
-                valueType: "string",
-                description: null,
-                options: [],
-              },
-          ),
+          parameters: parameterKeys.map((parameterKey) => {
+            const inferredParameter = inferredParameterMap.get(parameterKey);
+            const rawParameter =
+              rawParameters && typeof rawParameters === "object" && !Array.isArray(rawParameters)
+                ? (rawParameters as Record<string, unknown>)[parameterKey]
+                : null;
+            const rawDefault =
+              rawParameter && typeof rawParameter === "object" && !Array.isArray(rawParameter)
+                ? (rawParameter as Record<string, unknown>).default
+                : undefined;
+            const valueType = inferredParameter?.valueType ?? "string";
+            return inferredParameter
+              ? {
+                  ...inferredParameter,
+                  defaultValue:
+                    rawDefault === undefined
+                      ? inferredParameter.defaultValue
+                      : formatCollectionQueryBuilderValue(rawDefault, valueType),
+                }
+              : {
+                  key: parameterKey,
+                  label: parameterKey,
+                  valueType,
+                  description: null,
+                  options: [],
+                  defaultValue:
+                    rawDefault === undefined
+                      ? ""
+                      : formatCollectionQueryBuilderValue(rawDefault, valueType),
+                };
+          }),
           node: templateNode,
         } satisfies RunSurfaceCollectionQueryBuilderPredicateTemplateState,
       ];
@@ -16789,6 +16867,7 @@ function RunSurfaceCollectionQueryBuilder({
   const [templateDraftKey, setTemplateDraftKey] = useState("");
   const [predicateRefDraftKey, setPredicateRefDraftKey] = useState("");
   const [predicateRefDraftBindings, setPredicateRefDraftBindings] = useState<Record<string, string>>({});
+  const [templateParameterDraftDefaults, setTemplateParameterDraftDefaults] = useState<Record<string, string>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -17117,9 +17196,24 @@ function RunSurfaceCollectionQueryBuilder({
         if (!node) {
           return [];
         }
+        const serializedParameters = template.parameters.some((parameter) => parameter.defaultValue.trim())
+          ? Object.fromEntries(
+              template.parameters.map((parameter) => [
+                parameter.key,
+                parameter.defaultValue.trim()
+                  ? {
+                      default: coerceCollectionQueryBuilderValue(
+                        parameter.defaultValue,
+                        parameter.valueType,
+                      ),
+                    }
+                  : {},
+              ]),
+            )
+          : template.parameters.map((parameter) => parameter.key);
         return [[template.key, {
           [expressionAuthoring.predicateTemplates.templateField]: node,
-          [expressionAuthoring.predicateTemplates.parametersField]: template.parameters.map((parameter) => parameter.key),
+          [expressionAuthoring.predicateTemplates.parametersField]: serializedParameters,
         }]];
       }),
     );
@@ -17290,10 +17384,14 @@ function RunSurfaceCollectionQueryBuilder({
   const buildTemplateStateFromNode = (
     key: string,
     node: RunSurfaceCollectionQueryBuilderChildState,
+    existingParameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[] = [],
   ): RunSurfaceCollectionQueryBuilderPredicateTemplateState => ({
     id: buildRunSurfaceCollectionQueryBuilderEntityId("template"),
     key,
-    parameters: collectRunSurfaceCollectionQueryBuilderTemplateParameters(node, contracts),
+    parameters: mergeRunSurfaceCollectionQueryBuilderTemplateParameters(
+      collectRunSurfaceCollectionQueryBuilderTemplateParameters(node, contracts, predicateTemplates),
+      existingParameters,
+    ),
     node: cloneRunSurfaceCollectionQueryBuilderChildState(node),
   });
 
@@ -17302,7 +17400,13 @@ function RunSurfaceCollectionQueryBuilder({
     if (!trimmedKey || templateKeyConflict || !selectedSubtreeNode) {
       return;
     }
-    const nextTemplate = buildTemplateStateFromNode(trimmedKey, selectedSubtreeNode);
+    const nextTemplate = buildTemplateStateFromNode(
+      trimmedKey,
+      selectedSubtreeNode,
+      editorTarget.kind === "template" && selectedTemplate && !selectedTemplateSupportsClauseEditing
+        ? editableTemplateParameters
+        : [],
+    );
     if (editorTarget.kind === "template") {
       const previousTemplate = predicateTemplates.find((template) => template.id === editorTarget.templateId) ?? null;
       setPredicateTemplates((current) =>
@@ -17437,7 +17541,7 @@ function RunSurfaceCollectionQueryBuilder({
         current.map((template) =>
           template.id === editorTarget.templateId
             ? {
-                ...buildTemplateStateFromNode(trimmedKey, nextNode),
+                ...buildTemplateStateFromNode(trimmedKey, nextNode, editableTemplateParameters),
                 id: template.id,
               }
             : template,
@@ -17452,7 +17556,7 @@ function RunSurfaceCollectionQueryBuilder({
     }
     setPredicateTemplates((current) => [
       ...current,
-      buildTemplateStateFromNode(trimmedKey, nextNode),
+      buildTemplateStateFromNode(trimmedKey, nextNode, editableTemplateParameters),
     ]);
     setTemplateDraftKey("");
   };
@@ -17557,7 +17661,11 @@ function RunSurfaceCollectionQueryBuilder({
     predicateRefDraftKey
     && (
       !selectedRefTemplate
-      || selectedRefTemplate.parameters.every((parameter) => Boolean(predicateRefDraftBindings[parameter.key]?.trim()))
+      || selectedRefTemplate.parameters.every(
+        (parameter) =>
+          Boolean(predicateRefDraftBindings[parameter.key]?.trim())
+          || Boolean(parameter.defaultValue.trim()),
+      )
     ),
   );
   const selectedPredicateSupportsClauseEditing = selectedPredicate?.node.kind === "clause";
@@ -17610,6 +17718,118 @@ function RunSurfaceCollectionQueryBuilder({
       : selectedGroup
         ? `${selectedGroup.logic.toUpperCase()} subgroup`
         : "root group";
+  const clauseTemplateParameterBaseParameters = useMemo(
+    () => {
+      if (!editorClauseState) {
+        return [];
+      }
+      const inferredParameters = Array.from(
+        collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(editorClauseState, contracts).values(),
+      );
+      return (
+        editorTarget.kind === "template"
+        && selectedTemplate
+        && selectedTemplateSupportsClauseEditing
+      )
+        ? mergeRunSurfaceCollectionQueryBuilderTemplateParameters(
+            inferredParameters,
+            selectedTemplate.parameters,
+          )
+        : inferredParameters;
+    },
+    [contracts, editorClauseState, editorTarget.kind, selectedTemplate, selectedTemplateSupportsClauseEditing],
+  );
+  const subtreeTemplateParameterBaseParameters = useMemo(
+    () => (
+      editorTarget.kind === "template"
+      && selectedTemplate
+      && !selectedTemplateSupportsClauseEditing
+        ? mergeRunSurfaceCollectionQueryBuilderTemplateParameters(
+            collectRunSurfaceCollectionQueryBuilderTemplateParameters(
+              selectedTemplate.node,
+              contracts,
+              predicateTemplates,
+            ),
+            selectedTemplate.parameters,
+          )
+        : []
+    ),
+    [
+      contracts,
+      editorTarget.kind,
+      predicateTemplates,
+      selectedTemplate,
+      selectedTemplateSupportsClauseEditing,
+    ],
+  );
+  const templateParameterEditorContextKey = useMemo(
+    () => (
+      editorTarget.kind === "template"
+        ? `template:${selectedTemplate?.id ?? "unknown"}`
+        : "clause:draft"
+    ),
+    [editorTarget.kind, selectedTemplate?.id],
+  );
+  const templateParameterEditorBaseParameters = useMemo(
+    () => (
+      editorTarget.kind === "template" && !selectedTemplateSupportsClauseEditing
+        ? subtreeTemplateParameterBaseParameters
+        : clauseTemplateParameterBaseParameters
+    ),
+    [
+      clauseTemplateParameterBaseParameters,
+      editorTarget.kind,
+      selectedTemplateSupportsClauseEditing,
+      subtreeTemplateParameterBaseParameters,
+    ],
+  );
+  useEffect(() => {
+    setTemplateParameterDraftDefaults({});
+  }, [templateParameterEditorContextKey]);
+  const editableTemplateParameters = useMemo(
+    () =>
+      templateParameterEditorBaseParameters.map((parameter) => ({
+        ...parameter,
+        defaultValue:
+          templateParameterDraftDefaults[parameter.key]
+          ?? parameter.defaultValue
+          ?? "",
+      })),
+    [templateParameterDraftDefaults, templateParameterEditorBaseParameters],
+  );
+  const nestedTemplateBindingParameters = useMemo(
+    () => {
+      if (editorTarget.kind === "template") {
+        return editableTemplateParameters;
+      }
+      if (
+        expressionMode === "grouped"
+        && selectedGroupId !== RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID
+        && selectedSubtreeNode
+      ) {
+        return collectRunSurfaceCollectionQueryBuilderTemplateParameters(
+          selectedSubtreeNode,
+          contracts,
+          predicateTemplates,
+        );
+      }
+      return clauseTemplateParameterBaseParameters;
+    },
+    [
+      clauseTemplateParameterBaseParameters,
+      contracts,
+      editableTemplateParameters,
+      editorTarget.kind,
+      expressionMode,
+      predicateTemplates,
+      selectedGroupId,
+      selectedSubtreeNode,
+    ],
+  );
+  const nestedTemplateBindingParameterKeys = useMemo(
+    () => nestedTemplateBindingParameters.map((parameter) => parameter.key),
+    [nestedTemplateBindingParameters],
+  );
 
   const updateGroupSettings = (
     groupId: string,
@@ -18075,43 +18295,164 @@ function RunSurfaceCollectionQueryBuilder({
                   </small>
                 </label>
               </div>
+              {editableTemplateParameters.length && (Boolean(trimmedTemplateDraftKey) || editorTarget.kind === "template") ? (
+                <div className="run-surface-query-builder-section">
+                  <div className="run-surface-query-builder-card-head">
+                    <strong>Template parameter defaults</strong>
+                    <span>{editableTemplateParameters.length}</span>
+                  </div>
+                  <div className="run-surface-query-builder-parameter-grid">
+                    {editableTemplateParameters.map((parameter) => (
+                      <label className="run-surface-query-builder-control" key={`template-parameter:${parameter.key}`}>
+                        <span>{parameter.key}</span>
+                        {parameter.options.length ? (
+                          <select
+                            value={parameter.defaultValue}
+                            onChange={(event) =>
+                              setTemplateParameterDraftDefaults((current) => ({
+                                ...current,
+                                [parameter.key]: event.target.value,
+                              }))}
+                          >
+                            <option value="">No default</option>
+                            {Array.from(
+                              new Set([
+                                ...parameter.options,
+                                parameter.defaultValue,
+                              ].filter(Boolean)),
+                            ).map((value) => (
+                              <option key={`${parameter.key}:default:${value}`} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={parameter.defaultValue}
+                            onChange={(event) =>
+                              setTemplateParameterDraftDefaults((current) => ({
+                                ...current,
+                                [parameter.key]: event.target.value,
+                              }))}
+                            placeholder={`Optional default (${parameter.valueType})`}
+                          />
+                        )}
+                        <small>
+                          {parameter.description ?? parameter.label} · {parameter.valueType}
+                        </small>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {selectedRefTemplate?.parameters.length ? (
                 <div className="run-surface-query-builder-parameter-grid">
-                  {selectedRefTemplate.parameters.map((parameter) => (
-                    <label className="run-surface-query-builder-control" key={`${selectedRefTemplate.id}:${parameter.key}`}>
-                      <span>{parameter.key}</span>
-                      {parameter.options.length ? (
-                        <select
-                          value={predicateRefDraftBindings[parameter.key] ?? ""}
-                          onChange={(event) =>
-                            setPredicateRefDraftBindings((current) => ({
-                              ...current,
-                              [parameter.key]: event.target.value,
-                            }))}
-                        >
-                          {Array.from(new Set([...(parameter.options || []), predicateRefDraftBindings[parameter.key] ?? ""].filter(Boolean))).map((value) => (
-                            <option key={`${parameter.key}:${value}`} value={value}>
-                              {value}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          type="text"
-                          value={predicateRefDraftBindings[parameter.key] ?? ""}
-                          onChange={(event) =>
-                            setPredicateRefDraftBindings((current) => ({
-                              ...current,
-                              [parameter.key]: event.target.value,
-                            }))}
-                          placeholder={parameter.valueType}
-                        />
-                      )}
-                      <small>
-                        {parameter.description ?? parameter.label} · {parameter.valueType}
-                      </small>
-                    </label>
-                  ))}
+                  {selectedRefTemplate.parameters.map((parameter) => {
+                    const rawBindingValue = predicateRefDraftBindings[parameter.key] ?? "";
+                    const bindingReferenceKey = fromRunSurfaceCollectionQueryBindingReferenceValue(rawBindingValue);
+                    const usesBindingReference = Boolean(bindingReferenceKey);
+                    const bindingReferenceOptions = Array.from(
+                      new Set([
+                        ...nestedTemplateBindingParameterKeys,
+                        bindingReferenceKey,
+                      ].filter(Boolean)),
+                    );
+                    const literalOptions = Array.from(
+                      new Set([
+                        ...parameter.options,
+                        rawBindingValue,
+                      ].filter((value) => value && !isRunSurfaceCollectionQueryBindingReferenceValue(value))),
+                    );
+                    return (
+                      <label className="run-surface-query-builder-control" key={`${selectedRefTemplate.id}:${parameter.key}`}>
+                        <span>{parameter.key}</span>
+                        <label className="run-surface-query-builder-checkbox">
+                          <input
+                            checked={usesBindingReference}
+                            onChange={(event) =>
+                              setPredicateRefDraftBindings((current) => ({
+                                ...current,
+                                [parameter.key]: event.target.checked
+                                  ? toRunSurfaceCollectionQueryBindingReferenceValue(
+                                      bindingReferenceOptions[0] ?? parameter.key,
+                                    )
+                                  : "",
+                              }))}
+                            type="checkbox"
+                          />
+                          <span>Bind to outer template parameter</span>
+                        </label>
+                        {usesBindingReference ? (
+                          bindingReferenceOptions.length ? (
+                            <select
+                              value={bindingReferenceKey}
+                              onChange={(event) =>
+                                setPredicateRefDraftBindings((current) => ({
+                                  ...current,
+                                  [parameter.key]: toRunSurfaceCollectionQueryBindingReferenceValue(event.target.value),
+                                }))}
+                            >
+                              {bindingReferenceOptions.map((value) => (
+                                <option key={`${parameter.key}:binding:${value}`} value={value}>
+                                  {value}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <input
+                              type="text"
+                              value={bindingReferenceKey}
+                              onChange={(event) =>
+                                setPredicateRefDraftBindings((current) => ({
+                                  ...current,
+                                  [parameter.key]: toRunSurfaceCollectionQueryBindingReferenceValue(event.target.value),
+                                }))}
+                              placeholder="outer_template_parameter"
+                            />
+                          )
+                        ) : parameter.options.length ? (
+                          <select
+                            value={rawBindingValue}
+                            onChange={(event) =>
+                              setPredicateRefDraftBindings((current) => ({
+                                ...current,
+                                [parameter.key]: event.target.value,
+                              }))}
+                          >
+                            {parameter.defaultValue.trim() ? (
+                              <option value="">Use template default</option>
+                            ) : null}
+                            {literalOptions.map((value) => (
+                              <option key={`${parameter.key}:${value}`} value={value}>
+                                {value}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            type="text"
+                            value={rawBindingValue}
+                            onChange={(event) =>
+                              setPredicateRefDraftBindings((current) => ({
+                                ...current,
+                                [parameter.key]: event.target.value,
+                              }))}
+                            placeholder={
+                              parameter.defaultValue.trim()
+                                ? `${parameter.valueType} (blank uses default)`
+                                : parameter.valueType
+                            }
+                          />
+                        )}
+                        <small>
+                          {parameter.description ?? parameter.label} · {parameter.valueType}
+                          {parameter.defaultValue.trim() ? ` · default ${parameter.defaultValue}` : ""}
+                          {usesBindingReference ? " · nested template binding" : ""}
+                        </small>
+                      </label>
+                    );
+                  })}
                 </div>
               ) : null}
               <div className="run-surface-query-builder-actions">
@@ -18315,7 +18656,9 @@ function RunSurfaceCollectionQueryBuilder({
                               <div className="run-surface-family-chip-row">
                                 {template.parameters.map((parameter) => (
                                   <span className="run-surface-family-chip" key={`${template.id}:${parameter.key}`}>
-                                    {parameter.key}
+                                    {parameter.defaultValue.trim()
+                                      ? `${parameter.key}=${parameter.defaultValue}`
+                                      : parameter.key}
                                   </span>
                                 ))}
                               </div>
