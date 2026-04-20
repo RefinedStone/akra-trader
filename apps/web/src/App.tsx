@@ -17732,6 +17732,107 @@ function doesRunSurfaceCollectionQueryRuntimeCandidateSampleMatchContext(
   return false;
 }
 
+function formatRunSurfaceCollectionQueryBuilderClauseParameterSource(
+  clause: HydratedRunSurfaceCollectionQueryBuilderState,
+  parameterKey: string,
+) {
+  const bindingKey = clause.parameterBindingKeys[parameterKey]?.trim() ?? "";
+  if (bindingKey) {
+    return `$${bindingKey}`;
+  }
+  return clause.parameterValues[parameterKey] || "(blank)";
+}
+
+function formatRunSurfaceCollectionQueryBuilderClauseValueSource(
+  clause: HydratedRunSurfaceCollectionQueryBuilderState,
+) {
+  return clause.valueBindingKey.trim()
+    ? `$${clause.valueBindingKey.trim()}`
+    : (clause.builderValue || "(blank)");
+}
+
+function buildRunSurfaceCollectionQueryBuilderClauseDiffItems(
+  original: HydratedRunSurfaceCollectionQueryBuilderState | null,
+  draft: HydratedRunSurfaceCollectionQueryBuilderState | null,
+): RunSurfaceCollectionQueryBuilderClauseDiffItem[] {
+  if (!original || !draft) {
+    return [];
+  }
+  const items: RunSurfaceCollectionQueryBuilderClauseDiffItem[] = [];
+  if (original.contractKey !== draft.contractKey) {
+    items.push({
+      detail: `${original.contractKey} -> ${draft.contractKey}`,
+      key: "contract",
+      label: "Contract",
+    });
+  }
+  if (original.schemaId !== draft.schemaId) {
+    items.push({
+      detail: `${original.schemaId} -> ${draft.schemaId}`,
+      key: "schema",
+      label: "Collection",
+    });
+  }
+  if (original.quantifier !== draft.quantifier) {
+    items.push({
+      detail: `${original.quantifier.toUpperCase()} -> ${draft.quantifier.toUpperCase()}`,
+      key: "quantifier",
+      label: "Quantifier",
+    });
+  }
+  if (original.fieldKey !== draft.fieldKey) {
+    items.push({
+      detail: `${original.fieldKey} -> ${draft.fieldKey}`,
+      key: "field",
+      label: "Field",
+    });
+  }
+  if (original.operatorKey !== draft.operatorKey) {
+    items.push({
+      detail: `${original.operatorKey} -> ${draft.operatorKey}`,
+      key: "operator",
+      label: "Operator",
+    });
+  }
+  if (original.negated !== draft.negated) {
+    items.push({
+      detail: `${original.negated ? "negated" : "plain"} -> ${draft.negated ? "negated" : "plain"}`,
+      key: "negated",
+      label: "Negation",
+    });
+  }
+  const originalValue = formatRunSurfaceCollectionQueryBuilderClauseValueSource(original);
+  const draftValue = formatRunSurfaceCollectionQueryBuilderClauseValueSource(draft);
+  if (originalValue !== draftValue) {
+    items.push({
+      detail: `${originalValue} -> ${draftValue}`,
+      key: "value",
+      label: "Value",
+    });
+  }
+  const parameterKeys = Array.from(
+    new Set([
+      ...Object.keys(original.parameterValues),
+      ...Object.keys(draft.parameterValues),
+      ...Object.keys(original.parameterBindingKeys),
+      ...Object.keys(draft.parameterBindingKeys),
+    ]),
+  ).sort((left, right) => left.localeCompare(right));
+  parameterKeys.forEach((parameterKey) => {
+    const originalSource = formatRunSurfaceCollectionQueryBuilderClauseParameterSource(original, parameterKey);
+    const draftSource = formatRunSurfaceCollectionQueryBuilderClauseParameterSource(draft, parameterKey);
+    if (originalSource === draftSource) {
+      return;
+    }
+    items.push({
+      detail: `${originalSource} -> ${draftSource}`,
+      key: `parameter:${parameterKey}`,
+      label: `Path ${parameterKey}`,
+    });
+  });
+  return items;
+}
+
 function formatRunSurfaceCollectionQueryBuilderChildSummary(
   child: RunSurfaceCollectionQueryBuilderChildState,
   contracts: RunSurfaceCollectionQueryContract[],
@@ -18647,6 +18748,12 @@ type RunSurfaceCollectionQueryRuntimeCandidateContextSelection = {
   subFocusKey: string | null;
 };
 
+type RunSurfaceCollectionQueryBuilderClauseDiffItem = {
+  detail: string;
+  key: string;
+  label: string;
+};
+
 type RunSurfaceCollectionQueryRuntimeQuantifierOutcome = {
   candidateCount: number;
   detail: string;
@@ -18840,6 +18947,8 @@ function RunSurfaceCollectionQueryBuilder({
   const [editorNegated, setEditorNegated] = useState(false);
   const [runtimeCandidateTraceDrillthroughByKey, setRuntimeCandidateTraceDrillthroughByKey] =
     useState<Record<string, boolean>>({});
+  const [pinnedRuntimeCandidateClauseOriginKey, setPinnedRuntimeCandidateClauseOriginKey] =
+    useState<string | null>(null);
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -19099,13 +19208,17 @@ function RunSurfaceCollectionQueryBuilder({
   };
 
   const focusRuntimeCandidateClauseEditor = useCallback(
-    (clause: HydratedRunSurfaceCollectionQueryBuilderState | null) => {
+    (
+      clause: HydratedRunSurfaceCollectionQueryBuilderState | null,
+      originTraceKey?: string | null,
+    ) => {
       if (!clause) {
         return;
       }
       setEditorTarget({ kind: "draft" });
       setPredicateDraftKey("");
       setTemplateDraftKey("");
+      setPinnedRuntimeCandidateClauseOriginKey(originTraceKey ?? null);
       setEditorFromClause(clause);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -22723,8 +22836,59 @@ function RunSurfaceCollectionQueryBuilder({
       activePredicateRefReplayApplyConflictSimulationFocusedChainPosition,
     ],
   );
+  const runtimeCandidateTraceByKey = useMemo(() => {
+    const entries = new Map<string, RunSurfaceCollectionQueryRuntimeCandidateTrace>();
+    activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations.forEach((entry) => {
+      entry.runtimeCandidateTraces.forEach((trace) => {
+        entries.set(buildRuntimeCandidateTraceDrillthroughKey("focused_chain", entry.stepIndex, trace), trace);
+      });
+    });
+    if (activePredicateRefReplayApplyConflictSimulationFocusedChainEntry) {
+      activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.runtimeCandidateTraces.forEach((trace) => {
+        entries.set(
+          buildRuntimeCandidateTraceDrillthroughKey(
+            "active_replay",
+            activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.stepIndex,
+            trace,
+          ),
+          trace,
+        );
+      });
+    }
+    return entries;
+  }, [
+    activePredicateRefReplayApplyConflictSimulationFocusedChainEntry,
+    activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations,
+    buildRuntimeCandidateTraceDrillthroughKey,
+  ]);
+  const pinnedRuntimeCandidateOriginTrace = useMemo(
+    () => (
+      pinnedRuntimeCandidateClauseOriginKey
+        ? runtimeCandidateTraceByKey.get(pinnedRuntimeCandidateClauseOriginKey) ?? null
+        : null
+    ),
+    [pinnedRuntimeCandidateClauseOriginKey, runtimeCandidateTraceByKey],
+  );
+  const pinnedRuntimeCandidateClauseDiffItems = useMemo(
+    () => buildRunSurfaceCollectionQueryBuilderClauseDiffItems(
+      pinnedRuntimeCandidateOriginTrace?.editorClause ?? null,
+      editorClauseState,
+    ),
+    [editorClauseState, pinnedRuntimeCandidateOriginTrace],
+  );
+  useEffect(() => {
+    if (
+      pinnedRuntimeCandidateClauseOriginKey
+      && !runtimeCandidateTraceByKey.has(pinnedRuntimeCandidateClauseOriginKey)
+    ) {
+      setPinnedRuntimeCandidateClauseOriginKey(null);
+    }
+  }, [pinnedRuntimeCandidateClauseOriginKey, runtimeCandidateTraceByKey]);
   const linkedRuntimeCandidateTraceKeys = useMemo(() => {
     const keys = new Set<string>();
+    if (pinnedRuntimeCandidateClauseOriginKey && editorClauseState) {
+      keys.add(pinnedRuntimeCandidateClauseOriginKey);
+    }
     activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations.forEach((entry) => {
       entry.runtimeCandidateTraces.forEach((trace) => {
         if (
@@ -22757,8 +22921,10 @@ function RunSurfaceCollectionQueryBuilder({
     activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations,
     activeRuntimeCandidateRunContext,
     buildRuntimeCandidateTraceDrillthroughKey,
+    editorClauseState,
     doesRuntimeCandidateSampleMatchActiveContext,
     doesRuntimeCandidateTraceMatchEditorClause,
+    pinnedRuntimeCandidateClauseOriginKey,
   ]);
   useEffect(() => {
     if (!linkedRuntimeCandidateTraceKeys.length) {
@@ -25550,15 +25716,35 @@ function RunSurfaceCollectionQueryBuilder({
                                                     candidateTrace,
                                                   );
                                                   const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
+                                                  const tracePinnedFromClauseDraft =
+                                                    pinnedRuntimeCandidateClauseOriginKey === drillthroughKey;
                                                   const traceLinkedFromRunContext =
                                                     Boolean(activeRuntimeCandidateRunContext)
                                                     && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
                                                   const traceLinkedFromClauseEditor =
                                                     doesRuntimeCandidateTraceMatchEditorClause(candidateTrace);
+                                                  const tracePinnedSampleCount =
+                                                    activeRuntimeCandidateRunContext
+                                                      ? candidateTrace.allValues.filter(doesRuntimeCandidateSampleMatchActiveContext).length
+                                                      : 0;
+                                                  const traceClauseDiffItems =
+                                                    tracePinnedFromClauseDraft
+                                                      ? pinnedRuntimeCandidateClauseDiffItems
+                                                      : [];
+                                                  const displayedSamples = (
+                                                    drillthroughOpen ? candidateTrace.allValues : candidateTrace.sampleValues
+                                                  ).slice().sort((left, right) => {
+                                                    const leftPinned = doesRuntimeCandidateSampleMatchActiveContext(left);
+                                                    const rightPinned = doesRuntimeCandidateSampleMatchActiveContext(right);
+                                                    if (leftPinned === rightPinned) {
+                                                      return left.candidatePath.localeCompare(right.candidatePath);
+                                                    }
+                                                    return leftPinned ? -1 : 1;
+                                                  });
                                                   return (
                                                     <div
                                                       className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"} ${
-                                                        traceLinkedFromRunContext || traceLinkedFromClauseEditor
+                                                        traceLinkedFromRunContext || traceLinkedFromClauseEditor || tracePinnedFromClauseDraft
                                                           ? "is-linked"
                                                           : ""
                                                       }`.trim()}
@@ -25589,16 +25775,50 @@ function RunSurfaceCollectionQueryBuilder({
                                                             Linked from clause editor
                                                           </span>
                                                         ) : null}
+                                                        {tracePinnedFromClauseDraft ? (
+                                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                                            Pinned draft origin
+                                                          </span>
+                                                        ) : null}
+                                                        {tracePinnedSampleCount ? (
+                                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                                            {`${tracePinnedSampleCount} pinned candidates`}
+                                                          </span>
+                                                        ) : null}
                                                       </div>
                                                       {candidateTrace.editorClause ? (
                                                         <div className="run-surface-query-builder-actions">
                                                           <button
                                                             className="ghost-button"
-                                                            onClick={() => focusRuntimeCandidateClauseEditor(candidateTrace.editorClause)}
+                                                            onClick={() =>
+                                                              focusRuntimeCandidateClauseEditor(
+                                                                candidateTrace.editorClause,
+                                                                drillthroughKey,
+                                                              )
+                                                            }
                                                             type="button"
                                                           >
                                                             Load clause into editor
                                                           </button>
+                                                        </div>
+                                                      ) : null}
+                                                      {traceClauseDiffItems.length ? (
+                                                        <div className="run-surface-query-builder-trace-panel is-nested">
+                                                          <div className="run-surface-query-builder-card-head">
+                                                            <strong>Clause draft diff</strong>
+                                                            <span>{traceClauseDiffItems.length}</span>
+                                                          </div>
+                                                          <div className="run-surface-query-builder-trace-list">
+                                                            {traceClauseDiffItems.slice(0, 6).map((item) => (
+                                                              <div
+                                                                className="run-surface-query-builder-trace-step is-warning"
+                                                                key={`focused-causal-candidate-diff:${entry.stepIndex}:${drillthroughKey}:${item.key}`}
+                                                              >
+                                                                <strong>{item.label}</strong>
+                                                                <p>{item.detail}</p>
+                                                              </div>
+                                                            ))}
+                                                          </div>
                                                         </div>
                                                       ) : null}
                                                       {candidateTrace.runOutcomes.length ? (
@@ -25635,7 +25855,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                             <span>{`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}</span>
                                                           </div>
                                                           <div className="run-surface-query-builder-trace-list">
-                                                            {(drillthroughOpen ? candidateTrace.allValues : candidateTrace.sampleValues).map((sample) => {
+                                                            {displayedSamples.map((sample) => {
                                                               const sampleLinkedFromRunContext =
                                                                 doesRuntimeCandidateSampleMatchActiveContext(sample);
                                                               return (
@@ -27214,18 +27434,36 @@ function RunSurfaceCollectionQueryBuilder({
                                                               candidateTrace,
                                                             );
                                                             const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
+                                                            const tracePinnedFromClauseDraft =
+                                                              pinnedRuntimeCandidateClauseOriginKey === drillthroughKey;
                                                             const traceLinkedFromRunContext =
                                                               Boolean(activeRuntimeCandidateRunContext)
                                                               && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
                                                             const traceLinkedFromClauseEditor =
                                                               doesRuntimeCandidateTraceMatchEditorClause(candidateTrace);
+                                                            const tracePinnedSampleCount =
+                                                              activeRuntimeCandidateRunContext
+                                                                ? candidateTrace.allValues.filter(doesRuntimeCandidateSampleMatchActiveContext).length
+                                                                : 0;
+                                                            const traceClauseDiffItems =
+                                                              tracePinnedFromClauseDraft
+                                                                ? pinnedRuntimeCandidateClauseDiffItems
+                                                                : [];
                                                             const previewSamples = drillthroughOpen
                                                               ? candidateTrace.allValues
                                                               : candidateTrace.sampleValues.slice(0, 2);
+                                                            const orderedPreviewSamples = previewSamples.slice().sort((left, right) => {
+                                                              const leftPinned = doesRuntimeCandidateSampleMatchActiveContext(left);
+                                                              const rightPinned = doesRuntimeCandidateSampleMatchActiveContext(right);
+                                                              if (leftPinned === rightPinned) {
+                                                                return left.candidatePath.localeCompare(right.candidatePath);
+                                                              }
+                                                              return leftPinned ? -1 : 1;
+                                                            });
                                                             return (
                                                               <div
                                                                 className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"} ${
-                                                                  traceLinkedFromRunContext || traceLinkedFromClauseEditor
+                                                                  traceLinkedFromRunContext || traceLinkedFromClauseEditor || tracePinnedFromClauseDraft
                                                                     ? "is-linked"
                                                                     : ""
                                                                 }`.trim()}
@@ -27263,21 +27501,55 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       Linked from clause editor
                                                                     </span>
                                                                   ) : null}
+                                                                  {tracePinnedFromClauseDraft ? (
+                                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                                      Pinned draft origin
+                                                                    </span>
+                                                                  ) : null}
+                                                                  {tracePinnedSampleCount ? (
+                                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                                      {`${tracePinnedSampleCount} pinned candidates`}
+                                                                    </span>
+                                                                  ) : null}
                                                                 </div>
                                                                 {candidateTrace.editorClause ? (
                                                                   <div className="run-surface-query-builder-actions">
                                                                     <button
                                                                       className="ghost-button"
-                                                                      onClick={() => focusRuntimeCandidateClauseEditor(candidateTrace.editorClause)}
+                                                                      onClick={() =>
+                                                                        focusRuntimeCandidateClauseEditor(
+                                                                          candidateTrace.editorClause,
+                                                                          drillthroughKey,
+                                                                        )
+                                                                      }
                                                                       type="button"
                                                                     >
                                                                       Load clause into editor
                                                                     </button>
                                                                   </div>
                                                                 ) : null}
+                                                                {traceClauseDiffItems.length ? (
+                                                                  <div className="run-surface-query-builder-trace-panel is-nested">
+                                                                    <div className="run-surface-query-builder-card-head">
+                                                                      <strong>Clause draft diff</strong>
+                                                                      <span>{traceClauseDiffItems.length}</span>
+                                                                    </div>
+                                                                    <div className="run-surface-query-builder-trace-list">
+                                                                      {traceClauseDiffItems.slice(0, 6).map((item) => (
+                                                                        <div
+                                                                          className="run-surface-query-builder-trace-step is-warning"
+                                                                          key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-diff:${drillthroughKey}:${item.key}`}
+                                                                        >
+                                                                          <strong>{item.label}</strong>
+                                                                          <p>{item.detail}</p>
+                                                                        </div>
+                                                                      ))}
+                                                                    </div>
+                                                                  </div>
+                                                                ) : null}
                                                                 {previewSamples.length ? (
                                                                   <div className="run-surface-query-builder-trace-chip-list">
-                                                                    {previewSamples.map((sample) => {
+                                                                    {orderedPreviewSamples.map((sample) => {
                                                                       const sampleLinkedFromRunContext =
                                                                         doesRuntimeCandidateSampleMatchActiveContext(sample);
                                                                       return (
@@ -27330,7 +27602,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       <span>{previewSamples.length}</span>
                                                                     </div>
                                                                     <div className="run-surface-query-builder-trace-list">
-                                                                      {previewSamples.map((sample) => {
+                                                                      {orderedPreviewSamples.map((sample) => {
                                                                         const sampleLinkedFromRunContext =
                                                                           doesRuntimeCandidateSampleMatchActiveContext(sample);
                                                                         return (
