@@ -4794,10 +4794,10 @@
       "direction_id": "experiment-os",
       "title": "Publish parameterized predicate template discovery and query-builder authoring",
       "description": "Extend the shared typed-query or collection-query discovery contract and the collection query builder so consumers can discover available `predicate_templates`, parameter and collection binding slots, and any binding-domain metadata, then author or edit parameterized predicate instances with binding pickers directly in the UI instead of hand-writing `filter_expr` JSON.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 41,
-      "priority_reason": "The latest main-session reply says the runtime parser and OpenAPI schema are now wired, and explicitly calls out the remaining gap as discovery plus consumer-layer support so the query builder can author parameterized predicate templates and offer binding pickers. That makes shared discovery publication plus builder integration the clearest automatic next queued task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 458c9f9, which published `predicate_templates` authoring metadata through `query_collection:run_list` discovery, lifted the shared capability schema to `run-surface-capabilities.v14`, taught the collection query builder to persist and hydrate template or template-ref bindings, added parameter binding flows for path segments and condition values, verified with `python -m py_compile`, targeted `pytest`, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-parameterized-predicate-templates-to-typed-query-expressions",
         "planning-experiment-os-complete-collection-query-expression-editor-for-subtree-promotion-and-root-negation",
@@ -4805,9 +4805,27 @@
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:26:18Z",
+      "updated_at": "2026-04-20T18:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Moves experiment-os from backend-only parameterized predicate support into discoverable and operator-usable authoring flows, so typed-query reuse becomes an actual consumer contract instead of a capability hidden behind raw JSON."
+    },
+    {
+      "id": "planning-experiment-os-add-template-default-authoring-and-nested-template-binding-flows",
+      "direction_id": "experiment-os",
+      "title": "Add template default authoring and nested template-binding flows to the query builder",
+      "description": "Extend the newly shipped parameterized predicate template builder so operators can author template default values and compose templates by binding one template into another through dedicated editing flows, keeping `predicate_templates`, `predicate_ref.bindings`, and hydrated builder state round-trippable without falling back to raw JSON edits.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 42,
+      "priority_reason": "The latest main-session reply says the just-pushed template discovery and binding work is complete and explicitly identifies the next template-authoring gaps as default value authoring and nested template-to-template binding flows. Those are concrete executable follow-ups, so this becomes the next automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-publish-parameterized-predicate-template-discovery-and-builder-authoring"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T18:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os typed-query reuse from first-pass template discovery and binding into fuller operator authoring, so reusable filter templates can capture defaults and compose other templates without dropping back to hand-written filter JSON."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
