@@ -15780,6 +15780,8 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState = {
   key: string;
   label: string;
   helpNote: string;
+  priority: number;
+  autoSelectRule: "manual" | "always" | "binding_active" | "value_active";
   parameterValues: Record<string, string>;
   parameterBindingPresets: Record<string, string>;
 };
@@ -15941,6 +15943,21 @@ function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
     });
   });
   return Array.from(groups.values());
+}
+
+function sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(
+  bundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[],
+) {
+  return [...bundles].sort((left, right) => {
+    if (right.priority !== left.priority) {
+      return right.priority - left.priority;
+    }
+    const labelComparison = left.label.localeCompare(right.label);
+    if (labelComparison !== 0) {
+      return labelComparison;
+    }
+    return left.key.localeCompare(right.key);
+  });
 }
 
 function cloneRunSurfaceCollectionQueryBuilderChildState(
@@ -16808,6 +16825,16 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
                 typeof bundleRecord.help_note === "string"
                   ? bundleRecord.help_note
                   : "",
+              priority:
+                typeof bundleRecord.priority === "number" && Number.isFinite(bundleRecord.priority)
+                  ? bundleRecord.priority
+                  : 0,
+              autoSelectRule:
+                bundleRecord.auto_select_rule === "always"
+                || bundleRecord.auto_select_rule === "binding_active"
+                || bundleRecord.auto_select_rule === "value_active"
+                  ? bundleRecord.auto_select_rule
+                  : "manual",
               parameterValues: Object.fromEntries(
                 Object.entries(rawValues).flatMap(([parameterKey, rawValue]) =>
                   rawValue === undefined || rawValue === null
@@ -17123,6 +17150,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, string[]>>({});
   const [templateGroupExpansionByKey, setTemplateGroupExpansionByKey] = useState<Record<string, boolean>>({});
   const [predicateRefGroupBundleSelections, setPredicateRefGroupBundleSelections] =
+    useState<Record<string, string>>({});
+  const [predicateRefGroupAutoBundleSelections, setPredicateRefGroupAutoBundleSelections] =
     useState<Record<string, string>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
@@ -17518,6 +17547,12 @@ function RunSurfaceCollectionQueryBuilder({
                               label: bundle.label,
                               ...(bundle.helpNote.trim()
                                 ? { help_note: bundle.helpNote.trim() }
+                                : {}),
+                              ...(bundle.priority
+                                ? { priority: bundle.priority }
+                                : {}),
+                              ...(bundle.autoSelectRule !== "manual"
+                                ? { auto_select_rule: bundle.autoSelectRule }
                                 : {}),
                               ...(Object.keys(bundle.parameterValues).length
                                 ? {
@@ -18031,6 +18066,11 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [selectedRefTemplate],
   );
+  const getSortedTemplateGroupPresetBundles = useCallback(
+    (bundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[]) =>
+      sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(bundles),
+    [],
+  );
   const doesTemplateGroupMatchVisibilityRule = useCallback(
     (
       group: {
@@ -18056,6 +18096,37 @@ function RunSurfaceCollectionQueryBuilder({
         const currentValue = bindings[parameter.key]?.trim() ?? "";
         return Boolean(currentValue && !isRunSurfaceCollectionQueryBindingReferenceValue(currentValue))
           || Boolean(parameter.defaultValue.trim());
+      });
+    },
+    [],
+  );
+  const doesTemplateGroupBundleMatchAutoSelectRule = useCallback(
+    (
+      group: {
+        parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+      },
+      bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState,
+      bindings: Record<string, string>,
+    ) => {
+      if (bundle.autoSelectRule === "manual") {
+        return false;
+      }
+      if (bundle.autoSelectRule === "always") {
+        return true;
+      }
+      if (bundle.autoSelectRule === "binding_active") {
+        return group.parameters.some((parameter) => {
+          const currentValue = bindings[parameter.key]?.trim() ?? "";
+          return Boolean(fromRunSurfaceCollectionQueryBindingReferenceValue(currentValue))
+            || Boolean(parameter.bindingPreset.trim())
+            || Boolean(bundle.parameterBindingPresets[parameter.key]?.trim());
+        });
+      }
+      return group.parameters.some((parameter) => {
+        const currentValue = bindings[parameter.key]?.trim() ?? "";
+        return Boolean(currentValue && !isRunSurfaceCollectionQueryBindingReferenceValue(currentValue))
+          || Boolean(parameter.defaultValue.trim())
+          || Boolean(bundle.parameterValues[parameter.key]?.trim());
       });
     },
     [],
@@ -18110,6 +18181,119 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const autoSelectedPredicateRefGroupBundles = useMemo(
+    () =>
+      Object.fromEntries(
+        selectedRefTemplateParameterGroups.flatMap((group) => {
+          if (!selectedRefTemplate) {
+            return [];
+          }
+          const selectedBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
+            doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings),
+          );
+          if (!selectedBundle) {
+            return [];
+          }
+          return [[`${selectedRefTemplate.id}:${group.key}`, selectedBundle] as const];
+        }),
+      ),
+    [
+      doesTemplateGroupBundleMatchAutoSelectRule,
+      getSortedTemplateGroupPresetBundles,
+      predicateRefDraftBindings,
+      selectedRefTemplate,
+      selectedRefTemplateParameterGroups,
+    ],
+  );
+  useEffect(() => {
+    if (!selectedRefTemplate) {
+      setPredicateRefGroupAutoBundleSelections({});
+      return;
+    }
+    const activeSelectionKeys = new Set(
+      selectedRefTemplateParameterGroups.map((group) => `${selectedRefTemplate.id}:${group.key}`),
+    );
+    const pendingUpdates = selectedRefTemplateParameterGroups.flatMap((group) => {
+      const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
+      if (predicateRefGroupBundleSelections[selectionKey]) {
+        return [];
+      }
+      const nextAutoBundle = autoSelectedPredicateRefGroupBundles[selectionKey] ?? null;
+      const currentAutoBundleKey = predicateRefGroupAutoBundleSelections[selectionKey] ?? "";
+      if ((nextAutoBundle?.key ?? "") === currentAutoBundleKey) {
+        return [];
+      }
+      return [{
+        selectionKey,
+        group,
+        bundle: nextAutoBundle,
+      }];
+    });
+    const needsSelectionCleanup =
+      pendingUpdates.length > 0
+      || Object.keys(predicateRefGroupAutoBundleSelections).some((selectionKey) =>
+        !activeSelectionKeys.has(selectionKey) || Boolean(predicateRefGroupBundleSelections[selectionKey]),
+      );
+    if (!needsSelectionCleanup) {
+      return;
+    }
+    if (pendingUpdates.length) {
+      setPredicateRefDraftBindings((current) => {
+        const next = { ...current };
+        pendingUpdates.forEach(({ group, bundle }) => {
+          group.parameters.forEach((parameter) => {
+            delete next[parameter.key];
+          });
+          if (!bundle) {
+            return;
+          }
+          group.parameters.forEach((parameter) => {
+            const bindingPreset = bundle.parameterBindingPresets[parameter.key]?.trim();
+            if (bindingPreset) {
+              next[parameter.key] = toRunSurfaceCollectionQueryBindingReferenceValue(bindingPreset);
+              return;
+            }
+            const parameterValue = bundle.parameterValues[parameter.key];
+            if (parameterValue?.trim()) {
+              next[parameter.key] = parameterValue;
+            }
+          });
+        });
+        return next;
+      });
+    }
+    setPredicateRefGroupAutoBundleSelections((current) => {
+      const next: Record<string, string> = {};
+      activeSelectionKeys.forEach((selectionKey) => {
+        if (predicateRefGroupBundleSelections[selectionKey]) {
+          return;
+        }
+        const pendingUpdate = pendingUpdates.find((entry) => entry.selectionKey === selectionKey);
+        if (pendingUpdate) {
+          if (pendingUpdate.bundle?.key) {
+            next[selectionKey] = pendingUpdate.bundle.key;
+          }
+          return;
+        }
+        const currentAutoKey = current[selectionKey] ?? "";
+        if (currentAutoKey && autoSelectedPredicateRefGroupBundles[selectionKey]?.key === currentAutoKey) {
+          next[selectionKey] = currentAutoKey;
+          return;
+        }
+        const derivedAutoKey = autoSelectedPredicateRefGroupBundles[selectionKey]?.key ?? "";
+        if (derivedAutoKey) {
+          next[selectionKey] = derivedAutoKey;
+        }
+      });
+      return next;
+    });
+  }, [
+    autoSelectedPredicateRefGroupBundles,
+    predicateRefGroupAutoBundleSelections,
+    predicateRefGroupBundleSelections,
+    selectedRefTemplate,
+    selectedRefTemplateParameterGroups,
+  ]);
   const canAddPredicateRef = Boolean(
     predicateRefDraftKey
     && (
@@ -18670,6 +18854,8 @@ function RunSurfaceCollectionQueryBuilder({
               key: `bundle_${(currentGroup.presetBundles?.length ?? 0) + 1}`,
               label: `${group.label} preset ${(currentGroup.presetBundles?.length ?? 0) + 1}`,
               helpNote: "",
+              priority: 0,
+              autoSelectRule: "manual",
               parameterValues: {},
               parameterBindingPresets: {},
             },
@@ -19380,7 +19566,7 @@ function RunSurfaceCollectionQueryBuilder({
                         </div>
                         {parameterGroup.presetBundles.length ? (
                           <div className="run-surface-query-builder-domain-list">
-                            {parameterGroup.presetBundles.map((bundle) => (
+                            {getSortedTemplateGroupPresetBundles(parameterGroup.presetBundles).map((bundle) => (
                               <div
                                 className="run-surface-query-builder-domain-card"
                                 key={`${parameterGroup.key}:bundle:${bundle.key}`}
@@ -19457,6 +19643,48 @@ function RunSurfaceCollectionQueryBuilder({
                                       rows={2}
                                       value={bundle.helpNote}
                                     />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Bundle priority</span>
+                                    <input
+                                      type="number"
+                                      value={bundle.priority}
+                                      onChange={(event) =>
+                                        updateTemplateParameterGroupPresetBundle(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          (currentBundle) => ({
+                                            ...currentBundle,
+                                            priority: Number.isFinite(Number(event.target.value))
+                                              ? Number(event.target.value)
+                                              : 0,
+                                          }),
+                                        )}
+                                      placeholder="0"
+                                    />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Auto-select</span>
+                                    <select
+                                      value={bundle.autoSelectRule}
+                                      onChange={(event) =>
+                                        updateTemplateParameterGroupPresetBundle(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          (currentBundle) => ({
+                                            ...currentBundle,
+                                            autoSelectRule: event.target.value as RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState["autoSelectRule"],
+                                          }),
+                                        )
+                                      }
+                                    >
+                                      <option value="manual">Manual only</option>
+                                      <option value="always">Always</option>
+                                      <option value="binding_active">When bindings are active</option>
+                                      <option value="value_active">When values are active</option>
+                                    </select>
                                   </label>
                                 </div>
                                 <div className="run-surface-query-builder-parameter-grid">
@@ -19737,6 +19965,7 @@ function RunSurfaceCollectionQueryBuilder({
                   {selectedRefTemplateParameterGroups.map((parameterGroup) => {
                     const groupViewKey = `ref:${selectedRefTemplate.id}:${parameterGroup.key}`;
                     const isExpanded = isTemplateGroupExpanded(groupViewKey, parameterGroup.collapsedByDefault);
+                    const sortedPresetBundles = getSortedTemplateGroupPresetBundles(parameterGroup.presetBundles);
                     const matchesVisibilityRule = doesTemplateGroupMatchVisibilityRule(
                       parameterGroup,
                       predicateRefDraftBindings,
@@ -19745,7 +19974,11 @@ function RunSurfaceCollectionQueryBuilder({
                     const isGroupContentVisible = matchesVisibilityRule
                       ? isExpanded
                       : hasManualReveal;
-                    const selectedBundleKey = predicateRefGroupBundleSelections[`${selectedRefTemplate.id}:${parameterGroup.key}`] ?? "";
+                    const selectionKey = `${selectedRefTemplate.id}:${parameterGroup.key}`;
+                    const selectedBundleKey = predicateRefGroupBundleSelections[selectionKey] ?? "";
+                    const autoSelectedBundleKey = predicateRefGroupAutoBundleSelections[selectionKey] ?? "";
+                    const effectiveBundleKey = selectedBundleKey || autoSelectedBundleKey;
+                    const effectiveBundle = sortedPresetBundles.find((bundle) => bundle.key === effectiveBundleKey) ?? null;
                     return (
                       <div className="run-surface-query-builder-section" key={groupViewKey}>
                         <div className="run-surface-query-builder-card-head">
@@ -19781,25 +20014,34 @@ function RunSurfaceCollectionQueryBuilder({
                                 value={selectedBundleKey}
                                 onChange={(event) => {
                                   const nextBundle =
-                                    parameterGroup.presetBundles.find((bundle) => bundle.key === event.target.value)
+                                    sortedPresetBundles.find((bundle) => bundle.key === event.target.value)
                                     ?? null;
                                   applyPredicateRefGroupPresetBundle(selectedRefTemplate.id, parameterGroup, nextBundle);
                                 }}
                               >
-                                <option value="">No bundle</option>
-                                {parameterGroup.presetBundles.map((bundle) => (
+                                <option value="">
+                                  {autoSelectedBundleKey
+                                    ? `Use auto-selected bundle (${effectiveBundle?.label ?? autoSelectedBundleKey})`
+                                    : "No bundle"}
+                                </option>
+                                {sortedPresetBundles.map((bundle) => (
                                   <option key={`${parameterGroup.key}:${bundle.key}`} value={bundle.key}>
-                                    {bundle.label}
+                                    {`${bundle.label}${bundle.priority ? ` · P${bundle.priority}` : ""}`}
                                   </option>
                                 ))}
                               </select>
                               <small>
                                 {selectedBundleKey
                                   ? (
-                                      parameterGroup.presetBundles.find((bundle) => bundle.key === selectedBundleKey)?.helpNote
-                                      || "Applies the selected group preset bundle."
+                                      effectiveBundle?.helpNote
+                                      || "Manual bundle override is active for this group."
                                     )
-                                  : "Apply a preset bundle to prefill bindings and literal values for this group."}
+                                  : autoSelectedBundleKey
+                                    ? (
+                                        effectiveBundle?.helpNote
+                                        || `Auto-selected by ${effectiveBundle?.autoSelectRule.replaceAll("_", " ") ?? "priority"} at priority ${effectiveBundle?.priority ?? 0}.`
+                                      )
+                                    : "Apply a preset bundle to prefill bindings and literal values for this group."}
                               </small>
                             </label>
                           </div>
@@ -20160,7 +20402,7 @@ function RunSurfaceCollectionQueryBuilder({
                                       ) : null}
                                       {parameterGroup.presetBundles.length ? (
                                         <div className="run-surface-query-builder-domain-list">
-                                          {parameterGroup.presetBundles.map((bundle) => (
+                                          {getSortedTemplateGroupPresetBundles(parameterGroup.presetBundles).map((bundle) => (
                                             <div
                                               className="run-surface-query-builder-domain-card"
                                               key={`${template.id}:${parameterGroup.key}:bundle:${bundle.key}`}
@@ -20170,6 +20412,14 @@ function RunSurfaceCollectionQueryBuilder({
                                                 <span>{bundle.key}</span>
                                               </div>
                                               <div className="run-surface-family-chip-row">
+                                                <span className="run-surface-family-chip">
+                                                  {`P${bundle.priority}`}
+                                                </span>
+                                                <span className="run-surface-family-chip">
+                                                  {bundle.autoSelectRule === "manual"
+                                                    ? "manual only"
+                                                    : `auto ${bundle.autoSelectRule.replaceAll("_", " ")}`}
+                                                </span>
                                                 {Object.keys(bundle.parameterValues).length ? (
                                                   <span className="run-surface-family-chip">
                                                     {`${Object.keys(bundle.parameterValues).length} preset value${Object.keys(bundle.parameterValues).length === 1 ? "" : "s"}`}
