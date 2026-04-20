@@ -284,30 +284,42 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
 
   def list_replay_intent_alias_audit_records(
     self,
-    alias_id: str,
+    alias_id: str | None = None,
   ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    statement = select(replay_intent_alias_audit_records.c.payload)
+    if alias_id is not None:
+      statement = statement.where(replay_intent_alias_audit_records.c.alias_id == alias_id)
+    statement = statement.order_by(
+      replay_intent_alias_audit_records.c.recorded_at.desc(),
+      replay_intent_alias_audit_records.c.audit_id.desc(),
+    )
     with self._engine.connect() as connection:
-      rows = connection.execute(
-        select(replay_intent_alias_audit_records.c.payload)
-        .where(replay_intent_alias_audit_records.c.alias_id == alias_id)
-        .order_by(
-          replay_intent_alias_audit_records.c.recorded_at.desc(),
-          replay_intent_alias_audit_records.c.audit_id.desc(),
-        )
-      ).mappings().all()
+      rows = connection.execute(statement).mappings().all()
     return tuple(
       self._replay_alias_audit_adapter.validate_python(row["payload"])
       for row in rows
     )
 
-  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> None:
+  def delete_replay_intent_alias_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    if not audit_ids:
+      return 0
     with self._engine.begin() as connection:
-      connection.execute(
+      result = connection.execute(
+        delete(replay_intent_alias_audit_records).where(
+          replay_intent_alias_audit_records.c.audit_id.in_(audit_ids)
+        )
+      )
+    return result.rowcount or 0
+
+  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
         delete(replay_intent_alias_audit_records).where(
           replay_intent_alias_audit_records.c.expires_at.is_not(None),
           replay_intent_alias_audit_records.c.expires_at <= current_time.isoformat(),
         )
       )
+    return result.rowcount or 0
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     with self._engine.connect() as connection:

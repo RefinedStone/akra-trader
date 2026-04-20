@@ -322,6 +322,22 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "alias_token",
     "app",
   )
+  assert tuple(inspect.signature(routes["list_replay_link_alias_audits"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "alias_id",
+    "template_key",
+    "action",
+    "retention_policy",
+    "source_tab_id",
+    "search",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["prune_replay_link_alias_audits"].endpoint).parameters) == (
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["revoke_replay_link_alias"].endpoint).parameters) == (
     "alias_token",
     "request",
@@ -462,6 +478,66 @@ def test_replay_link_alias_registry_survives_restart(tmp_path: Path) -> None:
 
   assert revoked_resolve_response.status_code == 404
   assert "revoked" in revoked_resolve_response.json()["detail"]
+
+
+def test_replay_link_alias_audit_admin_endpoints_support_search_and_prune(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+
+  created_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_admin",
+      "template_label": "Template Admin",
+      "intent": {"replayScope": "all", "replayIndex": 1},
+      "redaction_policy": "full",
+      "retention_policy": "7d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+  assert created_response.status_code == 200
+  alias_token = created_response.json()["alias_token"]
+
+  resolve_response = client.get(f"/api/replay-links/aliases/{alias_token}")
+  assert resolve_response.status_code == 200
+
+  revoke_response = client.post(
+    f"/api/replay-links/aliases/{alias_token}/revoke",
+    json={"source_tab_id": "tab_remote", "source_tab_label": "Remote tab"},
+  )
+  assert revoke_response.status_code == 200
+
+  audit_list_response = client.get(
+    "/api/replay-links/audits",
+    params={
+      "template_key": "template_admin",
+      "action": "revoked",
+      "search": "Remote",
+      "limit": 10,
+    },
+  )
+  assert audit_list_response.status_code == 200
+  audit_items = audit_list_response.json()["items"]
+  assert len(audit_items) == 1
+  assert audit_items[0]["action"] == "revoked"
+
+  prune_response = client.post(
+    "/api/replay-links/audits/prune",
+    json={
+      "prune_mode": "matched",
+      "template_key": "template_admin",
+      "action": "resolved",
+    },
+  )
+  assert prune_response.status_code == 200
+  assert prune_response.json()["deleted_count"] == 1
+
+  post_prune_list_response = client.get(
+    "/api/replay-links/audits",
+    params={"template_key": "template_admin", "action": "resolved", "limit": 10},
+  )
+  assert post_prune_list_response.status_code == 200
+  assert post_prune_list_response.json()["total"] == 0
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:

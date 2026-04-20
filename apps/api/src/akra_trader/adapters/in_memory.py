@@ -264,12 +264,12 @@ class InMemoryRunRepository(RunRepositoryPort):
 
   def list_replay_intent_alias_audit_records(
     self,
-    alias_id: str,
+    alias_id: str | None = None,
   ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
     records = [
       record
       for record in self._replay_intent_alias_audit_records.values()
-      if record.alias_id == alias_id
+      if alias_id is None or record.alias_id == alias_id
     ]
     return tuple(
       sorted(
@@ -279,7 +279,16 @@ class InMemoryRunRepository(RunRepositoryPort):
       )
     )
 
-  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> None:
+  def delete_replay_intent_alias_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._replay_intent_alias_audit_records:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_records[audit_id]
+    return deleted_count
+
+  def prune_replay_intent_alias_audit_records(self, current_time: datetime) -> int:
+    original_count = len(self._replay_intent_alias_audit_records)
     self._replay_intent_alias_audit_records = OrderedDict(
       (
         audit_id,
@@ -288,6 +297,7 @@ class InMemoryRunRepository(RunRepositoryPort):
       for audit_id, record in self._replay_intent_alias_audit_records.items()
       if record.expires_at is None or record.expires_at > current_time
     )
+    return original_count - len(self._replay_intent_alias_audit_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

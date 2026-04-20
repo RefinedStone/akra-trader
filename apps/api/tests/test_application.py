@@ -13997,6 +13997,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "replay_link_alias_create",
     "replay_link_alias_resolve",
     "replay_link_alias_history",
+    "replay_link_audit_list",
+    "replay_link_audit_prune",
     "replay_link_alias_revoke",
     "market_data_status",
     "operator_visibility",
@@ -14046,6 +14048,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["replay_link_alias_create"].methods == ("POST",)
   assert bindings_by_key["replay_link_alias_resolve"].path_param_keys == ("alias_token",)
   assert bindings_by_key["replay_link_alias_history"].route_path == "/replay-links/aliases/{alias_token}/history"
+  assert bindings_by_key["replay_link_audit_list"].route_path == "/replay-links/audits"
+  assert bindings_by_key["replay_link_audit_list"].filter_param_specs[0].key == "alias_id"
+  assert bindings_by_key["replay_link_audit_prune"].request_payload_kind == "replay_link_audit_prune"
   assert bindings_by_key["replay_link_alias_revoke"].request_payload_kind == "replay_link_alias_revoke"
   assert bindings_by_key["market_data_status"].route_path == "/market-data/status"
   assert bindings_by_key["market_data_status"].filter_param_specs[0].key == "timeframe"
@@ -14528,6 +14533,84 @@ def test_replay_link_alias_history_retention_prunes_expired_audit_records(tmp_pa
   )
 
   assert restarted.list_replay_intent_alias_history(alias_token) == ()
+
+
+def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    presets=build_preset_catalog(tmp_path),
+    runs=build_runs_repository(tmp_path),
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings(app.get_run_surface_capabilities())
+  }
+
+  created_alias = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_alias_create"],
+    app=app,
+    request_payload={
+      "template_key": "template_a",
+      "template_label": "Template A",
+      "intent": {"replayScope": "all", "replayIndex": 2},
+      "redaction_policy": "full",
+      "retention_policy": "7d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_alias_resolve"],
+    app=app,
+    path_params={"alias_token": created_alias["alias_token"]},
+  )
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_alias_revoke"],
+    app=app,
+    path_params={"alias_token": created_alias["alias_token"]},
+    request_payload={"source_tab_id": "tab_remote", "source_tab_label": "Remote tab"},
+  )
+  manual_alias = app.create_replay_intent_alias(
+    template_key="template_b",
+    template_label="Template B",
+    intent={"replayScope": "grouped"},
+    redaction_policy="summary_only",
+    retention_policy="manual",
+    source_tab_id="tab_manual",
+    source_tab_label="Manual tab",
+  )
+
+  audit_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_list"],
+    app=app,
+    filters={"template_key": "template_a", "action": "revoked", "search": "Remote", "limit": 10},
+  )
+  assert audit_list_payload["total"] == 1
+  assert audit_list_payload["items"][0]["action"] == "revoked"
+
+  prune_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_prune"],
+    app=app,
+    request_payload={
+      "prune_mode": "matched",
+      "template_key": "template_b",
+      "include_manual": False,
+    },
+  )
+  assert prune_payload["deleted_count"] == 0
+
+  prune_manual_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_prune"],
+    app=app,
+    request_payload={
+      "prune_mode": "matched",
+      "alias_id": manual_alias.alias_id,
+      "include_manual": True,
+    },
+  )
+  assert prune_manual_payload["deleted_count"] == 1
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

@@ -158,9 +158,22 @@ class ReplayLinkAliasRevokeRequest(BaseModel):
   source_tab_label: str | None = None
 
 
+class ReplayLinkAliasAuditPruneRequest(BaseModel):
+  prune_mode: str = "expired"
+  alias_id: str | None = None
+  template_key: str | None = None
+  action: str | None = None
+  retention_policy: str | None = None
+  source_tab_id: str | None = None
+  search: str | None = None
+  recorded_before: datetime | None = None
+  include_manual: bool = False
+
+
 REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   "replay_link_alias_create": (ReplayLinkAliasCreateRequest, {}),
   "replay_link_alias_revoke": (ReplayLinkAliasRevokeRequest, {}),
+  "replay_link_audit_prune": (ReplayLinkAliasAuditPruneRequest, {}),
   "preset_create": (ExperimentPresetRequest, {}),
   "preset_update": (ExperimentPresetUpdateRequest, {"exclude_unset": True}),
   "preset_revision_restore": (ExperimentPresetRevisionRestoreRequest, {}),

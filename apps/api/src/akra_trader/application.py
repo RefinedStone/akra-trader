@@ -1296,7 +1296,7 @@ class TradingApplication:
 
   def _list_replay_intent_alias_audit_records(
     self,
-    alias_id: str,
+    alias_id: str | None = None,
   ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
     list_audits = getattr(self._runs, "list_replay_intent_alias_audit_records", None)
     if callable(list_audits):
@@ -1304,7 +1304,7 @@ class TradingApplication:
     records = [
       record
       for record in self._replay_intent_alias_audit_records.values()
-      if record.alias_id == alias_id
+      if alias_id is None or record.alias_id == alias_id
     ]
     return tuple(
       sorted(
@@ -1314,6 +1314,17 @@ class TradingApplication:
       )
     )
 
+  def _delete_replay_intent_alias_audit_records(self, audit_ids: tuple[str, ...]) -> int:
+    delete_audits = getattr(self._runs, "delete_replay_intent_alias_audit_records", None)
+    if callable(delete_audits):
+      return int(delete_audits(audit_ids))
+    deleted_count = 0
+    for audit_id in audit_ids:
+      if audit_id in self._replay_intent_alias_audit_records:
+        deleted_count += 1
+        del self._replay_intent_alias_audit_records[audit_id]
+    return deleted_count
+
   def _prune_replay_intent_alias_records(self) -> None:
     current_time = self._clock()
     self._replay_intent_alias_records = {
@@ -1322,17 +1333,18 @@ class TradingApplication:
       if record.expires_at is None or record.expires_at > current_time
     }
 
-  def _prune_replay_intent_alias_audit_records(self) -> None:
+  def _prune_replay_intent_alias_audit_records(self) -> int:
     current_time = self._clock()
     prune_audits = getattr(self._runs, "prune_replay_intent_alias_audit_records", None)
     if callable(prune_audits):
-      prune_audits(current_time)
-      return
+      return int(prune_audits(current_time))
+    original_count = len(self._replay_intent_alias_audit_records)
     self._replay_intent_alias_audit_records = {
       audit_id: record
       for audit_id, record in self._replay_intent_alias_audit_records.items()
       if record.expires_at is None or record.expires_at > current_time
     }
+    return original_count - len(self._replay_intent_alias_audit_records)
 
   def _record_replay_intent_alias_audit_event(
     self,
@@ -1375,6 +1387,125 @@ class TradingApplication:
       ),
     )
     return self._save_replay_intent_alias_audit_record(audit_record)
+
+  @staticmethod
+  def _normalize_replay_intent_alias_audit_action(value: str | None) -> str | None:
+    if not isinstance(value, str):
+      return None
+    normalized = value.strip().lower()
+    if normalized in {"created", "resolved", "revoked"}:
+      return normalized
+    return None
+
+  @classmethod
+  def _matches_replay_intent_alias_audit_search(
+    cls,
+    record: ReplayIntentAliasAuditRecord,
+    search: str | None,
+  ) -> bool:
+    if not isinstance(search, str) or not search.strip():
+      return True
+    needle = search.strip().lower()
+    haystacks = (
+      record.audit_id,
+      record.alias_id,
+      record.action,
+      record.template_key,
+      record.template_label,
+      record.redaction_policy,
+      record.retention_policy,
+      record.source_tab_id or "",
+      record.source_tab_label or "",
+      record.detail,
+    )
+    return any(needle in value.lower() for value in haystacks if value)
+
+  def list_replay_intent_alias_audits(
+    self,
+    *,
+    alias_id: str | None = None,
+    template_key: str | None = None,
+    action: str | None = None,
+    retention_policy: str | None = None,
+    source_tab_id: str | None = None,
+    search: str | None = None,
+    limit: int = 100,
+  ) -> tuple[ReplayIntentAliasAuditRecord, ...]:
+    self._prune_replay_intent_alias_audit_records()
+    normalized_alias_id = alias_id.strip() if isinstance(alias_id, str) and alias_id.strip() else None
+    normalized_template_key = (
+      template_key.strip() if isinstance(template_key, str) and template_key.strip() else None
+    )
+    normalized_action = self._normalize_replay_intent_alias_audit_action(action)
+    normalized_retention_policy = (
+      self._normalize_replay_intent_alias_retention_policy(retention_policy)
+      if isinstance(retention_policy, str) and retention_policy.strip()
+      else None
+    )
+    normalized_source_tab_id = (
+      source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None
+    )
+    normalized_limit = max(1, min(limit, 500))
+    filtered = [
+      record
+      for record in self._list_replay_intent_alias_audit_records(normalized_alias_id)
+      if (normalized_template_key is None or record.template_key == normalized_template_key)
+      and (normalized_action is None or record.action == normalized_action)
+      and (
+        normalized_retention_policy is None
+        or record.retention_policy == normalized_retention_policy
+      )
+      and (
+        normalized_source_tab_id is None
+        or record.source_tab_id == normalized_source_tab_id
+      )
+      and self._matches_replay_intent_alias_audit_search(record, search)
+    ]
+    return tuple(filtered[:normalized_limit])
+
+  def prune_replay_intent_alias_audits(
+    self,
+    *,
+    alias_id: str | None = None,
+    template_key: str | None = None,
+    action: str | None = None,
+    retention_policy: str | None = None,
+    source_tab_id: str | None = None,
+    search: str | None = None,
+    recorded_before: datetime | None = None,
+    include_manual: bool = False,
+    prune_mode: str = "expired",
+  ) -> dict[str, Any]:
+    normalized_mode = prune_mode if prune_mode in {"expired", "matched"} else "expired"
+    if normalized_mode == "expired":
+      deleted_count = self._prune_replay_intent_alias_audit_records()
+      return {
+        "deleted_count": deleted_count,
+        "mode": "expired",
+      }
+    candidate_records = self.list_replay_intent_alias_audits(
+      alias_id=alias_id,
+      template_key=template_key,
+      action=action,
+      retention_policy=retention_policy,
+      source_tab_id=source_tab_id,
+      search=search,
+      limit=500,
+    )
+    deleted_records = [
+      record
+      for record in candidate_records
+      if (include_manual or record.retention_policy != "manual")
+      and (recorded_before is None or record.recorded_at <= recorded_before)
+    ]
+    deleted_count = self._delete_replay_intent_alias_audit_records(
+      tuple(record.audit_id for record in deleted_records)
+    )
+    return {
+      "deleted_count": deleted_count,
+      "matched_audit_ids": [record.audit_id for record in deleted_records],
+      "mode": "matched",
+    }
 
   def _get_replay_intent_alias_record_for_token(
     self,
@@ -24161,6 +24292,18 @@ def serialize_replay_intent_alias_history(
   }
 
 
+def serialize_replay_intent_alias_audit_list(
+  audit_records: tuple[ReplayIntentAliasAuditRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_replay_intent_alias_audit_record(audit_record)
+      for audit_record in audit_records
+    ],
+    "total": len(audit_records),
+  }
+
+
 def _serialize_run_order_subresource_item(
   run: RunRecord,
   *,
@@ -24339,6 +24482,104 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="replay_link_alias_history",
     path_param_keys=("alias_token",),
+  )
+  replay_alias_audit_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_list",
+    route_path="/replay-links/audits",
+    route_name="list_replay_link_alias_audits",
+    response_title="List replay link alias audits",
+    scope="app",
+    binding_kind="replay_link_audit_list",
+    filter_keys=("alias_id", "template_key", "action", "retention_policy", "source_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "alias_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Alias ID",
+          description="Filter replay alias audits by alias identifier.",
+          examples=("abc123def4",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "template_key",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Template key",
+          description="Filter replay alias audits by template key.",
+          examples=("template_a",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Audit action",
+          description="Filter replay alias audits by action kind.",
+          examples=("revoked",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "retention_policy",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Retention policy",
+          description="Filter replay alias audits by retention policy.",
+          examples=("7d",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "source_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Source tab ID",
+          description="Filter replay alias audits by source tab identity.",
+          examples=("tab_local",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search replay alias audit ids, template labels, source tabs, and detail text.",
+          examples=("Remote tab",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=100,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=500),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of replay alias audit records to return.",
+          examples=(50,),
+        ),
+      ),
+    ),
+  )
+  replay_alias_audit_prune_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="replay_link_audit_prune",
+    route_path="/replay-links/audits/prune",
+    route_name="prune_replay_link_alias_audits",
+    response_title="Prune replay link alias audits",
+    scope="app",
+    binding_kind="replay_link_audit_prune",
+    methods=("POST",),
+    request_payload_kind="replay_link_audit_prune",
   )
   replay_alias_revoke_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="replay_link_alias_revoke",
@@ -25623,6 +25864,8 @@ def list_standalone_surface_runtime_bindings(
     replay_alias_create_binding,
     replay_alias_resolve_binding,
     replay_alias_history_binding,
+    replay_alias_audit_list_binding,
+    replay_alias_audit_prune_binding,
     replay_alias_revoke_binding,
     market_data_status_binding,
     operator_visibility_binding,
@@ -25717,6 +25960,30 @@ def execute_standalone_surface_binding(
     return serialize_replay_intent_alias_history(
       resolved_record,
       app.list_replay_intent_alias_history(resolved_path_params["alias_token"]),
+    )
+  if binding.binding_kind == "replay_link_audit_list":
+    return serialize_replay_intent_alias_audit_list(
+      app.list_replay_intent_alias_audits(
+        alias_id=resolved_filters.get("alias_id"),
+        template_key=resolved_filters.get("template_key"),
+        action=resolved_filters.get("action"),
+        retention_policy=resolved_filters.get("retention_policy"),
+        source_tab_id=resolved_filters.get("source_tab_id"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 100),
+      )
+    )
+  if binding.binding_kind == "replay_link_audit_prune":
+    return app.prune_replay_intent_alias_audits(
+      alias_id=resolved_payload.get("alias_id"),
+      template_key=resolved_payload.get("template_key"),
+      action=resolved_payload.get("action"),
+      retention_policy=resolved_payload.get("retention_policy"),
+      source_tab_id=resolved_payload.get("source_tab_id"),
+      search=resolved_payload.get("search"),
+      recorded_before=resolved_payload.get("recorded_before"),
+      include_manual=resolved_payload.get("include_manual", False),
+      prune_mode=resolved_payload.get("prune_mode", "expired"),
     )
   if binding.binding_kind == "replay_link_alias_revoke":
     return serialize_replay_intent_alias_record(
