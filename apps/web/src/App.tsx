@@ -17223,6 +17223,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<"all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle">("all");
   const [bundleCoordinationSimulationReplayEdgeFilter, setBundleCoordinationSimulationReplayEdgeFilter] =
     useState<"all" | string>("all");
+  const [bundleCoordinationSimulationPromotionDecisionsByGroupKey, setBundleCoordinationSimulationPromotionDecisionsByGroupKey] =
+    useState<Record<string, boolean>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -19269,6 +19271,17 @@ function RunSurfaceCollectionQueryBuilder({
       bundleCoordinationSimulationReplayEdgeFilter,
     ],
   );
+  useEffect(() => {
+    setBundleCoordinationSimulationPromotionDecisionsByGroupKey({});
+  }, [
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationScope,
+    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationReplayActionTypeFilter,
+    bundleCoordinationSimulationReplayEdgeFilter,
+    activeSimulatedPredicateRefSolverReplayIndex,
+    selectedRefTemplate?.id,
+  ]);
   const simulatedPredicateRefReplayPromotionDraft = useMemo(() => {
     type PromotionGroup = ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>[number];
     const targetSelections = new Map<string, {
@@ -19337,6 +19350,50 @@ function RunSurfaceCollectionQueryBuilder({
     getSortedTemplateGroupPresetBundles,
     simulatedCoordinationGroups,
   ]);
+  const simulatedPredicateRefReplayPromotionPreviewRows = useMemo(
+    () => simulatedPredicateRefReplayPromotionDraft.promotableSelections.map(({ group, bundle }) => {
+      const currentBundleKey =
+        coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey[group.key] ?? "";
+      const simulatedBundleKey =
+        simulatedPredicateRefGroupBundleState?.resolvedSelectionsByGroupKey[group.key] ?? "";
+      const currentBundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find((candidate) => candidate.key === currentBundleKey)
+        ?? null;
+      const simulatedBundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find((candidate) => candidate.key === simulatedBundleKey)
+        ?? null;
+      const currentStatus =
+        coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey[group.key]?.statusLabel ?? "Idle";
+      const simulatedStatus =
+        simulatedPredicateRefGroupBundleState?.policyTraceByGroupKey[group.key]?.statusLabel ?? "Idle";
+      return {
+        group,
+        promotedBundle: bundle,
+        currentBundleLabel: currentBundle?.label ?? "No bundle",
+        simulatedBundleLabel: simulatedBundle?.label ?? "No bundle",
+        currentStatus,
+        simulatedStatus,
+        matchesSimulation: simulatedBundle?.key === bundle.key,
+        changesCurrent: currentBundle?.key !== bundle.key,
+      };
+    }),
+    [
+      coordinatedPredicateRefGroupBundleState.policyTraceByGroupKey,
+      coordinatedPredicateRefGroupBundleState.resolvedSelectionsByGroupKey,
+      getSortedTemplateGroupPresetBundles,
+      simulatedPredicateRefGroupBundleState,
+      simulatedPredicateRefReplayPromotionDraft.promotableSelections,
+    ],
+  );
+  const stagedSimulatedPredicateRefReplayPromotionSelections = useMemo(
+    () => simulatedPredicateRefReplayPromotionPreviewRows.filter((row) =>
+      bundleCoordinationSimulationPromotionDecisionsByGroupKey[row.group.key] ?? true,
+    ),
+    [
+      bundleCoordinationSimulationPromotionDecisionsByGroupKey,
+      simulatedPredicateRefReplayPromotionPreviewRows,
+    ],
+  );
   useEffect(() => {
     if (
       bundleCoordinationSimulationReplayActionTypeFilter !== "all"
@@ -21677,21 +21734,24 @@ function RunSurfaceCollectionQueryBuilder({
                                     className="ghost-button"
                                     disabled={
                                       !selectedRefTemplate
-                                      || !simulatedPredicateRefReplayPromotionDraft.promotableSelections.length
+                                      || !stagedSimulatedPredicateRefReplayPromotionSelections.length
                                       || simulatedPredicateRefReplayPromotionDraft.conflicts.length > 0
                                     }
                                     onClick={() => {
-                                      if (!selectedRefTemplate || !simulatedPredicateRefReplayPromotionDraft.promotableSelections.length) {
+                                      if (!selectedRefTemplate || !stagedSimulatedPredicateRefReplayPromotionSelections.length) {
                                         return;
                                       }
                                       applyPredicateRefGroupPresetBundles(
                                         selectedRefTemplate.id,
-                                        simulatedPredicateRefReplayPromotionDraft.promotableSelections,
+                                        stagedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
+                                          group: row.group,
+                                          bundle: row.promotedBundle,
+                                        })),
                                       );
                                     }}
                                     type="button"
                                   >
-                                    Promote filtered edges to manual draft
+                                    Promote staged replay draft
                                   </button>
                                 </div>
                                 <input
@@ -21723,11 +21783,11 @@ function RunSurfaceCollectionQueryBuilder({
                                         {`Tracing dependency edge ${activeSimulatedPredicateRefSolverReplayFilteredEdge.label} across replay steps.`}
                                       </p>
                                     ) : null}
-                                    {simulatedPredicateRefReplayPromotionDraft.promotableSelections.length ? (
+                                    {simulatedPredicateRefReplayPromotionPreviewRows.length ? (
                                       <p className="run-note">
-                                        {`Manual draft promotion will apply ${simulatedPredicateRefReplayPromotionDraft.promotableSelections
-                                          .map((entry) => `${entry.group.label} → ${entry.bundle.label}`)
-                                          .join(", ")}.`}
+                                        {`Staged promotion currently applies ${stagedSimulatedPredicateRefReplayPromotionSelections
+                                          .map((entry) => `${entry.group.label} → ${entry.promotedBundle.label}`)
+                                          .join(", ") || "no groups"} from the filtered replay edge set.`}
                                       </p>
                                     ) : null}
                                     {simulatedPredicateRefReplayPromotionDraft.conflicts.length ? (
@@ -21736,6 +21796,52 @@ function RunSurfaceCollectionQueryBuilder({
                                           .map((conflict) => `${conflict.groupLabel} (${conflict.bundleLabels.join(", ")})`)
                                           .join("; ")}.`}
                                       </p>
+                                    ) : null}
+                                    {simulatedPredicateRefReplayPromotionPreviewRows.length ? (
+                                      <div className="run-surface-query-builder-trace-list">
+                                        {simulatedPredicateRefReplayPromotionPreviewRows.map((row) => {
+                                          const isSelected =
+                                            bundleCoordinationSimulationPromotionDecisionsByGroupKey[row.group.key] ?? true;
+                                          return (
+                                            <div
+                                              className={`run-surface-query-builder-trace-step is-${
+                                                row.matchesSimulation
+                                                  ? "success"
+                                                  : row.changesCurrent
+                                                    ? "info"
+                                                    : "muted"
+                                              }`}
+                                              key={`promotion-preview:${row.group.key}`}
+                                            >
+                                              <strong>{row.group.label}</strong>
+                                              <p>
+                                                {`${row.currentStatus} · ${row.currentBundleLabel} → ${row.simulatedStatus} · ${row.simulatedBundleLabel} → draft ${row.promotedBundle.label}`}
+                                              </p>
+                                              <div className="run-surface-query-builder-actions">
+                                                <button
+                                                  className={`ghost-button${isSelected ? " is-active" : ""}`}
+                                                  onClick={() =>
+                                                    setBundleCoordinationSimulationPromotionDecisionsByGroupKey((current) => ({
+                                                      ...current,
+                                                      [row.group.key]: !(current[row.group.key] ?? true),
+                                                    }))}
+                                                  type="button"
+                                                >
+                                                  {isSelected ? "Staged for apply" : "Skipped"}
+                                                </button>
+                                              </div>
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                <span className={`run-surface-query-builder-trace-chip${row.matchesSimulation ? " is-active" : ""}`}>
+                                                  {row.matchesSimulation ? "Matches simulated bundle" : "Differs from simulated bundle"}
+                                                </span>
+                                                <span className={`run-surface-query-builder-trace-chip${row.changesCurrent ? " is-active" : ""}`}>
+                                                  {row.changesCurrent ? "Changes current resolution" : "Keeps current resolution"}
+                                                </span>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
                                     ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
                                       {simulatedCoordinationGroups.map((group) => {
