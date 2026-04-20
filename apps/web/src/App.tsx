@@ -3081,6 +3081,10 @@ const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansio
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY = "akra-trader-run-surface-replay-history";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION = 1;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES = 12;
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-run-surface-replay-history-tab-id";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY = "akra-trader-run-surface-replay-history-sync-audit";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION = 1;
+const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 const COMPARISON_RUN_ID_SEARCH_PARAM = "compare_run_id";
 const COMPARISON_INTENT_SEARCH_PARAM = "compare_intent";
 const COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM = "compare_focus_run_id";
@@ -15829,9 +15833,36 @@ type PredicateRefReplayApplyHistoryEntry = {
     groupSelectionsBySelectionKey: Record<string, string | null>;
   };
   rows: PredicateRefReplayApplyHistoryRow[];
+  sourceTabId?: string | null;
+  sourceTabLabel?: string | null;
   templateId: string;
   templateLabel: string;
   lastRestoredAt?: string | null;
+  lastRestoredByTabId?: string | null;
+  lastRestoredByTabLabel?: string | null;
+};
+
+type PredicateRefReplayApplyHistoryTabIdentity = {
+  label: string;
+  tabId: string;
+};
+
+type PredicateRefReplayApplySyncAuditEntry = {
+  at: string;
+  auditId: string;
+  detail: string;
+  entryId: string;
+  kind: "local_apply" | "local_restore" | "remote_apply" | "remote_restore";
+  sourceTabId: string;
+  sourceTabLabel: string;
+  templateId: string;
+  templateLabel: string;
+};
+
+type PredicateRefReplayApplySyncAuditTrailState = {
+  entries: PredicateRefReplayApplySyncAuditEntry[];
+  tabId: string;
+  version: number;
 };
 
 type HydratedRunSurfaceCollectionQueryBuilderExpressionState = {
@@ -15854,6 +15885,142 @@ const RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID = "root";
 
 function buildRunSurfaceCollectionQueryBuilderEntityId(prefix: string) {
   return `${prefix}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `replay-tab-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabLabel(tabId: string) {
+  return `Tab ${tabId.replace(/[^a-z0-9]/gi, "").slice(0, 4).toUpperCase() || "REPL"}`;
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabIdentity(): PredicateRefReplayApplyHistoryTabIdentity {
+  const fallbackTabId = buildRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabId();
+  if (typeof window === "undefined") {
+    return {
+      tabId: fallbackTabId,
+      label: formatRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabLabel(fallbackTabId),
+    };
+  }
+  try {
+    const existingTabId =
+      window.sessionStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY)?.trim();
+    const tabId = existingTabId || fallbackTabId;
+    if (!existingTabId) {
+      window.sessionStorage.setItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY, tabId);
+    }
+    return {
+      tabId,
+      label: formatRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabLabel(tabId),
+    };
+  } catch {
+    return {
+      tabId: fallbackTabId,
+      label: formatRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabLabel(fallbackTabId),
+    };
+  }
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `replay-audit-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function limitPredicateRefReplayApplySyncAuditEntries(entries: PredicateRefReplayApplySyncAuditEntry[]) {
+  return entries.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_ENTRIES);
+}
+
+function normalizePredicateRefReplayApplySyncAuditEntry(value: unknown): PredicateRefReplayApplySyncAuditEntry | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.auditId !== "string"
+    || typeof record.at !== "string"
+    || typeof record.detail !== "string"
+    || typeof record.entryId !== "string"
+    || typeof record.kind !== "string"
+    || typeof record.sourceTabId !== "string"
+    || typeof record.sourceTabLabel !== "string"
+    || typeof record.templateId !== "string"
+    || typeof record.templateLabel !== "string"
+  ) {
+    return null;
+  }
+  if (!["local_apply", "local_restore", "remote_apply", "remote_restore"].includes(record.kind)) {
+    return null;
+  }
+  return {
+    at: record.at,
+    auditId: record.auditId,
+    detail: record.detail,
+    entryId: record.entryId,
+    kind: record.kind,
+    sourceTabId: record.sourceTabId,
+    sourceTabLabel: record.sourceTabLabel,
+    templateId: record.templateId,
+    templateLabel: record.templateLabel,
+  } as PredicateRefReplayApplySyncAuditEntry;
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
+  tabId: string,
+): PredicateRefReplayApplySyncAuditEntry[] {
+  if (typeof window === "undefined") {
+    return [];
+  }
+  try {
+    const raw = window.sessionStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw) as Partial<PredicateRefReplayApplySyncAuditTrailState> | null;
+    if (
+      !parsed
+      || parsed.version !== RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION
+      || typeof parsed.tabId !== "string"
+      || parsed.tabId !== tabId
+      || !Array.isArray(parsed.entries)
+    ) {
+      return [];
+    }
+    return limitPredicateRefReplayApplySyncAuditEntries(
+      parsed.entries
+        .map((entry) => normalizePredicateRefReplayApplySyncAuditEntry(entry))
+        .filter((entry): entry is PredicateRefReplayApplySyncAuditEntry => entry !== null),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function persistRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
+  tabId: string,
+  entries: PredicateRefReplayApplySyncAuditEntry[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const nextState: PredicateRefReplayApplySyncAuditTrailState = {
+      version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION,
+      tabId,
+      entries: limitPredicateRefReplayApplySyncAuditEntries(entries),
+    };
+    window.sessionStorage.setItem(
+      RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY,
+      JSON.stringify(nextState),
+    );
+  } catch {
+    return;
+  }
 }
 
 function normalizeReplayApplySnapshotRecord(value: unknown) {
@@ -15936,11 +16103,27 @@ function normalizePredicateRefReplayApplyHistoryEntry(value: unknown): Predicate
       groupSelectionsBySelectionKey: normalizeReplayApplySnapshotRecord(rollbackSnapshot.groupSelectionsBySelectionKey),
     },
     rows,
+    sourceTabId:
+      typeof record.sourceTabId === "string" || record.sourceTabId === null
+        ? record.sourceTabId
+        : null,
+    sourceTabLabel:
+      typeof record.sourceTabLabel === "string" || record.sourceTabLabel === null
+        ? record.sourceTabLabel
+        : null,
     templateId: record.templateId,
     templateLabel: record.templateLabel,
     lastRestoredAt:
       typeof record.lastRestoredAt === "string" || record.lastRestoredAt === null
         ? record.lastRestoredAt
+        : null,
+    lastRestoredByTabId:
+      typeof record.lastRestoredByTabId === "string" || record.lastRestoredByTabId === null
+        ? record.lastRestoredByTabId
+        : null,
+    lastRestoredByTabLabel:
+      typeof record.lastRestoredByTabLabel === "string" || record.lastRestoredByTabLabel === null
+        ? record.lastRestoredByTabLabel
         : null,
   };
 }
@@ -17447,13 +17630,23 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, boolean>>({});
   const [bundleCoordinationSimulationFinalSummaryOpen, setBundleCoordinationSimulationFinalSummaryOpen] =
     useState(false);
+  const predicateRefReplayApplyHistoryTabIdentity = useMemo(
+    () => loadRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabIdentity(),
+    [],
+  );
   const [predicateRefReplayApplyHistory, setPredicateRefReplayApplyHistory] =
     useState<PredicateRefReplayApplyHistoryEntry[]>(() => loadRunSurfaceCollectionQueryBuilderReplayApplyHistory());
+  const predicateRefReplayApplyHistoryRef = useRef<PredicateRefReplayApplyHistoryEntry[]>([]);
   const lastPersistedPredicateRefReplayApplyHistoryRef = useRef<string | null>(
     typeof window === "undefined"
       ? null
       : window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY),
   );
+  const [predicateRefReplayApplySyncAuditTrail, setPredicateRefReplayApplySyncAuditTrail] =
+    useState<PredicateRefReplayApplySyncAuditEntry[]>(() =>
+      loadRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
+        predicateRefReplayApplyHistoryTabIdentity.tabId,
+      ));
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18396,6 +18589,25 @@ function RunSurfaceCollectionQueryBuilder({
     () => selectedRefTemplateReplayApplyHistory[0] ?? null,
     [selectedRefTemplateReplayApplyHistory],
   );
+  const selectedRefTemplateReplayApplySyncAuditTrail = useMemo(
+    () => (
+      selectedRefTemplate
+        ? predicateRefReplayApplySyncAuditTrail.filter((entry) => entry.templateId === selectedRefTemplate.id)
+        : predicateRefReplayApplySyncAuditTrail
+    ),
+    [predicateRefReplayApplySyncAuditTrail, selectedRefTemplate],
+  );
+  useEffect(() => {
+    predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
+  }, [predicateRefReplayApplyHistory]);
+  const appendPredicateRefReplayApplySyncAuditEntry = useCallback(
+    (entry: PredicateRefReplayApplySyncAuditEntry) => {
+      setPredicateRefReplayApplySyncAuditTrail((current) =>
+        limitPredicateRefReplayApplySyncAuditEntries([entry, ...current]),
+      );
+    },
+    [],
+  );
   useEffect(() => {
     const serialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(predicateRefReplayApplyHistory);
     if (serialized === lastPersistedPredicateRefReplayApplyHistoryRef.current) {
@@ -18405,6 +18617,12 @@ function RunSurfaceCollectionQueryBuilder({
     lastPersistedPredicateRefReplayApplyHistoryRef.current = serialized;
   }, [predicateRefReplayApplyHistory]);
   useEffect(() => {
+    persistRunSurfaceCollectionQueryBuilderReplayApplySyncAuditTrail(
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+      predicateRefReplayApplySyncAuditTrail,
+    );
+  }, [predicateRefReplayApplyHistoryTabIdentity.tabId, predicateRefReplayApplySyncAuditTrail]);
+  useEffect(() => {
     if (typeof window === "undefined") {
       return undefined;
     }
@@ -18413,13 +18631,61 @@ function RunSurfaceCollectionQueryBuilder({
         return;
       }
       const remoteEntries = parseRunSurfaceCollectionQueryBuilderReplayApplyHistoryValue(event.newValue);
-      setPredicateRefReplayApplyHistory((current) => {
-        const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(current, remoteEntries);
-        const currentSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(current);
-        const mergedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
-        lastPersistedPredicateRefReplayApplyHistoryRef.current = mergedSerialized;
-        return mergedSerialized === currentSerialized ? current : mergedEntries;
+      const currentEntries = predicateRefReplayApplyHistoryRef.current;
+      const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(currentEntries, remoteEntries);
+      const currentSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(currentEntries);
+      const mergedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
+      lastPersistedPredicateRefReplayApplyHistoryRef.current = mergedSerialized;
+      if (mergedSerialized === currentSerialized) {
+        return;
+      }
+      const currentEntryById = new Map(
+        currentEntries.map((entry) => [entry.id, entry] as const),
+      );
+      const nextAuditEntries = remoteEntries.flatMap((remoteEntry: PredicateRefReplayApplyHistoryEntry) => {
+        const currentEntry = currentEntryById.get(remoteEntry.id) ?? null;
+        if (!currentEntry) {
+          return [{
+            at: remoteEntry.appliedAt,
+            auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+            detail: `${remoteEntry.sourceTabLabel ?? "Remote tab"} applied ${remoteEntry.approvedCount} replay rows.`,
+            entryId: remoteEntry.id,
+            kind: "remote_apply",
+            sourceTabId: remoteEntry.sourceTabId ?? "unknown",
+            sourceTabLabel: remoteEntry.sourceTabLabel ?? "Remote tab",
+            templateId: remoteEntry.templateId,
+            templateLabel: remoteEntry.templateLabel,
+          } satisfies PredicateRefReplayApplySyncAuditEntry];
+        }
+        const currentRestoredAt = currentEntry.lastRestoredAt ? Date.parse(currentEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+        const remoteRestoredAt = remoteEntry.lastRestoredAt ? Date.parse(remoteEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+        if (remoteRestoredAt > currentRestoredAt && remoteEntry.lastRestoredAt) {
+          return [{
+            at: remoteEntry.lastRestoredAt,
+            auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+            detail: `${remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab"} restored a replay snapshot.`,
+            entryId: remoteEntry.id,
+            kind: "remote_restore",
+            sourceTabId:
+              remoteEntry.lastRestoredByTabId ?? remoteEntry.sourceTabId ?? "unknown",
+            sourceTabLabel:
+              remoteEntry.lastRestoredByTabLabel ?? remoteEntry.sourceTabLabel ?? "Remote tab",
+            templateId: remoteEntry.templateId,
+            templateLabel: remoteEntry.templateLabel,
+          } satisfies PredicateRefReplayApplySyncAuditEntry];
+        }
+        return [];
       });
+      predicateRefReplayApplyHistoryRef.current = mergedEntries;
+      setPredicateRefReplayApplyHistory(mergedEntries);
+      if (nextAuditEntries.length) {
+        setPredicateRefReplayApplySyncAuditTrail((current) =>
+          limitPredicateRefReplayApplySyncAuditEntries([
+            ...nextAuditEntries,
+            ...current,
+          ]),
+        );
+      }
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
@@ -18676,12 +18942,29 @@ function RunSurfaceCollectionQueryBuilder({
             ? {
                 ...item,
                 lastRestoredAt: new Date().toISOString(),
+                lastRestoredByTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+                lastRestoredByTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
               }
             : item,
         ),
       );
+      appendPredicateRefReplayApplySyncAuditEntry({
+        at: new Date().toISOString(),
+        auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+        detail: `${predicateRefReplayApplyHistoryTabIdentity.label} restored the replay snapshot for ${entry.templateLabel}.`,
+        entryId: entry.id,
+        kind: "local_restore",
+        sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+        sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+        templateId: entry.templateId,
+        templateLabel: entry.templateLabel,
+      });
     },
-    [],
+    [
+      appendPredicateRefReplayApplySyncAuditEntry,
+      predicateRefReplayApplyHistoryTabIdentity.label,
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+    ],
   );
   const computeCoordinatedPredicateRefGroupBundleState = useCallback((
     policyOverridesByGroupKey: Record<
@@ -22419,6 +22702,8 @@ function RunSurfaceCollectionQueryBuilder({
                                                     simulatedBundleLabel: row.simulatedBundleLabel,
                                                     simulatedStatus: row.simulatedStatus,
                                                   })),
+                                                  sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+                                                  sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
                                                   templateId: selectedRefTemplate.id,
                                                   templateLabel: selectedRefTemplate.key,
                                                 };
@@ -22426,6 +22711,17 @@ function RunSurfaceCollectionQueryBuilder({
                                                   historyEntry,
                                                   ...current,
                                                 ].slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES));
+                                                appendPredicateRefReplayApplySyncAuditEntry({
+                                                  at: appliedAt,
+                                                  auditId: buildRunSurfaceCollectionQueryBuilderReplayApplySyncAuditId(),
+                                                  detail: `${predicateRefReplayApplyHistoryTabIdentity.label} applied ${historyEntry.approvedCount} approved replay rows.`,
+                                                  entryId: historyEntry.id,
+                                                  kind: "local_apply",
+                                                  sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+                                                  sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+                                                  templateId: historyEntry.templateId,
+                                                  templateLabel: historyEntry.templateLabel,
+                                                });
                                                 applyPredicateRefGroupPresetBundles(
                                                   selectedRefTemplate.id,
                                                   approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
@@ -22450,10 +22746,52 @@ function RunSurfaceCollectionQueryBuilder({
                                           <strong>Replay apply history</strong>
                                           <span>{`${selectedRefTemplateReplayApplyHistory.length} entries`}</span>
                                         </div>
+                                        <div className="run-surface-query-builder-trace-chip-list">
+                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                            {`Current tab · ${predicateRefReplayApplyHistoryTabIdentity.label}`}
+                                          </span>
+                                          <span className="run-surface-query-builder-trace-chip">
+                                            {selectedRefTemplateReplayApplySyncAuditTrail.length
+                                              ? `${selectedRefTemplateReplayApplySyncAuditTrail.length} sync audit events`
+                                              : "No sync audit events yet"}
+                                          </span>
+                                        </div>
                                         <p className="run-note">
                                           Each confirmed replay apply stores a rollback snapshot of the affected manual bundle
                                           selections and draft bindings for this template.
                                         </p>
+                                        {selectedRefTemplateReplayApplySyncAuditTrail.length ? (
+                                          <div className="run-surface-query-builder-trace-panel is-nested">
+                                            <div className="run-surface-query-builder-card-head">
+                                              <strong>Sync audit trail</strong>
+                                              <span>{`Session scoped · ${predicateRefReplayApplyHistoryTabIdentity.label}`}</span>
+                                            </div>
+                                            <div className="run-surface-query-builder-trace-list">
+                                              {selectedRefTemplateReplayApplySyncAuditTrail.map((auditEntry) => (
+                                                <div
+                                                  className={`run-surface-query-builder-trace-step is-${
+                                                    auditEntry.kind.includes("restore") ? "warning" : "info"
+                                                  }`}
+                                                  key={auditEntry.auditId}
+                                                >
+                                                  <strong>{auditEntry.templateLabel}</strong>
+                                                  <p>{auditEntry.detail}</p>
+                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                      {auditEntry.kind.replaceAll("_", " ")}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {auditEntry.sourceTabLabel}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {formatRelativeTimestampLabel(auditEntry.at)}
+                                                    </span>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : null}
                                         {latestSelectedRefTemplateReplayApplyEntry ? (
                                           <div className="run-surface-query-builder-actions">
                                             <button
@@ -22481,6 +22819,18 @@ function RunSurfaceCollectionQueryBuilder({
                                                 {`${entry.approvedCount} approved rows · ${entry.changedCurrentCount} changed current · ${entry.matchesSimulationCount} matched simulated · ${formatRelativeTimestampLabel(entry.appliedAt)}`}
                                               </p>
                                               <div className="run-surface-query-builder-trace-chip-list">
+                                                {entry.sourceTabLabel ? (
+                                                  <span className="run-surface-query-builder-trace-chip is-active">
+                                                    {`Applied by ${entry.sourceTabLabel}`}
+                                                  </span>
+                                                ) : null}
+                                                {entry.lastRestoredByTabLabel ? (
+                                                  <span className="run-surface-query-builder-trace-chip">
+                                                    {`Restored by ${entry.lastRestoredByTabLabel}`}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              <div className="run-surface-query-builder-trace-chip-list">
                                                 {entry.rows.map((row) => (
                                                   <span
                                                     className={`run-surface-query-builder-trace-chip${
@@ -22503,7 +22853,7 @@ function RunSurfaceCollectionQueryBuilder({
                                               </div>
                                               <p className="run-note">
                                                 {entry.lastRestoredAt
-                                                  ? `Last restored ${formatRelativeTimestampLabel(entry.lastRestoredAt)}.`
+                                                  ? `Last restored ${formatRelativeTimestampLabel(entry.lastRestoredAt)}${entry.lastRestoredByTabLabel ? ` by ${entry.lastRestoredByTabLabel}` : ""}.`
                                                   : "Snapshot available for rollback."}
                                               </p>
                                             </div>
