@@ -3130,6 +3130,8 @@ const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION = 1;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES = 12;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_ENTRIES = 24;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_ENTRIES = 24;
+const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_CONFLICT_ENTRIES = 8;
+const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_REVIEWED_CONFLICT_KEYS = 24;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-run-surface-replay-history-tab-id";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_KEY = "akra-trader-run-surface-replay-history-sync-audit";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_SESSION_VERSION = 1;
@@ -17213,9 +17215,13 @@ type RunSurfaceCollectionQueryBuilderReplayLinkAuditState = {
   version: number;
 };
 
+type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode = "live" | "opt_out" | "review";
+
 type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState = {
   redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  reviewedConflictKeys: string[];
   shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  syncMode: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode;
   version: number;
 };
 
@@ -17226,6 +17232,18 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState = {
   sourceTabLabel: string;
   updatedAt: string;
   version: number;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry = {
+  conflictKey: string;
+  detectedAt: string;
+  localRedactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  localShareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  remoteRedactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  remoteShareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  sourceTabId: string;
+  sourceTabLabel: string;
+  updatedAt: string;
 };
 
 type PredicateRefReplayApplyConflictState = {
@@ -18012,43 +18030,51 @@ function persistRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
 }
 
 function loadRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState() {
+  const defaultState = {
+    redactionPolicy: "full" as const,
+    reviewedConflictKeys: [] as string[],
+    shareMode: "portable" as const,
+    syncMode: "live" as const,
+  };
   if (typeof window === "undefined") {
-    return {
-      redactionPolicy: "full",
-      shareMode: "portable",
-    } as const;
+    return defaultState;
   }
   try {
     const raw = window.sessionStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_KEY);
     if (!raw) {
-      return {
-        redactionPolicy: "full",
-        shareMode: "portable",
-      } as const;
+      return defaultState;
     }
     const parsed = JSON.parse(raw) as Partial<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState> | null;
     return {
       redactionPolicy:
         parsed?.redactionPolicy === "omit_preview" || parsed?.redactionPolicy === "summary_only"
           ? parsed.redactionPolicy
-          : "full",
+          : defaultState.redactionPolicy,
+      reviewedConflictKeys: Array.isArray(parsed?.reviewedConflictKeys)
+        ? parsed.reviewedConflictKeys
+          .filter((value): value is string => typeof value === "string")
+          .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_REVIEWED_CONFLICT_KEYS)
+        : defaultState.reviewedConflictKeys,
       shareMode:
         parsed?.shareMode === "indirect"
           ? "indirect"
-          : "portable",
+          : defaultState.shareMode,
+      syncMode:
+        parsed?.syncMode === "opt_out" || parsed?.syncMode === "review"
+          ? parsed.syncMode
+          : defaultState.syncMode,
     } as const;
   } catch {
-    return {
-      redactionPolicy: "full",
-      shareMode: "portable",
-    } as const;
+    return defaultState;
   }
 }
 
 function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState(
   state: {
     redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    reviewedConflictKeys: string[];
     shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+    syncMode: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode;
   },
 ) {
   if (typeof window === "undefined") {
@@ -18123,6 +18149,50 @@ function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
   } catch {
     return;
   }
+}
+
+function limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceReviewedConflictKeys(keys: string[]) {
+  const seen = new Set<string>();
+  return keys.filter((key) => {
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  }).slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_REVIEWED_CONFLICT_KEYS);
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictKey(
+  state: Pick<
+    RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState,
+    "redactionPolicy" | "shareMode" | "sourceTabId" | "updatedAt"
+  >,
+) {
+  return [
+    state.sourceTabId,
+    state.updatedAt,
+    state.shareMode,
+    state.redactionPolicy,
+  ].join(":");
+}
+
+function limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflicts(
+  conflicts: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry[],
+) {
+  return conflicts.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_CONFLICT_ENTRIES);
+}
+
+function areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
+  left: {
+    redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  },
+  right: {
+    redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  },
+) {
+  return left.redactionPolicy === right.redactionPolicy && left.shareMode === right.shareMode;
 }
 
 function readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
@@ -20752,6 +20822,16 @@ function RunSurfaceCollectionQueryBuilder({
     useState<RunSurfaceCollectionQueryBuilderReplayLinkShareMode>(initialReplayLinkGovernanceState.shareMode);
   const [replayIntentRedactionPolicy, setReplayIntentRedactionPolicy] =
     useState<RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy>(initialReplayLinkGovernanceState.redactionPolicy);
+  const [replayIntentGovernanceSyncMode, setReplayIntentGovernanceSyncMode] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode>(initialReplayLinkGovernanceState.syncMode);
+  const [replayIntentGovernanceConflicts, setReplayIntentGovernanceConflicts] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictEntry[]>([]);
+  const [replayIntentGovernanceReviewedConflictKeys, setReplayIntentGovernanceReviewedConflictKeys] =
+    useState<string[]>(
+      limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceReviewedConflictKeys(
+        initialReplayLinkGovernanceState.reviewedConflictKeys,
+      ),
+    );
   const [replayIntentShareStatus, setReplayIntentShareStatus] = useState<{
     message: string;
     tone: "error" | "muted" | "success";
@@ -22667,14 +22747,118 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [replayIntentLinkAuditTrail, selectedRefTemplate?.key],
   );
+  const dismissReplayIntentGovernanceConflict = useCallback(
+    (conflictKey: string, options?: { rememberResolution?: boolean }) => {
+      setReplayIntentGovernanceConflicts((current) =>
+        current.filter((entry) => entry.conflictKey !== conflictKey),
+      );
+      if (options?.rememberResolution !== false) {
+        setReplayIntentGovernanceReviewedConflictKeys((current) =>
+          limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceReviewedConflictKeys([
+            conflictKey,
+            ...current,
+          ]),
+        );
+      }
+    },
+    [],
+  );
+  const handleIncomingReplayIntentGovernanceSyncState = useCallback(
+    (
+      remoteGovernance: RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState | null,
+      options?: { source?: "bootstrap" | "storage" },
+    ) => {
+      if (!remoteGovernance || remoteGovernance.sourceTabId === predicateRefReplayApplyHistoryTabIdentity.tabId) {
+        return;
+      }
+      const conflictKey = buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflictKey(remoteGovernance);
+      if (areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
+        {
+          redactionPolicy: replayIntentRedactionPolicy,
+          shareMode: replayIntentShareMode,
+        },
+        remoteGovernance,
+      )) {
+        setReplayIntentGovernanceConflicts((current) =>
+          current.filter((entry) => entry.conflictKey !== conflictKey),
+        );
+        return;
+      }
+      if (replayIntentGovernanceSyncMode === "opt_out") {
+        setReplayIntentShareStatus({
+          message: `${remoteGovernance.sourceTabLabel} changed replay link governance, but this tab is set to ignore remote sync.`,
+          tone: "muted",
+        });
+        return;
+      }
+      if (replayIntentGovernanceSyncMode === "review") {
+        if (replayIntentGovernanceReviewedConflictKeys.includes(conflictKey)) {
+          return;
+        }
+        setReplayIntentGovernanceConflicts((current) => {
+          const nextByKey = new Map(
+            current.map((entry) => [entry.conflictKey, entry] as const),
+          );
+          nextByKey.set(conflictKey, {
+            conflictKey,
+            detectedAt: new Date().toISOString(),
+            localRedactionPolicy: replayIntentRedactionPolicy,
+            localShareMode: replayIntentShareMode,
+            remoteRedactionPolicy: remoteGovernance.redactionPolicy,
+            remoteShareMode: remoteGovernance.shareMode,
+            sourceTabId: remoteGovernance.sourceTabId,
+            sourceTabLabel: remoteGovernance.sourceTabLabel,
+            updatedAt: remoteGovernance.updatedAt,
+          });
+          return limitRunSurfaceCollectionQueryBuilderReplayLinkGovernanceConflicts(
+            Array.from(nextByKey.values()).sort((left, right) => right.detectedAt.localeCompare(left.detectedAt)),
+          );
+        });
+        setReplayIntentShareStatus({
+          message:
+            options?.source === "bootstrap"
+              ? `${remoteGovernance.sourceTabLabel} has a pending replay link governance change waiting for review in this tab.`
+              : `${remoteGovernance.sourceTabLabel} updated replay link governance. Review the pending change before applying it here.`,
+          tone: "muted",
+        });
+        return;
+      }
+      setReplayIntentGovernanceConflicts((current) =>
+        current.filter((entry) => entry.conflictKey !== conflictKey),
+      );
+      setReplayIntentShareMode(remoteGovernance.shareMode);
+      setReplayIntentRedactionPolicy(remoteGovernance.redactionPolicy);
+      setReplayIntentShareStatus({
+        message: `${remoteGovernance.sourceTabLabel} synced replay link governance to ${remoteGovernance.shareMode} / ${remoteGovernance.redactionPolicy.replaceAll("_", " ")}.`,
+        tone: "muted",
+      });
+    },
+    [
+      dismissReplayIntentGovernanceConflict,
+      predicateRefReplayApplyHistoryTabIdentity.tabId,
+      replayIntentGovernanceReviewedConflictKeys,
+      replayIntentGovernanceSyncMode,
+      replayIntentRedactionPolicy,
+      replayIntentShareMode,
+    ],
+  );
   useEffect(() => {
     setReplayIntentShareStatus(null);
   }, [currentRunSurfaceCollectionQueryBuilderReplayIntentLink]);
   useEffect(() => {
     persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState({
       redactionPolicy: replayIntentRedactionPolicy,
+      reviewedConflictKeys: replayIntentGovernanceReviewedConflictKeys,
       shareMode: replayIntentShareMode,
+      syncMode: replayIntentGovernanceSyncMode,
     });
+  }, [
+    replayIntentGovernanceReviewedConflictKeys,
+    replayIntentGovernanceSyncMode,
+    replayIntentRedactionPolicy,
+    replayIntentShareMode,
+  ]);
+  useEffect(() => {
     persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState({
       redactionPolicy: replayIntentRedactionPolicy,
       shareMode: replayIntentShareMode,
@@ -22717,20 +22901,51 @@ function RunSurfaceCollectionQueryBuilder({
       if (event.key !== RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY) {
         return;
       }
-      const remoteGovernance = readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(event.newValue);
-      if (!remoteGovernance || remoteGovernance.sourceTabId === predicateRefReplayApplyHistoryTabIdentity.tabId) {
-        return;
-      }
-      setReplayIntentShareMode(remoteGovernance.shareMode);
-      setReplayIntentRedactionPolicy(remoteGovernance.redactionPolicy);
-      setReplayIntentShareStatus({
-        message: `${remoteGovernance.sourceTabLabel} synced replay link governance to ${remoteGovernance.shareMode} / ${remoteGovernance.redactionPolicy.replaceAll("_", " ")}.`,
-        tone: "muted",
-      });
+      handleIncomingReplayIntentGovernanceSyncState(
+        readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(event.newValue),
+        { source: "storage" },
+      );
     };
     window.addEventListener("storage", handleStorage);
     return () => window.removeEventListener("storage", handleStorage);
-  }, [predicateRefReplayApplyHistoryTabIdentity.label, predicateRefReplayApplyHistoryTabIdentity.tabId]);
+  }, [handleIncomingReplayIntentGovernanceSyncState]);
+  useEffect(() => {
+    if (replayIntentGovernanceSyncMode !== "review" && replayIntentGovernanceConflicts.length) {
+      setReplayIntentGovernanceConflicts([]);
+    }
+  }, [replayIntentGovernanceConflicts.length, replayIntentGovernanceSyncMode]);
+  useEffect(() => {
+    setReplayIntentGovernanceConflicts((current) =>
+      current.filter((entry) =>
+        !replayIntentGovernanceReviewedConflictKeys.includes(entry.conflictKey)
+        && !areRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSelectionsEqual(
+          {
+            redactionPolicy: replayIntentRedactionPolicy,
+            shareMode: replayIntentShareMode,
+          },
+          {
+            redactionPolicy: entry.remoteRedactionPolicy,
+            shareMode: entry.remoteShareMode,
+          },
+        ),
+      ),
+    );
+  }, [
+    replayIntentGovernanceReviewedConflictKeys,
+    replayIntentRedactionPolicy,
+    replayIntentShareMode,
+  ]);
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    handleIncomingReplayIntentGovernanceSyncState(
+      readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
+        window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY),
+      ),
+      { source: "bootstrap" },
+    );
+  }, [handleIncomingReplayIntentGovernanceSyncState]);
   const applyRunSurfaceCollectionQueryBuilderReplayIntent = useCallback(
     (intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null) => {
       if (!intent) {
@@ -28401,6 +28616,20 @@ function RunSurfaceCollectionQueryBuilder({
                               <option value="summary_only">Summary only</option>
                             </select>
                           </label>
+                          <label className="run-surface-query-builder-control">
+                            <span>Sync mode</span>
+                            <select
+                              value={replayIntentGovernanceSyncMode}
+                              onChange={(event) =>
+                                setReplayIntentGovernanceSyncMode(
+                                  event.target.value as RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncMode,
+                                )}
+                            >
+                              <option value="live">Live sync</option>
+                              <option value="review">Review remote changes</option>
+                              <option value="opt_out">Ignore remote changes</option>
+                            </select>
+                          </label>
                           <button
                             className="ghost-button"
                             onClick={() => {
@@ -28438,10 +28667,90 @@ function RunSurfaceCollectionQueryBuilder({
                               ? "Preview redaction keeps filters and replay step but drops preview trace/diff focus."
                               : "Summary redaction keeps high-level replay scope and filters while dropping step, edge, and preview focus."}
                         </p>
+                        <p className="run-note">
+                          {replayIntentGovernanceSyncMode === "live"
+                            ? "Remote tab governance changes apply immediately in this tab."
+                            : replayIntentGovernanceSyncMode === "review"
+                              ? "Remote governance changes queue for review before this tab adopts them."
+                              : "This tab keeps its own replay link governance and ignores remote tab updates."}
+                        </p>
+                        <div className="run-surface-query-builder-trace-chip-list">
+                          <span className="run-surface-query-builder-trace-chip is-active">
+                            {`Current tab · ${predicateRefReplayApplyHistoryTabIdentity.label}`}
+                          </span>
+                          <span className="run-surface-query-builder-trace-chip">
+                            {replayIntentGovernanceConflicts.length
+                              ? `${replayIntentGovernanceConflicts.length} pending governance review${replayIntentGovernanceConflicts.length === 1 ? "" : "s"}`
+                              : "No pending governance conflicts"}
+                          </span>
+                        </div>
                         {replayIntentShareStatus ? (
                           <p className={`run-note run-surface-query-builder-note is-${replayIntentShareStatus.tone}`}>
                             {replayIntentShareStatus.message}
                           </p>
+                        ) : null}
+                        {replayIntentGovernanceConflicts.length ? (
+                          <div className="run-surface-query-builder-trace-panel is-nested">
+                            <div className="run-surface-query-builder-card-head">
+                              <strong>Pending governance sync conflicts</strong>
+                              <span>{`${replayIntentGovernanceConflicts.length} pending`}</span>
+                            </div>
+                            <p className="run-note">
+                              Remote tabs changed replay link share governance while this tab stayed on a different configuration.
+                              Review each change to decide whether this tab keeps its local policy or adopts the remote one.
+                            </p>
+                            <div className="run-surface-query-builder-trace-list">
+                              {replayIntentGovernanceConflicts.map((conflict) => (
+                                <div
+                                  className="run-surface-query-builder-trace-step is-warning"
+                                  key={`replay-link-governance-conflict:${conflict.conflictKey}`}
+                                >
+                                  <strong>{conflict.sourceTabLabel}</strong>
+                                  <p>
+                                    {`Detected ${formatRelativeTimestampLabel(conflict.detectedAt)} · remote ${conflict.remoteShareMode} / ${conflict.remoteRedactionPolicy.replaceAll("_", " ")} · local ${conflict.localShareMode} / ${conflict.localRedactionPolicy.replaceAll("_", " ")}.`}
+                                  </p>
+                                  <div className="run-surface-query-builder-trace-chip-list">
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {`Local · ${conflict.localShareMode} · ${conflict.localRedactionPolicy.replaceAll("_", " ")}`}
+                                    </span>
+                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                      {`Remote · ${conflict.remoteShareMode} · ${conflict.remoteRedactionPolicy.replaceAll("_", " ")}`}
+                                    </span>
+                                  </div>
+                                  <div className="run-surface-query-builder-actions">
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        dismissReplayIntentGovernanceConflict(conflict.conflictKey);
+                                        setReplayIntentShareStatus({
+                                          message: `Kept local replay link governance for ${predicateRefReplayApplyHistoryTabIdentity.label} instead of ${conflict.sourceTabLabel}.`,
+                                          tone: "muted",
+                                        });
+                                      }}
+                                      type="button"
+                                    >
+                                      Keep local governance
+                                    </button>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        setReplayIntentShareMode(conflict.remoteShareMode);
+                                        setReplayIntentRedactionPolicy(conflict.remoteRedactionPolicy);
+                                        dismissReplayIntentGovernanceConflict(conflict.conflictKey);
+                                        setReplayIntentShareStatus({
+                                          message: `Applied ${conflict.sourceTabLabel}'s replay link governance in this tab.`,
+                                          tone: "success",
+                                        });
+                                      }}
+                                      type="button"
+                                    >
+                                      Apply remote governance
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         ) : null}
                         {visibleReplayIntentLinkAuditTrail.length ? (
                           <div className="run-surface-query-builder-trace-panel is-nested">
