@@ -5840,18 +5840,36 @@
       "direction_id": "experiment-os",
       "title": "Complete preview-driven reverse sync into provenance selection and stable diff refresh",
       "description": "Finish the remaining preview-driven reverse-sync gap by making focused candidates chosen from clause re-evaluation preview rows automatically follow through into provenance or run-context selection, and by keeping the same diff row selected while clause editor edits incrementally refresh the preview, so operators can continue one inspection thread without losing source context or row focus after each draft tweak.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 25,
-      "priority_reason": "The latest main-session reply says the last unfinished step after commit 9c1c280 is preview-driven reverse sync: focused candidates from preview rows still do not drive provenance or run-context selection, and clause editor edits do not yet incrementally refresh while preserving the same diff row. Promote this to `ready` as the clearest executable next task for builtin next-task automation.",
+      "priority_reason": "Completed in main session commit 28e8afc, which synced clause re-evaluation preview selection back into provenance and run context via `primarySampleKey` and sample lookup, preserved preview trace plus diff-row selection across re-computation, retained row selection while returning editor focus from preview, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-make-re-evaluation-preview-panels-drive-candidate-drillthrough-and-editor-focus"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:50:00Z",
+      "updated_at": "2026-04-20T12:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Deepens experiment-os replay and clause-authoring trust by closing the last preview-driven reverse-sync gap, keeping candidate evidence, provenance selection, and incrementally refreshed clause-diff rows aligned through ongoing edits."
+      "direction_relation_note": "Completed the main reverse-sync pass for experiment-os replay and clause-authoring trust by keeping candidate evidence, provenance selection, editor focus, and incrementally refreshed clause-diff rows aligned through ongoing edits."
+    },
+    {
+      "id": "planning-experiment-os-finish-preview-selection-priority-and-auto-scroll-polish",
+      "direction_id": "experiment-os",
+      "title": "Finish preview selection priority and auto-scroll polish",
+      "description": "Polish the remaining clause re-evaluation preview sync edge cases by auto-scrolling the preview panel back to the selected diff row after clause draft recalculation and by reinterpreting preview selection with explicit priority rules when provenance or run selection changes underneath it, so the synchronized replay and provenance workflow stays predictable through both editor-driven and provenance-driven context shifts.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 24,
+      "priority_reason": "The latest main-session reply says the reverse-sync feature shipped in commit 28e8afc, and explicitly identifies the remaining executable follow-up: auto-scroll the preview panel to the preserved selected diff row after draft edits, and define priority-based preview selection reinterpretation when provenance selection changes. Promote this as the next `ready` queue head for builtin next-task automation.",
+      "depends_on": [
+        "planning-experiment-os-complete-preview-driven-reverse-sync-into-provenance-selection-and-stable-diff-refresh"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T12:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay and clause-authoring trust by making synchronized preview selection behavior deterministic and visibly anchored even when draft recalculation or provenance-side reselection changes the surrounding context."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
