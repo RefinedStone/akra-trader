@@ -3125,6 +3125,8 @@ const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY = "akra-trader-run
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_VERSION = 1;
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_KEY = "akra-trader-run-surface-replay-link-governance";
 const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SESSION_VERSION = 1;
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY = "akra-trader-run-surface-replay-link-governance-sync";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION = 1;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES = 12;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_ENTRIES = 24;
 const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_ENTRIES = 24;
@@ -17217,6 +17219,15 @@ type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceState = {
   version: number;
 };
 
+type RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState = {
+  redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+  sourceTabId: string;
+  sourceTabLabel: string;
+  updatedAt: string;
+  version: number;
+};
+
 type PredicateRefReplayApplyConflictState = {
   conflicts: PredicateRefReplayApplyConflictEntry[];
   tabId: string;
@@ -17883,11 +17894,20 @@ function buildRunSurfaceCollectionQueryBuilderReplayLinkAuditId() {
 }
 
 function loadRunSurfaceCollectionQueryBuilderReplayLinkAliases() {
+  return loadRunSurfaceCollectionQueryBuilderReplayLinkAliasesFromStorageValue(
+    typeof window === "undefined"
+      ? null
+      : window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_KEY),
+  );
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayLinkAliasesFromStorageValue(
+  raw: string | null | undefined,
+) {
   if (typeof window === "undefined") {
     return [] as RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[];
   }
   try {
-    const raw = window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -17933,11 +17953,20 @@ function persistRunSurfaceCollectionQueryBuilderReplayLinkAliases(
 }
 
 function loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail() {
+  return loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrailFromStorageValue(
+    typeof window === "undefined"
+      ? null
+      : window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY),
+  );
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrailFromStorageValue(
+  raw: string | null | undefined,
+) {
   if (typeof window === "undefined") {
     return [] as RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[];
   }
   try {
-    const raw = window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -18035,6 +18064,97 @@ function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceState(
     );
   } catch {
     return;
+  }
+}
+
+function mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+  current: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[],
+  incoming: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[],
+) {
+  const byId = new Map<string, RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry>();
+  [...incoming, ...current].forEach((entry) => {
+    const existing = byId.get(entry.aliasId);
+    if (!existing || existing.createdAt < entry.createdAt) {
+      byId.set(entry.aliasId, entry);
+    }
+  });
+  return Array.from(byId.values())
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_ENTRIES);
+}
+
+function mergeRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(
+  current: RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[],
+  incoming: RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[],
+) {
+  const seen = new Set<string>();
+  return [...incoming, ...current]
+    .filter((entry) => {
+      if (seen.has(entry.id)) {
+        return false;
+      }
+      seen.add(entry.id);
+      return true;
+    })
+    .sort((left, right) => right.at.localeCompare(left.at))
+    .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_ENTRIES);
+}
+
+function persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
+  state: {
+    redactionPolicy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+    shareMode: RunSurfaceCollectionQueryBuilderReplayLinkShareMode;
+    sourceTabId: string;
+    sourceTabLabel: string;
+  },
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY,
+      JSON.stringify({
+        ...state,
+        updatedAt: new Date().toISOString(),
+        version: RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION,
+      } satisfies RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState),
+    );
+  } catch {
+    return;
+  }
+}
+
+function readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(
+  raw: string | null | undefined,
+): RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState | null {
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<RunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState> | null;
+    if (
+      !parsed
+      || parsed.version !== RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION
+      || typeof parsed.sourceTabId !== "string"
+      || typeof parsed.sourceTabLabel !== "string"
+      || typeof parsed.updatedAt !== "string"
+    ) {
+      return null;
+    }
+    return {
+      redactionPolicy:
+        parsed.redactionPolicy === "omit_preview" || parsed.redactionPolicy === "summary_only"
+          ? parsed.redactionPolicy
+          : "full",
+      shareMode: parsed.shareMode === "indirect" ? "indirect" : "portable",
+      sourceTabId: parsed.sourceTabId,
+      sourceTabLabel: parsed.sourceTabLabel,
+      updatedAt: parsed.updatedAt,
+      version: RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_VERSION,
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -20640,6 +20760,10 @@ function RunSurfaceCollectionQueryBuilder({
     useState<RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[]>(() =>
       loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(),
     );
+  const [replayIntentLinkAliases, setReplayIntentLinkAliases] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[]>(() =>
+      loadRunSurfaceCollectionQueryBuilderReplayLinkAliases(),
+    );
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -22551,10 +22675,62 @@ function RunSurfaceCollectionQueryBuilder({
       redactionPolicy: replayIntentRedactionPolicy,
       shareMode: replayIntentShareMode,
     });
-  }, [replayIntentRedactionPolicy, replayIntentShareMode]);
+    persistRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState({
+      redactionPolicy: replayIntentRedactionPolicy,
+      shareMode: replayIntentShareMode,
+      sourceTabId: predicateRefReplayApplyHistoryTabIdentity.tabId,
+      sourceTabLabel: predicateRefReplayApplyHistoryTabIdentity.label,
+    });
+  }, [
+    predicateRefReplayApplyHistoryTabIdentity.label,
+    predicateRefReplayApplyHistoryTabIdentity.tabId,
+    replayIntentRedactionPolicy,
+    replayIntentShareMode,
+  ]);
   useEffect(() => {
     persistRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(replayIntentLinkAuditTrail);
   }, [replayIntentLinkAuditTrail]);
+  useEffect(() => {
+    persistRunSurfaceCollectionQueryBuilderReplayLinkAliases(replayIntentLinkAliases);
+  }, [replayIntentLinkAliases]);
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_ALIAS_STORAGE_KEY) {
+        const remoteAliases =
+          loadRunSurfaceCollectionQueryBuilderReplayLinkAliasesFromStorageValue(event.newValue);
+        setReplayIntentLinkAliases((current) =>
+          mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(current, remoteAliases),
+        );
+        return;
+      }
+      if (event.key === RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_AUDIT_STORAGE_KEY) {
+        const remoteAuditTrail =
+          loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrailFromStorageValue(event.newValue);
+        setReplayIntentLinkAuditTrail((current) =>
+          mergeRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(current, remoteAuditTrail),
+        );
+        return;
+      }
+      if (event.key !== RUN_SURFACE_QUERY_BUILDER_REPLAY_LINK_GOVERNANCE_SYNC_STORAGE_KEY) {
+        return;
+      }
+      const remoteGovernance = readRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSyncState(event.newValue);
+      if (!remoteGovernance || remoteGovernance.sourceTabId === predicateRefReplayApplyHistoryTabIdentity.tabId) {
+        return;
+      }
+      setReplayIntentShareMode(remoteGovernance.shareMode);
+      setReplayIntentRedactionPolicy(remoteGovernance.redactionPolicy);
+      setReplayIntentShareStatus({
+        message: `${remoteGovernance.sourceTabLabel} synced replay link governance to ${remoteGovernance.shareMode} / ${remoteGovernance.redactionPolicy.replaceAll("_", " ")}.`,
+        tone: "muted",
+      });
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, [predicateRefReplayApplyHistoryTabIdentity.label, predicateRefReplayApplyHistoryTabIdentity.tabId]);
   const applyRunSurfaceCollectionQueryBuilderReplayIntent = useCallback(
     (intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null) => {
       if (!intent) {
@@ -22617,10 +22793,12 @@ function RunSurfaceCollectionQueryBuilder({
         templateKey: selectedRefTemplate.key,
         templateLabel: selectedRefTemplate.key,
       };
-      persistRunSurfaceCollectionQueryBuilderReplayLinkAliases([
-        nextAliasEntry,
-        ...loadRunSurfaceCollectionQueryBuilderReplayLinkAliases().filter((entry) => entry.aliasId !== aliasId),
-      ]);
+      setReplayIntentLinkAliases((current) =>
+        mergeRunSurfaceCollectionQueryBuilderReplayLinkAliases(
+          current,
+          [nextAliasEntry],
+        ),
+      );
       nextUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
         selectedRefTemplate.key,
         redactedIntent,
@@ -22643,6 +22821,7 @@ function RunSurfaceCollectionQueryBuilder({
     predicateRefReplayApplyHistoryTabIdentity.tabId,
     redactedRunSurfaceCollectionQueryBuilderReplayIntent,
     redactedRunSurfaceCollectionQueryBuilderReplayIntentCompactValue?.length,
+    setReplayIntentLinkAliases,
     replayIntentRedactionPolicy,
     replayIntentShareMode,
     selectedRefTemplate?.key,
