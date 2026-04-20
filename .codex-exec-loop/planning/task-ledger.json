@@ -5174,18 +5174,72 @@
       "direction_id": "experiment-os",
       "title": "Persist replay apply rollback snapshots and confirmation history across reload",
       "description": "Lift the newly shipped replay apply rollback snapshots and confirmation history out of transient query-builder state into the persisted storage layer, so replay apply audit entries and restore points survive reloads or reopened sessions instead of resetting with the mounted UI state.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply explicitly says rollback snapshots and confirmation history now work only inside the current session and that persistence is the remaining gap. That makes durable storage for replay apply history the immediate executable next task after commit 235fbdd, with no extra operator decision needed.",
+      "priority_reason": "Completed in main session commit b80136b, which moved replay apply history onto localStorage-backed state, persisted approved-row summaries plus rollback snapshots plus restore timestamps across reload, normalized stored entries on load, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-preserve-applied-replay-drafts-in-an-undo-stack"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T06:15:00Z",
+      "updated_at": "2026-04-21T06:45:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os operator trust from session-local replay rollback safety into durable cross-reload recovery, ensuring replay apply audit and restore history behaves like the rest of the persisted control-room workspace state."
+      "direction_relation_note": "Completed the durable replay apply recovery layer by making rollback snapshots and confirmation history survive reload and reopened sessions, which now leaves cross-session coordination and portability as the remaining follow-up surface."
+    },
+    {
+      "id": "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs",
+      "direction_id": "experiment-os",
+      "title": "Coordinate persisted replay apply history across browser tabs",
+      "description": "Build on the shipped localStorage-backed replay apply persistence by reconciling replay apply history inventory, latest rollback affordances, and restore actions across concurrent tabs or windows, so one operator session cannot silently diverge from another when replay apply or rollback occurs in parallel control-room views.",
+      "status": "done",
+      "base_priority": 87,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "Completed in main session commit 7571cb0, which merged replay apply history across tabs via the `storage` event, reconciled rollback restore timestamps and entry inventories instead of replacing them, avoided redundant rewrites when serialized state did not change, and passed `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
+      "depends_on": [
+        "planning-experiment-os-persist-replay-apply-rollback-history-across-reload"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T06:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the multi-tab replay-history coordination layer by keeping persisted apply and restore state coherent across concurrent control-room tabs, which now leaves operator-visible sync attribution and audit explanation as the clearest follow-up."
+    },
+    {
+      "id": "planning-experiment-os-add-tab-identity-and-sync-audit-for-replay-apply-history",
+      "direction_id": "experiment-os",
+      "title": "Add tab identity and sync audit trail UI for replay apply history",
+      "description": "Build on the shipped cross-tab replay apply history sync by attaching explicit tab identity and per-change sync metadata to apply or restore events, then surface that attribution in the replay apply history UI so operators can see which tab triggered a replay mutation or rollback restore instead of relying on silent propagation alone.",
+      "status": "ready",
+      "base_priority": 86,
+      "dynamic_priority_delta": 11,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is a sync explanation layer: replay apply history now stays aligned across tabs, but operators still cannot tell which tab issued an apply or restore or inspect a sync audit trail. That makes tab identity plus replay-history audit UI the clearest executable next task with no extra operator decision required.",
+      "depends_on": [
+        "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T06:55:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os replay-apply trust from coherent background synchronization into operator-explainable sync behavior, so cross-tab apply and rollback history can be audited instead of only merged."
+    },
+    {
+      "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
+      "direction_id": "experiment-os",
+      "title": "Add export/import or profile-scoped retention for replay apply history",
+      "description": "Extend the durable replay apply history beyond one browser's localStorage bucket by supporting explicit export or import, profile-scoped sync, or another portable retention contract for replay apply confirmation history and rollback snapshots, so operators can preserve or transfer replay mutation audit context across browser profiles, devices, or longer-lived sessions.",
+      "status": "proposed",
+      "base_priority": 85,
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply explicitly keeps history export or import on the table after reload persistence shipped, but that follow-up still needs a product-shape choice between portable transfer, profile-scoped sync, and retention posture. Keep it proposed behind the more direct real-time cross-tab coordination task.",
+      "depends_on": [
+        "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T06:45:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply durability from local browser persistence into a portable or account-scoped audit artifact, helping replay rollback evidence survive beyond one device or browser context."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
