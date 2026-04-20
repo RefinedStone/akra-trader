@@ -106,6 +106,8 @@ It is not yet a finished live trading product:
 - run-surface capability and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - query-builder feature logic now lives under `apps/web/src/features/query-builder/*`
+- query-builder now separates a tiny entry module, a feature model module, and the main component
+  module so parser/storage logic is no longer mixed into the feature entrypoint
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body

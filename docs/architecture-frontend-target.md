@@ -19,6 +19,7 @@ This wave introduces the first routing skeleton:
 - run-surface capability contracts and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - the query-builder feature now has its own package under `apps/web/src/features/query-builder/*`
+  with a tiny entrypoint, a feature model module, and a dedicated component module
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -63,9 +64,10 @@ where routing and presentation structure are decided.
 - route composition
   - keep overview, research, runtime ops, and guarded-live panel grouping in `src/routes/*`
 - remaining giant feature body
-  - dense feature JSX still lives mostly in `App.tsx`, but query-builder no longer does
-  - top-level control-room type/constant, transport, and run-surface contract context no longer
-    lives inline in that file
+- dense feature JSX still lives mostly in `App.tsx`, but query-builder no longer does
+- query-builder entry no longer mixes parser/storage/model helpers with the main component body
+- top-level control-room type/constant, transport, and run-surface contract context no longer
+  lives inline in that file
   - next waves should split comparison/history and run-panel bodies into feature-owned modules behind
     each route
 
