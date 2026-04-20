@@ -3078,6 +3078,9 @@ const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_KEY = "akra-trader-comparison-toolt
 const COMPARISON_TOOLTIP_CONFLICT_UI_STORAGE_VERSION = 1;
 const COMPARISON_TOOLTIP_TUNING_SHARE_PARAM = "comparisonTooltipTuning";
 const LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY = "akra-trader-gap-window-expansion";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY = "akra-trader-run-surface-replay-history";
+const RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION = 1;
+const MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES = 12;
 const COMPARISON_RUN_ID_SEARCH_PARAM = "compare_run_id";
 const COMPARISON_INTENT_SEARCH_PARAM = "compare_intent";
 const COMPARISON_FOCUS_RUN_ID_SEARCH_PARAM = "compare_focus_run_id";
@@ -15802,6 +15805,35 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateState = {
   node: RunSurfaceCollectionQueryBuilderChildState;
 };
 
+type PredicateRefReplayApplyHistoryRow = {
+  changesCurrent: boolean;
+  currentBundleLabel: string;
+  currentStatus: string;
+  groupKey: string;
+  groupLabel: string;
+  matchesSimulation: boolean;
+  promotedBundleKey: string;
+  promotedBundleLabel: string;
+  simulatedBundleLabel: string;
+  simulatedStatus: string;
+};
+
+type PredicateRefReplayApplyHistoryEntry = {
+  appliedAt: string;
+  approvedCount: number;
+  changedCurrentCount: number;
+  id: string;
+  matchesSimulationCount: number;
+  rollbackSnapshot: {
+    draftBindingsByParameterKey: Record<string, string | null>;
+    groupSelectionsBySelectionKey: Record<string, string | null>;
+  };
+  rows: PredicateRefReplayApplyHistoryRow[];
+  templateId: string;
+  templateLabel: string;
+  lastRestoredAt?: string | null;
+};
+
 type HydratedRunSurfaceCollectionQueryBuilderExpressionState = {
   mode: "single" | "grouped";
   draftClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
@@ -15822,6 +15854,142 @@ const RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID = "root";
 
 function buildRunSurfaceCollectionQueryBuilderEntityId(prefix: string) {
   return `${prefix}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function normalizeReplayApplySnapshotRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return {};
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, entryValue]) =>
+      typeof key === "string" && (typeof entryValue === "string" || entryValue === null)
+        ? [[key, entryValue] as const]
+        : [],
+    ),
+  );
+}
+
+function normalizePredicateRefReplayApplyHistoryEntry(value: unknown): PredicateRefReplayApplyHistoryEntry | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.id !== "string"
+    || typeof record.appliedAt !== "string"
+    || typeof record.templateId !== "string"
+    || typeof record.templateLabel !== "string"
+    || typeof record.approvedCount !== "number"
+    || typeof record.changedCurrentCount !== "number"
+    || typeof record.matchesSimulationCount !== "number"
+    || !Array.isArray(record.rows)
+  ) {
+    return null;
+  }
+  const rows = record.rows.flatMap((rowValue) => {
+    if (!rowValue || typeof rowValue !== "object" || Array.isArray(rowValue)) {
+      return [];
+    }
+    const rowRecord = rowValue as Record<string, unknown>;
+    if (
+      typeof rowRecord.groupKey !== "string"
+      || typeof rowRecord.groupLabel !== "string"
+      || typeof rowRecord.currentBundleLabel !== "string"
+      || typeof rowRecord.currentStatus !== "string"
+      || typeof rowRecord.simulatedBundleLabel !== "string"
+      || typeof rowRecord.simulatedStatus !== "string"
+      || typeof rowRecord.promotedBundleKey !== "string"
+      || typeof rowRecord.promotedBundleLabel !== "string"
+      || typeof rowRecord.matchesSimulation !== "boolean"
+      || typeof rowRecord.changesCurrent !== "boolean"
+    ) {
+      return [];
+    }
+    return [{
+      changesCurrent: rowRecord.changesCurrent,
+      currentBundleLabel: rowRecord.currentBundleLabel,
+      currentStatus: rowRecord.currentStatus,
+      groupKey: rowRecord.groupKey,
+      groupLabel: rowRecord.groupLabel,
+      matchesSimulation: rowRecord.matchesSimulation,
+      promotedBundleKey: rowRecord.promotedBundleKey,
+      promotedBundleLabel: rowRecord.promotedBundleLabel,
+      simulatedBundleLabel: rowRecord.simulatedBundleLabel,
+      simulatedStatus: rowRecord.simulatedStatus,
+    } satisfies PredicateRefReplayApplyHistoryRow];
+  });
+  if (!rows.length) {
+    return null;
+  }
+  const rollbackSnapshot =
+    record.rollbackSnapshot && typeof record.rollbackSnapshot === "object" && !Array.isArray(record.rollbackSnapshot)
+      ? (record.rollbackSnapshot as Record<string, unknown>)
+      : {};
+  return {
+    appliedAt: record.appliedAt,
+    approvedCount: record.approvedCount,
+    changedCurrentCount: record.changedCurrentCount,
+    id: record.id,
+    matchesSimulationCount: record.matchesSimulationCount,
+    rollbackSnapshot: {
+      draftBindingsByParameterKey: normalizeReplayApplySnapshotRecord(rollbackSnapshot.draftBindingsByParameterKey),
+      groupSelectionsBySelectionKey: normalizeReplayApplySnapshotRecord(rollbackSnapshot.groupSelectionsBySelectionKey),
+    },
+    rows,
+    templateId: record.templateId,
+    templateLabel: record.templateLabel,
+    lastRestoredAt:
+      typeof record.lastRestoredAt === "string" || record.lastRestoredAt === null
+        ? record.lastRestoredAt
+        : null,
+  };
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayApplyHistory() {
+  if (typeof window === "undefined") {
+    return [] as PredicateRefReplayApplyHistoryEntry[];
+  }
+  try {
+    const raw = window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+    const parsed = JSON.parse(raw);
+    if (
+      !parsed
+      || typeof parsed !== "object"
+      || Array.isArray(parsed)
+      || parsed.version !== RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION
+      || !Array.isArray(parsed.entries)
+    ) {
+      return [];
+    }
+    return parsed.entries
+      .map((entry: unknown) => normalizePredicateRefReplayApplyHistoryEntry(entry))
+      .filter((entry: PredicateRefReplayApplyHistoryEntry | null): entry is PredicateRefReplayApplyHistoryEntry => Boolean(entry))
+      .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES);
+  } catch {
+    return [];
+  }
+}
+
+function persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(
+  entries: PredicateRefReplayApplyHistoryEntry[],
+) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    window.localStorage.setItem(
+      RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY,
+      JSON.stringify({
+        version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION,
+        entries: entries.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES),
+      }),
+    );
+  } catch {
+    return;
+  }
 }
 
 function isRunSurfaceCollectionQueryBindingReferenceValue(value: string) {
@@ -17175,33 +17343,6 @@ function RunSurfaceCollectionQueryBuilder({
   onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
   onClearExpression?: (() => void) | null;
 }) {
-  type PredicateRefReplayApplyHistoryRow = {
-    changesCurrent: boolean;
-    currentBundleLabel: string;
-    currentStatus: string;
-    groupKey: string;
-    groupLabel: string;
-    matchesSimulation: boolean;
-    promotedBundleKey: string;
-    promotedBundleLabel: string;
-    simulatedBundleLabel: string;
-    simulatedStatus: string;
-  };
-  type PredicateRefReplayApplyHistoryEntry = {
-    appliedAt: string;
-    approvedCount: number;
-    changedCurrentCount: number;
-    id: string;
-    matchesSimulationCount: number;
-    rollbackSnapshot: {
-      draftBindingsByParameterKey: Record<string, string | null>;
-      groupSelectionsBySelectionKey: Record<string, string | null>;
-    };
-    rows: PredicateRefReplayApplyHistoryRow[];
-    templateId: string;
-    templateLabel: string;
-    lastRestoredAt?: string | null;
-  };
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
   const lastHydratedExpressionRef = useRef<string | null>(null);
   const [pendingHydratedState, setPendingHydratedState] =
@@ -17261,7 +17402,7 @@ function RunSurfaceCollectionQueryBuilder({
   const [bundleCoordinationSimulationFinalSummaryOpen, setBundleCoordinationSimulationFinalSummaryOpen] =
     useState(false);
   const [predicateRefReplayApplyHistory, setPredicateRefReplayApplyHistory] =
-    useState<PredicateRefReplayApplyHistoryEntry[]>([]);
+    useState<PredicateRefReplayApplyHistoryEntry[]>(() => loadRunSurfaceCollectionQueryBuilderReplayApplyHistory());
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18204,6 +18345,9 @@ function RunSurfaceCollectionQueryBuilder({
     () => selectedRefTemplateReplayApplyHistory[0] ?? null,
     [selectedRefTemplateReplayApplyHistory],
   );
+  useEffect(() => {
+    persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(predicateRefReplayApplyHistory);
+  }, [predicateRefReplayApplyHistory]);
   const simulatedCoordinationGroups = useMemo<ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>>(
     () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
     [selectedRefTemplateParameterGroups],
@@ -22205,7 +22349,7 @@ function RunSurfaceCollectionQueryBuilder({
                                                 setPredicateRefReplayApplyHistory((current) => [
                                                   historyEntry,
                                                   ...current,
-                                                ].slice(0, 12));
+                                                ].slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES));
                                                 applyPredicateRefGroupPresetBundles(
                                                   selectedRefTemplate.id,
                                                   approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
