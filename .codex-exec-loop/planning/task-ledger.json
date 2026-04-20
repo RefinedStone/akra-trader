@@ -505,20 +505,20 @@
     {
       "id": "planning-experiment-os-metadata-facet-discovery-api",
       "direction_id": "experiment-os",
-      "title": "Add facet and discovery APIs for experiment metadata filters",
-      "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, and tags so control-room filters can query durable metadata options directly instead of relying on freeform input fields over stored run metadata.",
+      "title": "Add consumer-facing query discovery APIs for experiment metadata filters",
+      "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, tags, and typed query capabilities so control-room filters or other clients can discover durable metadata options and query semantics directly instead of relying on freeform input fields or route-local knowledge over stored run metadata.",
       "status": "proposed",
       "base_priority": 90,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Discovery APIs still matter, but the just-finished preset revision UI now leaves a tighter next step in revision UX hardening before broader metadata filter discovery becomes the queue head.",
+      "dynamic_priority_delta": 3,
+      "priority_reason": "The latest main-session reply explicitly calls out a consumer-facing query discovery endpoint as a remaining gap after typed query binding metadata landed. That makes this proposal more relevant again, but the directly executable next step is still declaring sortable or filter operator schema inside the typed query contract first.",
       "depends_on": [
         "planning-experiment-os-queryable-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:05:00Z",
+      "updated_at": "2026-04-21T01:15:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs into discoverable product surfaces."
+      "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
@@ -4396,18 +4396,36 @@
       "direction_id": "experiment-os",
       "title": "Type query binding metadata with declarative constraints and OpenAPI fields",
       "description": "Build on the completed query and filter read-route generalization by lifting query parameter constraints, aliases, and richer OpenAPI-facing field metadata into a typed declarative binding spec, so runtime route registration stays binding-driven even for constrained query params and generated API docs no longer depend on thin handwritten `Query(...)` details outside the binding contract.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 36,
-      "priority_reason": "The latest main-session reply says the remaining gap is deeper typing of binding metadata, specifically query parameter constraints, aliases, and richer OpenAPI field metadata. That is a concrete executable follow-up and should become the new queue head now that query or filter based explicit read routes have been fully generalized.",
+      "priority_reason": "Completed in main session commit e45584b, which lifted query binding metadata into typed `constraints` and `openapi` contracts, wired route registration to emit `Query(...)` from that metadata, filled the metadata across market-data status, strategy or preset discovery, runs list, and compare routes, and verified both runtime behavior and OpenAPI schema exposure with targeted tests before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-generalize-runtime-binding-for-query-and-filter-based-explicit-read-routes"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:50:00Z",
+      "updated_at": "2026-04-21T01:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os runtime-binding convergence by turning query-parameter behavior and generated API documentation into first-class binding metadata rather than leaving constraints and descriptive field semantics as ad hoc FastAPI details."
+    },
+    {
+      "id": "planning-experiment-os-declare-sort-and-filter-operator-schema-in-typed-query-spec",
+      "direction_id": "experiment-os",
+      "title": "Declare sort and filter operator schema inside the typed query spec",
+      "description": "Extend the newly typed query binding contract so sortable fields, filter operators, and their accepted values are declared in metadata instead of remaining route-local logic, allowing query parsing, validation, and downstream discovery to share one executable schema for runs list, compare, and adjacent experiment read surfaces.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 38,
+      "priority_reason": "The latest main-session reply says the next unfinished declaration step after typed constraints and OpenAPI fields is sortable or filter operator schema. That is the clearest executable follow-up for the next queued task because it keeps the query contract moving from parameter-level metadata toward a full declarative query model.",
+      "depends_on": [
+        "planning-experiment-os-type-query-binding-metadata-and-openapi-fields"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T01:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os queryability by turning sort and filter semantics into durable schema, which is the missing contract layer between typed parameter metadata and later client-facing query discovery surfaces."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
@@ -4416,14 +4434,14 @@
       "description": "After the standalone surface rollout reaches the remaining complex mutation families, evaluate and execute the larger convergence step of moving non-standalone endpoints onto the same or a closely related contract-driven runtime binding abstraction, so API execution semantics stop diverging between standalone and non-standalone route families.",
       "status": "proposed",
       "base_priority": 87,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply identifies a narrower executable gap first: typed declarative query-binding metadata for constraints, aliases, and richer OpenAPI fields. Keep this larger architectural pass proposed behind that concrete metadata-typing follow-up.",
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply identifies narrower declarative-query follow-ups first: typed operator schema, richer examples, and client-facing query discovery. Keep this larger architectural pass proposed behind those concrete query-contract steps.",
       "depends_on": [
-        "planning-experiment-os-type-query-binding-metadata-and-openapi-fields"
+        "planning-experiment-os-declare-sort-and-filter-operator-schema-in-typed-query-spec"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:50:00Z",
+      "updated_at": "2026-04-21T01:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
     },
