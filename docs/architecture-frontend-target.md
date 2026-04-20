@@ -12,6 +12,8 @@ This wave introduces the first routing skeleton:
 - workspace route state moved into `apps/web/src/app/useWorkspaceRoute.ts`
 - workspace descriptors moved into `apps/web/src/app/workspaces.ts`
 - shell/header/nav layout moved into `apps/web/src/app/WorkspaceShell.tsx`
+- workspace panel grouping moved into `apps/web/src/routes/*`
+- `App.tsx` now delegates active route composition to `WorkspaceRouteContent.tsx`
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -53,14 +55,16 @@ where routing and presentation structure are decided.
   - keep labels, summaries, and path mapping in `workspaces.ts`
 - shell layout
   - keep hero, nav, refresh action, and workspace intro in `WorkspaceShell.tsx`
+- route composition
+  - keep overview, research, runtime ops, and guarded-live panel grouping in `src/routes/*`
 - remaining giant feature body
-  - stays in `App.tsx` temporarily
-  - next waves should split research/runtime/live sections into route-owned modules
+  - dense feature JSX still lives mostly in `App.tsx`
+  - next waves should split those panels into feature-owned modules behind each route
 
 ## Remaining Pressure Points
 
 - `App.tsx` still owns too much feature state and JSX.
-- route modules do not yet own their own data loading or feature grouping.
+- route modules now own panel grouping, but they do not yet own their own data loading or feature-local state.
 - feature-local API clients and shared types are still mixed into the control-room file.
 - comparison/history tooling is still large enough to deserve its own subsystem.
 
@@ -68,5 +72,6 @@ where routing and presentation structure are decided.
 
 - route state is independent from the control-room rendering body
 - shell layout can change without touching dense feature logic
+- workspace panel grouping can change without rewriting route selection branches in `App.tsx`
 - new workspace-level navigation changes happen under `src/app/*`
 - next feature splits can move one workspace at a time without redefining routing

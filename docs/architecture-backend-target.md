@@ -11,6 +11,8 @@ This is not fully complete yet. The current wave introduces the first executable
 
 - `ports.py` is now a compatibility shim over `port_contracts/*`
 - shared application defaults and comparison policy moved into `application_support/*`
+- standalone surface/runtime query types and filter/sort helpers moved into
+  `application_support/runtime_queries.py`
 - incident delivery dispatch is now driven by `adapters/operator_delivery_registry.py`
 
 ## Target Structure
@@ -54,6 +56,8 @@ This is not fully complete yet. The current wave introduces the first executable
 - Surface policy and serialization
   - keep run-surface enforcement, action-availability policy, and run serialization helpers in
     `application_support/run_surfaces.py`
+  - keep standalone surface/runtime query types plus filter/sort evaluation helpers in
+    `application_support/runtime_queries.py`
   - keep `application.py` as the import-compatible facade while these helpers move out
 - Incident delivery
   - keep provider implementations in `adapters/operator_delivery.py` for now
@@ -64,7 +68,7 @@ This is not fully complete yet. The current wave introduces the first executable
 - `application.py` is still too large and still mixes too many use cases.
 - `operator_delivery.py` still contains provider implementation bodies in one file.
 - `domain/models.py` remains too broad and should split by bounded feature area.
-- query-contract and standalone-surface helpers still need extraction into dedicated modules.
+- binding catalogs and standalone surface executors still need extraction into dedicated modules.
 
 ## Done Criteria For This Track
 

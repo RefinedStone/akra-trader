@@ -24,6 +24,7 @@ import {
 import { WorkspaceShell } from "./app/WorkspaceShell";
 import { buildControlWorkspaceDescriptors, ControlWorkspaceDescriptor, ControlStripMetric } from "./app/workspaces";
 import { useWorkspaceRoute } from "./app/useWorkspaceRoute";
+import { WorkspaceRouteContent } from "./routes/WorkspaceRouteContent";
 
 type ParameterSchema = Record<
   string,
@@ -7481,118 +7482,295 @@ export default function App() {
       statusText={statusText}
       workspaceDescriptors={workspaceDescriptors}
     >
-        <div className="workspace-panel-grid">
-          {activeWorkspace === "overview" ? (
-            <section className="panel panel-wide">
-          <div className="section-heading">
-            <div>
-              <p className="kicker">Strategy catalog</p>
-              <h2>Runtime tiers</h2>
-            </div>
-            <button className="ghost-button" onClick={() => void loadAll()}>
-              Refresh
-            </button>
-          </div>
+      <WorkspaceRouteContent
+        activeWorkspace={activeWorkspace}
+        routes={{
+          overview: {
+            catalogPanel: (
+              <section className="panel panel-wide">
+                <div className="section-heading">
+                  <div>
+                    <p className="kicker">Strategy catalog</p>
+                    <h2>Runtime tiers</h2>
+                  </div>
+                  <button className="ghost-button" onClick={() => void loadAll()}>
+                    Refresh
+                  </button>
+                </div>
 
-          <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} />
+                <RunSurfaceCapabilityDiscoveryPanel capabilities={runSurfaceCapabilities} />
 
-          <div className="strategy-columns">
-            <StrategyColumn
-              title="Native"
-              strategies={strategyGroups.native}
-              accent="amber"
-              runSurfaceCapabilities={runSurfaceCapabilities}
-            />
-            <StrategyColumn
-              title="NFI References"
-              strategies={strategyGroups.reference}
-              accent="cyan"
-              runSurfaceCapabilities={runSurfaceCapabilities}
-            />
-            <StrategyColumn
-              title="Future LLM"
-              strategies={strategyGroups.future}
-              accent="ember"
-              runSurfaceCapabilities={runSurfaceCapabilities}
-            />
-          </div>
-            </section>
-          ) : null}
-
-          {activeWorkspace === "research" ? (
-            <section className="panel">
-          <p className="kicker">Backtest</p>
-          <h2>Launch a run</h2>
-          <RunForm
-            form={backtestForm}
-            setForm={setBacktestForm}
-            strategies={strategies}
-            presets={presets}
-            onSubmit={handleBacktestSubmit}
-          />
-            </section>
-          ) : null}
-
-          {activeWorkspace === "runtime" ? (
-            <section className="panel">
-          <p className="kicker">Sandbox</p>
-          <h2>Start sandbox worker</h2>
-          <RunForm
-            form={sandboxForm}
-            setForm={setSandboxForm}
-            strategies={strategies.filter((strategy) => strategy.runtime === "native")}
-            presets={presets}
-            onSubmit={handleSandboxSubmit}
-          />
-            </section>
-          ) : null}
-
-          {activeWorkspace === "live" ? (
-            <section className="panel">
-          <p className="kicker">Guarded live</p>
-          <h2>Start live worker</h2>
-          <RunForm
-            form={liveForm}
-            setForm={setLiveForm}
-            strategies={strategies.filter((strategy) => strategy.runtime === "native")}
-            presets={presets}
-            onSubmit={handleLiveSubmit}
-          />
-            </section>
-          ) : null}
-
-          {activeWorkspace === "research" ? (
-            <section className="panel panel-wide">
-          <p className="kicker">Experiment OS</p>
-          <h2>Scenario presets</h2>
-          <PresetCatalogPanel
-            form={presetForm}
-            presets={presets}
-            runSurfaceCapabilities={runSurfaceCapabilities}
-            setForm={setPresetForm}
-            strategies={strategies}
-            editingPresetId={editingPresetId}
-            expandedPresetRevisionIds={expandedPresetRevisionIds}
-            onEditPreset={beginPresetEdit}
-            onResetEditor={resetPresetEditor}
-            onLifecycleAction={applyPresetLifecycleAction}
-            onRestoreRevision={restorePresetRevision}
-            onSubmit={handlePresetSubmit}
-            onToggleRevisions={togglePresetRevisions}
-          />
-            </section>
-          ) : null}
-
-          {activeWorkspace === "research" ? (
-            <section className="panel panel-wide">
-          <p className="kicker">Reference lane</p>
-          <h2>Third-party references</h2>
-          <ReferenceCatalog references={references} />
-            </section>
-          ) : null}
-
-          {activeWorkspace === "runtime" ? (
-            <section className="panel panel-wide">
+                <div className="strategy-columns">
+                  <StrategyColumn
+                    title="Native"
+                    strategies={strategyGroups.native}
+                    accent="amber"
+                    runSurfaceCapabilities={runSurfaceCapabilities}
+                  />
+                  <StrategyColumn
+                    title="NFI References"
+                    strategies={strategyGroups.reference}
+                    accent="cyan"
+                    runSurfaceCapabilities={runSurfaceCapabilities}
+                  />
+                  <StrategyColumn
+                    title="Future LLM"
+                    strategies={strategyGroups.future}
+                    accent="ember"
+                    runSurfaceCapabilities={runSurfaceCapabilities}
+                  />
+                </div>
+              </section>
+            ),
+          },
+          research: {
+            launchPanel: (
+              <section className="panel">
+                <p className="kicker">Backtest</p>
+                <h2>Launch a run</h2>
+                <RunForm
+                  form={backtestForm}
+                  setForm={setBacktestForm}
+                  strategies={strategies}
+                  presets={presets}
+                  onSubmit={handleBacktestSubmit}
+                />
+              </section>
+            ),
+            presetPanel: (
+              <section className="panel panel-wide">
+                <p className="kicker">Experiment OS</p>
+                <h2>Scenario presets</h2>
+                <PresetCatalogPanel
+                  form={presetForm}
+                  presets={presets}
+                  runSurfaceCapabilities={runSurfaceCapabilities}
+                  setForm={setPresetForm}
+                  strategies={strategies}
+                  editingPresetId={editingPresetId}
+                  expandedPresetRevisionIds={expandedPresetRevisionIds}
+                  onEditPreset={beginPresetEdit}
+                  onResetEditor={resetPresetEditor}
+                  onLifecycleAction={applyPresetLifecycleAction}
+                  onRestoreRevision={restorePresetRevision}
+                  onSubmit={handlePresetSubmit}
+                  onToggleRevisions={togglePresetRevisions}
+                />
+              </section>
+            ),
+            referencePanel: (
+              <section className="panel panel-wide">
+                <p className="kicker">Reference lane</p>
+                <h2>Third-party references</h2>
+                <ReferenceCatalog references={references} />
+              </section>
+            ),
+            runsPanel: (
+              <RunSection
+                surfaceKey="backtest"
+                title="Recent backtests"
+                runs={backtests}
+                presets={presets}
+                runSurfaceCapabilities={runSurfaceCapabilities}
+                strategies={strategies}
+                filter={backtestRunFilter}
+                setFilter={setBacktestRunFilter}
+                comparison={{
+                  selectedRunIds: selectedComparisonRunIds,
+                  comparisonIntent,
+                  latestWorkspaceSyncState,
+                  expandedHistoryConflictReviewIds,
+                  expandedWorkspaceScoreDetailIds,
+                  focusedWorkspaceScoreDetailSources,
+                  focusedWorkspaceScoreDetailSignalKeys,
+                  expandedWorkspaceScoreSignalDetailIds,
+                  collapsedWorkspaceScoreSignalSubviewIds,
+                  collapsedWorkspaceScoreSignalNestedSubviewIds,
+                  focusedWorkspaceScoreSignalMicroViews,
+                  focusedWorkspaceScoreSignalMicroInteractions,
+                  hoveredWorkspaceScoreSignalMicroTargets,
+                  scrubbedWorkspaceScoreSignalMicroSteps,
+                  selectedWorkspaceScoreSignalMicroNotePages,
+                  activeWorkspaceOverviewRowId,
+                  historyStep: comparisonHistoryStep,
+                  historyTabIdentity: comparisonHistoryTabIdentity,
+                  historySharedSync: comparisonHistorySharedSyncState,
+                  historySyncAuditTrail: comparisonHistorySyncAuditTrail,
+                  historyEntries: comparisonHistoryPanel.entries,
+                  visibleHistoryEntries: visibleComparisonHistoryEntries,
+                  activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
+                  historyBrowserOpen: comparisonHistoryPanelOpen,
+                  historySearchQuery: comparisonHistorySearchQuery,
+                  showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
+                  historyAuditFilter: comparisonHistoryAuditFilter,
+                  showResolvedHistoryAudits: comparisonHistoryShowResolvedAuditEntries,
+                  canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
+                  canNavigateHistoryForward:
+                    visibleComparisonHistoryActiveIndex >= 0
+                    && visibleComparisonHistoryActiveIndex < visibleComparisonHistoryEntries.length - 1,
+                  selectedScoreLink: selectedComparisonScoreLink,
+                  payload: runComparison,
+                  loading: runComparisonLoading,
+                  error: runComparisonError,
+                  onChangeComparisonIntent: handleComparisonIntentChange,
+                  onChangeSelectedScoreLink: handleSelectedComparisonScoreLinkChange,
+                  onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
+                  onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
+                  onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
+                  onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
+                  onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
+                  onToggleHistoryConflictReview: (auditId) =>
+                    setExpandedHistoryConflictReviewIds((current) => ({
+                      ...current,
+                      [auditId]: !current[auditId],
+                    })),
+                  onToggleWorkspaceScoreDetail: (scoreDetailKey) =>
+                    setExpandedWorkspaceScoreDetailIds((current) => ({
+                      ...current,
+                      [scoreDetailKey]: !current[scoreDetailKey],
+                    })),
+                  onChangeFocusedWorkspaceScoreDetailSource: (scoreDetailKey, source) =>
+                    setFocusedWorkspaceScoreDetailSources((current) =>
+                      current[scoreDetailKey] === source
+                        ? current
+                        : {
+                            ...current,
+                            [scoreDetailKey]: source,
+                          }
+                    ),
+                  onChangeFocusedWorkspaceScoreDetailSignalKey: (scoreDetailKey, signalKey) =>
+                    setFocusedWorkspaceScoreDetailSignalKeys((current) => {
+                      if (!signalKey) {
+                        if (!(scoreDetailKey in current)) {
+                          return current;
+                        }
+                        const next = { ...current };
+                        delete next[scoreDetailKey];
+                        return next;
+                      }
+                      if (current[scoreDetailKey] === signalKey) {
+                        return current;
+                      }
+                      return {
+                        ...current,
+                        [scoreDetailKey]: signalKey,
+                      };
+                    }),
+                  onToggleWorkspaceScoreSignalDetail: (scoreDetailKey) =>
+                    setExpandedWorkspaceScoreSignalDetailIds((current) => ({
+                      ...current,
+                      [scoreDetailKey]: !current[scoreDetailKey],
+                    })),
+                  onToggleWorkspaceScoreSignalSubview: (subviewId) =>
+                    setCollapsedWorkspaceScoreSignalSubviewIds((current) => ({
+                      ...current,
+                      [subviewId]: !current[subviewId],
+                    })),
+                  onToggleWorkspaceScoreSignalNestedSubview: (subviewId) =>
+                    setCollapsedWorkspaceScoreSignalNestedSubviewIds((current) => ({
+                      ...current,
+                      [subviewId]: !current[subviewId],
+                    })),
+                  onChangeWorkspaceScoreSignalMicroView: (subviewId, value) =>
+                    setFocusedWorkspaceScoreSignalMicroViews((current) =>
+                      current[subviewId] === value
+                        ? current
+                        : {
+                            ...current,
+                            [subviewId]: value,
+                          }
+                    ),
+                  onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
+                    setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
+                      current[interactionId] === value
+                        ? current
+                        : {
+                            ...current,
+                            [interactionId]: value,
+                          }
+                    ),
+                  onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId, value) =>
+                    setHoveredWorkspaceScoreSignalMicroTargets((current) =>
+                      current[interactionId] === value
+                        ? current
+                        : {
+                            ...current,
+                            [interactionId]: value,
+                          }
+                    ),
+                  onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId, value) =>
+                    setScrubbedWorkspaceScoreSignalMicroSteps((current) =>
+                      current[interactionId] === value
+                        ? current
+                        : {
+                            ...current,
+                            [interactionId]: value,
+                          }
+                    ),
+                  onChangeWorkspaceScoreSignalMicroNotePage: (interactionId, value) =>
+                    setSelectedWorkspaceScoreSignalMicroNotePages((current) =>
+                      current[interactionId] === value
+                        ? current
+                        : {
+                            ...current,
+                            [interactionId]: value,
+                          }
+                    ),
+                  onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
+                  onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
+                  onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
+                  onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
+                  onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
+                  onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
+                  onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
+                  onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
+                  onSetHistoryPreferenceFieldSource: handleSetComparisonHistoryPreferenceFieldSource,
+                  onSetHistoryPreferenceFieldSourceAll: handleSetComparisonHistoryPreferenceFieldSourceAll,
+                  onApplyHistoryPreferenceResolution: handleApplyComparisonHistoryPreferenceResolution,
+                  onSetHistoryWorkspaceFieldSource: handleSetComparisonHistoryWorkspaceFieldSource,
+                  onSetHistoryWorkspaceFieldSourceAll: handleSetComparisonHistoryWorkspaceFieldSourceAll,
+                  onUseHistoryWorkspaceRankedSources: handleUseComparisonHistoryWorkspaceRankedSources,
+                  onApplyHistoryWorkspaceResolution: handleApplyComparisonHistoryWorkspaceResolution,
+                  onToggleRunSelection: toggleComparisonRun,
+                  onClearSelection: clearComparisonRuns,
+                  onSelectBenchmarkPair: selectBenchmarkPair,
+                }}
+                rerunActions={[
+                  {
+                    availabilityKey: "rerun_backtest",
+                    label: "Rerun backtest",
+                    onRerun: rerunBacktest,
+                  },
+                  {
+                    availabilityKey: "rerun_sandbox",
+                    label: "Start sandbox worker",
+                    onRerun: rerunSandbox,
+                  },
+                  {
+                    availabilityKey: "rerun_paper",
+                    label: "Start paper session",
+                    onRerun: rerunPaper,
+                  },
+                ]}
+              />
+            ),
+          },
+          runtime: {
+            launchPanel: (
+              <section className="panel">
+                <p className="kicker">Sandbox</p>
+                <h2>Start sandbox worker</h2>
+                <RunForm
+                  form={sandboxForm}
+                  setForm={setSandboxForm}
+                  strategies={strategies.filter((strategy) => strategy.runtime === "native")}
+                  presets={presets}
+                  onSubmit={handleSandboxSubmit}
+                />
+              </section>
+            ),
+            marketDataPanel: (
+              <section className="panel panel-wide">
           <p className="kicker">Data plane</p>
           <h2>Market data status</h2>
           {marketStatus ? (
@@ -7783,11 +7961,10 @@ export default function App() {
           ) : (
             <p>No data status loaded.</p>
           )}
-            </section>
-          ) : null}
-
-          {activeWorkspace === "runtime" ? (
-            <section className="panel panel-wide">
+              </section>
+            ),
+            operatorPanel: (
+              <section className="panel panel-wide">
           <p className="kicker">Operator trust</p>
           <h2>Runtime alerts and audit</h2>
           {operatorVisibility ? (
@@ -8128,11 +8305,75 @@ export default function App() {
           ) : (
             <p>No operator visibility loaded.</p>
           )}
-            </section>
-          ) : null}
-
-          {activeWorkspace === "live" ? (
-            <section className="panel panel-wide">
+              </section>
+            ),
+            sandboxRunsPanel: (
+              <RunSection
+                surfaceKey="sandbox"
+                title="Sandbox runs"
+                runs={sandboxRuns}
+                presets={presets}
+                runSurfaceCapabilities={runSurfaceCapabilities}
+                strategies={strategies}
+                filter={sandboxRunFilter}
+                setFilter={setSandboxRunFilter}
+                rerunActions={[
+                  {
+                    availabilityKey: "rerun_sandbox",
+                    label: "Restore sandbox worker",
+                    onRerun: rerunSandbox,
+                  },
+                  {
+                    availabilityKey: "rerun_paper",
+                    label: "Start paper session",
+                    onRerun: rerunPaper,
+                  },
+                ]}
+                onStop={stopSandboxRun}
+              />
+            ),
+            paperRunsPanel: (
+              <RunSection
+                surfaceKey="paper"
+                title="Paper runs"
+                runs={paperRuns}
+                presets={presets}
+                runSurfaceCapabilities={runSurfaceCapabilities}
+                strategies={strategies}
+                filter={paperRunFilter}
+                setFilter={setPaperRunFilter}
+                rerunActions={[
+                  {
+                    availabilityKey: "rerun_sandbox",
+                    label: "Start sandbox worker",
+                    onRerun: rerunSandbox,
+                  },
+                  {
+                    availabilityKey: "rerun_paper",
+                    label: "Start paper session",
+                    onRerun: rerunPaper,
+                  },
+                ]}
+                onStop={stopPaperRun}
+              />
+            ),
+          },
+          live: {
+            launchPanel: (
+              <section className="panel">
+                <p className="kicker">Guarded live</p>
+                <h2>Start live worker</h2>
+                <RunForm
+                  form={liveForm}
+                  setForm={setLiveForm}
+                  strategies={strategies.filter((strategy) => strategy.runtime === "native")}
+                  presets={presets}
+                  onSubmit={handleLiveSubmit}
+                />
+              </section>
+            ),
+            controlPanel: (
+              <section className="panel panel-wide">
           <p className="kicker">Guarded live</p>
           <h2>Kill switch and reconciliation</h2>
           {guardedLive ? (
@@ -9331,269 +9572,31 @@ export default function App() {
           ) : (
             <p>No guarded-live status loaded.</p>
           )}
-            </section>
-          ) : null}
-
-          {activeWorkspace === "research" ? (
-            <RunSection
-          surfaceKey="backtest"
-          title="Recent backtests"
-          runs={backtests}
-          presets={presets}
-          runSurfaceCapabilities={runSurfaceCapabilities}
-          strategies={strategies}
-          filter={backtestRunFilter}
-          setFilter={setBacktestRunFilter}
-          comparison={{
-            selectedRunIds: selectedComparisonRunIds,
-            comparisonIntent,
-            latestWorkspaceSyncState,
-            expandedHistoryConflictReviewIds,
-            expandedWorkspaceScoreDetailIds,
-            focusedWorkspaceScoreDetailSources,
-            focusedWorkspaceScoreDetailSignalKeys,
-            expandedWorkspaceScoreSignalDetailIds,
-            collapsedWorkspaceScoreSignalSubviewIds,
-            collapsedWorkspaceScoreSignalNestedSubviewIds,
-            focusedWorkspaceScoreSignalMicroViews,
-            focusedWorkspaceScoreSignalMicroInteractions,
-            hoveredWorkspaceScoreSignalMicroTargets,
-            scrubbedWorkspaceScoreSignalMicroSteps,
-            selectedWorkspaceScoreSignalMicroNotePages,
-            activeWorkspaceOverviewRowId,
-            historyStep: comparisonHistoryStep,
-            historyTabIdentity: comparisonHistoryTabIdentity,
-            historySharedSync: comparisonHistorySharedSyncState,
-            historySyncAuditTrail: comparisonHistorySyncAuditTrail,
-            historyEntries: comparisonHistoryPanel.entries,
-            visibleHistoryEntries: visibleComparisonHistoryEntries,
-            activeHistoryEntryId: comparisonHistoryPanel.activeEntryId,
-            historyBrowserOpen: comparisonHistoryPanelOpen,
-            historySearchQuery: comparisonHistorySearchQuery,
-            showPinnedHistoryOnly: comparisonHistoryShowPinnedOnly,
-            historyAuditFilter: comparisonHistoryAuditFilter,
-            showResolvedHistoryAudits: comparisonHistoryShowResolvedAuditEntries,
-            canNavigateHistoryBackward: visibleComparisonHistoryActiveIndex > 0,
-            canNavigateHistoryForward:
-              visibleComparisonHistoryActiveIndex >= 0
-              && visibleComparisonHistoryActiveIndex < visibleComparisonHistoryEntries.length - 1,
-            selectedScoreLink: selectedComparisonScoreLink,
-            payload: runComparison,
-            loading: runComparisonLoading,
-            error: runComparisonError,
-            onChangeComparisonIntent: handleComparisonIntentChange,
-            onChangeSelectedScoreLink: handleSelectedComparisonScoreLinkChange,
-            onToggleHistoryBrowser: () => setComparisonHistoryPanelOpen((current) => !current),
-            onChangeHistorySearchQuery: setComparisonHistorySearchQuery,
-            onChangeShowPinnedHistoryOnly: setComparisonHistoryShowPinnedOnly,
-            onChangeHistoryAuditFilter: setComparisonHistoryAuditFilter,
-            onChangeShowResolvedHistoryAudits: setComparisonHistoryShowResolvedAuditEntries,
-            onToggleHistoryConflictReview: (auditId) =>
-              setExpandedHistoryConflictReviewIds((current) => ({
-                ...current,
-                [auditId]: !current[auditId],
-              })),
-            onToggleWorkspaceScoreDetail: (scoreDetailKey) =>
-              setExpandedWorkspaceScoreDetailIds((current) => ({
-                ...current,
-                [scoreDetailKey]: !current[scoreDetailKey],
-              })),
-            onChangeFocusedWorkspaceScoreDetailSource: (scoreDetailKey, source) =>
-              setFocusedWorkspaceScoreDetailSources((current) =>
-                current[scoreDetailKey] === source
-                  ? current
-                  : {
-                      ...current,
-                      [scoreDetailKey]: source,
-                    }
-              ),
-            onChangeFocusedWorkspaceScoreDetailSignalKey: (scoreDetailKey, signalKey) =>
-              setFocusedWorkspaceScoreDetailSignalKeys((current) => {
-                if (!signalKey) {
-                  if (!(scoreDetailKey in current)) {
-                    return current;
-                  }
-                  const next = { ...current };
-                  delete next[scoreDetailKey];
-                  return next;
-                }
-                if (current[scoreDetailKey] === signalKey) {
-                  return current;
-                }
-                return {
-                  ...current,
-                  [scoreDetailKey]: signalKey,
-                };
-              }),
-            onToggleWorkspaceScoreSignalDetail: (scoreDetailKey) =>
-              setExpandedWorkspaceScoreSignalDetailIds((current) => ({
-                ...current,
-                [scoreDetailKey]: !current[scoreDetailKey],
-              })),
-            onToggleWorkspaceScoreSignalSubview: (subviewId) =>
-              setCollapsedWorkspaceScoreSignalSubviewIds((current) => ({
-                ...current,
-                [subviewId]: !current[subviewId],
-              })),
-            onToggleWorkspaceScoreSignalNestedSubview: (subviewId) =>
-              setCollapsedWorkspaceScoreSignalNestedSubviewIds((current) => ({
-                ...current,
-                [subviewId]: !current[subviewId],
-              })),
-            onChangeWorkspaceScoreSignalMicroView: (subviewId, value) =>
-              setFocusedWorkspaceScoreSignalMicroViews((current) =>
-                current[subviewId] === value
-                  ? current
-                  : {
-                      ...current,
-                      [subviewId]: value,
-                    }
-              ),
-            onChangeWorkspaceScoreSignalMicroInteraction: (interactionId, value) =>
-              setFocusedWorkspaceScoreSignalMicroInteractions((current) =>
-                current[interactionId] === value
-                  ? current
-                  : {
-                      ...current,
-                      [interactionId]: value,
-                    }
-              ),
-            onChangeWorkspaceScoreSignalMicroHoverTarget: (interactionId, value) =>
-              setHoveredWorkspaceScoreSignalMicroTargets((current) =>
-                current[interactionId] === value
-                  ? current
-                  : {
-                      ...current,
-                      [interactionId]: value,
-                    }
-              ),
-            onChangeWorkspaceScoreSignalMicroScrubStep: (interactionId, value) =>
-              setScrubbedWorkspaceScoreSignalMicroSteps((current) =>
-                current[interactionId] === value
-                  ? current
-                  : {
-                      ...current,
-                      [interactionId]: value,
-                    }
-              ),
-            onChangeWorkspaceScoreSignalMicroNotePage: (interactionId, value) =>
-              setSelectedWorkspaceScoreSignalMicroNotePages((current) =>
-                current[interactionId] === value
-                  ? current
-                  : {
-                      ...current,
-                      [interactionId]: value,
-                    }
-              ),
-            onChangeActiveWorkspaceOverviewRowId: setActiveWorkspaceOverviewRowId,
-            onNavigateHistoryEntry: handleNavigateComparisonHistoryEntry,
-            onNavigateHistoryRelative: handleNavigateComparisonHistoryRelative,
-            onToggleHistoryEntryPinned: handleToggleComparisonHistoryEntryPinned,
-            onTrimHistoryEntries: handleTrimComparisonHistoryEntries,
-            onSetHistoryConflictFieldSource: handleSetComparisonHistoryConflictFieldSource,
-            onSetHistoryConflictFieldSourceAll: handleSetComparisonHistoryConflictFieldSourceAll,
-            onApplyHistoryConflictResolution: handleApplyComparisonHistoryConflictResolution,
-            onSetHistoryPreferenceFieldSource: handleSetComparisonHistoryPreferenceFieldSource,
-            onSetHistoryPreferenceFieldSourceAll: handleSetComparisonHistoryPreferenceFieldSourceAll,
-            onApplyHistoryPreferenceResolution: handleApplyComparisonHistoryPreferenceResolution,
-            onSetHistoryWorkspaceFieldSource: handleSetComparisonHistoryWorkspaceFieldSource,
-            onSetHistoryWorkspaceFieldSourceAll: handleSetComparisonHistoryWorkspaceFieldSourceAll,
-            onUseHistoryWorkspaceRankedSources: handleUseComparisonHistoryWorkspaceRankedSources,
-            onApplyHistoryWorkspaceResolution: handleApplyComparisonHistoryWorkspaceResolution,
-            onToggleRunSelection: toggleComparisonRun,
-            onClearSelection: clearComparisonRuns,
-            onSelectBenchmarkPair: selectBenchmarkPair,
-          }}
-          rerunActions={[
-            {
-              availabilityKey: "rerun_backtest",
-              label: "Rerun backtest",
-              onRerun: rerunBacktest,
-            },
-            {
-              availabilityKey: "rerun_sandbox",
-              label: "Start sandbox worker",
-              onRerun: rerunSandbox,
-            },
-            {
-              availabilityKey: "rerun_paper",
-              label: "Start paper session",
-              onRerun: rerunPaper,
-            },
-          ]}
-            />
-          ) : null}
-          {activeWorkspace === "runtime" ? (
-            <RunSection
-          surfaceKey="sandbox"
-          title="Sandbox runs"
-          runs={sandboxRuns}
-          presets={presets}
-          runSurfaceCapabilities={runSurfaceCapabilities}
-          strategies={strategies}
-          filter={sandboxRunFilter}
-          setFilter={setSandboxRunFilter}
-          rerunActions={[
-            {
-              availabilityKey: "rerun_sandbox",
-              label: "Restore sandbox worker",
-              onRerun: rerunSandbox,
-            },
-            {
-              availabilityKey: "rerun_paper",
-              label: "Start paper session",
-              onRerun: rerunPaper,
-            },
-          ]}
-          onStop={stopSandboxRun}
-            />
-          ) : null}
-          {activeWorkspace === "runtime" ? (
-            <RunSection
-          surfaceKey="paper"
-          title="Paper runs"
-          runs={paperRuns}
-          presets={presets}
-          runSurfaceCapabilities={runSurfaceCapabilities}
-          strategies={strategies}
-          filter={paperRunFilter}
-          setFilter={setPaperRunFilter}
-          rerunActions={[
-            {
-              availabilityKey: "rerun_sandbox",
-              label: "Start sandbox worker",
-              onRerun: rerunSandbox,
-            },
-            {
-              availabilityKey: "rerun_paper",
-              label: "Start paper session",
-              onRerun: rerunPaper,
-            },
-          ]}
-          onStop={stopPaperRun}
-            />
-          ) : null}
-          {activeWorkspace === "live" ? (
-            <RunSection
-          surfaceKey="live"
-          title="Guarded live runs"
-          runs={liveRuns}
-          presets={presets}
-          runSurfaceCapabilities={runSurfaceCapabilities}
-          strategies={strategies}
-          filter={liveRunFilter}
-          setFilter={setLiveRunFilter}
-          onStop={stopLiveRun}
-          getOrderControls={(run) => ({
-            getReplacementDraft: (_orderId, order) => getLiveOrderReplacementDraft(run.config.run_id, order),
-            onChangeReplacementDraft: (orderId, draft) =>
-              setLiveOrderReplacementDraft(run.config.run_id, orderId, draft),
-            onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
-            onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
-          })}
-            />
-          ) : null}
-        </div>
+              </section>
+            ),
+            runsPanel: (
+              <RunSection
+                surfaceKey="live"
+                title="Guarded live runs"
+                runs={liveRuns}
+                presets={presets}
+                runSurfaceCapabilities={runSurfaceCapabilities}
+                strategies={strategies}
+                filter={liveRunFilter}
+                setFilter={setLiveRunFilter}
+                onStop={stopLiveRun}
+                getOrderControls={(run) => ({
+                  getReplacementDraft: (_orderId, order) => getLiveOrderReplacementDraft(run.config.run_id, order),
+                  onChangeReplacementDraft: (orderId, draft) =>
+                    setLiveOrderReplacementDraft(run.config.run_id, orderId, draft),
+                  onCancelOrder: (orderId) => cancelLiveOrder(run.config.run_id, orderId),
+                  onReplaceOrder: (orderId, draft) => replaceLiveOrder(run.config.run_id, orderId, draft),
+                })}
+              />
+            ),
+          },
+        }}
+      />
     </WorkspaceShell>
   );
 }

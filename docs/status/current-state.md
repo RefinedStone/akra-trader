@@ -43,6 +43,8 @@ It is not yet a finished live trading product:
 - split port contracts under `port_contracts/*` with `ports.py` kept as a compatibility shim
 - shared application fallback adapters and comparison policy moved into `application_support/*`
 - run-surface enforcement and run serialization helpers moved into `application_support/run_surfaces.py`
+- standalone surface/runtime query types plus filter/sort helpers moved into
+  `application_support/runtime_queries.py`
 - durable run storage through `SqlAlchemyRunRepository`
 - repo-local SQLite defaults with configurable Postgres support
 - native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,
@@ -92,8 +94,9 @@ It is not yet a finished live trading product:
 
 - route-aware React control-room shell with dedicated workspace routing metadata and shell layout
   modules under `apps/web/src/app/*`
+- workspace-level panel grouping now lives under `apps/web/src/routes/*`
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns
-  are no longer defined inline with all feature rendering
+  and route-level panel selection are no longer defined inline with all feature rendering
 - separate histories for backtest, sandbox, paper, and live modes
 - guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
 - operator surfaces for replay-link alias governance and audit export administration
@@ -106,6 +109,8 @@ It is not yet a finished live trading product:
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to
   be extracted out of `App.tsx`
+- standalone surface binding catalogs and executors still live in `application.py` even though the
+  underlying query contracts moved out
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator
   workflows are still weaker than the underlying backend capabilities
 - `application.py` and `operator_delivery.py` are smaller and more structured than before, but both
