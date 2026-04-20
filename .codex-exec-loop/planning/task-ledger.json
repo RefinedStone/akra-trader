@@ -5732,18 +5732,36 @@
       "direction_id": "experiment-os",
       "title": "Promote native runtime candidate ids into provenance contracts",
       "description": "Replace the remaining synthesized replay candidate id shape with an upstream runtime contract that carries canonical candidate or entity ids directly from the evaluator or source runtime into provenance artifacts and replay samples, so candidate identity stops depending on canonical-symbol plus exact-text reconstruction even when that reconstruction is now stable.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 30,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is making id sources more native: backend and frontend now preserve stable canonical ids, but upstream runtime still does not provide its own canonical candidate or entity id contract. That source-owned identity contract is the clearest executable next task because it removes the last synthesized-id layer from experiment provenance and replay binding.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit efae93c, which promoted provenance candidate binding contracts to carry explicit `runtime_candidate_id` alongside canonical `candidate_id`, switched web replay selection to prefer the runtime-side id first, verified the change with targeted `pytest`, `cd apps/web && npx tsc --noEmit`, and `git diff --check`, then pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-preserve-canonical-runtime-candidate-ids-in-provenance-artifacts"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:10:00Z",
+      "updated_at": "2026-04-20T10:20:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay identity trust from preserved canonical ids into a fully native runtime identity contract, so provenance artifacts and replay lookup consume evaluator-owned candidate or entity ids instead of a downstream canonicalized surrogate."
+      "direction_relation_note": "Completed the next experiment-os replay identity pass by splitting canonical provenance identity from explicit runtime-side candidate identity in the contract and replay selection path, which now leaves the narrower upstream follow-up of sourcing that runtime id from native producer or evaluator ids instead of still mirroring canonical values."
+    },
+    {
+      "id": "planning-experiment-os-preserve-upstream-native-runtime-ids-from-artifact-producers",
+      "direction_id": "experiment-os",
+      "title": "Preserve upstream native runtime ids from artifact producers",
+      "description": "Now that provenance contracts and replay selection explicitly carry `runtime_candidate_id`, upgrade the runtime or artifact producer path so that field preserves the source runtime's own candidate or entity id instead of reusing the canonical symbol-plus-text identity, allowing provenance and replay binding to consume true upstream-native ids without another contract change.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 31,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is upstream-native identity: the contract now has official `runtime_candidate_id`, but artifact producers still fill it with the same canonical text or symbol-derived value. That producer-side native-id preservation step is the clearest executable next task because the contract and replay consumer are already prepared for it.",
+      "depends_on": [
+        "planning-experiment-os-promote-native-runtime-candidate-ids-into-provenance-contracts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T10:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay identity trust from a contract-level runtime id placeholder into a true source-owned identity path, so provenance artifacts and replay binding finally preserve evaluator or producer native ids rather than a canonical surrogate duplicated into a new field."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
