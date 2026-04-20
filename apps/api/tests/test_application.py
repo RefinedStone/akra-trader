@@ -13986,10 +13986,14 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].openapi.description == (
     "Filter strategies by runtime lane."
   )
+  assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[-1].key == "registered_at"
   assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[0].key == "strategy_id"
+  assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[-1].key == "lifecycle.registered_at"
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
   assert bindings_by_key["preset_catalog_discovery"].route_path == "/presets"
   assert bindings_by_key["preset_catalog_discovery"].filter_param_specs[1].key == "timeframe"
+  assert bindings_by_key["preset_catalog_discovery"].filter_param_specs[-1].key == "updated_at"
+  assert bindings_by_key["preset_catalog_discovery"].sort_field_specs[-1].key == "timestamps.created_at"
   assert bindings_by_key["preset_catalog_create"].methods == ("POST",)
   assert bindings_by_key["preset_catalog_item_get"].path_param_keys == ("preset_id",)
   assert bindings_by_key["preset_catalog_item_update"].methods == ("PATCH",)
@@ -13998,6 +14002,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_list"].filter_keys[-1] == "tag"
   assert bindings_by_key["run_list"].filter_param_specs[-1].key == "tag"
   assert bindings_by_key["run_list"].filter_param_specs[0].openapi.title == "Run mode"
+  assert any(spec.key == "started_at" for spec in bindings_by_key["run_list"].filter_param_specs)
+  assert any(spec.key == "initial_cash" for spec in bindings_by_key["run_list"].filter_param_specs)
   run_total_return_spec = next(
     spec
     for spec in bindings_by_key["run_list"].filter_param_specs
@@ -14012,7 +14018,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert run_trade_count_spec.constraints.ge == 0
   assert bindings_by_key["run_list"].filter_param_specs[-1].operators[0].key == "contains_all"
   assert bindings_by_key["run_list"].sort_field_specs[0].default_direction == "desc"
-  assert bindings_by_key["run_list"].sort_field_specs[-1].key == "trade_count"
+  assert bindings_by_key["run_list"].sort_field_specs[-1].key == "metrics.trade_count"
+  nested_run_metric_sort = next(
+    field
+    for field in bindings_by_key["run_list"].sort_field_specs
+    if field.key == "metrics.total_return_pct"
+  )
+  assert nested_run_metric_sort.value_path == ("metrics", "total_return_pct")
   assert bindings_by_key["run_compare"].filter_keys == ("run_id", "intent", "narrative_score")
   assert bindings_by_key["run_compare"].filter_param_specs[0].key == "run_id"
   assert bindings_by_key["run_compare"].filter_param_specs[1].constraints.min_length == 1
@@ -14023,6 +14035,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   )
   assert [operator.key for operator in compare_score_spec.operators] == ["eq", "gt", "ge", "lt", "le"]
   assert bindings_by_key["run_compare"].sort_field_specs[1].key == "narrative_score"
+  assert bindings_by_key["run_compare"].sort_field_specs[-1].key == "narratives.insight_score"
   assert bindings_by_key["run_backtest_launch"].methods == ("POST",)
   assert bindings_by_key["run_backtest_item_get"].route_path == "/runs/backtests/{run_id}"
   assert bindings_by_key["run_rerun_backtest"].path_param_keys == ("rerun_boundary_id",)

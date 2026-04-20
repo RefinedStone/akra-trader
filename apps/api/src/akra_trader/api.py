@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC
 from datetime import datetime
 import inspect
 from numbers import Number
@@ -209,6 +210,7 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
       "filters": [
         {
           "key": spec.key,
+          "value_type": _describe_filter_value_type(spec.annotation),
           "operators": [
             {
               "key": operator.key,
@@ -227,11 +229,27 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
           "label": field.label,
           "description": field.description,
           "default_direction": field.default_direction,
+          "value_type": field.value_type,
+          "value_path": list(field.value_path),
         }
         for field in binding.sort_field_specs
       ],
     }
   }
+
+
+def _describe_filter_value_type(annotation: Any) -> str:
+  resolved_annotation = _resolve_filter_scalar_annotation(annotation)
+  origin = get_origin(annotation)
+  if origin in {list, tuple}:
+    return f"list[{_describe_filter_value_type(resolved_annotation)}]"
+  if resolved_annotation is int:
+    return "integer"
+  if resolved_annotation is float:
+    return "number"
+  if resolved_annotation is datetime:
+    return "datetime"
+  return "string"
 
 
 def _resolve_filter_scalar_annotation(annotation: Any) -> Any:
@@ -253,6 +271,12 @@ def _coerce_filter_scalar_value(annotation: Any, raw_value: str) -> Any:
     return int(raw_value)
   if resolved_annotation is float:
     return float(raw_value)
+  if resolved_annotation is datetime:
+    normalized_value = raw_value.replace("Z", "+00:00")
+    parsed = datetime.fromisoformat(normalized_value)
+    if parsed.tzinfo is None:
+      return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
   return raw_value
 
 

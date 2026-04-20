@@ -254,6 +254,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "lane",
     "lifecycle_stage",
     "version",
+    "registered_at",
     "sort",
     "app",
   )
@@ -262,6 +263,8 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "strategy_id",
     "timeframe",
     "lifecycle_stage",
+    "created_at",
+    "updated_at",
     "sort",
     "app",
   )
@@ -274,6 +277,11 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "preset_id",
     "benchmark_family",
     "dataset_identity",
+    "started_at",
+    "updated_at",
+    "initial_cash",
+    "ending_equity",
+    "exposure_pct",
     "total_return_pct",
     "max_drawdown_pct",
     "win_rate_pct",
@@ -338,9 +346,22 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert compare_params["run_id"]["description"] == "Run identifiers to include in the comparison set."
   assert _first_non_null_schema_branch(compare_params["intent"]["schema"])["minLength"] == 1
   assert compare_params["intent"]["schema"]["title"] == "Comparison intent"
+  assert _first_non_null_schema_branch(runs_params["started_at"]["schema"])["format"] == "date-time"
+  assert _first_non_null_schema_branch(runs_params["updated_at"]["schema"])["format"] == "date-time"
+  assert _first_non_null_schema_branch(runs_params["exposure_pct"]["schema"])["maximum"] == 100
 
   run_query_schema = openapi["paths"]["/api/runs"]["get"]["x-akra-query-schema"]
+  started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
+  assert started_at_filter["value_type"] == "datetime"
+  assert [operator["key"] for operator in started_at_filter["operators"]] == [
+    "eq",
+    "gt",
+    "ge",
+    "lt",
+    "le",
+  ]
   total_return_filter = next(item for item in run_query_schema["filters"] if item["key"] == "total_return_pct")
+  assert total_return_filter["value_type"] == "number"
   assert [operator["key"] for operator in total_return_filter["operators"]] == [
     "eq",
     "gt",
@@ -353,6 +374,13 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
   assert any(field["key"] == "trade_count" for field in run_query_schema["sort_fields"])
+  nested_metric_sort = next(
+    field
+    for field in run_query_schema["sort_fields"]
+    if field["key"] == "metrics.total_return_pct"
+  )
+  assert nested_metric_sort["value_type"] == "number"
+  assert nested_metric_sort["value_path"] == ["metrics", "total_return_pct"]
   run_sort_param = next(
     param for param in openapi["paths"]["/api/runs"]["get"]["parameters"]
     if param["name"] == "sort"
@@ -372,6 +400,7 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
     "le",
   ]
   assert compare_query_schema["sort_fields"][1]["key"] == "narrative_score"
+  assert any(field["key"] == "narratives.insight_score" for field in compare_query_schema["sort_fields"])
   assert compare_params["narrative_score"]["schema"]["title"] == "Narrative score"
 
   market_data_params = {
@@ -501,6 +530,69 @@ def test_run_query_contract_applies_numeric_range_filters_and_multi_field_sort(t
     assert all(item["metrics"]["trade_count"] >= 2 for item in payload[:4])
 
 
+def test_run_query_contract_applies_datetime_ranges_wider_metrics_and_nested_sort(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    run_ids: list[str] = []
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      run_ids.append(response.json()["config"]["run_id"])
+
+    app = client.app.state.container.app
+    started_at_by_run = {
+      run_ids[0]: datetime(2025, 1, 1, 0, 0, tzinfo=UTC),
+      run_ids[1]: datetime(2025, 1, 1, 1, 0, tzinfo=UTC),
+      run_ids[2]: datetime(2025, 1, 1, 2, 0, tzinfo=UTC),
+      run_ids[3]: datetime(2025, 1, 1, 3, 0, tzinfo=UTC),
+    }
+    metric_overrides = {
+      run_ids[0]: {"ending_equity": 10800.0, "exposure_pct": 35.0, "total_return_pct": 8.0, "trade_count": 3},
+      run_ids[1]: {"ending_equity": 11200.0, "exposure_pct": 40.0, "total_return_pct": 12.0, "trade_count": 4},
+      run_ids[2]: {"ending_equity": 11200.0, "exposure_pct": 65.0, "total_return_pct": 12.0, "trade_count": 4},
+      run_ids[3]: {"ending_equity": 12200.0, "exposure_pct": 70.0, "total_return_pct": 22.0, "trade_count": 2},
+    }
+    for run_id in run_ids:
+      run = app.get_run(run_id)
+      assert run is not None
+      run.started_at = started_at_by_run[run_id]
+      run.ended_at = started_at_by_run[run_id] + timedelta(minutes=15)
+      run.metrics.update(metric_overrides[run_id])
+      app._runs.save_run(run)
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("started_at__ge", "2025-01-01T01:00:00+00:00"),
+        ("ending_equity__ge", "11200"),
+        ("exposure_pct__ge", "40"),
+        ("sort", "metrics.trade_count:desc"),
+        ("sort", "metrics.total_return_pct:asc"),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    expected_leading_ids = [
+      *sorted((run_ids[1], run_ids[2])),
+      run_ids[3],
+    ]
+    assert [item["config"]["run_id"] for item in payload[:3]] == expected_leading_ids
+    assert all(
+      datetime.fromisoformat(item["started_at"]) >= datetime(2025, 1, 1, 1, 0, tzinfo=UTC)
+      for item in payload[:3]
+    )
+    assert all(item["metrics"]["ending_equity"] >= 11200 for item in payload[:3])
+    assert all(item["metrics"]["exposure_pct"] >= 40 for item in payload[:3])
+
+
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   run_ids: list[str] = []
@@ -569,8 +661,8 @@ def test_compare_query_contract_applies_numeric_range_filter_and_multi_field_sor
       ("run_id", run_ids[2]),
       ("intent", "strategy_tuning"),
       ("narrative_score__ge", str(threshold)),
-      ("sort", "narrative_score:asc"),
-      ("sort", "run_id_order:desc"),
+      ("sort", "narratives.insight_score:asc"),
+      ("sort", "narratives.run_id_order:desc"),
     ],
   )
 

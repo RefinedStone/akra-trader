@@ -23026,6 +23026,8 @@ class StandaloneSurfaceSortFieldSpec:
   label: str
   description: str
   default_direction: str = "asc"
+  value_type: str = "string"
+  value_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -23084,6 +23086,38 @@ def _build_numeric_range_filter_operators(
   )
 
 
+def _build_datetime_range_filter_operators(
+  subject: str,
+) -> tuple[StandaloneSurfaceFilterOperatorSpec, ...]:
+  return (
+    StandaloneSurfaceFilterOperatorSpec(
+      key="eq",
+      label="Equals",
+      description=f"Matches {subject} exactly.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="gt",
+      label="After",
+      description=f"Matches {subject} values after the requested timestamp.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="ge",
+      label="On or after",
+      description=f"Matches {subject} values on or after the requested timestamp.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="lt",
+      label="Before",
+      description=f"Matches {subject} values before the requested timestamp.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="le",
+      label="On or before",
+      description=f"Matches {subject} values on or before the requested timestamp.",
+    ),
+  )
+
+
 def _extract_runtime_filter_conditions(
   filters: dict[str, Any] | None,
 ) -> tuple[StandaloneSurfaceFilterCondition, ...]:
@@ -23137,6 +23171,14 @@ def _normalize_runtime_numeric_filter_value(value: Any) -> float | int | None:
   return float(value)
 
 
+def _normalize_runtime_datetime_filter_value(value: Any) -> datetime | None:
+  if not isinstance(value, datetime):
+    return None
+  if value.tzinfo is None:
+    return value.replace(tzinfo=UTC)
+  return value.astimezone(UTC)
+
+
 def _evaluate_runtime_filter_condition(
   candidate_value: Any,
   *,
@@ -23159,17 +23201,25 @@ def _evaluate_runtime_filter_condition(
     operand_values = tuple(operand or ())
     return candidate_value in operand_values
   if operator in {"gt", "ge", "lt", "le"}:
-    candidate_number = _normalize_runtime_numeric_filter_value(candidate_value)
-    operand_number = _normalize_runtime_numeric_filter_value(operand)
-    if candidate_number is None or operand_number is None:
-      return False
+    candidate_datetime = _normalize_runtime_datetime_filter_value(candidate_value)
+    operand_datetime = _normalize_runtime_datetime_filter_value(operand)
+    if candidate_datetime is not None and operand_datetime is not None:
+      candidate_comparable: float | int | datetime = candidate_datetime
+      operand_comparable: float | int | datetime = operand_datetime
+    else:
+      candidate_number = _normalize_runtime_numeric_filter_value(candidate_value)
+      operand_number = _normalize_runtime_numeric_filter_value(operand)
+      if candidate_number is None or operand_number is None:
+        return False
+      candidate_comparable = candidate_number
+      operand_comparable = operand_number
     if operator == "gt":
-      return candidate_number > operand_number
+      return candidate_comparable > operand_comparable
     if operator == "ge":
-      return candidate_number >= operand_number
+      return candidate_comparable >= operand_comparable
     if operator == "lt":
-      return candidate_number < operand_number
-    return candidate_number <= operand_number
+      return candidate_comparable < operand_comparable
+    return candidate_comparable <= operand_comparable
   raise ValueError(f"Unsupported runtime filter operator: {operator}")
 
 
@@ -23227,11 +23277,13 @@ def _apply_runtime_query_to_strategies(
       "lane": lambda strategy: strategy.runtime,
       "lifecycle_stage": lambda strategy: strategy.lifecycle.stage,
       "version": lambda strategy: strategy.version,
+      "registered_at": lambda strategy: strategy.lifecycle.registered_at,
     },
     sort_getters={
       "strategy_id": lambda strategy: strategy.strategy_id,
       "runtime": lambda strategy: strategy.runtime,
       "registered_at": lambda strategy: strategy.lifecycle.registered_at,
+      "lifecycle.registered_at": lambda strategy: strategy.lifecycle.registered_at,
     },
   )
 
@@ -23247,11 +23299,15 @@ def _apply_runtime_query_to_presets(
       "strategy_id": lambda preset: preset.strategy_id,
       "timeframe": lambda preset: preset.timeframe,
       "lifecycle_stage": lambda preset: preset.lifecycle.stage,
+      "created_at": lambda preset: preset.created_at,
+      "updated_at": lambda preset: preset.updated_at,
     },
     sort_getters={
       "updated_at": lambda preset: preset.updated_at,
       "created_at": lambda preset: preset.created_at,
       "preset_id": lambda preset: preset.preset_id,
+      "timestamps.updated_at": lambda preset: preset.updated_at,
+      "timestamps.created_at": lambda preset: preset.created_at,
     },
   )
 
@@ -23275,6 +23331,11 @@ def _apply_runtime_query_to_runs(
         if run.provenance.market_data is not None
         else None
       ),
+      "started_at": lambda run: run.started_at,
+      "updated_at": _run_effective_updated_at,
+      "initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
+      "ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
+      "exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
       "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
       "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
       "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
@@ -23285,10 +23346,23 @@ def _apply_runtime_query_to_runs(
       "updated_at": _run_effective_updated_at,
       "started_at": lambda run: run.started_at,
       "run_id": lambda run: run.config.run_id,
+      "initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
+      "ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
+      "exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
       "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
       "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
       "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
       "trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
+      "config.run_id": lambda run: run.config.run_id,
+      "timing.started_at": lambda run: run.started_at,
+      "timing.updated_at": _run_effective_updated_at,
+      "metrics.initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
+      "metrics.ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
+      "metrics.exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
+      "metrics.total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
+      "metrics.max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
+      "metrics.win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
+      "metrics.trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
     },
   )
 
@@ -23314,6 +23388,11 @@ def _apply_runtime_query_to_comparison(
         len(run_order_index),
       ),
       "narrative_score": lambda narrative: narrative.insight_score,
+      "narratives.run_id_order": lambda narrative: run_order_index.get(
+        narrative.run_id,
+        len(run_order_index),
+      ),
+      "narratives.insight_score": lambda narrative: narrative.insight_score,
     },
   )
   return replace(comparison, narratives=tuple(narratives))
@@ -23522,7 +23601,7 @@ def list_standalone_surface_runtime_bindings(
     response_title="Strategy catalog discovery",
     scope="app",
     binding_kind="strategy_catalog_discovery",
-    filter_keys=("lane", "lifecycle_stage", "version"),
+    filter_keys=("lane", "lifecycle_stage", "version", "registered_at"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "lane",
@@ -23583,23 +23662,46 @@ def list_standalone_surface_runtime_bindings(
           ),
         ),
       ),
+      StandaloneSurfaceFilterParamSpec(
+        "registered_at",
+        datetime | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Registered at",
+          description="Filter imported strategies by registration timestamp.",
+          examples=("2025-01-01T00:00:00+00:00",),
+        ),
+        operators=_build_datetime_range_filter_operators("strategy registration time"),
+      ),
     ),
     sort_field_specs=(
       StandaloneSurfaceSortFieldSpec(
         key="strategy_id",
         label="Strategy ID",
         description="Sorts by strategy identifier.",
+        value_path=("strategy_id",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="runtime",
         label="Runtime lane",
         description="Sorts by runtime lane grouping.",
+        value_path=("runtime",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="registered_at",
         label="Registration time",
         description="Sorts imported strategies by registration timestamp.",
         default_direction="desc",
+        value_type="datetime",
+        value_path=("lifecycle", "registered_at"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="lifecycle.registered_at",
+        label="Lifecycle registration time",
+        description="Sorts imported strategies by the nested lifecycle registration timestamp.",
+        default_direction="desc",
+        value_type="datetime",
+        value_path=("lifecycle", "registered_at"),
       ),
     ),
   )
@@ -23618,7 +23720,7 @@ def list_standalone_surface_runtime_bindings(
     response_title="Preset catalog discovery",
     scope="app",
     binding_kind="preset_catalog_discovery",
-    filter_keys=("strategy_id", "timeframe", "lifecycle_stage"),
+    filter_keys=("strategy_id", "timeframe", "lifecycle_stage", "created_at", "updated_at"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "strategy_id",
@@ -23674,6 +23776,28 @@ def list_standalone_surface_runtime_bindings(
           ),
         ),
       ),
+      StandaloneSurfaceFilterParamSpec(
+        "created_at",
+        datetime | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Created at",
+          description="Filter presets by creation timestamp.",
+          examples=("2025-01-01T00:00:00+00:00",),
+        ),
+        operators=_build_datetime_range_filter_operators("preset creation time"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "updated_at",
+        datetime | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Updated at",
+          description="Filter presets by last update timestamp.",
+          examples=("2025-01-02T00:00:00+00:00",),
+        ),
+        operators=_build_datetime_range_filter_operators("preset update time"),
+      ),
     ),
     sort_field_specs=(
       StandaloneSurfaceSortFieldSpec(
@@ -23681,17 +23805,38 @@ def list_standalone_surface_runtime_bindings(
         label="Updated at",
         description="Sorts presets by most recent update time.",
         default_direction="desc",
+        value_type="datetime",
+        value_path=("updated_at",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="created_at",
         label="Created at",
         description="Sorts presets by creation time.",
         default_direction="desc",
+        value_type="datetime",
+        value_path=("created_at",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="preset_id",
         label="Preset ID",
         description="Sorts presets by preset identifier.",
+        value_path=("preset_id",),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="timestamps.updated_at",
+        label="Nested updated at",
+        description="Sorts presets by the nested update timestamp contract.",
+        default_direction="desc",
+        value_type="datetime",
+        value_path=("updated_at",),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="timestamps.created_at",
+        label="Nested created at",
+        description="Sorts presets by the nested creation timestamp contract.",
+        default_direction="desc",
+        value_type="datetime",
+        value_path=("created_at",),
       ),
     ),
   )
@@ -23781,6 +23926,11 @@ def list_standalone_surface_runtime_bindings(
       "preset_id",
       "benchmark_family",
       "dataset_identity",
+      "started_at",
+      "updated_at",
+      "initial_cash",
+      "ending_equity",
+      "exposure_pct",
       "total_return_pct",
       "max_drawdown_pct",
       "win_rate_pct",
@@ -23923,6 +24073,64 @@ def list_standalone_surface_runtime_bindings(
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
+        "started_at",
+        datetime | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Started at",
+          description="Filter runs by start timestamp.",
+          examples=("2025-01-01T00:00:00+00:00",),
+        ),
+        operators=_build_datetime_range_filter_operators("run start time"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "updated_at",
+        datetime | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Updated at",
+          description="Filter runs by effective update timestamp.",
+          examples=("2025-01-01T00:05:00+00:00",),
+        ),
+        operators=_build_datetime_range_filter_operators("run update time"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "initial_cash",
+        float | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Initial cash",
+          description="Filter runs by initial cash baseline.",
+          examples=(10000.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run initial cash"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "ending_equity",
+        float | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Ending equity",
+          description="Filter runs by ending equity.",
+          examples=(11250.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run ending equity"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "exposure_pct",
+        float | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Exposure %",
+          description="Filter runs by exposure percentage.",
+          examples=(45.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run exposure percentage"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
         "total_return_pct",
         float | None,
         default=None,
@@ -24000,40 +24208,154 @@ def list_standalone_surface_runtime_bindings(
         label="Updated at",
         description="Sorts runs by most recent update time.",
         default_direction="desc",
+        value_type="datetime",
+        value_path=("updated_at",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="started_at",
         label="Started at",
         description="Sorts runs by start timestamp.",
         default_direction="desc",
+        value_type="datetime",
+        value_path=("started_at",),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="run_id",
         label="Run ID",
         description="Sorts runs by run identifier.",
+        value_path=("config", "run_id"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="initial_cash",
+        label="Initial cash",
+        description="Sorts runs by initial cash baseline.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "initial_cash"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="ending_equity",
+        label="Ending equity",
+        description="Sorts runs by ending equity.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "ending_equity"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="exposure_pct",
+        label="Exposure %",
+        description="Sorts runs by exposure percentage.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "exposure_pct"),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="total_return_pct",
         label="Total return %",
         description="Sorts runs by realized total return percentage.",
         default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "total_return_pct"),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="max_drawdown_pct",
         label="Max drawdown %",
         description="Sorts runs by realized max drawdown percentage.",
+        value_type="number",
+        value_path=("metrics", "max_drawdown_pct"),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="win_rate_pct",
         label="Win rate %",
         description="Sorts runs by realized win-rate percentage.",
         default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "win_rate_pct"),
       ),
       StandaloneSurfaceSortFieldSpec(
         key="trade_count",
         label="Trade count",
         description="Sorts runs by realized trade count.",
         default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "trade_count"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="config.run_id",
+        label="Nested run ID",
+        description="Sorts runs by the nested config run identifier.",
+        value_path=("config", "run_id"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="timing.started_at",
+        label="Nested started at",
+        description="Sorts runs by the nested timing start timestamp.",
+        default_direction="desc",
+        value_type="datetime",
+        value_path=("started_at",),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="timing.updated_at",
+        label="Nested updated at",
+        description="Sorts runs by the nested timing update timestamp.",
+        default_direction="desc",
+        value_type="datetime",
+        value_path=("updated_at",),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.initial_cash",
+        label="Nested initial cash",
+        description="Sorts runs by the nested initial cash metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "initial_cash"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.ending_equity",
+        label="Nested ending equity",
+        description="Sorts runs by the nested ending equity metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "ending_equity"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.exposure_pct",
+        label="Nested exposure %",
+        description="Sorts runs by the nested exposure percentage metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "exposure_pct"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.total_return_pct",
+        label="Nested total return %",
+        description="Sorts runs by the nested total return metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "total_return_pct"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.max_drawdown_pct",
+        label="Nested max drawdown %",
+        description="Sorts runs by the nested max drawdown metric.",
+        value_type="number",
+        value_path=("metrics", "max_drawdown_pct"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.win_rate_pct",
+        label="Nested win rate %",
+        description="Sorts runs by the nested win-rate metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "win_rate_pct"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="metrics.trade_count",
+        label="Nested trade count",
+        description="Sorts runs by the nested trade-count metric.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("metrics", "trade_count"),
       ),
     ),
   )
@@ -24099,12 +24421,29 @@ def list_standalone_surface_runtime_bindings(
         key="run_id_order",
         label="Input run order",
         description="Keeps the compared runs in the explicit query order.",
+        value_type="integer",
       ),
       StandaloneSurfaceSortFieldSpec(
         key="narrative_score",
         label="Narrative score",
         description="Ranks comparison narratives by computed score.",
         default_direction="desc",
+        value_type="number",
+        value_path=("narratives", "insight_score"),
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="narratives.run_id_order",
+        label="Nested narrative input order",
+        description="Sorts comparison narratives by their nested requested run order.",
+        value_type="integer",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="narratives.insight_score",
+        label="Nested narrative score",
+        description="Sorts comparison narratives by the nested insight score field.",
+        default_direction="desc",
+        value_type="number",
+        value_path=("narratives", "insight_score"),
       ),
     ),
   )
