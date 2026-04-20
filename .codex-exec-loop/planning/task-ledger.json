@@ -5624,18 +5624,54 @@
       "direction_id": "experiment-os",
       "title": "Persist provenance candidate hover as artifact-level replay selection",
       "description": "Build on the shipped focused-candidate sync by promoting provenance-side concrete candidate hover into its own durable artifact-level selection state that reopens and preserves the same replay drill-through focus, so operators can move bidirectionally between provenance evidence and replay rows without losing the exact candidate they were inspecting.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 24,
-      "priority_reason": "The latest main-session reply says the remaining deeper bidirectional sync gap after commit 4202468 is that provenance-side concrete candidate hover is not yet stored as its own artifact-level selection. That is the clearest directly executable follow-up for the next queued task.",
+      "priority_reason": "Completed in main session commit fcf5ed2, which persisted provenance candidate hover as artifact-level replay selection, carried matching `artifactHoverKey` metadata into concrete runtime candidate samples, preserved artifact-selected candidate context after hover exit on the same provenance surface, surfaced `Artifact replay selection` state in the UI, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-direct-candidate-focus-sync-and-re-evaluation-preview"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T08:40:02Z",
+      "updated_at": "2026-04-20T08:55:10Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from synchronized focused-candidate rows into a stronger artifact-selection contract, so provenance evidence and replay drill-through can share one exact candidate-selection state instead of only transient hover context."
+      "direction_relation_note": "Completed the artifact-selection persistence pass for experiment-os replay explanation trust by turning provenance hover into durable artifact-level candidate ownership, which now leaves stricter artifact matching accuracy as the clearest follow-up for keeping replay selection tied to the right source evidence."
+    },
+    {
+      "id": "planning-experiment-os-tighten-provenance-artifact-matching-for-replay-selection",
+      "direction_id": "experiment-os",
+      "title": "Tighten provenance artifact matching for replay selection",
+      "description": "Build on the shipped artifact-level replay selection by replacing the current issue-text and symbol-context heuristic mapping with more direct artifact-source matching, preferably from structured artifact payload metadata when available, so persisted provenance selection points at the exact replay candidate set instead of relying on fuzzy summary or section-line matches.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 25,
+      "priority_reason": "Completed in main session commit 7259e84, which tightened provenance artifact matching by structuring artifact summary and section-line parsing, requiring both candidate issue text and `symbol_key` agreement, scoring visible line text plus section or label keys plus structured values to select the best hover key, and verifying with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-persist-provenance-candidate-hover-as-artifact-selection-for-replay-sync"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T09:00:03Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Closed the frontend provenance-matching tightening pass for experiment-os replay explanation trust by making hover selection structurally score the best artifact evidence instead of broadly substring scanning, which now leaves backend-carried source metadata as the next gap for exact source-to-candidate binding."
+    },
+    {
+      "id": "planning-experiment-os-carry-source-location-metadata-in-provenance-artifacts-for-replay-selection",
+      "direction_id": "experiment-os",
+      "title": "Carry source-location metadata in provenance artifacts for replay selection",
+      "description": "Replace the remaining frontend-only artifact parsing heuristic by extending provenance artifact payloads to carry explicit candidate-to-artifact source location metadata, so replay selection can bind directly to structured source entries instead of inferring matches from summary and section text.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 26,
+      "priority_reason": "The latest main-session reply says the frontend structural matching pass is complete in commit 7259e84, and the direct remaining gap is expanding provenance-side source metadata because artifact payloads still do not carry candidate-to-artifact source location directly. That makes the backend contract upgrade the clearest next executable queue head.",
+      "depends_on": [
+        "planning-experiment-os-tighten-provenance-artifact-matching-for-replay-selection"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T09:00:03Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust from stronger frontend artifact matching into a first-class provenance contract where replay candidate ownership is pinned by explicit source-location metadata instead of text-derived inference."
     },
     {
       "id": "planning-experiment-os-project-clause-re-evaluation-preview-into-replay-timeline-diffs",
