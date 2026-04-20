@@ -504,6 +504,8 @@ def build_container(settings: Settings) -> Container:
       settings.operator_alert_paging_policy_critical_escalation_targets
     ),
     operator_alert_external_sync_token=settings.operator_alert_external_sync_token,
+    replay_alias_audit_admin_read_token=settings.replay_alias_audit_admin_read_token,
+    replay_alias_audit_admin_write_token=settings.replay_alias_audit_admin_write_token,
     operator_alert_escalation_targets=settings.operator_alert_escalation_targets,
     operator_alert_incident_ack_timeout_seconds=settings.operator_alert_incident_ack_timeout_seconds,
     operator_alert_incident_max_escalations=settings.operator_alert_incident_max_escalations,

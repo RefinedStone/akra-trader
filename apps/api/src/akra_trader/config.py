@@ -244,6 +244,8 @@ class Settings:
   operator_alert_paging_policy_warning_escalation_targets: tuple[str, ...] = ()
   operator_alert_paging_policy_critical_escalation_targets: tuple[str, ...] = ()
   operator_alert_external_sync_token: str | None = None
+  replay_alias_audit_admin_read_token: str | None = None
+  replay_alias_audit_admin_write_token: str | None = None
   operator_alert_incident_ack_timeout_seconds: int = 300
   operator_alert_incident_max_escalations: int = 2
   operator_alert_incident_escalation_backoff_multiplier: float = 2.0
@@ -975,6 +977,12 @@ def load_settings() -> Settings:
     ),
     operator_alert_external_sync_token=(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_EXTERNAL_SYNC_TOKEN") or None
+    ),
+    replay_alias_audit_admin_read_token=(
+      os.getenv("AKRA_TRADER_REPLAY_ALIAS_AUDIT_ADMIN_READ_TOKEN") or None
+    ),
+    replay_alias_audit_admin_write_token=(
+      os.getenv("AKRA_TRADER_REPLAY_ALIAS_AUDIT_ADMIN_WRITE_TOKEN") or None
     ),
     operator_alert_incident_ack_timeout_seconds=int(
       os.getenv("AKRA_TRADER_OPERATOR_ALERT_INCIDENT_ACK_TIMEOUT_SECONDS", "300")

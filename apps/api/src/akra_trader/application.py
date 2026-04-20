@@ -627,6 +627,8 @@ class TradingApplication:
     operator_alert_paging_policy_warning_escalation_targets: tuple[str, ...] = (),
     operator_alert_paging_policy_critical_escalation_targets: tuple[str, ...] = (),
     operator_alert_external_sync_token: str | None = None,
+    replay_alias_audit_admin_read_token: str | None = None,
+    replay_alias_audit_admin_write_token: str | None = None,
     operator_alert_escalation_targets: tuple[str, ...] = (),
     operator_alert_incident_ack_timeout_seconds: int = 300,
     operator_alert_incident_max_escalations: int = 2,
@@ -692,6 +694,8 @@ class TradingApplication:
       operator_alert_paging_policy_critical_escalation_targets
     )
     self._operator_alert_external_sync_token = operator_alert_external_sync_token
+    self._replay_alias_audit_admin_read_token = replay_alias_audit_admin_read_token
+    self._replay_alias_audit_admin_write_token = replay_alias_audit_admin_write_token
     self._operator_alert_escalation_targets = tuple(
       dict.fromkeys(operator_alert_escalation_targets)
     )
@@ -2213,6 +2217,32 @@ class TradingApplication:
       return
     if token != self._operator_alert_external_sync_token:
       raise PermissionError("invalid operator incident sync token")
+
+  def require_replay_alias_audit_admin_token(
+    self,
+    token: str | None,
+    *,
+    scope: str,
+  ) -> None:
+    read_token = self._replay_alias_audit_admin_read_token
+    write_token = self._replay_alias_audit_admin_write_token
+    if read_token is None and write_token is None:
+      return
+    if scope == "write":
+      expected_token = write_token or read_token
+      if token != expected_token:
+        raise PermissionError("invalid replay alias audit admin token")
+      return
+    if scope == "read":
+      accepted_tokens = {
+        candidate
+        for candidate in (read_token, write_token)
+        if candidate is not None
+      }
+      if token not in accepted_tokens:
+        raise PermissionError("invalid replay alias audit admin token")
+      return
+    raise ValueError(f"Unsupported replay alias audit admin scope: {scope}")
 
   def sync_guarded_live_incident_from_external(
     self,
@@ -24490,6 +24520,7 @@ def list_standalone_surface_runtime_bindings(
     response_title="List replay link alias audits",
     scope="app",
     binding_kind="replay_link_audit_list",
+    header_keys=("x_akra_replay_audit_admin_token",),
     filter_keys=("alias_id", "template_key", "action", "retention_policy", "source_tab_id", "search", "limit"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
@@ -24579,6 +24610,7 @@ def list_standalone_surface_runtime_bindings(
     scope="app",
     binding_kind="replay_link_audit_prune",
     methods=("POST",),
+    header_keys=("x_akra_replay_audit_admin_token",),
     request_payload_kind="replay_link_audit_prune",
   )
   replay_alias_revoke_binding = StandaloneSurfaceRuntimeBinding(
@@ -25962,6 +25994,10 @@ def execute_standalone_surface_binding(
       app.list_replay_intent_alias_history(resolved_path_params["alias_token"]),
     )
   if binding.binding_kind == "replay_link_audit_list":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="read",
+    )
     return serialize_replay_intent_alias_audit_list(
       app.list_replay_intent_alias_audits(
         alias_id=resolved_filters.get("alias_id"),
@@ -25974,6 +26010,10 @@ def execute_standalone_surface_binding(
       )
     )
   if binding.binding_kind == "replay_link_audit_prune":
+    app.require_replay_alias_audit_admin_token(
+      resolved_headers.get("x_akra_replay_audit_admin_token"),
+      scope="write",
+    )
     return app.prune_replay_intent_alias_audits(
       alias_id=resolved_payload.get("alias_id"),
       template_key=resolved_payload.get("template_key"),

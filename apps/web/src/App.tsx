@@ -3906,12 +3906,25 @@ const COMPARISON_TOOLTIP_TUNING_GROUPS: Record<
 };
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
   const response = await fetch(`${apiBase}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers,
   });
   if (!response.ok) {
-    throw new Error(`${response.status} ${response.statusText}`);
+    let detail = `${response.status} ${response.statusText}`;
+    try {
+      const errorPayload = await response.json() as { detail?: unknown };
+      if (typeof errorPayload.detail === "string" && errorPayload.detail.trim()) {
+        detail = `${response.status} ${errorPayload.detail}`;
+      }
+    } catch {
+      // Ignore malformed error payloads and fall back to the HTTP status text.
+    }
+    throw new Error(detail);
   }
   return response.json() as Promise<T>;
 }
@@ -3981,6 +3994,85 @@ async function revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias(
       body: JSON.stringify({
         source_tab_id: payload.sourceTabId,
         source_tab_label: payload.sourceTabLabel,
+      }),
+    },
+  );
+}
+
+async function listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits(params: {
+  adminToken?: string;
+  action?: string;
+  aliasId?: string;
+  limit?: number;
+  retentionPolicy?: string;
+  search?: string;
+  sourceTabId?: string;
+  templateKey?: string;
+}) {
+  const searchParams = new URLSearchParams();
+  if (params.aliasId?.trim()) {
+    searchParams.set("alias_id", params.aliasId.trim());
+  }
+  if (params.templateKey?.trim()) {
+    searchParams.set("template_key", params.templateKey.trim());
+  }
+  if (params.action?.trim() && params.action !== "all") {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.retentionPolicy?.trim() && params.retentionPolicy !== "all") {
+    searchParams.set("retention_policy", params.retentionPolicy.trim());
+  }
+  if (params.sourceTabId?.trim()) {
+    searchParams.set("source_tab_id", params.sourceTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 500))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditListPayload>(
+    `/replay-links/audits${suffix}`,
+    {
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+    },
+  );
+}
+
+async function pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits(params: {
+  adminToken?: string;
+  action?: string;
+  aliasId?: string;
+  includeManual?: boolean;
+  pruneMode: "expired" | "matched";
+  recordedBefore?: string;
+  retentionPolicy?: string;
+  search?: string;
+  sourceTabId?: string;
+  templateKey?: string;
+}) {
+  return fetchJson<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload>(
+    "/replay-links/audits/prune",
+    {
+      method: "POST",
+      headers: params.adminToken?.trim()
+        ? { "X-Akra-Replay-Audit-Admin-Token": params.adminToken.trim() }
+        : undefined,
+      body: JSON.stringify({
+        prune_mode: params.pruneMode,
+        ...(params.aliasId?.trim() ? { alias_id: params.aliasId.trim() } : {}),
+        ...(params.templateKey?.trim() ? { template_key: params.templateKey.trim() } : {}),
+        ...(params.action?.trim() && params.action !== "all" ? { action: params.action.trim() } : {}),
+        ...(params.retentionPolicy?.trim() && params.retentionPolicy !== "all"
+          ? { retention_policy: params.retentionPolicy.trim() }
+          : {}),
+        ...(params.sourceTabId?.trim() ? { source_tab_id: params.sourceTabId.trim() } : {}),
+        ...(params.search?.trim() ? { search: params.search.trim() } : {}),
+        ...(params.recordedBefore?.trim() ? { recorded_before: params.recordedBefore.trim() } : {}),
+        include_manual: Boolean(params.includeManual),
       }),
     },
   );
@@ -17290,6 +17382,35 @@ type RunSurfaceCollectionQueryBuilderReplayLinkAliasRecordPayload = {
   template_label: string;
 };
 
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry = {
+  action: string;
+  alias_created_at: string | null;
+  alias_expires_at: string | null;
+  alias_id: string;
+  alias_revoked_at: string | null;
+  audit_id: string;
+  detail: string;
+  expires_at: string | null;
+  recorded_at: string;
+  redaction_policy: RunSurfaceCollectionQueryBuilderReplayLinkRedactionPolicy;
+  retention_policy: RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy;
+  source_tab_id: string | null;
+  source_tab_label: string | null;
+  template_key: string;
+  template_label: string;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditListPayload = {
+  items: RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry[];
+  total: number;
+};
+
+type RunSurfaceCollectionQueryBuilderReplayLinkServerAuditPrunePayload = {
+  deleted_count: number;
+  matched_audit_ids?: string[];
+  mode: "expired" | "matched" | string;
+};
+
 type RunSurfaceCollectionQueryBuilderReplayLinkAliasState = {
   aliases: RunSurfaceCollectionQueryBuilderReplayLinkAliasEntry[];
   version: number;
@@ -21456,6 +21577,27 @@ function RunSurfaceCollectionQueryBuilder({
     message: string;
     tone: "error" | "muted" | "success";
   } | null>(null);
+  const [replayIntentServerAuditReadToken, setReplayIntentServerAuditReadToken] = useState("");
+  const [replayIntentServerAuditWriteToken, setReplayIntentServerAuditWriteToken] = useState("");
+  const [replayIntentServerAuditTemplateFilter, setReplayIntentServerAuditTemplateFilter] = useState("");
+  const [replayIntentServerAuditAliasFilter, setReplayIntentServerAuditAliasFilter] = useState("");
+  const [replayIntentServerAuditActionFilter, setReplayIntentServerAuditActionFilter] =
+    useState<"all" | "created" | "resolved" | "revoked">("all");
+  const [replayIntentServerAuditRetentionFilter, setReplayIntentServerAuditRetentionFilter] =
+    useState<"all" | RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy>("all");
+  const [replayIntentServerAuditSourceTabFilter, setReplayIntentServerAuditSourceTabFilter] = useState("");
+  const [replayIntentServerAuditSearch, setReplayIntentServerAuditSearch] = useState("");
+  const [replayIntentServerAuditLimit, setReplayIntentServerAuditLimit] = useState("25");
+  const [replayIntentServerAuditRecordedBefore, setReplayIntentServerAuditRecordedBefore] = useState("");
+  const [replayIntentServerAuditIncludeManual, setReplayIntentServerAuditIncludeManual] = useState(false);
+  const [replayIntentServerAuditItems, setReplayIntentServerAuditItems] =
+    useState<RunSurfaceCollectionQueryBuilderReplayLinkServerAuditEntry[]>([]);
+  const [replayIntentServerAuditTotal, setReplayIntentServerAuditTotal] = useState(0);
+  const [replayIntentServerAuditStatus, setReplayIntentServerAuditStatus] = useState<{
+    message: string;
+    tone: "error" | "muted" | "success";
+  } | null>(null);
+  const [replayIntentServerAuditLoading, setReplayIntentServerAuditLoading] = useState(false);
   const [replayIntentLinkAuditTrail, setReplayIntentLinkAuditTrail] =
     useState<RunSurfaceCollectionQueryBuilderReplayLinkAuditEntry[]>(() =>
       loadRunSurfaceCollectionQueryBuilderReplayLinkAuditTrail(),
@@ -23384,6 +23526,14 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [replayIntentLinkAliases, selectedRefTemplate?.key],
   );
+  useEffect(() => {
+    if (!selectedRefTemplate?.key) {
+      return;
+    }
+    setReplayIntentServerAuditTemplateFilter((current) =>
+      current.trim() ? current : selectedRefTemplate.key,
+    );
+  }, [selectedRefTemplate?.key]);
   const currentReplayIntentGovernanceSnapshot = useMemo(
     () => buildRunSurfaceCollectionQueryBuilderReplayLinkGovernanceSnapshot({
       redactionPolicy: replayIntentRedactionPolicy,
@@ -24158,6 +24308,105 @@ function RunSurfaceCollectionQueryBuilder({
     appendReplayIntentLinkAuditEntry,
     predicateRefReplayApplyHistoryTabIdentity.label,
     predicateRefReplayApplyHistoryTabIdentity.tabId,
+  ]);
+  const loadRunSurfaceCollectionQueryBuilderServerReplayLinkAudits = useCallback(async (
+    options?: { adminToken?: string; silent?: boolean },
+  ) => {
+    const adminToken = (options?.adminToken ?? replayIntentServerAuditReadToken.trim())
+      || replayIntentServerAuditWriteToken.trim();
+    const normalizedLimit = Number.parseInt(replayIntentServerAuditLimit, 10);
+    setReplayIntentServerAuditLoading(true);
+    if (!options?.silent) {
+      setReplayIntentServerAuditStatus(null);
+    }
+    try {
+      const payload = await listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits({
+        adminToken,
+        action: replayIntentServerAuditActionFilter,
+        aliasId: replayIntentServerAuditAliasFilter,
+        limit: Number.isFinite(normalizedLimit) ? normalizedLimit : 25,
+        retentionPolicy: replayIntentServerAuditRetentionFilter,
+        search: replayIntentServerAuditSearch,
+        sourceTabId: replayIntentServerAuditSourceTabFilter,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      setReplayIntentServerAuditItems(payload.items);
+      setReplayIntentServerAuditTotal(payload.total);
+      if (!options?.silent) {
+        setReplayIntentServerAuditStatus({
+          message: `Loaded ${payload.items.length} server replay alias audit record${payload.items.length === 1 ? "" : "s"}.`,
+          tone: payload.items.length ? "success" : "muted",
+        });
+      }
+    } catch (error) {
+      setReplayIntentServerAuditStatus({
+        message: error instanceof Error ? error.message : "Failed to load server replay alias audits.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditLoading(false);
+    }
+  }, [
+    replayIntentServerAuditActionFilter,
+    replayIntentServerAuditAliasFilter,
+    replayIntentServerAuditLimit,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRetentionFilter,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
+  ]);
+  const pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords = useCallback(async (
+    pruneMode: "expired" | "matched",
+  ) => {
+    const adminToken = replayIntentServerAuditWriteToken.trim() || replayIntentServerAuditReadToken.trim();
+    setReplayIntentServerAuditLoading(true);
+    setReplayIntentServerAuditStatus(null);
+    try {
+      const payload = await pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits({
+        adminToken,
+        action: replayIntentServerAuditActionFilter,
+        aliasId: replayIntentServerAuditAliasFilter,
+        includeManual: replayIntentServerAuditIncludeManual,
+        pruneMode,
+        recordedBefore: replayIntentServerAuditRecordedBefore,
+        retentionPolicy: replayIntentServerAuditRetentionFilter,
+        search: replayIntentServerAuditSearch,
+        sourceTabId: replayIntentServerAuditSourceTabFilter,
+        templateKey: replayIntentServerAuditTemplateFilter,
+      });
+      setReplayIntentServerAuditStatus({
+        message:
+          pruneMode === "expired"
+            ? `Pruned ${payload.deleted_count} expired server replay alias audit record${payload.deleted_count === 1 ? "" : "s"}.`
+            : `Pruned ${payload.deleted_count} matched server replay alias audit record${payload.deleted_count === 1 ? "" : "s"}.`,
+        tone: payload.deleted_count ? "success" : "muted",
+      });
+      await loadRunSurfaceCollectionQueryBuilderServerReplayLinkAudits({
+        adminToken,
+        silent: true,
+      });
+    } catch (error) {
+      setReplayIntentServerAuditStatus({
+        message: error instanceof Error ? error.message : "Failed to prune server replay alias audits.",
+        tone: "error",
+      });
+    } finally {
+      setReplayIntentServerAuditLoading(false);
+    }
+  }, [
+    loadRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
+    replayIntentServerAuditActionFilter,
+    replayIntentServerAuditAliasFilter,
+    replayIntentServerAuditIncludeManual,
+    replayIntentServerAuditReadToken,
+    replayIntentServerAuditRecordedBefore,
+    replayIntentServerAuditRetentionFilter,
+    replayIntentServerAuditSearch,
+    replayIntentServerAuditSourceTabFilter,
+    replayIntentServerAuditTemplateFilter,
+    replayIntentServerAuditWriteToken,
   ]);
   const copyRunSurfaceCollectionQueryBuilderReplayLinkGovernancePayload = useCallback(async () => {
     if (!currentReplayIntentGovernancePayloadValue) {
@@ -29869,6 +30118,230 @@ function RunSurfaceCollectionQueryBuilder({
                             </div>
                           </div>
                         ) : null}
+                        <div className="run-surface-query-builder-trace-panel is-nested">
+                          <div className="run-surface-query-builder-card-head">
+                            <strong>Server replay alias audit admin</strong>
+                            <span>{replayIntentServerAuditTotal
+                              ? `${replayIntentServerAuditTotal} loaded`
+                              : "Scoped access"}</span>
+                          </div>
+                          <p className="run-note">
+                            List and prune persisted server replay alias audits with separate read and write admin tokens.
+                            If your server uses a single shared token, the write token field alone is enough.
+                          </p>
+                          {replayIntentServerAuditStatus ? (
+                            <p className={`run-note run-surface-query-builder-note is-${replayIntentServerAuditStatus.tone}`}>
+                              {replayIntentServerAuditStatus.message}
+                            </p>
+                          ) : null}
+                          <div className="run-surface-query-builder-inline-grid">
+                            <label className="run-surface-query-builder-control">
+                              <span>Read admin token</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditReadToken(event.target.value)}
+                                placeholder="Optional read token"
+                                type="password"
+                                value={replayIntentServerAuditReadToken}
+                              />
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Write admin token</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditWriteToken(event.target.value)}
+                                placeholder="Optional write token"
+                                type="password"
+                                value={replayIntentServerAuditWriteToken}
+                              />
+                            </label>
+                          </div>
+                          <div className="run-surface-query-builder-inline-grid">
+                            <label className="run-surface-query-builder-control">
+                              <span>Template key</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditTemplateFilter(event.target.value)}
+                                placeholder="template key"
+                                value={replayIntentServerAuditTemplateFilter}
+                              />
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Alias ID</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditAliasFilter(event.target.value)}
+                                placeholder="alias id"
+                                value={replayIntentServerAuditAliasFilter}
+                              />
+                            </label>
+                          </div>
+                          <div className="run-surface-query-builder-inline-grid">
+                            <label className="run-surface-query-builder-control">
+                              <span>Action</span>
+                              <select
+                                value={replayIntentServerAuditActionFilter}
+                                onChange={(event) =>
+                                  setReplayIntentServerAuditActionFilter(
+                                    event.target.value as "all" | "created" | "resolved" | "revoked",
+                                  )}
+                              >
+                                <option value="all">All actions</option>
+                                <option value="created">Created</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="revoked">Revoked</option>
+                              </select>
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Retention</span>
+                              <select
+                                value={replayIntentServerAuditRetentionFilter}
+                                onChange={(event) =>
+                                  setReplayIntentServerAuditRetentionFilter(
+                                    event.target.value as "all" | RunSurfaceCollectionQueryBuilderReplayLinkRetentionPolicy,
+                                  )}
+                              >
+                                <option value="all">All retention</option>
+                                <option value="1d">1 day</option>
+                                <option value="7d">7 days</option>
+                                <option value="30d">30 days</option>
+                                <option value="manual">Keep until cleared</option>
+                              </select>
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Source tab ID</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditSourceTabFilter(event.target.value)}
+                                placeholder="tab id"
+                                value={replayIntentServerAuditSourceTabFilter}
+                              />
+                            </label>
+                          </div>
+                          <div className="run-surface-query-builder-inline-grid">
+                            <label className="run-surface-query-builder-control">
+                              <span>Search</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditSearch(event.target.value)}
+                                placeholder="search ids, labels, or details"
+                                value={replayIntentServerAuditSearch}
+                              />
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Limit</span>
+                              <input
+                                inputMode="numeric"
+                                onChange={(event) => setReplayIntentServerAuditLimit(event.target.value)}
+                                placeholder="25"
+                                value={replayIntentServerAuditLimit}
+                              />
+                            </label>
+                            <label className="run-surface-query-builder-control">
+                              <span>Recorded before</span>
+                              <input
+                                onChange={(event) => setReplayIntentServerAuditRecordedBefore(event.target.value)}
+                                placeholder="2026-04-20T12:00:00+09:00"
+                                value={replayIntentServerAuditRecordedBefore}
+                              />
+                            </label>
+                          </div>
+                          <label className="run-surface-query-builder-control">
+                            <span>Matched prune options</span>
+                            <label className="run-surface-query-builder-checkbox">
+                              <input
+                                checked={replayIntentServerAuditIncludeManual}
+                                onChange={(event) => setReplayIntentServerAuditIncludeManual(event.target.checked)}
+                                type="checkbox"
+                              />
+                              <span>Include manual retention entries when pruning matched records</span>
+                            </label>
+                          </label>
+                          <div className="run-surface-query-builder-actions">
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditLoading}
+                              onClick={() => {
+                                void loadRunSurfaceCollectionQueryBuilderServerReplayLinkAudits();
+                              }}
+                              type="button"
+                            >
+                              {replayIntentServerAuditLoading ? "Loading…" : "Load server audits"}
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditLoading}
+                              onClick={() => {
+                                void pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords("expired");
+                              }}
+                              type="button"
+                            >
+                              Prune expired audits
+                            </button>
+                            <button
+                              className="ghost-button"
+                              disabled={replayIntentServerAuditLoading}
+                              onClick={() => {
+                                void pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditRecords("matched");
+                              }}
+                              type="button"
+                            >
+                              Prune matched audits
+                            </button>
+                          </div>
+                          {replayIntentServerAuditItems.length ? (
+                            <div className="run-surface-query-builder-trace-list">
+                              {replayIntentServerAuditItems.map((entry) => (
+                                <div
+                                  className={`run-surface-query-builder-trace-step is-${
+                                    entry.action === "revoked"
+                                      ? "warning"
+                                      : entry.action === "resolved"
+                                        ? "success"
+                                        : "info"
+                                  }`}
+                                  key={`server-replay-audit:${entry.audit_id}`}
+                                >
+                                  <strong>{`${entry.action.replaceAll("_", " ")} · ${entry.template_label}`}</strong>
+                                  <p>
+                                    {`${entry.alias_id.slice(0, 8)} · ${entry.source_tab_label ?? "Server"} · ${formatRelativeTimestampLabel(entry.recorded_at)}`}
+                                  </p>
+                                  <div className="run-surface-query-builder-trace-chip-list">
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {entry.redaction_policy.replaceAll("_", " ")}
+                                    </span>
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {formatRunSurfaceCollectionQueryBuilderReplayLinkGovernanceFieldValue("retentionPolicy", {
+                                        redactionPolicy: entry.redaction_policy,
+                                        retentionPolicy: entry.retention_policy,
+                                        shareMode: "indirect",
+                                        syncMode: replayIntentGovernanceSyncMode,
+                                      })}
+                                    </span>
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {entry.alias_revoked_at ? "revoked alias" : "active alias"}
+                                    </span>
+                                    <span className="run-surface-query-builder-trace-chip">
+                                      {entry.audit_id.slice(0, 8)}
+                                    </span>
+                                  </div>
+                                  <p className="run-note">{entry.detail}</p>
+                                  {entry.alias_created_at ? (
+                                    <p className="run-note">
+                                      {`Alias created ${formatRelativeTimestampLabel(entry.alias_created_at)}.`}
+                                    </p>
+                                  ) : null}
+                                  {entry.alias_expires_at ? (
+                                    <p className="run-note">
+                                      {`Alias expires ${formatRelativeTimestampLabel(entry.alias_expires_at)}.`}
+                                    </p>
+                                  ) : null}
+                                  {entry.alias_revoked_at ? (
+                                    <p className="run-note">
+                                      {`Alias revoked ${formatRelativeTimestampLabel(entry.alias_revoked_at)}.`}
+                                    </p>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          ) : replayIntentServerAuditStatus ? (
+                            <p className="empty-state">No server replay alias audits match the current admin filter.</p>
+                          ) : null}
+                        </div>
                         {replayIntentGovernanceConflicts.length ? (
                           <div className="run-surface-query-builder-trace-panel is-nested">
                             <div className="run-surface-query-builder-card-head">

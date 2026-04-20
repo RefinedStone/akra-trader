@@ -14049,7 +14049,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["replay_link_alias_resolve"].path_param_keys == ("alias_token",)
   assert bindings_by_key["replay_link_alias_history"].route_path == "/replay-links/aliases/{alias_token}/history"
   assert bindings_by_key["replay_link_audit_list"].route_path == "/replay-links/audits"
+  assert bindings_by_key["replay_link_audit_list"].header_keys == ("x_akra_replay_audit_admin_token",)
   assert bindings_by_key["replay_link_audit_list"].filter_param_specs[0].key == "alias_id"
+  assert bindings_by_key["replay_link_audit_prune"].header_keys == ("x_akra_replay_audit_admin_token",)
   assert bindings_by_key["replay_link_audit_prune"].request_payload_kind == "replay_link_audit_prune"
   assert bindings_by_key["replay_link_alias_revoke"].request_payload_kind == "replay_link_alias_revoke"
   assert bindings_by_key["market_data_status"].route_path == "/market-data/status"
@@ -14542,6 +14544,8 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
     references=build_references(),
     presets=build_preset_catalog(tmp_path),
     runs=build_runs_repository(tmp_path),
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
   )
   bindings_by_key = {
     binding.surface_key: binding
@@ -14586,6 +14590,7 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
     binding=bindings_by_key["replay_link_audit_list"],
     app=app,
     filters={"template_key": "template_a", "action": "revoked", "search": "Remote", "limit": 10},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
   )
   assert audit_list_payload["total"] == 1
   assert audit_list_payload["items"][0]["action"] == "revoked"
@@ -14598,6 +14603,7 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
       "template_key": "template_b",
       "include_manual": False,
     },
+    headers={"x_akra_replay_audit_admin_token": "write-token"},
   )
   assert prune_payload["deleted_count"] == 0
 
@@ -14609,8 +14615,53 @@ def test_replay_link_alias_audit_admin_listing_and_pruning(tmp_path: Path) -> No
       "alias_id": manual_alias.alias_id,
       "include_manual": True,
     },
+    headers={"x_akra_replay_audit_admin_token": "write-token"},
   )
   assert prune_manual_payload["deleted_count"] == 1
+
+
+def test_replay_link_alias_audit_admin_binding_enforces_scoped_tokens(tmp_path: Path) -> None:
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=build_runs_repository(tmp_path),
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
+  )
+  bindings_by_key = {
+    binding.surface_key: binding
+    for binding in list_standalone_surface_runtime_bindings(app.get_run_surface_capabilities())
+  }
+
+  with pytest.raises(PermissionError, match="invalid replay alias audit admin token"):
+    execute_standalone_surface_binding(
+      binding=bindings_by_key["replay_link_audit_list"],
+      app=app,
+      filters={"limit": 10},
+    )
+
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_list"],
+    app=app,
+    filters={"limit": 10},
+    headers={"x_akra_replay_audit_admin_token": "read-token"},
+  )
+
+  with pytest.raises(PermissionError, match="invalid replay alias audit admin token"):
+    execute_standalone_surface_binding(
+      binding=bindings_by_key["replay_link_audit_prune"],
+      app=app,
+      request_payload={"prune_mode": "expired"},
+      headers={"x_akra_replay_audit_admin_token": "read-token"},
+    )
+
+  execute_standalone_surface_binding(
+    binding=bindings_by_key["replay_link_audit_prune"],
+    app=app,
+    request_payload={"prune_mode": "expired"},
+    headers={"x_akra_replay_audit_admin_token": "write-token"},
+  )
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

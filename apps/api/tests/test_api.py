@@ -50,6 +50,8 @@ def build_client(
   guarded_live_execution_enabled: bool = False,
   guarded_live_venue: str | None = None,
   operator_alert_external_sync_token: str | None = None,
+  replay_alias_audit_admin_read_token: str | None = None,
+  replay_alias_audit_admin_write_token: str | None = None,
 ) -> TestClient:
   settings = Settings(
     runs_database_url=f"sqlite:///{database_path}",
@@ -57,6 +59,8 @@ def build_client(
     guarded_live_execution_enabled=guarded_live_execution_enabled,
     guarded_live_venue=guarded_live_venue,
     operator_alert_external_sync_token=operator_alert_external_sync_token,
+    replay_alias_audit_admin_read_token=replay_alias_audit_admin_read_token,
+    replay_alias_audit_admin_write_token=replay_alias_audit_admin_write_token,
   )
   return TestClient(create_app(settings))
 
@@ -332,10 +336,12 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "source_tab_id",
     "search",
     "limit",
+    "x_akra_replay_audit_admin_token",
     "app",
   )
   assert tuple(inspect.signature(routes["prune_replay_link_alias_audits"].endpoint).parameters) == (
     "request",
+    "x_akra_replay_audit_admin_token",
     "app",
   )
   assert tuple(inspect.signature(routes["revoke_replay_link_alias"].endpoint).parameters) == (
@@ -481,7 +487,11 @@ def test_replay_link_alias_registry_survives_restart(tmp_path: Path) -> None:
 
 
 def test_replay_link_alias_audit_admin_endpoints_support_search_and_prune(tmp_path: Path) -> None:
-  client = build_client(tmp_path / "runs.sqlite3")
+  client = build_client(
+    tmp_path / "runs.sqlite3",
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
+  )
 
   created_response = client.post(
     "/api/replay-links/aliases",
@@ -515,6 +525,7 @@ def test_replay_link_alias_audit_admin_endpoints_support_search_and_prune(tmp_pa
       "search": "Remote",
       "limit": 10,
     },
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
   )
   assert audit_list_response.status_code == 200
   audit_items = audit_list_response.json()["items"]
@@ -528,6 +539,7 @@ def test_replay_link_alias_audit_admin_endpoints_support_search_and_prune(tmp_pa
       "template_key": "template_admin",
       "action": "resolved",
     },
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
   )
   assert prune_response.status_code == 200
   assert prune_response.json()["deleted_count"] == 1
@@ -535,9 +547,61 @@ def test_replay_link_alias_audit_admin_endpoints_support_search_and_prune(tmp_pa
   post_prune_list_response = client.get(
     "/api/replay-links/audits",
     params={"template_key": "template_admin", "action": "resolved", "limit": 10},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
   )
   assert post_prune_list_response.status_code == 200
   assert post_prune_list_response.json()["total"] == 0
+
+
+def test_replay_link_alias_audit_admin_endpoints_require_scoped_tokens(tmp_path: Path) -> None:
+  client = build_client(
+    tmp_path / "runs.sqlite3",
+    replay_alias_audit_admin_read_token="read-token",
+    replay_alias_audit_admin_write_token="write-token",
+  )
+
+  created_response = client.post(
+    "/api/replay-links/aliases",
+    json={
+      "template_key": "template_admin",
+      "template_label": "Template Admin",
+      "intent": {"replayScope": "all", "replayIndex": 1},
+      "redaction_policy": "full",
+      "retention_policy": "7d",
+      "source_tab_id": "tab_local",
+      "source_tab_label": "Local tab",
+    },
+  )
+  assert created_response.status_code == 200
+
+  forbidden_list_response = client.get("/api/replay-links/audits")
+  assert forbidden_list_response.status_code == 403
+
+  read_list_response = client.get(
+    "/api/replay-links/audits",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert read_list_response.status_code == 200
+
+  write_list_response = client.get(
+    "/api/replay-links/audits",
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert write_list_response.status_code == 200
+
+  forbidden_prune_response = client.post(
+    "/api/replay-links/audits/prune",
+    json={"prune_mode": "expired"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "read-token"},
+  )
+  assert forbidden_prune_response.status_code == 403
+
+  write_prune_response = client.post(
+    "/api/replay-links/audits/prune",
+    json={"prune_mode": "expired"},
+    headers={"X-Akra-Replay-Audit-Admin-Token": "write-token"},
+  )
+  assert write_prune_response.status_code == 200
 
 
 def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
