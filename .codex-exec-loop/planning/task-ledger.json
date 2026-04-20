@@ -4904,18 +4904,54 @@
       "direction_id": "experiment-os",
       "title": "Add group-level preset bundles and visibility rules to subtree templates",
       "description": "Build on the shipped group-level subtree metadata so parameter groups can carry reusable preset bundles and group-specific visibility rules, with authoring, persistence, hydration, preview, and template-ref behavior that lets whole groups express deeper authoring intent instead of stopping at label, note, and default-collapse state.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 47,
-      "priority_reason": "The latest main-session reply explicitly says the remaining executable gap in subtree group metadata is deeper authoring behavior above the newly shipped label or help-note or collapse state: group-level preset bundles and group-specific visibility rules are still missing. That is the clearest follow-on task to continue the same feature line automatically.",
+      "priority_reason": "Completed in main session commit 8931f8d, which added subtree template group `visibility_rule` plus `preset_bundles`, wired JSON serialization and hydration for group metadata, exposed authoring controls for group bundle labels or help notes or parameter-level preset values and binding presets, applied visibility evaluation and reveal flows in predicate-ref insertion UI, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-group-level-subtree-template-authoring-metadata-and-behavior"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T04:30:24Z",
+      "updated_at": "2026-04-20T20:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os subtree template authoring from descriptive group metadata into executable reusable group behavior, so grouped predicate templates can encode preset-driven structure and conditional visibility at the same group layer operators edit."
+    },
+    {
+      "id": "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles",
+      "direction_id": "experiment-os",
+      "title": "Add priority and conditional auto-selection for subtree group bundles",
+      "description": "Build on the shipped group-level subtree preset bundles and visibility rules by adding deeper execution semantics inside each parameter group, including bundle priority ordering and conditional auto-selection rules that can choose the right bundle during preview and predicate-ref insertion without requiring only manual bundle picking.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 48,
+      "priority_reason": "The latest main-session reply explicitly says the remaining executable gap after authoring, preview, and ref insertion wiring is the deeper execution layer for group bundles, especially bundle priority and conditional bundle auto-selection. That is now the clearest next task to continue automatically.",
+      "depends_on": [
+        "planning-experiment-os-add-group-level-preset-bundles-and-visibility-rules-to-subtree-templates"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os subtree template groups from manually applied bundle metadata into executable selection semantics, so grouped predicate templates can choose reusable parameter presets more intelligently at insertion time."
+    },
+    {
+      "id": "planning-experiment-os-compose-subtree-group-bundles-across-groups",
+      "direction_id": "experiment-os",
+      "title": "Compose subtree group preset bundles across groups",
+      "description": "Extend the new group bundle system beyond per-group execution by defining cross-group bundle composition rules, conflict resolution, and merge behavior so one subtree template can coordinate compatible bundle choices across multiple parameter groups without relying on isolated manual picks.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply also calls out cross-group bundle composition as unfinished, but it should stay proposed behind bundle priority and conditional auto-selection because composition needs a firmer precedence and merge contract before it becomes the next automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T20:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os subtree template reuse from isolated group presets toward coordinated multi-group template behavior, which is necessary once grouped bundle selection starts carrying real execution semantics."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
@@ -4925,13 +4961,13 @@
       "status": "proposed",
       "base_priority": 88,
       "dynamic_priority_delta": 1,
-      "priority_reason": "The latest main-session reply still lists richer note formatting as unfinished work after group metadata shipped, but it remains behind the more directly executable behavior gap because note representation should settle after group-level preset bundles and visibility rules define the deeper authoring model.",
+      "priority_reason": "Richer note formatting remains valid follow-up work, but the latest main-session reply now makes the next executable subtree gap more specific: bundle priority, conditional auto-selection, and later composition behavior. Keep note-formatting proposed behind those deeper bundle semantics.",
       "depends_on": [
-        "planning-experiment-os-add-group-level-preset-bundles-and-visibility-rules-to-subtree-templates"
+        "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T04:30:24Z",
+      "updated_at": "2026-04-20T20:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os template authoring guidance usable as subtree metadata becomes more structured by ensuring help notes can express richer operator context than a single flat string."
     },
