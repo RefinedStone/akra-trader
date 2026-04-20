@@ -363,6 +363,8 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["predicate_refs"]["reference_field"] == "predicate_ref"
   assert run_query_schema["expression_trees"]["quantified_conditions"]["field"] == "quantifier"
   assert run_query_schema["expression_trees"]["quantified_conditions"]["values"] == ["any", "all", "none"]
+  assert run_query_schema["expression_trees"]["collection_nodes"]["field"] == "collection"
+  assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["quantifier"] == "any|all|none"
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]
@@ -390,6 +392,9 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
     "eq",
     "prefix",
   ]
+  order_status_filter = next(item for item in run_query_schema["filters"] if item["key"] == "order_status")
+  assert order_status_filter["query_exposed"] is False
+  assert order_status_filter["value_path"] == ["status", "value"]
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
   assert any(field["key"] == "trade_count" for field in run_query_schema["sort_fields"])
@@ -412,6 +417,7 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert filter_expr_param["description"] == (
     "JSON boolean expression tree using `logic`, `conditions`, `children`, and optional `negated` fields."
   )
+  assert "order_status" not in runs_params
   assert _first_non_null_schema_branch(runs_params["trade_count"]["schema"])["minimum"] == 0
   assert runs_params["total_return_pct"]["schema"]["title"] == "Total return %"
 
@@ -837,6 +843,105 @@ def test_run_query_contract_supports_predicate_references_and_quantified_list_pr
     )
     assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
     assert runs_by_symbol["XRP/USDT"] not in returned_run_ids
+
+
+def test_run_query_contract_supports_quantified_nested_object_collection_predicates(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    runs_by_symbol: dict[str, str] = {}
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      runs_by_symbol[symbol] = response.json()["config"]["run_id"]
+
+    app = client.app.state.container.app
+    order_sets = {
+      "BTC/USDT": [
+        Order(
+          run_id=runs_by_symbol["BTC/USDT"],
+          instrument_id="binance:BTC/USDT",
+          side=OrderSide.BUY,
+          quantity=1.0,
+          requested_price=101.0,
+          order_type=OrderType.LIMIT,
+          status=OrderStatus.OPEN,
+        ),
+        Order(
+          run_id=runs_by_symbol["BTC/USDT"],
+          instrument_id="binance:BTC/USDT",
+          side=OrderSide.SELL,
+          quantity=1.0,
+          requested_price=102.0,
+          order_type=OrderType.MARKET,
+          status=OrderStatus.FILLED,
+        ),
+      ],
+      "ETH/USDT": [
+        Order(
+          run_id=runs_by_symbol["ETH/USDT"],
+          instrument_id="binance:ETH/USDT",
+          side=OrderSide.BUY,
+          quantity=1.0,
+          requested_price=201.0,
+          order_type=OrderType.LIMIT,
+          status=OrderStatus.FILLED,
+        ),
+      ],
+      "SOL/USDT": [
+        Order(
+          run_id=runs_by_symbol["SOL/USDT"],
+          instrument_id="binance:SOL/USDT",
+          side=OrderSide.BUY,
+          quantity=1.0,
+          requested_price=301.0,
+          order_type=OrderType.MARKET,
+          status=OrderStatus.OPEN,
+        ),
+      ],
+    }
+    for symbol, orders in order_sets.items():
+      run = app.get_run(runs_by_symbol[symbol])
+      assert run is not None
+      run.orders = orders
+      app._runs.save_run(run)
+
+    filter_expression = {
+      "predicates": {
+        "open_limit_order": {
+          "collection": {
+            "path": "orders",
+            "quantifier": "any",
+          },
+          "logic": "and",
+          "conditions": [
+            {"key": "order_status", "operator": "eq", "value": "open"},
+            {"key": "order_type", "operator": "eq", "value": "limit"},
+          ],
+        },
+      },
+      "root": {
+        "predicate_ref": "open_limit_order",
+      },
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("filter_expr", json.dumps(filter_expression)),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_run_ids = [item["config"]["run_id"] for item in payload]
+    assert returned_run_ids == [runs_by_symbol["BTC/USDT"]]
 
 
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:

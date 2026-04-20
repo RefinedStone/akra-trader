@@ -246,6 +246,14 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
           "values": ["any", "all", "none"],
           "semantics": "Applies the condition across list-valued candidates.",
         },
+        "collection_nodes": {
+          "field": "collection",
+          "shape": {
+            "path": "<collection path>",
+            "quantifier": "any|all|none",
+          },
+          "semantics": "Evaluates the node against collection elements and folds the results with the declared quantifier.",
+        },
         "condition_shape": {
           "key": "<filter_key>",
           "operator": "<operator>",
@@ -258,11 +266,16 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
           "children": ["<node>", "..."],
           "negated": "boolean",
           "predicate_ref": "<named predicate>",
+          "collection": {
+            "path": "<collection path>",
+            "quantifier": "any|all|none",
+          },
         },
       },
       "filters": [
         {
           "key": spec.key,
+          "query_exposed": spec.query_exposed,
           "value_type": _describe_filter_value_type(spec.annotation),
           "value_path": list(spec.value_path),
           "operators": [
@@ -488,6 +501,27 @@ def _parse_runtime_filter_expression_node(
   logic = raw_node.get("logic", "and")
   if not isinstance(logic, str) or logic.lower() not in {"and", "or"}:
     raise ValueError("Filter expression logic must be either `and` or `or`.")
+  collection_path: tuple[str, ...] = ()
+  collection_quantifier: str | None = None
+  raw_collection = raw_node.get("collection")
+  if raw_collection is not None:
+    if not isinstance(raw_collection, dict):
+      raise ValueError("Filter expression collection nodes must declare an object `collection` field.")
+    raw_collection_path = raw_collection.get("path")
+    if isinstance(raw_collection_path, str):
+      collection_path = tuple(
+        segment
+        for segment in raw_collection_path.split(".")
+        if segment
+      )
+    elif isinstance(raw_collection_path, list) and all(isinstance(segment, str) and segment for segment in raw_collection_path):
+      collection_path = tuple(raw_collection_path)
+    else:
+      raise ValueError("Filter expression collection paths must be a dotted string or list of path segments.")
+    raw_collection_quantifier = raw_collection.get("quantifier")
+    if not isinstance(raw_collection_quantifier, str) or raw_collection_quantifier not in {"any", "all", "none"}:
+      raise ValueError("Filter expression collection quantifier must be one of `any`, `all`, or `none`.")
+    collection_quantifier = raw_collection_quantifier
   raw_conditions = raw_node.get("conditions", [])
   if not isinstance(raw_conditions, list):
     raise ValueError("Filter expression `conditions` must be a list.")
@@ -517,6 +551,8 @@ def _parse_runtime_filter_expression_node(
     conditions=conditions,
     children=children,
     negated=bool(raw_node.get("negated", False)),
+    collection_path=collection_path,
+    collection_quantifier=collection_quantifier,
   )
 
 
@@ -602,6 +638,7 @@ def _build_runtime_query_filters(
   filters = {
     spec.key: kwargs[spec.key]
     for spec in binding.filter_param_specs
+    if spec.query_exposed
   }
   filter_expression = _build_runtime_filter_expression(
     binding,
@@ -613,6 +650,8 @@ def _build_runtime_query_filters(
   if request is not None:
     query_params = request.query_params
     for spec in binding.filter_param_specs:
+      if not spec.query_exposed:
+        continue
       alias = spec.openapi.alias if spec.openapi and spec.openapi.alias else spec.key
       supported_operators = {
         operator.key: operator
@@ -794,6 +833,8 @@ def create_router(container: Container) -> APIRouter:
         )
       )
     for filter_spec in binding.filter_param_specs:
+      if not filter_spec.query_exposed:
+        continue
       parameters.append(
         inspect.Parameter(
           filter_spec.key,

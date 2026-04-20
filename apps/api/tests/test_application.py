@@ -14023,6 +14023,13 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     if spec.key == "trade_count"
   )
   assert run_trade_count_spec.constraints.ge == 0
+  run_order_status_spec = next(
+    spec
+    for spec in bindings_by_key["run_list"].filter_param_specs
+    if spec.key == "order_status"
+  )
+  assert run_order_status_spec.value_path == ("status", "value")
+  assert run_order_status_spec.query_exposed is False
   assert bindings_by_key["run_list"].filter_param_specs[-1].operators[0].key == "contains_all"
   assert bindings_by_key["run_list"].sort_field_specs[0].default_direction == "desc"
   assert bindings_by_key["run_list"].sort_field_specs[-1].key == "metrics.trade_count"

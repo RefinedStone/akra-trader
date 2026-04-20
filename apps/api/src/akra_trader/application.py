@@ -23040,6 +23040,7 @@ class StandaloneSurfaceFilterParamSpec:
   openapi: StandaloneSurfaceFilterOpenAPISpec | None = None
   operators: tuple[StandaloneSurfaceFilterOperatorSpec, ...] = ()
   value_path: tuple[str, ...] = ()
+  query_exposed: bool = True
 
 
 @dataclass(frozen=True)
@@ -23057,6 +23058,8 @@ class StandaloneSurfaceFilterExpressionNode:
   conditions: tuple[StandaloneSurfaceFilterCondition, ...] = ()
   children: tuple["StandaloneSurfaceFilterExpressionNode", ...] = ()
   negated: bool = False
+  collection_path: tuple[str, ...] = ()
+  collection_quantifier: str | None = None
 
 
 @dataclass(frozen=True)
@@ -23353,12 +23356,79 @@ def _evaluate_runtime_filter_conditions(
   return True
 
 
+def _normalize_runtime_collection_items(value: Any) -> tuple[Any, ...] | None:
+  if value is _RUNTIME_QUERY_MISSING:
+    return None
+  if value is None:
+    return ()
+  if isinstance(value, dict):
+    return tuple(value.values())
+  if isinstance(value, (list, tuple, set)):
+    return tuple(value)
+  return None
+
+
+def _evaluate_runtime_quantified_expression_results(
+  results: tuple[bool | None, ...],
+  *,
+  quantifier: str,
+) -> bool | None:
+  if quantifier == "any":
+    if any(result is True for result in results):
+      return True
+    if not results or any(result is False for result in results):
+      return False
+    return None
+  if quantifier == "all":
+    if not results:
+      return False
+    if any(result is False for result in results):
+      return False
+    if all(result is True for result in results):
+      return True
+    return None
+  if quantifier == "none":
+    if any(result is True for result in results):
+      return False
+    if not results or any(result is False for result in results):
+      return True
+    return None
+  raise ValueError(f"Unsupported runtime collection quantifier: {quantifier}")
+
+
 def _evaluate_runtime_filter_expression(
   item: Any,
   expression: StandaloneSurfaceFilterExpressionNode,
   *,
   filter_getters: dict[str, Callable[[Any], Any]],
 ) -> bool | None:
+  if expression.collection_quantifier is not None:
+    collection_items = _normalize_runtime_collection_items(
+      _resolve_runtime_query_path_value(item, expression.collection_path)
+    )
+    if collection_items is None:
+      return None
+    element_expression = StandaloneSurfaceFilterExpressionNode(
+      logic=expression.logic,
+      conditions=expression.conditions,
+      children=expression.children,
+    )
+    result = _evaluate_runtime_quantified_expression_results(
+      tuple(
+        _evaluate_runtime_filter_expression(
+          collection_item,
+          element_expression,
+          filter_getters=filter_getters,
+        )
+        for collection_item in collection_items
+      ),
+      quantifier=expression.collection_quantifier,
+    )
+    if expression.negated:
+      if result is None:
+        return None
+      return not result
+    return result
   term_results: list[bool | None] = []
   for condition in expression.conditions:
     getter = filter_getters.get(condition.key)
@@ -24376,6 +24446,46 @@ def list_standalone_surface_runtime_bindings(
         ),
         operators=_build_numeric_range_filter_operators("run trade count"),
         value_path=("metrics", "trade_count"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "order_status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Order status",
+          description="Expression-only order collection field for nested order predicates.",
+          examples=("open",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single order status on a collection element.",
+          ),
+        ),
+        value_path=("status", "value"),
+        query_exposed=False,
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "order_type",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Order type",
+          description="Expression-only order collection field for nested order predicates.",
+          examples=("limit",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single order type on a collection element.",
+          ),
+        ),
+        value_path=("order_type", "value"),
+        query_exposed=False,
       ),
       StandaloneSurfaceFilterParamSpec(
         "tag",
