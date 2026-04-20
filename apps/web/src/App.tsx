@@ -16027,10 +16027,25 @@ function evaluateRunSurfaceCollectionQueryRuntimeCondition(
   return false;
 }
 
+function evaluateRunSurfaceCollectionQueryRuntimeQuantifierOutcome(
+  quantifier: "any" | "all" | "none",
+  candidateCount: number,
+  matchedCount: number,
+) {
+  if (quantifier === "any") {
+    return matchedCount > 0;
+  }
+  if (quantifier === "all") {
+    return candidateCount > 0 && matchedCount === candidateCount;
+  }
+  return matchedCount === 0;
+}
+
 function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
   comparedValueLabel: string;
   comparedValueOperand: unknown;
   field: RunSurfaceCollectionQueryElementField | null;
+  quantifier: "any" | "all" | "none";
   resolvedParameterValues: Record<string, string>;
   runs: Run[];
   schema: RunSurfaceCollectionQuerySchema | null;
@@ -16041,12 +16056,15 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
     comparedValueOperand,
     field,
     operatorKey,
+    quantifier,
     resolvedParameterValues,
     runs,
     schema,
   } = params;
   if (!schema || !field || !runs.length) {
     return {
+      allValues: [] as RunSurfaceCollectionQueryRuntimeCandidateSample[],
+      runOutcomes: [] as RunSurfaceCollectionQueryRuntimeQuantifierOutcome[],
       sampleValues: [] as RunSurfaceCollectionQueryRuntimeCandidateSample[],
       sampleMatchCount: 0,
       sampleTotalCount: 0,
@@ -16058,12 +16076,16 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
   const accessorLabel = field.valueRoot
     ? `${schema.itemKind} value`
     : `${schema.itemKind}.${accessorPath.join(".") || field.key}`;
-  const sampleValues: RunSurfaceCollectionQueryRuntimeCandidateSample[] = [];
+  const allValues: RunSurfaceCollectionQueryRuntimeCandidateSample[] = [];
+  const runOutcomes: RunSurfaceCollectionQueryRuntimeQuantifierOutcome[] = [];
   let sampleTotalCount = 0;
   let sampleMatchCount = 0;
   runs.forEach((run) => {
     const collectionItems = resolveRunSurfaceCollectionQueryRuntimeCollectionItems(run, resolvedPath);
+    let runCandidateCount = 0;
+    let runMatchedCount = 0;
     collectionItems.forEach((collectionItem) => {
+      runCandidateCount += 1;
       sampleTotalCount += 1;
       const candidateValueRaw = field.valueRoot
         ? collectionItem.value
@@ -16080,15 +16102,13 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
             comparedValueOperand,
           );
       if (result) {
+        runMatchedCount += 1;
         sampleMatchCount += 1;
-      }
-      if (sampleValues.length >= RUN_SURFACE_COLLECTION_RUNTIME_SAMPLE_LIMIT) {
-        return;
       }
       const candidateValue = candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
         ? `Missing ${accessorLabel}`
         : formatCollectionQueryBuilderValue(candidateValueRaw, field.valueType);
-      sampleValues.push({
+      allValues.push({
         candidatePath,
         candidateValue,
         detail: candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
@@ -16100,12 +16120,28 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
         runId: run.config.run_id,
       });
     });
+    const quantifierResult = evaluateRunSurfaceCollectionQueryRuntimeQuantifierOutcome(
+      quantifier,
+      runCandidateCount,
+      runMatchedCount,
+    );
+    runOutcomes.push({
+      candidateCount: runCandidateCount,
+      detail: runCandidateCount
+        ? `${quantifier.toUpperCase()} resolved to ${quantifierResult ? "true" : "false"} from ${runMatchedCount}/${runCandidateCount} matching candidates in run ${run.config.run_id}.`
+        : `${quantifier.toUpperCase()} resolved to ${quantifierResult ? "true" : "false"} because run ${run.config.run_id} had no concrete candidates on ${resolvedPath.join(".") || schema.label}.`,
+      matchedCount: runMatchedCount,
+      result: quantifierResult,
+      runId: run.config.run_id,
+    });
   });
   return {
-    sampleValues,
+    allValues,
+    runOutcomes,
+    sampleValues: allValues.slice(0, RUN_SURFACE_COLLECTION_RUNTIME_SAMPLE_LIMIT),
     sampleMatchCount,
     sampleTotalCount,
-    sampleTruncated: sampleTotalCount > sampleValues.length,
+    sampleTruncated: allValues.length > RUN_SURFACE_COLLECTION_RUNTIME_SAMPLE_LIMIT,
   };
 }
 
@@ -18514,13 +18550,24 @@ type RunSurfaceCollectionQueryRuntimeCandidateSample = {
   runId: string;
 };
 
+type RunSurfaceCollectionQueryRuntimeQuantifierOutcome = {
+  candidateCount: number;
+  detail: string;
+  matchedCount: number;
+  result: boolean;
+  runId: string;
+};
+
 type RunSurfaceCollectionQueryRuntimeCandidateTrace = {
+  allValues: RunSurfaceCollectionQueryRuntimeCandidateSample[];
   candidateAccessor: string;
   candidatePath: string;
   comparedValue: string;
   detail: string;
   location: string;
+  quantifier: "any" | "all" | "none";
   result: boolean;
+  runOutcomes: RunSurfaceCollectionQueryRuntimeQuantifierOutcome[];
   sampleMatchCount: number;
   sampleTotalCount: number;
   sampleTruncated: boolean;
@@ -18689,6 +18736,8 @@ function RunSurfaceCollectionQueryBuilder({
   const [builderValue, setBuilderValue] = useState<string>("");
   const [valueBindingKey, setValueBindingKey] = useState("");
   const [editorNegated, setEditorNegated] = useState(false);
+  const [runtimeCandidateTraceDrillthroughByKey, setRuntimeCandidateTraceDrillthroughByKey] =
+    useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!contracts.length) {
@@ -18945,6 +18994,15 @@ function RunSurfaceCollectionQueryBuilder({
     setActiveContractKey(clause.contractKey);
     setPendingHydratedState(clause);
   };
+
+  const buildRuntimeCandidateTraceDrillthroughKey = useCallback(
+    (
+      scope: "focused_chain" | "active_replay",
+      stepIndex: number,
+      trace: RunSurfaceCollectionQueryRuntimeCandidateTrace,
+    ) => `${scope}:${stepIndex}:${trace.location}:${trace.candidatePath}:${trace.candidateAccessor}`,
+    [],
+  );
 
   const expressionLabel = useMemo(() => {
     if (!activeSchema || !activeField || !activeOperator) {
@@ -21971,11 +22029,13 @@ function RunSurfaceCollectionQueryBuilder({
             comparedValueOperand,
             field,
             operatorKey: child.clause.operatorKey,
+            quantifier: child.clause.quantifier,
             resolvedParameterValues,
             runs: runtimeRuns,
             schema: activeSchema,
           });
           const runtimeCandidateTraces = [{
+            allValues: concreteRuntimeSamples.allValues,
             candidateAccessor,
             candidatePath,
             comparedValue,
@@ -21993,7 +22053,9 @@ function RunSurfaceCollectionQueryBuilder({
                 ? `Resolved inputs: ${comparisonNotes.join(" · ")}`
                 : "No reviewed binding reached the candidate inputs for this clause."),
             location: clauseLocation,
+            quantifier: child.clause.quantifier,
             result: directMatch,
+            runOutcomes: concreteRuntimeSamples.runOutcomes,
             sampleMatchCount: concreteRuntimeSamples.sampleMatchCount,
             sampleTotalCount: concreteRuntimeSamples.sampleTotalCount,
             sampleTruncated: concreteRuntimeSamples.sampleTruncated,
@@ -22029,12 +22091,15 @@ function RunSurfaceCollectionQueryBuilder({
               matchedPredicateBranches: [],
               parameterComparisons: [],
               runtimeCandidateTraces: [{
+                allValues: [],
                 candidateAccessor: child.predicateKey,
                 candidatePath: predicateLocation,
                 comparedValue: "No matching binding",
                 detail: "Predicate reference has no reviewed binding flowing into its runtime parameters.",
                 location: predicateLocation,
+                quantifier: "any",
                 result: false,
+                runOutcomes: [],
                 sampleMatchCount: 0,
                 sampleTotalCount: 0,
                 sampleTruncated: false,
@@ -22069,12 +22134,15 @@ function RunSurfaceCollectionQueryBuilder({
               matchedPredicateBranches,
               parameterComparisons: [],
               runtimeCandidateTraces: [{
+                allValues: [],
                 candidateAccessor: child.predicateKey,
                 candidatePath: predicateLocation,
                 comparedValue: "Cycle guard",
                 detail: "Predicate reference matched but nested runtime candidate replay stopped at a cycle guard.",
                 location: predicateLocation,
+                quantifier: "any",
                 result: true,
+                runOutcomes: [],
                 sampleMatchCount: 0,
                 sampleTotalCount: 0,
                 sampleTruncated: false,
@@ -22099,12 +22167,15 @@ function RunSurfaceCollectionQueryBuilder({
               matchedPredicateBranches,
               parameterComparisons: [],
               runtimeCandidateTraces: [{
+                allValues: [],
                 candidateAccessor: child.predicateKey,
                 candidatePath: predicateLocation,
                 comparedValue: "Template missing",
                 detail: "Predicate reference matched and no nested template definition was available for runtime candidate replay.",
                 location: predicateLocation,
+                quantifier: "any",
                 result: true,
+                runOutcomes: [],
                 sampleMatchCount: 0,
                 sampleTotalCount: 0,
                 sampleTruncated: false,
@@ -22137,6 +22208,7 @@ function RunSurfaceCollectionQueryBuilder({
             parameterComparisons: nestedEvaluation.parameterComparisons,
             runtimeCandidateTraces: [
               {
+                allValues: [],
                 candidateAccessor: child.predicateKey,
                 candidatePath: predicateLocation,
                 comparedValue: matchedParameterBindings
@@ -22149,7 +22221,9 @@ function RunSurfaceCollectionQueryBuilder({
                       `${bindingKey} <- $${referenceKey} (${bindingContextByKey[referenceKey] ?? "$" + referenceKey})`)
                     .join(" · ")}.`,
                 location: predicateLocation,
+                quantifier: "any",
                 result: predicateResult,
+                runOutcomes: [],
                 sampleMatchCount: 0,
                 sampleTotalCount: 0,
                 sampleTruncated: false,
@@ -22259,6 +22333,7 @@ function RunSurfaceCollectionQueryBuilder({
           matchedPredicateBranches: [],
           parameterComparisons: [],
           runtimeCandidateTraces: [{
+            allValues: [],
             candidateAccessor: `${child.logic.toUpperCase()} subgroup`,
             candidatePath: `${templateKey}.node.${pathSegments.join(".")}`,
             comparedValue: stopReason ?? "all child branches evaluated",
@@ -22266,7 +22341,9 @@ function RunSurfaceCollectionQueryBuilder({
               `${child.logic.toUpperCase()} subgroup ${child.negated ? "negates " : ""}combines child runtime candidate rows. `
               + (stopReason ? `Resolution stopped early because ${stopReason}.` : "Every child candidate row was evaluated."),
             location: `${templateKey}.node.${pathSegments.join(".")}`,
+            quantifier: "any",
             result: resolvedGroupResult,
+            runOutcomes: [],
             sampleMatchCount: 0,
             sampleTotalCount: 0,
             sampleTruncated: false,
@@ -25270,58 +25347,108 @@ function RunSurfaceCollectionQueryBuilder({
                                                 <span>{entry.runtimeCandidateTraces.length}</span>
                                               </div>
                                               <div className="run-surface-query-builder-trace-list">
-                                                {entry.runtimeCandidateTraces.map((candidateTrace) => (
-                                                  <div
-                                                    className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
-                                                    key={`focused-causal-candidate:${entry.stepIndex}:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
-                                                  >
-                                                    <strong>{candidateTrace.candidateAccessor}</strong>
-                                                    <p>{candidateTrace.detail}</p>
-                                                    <div className="run-surface-query-builder-trace-chip-list">
-                                                      <span className="run-surface-query-builder-trace-chip">
-                                                        {candidateTrace.candidatePath}
-                                                      </span>
-                                                      <span className="run-surface-query-builder-trace-chip">
-                                                        {candidateTrace.comparedValue}
-                                                      </span>
-                                                      <span className={`run-surface-query-builder-trace-chip${candidateTrace.result ? " is-active" : ""}`}>
-                                                        {candidateTrace.result ? "matched" : "not matched"}
-                                                      </span>
-                                                    </div>
-                                                    {candidateTrace.sampleTotalCount ? (
-                                                      <div className="run-surface-query-builder-trace-panel is-nested">
-                                                        <div className="run-surface-query-builder-card-head">
-                                                          <strong>Concrete payload values</strong>
-                                                          <span>{`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}</span>
-                                                        </div>
-                                                        <div className="run-surface-query-builder-trace-list">
-                                                          {candidateTrace.sampleValues.map((sample) => (
-                                                            <div
-                                                              className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"}`}
-                                                              key={`focused-causal-candidate-sample:${entry.stepIndex}:${candidateTrace.location}:${sample.runId}:${sample.candidatePath}`}
-                                                            >
-                                                              <strong>{sample.candidatePath}</strong>
-                                                              <p>{sample.detail}</p>
-                                                              <div className="run-surface-query-builder-trace-chip-list">
-                                                                <span className="run-surface-query-builder-trace-chip">
-                                                                  {sample.candidateValue}
-                                                                </span>
-                                                                <span className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}>
-                                                                  {sample.result ? "matched" : "not matched"}
-                                                                </span>
-                                                              </div>
-                                                            </div>
-                                                          ))}
-                                                        </div>
-                                                        {candidateTrace.sampleTruncated ? (
-                                                          <p className="run-note">
-                                                            Showing {candidateTrace.sampleValues.length} of {candidateTrace.sampleTotalCount} concrete payload candidates.
-                                                          </p>
-                                                        ) : null}
+                                                {entry.runtimeCandidateTraces.map((candidateTrace) => {
+                                                  const drillthroughKey = buildRuntimeCandidateTraceDrillthroughKey(
+                                                    "focused_chain",
+                                                    entry.stepIndex,
+                                                    candidateTrace,
+                                                  );
+                                                  const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
+                                                  return (
+                                                    <div
+                                                      className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
+                                                      key={`focused-causal-candidate:${entry.stepIndex}:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
+                                                    >
+                                                      <strong>{candidateTrace.candidateAccessor}</strong>
+                                                      <p>{candidateTrace.detail}</p>
+                                                      <div className="run-surface-query-builder-trace-chip-list">
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {candidateTrace.candidatePath}
+                                                        </span>
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {candidateTrace.comparedValue}
+                                                        </span>
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {`${candidateTrace.quantifier.toUpperCase()} quantifier`}
+                                                        </span>
+                                                        <span className={`run-surface-query-builder-trace-chip${candidateTrace.result ? " is-active" : ""}`}>
+                                                          {candidateTrace.result ? "matched" : "not matched"}
+                                                        </span>
                                                       </div>
-                                                    ) : null}
-                                                  </div>
-                                                ))}
+                                                      {candidateTrace.runOutcomes.length ? (
+                                                        <div className="run-surface-query-builder-trace-panel is-nested">
+                                                          <div className="run-surface-query-builder-card-head">
+                                                            <strong>Quantifier outcomes</strong>
+                                                            <span>{`${candidateTrace.runOutcomes.filter((outcome) => outcome.result).length}/${candidateTrace.runOutcomes.length} runs true`}</span>
+                                                          </div>
+                                                          <div className="run-surface-query-builder-trace-list">
+                                                            {candidateTrace.runOutcomes.map((outcome) => (
+                                                              <div
+                                                                className={`run-surface-query-builder-trace-step is-${outcome.result ? "success" : "muted"}`}
+                                                                key={`focused-causal-quantifier:${entry.stepIndex}:${candidateTrace.location}:${outcome.runId}`}
+                                                              >
+                                                                <strong>{outcome.runId}</strong>
+                                                                <p>{outcome.detail}</p>
+                                                                <div className="run-surface-query-builder-trace-chip-list">
+                                                                  <span className="run-surface-query-builder-trace-chip">
+                                                                    {`${outcome.matchedCount}/${outcome.candidateCount} matched`}
+                                                                  </span>
+                                                                  <span className={`run-surface-query-builder-trace-chip${outcome.result ? " is-active" : ""}`}>
+                                                                    {outcome.result ? "quantifier true" : "quantifier false"}
+                                                                  </span>
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      ) : null}
+                                                      {candidateTrace.sampleTotalCount ? (
+                                                        <div className="run-surface-query-builder-trace-panel is-nested">
+                                                          <div className="run-surface-query-builder-card-head">
+                                                            <strong>Concrete payload values</strong>
+                                                            <span>{`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}</span>
+                                                          </div>
+                                                          <div className="run-surface-query-builder-trace-list">
+                                                            {(drillthroughOpen ? candidateTrace.allValues : candidateTrace.sampleValues).map((sample) => (
+                                                              <div
+                                                                className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"}`}
+                                                                key={`focused-causal-candidate-sample:${entry.stepIndex}:${candidateTrace.location}:${sample.runId}:${sample.candidatePath}`}
+                                                              >
+                                                                <strong>{sample.candidatePath}</strong>
+                                                                <p>{sample.detail}</p>
+                                                                <div className="run-surface-query-builder-trace-chip-list">
+                                                                  <span className="run-surface-query-builder-trace-chip">
+                                                                    {sample.candidateValue}
+                                                                  </span>
+                                                                  <span className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}>
+                                                                    {sample.result ? "matched" : "not matched"}
+                                                                  </span>
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                          {candidateTrace.sampleTruncated ? (
+                                                            <div className="run-surface-query-builder-actions">
+                                                              <button
+                                                                className={`ghost-button${drillthroughOpen ? " is-active" : ""}`}
+                                                                onClick={() =>
+                                                                  setRuntimeCandidateTraceDrillthroughByKey((current) => ({
+                                                                    ...current,
+                                                                    [drillthroughKey]: !drillthroughOpen,
+                                                                  }))}
+                                                                type="button"
+                                                              >
+                                                                {drillthroughOpen
+                                                                  ? `Collapse to ${candidateTrace.sampleValues.length} sample candidates`
+                                                                  : `Drill through all ${candidateTrace.sampleTotalCount} candidates`}
+                                                              </button>
+                                                            </div>
+                                                          ) : null}
+                                                        </div>
+                                                      ) : null}
+                                                    </div>
+                                                  );
+                                                })}
                                               </div>
                                             </div>
                                           ) : null}
@@ -26830,35 +26957,85 @@ function RunSurfaceCollectionQueryBuilder({
                                                       <div className="run-surface-query-builder-trace-list">
                                                         {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.runtimeCandidateTraces
                                                           .slice(0, 3)
-                                                          .map((candidateTrace) => (
-                                                            <div
-                                                              className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
-                                                              key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
-                                                            >
-                                                              <strong>{candidateTrace.candidateAccessor}</strong>
-                                                              <p>{candidateTrace.detail}</p>
-                                                              {candidateTrace.sampleTotalCount ? (
+                                                          .map((candidateTrace) => {
+                                                            const drillthroughKey = buildRuntimeCandidateTraceDrillthroughKey(
+                                                              "active_replay",
+                                                              activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.stepIndex,
+                                                              candidateTrace,
+                                                            );
+                                                            const drillthroughOpen = runtimeCandidateTraceDrillthroughByKey[drillthroughKey] ?? false;
+                                                            const previewSamples = drillthroughOpen
+                                                              ? candidateTrace.allValues
+                                                              : candidateTrace.sampleValues.slice(0, 2);
+                                                            return (
+                                                              <div
+                                                                className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"}`}
+                                                                key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate:${candidateTrace.location}:${candidateTrace.candidatePath}:${candidateTrace.candidateAccessor}`}
+                                                              >
+                                                                <strong>{candidateTrace.candidateAccessor}</strong>
+                                                                <p>{candidateTrace.detail}</p>
                                                                 <div className="run-surface-query-builder-trace-chip-list">
+                                                                  <span className="run-surface-query-builder-trace-chip">
+                                                                    {`${candidateTrace.quantifier.toUpperCase()} quantifier`}
+                                                                  </span>
                                                                   <span className="run-surface-query-builder-trace-chip">
                                                                     {`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}
                                                                   </span>
-                                                                  {candidateTrace.sampleValues.slice(0, 2).map((sample) => (
+                                                                  {candidateTrace.runOutcomes.slice(0, 2).map((outcome) => (
                                                                     <span
-                                                                      className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}
-                                                                      key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-sample:${sample.runId}:${sample.candidatePath}`}
+                                                                      className={`run-surface-query-builder-trace-chip${outcome.result ? " is-active" : ""}`}
+                                                                      key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-outcome:${candidateTrace.location}:${outcome.runId}`}
                                                                     >
-                                                                      {`${sample.candidatePath} · ${sample.candidateValue}`}
+                                                                      {`${outcome.runId} · ${outcome.result ? "true" : "false"}`}
                                                                     </span>
                                                                   ))}
-                                                                  {candidateTrace.sampleTruncated ? (
+                                                                  {candidateTrace.runOutcomes.length > 2 ? (
                                                                     <span className="run-surface-query-builder-trace-chip">
-                                                                      {`+${Math.max(candidateTrace.sampleTotalCount - 2, 0)} more`}
+                                                                      {`+${candidateTrace.runOutcomes.length - 2} runs`}
                                                                     </span>
                                                                   ) : null}
                                                                 </div>
-                                                              ) : null}
-                                                            </div>
-                                                          ))}
+                                                                {previewSamples.length ? (
+                                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                                    {previewSamples.map((sample) => (
+                                                                      <span
+                                                                        className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}
+                                                                        key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-sample:${sample.runId}:${sample.candidatePath}`}
+                                                                      >
+                                                                        {`${sample.candidatePath} · ${sample.candidateValue}`}
+                                                                      </span>
+                                                                    ))}
+                                                                    {candidateTrace.sampleTruncated && !drillthroughOpen ? (
+                                                                      <button
+                                                                        className="ghost-button"
+                                                                        onClick={() =>
+                                                                          setRuntimeCandidateTraceDrillthroughByKey((current) => ({
+                                                                            ...current,
+                                                                            [drillthroughKey]: true,
+                                                                          }))}
+                                                                        type="button"
+                                                                      >
+                                                                        {`Drill through ${candidateTrace.sampleTotalCount} candidates`}
+                                                                      </button>
+                                                                    ) : null}
+                                                                    {candidateTrace.sampleTruncated && drillthroughOpen ? (
+                                                                      <button
+                                                                        className="ghost-button is-active"
+                                                                        onClick={() =>
+                                                                          setRuntimeCandidateTraceDrillthroughByKey((current) => ({
+                                                                            ...current,
+                                                                            [drillthroughKey]: false,
+                                                                          }))}
+                                                                        type="button"
+                                                                      >
+                                                                        Collapse drill-through
+                                                                      </button>
+                                                                    ) : null}
+                                                                  </div>
+                                                                ) : null}
+                                                              </div>
+                                                            );
+                                                          })}
                                                       </div>
                                                     ) : null}
                                                     {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.truthTableRows.length ? (
