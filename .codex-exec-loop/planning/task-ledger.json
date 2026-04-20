@@ -580,18 +580,36 @@
       "direction_id": "experiment-os",
       "title": "Wire collection query builder output into run list queries and saved filter workflows",
       "description": "Take the newly metadata-driven collection query builder past preview-only UX by feeding its generated `filter_expr` into actual run list query requests and any saved-filter authoring or restore workflow, so operators can execute and persist the same capability-derived collection filters instead of rebuilding them manually outside the panel.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 40,
-      "priority_reason": "The latest main-session reply says the builder and parameter picker now read hydrated capability metadata and generate preview expressions, but the remaining executable gap is wiring that output into real run list query requests and saved filter workflows. That is now the clearest automatic next task because the authoring UI exists and the missing value is end-to-end execution or persistence.",
+      "priority_reason": "Completed in main session commit a43fa6e, which wired builder-produced `filter_expr` JSON into `/runs` queries, added collection labels and `filter_expr` support to run history filters, shipped metadata-driven apply or clear actions per run section, and added mode-scoped saved-filter save, reapply, and delete workflows persisted in localStorage before typecheck and diff-check verification.",
       "depends_on": [
         "planning-experiment-os-build-collection-query-builder-ui-from-capability-metadata"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:45:00Z",
+      "updated_at": "2026-04-20T04:00:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Closes the remaining experiment-os gap between metadata-driven filter authoring and actual experiment retrieval workflows by making collection-query expressions executable and reusable in the same run-list and saved-filter paths operators already depend on."
+    },
+    {
+      "id": "planning-experiment-os-reverse-hydrate-filter-expressions-into-collection-query-builder-state",
+      "direction_id": "experiment-os",
+      "title": "Reverse-hydrate saved `filter_expr` JSON back into collection query builder state",
+      "description": "Teach the collection query builder to parse existing saved or active `filter_expr` JSON back into its control state so operators can reopen a run-list or saved-filter expression, inspect the capability-derived predicates, and continue editing instead of only applying opaque serialized filters.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 39,
+      "priority_reason": "The latest main-session reply says builder output now drives run-list fetches and saved-filter workflows end to end, and explicitly calls out reverse hydration as the remaining gap. That makes parsing existing `filter_expr` payloads back into builder controls the clearest automatic next task because operators can save and reapply filters today but still cannot reopen them for structured editing.",
+      "depends_on": [
+        "planning-experiment-os-wire-collection-query-builder-output-into-run-list-and-saved-filter-flows"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T04:00:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from executable saved filters into durable editable experiment queries by removing the current one-way serialization boundary between collection-query builder state and persisted run-list filter expressions."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
