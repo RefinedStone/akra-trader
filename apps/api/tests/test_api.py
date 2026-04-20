@@ -359,6 +359,10 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["param"] == "filter_expr"
   assert run_query_schema["expression_trees"]["logic_values"] == ["and", "or"]
   assert run_query_schema["expression_trees"]["supports_negation"] is True
+  assert run_query_schema["expression_trees"]["predicate_refs"]["registry_field"] == "predicates"
+  assert run_query_schema["expression_trees"]["predicate_refs"]["reference_field"] == "predicate_ref"
+  assert run_query_schema["expression_trees"]["quantified_conditions"]["field"] == "quantifier"
+  assert run_query_schema["expression_trees"]["quantified_conditions"]["values"] == ["any", "all", "none"]
   started_at_filter = next(item for item in run_query_schema["filters"] if item["key"] == "started_at")
   assert started_at_filter["value_type"] == "datetime"
   assert started_at_filter["value_path"] == ["started_at"]
@@ -380,7 +384,12 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
     "le",
   ]
   tag_filter = next(item for item in run_query_schema["filters"] if item["key"] == "tag")
-  assert [operator["key"] for operator in tag_filter["operators"]] == ["contains_all", "contains_any"]
+  assert [operator["key"] for operator in tag_filter["operators"]] == [
+    "contains_all",
+    "contains_any",
+    "eq",
+    "prefix",
+  ]
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
   assert any(field["key"] == "trade_count" for field in run_query_schema["sort_fields"])
@@ -760,6 +769,74 @@ def test_run_query_contract_applies_nested_boolean_filter_expression_tree(tmp_pa
     assert returned_run_ids == sorted([run_ids[0], run_ids[1]])
     assert run_ids[2] not in returned_run_ids
     assert run_ids[3] not in returned_run_ids
+
+
+def test_run_query_contract_supports_predicate_references_and_quantified_list_predicates(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    runs_by_symbol: dict[str, str] = {}
+    tags_by_symbol = {
+      "BTC/USDT": ["baseline", "review"],
+      "ETH/USDT": ["review", "candidate"],
+      "SOL/USDT": ["stress-alpha", "candidate"],
+      "XRP/USDT": ["baseline", "stress-beta"],
+    }
+    for symbol, tags in tags_by_symbol.items():
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+          "tags": tags,
+        },
+      )
+      assert response.status_code == 200
+      runs_by_symbol[symbol] = response.json()["config"]["run_id"]
+
+    filter_expression = {
+      "predicates": {
+        "baseline_or_review": {
+          "logic": "or",
+          "conditions": [
+            {"key": "tag", "operator": "eq", "quantifier": "any", "value": "baseline"},
+            {"key": "tag", "operator": "eq", "quantifier": "any", "value": "review"},
+          ],
+        },
+        "no_stress_prefix": {
+          "logic": "and",
+          "conditions": [
+            {"key": "tag", "operator": "prefix", "quantifier": "none", "value": "stress"},
+          ],
+        },
+      },
+      "root": {
+        "logic": "and",
+        "children": [
+          {"predicate_ref": "baseline_or_review"},
+          {"predicate_ref": "no_stress_prefix"},
+        ],
+      },
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("filter_expr", json.dumps(filter_expression)),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_run_ids = [item["config"]["run_id"] for item in payload]
+    assert returned_run_ids == sorted(
+      [
+        runs_by_symbol["BTC/USDT"],
+        runs_by_symbol["ETH/USDT"],
+      ]
+    )
+    assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
+    assert runs_by_symbol["XRP/USDT"] not in returned_run_ids
 
 
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:

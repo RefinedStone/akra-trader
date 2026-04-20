@@ -237,16 +237,27 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
         "format": "json",
         "supports_negation": True,
         "logic_values": ["and", "or"],
+        "predicate_refs": {
+          "registry_field": "predicates",
+          "reference_field": "predicate_ref",
+        },
+        "quantified_conditions": {
+          "field": "quantifier",
+          "values": ["any", "all", "none"],
+          "semantics": "Applies the condition across list-valued candidates.",
+        },
         "condition_shape": {
           "key": "<filter_key>",
           "operator": "<operator>",
           "value": "<typed value>",
+          "quantifier": "any|all|none",
         },
         "node_shape": {
           "logic": "and|or",
           "conditions": ["<condition>", "..."],
           "children": ["<node>", "..."],
           "negated": "boolean",
+          "predicate_ref": "<named predicate>",
         },
       },
       "filters": [
@@ -426,6 +437,10 @@ def _parse_runtime_filter_expression_condition(
     raise ValueError(f"Unsupported filter operator for {filter_key}: {operator_key}")
   if "value" not in raw_condition:
     raise ValueError(f"Filter expression conditions must declare a value for {filter_key}.")
+  quantifier = raw_condition.get("quantifier")
+  if quantifier is not None:
+    if not isinstance(quantifier, str) or quantifier not in {"any", "all", "none"}:
+      raise ValueError("Filter expression quantifier must be one of `any`, `all`, or `none`.")
   return StandaloneSurfaceFilterCondition(
     key=filter_key,
     operator=operator_key,
@@ -434,6 +449,7 @@ def _parse_runtime_filter_expression_condition(
       value_shape=operator_spec.value_shape,
       raw_value=raw_condition["value"],
     ),
+    quantifier=quantifier,
   )
 
 
@@ -441,9 +457,34 @@ def _parse_runtime_filter_expression_node(
   raw_node: Any,
   *,
   filter_specs_by_key: dict[str, StandaloneSurfaceFilterParamSpec],
+  predicate_registry: dict[str, Any],
+  active_predicate_refs: tuple[str, ...] = (),
 ) -> StandaloneSurfaceFilterExpressionNode:
   if not isinstance(raw_node, dict):
     raise ValueError("Filter expression nodes must be objects.")
+  predicate_ref = raw_node.get("predicate_ref")
+  if predicate_ref is not None:
+    if not isinstance(predicate_ref, str) or not predicate_ref:
+      raise ValueError("Filter expression predicate references must be non-empty strings.")
+    if predicate_ref in active_predicate_refs:
+      raise ValueError(f"Cyclic filter predicate reference detected for {predicate_ref}.")
+    referenced_node = predicate_registry.get(predicate_ref)
+    if referenced_node is None:
+      raise ValueError(f"Unknown filter predicate reference: {predicate_ref}")
+    resolved = _parse_runtime_filter_expression_node(
+      referenced_node,
+      filter_specs_by_key=filter_specs_by_key,
+      predicate_registry=predicate_registry,
+      active_predicate_refs=(*active_predicate_refs, predicate_ref),
+    )
+    if bool(raw_node.get("negated", False)):
+      return StandaloneSurfaceFilterExpressionNode(
+        logic=resolved.logic,
+        conditions=resolved.conditions,
+        children=resolved.children,
+        negated=not resolved.negated,
+      )
+    return resolved
   logic = raw_node.get("logic", "and")
   if not isinstance(logic, str) or logic.lower() not in {"and", "or"}:
     raise ValueError("Filter expression logic must be either `and` or `or`.")
@@ -464,6 +505,8 @@ def _parse_runtime_filter_expression_node(
     _parse_runtime_filter_expression_node(
       raw_child,
       filter_specs_by_key=filter_specs_by_key,
+      predicate_registry=predicate_registry,
+      active_predicate_refs=active_predicate_refs,
     )
     for raw_child in raw_children
   )
@@ -488,12 +531,28 @@ def _build_runtime_filter_expression(
     parsed_expression = json.loads(raw_expression)
   except json.JSONDecodeError as exc:
     raise ValueError("Filter expression must be valid JSON.") from exc
+  predicate_registry: dict[str, Any] = {}
+  root_expression = parsed_expression
+  if isinstance(parsed_expression, dict) and "predicates" in parsed_expression:
+    raw_predicates = parsed_expression.get("predicates")
+    if not isinstance(raw_predicates, dict):
+      raise ValueError("Filter expression `predicates` must be an object map.")
+    predicate_registry = raw_predicates
+    if "root" in parsed_expression:
+      root_expression = parsed_expression["root"]
+    else:
+      root_expression = {
+        key: value
+        for key, value in parsed_expression.items()
+        if key != "predicates"
+      }
   return _parse_runtime_filter_expression_node(
-    parsed_expression,
+    root_expression,
     filter_specs_by_key={
       spec.key: spec
       for spec in binding.filter_param_specs
     },
+    predicate_registry=predicate_registry,
   )
 
 

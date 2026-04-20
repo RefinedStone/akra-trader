@@ -23048,6 +23048,7 @@ class StandaloneSurfaceFilterCondition:
   operator: str
   value: Any
   group: str | None = None
+  quantifier: str | None = None
 
 
 @dataclass(frozen=True)
@@ -23268,7 +23269,24 @@ def _evaluate_runtime_filter_condition(
   *,
   operator: str,
   operand: Any,
+  quantifier: str | None = None,
 ) -> bool:
+  if quantifier is not None and isinstance(candidate_value, (list, tuple, set)):
+    element_matches = [
+      _evaluate_runtime_filter_condition(
+        element,
+        operator=operator,
+        operand=operand,
+      )
+      for element in candidate_value
+    ]
+    if quantifier == "any":
+      return any(element_matches)
+    if quantifier == "all":
+      return bool(element_matches) and all(element_matches)
+    if quantifier == "none":
+      return not any(element_matches)
+    raise ValueError(f"Unsupported runtime filter quantifier: {quantifier}")
   if operator == "eq":
     return candidate_value == operand
   if operator == "prefix":
@@ -23327,6 +23345,7 @@ def _evaluate_runtime_filter_conditions(
       candidate_value,
       operator=condition.operator,
       operand=condition.value,
+      quantifier=condition.quantifier,
     ):
       return False
   if require_known_conditions and known_conditions == 0:
@@ -23355,6 +23374,7 @@ def _evaluate_runtime_filter_expression(
         candidate_value,
         operator=condition.operator,
         operand=condition.value,
+        quantifier=condition.quantifier,
       )
     )
   for child in expression.children:
@@ -24378,6 +24398,16 @@ def list_standalone_surface_runtime_bindings(
             label="Contains any",
             description="Matches if any requested tag is present on the run.",
             value_shape="list",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches an exact tag value inside expression predicates.",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="prefix",
+            label="Prefix",
+            description="Matches a tag prefix inside expression predicates.",
           ),
         ),
         value_path=("provenance", "experiment", "tags"),
