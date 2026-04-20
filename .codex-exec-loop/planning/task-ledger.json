@@ -635,18 +635,36 @@
       "direction_id": "experiment-os",
       "title": "Deepen collection query builder visual editing to nested boolean subtrees",
       "description": "Extend the collection query builder beyond the new root-level grouped expression editor so operators can visually add, nest, reorder, and rehydrate deeper boolean subtrees and more general `filter_expr` expression-tree structures instead of dropping back to top-level-only group editing once a saved filter grows beyond one root group.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 39,
-      "priority_reason": "The latest main-session reply says the grouped root expression and `predicate_ref` editor is now complete, and directly identifies deeper visual editor coverage for nested boolean subtrees and more complex expression trees as the remaining gap. That makes nested subtree editing the clearest automatic next queued task.",
+      "priority_reason": "Completed in main session commit 171ad0e, which added recursive `group` nodes to the builder child model, rehydrated nested saved `filter_expr` trees back into builder state, let operators select and edit arbitrary nested subgroups with local `and/or` and negation controls, rendered the expression structure as a recursive tree, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-expand-collection-query-builder-to-grouped-expressions-and-predicate-refs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T04:36:00Z",
+      "updated_at": "2026-04-20T04:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os from root-level grouped filter editing into a fuller visual editor for the recursive boolean expression contract the backend already supports, reducing the remaining gap between what operators can save or run and what they can structurally inspect or modify from the UI."
+      "direction_relation_note": "Completed the next experiment-os builder pass by making the recursive boolean expression contract visually editable through nested subgroup selection, subtree insertion, and recursive structure rendering instead of stopping at root-level grouping."
+    },
+    {
+      "id": "planning-experiment-os-complete-collection-query-expression-editor-for-subtree-promotion-and-root-negation",
+      "direction_id": "experiment-os",
+      "title": "Complete collection query expression editor for subtree promotion and root negation",
+      "description": "Finish the remaining collection query expression editor gap by letting operators promote predicate definitions from single clauses into nested boolean subtrees and edit root-level negation in the same builder UI, so the frontend can author the fuller `filter_expr` contract without dropping to partial representations when predicates or the top-level expression need negated group structure.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 40,
+      "priority_reason": "The latest main-session reply says nested subtree visual editing is complete and directly names the remaining gap: predicate definitions still cannot be promoted from a clause into a subtree, and root-level negation is not yet handled in the same UI. That makes expression-editor completion the clearest automatic next queued task.",
+      "depends_on": [
+        "planning-experiment-os-deepen-collection-query-builder-visual-editor-to-nested-expression-subtrees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T04:51:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os from nested subgroup editing into a more complete visual authoring surface for the recursive typed-query contract, reducing the remaining mismatch between what the backend expression model can represent and what operators can build or revise from the control-room UI."
     },
     {
       "id": "planning-experiment-os-dataset-identity-rerun-workflow",
