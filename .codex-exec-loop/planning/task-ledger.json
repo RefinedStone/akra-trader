@@ -5354,36 +5354,36 @@
       "direction_id": "experiment-os",
       "title": "Let replay annotations edit reviewed field-pick source and refresh the active replay step",
       "description": "Extend the new bidirectional replay annotation flow by allowing operators to flip a reviewed field pick between local and remote directly from the replay step or diff annotation surface, then write that change back into the collision review draft and immediately refresh the currently focused replay-step annotations or diff highlights so replay no longer stays read-only once the row-link handoff exists.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 11,
-      "priority_reason": "The latest main-session reply says the remaining executable gap is full bidirectional editing: operators can jump from replay annotations back to review rows now, but they still cannot change a reviewed field source from replay and see the active replay-step annotation update immediately. That write-back and refresh loop is the clearest next task because it completes the most direct editing path before broader timeline auto-navigation is added.",
+      "priority_reason": "Completed in main session commit 453bf6f, which let replay annotation chips edit the reviewed field-pick source inline, linked the same chip cluster back to the matching conflict-review field row, and refreshed the active replay step against the updated simulation override with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-backpropagate-simulation-results-into-collision-review-rows"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:59:24Z",
+      "updated_at": "2026-04-20T07:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os replay-apply trust from bidirectional inspection into direct in-context editing, so operators can revise reviewed field-pick sources from the exact replay annotation that reveals an undesired simulated effect."
     },
     {
       "id": "planning-experiment-os-auto-focus-replay-timeline-from-collision-review-row-selection",
       "direction_id": "experiment-os",
-      "title": "Auto-focus the replay timeline from the active collision review row",
-      "description": "Build on the completed row-link navigation and upcoming inline replay edit flow by switching or revealing the matching replay timeline step whenever a conflict review row becomes the active focus target, so operators can move from authored review rows back into the most relevant simulated step without manually hunting through the solver replay.",
-      "status": "proposed",
+      "title": "Deepen bidirectional replay-review sync with timeline refocus and diff attribution refresh",
+      "description": "Build on the completed inline replay edit flow by making conflict review row changes and review-focus transitions re-place the replay timeline on the most relevant step for the updated selection, while also recomputing step-level diff attribution or annotation context so replay focus stays causally aligned with the latest reviewed picks instead of only jumping to a stale or coarse step match.",
+      "status": "ready",
       "base_priority": 85,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly keeps focused-review-row to replay-step auto-navigation as a remaining gap, but it is a broader synchronization contract than the immediate inline edit-and-refresh pass. Keep it proposed behind the write-back workflow so automatic step switching can target the stabilized bidirectional editing model instead of another intermediate state.",
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply says the remaining executable gap is deeper bidirectional synchronization: review-row changes still do not finely re-place replay timeline focus or recalculate step-level diff attribution from the latest reviewed picks. That follow-up is now the clearest executable next task after inline replay editing shipped, so it should become the queue head.",
       "depends_on": [
         "planning-experiment-os-edit-reviewed-field-pick-source-from-replay-annotations"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:59:24Z",
+      "updated_at": "2026-04-20T07:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply review from linked inspection and inline editing into focus-synchronized navigation, so collision review and replay stay aligned as operators move between authored picks and simulated consequences."
+      "direction_relation_note": "Extends experiment-os replay-apply review from linked inspection and inline editing into full bidirectional synchronization, so review-row focus, replay-step placement, and per-step attribution stay aligned as operators revise picks and inspect simulated consequences."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
