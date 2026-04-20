@@ -21415,16 +21415,166 @@ function RunSurfaceCollectionQueryBuilder({
       activeSimulatedPredicateRefSolverReplayIndex,
     ],
   );
+  const selectedRefTemplateParameterGroupByKey = useMemo(
+    () => Object.fromEntries(
+      selectedRefTemplateParameterGroups.map((group) => [group.key, group] as const),
+    ),
+    [selectedRefTemplateParameterGroups],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedParameter = useMemo(
+    () => {
+      if (
+        !activePredicateRefReplayApplyConflictSimulationFocusedItem
+        || activePredicateRefReplayApplyConflictSimulationFocusedItem.section !== "binding_snapshot"
+      ) {
+        return null;
+      }
+      const parameterGroup =
+        activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+          ? selectedRefTemplateParameterGroupByKey[activePredicateRefReplayApplyConflictSimulationFocusedGroupKey] ?? null
+          : null;
+      return parameterGroup?.parameters.find(
+        (parameter) => parameter.key === activePredicateRefReplayApplyConflictSimulationFocusedItem.key,
+      ) ?? null;
+    },
+    [
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+      activePredicateRefReplayApplyConflictSimulationFocusedItem,
+      selectedRefTemplateParameterGroupByKey,
+    ],
+  );
+  const activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations = useMemo(
+    () => {
+      if (
+        !activePredicateRefReplayApplyConflictSimulationReview
+        || !activePredicateRefReplayApplyConflictSimulationFocusedItem
+        || !activePredicateRefReplayApplyConflictSimulationFocusedGroupKey
+      ) {
+        return [];
+      }
+      const group =
+        selectedRefTemplateParameterGroupByKey[activePredicateRefReplayApplyConflictSimulationFocusedGroupKey] ?? null;
+      if (!group) {
+        return [];
+      }
+      const selectedSource =
+        activePredicateRefReplayApplyConflictSimulationReview.selectedSources[
+          activePredicateRefReplayApplyConflictSimulationFocusedItem.decisionKey
+        ] ?? "local";
+      const reviewedValue = selectedSource === "remote"
+        ? activePredicateRefReplayApplyConflictSimulationFocusedItem.remoteValue
+        : activePredicateRefReplayApplyConflictSimulationFocusedItem.localValue;
+      const reviewedParameter = activePredicateRefReplayApplyConflictSimulationFocusedParameter;
+      const effectiveCoordinationPolicy =
+        bundleCoordinationSimulationPolicyOverrides[group.key] ?? group.coordinationPolicy;
+      return activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry) => {
+        const step = simulatedPredicateRefSolverReplay[entry.stepIndex] ?? null;
+        const bundleKey = step?.resolvedSelectionsByGroupKey[group.key] ?? "";
+        const bundle =
+          getSortedTemplateGroupPresetBundles(group.presetBundles).find((candidate) => candidate.key === bundleKey)
+          ?? null;
+        const parameterReasons: Array<{ label: string; detail: string }> = [{
+          label: "Reviewed pick",
+          detail: `${activePredicateRefReplayApplyConflictSimulationFocusedItem.label} keeps the ${selectedSource} value (${reviewedValue}).`,
+        }];
+        if (reviewedParameter) {
+          const currentBindingValue =
+            activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey[
+              reviewedParameter.key
+            ] ?? "";
+          const reasonParts = [
+            `${reviewedParameter.customLabel.trim() || reviewedParameter.label} is a ${reviewedParameter.valueType} parameter.`,
+          ];
+          if (currentBindingValue) {
+            reasonParts.push(
+              isRunSurfaceCollectionQueryBindingReferenceValue(currentBindingValue)
+                ? `Current draft binds it to $${fromRunSurfaceCollectionQueryBindingReferenceValue(currentBindingValue)}.`
+                : `Current draft value is ${currentBindingValue}.`,
+            );
+          } else if (reviewedParameter.defaultValue.trim()) {
+            reasonParts.push(`Template default is ${reviewedParameter.defaultValue}.`);
+          }
+          if (reviewedParameter.bindingPreset.trim()) {
+            reasonParts.push(`Suggested binding preset is $${reviewedParameter.bindingPreset}.`);
+          }
+          if (reviewedParameter.helpNote.trim()) {
+            reasonParts.push(reviewedParameter.helpNote.trim());
+          }
+          parameterReasons.push({
+            label: reviewedParameter.customLabel.trim() || reviewedParameter.label,
+            detail: reasonParts.join(" "),
+          });
+        }
+        const bundleParameterReasons = bundle
+          ? group.parameters.flatMap((parameter) => {
+              const bindingPreset = bundle.parameterBindingPresets[parameter.key]?.trim() ?? "";
+              const parameterValue = bundle.parameterValues[parameter.key]?.trim() ?? "";
+              if (!bindingPreset && !parameterValue) {
+                return [];
+              }
+              return [{
+                label: parameter.customLabel.trim() || parameter.label,
+                detail: bindingPreset
+                  ? `${bundle.label} binds ${parameter.customLabel.trim() || parameter.label} to $${bindingPreset}.`
+                  : `${bundle.label} fixes ${parameter.customLabel.trim() || parameter.label} to ${parameterValue}.`,
+              }];
+            }).slice(0, 3)
+          : [];
+        parameterReasons.push(...bundleParameterReasons);
+        if (!bundleParameterReasons.length && group.helpNote.trim()) {
+          parameterReasons.push({
+            label: group.label,
+            detail: group.helpNote.trim(),
+          });
+        }
+        let bundleRuleTitle = bundle?.label ?? "No resolved bundle";
+        let bundleRuleDetail = entry.detail;
+        if (bundle) {
+          if (entry.type === "manual_anchor") {
+            bundleRuleDetail = `${entry.detail} ${bundle.label} stays pinned manually for ${group.label}.`;
+          } else if (entry.type === "dependency_selection") {
+            bundleRuleDetail = `${entry.detail} ${bundle.label} resolves under ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(effectiveCoordinationPolicy)} at priority P${bundle.priority}.`;
+          } else if (entry.type === "direct_auto_selection") {
+            bundleRuleDetail = `${entry.detail} ${bundle.label} matches ${bundle.autoSelectRule.replaceAll("_", " ")} at priority P${bundle.priority}.`;
+          } else if (entry.type === "conflict_blocked") {
+            bundleRuleDetail = `${entry.detail} ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(effectiveCoordinationPolicy)} blocks automatic bundle resolution.`;
+          } else if (bundle.helpNote.trim()) {
+            bundleRuleDetail = `${entry.detail} ${bundle.helpNote.trim()}`;
+          }
+        } else if (entry.kind === "selection_change") {
+          bundleRuleTitle = "State transition";
+        }
+        return {
+          ...entry,
+          bundleRuleDetail,
+          bundleRuleTitle,
+          parameterReasons,
+        };
+      });
+    },
+    [
+      activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey,
+      activePredicateRefReplayApplyConflictSimulationFocusedChain,
+      activePredicateRefReplayApplyConflictSimulationFocusedGroupKey,
+      activePredicateRefReplayApplyConflictSimulationFocusedItem,
+      activePredicateRefReplayApplyConflictSimulationFocusedParameter,
+      activePredicateRefReplayApplyConflictSimulationReview,
+      bundleCoordinationSimulationPolicyOverrides,
+      getSortedTemplateGroupPresetBundles,
+      selectedRefTemplateParameterGroupByKey,
+      simulatedPredicateRefSolverReplay,
+    ],
+  );
   const activePredicateRefReplayApplyConflictSimulationFocusedChainEntry = useMemo(
     () => (
       activePredicateRefReplayApplyConflictSimulationFocusedChainPosition >= 0
-        ? activePredicateRefReplayApplyConflictSimulationFocusedChain[
+        ? activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations[
             activePredicateRefReplayApplyConflictSimulationFocusedChainPosition
           ] ?? null
         : null
     ),
     [
-      activePredicateRefReplayApplyConflictSimulationFocusedChain,
+      activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations,
       activePredicateRefReplayApplyConflictSimulationFocusedChainPosition,
     ],
   );
@@ -24052,7 +24202,7 @@ function RunSurfaceCollectionQueryBuilder({
                                   {`${activePredicateRefReplayApplyConflictSimulationFocusedItem.label} propagates through ${activePredicateRefReplayApplyConflictSimulationFocusedGroupKey ?? "the replay graph"} across the steps below.`}
                                 </p>
                                 <div className="run-surface-query-builder-trace-chip-list">
-                                  {activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry, index) => (
+                                  {activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations.map((entry, index) => (
                                     <button
                                       className={`run-surface-query-builder-trace-chip${
                                         entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
@@ -24068,7 +24218,7 @@ function RunSurfaceCollectionQueryBuilder({
                                   ))}
                                 </div>
                                 <div className="run-surface-query-builder-trace-list">
-                                  {activePredicateRefReplayApplyConflictSimulationFocusedChain.map((entry, index) => (
+                                  {activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations.map((entry, index) => (
                                     <div
                                       className={`run-surface-query-builder-trace-step is-${
                                         entry.stepIndex === activeSimulatedPredicateRefSolverReplayIndex
@@ -24080,7 +24230,7 @@ function RunSurfaceCollectionQueryBuilder({
                                               : "info"
                                       }`}
                                       key={`focused-causal-step:${entry.stepIndex}:${index}`}
-                                    >
+                                      >
                                       <strong>{`${entry.stepLabel}${entry.type ? ` · ${entry.type.replaceAll("_", " ")}` : ""}`}</strong>
                                       <div className="run-surface-query-builder-trace-chip-list">
                                         <span className="run-surface-query-builder-trace-chip is-active">
@@ -24098,6 +24248,13 @@ function RunSurfaceCollectionQueryBuilder({
                                         ) : null}
                                       </div>
                                       <p>{entry.detail}</p>
+                                      <div className="run-surface-query-builder-trace-panel is-nested">
+                                        <div className="run-surface-query-builder-card-head">
+                                          <strong>Bundle rule explanation</strong>
+                                          <span>{entry.bundleRuleTitle}</span>
+                                        </div>
+                                        <p className="run-note">{entry.bundleRuleDetail}</p>
+                                      </div>
                                       {entry.edgeLabels.length ? (
                                         <div className="run-surface-query-builder-trace-chip-list">
                                           {entry.edgeLabels.map((edgeLabel) => (
@@ -24108,6 +24265,25 @@ function RunSurfaceCollectionQueryBuilder({
                                               {edgeLabel}
                                             </span>
                                           ))}
+                                        </div>
+                                      ) : null}
+                                      {entry.parameterReasons.length ? (
+                                        <div className="run-surface-query-builder-trace-panel is-nested">
+                                          <div className="run-surface-query-builder-card-head">
+                                            <strong>Parameter-level predicate reasons</strong>
+                                            <span>{entry.parameterReasons.length}</span>
+                                          </div>
+                                          <div className="run-surface-query-builder-trace-list">
+                                            {entry.parameterReasons.map((reason) => (
+                                              <div
+                                                className="run-surface-query-builder-trace-step is-info"
+                                                key={`focused-causal-reason:${entry.stepIndex}:${reason.label}`}
+                                              >
+                                                <strong>{reason.label}</strong>
+                                                <p>{reason.detail}</p>
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                       ) : null}
                                       <div className="run-surface-query-builder-actions">
@@ -25446,6 +25622,35 @@ function RunSurfaceCollectionQueryBuilder({
                                                   <span className="run-surface-query-builder-trace-chip">
                                                     {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.edgeRoleLabel}
                                                   </span>
+                                                ) : null}
+                                              </div>
+                                            ) : null}
+                                            {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry
+                                            && activePredicateRefReplayApplyConflictSimulationFocusedChainStepIndexSet.has(
+                                              activeSimulatedPredicateRefSolverReplayIndex,
+                                            ) ? (
+                                              <div className="run-surface-query-builder-trace-panel is-nested">
+                                                <div className="run-surface-query-builder-card-head">
+                                                  <strong>Bundle rule explanation</strong>
+                                                  <span>{activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.bundleRuleTitle}</span>
+                                                </div>
+                                                <p className="run-note">
+                                                  {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.bundleRuleDetail}
+                                                </p>
+                                                {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterReasons.length ? (
+                                                  <div className="run-surface-query-builder-trace-list">
+                                                    {activePredicateRefReplayApplyConflictSimulationFocusedChainEntry.parameterReasons
+                                                      .slice(0, 3)
+                                                      .map((reason) => (
+                                                        <div
+                                                          className="run-surface-query-builder-trace-step is-info"
+                                                          key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-reason:${reason.label}`}
+                                                        >
+                                                          <strong>{reason.label}</strong>
+                                                          <p>{reason.detail}</p>
+                                                        </div>
+                                                      ))}
+                                                  </div>
                                                 ) : null}
                                               </div>
                                             ) : null}
