@@ -510,13 +510,13 @@
       "status": "proposed",
       "base_priority": 90,
       "dynamic_priority_delta": 6,
-      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining contract gap moved again after boolean trees shipped: named reusable predicates and quantified list predicates are still missing. Keep discovery proposed behind that next expression-contract pass so discovery endpoints advertise the richer reusable and collection-aware query surface instead of another intermediate shape.",
+      "priority_reason": "Capability discovery and query-schema reuse remain valid follow-up work, but the latest main-session reply says the immediate remaining expression-system gaps moved again after reusable predicates and list quantifiers shipped: parameterization, macro expansion, or broader quantified collection support still need to settle. Keep discovery proposed behind that next expression-contract pass so discovery endpoints advertise a less transitional query surface.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:40:00Z",
+      "updated_at": "2026-04-21T04:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4522,18 +4522,36 @@
       "direction_id": "experiment-os",
       "title": "Add reusable predicate references and quantified list predicates to typed query expressions",
       "description": "Build on the shipped JSON boolean tree by introducing named reusable predicate definitions or references plus quantified list predicate semantics such as any, all, or none over nested collections, so typed query can express repeated clauses and collection-aware matching without exploding ad hoc duplicated subtrees.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 91,
       "dynamic_priority_delta": 42,
-      "priority_reason": "The latest main-session reply explicitly says the boolean-tree pass is complete and the remaining deeper generalization is adding named reusable predicates plus quantified list predicates. That is now the clearest executable queue head because it extends the query contract itself, while expression normalization or optimization can remain a follow-on once the richer predicate surface stabilizes.",
+      "priority_reason": "Completed in main session commit 8833c0c, which added `predicates` registries plus `predicate_ref`, quantifier-aware list condition evaluation for `any|all|none`, list-ready tag expression operators, OpenAPI `x-akra-query-schema` updates, targeted pytest coverage, `python -m py_compile`, and `git diff --check`, then pushed the change to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-typed-query-to-nested-boolean-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:40:00Z",
+      "updated_at": "2026-04-21T04:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from general boolean composition into reusable and collection-aware predicate semantics, which should make the typed query contract more expressive before discovery APIs and broader runtime-binding reuse cement it."
+    },
+    {
+      "id": "planning-experiment-os-generalize-quantified-predicates-to-nested-object-collections",
+      "direction_id": "experiment-os",
+      "title": "Generalize quantified predicates from list scalars to nested object collections",
+      "description": "Extend the newly shipped `any|all|none` predicate model beyond list-valued scalar fields so typed query expressions can quantify over nested object collections with inner field predicates, allowing richer collection-aware matching without route-local flattening or ad hoc helper fields.",
+      "status": "ready",
+      "base_priority": 91,
+      "dynamic_priority_delta": 44,
+      "priority_reason": "The latest main-session reply explicitly identifies broader quantified-predicate generalization to nested object collections as one of the remaining next-stage expression-system gaps, and it is the most direct executable follow-up now that reusable predicates and list quantifiers shipped. Promote this as the next queue head ahead of parameterization, macro expansion, discovery, or optimizer work.",
+      "depends_on": [
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T04:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os typed query evolution focused on richer executable expression semantics by making quantified predicates apply to nested collection objects instead of stopping at list scalars and route-specific projections."
     },
     {
       "id": "planning-experiment-os-normalize-and-optimize-typed-query-expression-trees",
@@ -4543,15 +4561,51 @@
       "status": "proposed",
       "base_priority": 89,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply also calls out expression normalization or optimization as remaining work, but the more immediate queue head is still extending the contract with reusable predicates and quantified list semantics. Keep normalization proposed behind that richer contract pass so the optimizer targets the settled expression vocabulary instead of another transient tree shape.",
+      "priority_reason": "The latest main-session reply still calls out normalization or optimization as unfinished work, but the most direct next queue head is broader quantified-predicate support over nested object collections. Keep normalization proposed behind that contract expansion so canonicalization targets the fuller expression vocabulary instead of another partial intermediate form.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:40:00Z",
+      "updated_at": "2026-04-21T04:15:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports experiment-os queryability by turning the richer expression contract into a stable canonical form that discovery, caching, and runtime evaluation can rely on without duplicated route-local simplification rules."
+    },
+    {
+      "id": "planning-experiment-os-add-parameterized-predicate-templates-to-typed-query-expressions",
+      "direction_id": "experiment-os",
+      "title": "Add parameterized predicate templates to typed query expressions",
+      "description": "Build on the new reusable predicate registry by allowing predicate definitions to declare parameters and typed argument binding, so repeated expression shapes can be reused with caller-supplied values instead of cloning near-identical predicate trees for each threshold or identifier.",
+      "status": "proposed",
+      "base_priority": 89,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply explicitly names predicate parameterization as a remaining next-stage expression-system option. Keep it proposed behind the broader quantified nested-collection pass so parameter binding can target the more complete expression model rather than another scalar-focused intermediate.",
+      "depends_on": [
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T04:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os queryability from reusable fixed predicates toward template-like expression reuse, which can reduce duplication once the broader quantified collection contract is stable."
+    },
+    {
+      "id": "planning-experiment-os-add-expression-macro-expansion-to-typed-query-trees",
+      "direction_id": "experiment-os",
+      "title": "Add expression macro expansion to typed query trees",
+      "description": "Introduce explicit macro or shorthand expansion for typed query expressions so common higher-level filter patterns can compile into reusable predicate trees, keeping client payloads smaller while centralizing supported expansion rules inside the typed query contract.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 4,
+      "priority_reason": "The latest main-session reply also identifies expression macro expansion as a remaining next-stage option. Keep it proposed behind nested collection quantifiers and before discovery freeze so expansion targets a richer settled expression surface instead of another transitional grammar.",
+      "depends_on": [
+        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T04:15:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Supports experiment-os queryability by offering higher-level reusable query shorthands once the lower-level expression contract is expressive enough to serve as the expansion target."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
