@@ -653,16 +653,16 @@
       "direction_id": "experiment-os",
       "title": "Complete collection query expression editor for subtree promotion and root negation",
       "description": "Finish the remaining collection query expression editor gap by letting operators promote predicate definitions from single clauses into nested boolean subtrees and edit root-level negation in the same builder UI, so the frontend can author the fuller `filter_expr` contract without dropping to partial representations when predicates or the top-level expression need negated group structure.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
-      "dynamic_priority_delta": 40,
-      "priority_reason": "The latest main-session reply says nested subtree visual editing is complete and directly names the remaining gap: predicate definitions still cannot be promoted from a clause into a subtree, and root-level negation is not yet handled in the same UI. That makes expression-editor completion the clearest automatic next queued task.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit ce7f598, which finished the collection query expression editor by letting grouped expressions edit and serialize root-level `negated` state, allowing subgroup or root subtree promotion into reusable predicates, restoring subtree predicates from saved `filter_expr`, and verifying with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-deepen-collection-query-builder-visual-editor-to-nested-expression-subtrees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T04:51:00Z",
+      "updated_at": "2026-04-20T03:17:23Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os from nested subgroup editing into a more complete visual authoring surface for the recursive typed-query contract, reducing the remaining mismatch between what the backend expression model can represent and what operators can build or revise from the control-room UI."
     },
@@ -4776,16 +4776,16 @@
       "direction_id": "experiment-os",
       "title": "Add parameterized predicate templates and collection bindings to typed query expressions",
       "description": "Build on the new reusable predicate registry by allowing predicate definitions to declare parameters, typed argument binding, and collection-aware quantifier slots, so repeated expression shapes can be reused with caller-supplied values instead of cloning near-identical predicate trees for each threshold, identifier, or nested collection predicate.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 89,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "Parameterized predicate templates are still a valid typed-query follow-up, but the latest main-session reply narrows the immediate continuation to parameterized collection schema discovery rather than template binding itself. Keep predicate templates proposed behind the new element-schema and collection-schema advertising pass so template binding can target a richer, machine-discoverable collection contract instead of another partial intermediate shape.",
+      "dynamic_priority_delta": 39,
+      "priority_reason": "The latest main-session reply says subtree promotion and root negation are complete and directly names predicate parameterization as the remaining advanced expression-authoring gap. That makes parameterized predicate templates the clearest automatic next queued task, with macro-level reuse kept as the later layer on top of the same reusable expression foundation.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:54:59Z",
+      "updated_at": "2026-04-20T03:17:23Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os queryability from reusable fixed predicates toward template-like expression reuse, which can reduce duplication once the broader quantified collection contract is stable."
     },
@@ -4814,14 +4814,14 @@
       "description": "Introduce explicit macro or shorthand expansion for typed query expressions so common higher-level filter patterns can compile into reusable predicate trees, keeping client payloads smaller while centralizing supported expansion rules inside the typed query contract.",
       "status": "proposed",
       "base_priority": 88,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply still identifies expression macro expansion as a next-stage option, but the immediate executable gap is deeper nested collection quantification after object-collection support landed. Keep macro expansion proposed behind that pass so expansion rules target a richer settled collection grammar instead of another transitional form.",
+      "dynamic_priority_delta": 5,
+      "priority_reason": "The latest main-session reply explicitly keeps expression macro reuse on the table, but parameterized predicate templates are the more direct next executable layer after subtree promotion and root negation shipped. Keep macro expansion proposed behind that parameterized reuse pass so macro rules can target a stronger templateable expression foundation instead of bypassing it.",
       "depends_on": [
         "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:31:00Z",
+      "updated_at": "2026-04-20T03:17:23Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports experiment-os queryability by offering higher-level reusable query shorthands once the lower-level expression contract is expressive enough to serve as the expansion target."
     },
