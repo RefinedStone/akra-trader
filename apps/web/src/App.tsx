@@ -16108,6 +16108,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
       const candidateValue = candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
         ? `Missing ${accessorLabel}`
         : formatCollectionQueryBuilderValue(candidateValueRaw, field.valueType);
+      const runContextArtifactHoverKeys = buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys({
+        candidateValueRaw,
+        resolvedParameterValues,
+        resolvedPath,
+        run,
+      });
       const orderRecord =
         collectionItem.value && typeof collectionItem.value === "object" && !Array.isArray(collectionItem.value)
           ? (collectionItem.value as Record<string, unknown>)
@@ -16145,6 +16151,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
           } ${comparedValueLabel}.`,
         result,
         runId: run.config.run_id,
+        runContextArtifactHoverKeys,
         runContextComponentKey: runContext?.componentKey ?? null,
         runContextLabel: runContext?.label ?? null,
         runContextSection: runContext?.section ?? null,
@@ -16180,6 +16187,68 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(
   sample: RunSurfaceCollectionQueryRuntimeCandidateSample,
 ) {
   return `${sample.runId}:${sample.candidatePath}`;
+}
+
+function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params: {
+  candidateValueRaw: unknown;
+  resolvedParameterValues: Record<string, string>;
+  resolvedPath: string[];
+  run: Run;
+}) {
+  const { candidateValueRaw, resolvedParameterValues, resolvedPath, run } = params;
+  if (
+    resolvedPath[0] !== "provenance"
+    || resolvedPath[1] !== "market_data_by_symbol"
+    || resolvedPath[3] !== "issues"
+    || typeof candidateValueRaw !== "string"
+  ) {
+    return [];
+  }
+  const candidateValue = candidateValueRaw.trim();
+  if (!candidateValue) {
+    return [];
+  }
+  const symbolKey = resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "";
+  const candidateValueLower = candidateValue.toLowerCase();
+  const symbolKeyLower = symbolKey.toLowerCase();
+  const hoverKeys = new Set<string>();
+  run.provenance.benchmark_artifacts.forEach((artifact) => {
+    const artifactContext = [
+      artifact.kind,
+      artifact.label,
+      artifact.path,
+      artifact.summary_source_path ?? "",
+    ]
+      .join(" ")
+      .toLowerCase();
+    const matchesArtifactText = (value: string) => {
+      const normalizedValue = value.trim().toLowerCase();
+      if (!normalizedValue.includes(candidateValueLower)) {
+        return false;
+      }
+      if (!symbolKeyLower) {
+        return true;
+      }
+      return normalizedValue.includes(symbolKeyLower) || artifactContext.includes(symbolKeyLower);
+    };
+    formatBenchmarkArtifactSummaryEntries(artifact.summary).forEach(([summaryKey, summaryValue]) => {
+      if (!matchesArtifactText(summaryValue ?? "")) {
+        return;
+      }
+      hoverKeys.add(buildComparisonProvenanceArtifactSummaryHoverKey(artifact.path, summaryKey));
+    });
+    formatBenchmarkArtifactSectionEntries(artifact.sections ?? {}).forEach(([sectionKey, lines]) => {
+      lines.forEach((line, lineIndex) => {
+        if (!matchesArtifactText(line)) {
+          return;
+        }
+        hoverKeys.add(
+          buildComparisonProvenanceArtifactSectionLineHoverKey(artifact.path, sectionKey, lineIndex),
+        );
+      });
+    });
+  });
+  return Array.from(hoverKeys);
 }
 
 function buildRunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItems(
@@ -17872,6 +17941,9 @@ function doesRunSurfaceCollectionQueryRuntimeCandidateSampleMatchContext(
   if (!selection || sample.runId !== selection.runId) {
     return false;
   }
+  if (selection.artifactHoverKey) {
+    return sample.runContextArtifactHoverKeys.includes(selection.artifactHoverKey);
+  }
   if (selection.subFocusKey) {
     return sample.runContextSubFocusKey === selection.subFocusKey;
   }
@@ -17882,6 +17954,27 @@ function doesRunSurfaceCollectionQueryRuntimeCandidateSampleMatchContext(
     );
   }
   return false;
+}
+
+function isSameRunSurfaceCollectionQueryRuntimeCandidateSelectionSurface(
+  left: Pick<
+    RunSurfaceCollectionQueryRuntimeCandidateContextSelection,
+    "componentKey" | "runId" | "section" | "subFocusKey"
+  > | null,
+  right: Pick<
+    RunSurfaceCollectionQueryRuntimeCandidateContextSelection,
+    "componentKey" | "runId" | "section" | "subFocusKey"
+  > | null,
+) {
+  if (!left || !right) {
+    return false;
+  }
+  return (
+    left.runId === right.runId
+    && left.section === right.section
+    && left.componentKey === right.componentKey
+    && left.subFocusKey === right.subFocusKey
+  );
 }
 
 function formatRunSurfaceCollectionQueryBuilderClauseParameterSource(
@@ -18887,6 +18980,7 @@ type RunSurfaceCollectionQueryRuntimeCandidateSample = {
   detail: string;
   result: boolean;
   runId: string;
+  runContextArtifactHoverKeys: string[];
   runContextComponentKey: string | null;
   runContextLabel: string | null;
   runContextSection: ComparisonScoreSection | null;
@@ -18897,6 +18991,15 @@ type RunSurfaceCollectionQueryRuntimeCandidateContextSelection = {
   artifactHoverKey: string | null;
   componentKey: string | null;
   runId: string;
+  section: ComparisonScoreSection | null;
+  subFocusKey: string | null;
+};
+
+type RunSurfaceCollectionQueryRuntimeCandidateArtifactSelection = {
+  artifactHoverKey: string;
+  componentKey: string | null;
+  runId: string;
+  sampleKeys: string[];
   section: ComparisonScoreSection | null;
   subFocusKey: string | null;
 };
@@ -18960,7 +19063,10 @@ function RunSurfaceCollectionQueryBuilder({
   activeRuntimeCandidateRunContext?: RunSurfaceCollectionQueryRuntimeCandidateContextSelection | null;
   onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
   onClearExpression?: (() => void) | null;
-  onFocusRuntimeCandidateRunContext?: ((sample: RunSurfaceCollectionQueryRuntimeCandidateSample) => void) | null;
+  onFocusRuntimeCandidateRunContext?: ((
+    sample: RunSurfaceCollectionQueryRuntimeCandidateSample,
+    options?: { artifactHoverKey?: string | null },
+  ) => void) | null;
 }) {
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
   const lastHydratedExpressionRef = useRef<string | null>(null);
@@ -19109,6 +19215,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, boolean>>({});
   const [pinnedRuntimeCandidateClauseOriginKey, setPinnedRuntimeCandidateClauseOriginKey] =
     useState<string | null>(null);
+  const [persistedRuntimeCandidateArtifactSelection, setPersistedRuntimeCandidateArtifactSelection] =
+    useState<RunSurfaceCollectionQueryRuntimeCandidateArtifactSelection | null>(null);
   const [focusedRuntimeCandidateSampleKey, setFocusedRuntimeCandidateSampleKey] =
     useState<string | null>(null);
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
@@ -19419,6 +19527,13 @@ function RunSurfaceCollectionQueryBuilder({
     (sample: RunSurfaceCollectionQueryRuntimeCandidateSample) =>
       focusedRuntimeCandidateSampleKey === buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
     [focusedRuntimeCandidateSampleKey],
+  );
+  const doesRuntimeCandidateSampleMatchPersistedArtifactSelection = useCallback(
+    (sample: RunSurfaceCollectionQueryRuntimeCandidateSample) =>
+      persistedRuntimeCandidateArtifactSelection?.sampleKeys.includes(
+        buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
+      ) ?? false,
+    [persistedRuntimeCandidateArtifactSelection],
   );
 
   const expressionLabel = useMemo(() => {
@@ -23041,6 +23156,61 @@ function RunSurfaceCollectionQueryBuilder({
     () => Array.from(runtimeCandidateTraceByKey.values()).flatMap((trace) => trace.allValues),
     [runtimeCandidateTraceByKey],
   );
+  const activeRuntimeCandidateMatchKeys = useMemo(
+    () => Array.from(
+      new Set(
+        allRuntimeCandidateSamples
+          .filter(doesRuntimeCandidateSampleMatchActiveContext)
+          .map((sample) => buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample)),
+      ),
+    ),
+    [allRuntimeCandidateSamples, doesRuntimeCandidateSampleMatchActiveContext],
+  );
+  const effectivePersistedRuntimeCandidateArtifactSelection = useMemo(
+    () => (
+      activeRuntimeCandidateRunContext
+      && !activeRuntimeCandidateRunContext.artifactHoverKey
+      && isSameRunSurfaceCollectionQueryRuntimeCandidateSelectionSurface(
+        activeRuntimeCandidateRunContext,
+        persistedRuntimeCandidateArtifactSelection,
+      )
+        ? persistedRuntimeCandidateArtifactSelection
+        : null
+    ),
+    [activeRuntimeCandidateRunContext, persistedRuntimeCandidateArtifactSelection],
+  );
+  const effectiveRuntimeCandidateSelectionKeys = useMemo(
+    () => (
+      activeRuntimeCandidateRunContext?.artifactHoverKey
+        ? activeRuntimeCandidateMatchKeys
+        : (effectivePersistedRuntimeCandidateArtifactSelection?.sampleKeys ?? activeRuntimeCandidateMatchKeys)
+    ),
+    [
+      activeRuntimeCandidateMatchKeys,
+      activeRuntimeCandidateRunContext?.artifactHoverKey,
+      effectivePersistedRuntimeCandidateArtifactSelection,
+    ],
+  );
+  const resolveRuntimeCandidateSampleArtifactHoverKey = useCallback(
+    (sample: RunSurfaceCollectionQueryRuntimeCandidateSample) => {
+      if (
+        activeRuntimeCandidateRunContext?.artifactHoverKey
+        && sample.runContextArtifactHoverKeys.includes(activeRuntimeCandidateRunContext.artifactHoverKey)
+      ) {
+        return activeRuntimeCandidateRunContext.artifactHoverKey;
+      }
+      if (
+        effectivePersistedRuntimeCandidateArtifactSelection?.artifactHoverKey
+        && sample.runContextArtifactHoverKeys.includes(
+          effectivePersistedRuntimeCandidateArtifactSelection.artifactHoverKey,
+        )
+      ) {
+        return effectivePersistedRuntimeCandidateArtifactSelection.artifactHoverKey;
+      }
+      return sample.runContextArtifactHoverKeys[0] ?? null;
+    },
+    [activeRuntimeCandidateRunContext, effectivePersistedRuntimeCandidateArtifactSelection],
+  );
   const pinnedRuntimeCandidateClauseDiffItems = useMemo(
     () => buildRunSurfaceCollectionQueryBuilderClauseDiffItems(
       pinnedRuntimeCandidateOriginTrace?.editorClause ?? null,
@@ -23050,31 +23220,76 @@ function RunSurfaceCollectionQueryBuilder({
   );
   useEffect(() => {
     if (!activeRuntimeCandidateRunContext) {
+      setPersistedRuntimeCandidateArtifactSelection(null);
       return;
     }
-    const matchingKeys = Array.from(
-      new Set(
-        allRuntimeCandidateSamples
-          .filter(doesRuntimeCandidateSampleMatchActiveContext)
-          .map((sample) => buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample)),
-      ),
+    if (activeRuntimeCandidateRunContext.artifactHoverKey) {
+      const artifactHoverKey = activeRuntimeCandidateRunContext.artifactHoverKey;
+      if (activeRuntimeCandidateMatchKeys.length) {
+        setPersistedRuntimeCandidateArtifactSelection((current) => {
+          if (
+            current
+            && current.artifactHoverKey === artifactHoverKey
+            && isSameRunSurfaceCollectionQueryRuntimeCandidateSelectionSurface(
+              current,
+              activeRuntimeCandidateRunContext,
+            )
+            && current.sampleKeys.length === activeRuntimeCandidateMatchKeys.length
+            && current.sampleKeys.every((key, index) => key === activeRuntimeCandidateMatchKeys[index])
+          ) {
+            return current;
+          }
+          return {
+            artifactHoverKey,
+            componentKey: activeRuntimeCandidateRunContext.componentKey,
+            runId: activeRuntimeCandidateRunContext.runId,
+            sampleKeys: activeRuntimeCandidateMatchKeys,
+            section: activeRuntimeCandidateRunContext.section,
+            subFocusKey: activeRuntimeCandidateRunContext.subFocusKey,
+          };
+        });
+      } else {
+        setPersistedRuntimeCandidateArtifactSelection((current) =>
+          current
+          && current.artifactHoverKey === artifactHoverKey
+          && isSameRunSurfaceCollectionQueryRuntimeCandidateSelectionSurface(
+            current,
+            activeRuntimeCandidateRunContext,
+          )
+            ? null
+            : current,
+        );
+      }
+      return;
+    }
+    setPersistedRuntimeCandidateArtifactSelection((current) =>
+      current
+      && isSameRunSurfaceCollectionQueryRuntimeCandidateSelectionSurface(
+        current,
+        activeRuntimeCandidateRunContext,
+      )
+        ? current
+        : null,
     );
-    if (matchingKeys.length === 1) {
-      if (matchingKeys[0] !== focusedRuntimeCandidateSampleKey) {
-        setFocusedRuntimeCandidateSampleKey(matchingKeys[0]);
+  }, [
+    activeRuntimeCandidateMatchKeys,
+    activeRuntimeCandidateRunContext,
+  ]);
+  useEffect(() => {
+    if (effectiveRuntimeCandidateSelectionKeys.length === 1) {
+      if (effectiveRuntimeCandidateSelectionKeys[0] !== focusedRuntimeCandidateSampleKey) {
+        setFocusedRuntimeCandidateSampleKey(effectiveRuntimeCandidateSelectionKeys[0]);
       }
       return;
     }
     if (
       focusedRuntimeCandidateSampleKey
-      && !matchingKeys.includes(focusedRuntimeCandidateSampleKey)
+      && !effectiveRuntimeCandidateSelectionKeys.includes(focusedRuntimeCandidateSampleKey)
     ) {
       setFocusedRuntimeCandidateSampleKey(null);
     }
   }, [
-    activeRuntimeCandidateRunContext,
-    allRuntimeCandidateSamples,
-    doesRuntimeCandidateSampleMatchActiveContext,
+    effectiveRuntimeCandidateSelectionKeys,
     focusedRuntimeCandidateSampleKey,
   ]);
   useEffect(() => {
@@ -23096,6 +23311,18 @@ function RunSurfaceCollectionQueryBuilder({
       setPinnedRuntimeCandidateClauseOriginKey(null);
     }
   }, [pinnedRuntimeCandidateClauseOriginKey, runtimeCandidateTraceByKey]);
+  useEffect(() => {
+    if (
+      !persistedRuntimeCandidateArtifactSelection
+      || persistedRuntimeCandidateArtifactSelection.sampleKeys.some((key) =>
+        allRuntimeCandidateSamples.some(
+          (sample) => buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample) === key,
+        ))
+    ) {
+      return;
+    }
+    setPersistedRuntimeCandidateArtifactSelection(null);
+  }, [allRuntimeCandidateSamples, persistedRuntimeCandidateArtifactSelection]);
   const linkedRuntimeCandidateTraceKeys = useMemo(() => {
     const keys = new Set<string>();
     if (pinnedRuntimeCandidateClauseOriginKey && editorClauseState) {
@@ -23107,6 +23334,8 @@ function RunSurfaceCollectionQueryBuilder({
           (focusedRuntimeCandidateSampleKey && trace.allValues.some(doesRuntimeCandidateSampleMatchFocusedKey))
           || (
           (activeRuntimeCandidateRunContext && trace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext))
+          || (effectivePersistedRuntimeCandidateArtifactSelection
+            && trace.allValues.some(doesRuntimeCandidateSampleMatchPersistedArtifactSelection))
           || doesRuntimeCandidateTraceMatchEditorClause(trace)
           )
         ) {
@@ -23120,6 +23349,8 @@ function RunSurfaceCollectionQueryBuilder({
           (focusedRuntimeCandidateSampleKey && trace.allValues.some(doesRuntimeCandidateSampleMatchFocusedKey))
           || (
           (activeRuntimeCandidateRunContext && trace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext))
+          || (effectivePersistedRuntimeCandidateArtifactSelection
+            && trace.allValues.some(doesRuntimeCandidateSampleMatchPersistedArtifactSelection))
           || doesRuntimeCandidateTraceMatchEditorClause(trace)
           )
         ) {
@@ -23139,9 +23370,11 @@ function RunSurfaceCollectionQueryBuilder({
     activePredicateRefReplayApplyConflictSimulationFocusedChainExplanations,
     activeRuntimeCandidateRunContext,
     buildRuntimeCandidateTraceDrillthroughKey,
+    effectivePersistedRuntimeCandidateArtifactSelection,
     editorClauseState,
     doesRuntimeCandidateSampleMatchActiveContext,
     doesRuntimeCandidateSampleMatchFocusedKey,
+    doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
     doesRuntimeCandidateTraceMatchEditorClause,
     focusedRuntimeCandidateSampleKey,
     pinnedRuntimeCandidateClauseOriginKey,
@@ -25941,6 +26174,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                   const traceLinkedFromRunContext =
                                                     Boolean(activeRuntimeCandidateRunContext)
                                                     && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
+                                                  const traceLinkedFromArtifactSelection =
+                                                    Boolean(effectivePersistedRuntimeCandidateArtifactSelection)
+                                                    && candidateTrace.allValues.some(
+                                                      doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
+                                                    );
                                                   const traceLinkedFromClauseEditor =
                                                     doesRuntimeCandidateTraceMatchEditorClause(candidateTrace);
                                                   const traceFocusedSampleCount =
@@ -25950,6 +26188,12 @@ function RunSurfaceCollectionQueryBuilder({
                                                   const tracePinnedSampleCount =
                                                     activeRuntimeCandidateRunContext
                                                       ? candidateTrace.allValues.filter(doesRuntimeCandidateSampleMatchActiveContext).length
+                                                      : 0;
+                                                  const traceArtifactSelectionSampleCount =
+                                                    effectivePersistedRuntimeCandidateArtifactSelection
+                                                      ? candidateTrace.allValues.filter(
+                                                          doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
+                                                        ).length
                                                       : 0;
                                                   const traceClauseDiffItems =
                                                     tracePinnedFromClauseDraft
@@ -25984,6 +26228,13 @@ function RunSurfaceCollectionQueryBuilder({
                                                     if (leftFocused !== rightFocused) {
                                                       return leftFocused ? -1 : 1;
                                                     }
+                                                    const leftArtifactSelected =
+                                                      doesRuntimeCandidateSampleMatchPersistedArtifactSelection(left);
+                                                    const rightArtifactSelected =
+                                                      doesRuntimeCandidateSampleMatchPersistedArtifactSelection(right);
+                                                    if (leftArtifactSelected !== rightArtifactSelected) {
+                                                      return leftArtifactSelected ? -1 : 1;
+                                                    }
                                                     const leftPinned = doesRuntimeCandidateSampleMatchActiveContext(left);
                                                     const rightPinned = doesRuntimeCandidateSampleMatchActiveContext(right);
                                                     if (leftPinned === rightPinned) {
@@ -25994,7 +26245,10 @@ function RunSurfaceCollectionQueryBuilder({
                                                   return (
                                                     <div
                                                       className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"} ${
-                                                        traceLinkedFromRunContext || traceLinkedFromClauseEditor || tracePinnedFromClauseDraft
+                                                        traceLinkedFromRunContext
+                                                        || traceLinkedFromArtifactSelection
+                                                        || traceLinkedFromClauseEditor
+                                                        || tracePinnedFromClauseDraft
                                                           ? "is-linked"
                                                           : ""
                                                       }`.trim()}
@@ -26020,6 +26274,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                             Linked from run context
                                                           </span>
                                                         ) : null}
+                                                        {traceLinkedFromArtifactSelection ? (
+                                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                                            Artifact replay selection
+                                                          </span>
+                                                        ) : null}
                                                         {traceLinkedFromClauseEditor ? (
                                                           <span className="run-surface-query-builder-trace-chip is-active">
                                                             Linked from clause editor
@@ -26038,6 +26297,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                         {tracePinnedSampleCount ? (
                                                           <span className="run-surface-query-builder-trace-chip is-active">
                                                             {`${tracePinnedSampleCount} pinned candidates`}
+                                                          </span>
+                                                        ) : null}
+                                                        {traceArtifactSelectionSampleCount ? (
+                                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                                            {`${traceArtifactSelectionSampleCount} artifact-selected`}
                                                           </span>
                                                         ) : null}
                                                       </div>
@@ -26146,12 +26410,18 @@ function RunSurfaceCollectionQueryBuilder({
                                                             {displayedSamples.map((sample) => {
                                                               const sampleLinkedFromRunContext =
                                                                 doesRuntimeCandidateSampleMatchActiveContext(sample);
+                                                              const sampleLinkedFromArtifactSelection =
+                                                                doesRuntimeCandidateSampleMatchPersistedArtifactSelection(sample);
                                                               const sampleFocused =
                                                                 doesRuntimeCandidateSampleMatchFocusedKey(sample);
                                                               return (
                                                                 <div
                                                                   className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"} ${
-                                                                    sampleLinkedFromRunContext || sampleFocused ? "is-linked" : ""
+                                                                    sampleLinkedFromRunContext
+                                                                    || sampleLinkedFromArtifactSelection
+                                                                    || sampleFocused
+                                                                      ? "is-linked"
+                                                                      : ""
                                                                   }`.trim()}
                                                                   key={`focused-causal-candidate-sample:${entry.stepIndex}:${candidateTrace.location}:${sample.runId}:${sample.candidatePath}`}
                                                                 >
@@ -26169,6 +26439,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                         Linked from run context
                                                                       </span>
                                                                     ) : null}
+                                                                    {sampleLinkedFromArtifactSelection ? (
+                                                                      <span className="run-surface-query-builder-trace-chip is-active">
+                                                                        Artifact replay selection
+                                                                      </span>
+                                                                    ) : null}
                                                                     {sampleFocused ? (
                                                                       <span className="run-surface-query-builder-trace-chip is-active">
                                                                         Focused candidate
@@ -26183,7 +26458,10 @@ function RunSurfaceCollectionQueryBuilder({
                                                                           setFocusedRuntimeCandidateSampleKey(
                                                                             buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
                                                                           );
-                                                                          onFocusRuntimeCandidateRunContext(sample);
+                                                                          onFocusRuntimeCandidateRunContext(sample, {
+                                                                            artifactHoverKey:
+                                                                              resolveRuntimeCandidateSampleArtifactHoverKey(sample),
+                                                                          });
                                                                         }}
                                                                         type="button"
                                                                       >
@@ -27739,6 +28017,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                             const traceLinkedFromRunContext =
                                                               Boolean(activeRuntimeCandidateRunContext)
                                                               && candidateTrace.allValues.some(doesRuntimeCandidateSampleMatchActiveContext);
+                                                            const traceLinkedFromArtifactSelection =
+                                                              Boolean(effectivePersistedRuntimeCandidateArtifactSelection)
+                                                              && candidateTrace.allValues.some(
+                                                                doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
+                                                              );
                                                             const traceLinkedFromClauseEditor =
                                                               doesRuntimeCandidateTraceMatchEditorClause(candidateTrace);
                                                             const traceFocusedSampleCount =
@@ -27748,6 +28031,12 @@ function RunSurfaceCollectionQueryBuilder({
                                                             const tracePinnedSampleCount =
                                                               activeRuntimeCandidateRunContext
                                                                 ? candidateTrace.allValues.filter(doesRuntimeCandidateSampleMatchActiveContext).length
+                                                                : 0;
+                                                            const traceArtifactSelectionSampleCount =
+                                                              effectivePersistedRuntimeCandidateArtifactSelection
+                                                                ? candidateTrace.allValues.filter(
+                                                                    doesRuntimeCandidateSampleMatchPersistedArtifactSelection,
+                                                                  ).length
                                                                 : 0;
                                                             const traceClauseDiffItems =
                                                               tracePinnedFromClauseDraft
@@ -27783,6 +28072,13 @@ function RunSurfaceCollectionQueryBuilder({
                                                               if (leftFocused !== rightFocused) {
                                                                 return leftFocused ? -1 : 1;
                                                               }
+                                                              const leftArtifactSelected =
+                                                                doesRuntimeCandidateSampleMatchPersistedArtifactSelection(left);
+                                                              const rightArtifactSelected =
+                                                                doesRuntimeCandidateSampleMatchPersistedArtifactSelection(right);
+                                                              if (leftArtifactSelected !== rightArtifactSelected) {
+                                                                return leftArtifactSelected ? -1 : 1;
+                                                              }
                                                               const leftPinned = doesRuntimeCandidateSampleMatchActiveContext(left);
                                                               const rightPinned = doesRuntimeCandidateSampleMatchActiveContext(right);
                                                               if (leftPinned === rightPinned) {
@@ -27793,7 +28089,10 @@ function RunSurfaceCollectionQueryBuilder({
                                                             return (
                                                               <div
                                                                 className={`run-surface-query-builder-trace-step is-${candidateTrace.result ? "success" : "muted"} ${
-                                                                  traceLinkedFromRunContext || traceLinkedFromClauseEditor || tracePinnedFromClauseDraft
+                                                                  traceLinkedFromRunContext
+                                                                  || traceLinkedFromArtifactSelection
+                                                                  || traceLinkedFromClauseEditor
+                                                                  || tracePinnedFromClauseDraft
                                                                     ? "is-linked"
                                                                     : ""
                                                                 }`.trim()}
@@ -27826,6 +28125,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       Linked from run context
                                                                     </span>
                                                                   ) : null}
+                                                                  {traceLinkedFromArtifactSelection ? (
+                                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                                      Artifact replay selection
+                                                                    </span>
+                                                                  ) : null}
                                                                   {traceLinkedFromClauseEditor ? (
                                                                     <span className="run-surface-query-builder-trace-chip is-active">
                                                                       Linked from clause editor
@@ -27844,6 +28148,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                   {tracePinnedSampleCount ? (
                                                                     <span className="run-surface-query-builder-trace-chip is-active">
                                                                       {`${tracePinnedSampleCount} pinned candidates`}
+                                                                    </span>
+                                                                  ) : null}
+                                                                  {traceArtifactSelectionSampleCount ? (
+                                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                                      {`${traceArtifactSelectionSampleCount} artifact-selected`}
                                                                     </span>
                                                                   ) : null}
                                                                 </div>
@@ -27920,12 +28229,17 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     {orderedPreviewSamples.map((sample) => {
                                                                       const sampleLinkedFromRunContext =
                                                                         doesRuntimeCandidateSampleMatchActiveContext(sample);
+                                                                      const sampleLinkedFromArtifactSelection =
+                                                                        doesRuntimeCandidateSampleMatchPersistedArtifactSelection(sample);
                                                                       const sampleFocused =
                                                                         doesRuntimeCandidateSampleMatchFocusedKey(sample);
                                                                       return (
                                                                         <span
                                                                           className={`run-surface-query-builder-trace-chip${
-                                                                            sample.result || sampleLinkedFromRunContext || sampleFocused
+                                                                            sample.result
+                                                                            || sampleLinkedFromRunContext
+                                                                            || sampleLinkedFromArtifactSelection
+                                                                            || sampleFocused
                                                                               ? " is-active"
                                                                               : ""
                                                                           }`}
@@ -27934,6 +28248,8 @@ function RunSurfaceCollectionQueryBuilder({
                                                                           {`${sample.candidatePath} · ${sample.candidateValue}${
                                                                             sampleFocused
                                                                               ? " · focused"
+                                                                              : sampleLinkedFromArtifactSelection
+                                                                                ? " · artifact-selected"
                                                                               : sampleLinkedFromRunContext
                                                                                 ? " · linked"
                                                                                 : ""
@@ -27979,12 +28295,18 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       {orderedPreviewSamples.map((sample) => {
                                                                         const sampleLinkedFromRunContext =
                                                                           doesRuntimeCandidateSampleMatchActiveContext(sample);
+                                                                        const sampleLinkedFromArtifactSelection =
+                                                                          doesRuntimeCandidateSampleMatchPersistedArtifactSelection(sample);
                                                                         const sampleFocused =
                                                                           doesRuntimeCandidateSampleMatchFocusedKey(sample);
                                                                         return (
                                                                           <div
                                                                             className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"} ${
-                                                                              sampleLinkedFromRunContext || sampleFocused ? "is-linked" : ""
+                                                                              sampleLinkedFromRunContext
+                                                                              || sampleLinkedFromArtifactSelection
+                                                                              || sampleFocused
+                                                                                ? "is-linked"
+                                                                                : ""
                                                                             }`.trim()}
                                                                             key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-detail:${sample.runId}:${sample.candidatePath}`}
                                                                           >
@@ -28002,6 +28324,11 @@ function RunSurfaceCollectionQueryBuilder({
                                                                                   Linked from run context
                                                                                 </span>
                                                                               ) : null}
+                                                                              {sampleLinkedFromArtifactSelection ? (
+                                                                                <span className="run-surface-query-builder-trace-chip is-active">
+                                                                                  Artifact replay selection
+                                                                                </span>
+                                                                              ) : null}
                                                                               {sampleFocused ? (
                                                                                 <span className="run-surface-query-builder-trace-chip is-active">
                                                                                   Focused candidate
@@ -28016,7 +28343,10 @@ function RunSurfaceCollectionQueryBuilder({
                                                                                     setFocusedRuntimeCandidateSampleKey(
                                                                                       buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
                                                                                     );
-                                                                                    onFocusRuntimeCandidateRunContext(sample);
+                                                                                    onFocusRuntimeCandidateRunContext(sample, {
+                                                                                      artifactHoverKey:
+                                                                                        resolveRuntimeCandidateSampleArtifactHoverKey(sample),
+                                                                                    });
                                                                                   }}
                                                                                   type="button"
                                                                                 >
@@ -29707,6 +30037,7 @@ function RunSection({
   };
   const focusRunListRuntimeCandidateContext = (
     sample: RunSurfaceCollectionQueryRuntimeCandidateSample,
+    options?: { artifactHoverKey?: string | null },
   ) => {
     if (
       comparison
@@ -29718,6 +30049,7 @@ function RunSection({
         sample.runContextSection,
         sample.runContextComponentKey,
         {
+          artifactHoverKey: options?.artifactHoverKey ?? null,
           subFocusKey: sample.runContextSubFocusKey,
         },
       );
