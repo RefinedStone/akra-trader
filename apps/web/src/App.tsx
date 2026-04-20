@@ -19438,6 +19438,24 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const togglePredicateRefReplayApplyConflictSimulationFieldPickSource = useCallback(
+    (decisionKey: string) => {
+      if (!activePredicateRefReplayApplyConflictSimulationReview) {
+        return;
+      }
+      const currentSource =
+        activePredicateRefReplayApplyConflictSimulationReview.selectedSources[decisionKey] ?? "local";
+      setPredicateRefReplayApplyConflictDraftSource(
+        activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+        decisionKey,
+        currentSource === "remote" ? "local" : "remote",
+      );
+    },
+    [
+      activePredicateRefReplayApplyConflictSimulationReview,
+      setPredicateRefReplayApplyConflictDraftSource,
+    ],
+  );
   const resolvePredicateRefReplayApplyConflict = useCallback(
     (
       conflict: PredicateRefReplayApplyConflictEntry,
@@ -21235,6 +21253,40 @@ function RunSurfaceCollectionQueryBuilder({
     activeSimulatedPredicateRefSolverReplayStep,
     bundleCoordinationSimulationReplayGroupFilter,
     bundleCoordinationSimulationScope,
+    simulatedPredicateRefSolverReplay,
+  ]);
+  const activePredicateRefReplayApplyConflictSimulationSelectionSignature = useMemo(
+    () => (
+      activePredicateRefReplayApplyConflictSimulationReview
+        ? JSON.stringify(
+            Object.entries(activePredicateRefReplayApplyConflictSimulationReview.selectedSources)
+              .sort(([leftKey], [rightKey]) => leftKey.localeCompare(rightKey)),
+          )
+        : ""
+    ),
+    [activePredicateRefReplayApplyConflictSimulationReview],
+  );
+  useEffect(() => {
+    if (
+      !activePredicateRefReplayApplyConflictSimulationReview
+      || !activePredicateRefReplayApplyConflictSimulationGroupKeys.length
+      || !simulatedPredicateRefSolverReplay.length
+    ) {
+      return;
+    }
+    const preferredGroupKey =
+      bundleCoordinationSimulationReplayGroupFilter !== "all"
+      && activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(bundleCoordinationSimulationReplayGroupFilter)
+        ? bundleCoordinationSimulationReplayGroupFilter
+        : activePredicateRefReplayApplyConflictSimulationGroupKeys[0];
+    const nextIndex = simulatedPredicateRefSolverReplay.findIndex((step) =>
+      step.actions.some((action) => action.groupKey === preferredGroupKey));
+    setBundleCoordinationSimulationReplayIndex(nextIndex >= 0 ? nextIndex : 0);
+  }, [
+    activePredicateRefReplayApplyConflictSimulationGroupKeys,
+    activePredicateRefReplayApplyConflictSimulationReview,
+    activePredicateRefReplayApplyConflictSimulationSelectionSignature,
+    bundleCoordinationSimulationReplayGroupFilter,
     simulatedPredicateRefSolverReplay,
   ]);
   useEffect(() => {
@@ -23654,22 +23706,39 @@ function RunSurfaceCollectionQueryBuilder({
                             {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length ? (
                               <div className="run-surface-query-builder-trace-chip-list">
                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.slice(0, 4).map((pick) => (
-                                  <button
-                                    className={`run-surface-query-builder-trace-chip${
-                                      pick.source === "remote" ? " is-active" : ""
-                                    }`}
-                                    key={`collision-override-global-pick:${pick.decisionKey}`}
-                                    onClick={() =>
-                                      activePredicateRefReplayApplyConflictSimulationReview
-                                        ? focusPredicateRefReplayApplyConflictDecision(
-                                            activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
-                                            pick.decisionKey,
-                                          )
-                                        : undefined}
-                                    type="button"
-                                  >
-                                    {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                  </button>
+                                  <span className="run-surface-query-builder-trace-chip-list" key={`collision-override-global-pick:${pick.decisionKey}`}>
+                                    <button
+                                      className={`run-surface-query-builder-trace-chip${
+                                        pick.source === "remote" ? " is-active" : ""
+                                      }`}
+                                      onClick={() =>
+                                        togglePredicateRefReplayApplyConflictSimulationFieldPickSource(
+                                          pick.decisionKey,
+                                        )}
+                                      type="button"
+                                    >
+                                      {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                    </button>
+                                    <button
+                                      className={`run-surface-query-builder-trace-chip${
+                                        predicateRefReplayApplyConflictFocusedDecision?.conflictId
+                                          === activePredicateRefReplayApplyConflictSimulationReview?.conflict.conflictId
+                                        && predicateRefReplayApplyConflictFocusedDecision?.decisionKey === pick.decisionKey
+                                          ? " is-active"
+                                          : ""
+                                      }`}
+                                      onClick={() =>
+                                        activePredicateRefReplayApplyConflictSimulationReview
+                                          ? focusPredicateRefReplayApplyConflictDecision(
+                                              activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                              pick.decisionKey,
+                                            )
+                                          : undefined}
+                                      type="button"
+                                    >
+                                      Review field
+                                    </button>
+                                  </span>
                                 ))}
                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.global.length > 4 ? (
                                   <span className="run-surface-query-builder-trace-chip">
@@ -23727,22 +23796,42 @@ function RunSurfaceCollectionQueryBuilder({
                                         {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey]
                                           .slice(0, 4)
                                           .map((pick) => (
-                                            <button
-                                              className={`run-surface-query-builder-trace-chip${
-                                                pick.source === "remote" ? " is-active" : ""
-                                              }`}
+                                            <span
+                                              className="run-surface-query-builder-trace-chip-list"
                                               key={`simulation-diff-pick:${diff.groupKey}:${pick.decisionKey}`}
-                                              onClick={() =>
-                                                activePredicateRefReplayApplyConflictSimulationReview
-                                                  ? focusPredicateRefReplayApplyConflictDecision(
-                                                      activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
-                                                      pick.decisionKey,
-                                                    )
-                                                  : undefined}
-                                              type="button"
                                             >
-                                              {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                            </button>
+                                              <button
+                                                className={`run-surface-query-builder-trace-chip${
+                                                  pick.source === "remote" ? " is-active" : ""
+                                                }`}
+                                                onClick={() =>
+                                                  togglePredicateRefReplayApplyConflictSimulationFieldPickSource(
+                                                    pick.decisionKey,
+                                                  )}
+                                                type="button"
+                                              >
+                                                {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                              </button>
+                                              <button
+                                                className={`run-surface-query-builder-trace-chip${
+                                                  predicateRefReplayApplyConflictFocusedDecision?.conflictId
+                                                    === activePredicateRefReplayApplyConflictSimulationReview?.conflict.conflictId
+                                                  && predicateRefReplayApplyConflictFocusedDecision?.decisionKey === pick.decisionKey
+                                                    ? " is-active"
+                                                    : ""
+                                                }`}
+                                                onClick={() =>
+                                                  activePredicateRefReplayApplyConflictSimulationReview
+                                                    ? focusPredicateRefReplayApplyConflictDecision(
+                                                        activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                                        pick.decisionKey,
+                                                      )
+                                                    : undefined}
+                                                type="button"
+                                              >
+                                                Review field
+                                              </button>
+                                            </span>
                                           ))}
                                         {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[diff.groupKey].length > 4 ? (
                                           <span className="run-surface-query-builder-trace-chip">
@@ -24849,22 +24938,42 @@ function RunSurfaceCollectionQueryBuilder({
                                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey]
                                                   .slice(0, 4)
                                                   .map((pick) => (
-                                                    <button
-                                                      className={`run-surface-query-builder-trace-chip${
-                                                        pick.source === "remote" ? " is-active" : ""
-                                                      }`}
+                                                    <span
+                                                      className="run-surface-query-builder-trace-chip-list"
                                                       key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:review-pick:${pick.decisionKey}`}
-                                                      onClick={() =>
-                                                        activePredicateRefReplayApplyConflictSimulationReview
-                                                          ? focusPredicateRefReplayApplyConflictDecision(
-                                                              activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
-                                                              pick.decisionKey,
-                                                            )
-                                                          : undefined}
-                                                      type="button"
                                                     >
-                                                      {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
-                                                    </button>
+                                                      <button
+                                                        className={`run-surface-query-builder-trace-chip${
+                                                          pick.source === "remote" ? " is-active" : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          togglePredicateRefReplayApplyConflictSimulationFieldPickSource(
+                                                            pick.decisionKey,
+                                                          )}
+                                                        type="button"
+                                                      >
+                                                        {`${pick.label} · ${pick.source === "remote" ? "remote" : "local"}`}
+                                                      </button>
+                                                      <button
+                                                        className={`run-surface-query-builder-trace-chip${
+                                                          predicateRefReplayApplyConflictFocusedDecision?.conflictId
+                                                            === activePredicateRefReplayApplyConflictSimulationReview?.conflict.conflictId
+                                                          && predicateRefReplayApplyConflictFocusedDecision?.decisionKey === pick.decisionKey
+                                                            ? " is-active"
+                                                            : ""
+                                                        }`}
+                                                        onClick={() =>
+                                                          activePredicateRefReplayApplyConflictSimulationReview
+                                                            ? focusPredicateRefReplayApplyConflictDecision(
+                                                                activePredicateRefReplayApplyConflictSimulationReview.conflict.conflictId,
+                                                                pick.decisionKey,
+                                                              )
+                                                            : undefined}
+                                                        type="button"
+                                                      >
+                                                        Review field
+                                                      </button>
+                                                    </span>
                                                   ))}
                                                 {activePredicateRefReplayApplyConflictSimulationFieldPicks.byGroupKey[action.groupKey].length > 4 ? (
                                                   <span className="run-surface-query-builder-trace-chip">
