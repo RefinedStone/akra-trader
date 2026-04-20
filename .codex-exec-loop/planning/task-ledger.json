@@ -5534,18 +5534,54 @@
       "direction_id": "experiment-os",
       "title": "Expand replay sample depth with candidate drill-through and quantifier outcome summaries",
       "description": "Build on the shipped concrete run-payload candidate replay by extending explanation depth beyond the current sample rows: let operators drill through the fuller candidate set behind a replayed clause and surface aggregate quantifier outcomes per run in a dedicated summary panel, so replay trust does not stop at one sampled candidate slice.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 19,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work after commit 862c37f is sample-depth expansion: replay explanations now show concrete current-run candidate samples, but operators still cannot inspect the full candidate set or a dedicated run-level summary of aggregate quantifier outcomes. That is the clearest executable next task.",
+      "priority_reason": "Completed in main session commit 9c3a530, which added per-run `ANY`/`ALL`/`NONE` quantifier outcome summaries plus full candidate drill-through to focused causal chains and active replay-step cards, kept per-run outcome plus full candidate rows plus sample slices in the replay trace model, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-replay-concrete-runtime-candidate-values-from-run-payloads"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T08:40:00Z",
+      "updated_at": "2026-04-20T08:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay explanation trust from concrete sampled candidate values into deeper operator-auditable evidence by exposing fuller candidate drill-through and aggregate quantifier outcome context for each run."
+      "direction_relation_note": "Completed the deeper sample-depth replay evidence pass for experiment-os by exposing full candidate drill-through and run-level quantifier outcome summaries, so replay trust no longer stops at one sampled candidate slice."
+    },
+    {
+      "id": "planning-experiment-os-cross-link-replay-candidate-drillthrough-to-run-provenance-and-clause-editor",
+      "direction_id": "experiment-os",
+      "title": "Cross-link replay candidate drill-through to run provenance and clause editor context",
+      "description": "Build on the shipped full candidate drill-through and quantifier outcome summaries by linking candidate rows and per-run outcomes back to the run payload provenance section and the original collection-query clause editor context, so operators can jump from replayed candidate evidence to both the source payload provenance and authored clause definition instead of reading those surfaces separately.",
+      "status": "done",
+      "base_priority": 89,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "Completed in main session commit e4d51b3, which wired replay candidate drill-through rows back into run-list subfocus and comparison deep-link selection, added provenance jumps for order previews and market-data symbol issues, reloaded clause-derived runtime trace context into the builder editor, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-expand-replay-sample-depth-and-quantifier-summary-from-run-payloads"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T09:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the first bidirectional navigation pass for experiment-os replay explanation trust by connecting candidate drill-through rows and clause-derived traces back into the exact run provenance surfaces and authored clause editor context."
+    },
+    {
+      "id": "planning-experiment-os-sync-replay-candidate-drillthrough-back-from-provenance-and-editor-state",
+      "direction_id": "experiment-os",
+      "title": "Sync replay candidate drill-through back from provenance rows and clause editor state",
+      "description": "Build on the shipped drill-through cross-links by letting provenance issue or order rows reselect the same replay candidate trace and by auto-syncing clause editor changes into the active candidate drill-through filter state, so operators can move bidirectionally between source context and replay evidence without manual re-selection or stale clause filters.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 21,
+      "priority_reason": "The latest main-session reply says the remaining gap after commit e4d51b3 is deeper source sync: operators can jump from replay candidates to run context and the clause editor, but provenance rows still cannot reverse-select the originating candidate trace and clause editor edits do not yet auto-sync the candidate drill-through filter. That is now the clearest executable next task.",
+      "depends_on": [
+        "planning-experiment-os-cross-link-replay-candidate-drillthrough-to-run-provenance-and-clause-editor"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T09:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay explanation trust from one-way drill-through links into true bidirectional source synchronization, so provenance inspection and clause editing keep the active candidate evidence context aligned."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
