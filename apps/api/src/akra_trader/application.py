@@ -22988,6 +22988,7 @@ class StandaloneSurfaceRuntimeBinding:
   subresource_key: str | None = None
   filter_keys: tuple[str, ...] = ()
   filter_param_specs: tuple["StandaloneSurfaceFilterParamSpec", ...] = ()
+  sort_field_specs: tuple["StandaloneSurfaceSortFieldSpec", ...] = ()
   path_param_keys: tuple[str, ...] = ()
   header_keys: tuple[str, ...] = ()
   request_payload_kind: str | None = None
@@ -23012,6 +23013,22 @@ class StandaloneSurfaceFilterOpenAPISpec:
 
 
 @dataclass(frozen=True)
+class StandaloneSurfaceFilterOperatorSpec:
+  key: str
+  label: str
+  description: str
+  value_shape: str = "scalar"
+
+
+@dataclass(frozen=True)
+class StandaloneSurfaceSortFieldSpec:
+  key: str
+  label: str
+  description: str
+  default_direction: str = "asc"
+
+
+@dataclass(frozen=True)
 class StandaloneSurfaceFilterParamSpec:
   key: str
   annotation: Any
@@ -23019,6 +23036,7 @@ class StandaloneSurfaceFilterParamSpec:
   default_factory: Callable[[], Any] | None = None
   constraints: StandaloneSurfaceFilterConstraintSpec | None = None
   openapi: StandaloneSurfaceFilterOpenAPISpec | None = None
+  operators: tuple[StandaloneSurfaceFilterOperatorSpec, ...] = ()
 
 
 def _serialize_run_order_subresource_item(
@@ -23191,6 +23209,13 @@ def list_standalone_surface_runtime_bindings(
           description="Candlestick timeframe to inspect in market-data status.",
           examples=("5m",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches exactly one timeframe value.",
+          ),
+        ),
       ),
     ),
   )
@@ -23229,6 +23254,13 @@ def list_standalone_surface_runtime_bindings(
           description="Filter strategies by runtime lane.",
           examples=("native",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single runtime lane value.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "lifecycle_stage",
@@ -23239,6 +23271,13 @@ def list_standalone_surface_runtime_bindings(
           title="Lifecycle stage",
           description="Filter strategies by lifecycle stage.",
           examples=("active",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single lifecycle stage.",
+          ),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
@@ -23251,6 +23290,36 @@ def list_standalone_surface_runtime_bindings(
           description="Filter strategies by declared version string.",
           examples=("1.0.0",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches one declared version value.",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="prefix",
+            label="Version prefix",
+            description="Matches a version prefix such as a major or minor line.",
+          ),
+        ),
+      ),
+    ),
+    sort_field_specs=(
+      StandaloneSurfaceSortFieldSpec(
+        key="strategy_id",
+        label="Strategy ID",
+        description="Sorts by strategy identifier.",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="runtime",
+        label="Runtime lane",
+        description="Sorts by runtime lane grouping.",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="registered_at",
+        label="Registration time",
+        description="Sorts imported strategies by registration timestamp.",
+        default_direction="desc",
       ),
     ),
   )
@@ -23281,6 +23350,13 @@ def list_standalone_surface_runtime_bindings(
           description="Filter presets by strategy identifier.",
           examples=("ma_cross_v1",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single strategy identifier.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "timeframe",
@@ -23291,6 +23367,13 @@ def list_standalone_surface_runtime_bindings(
           title="Timeframe",
           description="Filter presets by configured timeframe.",
           examples=("5m",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single configured timeframe.",
+          ),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
@@ -23303,6 +23386,32 @@ def list_standalone_surface_runtime_bindings(
           description="Filter presets by lifecycle stage.",
           examples=("draft",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single lifecycle stage.",
+          ),
+        ),
+      ),
+    ),
+    sort_field_specs=(
+      StandaloneSurfaceSortFieldSpec(
+        key="updated_at",
+        label="Updated at",
+        description="Sorts presets by most recent update time.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="created_at",
+        label="Created at",
+        description="Sorts presets by creation time.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="preset_id",
+        label="Preset ID",
+        description="Sorts presets by preset identifier.",
       ),
     ),
   )
@@ -23405,6 +23514,13 @@ def list_standalone_surface_runtime_bindings(
           description="Filter runs by execution mode.",
           examples=("backtest",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single run mode.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "strategy_id",
@@ -23415,6 +23531,13 @@ def list_standalone_surface_runtime_bindings(
           title="Strategy ID",
           description="Filter runs by strategy identifier.",
           examples=("ma_cross_v1",),
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single strategy identifier.",
+          ),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
@@ -23427,6 +23550,18 @@ def list_standalone_surface_runtime_bindings(
           description="Filter runs by strategy version.",
           examples=("1.0.0",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches one strategy version.",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="prefix",
+            label="Version prefix",
+            description="Matches a strategy version prefix.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "rerun_boundary_id",
@@ -23436,6 +23571,13 @@ def list_standalone_surface_runtime_bindings(
         openapi=StandaloneSurfaceFilterOpenAPISpec(
           title="Rerun boundary ID",
           description="Filter runs by rerun boundary identifier.",
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single rerun boundary identifier.",
+          ),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
@@ -23448,6 +23590,13 @@ def list_standalone_surface_runtime_bindings(
           description="Filter runs by preset identifier.",
           examples=("core_5m",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single preset identifier.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "benchmark_family",
@@ -23459,6 +23608,13 @@ def list_standalone_surface_runtime_bindings(
           description="Filter runs by benchmark family tag.",
           examples=("native_validation",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single benchmark family tag.",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "dataset_identity",
@@ -23468,6 +23624,18 @@ def list_standalone_surface_runtime_bindings(
         openapi=StandaloneSurfaceFilterOpenAPISpec(
           title="Dataset identity",
           description="Filter runs by dataset identity.",
+        ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Matches a single dataset identity.",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="prefix",
+            label="Prefix",
+            description="Matches a dataset identity prefix.",
+          ),
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
@@ -23479,6 +23647,39 @@ def list_standalone_surface_runtime_bindings(
           description="Filter runs by experiment tags.",
           examples=(["baseline"],),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="contains_all",
+            label="Contains all",
+            description="Requires all requested tags to be present on the run.",
+            value_shape="list",
+          ),
+          StandaloneSurfaceFilterOperatorSpec(
+            key="contains_any",
+            label="Contains any",
+            description="Matches if any requested tag is present on the run.",
+            value_shape="list",
+          ),
+        ),
+      ),
+    ),
+    sort_field_specs=(
+      StandaloneSurfaceSortFieldSpec(
+        key="updated_at",
+        label="Updated at",
+        description="Sorts runs by most recent update time.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="started_at",
+        label="Started at",
+        description="Sorts runs by start timestamp.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="run_id",
+        label="Run ID",
+        description="Sorts runs by run identifier.",
       ),
     ),
   )
@@ -23500,6 +23701,14 @@ def list_standalone_surface_runtime_bindings(
           description="Run identifiers to include in the comparison set.",
           examples=(["run-001", "run-002"],),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="include",
+            label="Include set",
+            description="Preserves the explicit set and order of compared run IDs.",
+            value_shape="list",
+          ),
+        ),
       ),
       StandaloneSurfaceFilterParamSpec(
         "intent",
@@ -23511,6 +23720,26 @@ def list_standalone_surface_runtime_bindings(
           description="Narrative intent used for run comparison scoring.",
           examples=("strategy_tuning",),
         ),
+        operators=(
+          StandaloneSurfaceFilterOperatorSpec(
+            key="eq",
+            label="Equals",
+            description="Uses a single comparison intent profile.",
+          ),
+        ),
+      ),
+    ),
+    sort_field_specs=(
+      StandaloneSurfaceSortFieldSpec(
+        key="run_id_order",
+        label="Input run order",
+        description="Keeps the compared runs in the explicit query order.",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="narrative_score",
+        label="Narrative score",
+        description="Ranks comparison narratives by computed score.",
+        default_direction="desc",
       ),
     ),
   )

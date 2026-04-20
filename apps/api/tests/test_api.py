@@ -325,6 +325,16 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert _first_non_null_schema_branch(compare_params["intent"]["schema"])["minLength"] == 1
   assert compare_params["intent"]["schema"]["title"] == "Comparison intent"
 
+  run_query_schema = openapi["paths"]["/api/runs"]["get"]["x-akra-query-schema"]
+  tag_filter = next(item for item in run_query_schema["filters"] if item["key"] == "tag")
+  assert [operator["key"] for operator in tag_filter["operators"]] == ["contains_all", "contains_any"]
+  assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
+  assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
+
+  compare_query_schema = openapi["paths"]["/api/runs/compare"]["get"]["x-akra-query-schema"]
+  assert compare_query_schema["filters"][0]["operators"][0]["key"] == "include"
+  assert compare_query_schema["sort_fields"][1]["key"] == "narrative_score"
+
   market_data_params = {
     param["name"]: param
     for param in openapi["paths"]["/api/market-data/status"]["get"]["parameters"]
@@ -333,6 +343,7 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
     "Candlestick timeframe to inspect in market-data status."
   )
   assert market_data_params["timeframe"]["schema"]["minLength"] == 2
+  assert openapi["paths"]["/api/market-data/status"]["get"]["x-akra-query-schema"]["filters"][0]["operators"][0]["key"] == "eq"
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:

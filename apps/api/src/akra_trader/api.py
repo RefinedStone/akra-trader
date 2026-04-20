@@ -179,6 +179,39 @@ def _build_query_default(spec: StandaloneSurfaceFilterParamSpec) -> Any:
   return Query(default=spec.default, **kwargs)
 
 
+def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict[str, Any] | None:
+  if not binding.filter_param_specs and not binding.sort_field_specs:
+    return None
+  return {
+    "x-akra-query-schema": {
+      "filters": [
+        {
+          "key": spec.key,
+          "operators": [
+            {
+              "key": operator.key,
+              "label": operator.label,
+              "description": operator.description,
+              "value_shape": operator.value_shape,
+            }
+            for operator in spec.operators
+          ],
+        }
+        for spec in binding.filter_param_specs
+      ],
+      "sort_fields": [
+        {
+          "key": field.key,
+          "label": field.label,
+          "description": field.description,
+          "default_direction": field.default_direction,
+        }
+        for field in binding.sort_field_specs
+      ],
+    }
+  }
+
+
 def create_router(container: Container) -> APIRouter:
   router = APIRouter()
 
@@ -307,6 +340,7 @@ def create_router(container: Container) -> APIRouter:
       methods=list(binding.methods),
       name=binding.route_name,
       summary=binding.response_title,
+      openapi_extra=_build_route_openapi_extra(binding),
     )
 
   return router
