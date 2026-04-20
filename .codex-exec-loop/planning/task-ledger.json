@@ -4832,18 +4832,36 @@
       "direction_id": "experiment-os",
       "title": "Separate subtree draft default authoring for unsaved template-promotion flows",
       "description": "Polish the query builder's remaining template-authoring gap by giving unsaved subtree-promotion flows their own default-editing context, so default values can be authored consistently before a subtree is promoted into a saved template instead of only after it enters the saved-template or clause-template paths.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 43,
-      "priority_reason": "The latest main-session reply says template default authoring now works for saved-template and clause-template flows, but unsaved subtree promotion still lacks a separate default-editing context. That is the clearest directly executable follow-up, so promote it to the automatic queue head instead of repeating the completed template-binding task.",
+      "priority_reason": "Completed in main session commit 7da3b0c, which split unsaved template draft defaults by clause draft, selected subtree draft, and saved template edit contexts, kept subtree draft defaults scoped to the selected subtree context during promotion flows, verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`, and pushed to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-template-default-authoring-and-nested-template-binding-flows"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:00:00Z",
+      "updated_at": "2026-04-20T19:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os typed-query authoring from saved-template default editing into the still-missing draft subtree promotion path, closing the remaining UI gap before template reuse can stay fully visual across the whole promotion workflow."
+    },
+    {
+      "id": "planning-experiment-os-persist-subtree-specific-template-authoring-metadata-beyond-default-values",
+      "direction_id": "experiment-os",
+      "title": "Persist subtree-specific template authoring metadata beyond default values",
+      "description": "Deepen the newly separated unsaved subtree template-promotion workflow so subtree draft authoring can keep its own binding preset state and subtree-specific parameter ordering or custom labels, instead of separating only default values while other authoring metadata still collapses back to the clause-level context.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 44,
+      "priority_reason": "The latest main-session reply says the default-authoring context split is complete and explicitly names the remaining gap: subtree draft binding presets and subtree-specific parameter ordering or custom labels still are not stored separately. That is now the clearest directly executable follow-up, so promote it to the automatic queue head.",
+      "depends_on": [
+        "planning-experiment-os-separate-subtree-draft-default-authoring-context-for-unsaved-template-promotion"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os typed-query template authoring beyond default-value separation so subtree promotion workflows can preserve the rest of their authoring intent and remain visually editable without collapsing back into clause-level state."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
