@@ -15814,6 +15814,301 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateState = {
   node: RunSurfaceCollectionQueryBuilderChildState;
 };
 
+const RUN_SURFACE_COLLECTION_RUNTIME_SAMPLE_LIMIT = 5;
+const RUN_SURFACE_COLLECTION_RUNTIME_MISSING = Symbol("run-surface-collection-runtime-missing");
+
+type RunSurfaceCollectionQueryRuntimePathToken = string | number;
+
+type RunSurfaceCollectionQueryRuntimeCollectionItem = {
+  pathTokens: RunSurfaceCollectionQueryRuntimePathToken[];
+  value: unknown;
+};
+
+function formatRunSurfaceCollectionQueryRuntimePathSegment(segment: RunSurfaceCollectionQueryRuntimePathToken) {
+  if (typeof segment === "number") {
+    return `[${segment}]`;
+  }
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(segment)
+    ? `.${segment}`
+    : `[${JSON.stringify(segment)}]`;
+}
+
+function formatRunSurfaceCollectionQueryRuntimePath(
+  rootLabel: string,
+  pathTokens: RunSurfaceCollectionQueryRuntimePathToken[],
+) {
+  return `${rootLabel}${pathTokens.map(formatRunSurfaceCollectionQueryRuntimePathSegment).join("")}`;
+}
+
+function normalizeRunSurfaceCollectionQueryRuntimeCollectionItems(
+  value: unknown,
+  pathTokens: RunSurfaceCollectionQueryRuntimePathToken[],
+): RunSurfaceCollectionQueryRuntimeCollectionItem[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  if (Array.isArray(value)) {
+    return value.flatMap((item, index) => normalizeRunSurfaceCollectionQueryRuntimeCollectionItems(
+      item,
+      [...pathTokens, index],
+    ));
+  }
+  if (value instanceof Set) {
+    return Array.from(value).flatMap((item, index) => normalizeRunSurfaceCollectionQueryRuntimeCollectionItems(
+      item,
+      [...pathTokens, index],
+    ));
+  }
+  if (typeof value === "object") {
+    return [{ pathTokens, value }];
+  }
+  return [{ pathTokens, value }];
+}
+
+function resolveRunSurfaceCollectionQueryRuntimeCollectionItems(
+  current: unknown,
+  path: string[],
+  pathTokens: RunSurfaceCollectionQueryRuntimePathToken[] = [],
+): RunSurfaceCollectionQueryRuntimeCollectionItem[] {
+  if (current === null || current === undefined) {
+    return [];
+  }
+  if (!path.length) {
+    return normalizeRunSurfaceCollectionQueryRuntimeCollectionItems(current, pathTokens);
+  }
+  const [segment, ...tail] = path;
+  if (Array.isArray(current)) {
+    return current.flatMap((item, index) =>
+      resolveRunSurfaceCollectionQueryRuntimeCollectionItems(item, path, [...pathTokens, index]));
+  }
+  if (current instanceof Set) {
+    return Array.from(current).flatMap((item, index) =>
+      resolveRunSurfaceCollectionQueryRuntimeCollectionItems(item, path, [...pathTokens, index]));
+  }
+  if (typeof current !== "object") {
+    return [];
+  }
+  const record = current as Record<string, unknown>;
+  if (!(segment in record)) {
+    return [];
+  }
+  return resolveRunSurfaceCollectionQueryRuntimeCollectionItems(
+    record[segment],
+    tail,
+    [...pathTokens, segment],
+  );
+}
+
+function resolveRunSurfaceCollectionQueryRuntimeValuePath(
+  current: unknown,
+  path: string[],
+): unknown | typeof RUN_SURFACE_COLLECTION_RUNTIME_MISSING {
+  let value = current;
+  const resolvedPath = path.length ? path : [];
+  for (const segment of resolvedPath) {
+    if (value === null || value === undefined) {
+      return RUN_SURFACE_COLLECTION_RUNTIME_MISSING;
+    }
+    if (Array.isArray(value)) {
+      const parsedIndex = Number.parseInt(segment, 10);
+      if (Number.isNaN(parsedIndex) || parsedIndex < 0 || parsedIndex >= value.length) {
+        return RUN_SURFACE_COLLECTION_RUNTIME_MISSING;
+      }
+      value = value[parsedIndex];
+      continue;
+    }
+    if (typeof value !== "object") {
+      return RUN_SURFACE_COLLECTION_RUNTIME_MISSING;
+    }
+    const record = value as Record<string, unknown>;
+    if (!(segment in record)) {
+      return RUN_SURFACE_COLLECTION_RUNTIME_MISSING;
+    }
+    value = record[segment];
+  }
+  return value;
+}
+
+function normalizeRunSurfaceCollectionQueryRuntimeNumericValue(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number.parseFloat(value);
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+  return null;
+}
+
+function normalizeRunSurfaceCollectionQueryRuntimeDatetimeValue(value: unknown) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+  if (typeof value !== "string" && typeof value !== "number") {
+    return null;
+  }
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toRunSurfaceCollectionQueryRuntimeIterableValues(value: unknown) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (value instanceof Set) {
+    return Array.from(value);
+  }
+  if (value === null || value === undefined) {
+    return [];
+  }
+  if (typeof value === "string") {
+    return Array.from(value);
+  }
+  return [value];
+}
+
+function evaluateRunSurfaceCollectionQueryRuntimeCondition(
+  candidateValue: unknown,
+  operator: string,
+  operand: unknown,
+) {
+  if (operator === "eq") {
+    return candidateValue === operand;
+  }
+  if (operator === "prefix") {
+    return typeof candidateValue === "string"
+      && typeof operand === "string"
+      && candidateValue.startsWith(operand);
+  }
+  if (operator === "contains_all") {
+    const candidateValues = new Set(toRunSurfaceCollectionQueryRuntimeIterableValues(candidateValue));
+    const operandValues = new Set(toRunSurfaceCollectionQueryRuntimeIterableValues(operand));
+    return Array.from(operandValues).every((value) => candidateValues.has(value));
+  }
+  if (operator === "contains_any") {
+    const candidateValues = new Set(toRunSurfaceCollectionQueryRuntimeIterableValues(candidateValue));
+    const operandValues = new Set(toRunSurfaceCollectionQueryRuntimeIterableValues(operand));
+    return Array.from(operandValues).some((value) => candidateValues.has(value));
+  }
+  if (operator === "include") {
+    return toRunSurfaceCollectionQueryRuntimeIterableValues(operand).includes(candidateValue);
+  }
+  if (operator === "gt" || operator === "ge" || operator === "lt" || operator === "le") {
+    const candidateDatetime = normalizeRunSurfaceCollectionQueryRuntimeDatetimeValue(candidateValue);
+    const operandDatetime = normalizeRunSurfaceCollectionQueryRuntimeDatetimeValue(operand);
+    if (candidateDatetime && operandDatetime) {
+      if (operator === "gt") {
+        return candidateDatetime > operandDatetime;
+      }
+      if (operator === "ge") {
+        return candidateDatetime >= operandDatetime;
+      }
+      if (operator === "lt") {
+        return candidateDatetime < operandDatetime;
+      }
+      return candidateDatetime <= operandDatetime;
+    }
+    const candidateNumber = normalizeRunSurfaceCollectionQueryRuntimeNumericValue(candidateValue);
+    const operandNumber = normalizeRunSurfaceCollectionQueryRuntimeNumericValue(operand);
+    if (candidateNumber === null || operandNumber === null) {
+      return false;
+    }
+    if (operator === "gt") {
+      return candidateNumber > operandNumber;
+    }
+    if (operator === "ge") {
+      return candidateNumber >= operandNumber;
+    }
+    if (operator === "lt") {
+      return candidateNumber < operandNumber;
+    }
+    return candidateNumber <= operandNumber;
+  }
+  return false;
+}
+
+function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
+  comparedValueLabel: string;
+  comparedValueOperand: unknown;
+  field: RunSurfaceCollectionQueryElementField | null;
+  resolvedParameterValues: Record<string, string>;
+  runs: Run[];
+  schema: RunSurfaceCollectionQuerySchema | null;
+  operatorKey: string;
+}) {
+  const {
+    comparedValueLabel,
+    comparedValueOperand,
+    field,
+    operatorKey,
+    resolvedParameterValues,
+    runs,
+    schema,
+  } = params;
+  if (!schema || !field || !runs.length) {
+    return {
+      sampleValues: [] as RunSurfaceCollectionQueryRuntimeCandidateSample[],
+      sampleMatchCount: 0,
+      sampleTotalCount: 0,
+      sampleTruncated: false,
+    };
+  }
+  const resolvedPath = resolveCollectionQueryPath(schema.pathTemplate, resolvedParameterValues);
+  const accessorPath = field.valueRoot ? [] : (field.valuePath.length ? field.valuePath : [field.key]);
+  const accessorLabel = field.valueRoot
+    ? `${schema.itemKind} value`
+    : `${schema.itemKind}.${accessorPath.join(".") || field.key}`;
+  const sampleValues: RunSurfaceCollectionQueryRuntimeCandidateSample[] = [];
+  let sampleTotalCount = 0;
+  let sampleMatchCount = 0;
+  runs.forEach((run) => {
+    const collectionItems = resolveRunSurfaceCollectionQueryRuntimeCollectionItems(run, resolvedPath);
+    collectionItems.forEach((collectionItem) => {
+      sampleTotalCount += 1;
+      const candidateValueRaw = field.valueRoot
+        ? collectionItem.value
+        : resolveRunSurfaceCollectionQueryRuntimeValuePath(collectionItem.value, accessorPath);
+      const candidatePath = formatRunSurfaceCollectionQueryRuntimePath(
+        `run:${run.config.run_id}`,
+        collectionItem.pathTokens,
+      );
+      const result = candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
+        ? false
+        : evaluateRunSurfaceCollectionQueryRuntimeCondition(
+            candidateValueRaw,
+            operatorKey,
+            comparedValueOperand,
+          );
+      if (result) {
+        sampleMatchCount += 1;
+      }
+      if (sampleValues.length >= RUN_SURFACE_COLLECTION_RUNTIME_SAMPLE_LIMIT) {
+        return;
+      }
+      const candidateValue = candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
+        ? `Missing ${accessorLabel}`
+        : formatCollectionQueryBuilderValue(candidateValueRaw, field.valueType);
+      sampleValues.push({
+        candidatePath,
+        candidateValue,
+        detail: candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
+          ? `${candidatePath} has no ${accessorLabel} value in the current run payload.`
+          : `${candidatePath} resolved ${accessorLabel} to ${candidateValue} and ${
+            result ? "matched" : "did not match"
+          } ${comparedValueLabel}.`,
+        result,
+        runId: run.config.run_id,
+      });
+    });
+  });
+  return {
+    sampleValues,
+    sampleMatchCount,
+    sampleTotalCount,
+    sampleTruncated: sampleTotalCount > sampleValues.length,
+  };
+}
+
 type PredicateRefReplayApplyHistoryRow = {
   changesCurrent: boolean;
   currentBundleLabel: string;
@@ -18211,12 +18506,34 @@ type RunSurfaceCollectionQueryBuilderApplyPayload = {
   operatorKey: string;
 };
 
+type RunSurfaceCollectionQueryRuntimeCandidateSample = {
+  candidatePath: string;
+  candidateValue: string;
+  detail: string;
+  result: boolean;
+  runId: string;
+};
+
+type RunSurfaceCollectionQueryRuntimeCandidateTrace = {
+  candidateAccessor: string;
+  candidatePath: string;
+  comparedValue: string;
+  detail: string;
+  location: string;
+  result: boolean;
+  sampleMatchCount: number;
+  sampleTotalCount: number;
+  sampleTruncated: boolean;
+  sampleValues: RunSurfaceCollectionQueryRuntimeCandidateSample[];
+};
+
 function RunSurfaceCollectionQueryBuilder({
   contracts,
   compact = false,
   activeExpression,
   activeExpressionLabel,
   applyLabel = "Apply expression",
+  runtimeRuns = [],
   onApplyExpression,
   onClearExpression,
 }: {
@@ -18225,6 +18542,7 @@ function RunSurfaceCollectionQueryBuilder({
   activeExpression?: string | null;
   activeExpressionLabel?: string | null;
   applyLabel?: string;
+  runtimeRuns?: Run[];
   onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
   onClearExpression?: (() => void) | null;
 }) {
@@ -21543,14 +21861,7 @@ function RunSurfaceCollectionQueryBuilder({
       ): {
         matchedPredicateBranches: Array<{ location: string; detail: string }>;
         parameterComparisons: Array<{ location: string; detail: string }>;
-        runtimeCandidateTraces: Array<{
-          candidateAccessor: string;
-          candidatePath: string;
-          comparedValue: string;
-          detail: string;
-          location: string;
-          result: boolean;
-        }>;
+        runtimeCandidateTraces: RunSurfaceCollectionQueryRuntimeCandidateTrace[];
         shortCircuitTraces: Array<{ location: string; detail: string }>;
         truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
         result: boolean;
@@ -21641,9 +21952,29 @@ function RunSurfaceCollectionQueryBuilder({
                   : `${activeSchema?.itemKind ?? "candidate"}.${field.valuePath.join(".") || field.key}`
               )
             : "candidate value";
+          const comparedValueOperand = field
+            ? coerceCollectionQueryBuilderValue(
+                child.clause.valueBindingKey
+                  ? (bindingContextByKey[child.clause.valueBindingKey] ?? "")
+                  : child.clause.builderValue,
+                field.valueType,
+              )
+            : child.clause.builderValue;
           const comparedValue = child.clause.valueBindingKey
-            ? (bindingContextByKey[child.clause.valueBindingKey] ?? `$${child.clause.valueBindingKey}`)
+            ? (
+                formatCollectionQueryBuilderValue(comparedValueOperand, field?.valueType ?? "string")
+                || `$${child.clause.valueBindingKey}`
+              )
             : (child.clause.builderValue || "(blank)");
+          const concreteRuntimeSamples = buildRunSurfaceCollectionQueryRuntimeCandidateSamples({
+            comparedValueLabel: comparedValue,
+            comparedValueOperand,
+            field,
+            operatorKey: child.clause.operatorKey,
+            resolvedParameterValues,
+            runs: runtimeRuns,
+            schema: activeSchema,
+          });
           const runtimeCandidateTraces = [{
             candidateAccessor,
             candidatePath,
@@ -21651,11 +21982,22 @@ function RunSurfaceCollectionQueryBuilder({
             detail:
               `${child.clause.quantifier.toUpperCase()} evaluates ${candidateAccessor} from ${candidatePath} `
               + `${operator?.label ?? child.clause.operatorKey} ${comparedValue}. `
+              + (
+                concreteRuntimeSamples.sampleTotalCount
+                  ? `Concrete payload replay: ${concreteRuntimeSamples.sampleMatchCount}/${concreteRuntimeSamples.sampleTotalCount} candidate values matched across ${runtimeRuns.length} run payloads. `
+                  : runtimeRuns.length
+                    ? "Concrete payload replay found no candidate values across the current run payloads. "
+                    : "No run payloads are attached to replay concrete candidate values. "
+              )
               + (comparisonNotes.length
                 ? `Resolved inputs: ${comparisonNotes.join(" · ")}`
                 : "No reviewed binding reached the candidate inputs for this clause."),
             location: clauseLocation,
             result: directMatch,
+            sampleMatchCount: concreteRuntimeSamples.sampleMatchCount,
+            sampleTotalCount: concreteRuntimeSamples.sampleTotalCount,
+            sampleTruncated: concreteRuntimeSamples.sampleTruncated,
+            sampleValues: concreteRuntimeSamples.sampleValues,
           }];
           return {
             matchedPredicateBranches: [],
@@ -21693,6 +22035,10 @@ function RunSurfaceCollectionQueryBuilder({
                 detail: "Predicate reference has no reviewed binding flowing into its runtime parameters.",
                 location: predicateLocation,
                 result: false,
+                sampleMatchCount: 0,
+                sampleTotalCount: 0,
+                sampleTruncated: false,
+                sampleValues: [],
               }],
               shortCircuitTraces: [],
               truthTableRows: [{
@@ -21729,6 +22075,10 @@ function RunSurfaceCollectionQueryBuilder({
                 detail: "Predicate reference matched but nested runtime candidate replay stopped at a cycle guard.",
                 location: predicateLocation,
                 result: true,
+                sampleMatchCount: 0,
+                sampleTotalCount: 0,
+                sampleTruncated: false,
+                sampleValues: [],
               }],
               shortCircuitTraces: [{
                 location: predicateLocation,
@@ -21755,6 +22105,10 @@ function RunSurfaceCollectionQueryBuilder({
                 detail: "Predicate reference matched and no nested template definition was available for runtime candidate replay.",
                 location: predicateLocation,
                 result: true,
+                sampleMatchCount: 0,
+                sampleTotalCount: 0,
+                sampleTruncated: false,
+                sampleValues: [],
               }],
               shortCircuitTraces: [],
               truthTableRows: [{
@@ -21796,6 +22150,10 @@ function RunSurfaceCollectionQueryBuilder({
                     .join(" · ")}.`,
                 location: predicateLocation,
                 result: predicateResult,
+                sampleMatchCount: 0,
+                sampleTotalCount: 0,
+                sampleTruncated: false,
+                sampleValues: [],
               },
               ...nestedEvaluation.runtimeCandidateTraces,
             ],
@@ -21821,14 +22179,7 @@ function RunSurfaceCollectionQueryBuilder({
           evaluation: {
             matchedPredicateBranches: Array<{ location: string; detail: string }>;
             parameterComparisons: Array<{ location: string; detail: string }>;
-            runtimeCandidateTraces: Array<{
-              candidateAccessor: string;
-              candidatePath: string;
-              comparedValue: string;
-              detail: string;
-              location: string;
-              result: boolean;
-            }>;
+            runtimeCandidateTraces: RunSurfaceCollectionQueryRuntimeCandidateTrace[];
             shortCircuitTraces: Array<{ location: string; detail: string }>;
             truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
             result: boolean;
@@ -21876,14 +22227,7 @@ function RunSurfaceCollectionQueryBuilder({
         return evaluatedChildren.reduce<{
           matchedPredicateBranches: Array<{ location: string; detail: string }>;
           parameterComparisons: Array<{ location: string; detail: string }>;
-          runtimeCandidateTraces: Array<{
-            candidateAccessor: string;
-            candidatePath: string;
-            comparedValue: string;
-            detail: string;
-            location: string;
-            result: boolean;
-          }>;
+          runtimeCandidateTraces: RunSurfaceCollectionQueryRuntimeCandidateTrace[];
           shortCircuitTraces: Array<{ location: string; detail: string }>;
           truthTableRows: Array<{ detail: string; expression: string; location: string; result: boolean }>;
           result: boolean;
@@ -21923,6 +22267,10 @@ function RunSurfaceCollectionQueryBuilder({
               + (stopReason ? `Resolution stopped early because ${stopReason}.` : "Every child candidate row was evaluated."),
             location: `${templateKey}.node.${pathSegments.join(".")}`,
             result: resolvedGroupResult,
+            sampleMatchCount: 0,
+            sampleTotalCount: 0,
+            sampleTruncated: false,
+            sampleValues: [],
           }],
           shortCircuitTraces: [
             ...skippedChildren.map((skippedChild) => ({
@@ -22136,6 +22484,7 @@ function RunSurfaceCollectionQueryBuilder({
       bundleCoordinationSimulationPolicyOverrides,
       getSortedTemplateGroupPresetBundles,
       predicateTemplates,
+      runtimeRuns,
       selectedRefTemplate,
       selectedRefTemplateParameterGroupByKey,
       simulatedPredicateRefSolverReplay,
@@ -24939,6 +25288,38 @@ function RunSurfaceCollectionQueryBuilder({
                                                         {candidateTrace.result ? "matched" : "not matched"}
                                                       </span>
                                                     </div>
+                                                    {candidateTrace.sampleTotalCount ? (
+                                                      <div className="run-surface-query-builder-trace-panel is-nested">
+                                                        <div className="run-surface-query-builder-card-head">
+                                                          <strong>Concrete payload values</strong>
+                                                          <span>{`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}</span>
+                                                        </div>
+                                                        <div className="run-surface-query-builder-trace-list">
+                                                          {candidateTrace.sampleValues.map((sample) => (
+                                                            <div
+                                                              className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"}`}
+                                                              key={`focused-causal-candidate-sample:${entry.stepIndex}:${candidateTrace.location}:${sample.runId}:${sample.candidatePath}`}
+                                                            >
+                                                              <strong>{sample.candidatePath}</strong>
+                                                              <p>{sample.detail}</p>
+                                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                                <span className="run-surface-query-builder-trace-chip">
+                                                                  {sample.candidateValue}
+                                                                </span>
+                                                                <span className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}>
+                                                                  {sample.result ? "matched" : "not matched"}
+                                                                </span>
+                                                              </div>
+                                                            </div>
+                                                          ))}
+                                                        </div>
+                                                        {candidateTrace.sampleTruncated ? (
+                                                          <p className="run-note">
+                                                            Showing {candidateTrace.sampleValues.length} of {candidateTrace.sampleTotalCount} concrete payload candidates.
+                                                          </p>
+                                                        ) : null}
+                                                      </div>
+                                                    ) : null}
                                                   </div>
                                                 ))}
                                               </div>
@@ -26456,6 +26837,26 @@ function RunSurfaceCollectionQueryBuilder({
                                                             >
                                                               <strong>{candidateTrace.candidateAccessor}</strong>
                                                               <p>{candidateTrace.detail}</p>
+                                                              {candidateTrace.sampleTotalCount ? (
+                                                                <div className="run-surface-query-builder-trace-chip-list">
+                                                                  <span className="run-surface-query-builder-trace-chip">
+                                                                    {`${candidateTrace.sampleMatchCount}/${candidateTrace.sampleTotalCount} matched`}
+                                                                  </span>
+                                                                  {candidateTrace.sampleValues.slice(0, 2).map((sample) => (
+                                                                    <span
+                                                                      className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}
+                                                                      key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-sample:${sample.runId}:${sample.candidatePath}`}
+                                                                    >
+                                                                      {`${sample.candidatePath} · ${sample.candidateValue}`}
+                                                                    </span>
+                                                                  ))}
+                                                                  {candidateTrace.sampleTruncated ? (
+                                                                    <span className="run-surface-query-builder-trace-chip">
+                                                                      {`+${Math.max(candidateTrace.sampleTotalCount - 2, 0)} more`}
+                                                                    </span>
+                                                                  ) : null}
+                                                                </div>
+                                                              ) : null}
                                                             </div>
                                                           ))}
                                                       </div>
@@ -27414,7 +27815,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
         <span className="meta-pill subtle">{schemaVersion}</span>
       </div>
       {collectionQueryContracts.length ? (
-        <RunSurfaceCollectionQueryBuilder contracts={collectionQueryContracts} compact={compact} />
+        <RunSurfaceCollectionQueryBuilder contracts={collectionQueryContracts} compact={compact} runtimeRuns={[]} />
       ) : null}
       {sharedContracts.length ? (
         <div className="run-surface-family-section">
@@ -28551,6 +28952,7 @@ function RunSection({
                 contracts={collectionQueryContracts}
                 onApplyExpression={applyCollectionQueryExpression}
                 onClearExpression={filter.filter_expr ? clearCollectionQueryExpression : null}
+                runtimeRuns={runs}
               />
             ) : null}
           </div>
