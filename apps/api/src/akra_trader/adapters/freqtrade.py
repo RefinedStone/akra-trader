@@ -1281,7 +1281,12 @@ class FreqtradeReferenceAdapter:
     value: Any,
     source_path: str,
   ) -> dict[str, Any]:
+    candidate_bindings = self._build_artifact_candidate_bindings(
+      label_key=label_key,
+      value=value,
+    )
     return {
+      "candidate_bindings": candidate_bindings,
       "label_key": label_key,
       "searchable_texts": self._collect_artifact_source_search_texts(label_key=label_key, value=value),
       "source_path": source_path,
@@ -1296,7 +1301,13 @@ class FreqtradeReferenceAdapter:
     value: Any,
     source_path: str,
   ) -> dict[str, Any]:
+    candidate_bindings = self._build_artifact_candidate_bindings(
+      label_key=line_key,
+      section_key=section_key,
+      value=value,
+    )
     return {
+      "candidate_bindings": candidate_bindings,
       "line_index": line_index,
       "line_key": line_key,
       "searchable_texts": self._collect_artifact_source_search_texts(
@@ -1307,6 +1318,143 @@ class FreqtradeReferenceAdapter:
       "section_key": section_key,
       "source_path": source_path,
     }
+
+  def _build_artifact_candidate_bindings(
+    self,
+    *,
+    label_key: str,
+    value: Any,
+    section_key: str | None = None,
+  ) -> list[dict[str, Any]]:
+    symbol_keys = self._collect_artifact_candidate_binding_symbol_keys(value)
+    if not symbol_keys:
+      return []
+
+    candidate_values = self._collect_artifact_candidate_binding_values(
+      label_key=label_key,
+      value=value,
+      section_key=section_key,
+    )
+    bindings: list[dict[str, Any]] = []
+    seen: set[tuple[str, str | None]] = set()
+
+    def add(symbol_key: str, candidate_value: str | None) -> None:
+      normalized_symbol = self._normalize_artifact_candidate_binding_symbol_key(symbol_key)
+      if not normalized_symbol:
+        return
+      normalized_value = candidate_value.strip() if isinstance(candidate_value, str) else None
+      key = (normalized_symbol, normalized_value)
+      if key in seen:
+        return
+      seen.add(key)
+      bindings.append({
+        "binding_kind": "market_data_issue",
+        "candidate_path_template": "provenance.market_data_by_symbol.{symbol_key}.issues",
+        "candidate_value": normalized_value,
+        "symbol_key": normalized_symbol,
+      })
+
+    for symbol_key in symbol_keys:
+      add(symbol_key, None)
+      for candidate_value in candidate_values:
+        if self._artifact_candidate_value_mentions_symbol(candidate_value, symbol_key):
+          add(symbol_key, candidate_value)
+    return bindings
+
+  def _collect_artifact_candidate_binding_values(
+    self,
+    *,
+    label_key: str,
+    value: Any,
+    section_key: str | None = None,
+  ) -> list[str]:
+    collected: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str | None) -> None:
+      if candidate is None:
+        return
+      normalized = candidate.strip()
+      if not normalized:
+        return
+      key = self._normalize_artifact_source_search_text(normalized)
+      if not key or key in seen:
+        return
+      seen.add(key)
+      collected.append(normalized)
+
+    add(self._stringify_artifact_source_value(value))
+
+    if isinstance(value, (str, int, float, bool)):
+      add(str(value))
+    elif isinstance(value, dict):
+      for nested_key, nested_value in value.items():
+        formatted_key = self._format_artifact_source_label(str(nested_key))
+        if isinstance(nested_value, (str, int, float, bool)):
+          add(f"{formatted_key}: {nested_value}")
+          add(str(nested_value))
+    elif isinstance(value, (list, tuple, set)):
+      for item in value:
+        if isinstance(item, (str, int, float, bool)):
+          add(str(item))
+
+    add(self._format_artifact_source_label(label_key))
+    if section_key is not None:
+      add(self._format_artifact_source_label(section_key))
+    return collected
+
+  def _collect_artifact_candidate_binding_symbol_keys(self, value: Any) -> list[str]:
+    symbol_keys: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str | None) -> None:
+      normalized = self._normalize_artifact_candidate_binding_symbol_key(candidate)
+      if not normalized or normalized in seen:
+        return
+      seen.add(normalized)
+      symbol_keys.append(normalized)
+
+    def visit(candidate: Any) -> None:
+      if candidate in (None, ""):
+        return
+      if isinstance(candidate, str):
+        for match in re.finditer(r"(?<![A-Z0-9])([A-Z0-9]+/[A-Z0-9]+)(?![A-Z0-9])", candidate):
+          add(match.group(1))
+        return
+      if isinstance(candidate, dict):
+        for nested_key, nested_value in candidate.items():
+          if str(nested_key) in {"pair", "symbol", "label", "key"} and isinstance(nested_value, str):
+            add(nested_value)
+          visit(nested_value)
+        return
+      if isinstance(candidate, (list, tuple, set)):
+        for item in candidate:
+          visit(item)
+
+    visit(value)
+    return symbol_keys
+
+  @staticmethod
+  def _normalize_artifact_candidate_binding_symbol_key(value: str | None) -> str | None:
+    if value is None:
+      return None
+    trimmed = value.strip()
+    if not trimmed:
+      return None
+    if ":" in trimmed:
+      trimmed = trimmed.split(":", 1)[1].strip()
+    return trimmed or None
+
+  def _artifact_candidate_value_mentions_symbol(self, candidate_value: str, symbol_key: str) -> bool:
+    normalized_candidate = self._normalize_artifact_source_search_text(candidate_value)
+    if not normalized_candidate:
+      return False
+    normalized_symbol = self._normalize_artifact_source_search_text(symbol_key)
+    if normalized_symbol and normalized_symbol in normalized_candidate:
+      return True
+    bare_symbol = symbol_key.replace("/", " ")
+    normalized_bare_symbol = self._normalize_artifact_source_search_text(bare_symbol)
+    return bool(normalized_bare_symbol and normalized_bare_symbol in normalized_candidate)
 
   def _collect_artifact_source_search_texts(
     self,

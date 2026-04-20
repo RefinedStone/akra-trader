@@ -186,6 +186,12 @@ type BenchmarkArtifact = {
     summary?: Record<
       string,
       {
+        candidate_bindings?: Array<{
+          binding_kind?: string | null;
+          candidate_path_template?: string | null;
+          candidate_value?: string | null;
+          symbol_key?: string | null;
+        }> | null;
         label_key?: string | null;
         searchable_texts?: string[] | null;
         source_path?: string | null;
@@ -194,6 +200,12 @@ type BenchmarkArtifact = {
     sections?: Record<
       string,
       Array<{
+        candidate_bindings?: Array<{
+          binding_kind?: string | null;
+          candidate_path_template?: string | null;
+          candidate_value?: string | null;
+          symbol_key?: string | null;
+        }> | null;
         line_index?: number | null;
         line_key?: string | null;
         searchable_texts?: string[] | null;
@@ -16289,6 +16301,48 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMetadataMatchTe
     .filter(Boolean);
 }
 
+function normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(value: string | null | undefined) {
+  if (!value) {
+    return "";
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return "";
+  }
+  return trimmed.includes(":")
+    ? trimmed.split(":").slice(1).join(":").trim()
+    : trimmed;
+}
+
+function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindings(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return null;
+      }
+      const record = entry as Record<string, unknown>;
+      return {
+        bindingKind:
+          typeof record.binding_kind === "string" ? record.binding_kind : null,
+        candidatePathTemplate:
+          typeof record.candidate_path_template === "string" ? record.candidate_path_template : null,
+        candidateValue:
+          typeof record.candidate_value === "string" ? record.candidate_value : null,
+        symbolKey:
+          typeof record.symbol_key === "string" ? record.symbol_key : null,
+      };
+    })
+    .filter((entry): entry is {
+      bindingKind: string | null;
+      candidatePathTemplate: string | null;
+      candidateValue: string | null;
+      symbolKey: string | null;
+    } => entry !== null);
+}
+
 function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntries(
   artifact: BenchmarkArtifact,
 ) {
@@ -16299,6 +16353,10 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntri
         typeof metadataEntry?.label_key === "string" && metadataEntry.label_key.trim()
           ? metadataEntry.label_key
           : summaryKey;
+      const candidateBindings =
+        collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindings(
+          metadataEntry?.candidate_bindings,
+        );
       const visibleText = formatBenchmarkArtifactSummaryValue(summaryKey, rawValue);
       if (!visibleText) {
         return null;
@@ -16314,6 +16372,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntri
         ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
       ].filter(Boolean);
       return {
+        candidateBindings,
         hoverKey: buildComparisonProvenanceArtifactSummaryHoverKey(artifact.path, summaryKey),
         kind: "summary" as const,
         labelKey,
@@ -16322,6 +16381,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntri
       };
     })
     .filter((entry): entry is {
+      candidateBindings: Array<{
+        bindingKind: string | null;
+        candidatePathTemplate: string | null;
+        candidateValue: string | null;
+        symbolKey: string | null;
+      }>;
       hoverKey: string;
       kind: "summary";
       labelKey: string;
@@ -16358,6 +16423,10 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
               typeof metadataEntry?.line_index === "number"
                 ? metadataEntry.line_index
                 : fallbackLineIndex;
+            const candidateBindings =
+              collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindings(
+                metadataEntry?.candidate_bindings,
+              );
             const visibleText = `${formatBenchmarkArtifactSummaryLabel(lineKey)}: ${inlineValue}`;
             const searchableTexts = [
               ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMetadataMatchTexts(
@@ -16373,6 +16442,7 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
               ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
             ].filter(Boolean);
             return {
+              candidateBindings,
               hoverKey: buildComparisonProvenanceArtifactSectionLineHoverKey(
                 artifact.path,
                 sectionKey,
@@ -16386,6 +16456,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
             };
           })
           .filter((entry): entry is {
+            candidateBindings: Array<{
+              bindingKind: string | null;
+              candidatePathTemplate: string | null;
+              candidateValue: string | null;
+              symbolKey: string | null;
+            }>;
             hoverKey: string;
             kind: "section_line";
             labelKey: string;
@@ -16415,6 +16491,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
             ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
           ].filter(Boolean);
           return {
+            candidateBindings: [] as Array<{
+              bindingKind: string | null;
+              candidatePathTemplate: string | null;
+              candidateValue: string | null;
+              symbolKey: string | null;
+            }>,
             kind: "section_line" as const,
             labelKey: lineKey,
             searchableTexts,
@@ -16423,6 +16505,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
           };
         })
         .filter((entry): entry is {
+          candidateBindings: Array<{
+            bindingKind: string | null;
+            candidatePathTemplate: string | null;
+            candidateValue: string | null;
+            symbolKey: string | null;
+          }>;
           kind: "section_line";
           labelKey: string;
           searchableTexts: string[];
@@ -16443,6 +16531,12 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
 function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
   candidateValue: string;
   entry: {
+    candidateBindings?: Array<{
+      bindingKind: string | null;
+      candidatePathTemplate: string | null;
+      candidateValue: string | null;
+      symbolKey: string | null;
+    }>;
     kind: "section_line" | "summary";
     labelKey: string;
     searchableTexts: string[];
@@ -16498,6 +16592,47 @@ function scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch(params: {
   return score;
 }
 
+function doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch(params: {
+  binding: {
+    bindingKind: string | null;
+    candidatePathTemplate: string | null;
+    candidateValue: string | null;
+    symbolKey: string | null;
+  };
+  candidateValue: string;
+  resolvedPath: string[];
+  symbolKey: string;
+}) {
+  const { binding, candidateValue, resolvedPath, symbolKey } = params;
+  if (binding.bindingKind !== "market_data_issue") {
+    return false;
+  }
+  if (binding.candidatePathTemplate !== "provenance.market_data_by_symbol.{symbol_key}.issues") {
+    return false;
+  }
+  if (
+    resolvedPath[0] !== "provenance"
+    || resolvedPath[1] !== "market_data_by_symbol"
+    || resolvedPath[3] !== "issues"
+  ) {
+    return false;
+  }
+  const normalizedBindingSymbol =
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(binding.symbolKey);
+  const normalizedCandidateSymbol =
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(symbolKey || resolvedPath[2] || "");
+  if (!normalizedBindingSymbol || !normalizedCandidateSymbol || normalizedBindingSymbol !== normalizedCandidateSymbol) {
+    return false;
+  }
+  if (!binding.candidateValue) {
+    return true;
+  }
+  return (
+    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(binding.candidateValue)
+    === normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(candidateValue)
+  );
+}
+
 function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params: {
   candidateValueRaw: unknown;
   resolvedParameterValues: Record<string, string>;
@@ -16525,6 +16660,43 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactHoverKeys(params:
       ...buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntries(artifact),
       ...buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntries(artifact),
     ];
+    const directValueMatches = artifactEntries.flatMap((entry) => {
+      const hasExactBinding = (entry.candidateBindings ?? []).some((binding) =>
+        doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch({
+          binding,
+          candidateValue,
+          resolvedPath,
+          symbolKey,
+        }) && binding.candidateValue !== null
+      );
+      return hasExactBinding ? [entry.hoverKey] : [];
+    });
+    if (directValueMatches.length) {
+      return Array.from(new Set(directValueMatches)).map((hoverKey) => ({
+        hoverKey,
+        score: Number.MAX_SAFE_INTEGER,
+      }));
+    }
+    const directScopedEntries = artifactEntries.filter((entry) =>
+      (entry.candidateBindings ?? []).some((binding) =>
+        doesRunSurfaceCollectionQueryRuntimeCandidateArtifactDirectBindingMatch({
+          binding,
+          candidateValue,
+          resolvedPath,
+          symbolKey,
+        })
+      )
+    );
+    if (directScopedEntries.length) {
+      return directScopedEntries.flatMap((entry) => {
+        const score = scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch({
+          candidateValue,
+          entry,
+          symbolVariants,
+        });
+        return score === null ? [{ hoverKey: entry.hoverKey, score: 1000 }] : [{ hoverKey: entry.hoverKey, score: 1000 + score }];
+      });
+    }
     return artifactEntries.flatMap((entry) => {
       const score = scoreRunSurfaceCollectionQueryRuntimeCandidateArtifactMatch({
         candidateValue,
