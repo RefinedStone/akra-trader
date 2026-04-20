@@ -4886,18 +4886,36 @@
       "direction_id": "experiment-os",
       "title": "Add group-level subtree template authoring metadata and behavior",
       "description": "Build on the completed parameter-level `groupName` and `helpNote` metadata by introducing first-class group records for subtree template authoring, including stable group metadata plus group-level collapse and binding-preset behavior that survives subtree promotion, saved template hydration, grouped expression preview, and template-ref authoring instead of leaving groups as flat parameter annotations only.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 46,
-      "priority_reason": "The latest main-session reply explicitly says the remaining higher-level authoring gap is above parameter-level metadata: group entities still lack their own metadata and group-level collapse or preset behavior. That is the clearest directly executable next task, so promote it to the queue head for automatic follow-through.",
+      "priority_reason": "Completed in main session commit d702c40, which added first-class `parameter_groups` metadata for subtree template authoring, persisted group `label`, `helpNote`, and default collapsed state through template state plus filter preview or hydration flows, exposed group metadata editing in the builder, and applied the metadata in template registry and predicate-ref binding UI before passing `cd apps/web && npx tsc --noEmit` and `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css`.",
       "depends_on": [
         "planning-experiment-os-structure-subtree-template-authoring-metadata-for-groups-and-help-notes"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:41:00Z",
+      "updated_at": "2026-04-20T04:30:24Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os typed-query template authoring from parameter-level grouping hints into reusable higher-level group structure, so subtree templates can preserve editing intent and operator guidance at the same hierarchy operators actually author against."
+    },
+    {
+      "id": "planning-experiment-os-add-group-level-preset-bundles-and-visibility-rules-to-subtree-templates",
+      "direction_id": "experiment-os",
+      "title": "Add group-level preset bundles and visibility rules to subtree templates",
+      "description": "Build on the shipped group-level subtree metadata so parameter groups can carry reusable preset bundles and group-specific visibility rules, with authoring, persistence, hydration, preview, and template-ref behavior that lets whole groups express deeper authoring intent instead of stopping at label, note, and default-collapse state.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 47,
+      "priority_reason": "The latest main-session reply explicitly says the remaining executable gap in subtree group metadata is deeper authoring behavior above the newly shipped label or help-note or collapse state: group-level preset bundles and group-specific visibility rules are still missing. That is the clearest follow-on task to continue the same feature line automatically.",
+      "depends_on": [
+        "planning-experiment-os-add-group-level-subtree-template-authoring-metadata-and-behavior"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T04:30:24Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os subtree template authoring from descriptive group metadata into executable reusable group behavior, so grouped predicate templates can encode preset-driven structure and conditional visibility at the same group layer operators edit."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
@@ -4907,13 +4925,13 @@
       "status": "proposed",
       "base_priority": 88,
       "dynamic_priority_delta": 1,
-      "priority_reason": "The latest main-session reply also mentions richer note formatting as an unfinished follow-up, but it is a less direct queue head than first-class group metadata and behavior because note representation should settle after the higher-level group authoring model is in place.",
+      "priority_reason": "The latest main-session reply still lists richer note formatting as unfinished work after group metadata shipped, but it remains behind the more directly executable behavior gap because note representation should settle after group-level preset bundles and visibility rules define the deeper authoring model.",
       "depends_on": [
-        "planning-experiment-os-add-group-level-subtree-template-authoring-metadata-and-behavior"
+        "planning-experiment-os-add-group-level-preset-bundles-and-visibility-rules-to-subtree-templates"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:41:00Z",
+      "updated_at": "2026-04-20T04:30:24Z",
       "source_turn_id": null,
       "direction_relation_note": "Keeps experiment-os template authoring guidance usable as subtree metadata becomes more structured by ensuring help notes can express richer operator context than a single flat string."
     },
