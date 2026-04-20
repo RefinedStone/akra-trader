@@ -7,6 +7,10 @@ Updated for the refactor baseline as of April 21, 2026.
 The frontend target is a workspace-routed control room where route state, shell layout, feature API
 calls, and dense presentation blocks can be understood in smaller units.
 
+For frontend work, LLM sensitivity means one operator flow should be understandable from one feature
+entrypoint and a few nearby collaborators, without reopening `App.tsx` or unrelated workspace
+panels.
+
 This wave introduces the first routing skeleton:
 
 - workspace route state moved into `apps/web/src/app/useWorkspaceRoute.ts`
@@ -19,7 +23,8 @@ This wave introduces the first routing skeleton:
 - run-surface capability contracts and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - the query-builder feature now has its own package under `apps/web/src/features/query-builder/*`
-  with a tiny entrypoint, a feature model module, and a dedicated component module
+  with a tiny entrypoint, a feature model module, a dedicated component module, and a separate
+  replay-governance section module
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -52,6 +57,9 @@ where routing and presentation structure are decided.
 - feature fetch helpers should group by feature, not accumulate in one file.
 - raw payload rendering must stay inside feature components, not shell layout.
 - no new workspace sections should be added directly to shell markup without a route or feature owner.
+- feature entry modules should stay near-trivial and point to narrower model/view modules.
+- when one feature mixes parser, storage, transport, governance, and dense JSX, it should split
+  along those concerns before more UI is added.
 
 ## First-Wave Move Map
 
@@ -66,6 +74,7 @@ where routing and presentation structure are decided.
 - remaining giant feature body
 - dense feature JSX still lives mostly in `App.tsx`, but query-builder no longer does
 - query-builder entry no longer mixes parser/storage/model helpers with the main component body
+- query-builder replay-link governance UI no longer lives inline with the rest of the feature body
 - top-level control-room type/constant, transport, and run-surface contract context no longer
   lives inline in that file
   - next waves should split comparison/history and run-panel bodies into feature-owned modules behind
@@ -87,4 +96,5 @@ where routing and presentation structure are decided.
 - workspace panel grouping can change without rewriting route selection branches in `App.tsx`
 - new workspace-level navigation changes happen under `src/app/*`
 - query-builder feature logic can evolve without reopening `App.tsx`
+- replay-link governance changes can happen without reopening the entire query-builder body
 - next feature splits can move one workspace at a time without redefining routing

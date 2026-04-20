@@ -106,8 +106,9 @@ It is not yet a finished live trading product:
 - run-surface capability and comparison-boundary helpers now live in
   `apps/web/src/runSurfaceCapabilities.tsx`
 - query-builder feature logic now lives under `apps/web/src/features/query-builder/*`
-- query-builder now separates a tiny entry module, a feature model module, and the main component
-  module so parser/storage logic is no longer mixed into the feature entrypoint
+- query-builder now separates a tiny entry module, a feature model module, a main component
+  module, and a replay-governance section module so parser/storage and replay governance are no
+  longer mixed into the feature entrypoint
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns,
   route-level panel selection, run-surface capability helpers, and query-builder rendering are no
   longer defined inline with the remaining control-room body
@@ -126,6 +127,8 @@ It is not yet a finished live trading product:
 - the top-level control-room file no longer owns its full type/constant, API helper, run-surface
   helper, or query-builder context, but it still owns too much feature-local state and dense
   rendering logic
+- the query-builder feature now has a smaller reading surface than before, but its main component
+  and model modules are still much larger than one flow should be
 - standalone surface binding catalogs are isolated from the executor now, but the catalog module is
   still broad and should split further by bounded flow
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator

@@ -11,6 +11,25 @@ The repository must be understandable in smaller units than it is today.
 - route/shell code must not own dense feature logic forever
 - provider/plugin dispatch must not grow through giant condition chains
 
+## LLM Sensitivity
+
+In this repository, "LLM sensitivity" means the codebase is shaped so an AI agent can understand and
+change one flow without loading unrelated flows.
+
+This is a structure rule, not a prompt trick.
+
+- one primary behavior should have one entry module and a small set of direct collaborators
+- a route, use case, or provider should usually be understandable from the entrypoint plus 2 to 4
+  directly related modules
+- feature entry modules should stay tiny and mostly re-export or compose smaller modules
+- shell, route, and adapter-facade files must not silently absorb parser, storage, policy, or dense
+  rendering logic
+- when one feature starts mixing model, storage, transport, governance, and view logic in one
+  place, it must split by those concerns before new work continues there
+
+The goal is not only smaller files. The goal is bounded reading context, so both humans and agents
+can modify one behavior without reopening the rest of the product.
+
 ## Current Refactor Baseline
 
 The first architecture-reset wave is now partially implemented:
@@ -68,3 +87,5 @@ New work should reinforce the split, not re-expand the monoliths.
 - add new provider routing through the registry layer
 - add new workspace-level navigation under `apps/web/src/app/*`
 - prefer support/use-case modules over adding more policy to `application.py`
+- when a module can no longer be understood as one flow with a few direct collaborators, split it
+  before adding more behavior
