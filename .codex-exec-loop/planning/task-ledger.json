@@ -5102,18 +5102,72 @@
       "direction_id": "experiment-os",
       "title": "Preview promoted replay drafts against simulation diff and stage partial apply decisions",
       "description": "Build the next apply-flow layer after replay-edge promotion by comparing the promoted manual override draft against the current simulation diff, surfacing a reviewable staged preview, and letting operators accept or reject only selected promoted changes instead of forcing an all-or-nothing apply from replay inspection.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 15,
-      "priority_reason": "The latest main-session reply says filtered replay edge promotion shipped in commit a8bb64b and directly names the remaining next step: preview the promoted draft against the current simulation diff and support partial accept or reject in a staged apply workflow. This is now the clearest executable queue head because replay inspection and manual-draft promotion are complete enough to support selective apply semantics.",
+      "priority_reason": "Completed in main session commit e1d8631, which added preview rows for promoted replay draft groups, compared current versus simulated versus draft bundles, let operators stage or skip partial apply decisions per row, recalculated summary and apply behavior from the staged subset only, surfaced simulation-match and current-resolution-change signals, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T23:20:00Z",
+      "updated_at": "2026-04-20T23:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os subtree coordination from draft promotion into operator-reviewable staged apply, so replay-derived bundle changes can be compared against current simulation state and accepted selectively instead of only landing as an opaque manual draft."
+      "direction_relation_note": "Completed the staged apply preview layer for replay-derived bundle promotion, so operators can review current versus simulated versus draft state and selectively stage affected groups before any final approval or confirmation step applies them."
+    },
+    {
+      "id": "planning-experiment-os-add-three-way-approval-flow-for-staged-replay-apply",
+      "direction_id": "experiment-os",
+      "title": "Add 3-way approval flow and diff-only confirmation before staged replay apply",
+      "description": "Finish the replay-derived staged apply workflow by comparing staged draft groups against current manual selections and simulated output in one 3-way review surface, then require a final diff-only confirmation step before apply so operators approve only the staged deltas they are about to promote.",
+      "status": "done",
+      "base_priority": 87,
+      "dynamic_priority_delta": 16,
+      "priority_reason": "Completed in main session commit 78d42ed, which replaced direct staged replay apply with a review-first approval flow, added per-row Current/Simulated/Draft 3-way comparison, diff-only confirmation filtering, row-level approve or reject state, safe approval reset on filter or replay-step changes, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
+      "depends_on": [
+        "planning-experiment-os-add-staged-apply-preview-and-partial-accept-for-promoted-replay-drafts"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Completed the 3-way approval review layer for replay-derived staged apply, so operators can compare Current, Simulated, and Draft rows, narrow review to changed rows only, and approve or reject each candidate change before any final pre-apply summary or reversal safety is added."
+    },
+    {
+      "id": "planning-experiment-os-add-final-summary-modal-before-approved-replay-draft-apply",
+      "direction_id": "experiment-os",
+      "title": "Require an explicit final summary modal before applying approved replay draft",
+      "description": "Add the next safety layer after row-level replay approval by opening a final summary modal that aggregates approved versus rejected rows, highlights the exact approved deltas still differing from current and simulated state, and requires explicit confirmation before the approved replay draft is promoted into manual override state.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 17,
+      "priority_reason": "The latest main-session reply explicitly says the next missing safety layer after commit 78d42ed is an explicit final summary modal before apply. This is the clearest executable queue head because the 3-way review, diff-only narrowing, and row-level approve or reject states already exist and now need one last aggregated confirmation surface before mutation.",
+      "depends_on": [
+        "planning-experiment-os-add-three-way-approval-flow-for-staged-replay-apply"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os operator trust by turning row-level replay approvals into a deliberate final pre-apply checkpoint, so the operator confirms the exact approved mutation set in one modal instead of inferring the final outcome from dispersed row state."
+    },
+    {
+      "id": "planning-experiment-os-preserve-applied-replay-drafts-in-an-undo-stack",
+      "direction_id": "experiment-os",
+      "title": "Preserve applied replay drafts in an undo stack",
+      "description": "Capture the pre-apply manual override state and applied replay-draft mutation set in a reversible undo stack so operators can roll back an approved replay apply after confirmation, instead of treating staged replay promotion as a one-way mutation.",
+      "status": "proposed",
+      "base_priority": 86,
+      "dynamic_priority_delta": 8,
+      "priority_reason": "The latest main-session reply also names undo-stack preservation as a remaining safety layer, but it still needs a product choice about scope such as in-memory versus durable history, stack depth, and whether undo should restore only manual override state or also row approval metadata. Keep it proposed behind the now-clear final summary modal.",
+      "depends_on": [
+        "planning-experiment-os-add-final-summary-modal-before-approved-replay-draft-apply"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:05:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os replay-derived mutation flows reversible after the new approval and final-summary layers land, which would strengthen operator recovery and reduce the cost of approving the wrong staged draft."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
