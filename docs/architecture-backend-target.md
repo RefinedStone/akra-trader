@@ -13,6 +13,8 @@ This is not fully complete yet. The current wave introduces the first executable
 - shared application defaults and comparison policy moved into `application_support/*`
 - standalone surface/runtime query types and filter/sort helpers moved into
   `application_support/runtime_queries.py`
+- standalone surface executor, query-discovery serialization, and subresource binding helpers moved
+  into `application_support/standalone_surfaces.py`
 - incident delivery dispatch is now driven by `adapters/operator_delivery_registry.py`
 
 ## Target Structure
@@ -58,6 +60,8 @@ This is not fully complete yet. The current wave introduces the first executable
     `application_support/run_surfaces.py`
   - keep standalone surface/runtime query types plus filter/sort evaluation helpers in
     `application_support/runtime_queries.py`
+  - keep standalone surface execution, collection-query discovery serialization, and run-subresource
+    binding helpers in `application_support/standalone_surfaces.py`
   - keep `application.py` as the import-compatible facade while these helpers move out
 - Incident delivery
   - keep provider implementations in `adapters/operator_delivery.py` for now
@@ -68,7 +72,7 @@ This is not fully complete yet. The current wave introduces the first executable
 - `application.py` is still too large and still mixes too many use cases.
 - `operator_delivery.py` still contains provider implementation bodies in one file.
 - `domain/models.py` remains too broad and should split by bounded feature area.
-- binding catalogs and standalone surface executors still need extraction into dedicated modules.
+- standalone surface binding catalogs still need extraction into dedicated modules.
 
 ## Done Criteria For This Track
 
