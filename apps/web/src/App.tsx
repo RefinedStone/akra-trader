@@ -15772,6 +15772,16 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState = {
   label: string;
   helpNote: string;
   collapsedByDefault: boolean;
+  visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+  presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
+};
+
+type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState = {
+  key: string;
+  label: string;
+  helpNote: string;
+  parameterValues: Record<string, string>;
+  parameterBindingPresets: Record<string, string>;
 };
 
 type RunSurfaceCollectionQueryBuilderPredicateTemplateState = {
@@ -15885,6 +15895,8 @@ function mergeRunSurfaceCollectionQueryBuilderTemplateGroups(
       label: existingGroup?.label || trimmedGroupName || "Ungrouped parameters",
       helpNote: existingGroup?.helpNote ?? "",
       collapsedByDefault: existingGroup?.collapsedByDefault ?? false,
+      visibilityRule: existingGroup?.visibilityRule ?? "always",
+      presetBundles: existingGroup?.presetBundles ?? [],
     });
   });
   return Array.from(derivedGroups.values());
@@ -15903,6 +15915,8 @@ function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
       label: string;
       helpNote: string;
       collapsedByDefault: boolean;
+      visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+      presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
       parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
     }
   >();
@@ -15921,6 +15935,8 @@ function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
       label,
       helpNote: group?.helpNote ?? "",
       collapsedByDefault: group?.collapsedByDefault ?? false,
+      visibilityRule: group?.visibilityRule ?? "always",
+      presetBundles: group?.presetBundles ?? [],
       parameters: [parameter],
     });
   });
@@ -16748,6 +16764,10 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
           return [];
         }
         const groupRecord = rawGroup as Record<string, unknown>;
+        const rawPresetBundles =
+          groupRecord.preset_bundles && typeof groupRecord.preset_bundles === "object" && !Array.isArray(groupRecord.preset_bundles)
+            ? Object.entries(groupRecord.preset_bundles as Record<string, unknown>)
+            : [];
         return [{
           key: groupKey,
           label:
@@ -16759,6 +16779,51 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
               ? groupRecord.help_note
               : "",
           collapsedByDefault: Boolean(groupRecord.collapsed),
+          visibilityRule:
+            groupRecord.visibility_rule === "manual"
+            || groupRecord.visibility_rule === "binding_active"
+            || groupRecord.visibility_rule === "value_active"
+              ? groupRecord.visibility_rule
+              : "always",
+          presetBundles: rawPresetBundles.flatMap(([bundleKey, rawBundle]) => {
+            if (!rawBundle || typeof rawBundle !== "object" || Array.isArray(rawBundle)) {
+              return [];
+            }
+            const bundleRecord = rawBundle as Record<string, unknown>;
+            const rawValues =
+              bundleRecord.values && typeof bundleRecord.values === "object" && !Array.isArray(bundleRecord.values)
+                ? (bundleRecord.values as Record<string, unknown>)
+                : {};
+            const rawBindings =
+              bundleRecord.binding_presets && typeof bundleRecord.binding_presets === "object" && !Array.isArray(bundleRecord.binding_presets)
+                ? (bundleRecord.binding_presets as Record<string, unknown>)
+                : {};
+            return [{
+              key: bundleKey,
+              label:
+                typeof bundleRecord.label === "string" && bundleRecord.label.trim()
+                  ? bundleRecord.label.trim()
+                  : bundleKey,
+              helpNote:
+                typeof bundleRecord.help_note === "string"
+                  ? bundleRecord.help_note
+                  : "",
+              parameterValues: Object.fromEntries(
+                Object.entries(rawValues).flatMap(([parameterKey, rawValue]) =>
+                  rawValue === undefined || rawValue === null
+                    ? []
+                    : [[parameterKey, formatCollectionQueryBuilderValue(rawValue, "string")]],
+                ),
+              ),
+              parameterBindingPresets: Object.fromEntries(
+                Object.entries(rawBindings).flatMap(([parameterKey, rawValue]) =>
+                  typeof rawValue === "string" && rawValue.trim()
+                    ? [[parameterKey, rawValue.trim()]]
+                    : [],
+                ),
+              ),
+            } satisfies RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState];
+          }),
         } satisfies RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState];
       });
       return [
@@ -17057,6 +17122,8 @@ function RunSurfaceCollectionQueryBuilder({
   const [templateParameterDraftOrderByContext, setTemplateParameterDraftOrderByContext] =
     useState<Record<string, string[]>>({});
   const [templateGroupExpansionByKey, setTemplateGroupExpansionByKey] = useState<Record<string, boolean>>({});
+  const [predicateRefGroupBundleSelections, setPredicateRefGroupBundleSelections] =
+    useState<Record<string, string>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -17439,6 +17506,43 @@ function RunSurfaceCollectionQueryBuilder({
                     ? { help_note: group.helpNote.trim() }
                     : {}),
                   ...(group.collapsedByDefault ? { collapsed: true } : {}),
+                  ...(group.visibilityRule !== "always"
+                    ? { visibility_rule: group.visibilityRule }
+                    : {}),
+                  ...(group.presetBundles.length
+                    ? {
+                        preset_bundles: Object.fromEntries(
+                          group.presetBundles.map((bundle) => [
+                            bundle.key,
+                            {
+                              label: bundle.label,
+                              ...(bundle.helpNote.trim()
+                                ? { help_note: bundle.helpNote.trim() }
+                                : {}),
+                              ...(Object.keys(bundle.parameterValues).length
+                                ? {
+                                    values: Object.fromEntries(
+                                      Object.entries(bundle.parameterValues).map(([parameterKey, value]) => [
+                                        parameterKey,
+                                        coerceCollectionQueryBuilderValue(value, "string"),
+                                      ]),
+                                    ),
+                                  }
+                                : {}),
+                              ...(Object.keys(bundle.parameterBindingPresets).length
+                                ? {
+                                    binding_presets: Object.fromEntries(
+                                      Object.entries(bundle.parameterBindingPresets).flatMap(([parameterKey, value]) =>
+                                        value.trim() ? [[parameterKey, value.trim()]] : [],
+                                      ),
+                                    ),
+                                  }
+                                : {}),
+                            },
+                          ]),
+                        ),
+                      }
+                    : {}),
                 },
               ]),
             )
@@ -17927,6 +18031,35 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [selectedRefTemplate],
   );
+  const doesTemplateGroupMatchVisibilityRule = useCallback(
+    (
+      group: {
+        visibilityRule: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["visibilityRule"];
+        parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+      },
+      bindings: Record<string, string>,
+    ) => {
+      if (group.visibilityRule === "always") {
+        return true;
+      }
+      if (group.visibilityRule === "manual") {
+        return false;
+      }
+      if (group.visibilityRule === "binding_active") {
+        return group.parameters.some((parameter) => {
+          const currentValue = bindings[parameter.key]?.trim() ?? "";
+          return Boolean(fromRunSurfaceCollectionQueryBindingReferenceValue(currentValue))
+            || Boolean(parameter.bindingPreset.trim());
+        });
+      }
+      return group.parameters.some((parameter) => {
+        const currentValue = bindings[parameter.key]?.trim() ?? "";
+        return Boolean(currentValue && !isRunSurfaceCollectionQueryBindingReferenceValue(currentValue))
+          || Boolean(parameter.defaultValue.trim());
+      });
+    },
+    [],
+  );
   const isTemplateGroupExpanded = useCallback(
     (viewKey: string, collapsedByDefault: boolean) => (
       templateGroupExpansionByKey[viewKey] ?? !collapsedByDefault
@@ -17939,6 +18072,44 @@ function RunSurfaceCollectionQueryBuilder({
       [viewKey]: !(current[viewKey] ?? !collapsedByDefault),
     }));
   }, []);
+  const applyPredicateRefGroupPresetBundle = useCallback(
+    (
+      templateId: string,
+      group: {
+        key: string;
+        parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+      },
+      bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState | null,
+    ) => {
+      const selectionKey = `${templateId}:${group.key}`;
+      setPredicateRefGroupBundleSelections((current) => ({
+        ...current,
+        [selectionKey]: bundle?.key ?? "",
+      }));
+      setPredicateRefDraftBindings((current) => {
+        const next = { ...current };
+        group.parameters.forEach((parameter) => {
+          delete next[parameter.key];
+        });
+        if (!bundle) {
+          return next;
+        }
+        group.parameters.forEach((parameter) => {
+          const bindingPreset = bundle.parameterBindingPresets[parameter.key]?.trim();
+          if (bindingPreset) {
+            next[parameter.key] = toRunSurfaceCollectionQueryBindingReferenceValue(bindingPreset);
+            return;
+          }
+          const parameterValue = bundle.parameterValues[parameter.key];
+          if (parameterValue?.trim()) {
+            next[parameter.key] = parameterValue;
+          }
+        });
+        return next;
+      });
+    },
+    [],
+  );
   const canAddPredicateRef = Boolean(
     predicateRefDraftKey
     && (
@@ -18191,6 +18362,8 @@ function RunSurfaceCollectionQueryBuilder({
           label: groupOverride?.label?.trim() || group.label,
           helpNote: groupOverride?.helpNote ?? group.helpNote,
           collapsedByDefault: groupOverride?.collapsedByDefault ?? group.collapsedByDefault,
+          visibilityRule: groupOverride?.visibilityRule ?? group.visibilityRule,
+          presetBundles: groupOverride?.presetBundles ?? group.presetBundles,
         };
       }),
     [templateParameterGroupDraftMetadataByContext],
@@ -18416,6 +18589,8 @@ function RunSurfaceCollectionQueryBuilder({
           label: groupKey === "__ungrouped__" ? "Ungrouped parameters" : groupKey,
           helpNote: "",
           collapsedByDefault: false,
+          visibilityRule: "always",
+          presetBundles: [],
         };
         return {
           ...current,
@@ -18436,6 +18611,8 @@ function RunSurfaceCollectionQueryBuilder({
         label: string;
         helpNote: string;
         collapsedByDefault: boolean;
+        visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+        presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
         parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
       },
       nextLabel: string,
@@ -18457,6 +18634,8 @@ function RunSurfaceCollectionQueryBuilder({
           label: group.label,
           helpNote: group.helpNote,
           collapsedByDefault: group.collapsedByDefault,
+          visibilityRule: group.visibilityRule,
+          presetBundles: group.presetBundles,
         };
         delete currentContext[group.key];
         currentContext[nextGroupKey] = {
@@ -18470,6 +18649,70 @@ function RunSurfaceCollectionQueryBuilder({
       });
     },
     [],
+  );
+  const appendTemplateParameterGroupPresetBundle = useCallback(
+    (
+      contextKey: string,
+      group: {
+        key: string;
+        label: string;
+      },
+    ) => {
+      updateTemplateParameterGroupDraftMetadata(
+        contextKey,
+        group.key,
+        (currentGroup) => ({
+          ...currentGroup,
+          label: currentGroup.label || group.label,
+          presetBundles: [
+            ...(currentGroup.presetBundles ?? []),
+            {
+              key: `bundle_${(currentGroup.presetBundles?.length ?? 0) + 1}`,
+              label: `${group.label} preset ${(currentGroup.presetBundles?.length ?? 0) + 1}`,
+              helpNote: "",
+              parameterValues: {},
+              parameterBindingPresets: {},
+            },
+          ],
+        }),
+      );
+    },
+    [updateTemplateParameterGroupDraftMetadata],
+  );
+  const updateTemplateParameterGroupPresetBundle = useCallback(
+    (
+      contextKey: string,
+      groupKey: string,
+      bundleKey: string,
+      updater: (
+        bundle: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState,
+      ) => RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState,
+    ) => {
+      updateTemplateParameterGroupDraftMetadata(
+        contextKey,
+        groupKey,
+        (currentGroup) => ({
+          ...currentGroup,
+          presetBundles: (currentGroup.presetBundles ?? []).map((bundle) =>
+            bundle.key === bundleKey ? updater(bundle) : bundle,
+          ),
+        }),
+      );
+    },
+    [updateTemplateParameterGroupDraftMetadata],
+  );
+  const removeTemplateParameterGroupPresetBundle = useCallback(
+    (contextKey: string, groupKey: string, bundleKey: string) => {
+      updateTemplateParameterGroupDraftMetadata(
+        contextKey,
+        groupKey,
+        (currentGroup) => ({
+          ...currentGroup,
+          presetBundles: (currentGroup.presetBundles ?? []).filter((bundle) => bundle.key !== bundleKey),
+        }),
+      );
+    },
+    [updateTemplateParameterGroupDraftMetadata],
   );
   const updateTemplateParameterDraftBindingPreset = useCallback(
     (contextKey: string, parameterKey: string, value: string) => {
@@ -19080,6 +19323,27 @@ function RunSurfaceCollectionQueryBuilder({
                               value={parameterGroup.helpNote}
                             />
                           </label>
+                          <label className="run-surface-query-builder-control">
+                            <span>Visibility rule</span>
+                            <select
+                              onChange={(event) =>
+                                updateTemplateParameterGroupDraftMetadata(
+                                  templateParameterEditorContextKey,
+                                  parameterGroup.key,
+                                  (group) => ({
+                                    ...group,
+                                    label: group.label || parameterGroup.label,
+                                    visibilityRule: event.target.value as RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["visibilityRule"],
+                                  }),
+                                )}
+                              value={parameterGroup.visibilityRule}
+                            >
+                              <option value="always">Always show</option>
+                              <option value="manual">Show on manual reveal</option>
+                              <option value="binding_active">Show when binding is active</option>
+                              <option value="value_active">Show when value/default is active</option>
+                            </select>
+                          </label>
                           <label className="run-surface-query-builder-checkbox">
                             <input
                               checked={parameterGroup.collapsedByDefault}
@@ -19100,6 +19364,196 @@ function RunSurfaceCollectionQueryBuilder({
                         </div>
                         {parameterGroup.helpNote.trim() ? (
                           <p className="run-note">{parameterGroup.helpNote}</p>
+                        ) : null}
+                        <div className="run-surface-query-builder-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() =>
+                              appendTemplateParameterGroupPresetBundle(
+                                templateParameterEditorContextKey,
+                                parameterGroup,
+                              )}
+                            type="button"
+                          >
+                            Add preset bundle
+                          </button>
+                        </div>
+                        {parameterGroup.presetBundles.length ? (
+                          <div className="run-surface-query-builder-domain-list">
+                            {parameterGroup.presetBundles.map((bundle) => (
+                              <div
+                                className="run-surface-query-builder-domain-card"
+                                key={`${parameterGroup.key}:bundle:${bundle.key}`}
+                              >
+                                <div className="run-surface-query-builder-card-head">
+                                  <strong>{bundle.label}</strong>
+                                  <span>{bundle.key}</span>
+                                </div>
+                                <div className="run-surface-query-builder-actions">
+                                  <button
+                                    className="ghost-button"
+                                    onClick={() =>
+                                      removeTemplateParameterGroupPresetBundle(
+                                        templateParameterEditorContextKey,
+                                        parameterGroup.key,
+                                        bundle.key,
+                                      )}
+                                    type="button"
+                                  >
+                                    Remove bundle
+                                  </button>
+                                </div>
+                                <div className="run-surface-query-builder-parameter-grid">
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Bundle key</span>
+                                    <input
+                                      type="text"
+                                      value={bundle.key}
+                                      onChange={(event) =>
+                                        updateTemplateParameterGroupPresetBundle(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          (currentBundle) => ({
+                                            ...currentBundle,
+                                            key: event.target.value,
+                                          }),
+                                        )}
+                                      placeholder="focus_on_bindings"
+                                    />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Bundle label</span>
+                                    <input
+                                      type="text"
+                                      value={bundle.label}
+                                      onChange={(event) =>
+                                        updateTemplateParameterGroupPresetBundle(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          (currentBundle) => ({
+                                            ...currentBundle,
+                                            label: event.target.value,
+                                          }),
+                                        )}
+                                      placeholder="Focus on bindings"
+                                    />
+                                  </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Bundle help note</span>
+                                    <textarea
+                                      onChange={(event) =>
+                                        updateTemplateParameterGroupPresetBundle(
+                                          templateParameterEditorContextKey,
+                                          parameterGroup.key,
+                                          bundle.key,
+                                          (currentBundle) => ({
+                                            ...currentBundle,
+                                            helpNote: event.target.value,
+                                          }),
+                                        )}
+                                      placeholder="Optional note for when this bundle should be used"
+                                      rows={2}
+                                      value={bundle.helpNote}
+                                    />
+                                  </label>
+                                </div>
+                                <div className="run-surface-query-builder-parameter-grid">
+                                  {parameterGroup.parameters.map((parameter) => {
+                                    const bundleValue = bundle.parameterValues[parameter.key] ?? "";
+                                    const bundleBindingPreset = bundle.parameterBindingPresets[parameter.key] ?? "";
+                                    return (
+                                      <div
+                                        className="run-surface-query-builder-domain-card"
+                                        key={`${bundle.key}:${parameter.key}`}
+                                      >
+                                        <div className="run-surface-query-builder-card-head">
+                                          <strong>{parameter.customLabel.trim() || parameter.label}</strong>
+                                          <span>{parameter.key}</span>
+                                        </div>
+                                        <div className="run-surface-query-builder-parameter-grid">
+                                          <label className="run-surface-query-builder-control">
+                                            <span>Bundle value</span>
+                                            {parameter.options.length ? (
+                                              <select
+                                                value={bundleValue}
+                                                onChange={(event) =>
+                                                  updateTemplateParameterGroupPresetBundle(
+                                                    templateParameterEditorContextKey,
+                                                    parameterGroup.key,
+                                                    bundle.key,
+                                                    (currentBundle) => ({
+                                                      ...currentBundle,
+                                                      parameterValues: {
+                                                        ...currentBundle.parameterValues,
+                                                        [parameter.key]: event.target.value,
+                                                      },
+                                                    }),
+                                                  )}
+                                              >
+                                                <option value="">No bundle value</option>
+                                                {Array.from(
+                                                  new Set([
+                                                    ...parameter.options,
+                                                    bundleValue,
+                                                  ].filter(Boolean)),
+                                                ).map((value) => (
+                                                  <option key={`${bundle.key}:${parameter.key}:value:${value}`} value={value}>
+                                                    {value}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            ) : (
+                                              <input
+                                                type="text"
+                                                value={bundleValue}
+                                                onChange={(event) =>
+                                                  updateTemplateParameterGroupPresetBundle(
+                                                    templateParameterEditorContextKey,
+                                                    parameterGroup.key,
+                                                    bundle.key,
+                                                    (currentBundle) => ({
+                                                      ...currentBundle,
+                                                      parameterValues: {
+                                                        ...currentBundle.parameterValues,
+                                                        [parameter.key]: event.target.value,
+                                                      },
+                                                    }),
+                                                  )}
+                                                placeholder={`Preset value (${parameter.valueType})`}
+                                              />
+                                            )}
+                                          </label>
+                                          <label className="run-surface-query-builder-control">
+                                            <span>Bundle binding preset</span>
+                                            <input
+                                              type="text"
+                                              value={bundleBindingPreset}
+                                              onChange={(event) =>
+                                                updateTemplateParameterGroupPresetBundle(
+                                                  templateParameterEditorContextKey,
+                                                  parameterGroup.key,
+                                                  bundle.key,
+                                                  (currentBundle) => ({
+                                                    ...currentBundle,
+                                                    parameterBindingPresets: {
+                                                      ...currentBundle.parameterBindingPresets,
+                                                      [parameter.key]: event.target.value,
+                                                    },
+                                                  }),
+                                                )}
+                                              placeholder="outer_template_parameter"
+                                            />
+                                          </label>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
                         ) : null}
                         <div className="run-surface-query-builder-parameter-grid">
                           {parameterGroup.parameters.map((parameter) => {
@@ -19283,6 +19737,15 @@ function RunSurfaceCollectionQueryBuilder({
                   {selectedRefTemplateParameterGroups.map((parameterGroup) => {
                     const groupViewKey = `ref:${selectedRefTemplate.id}:${parameterGroup.key}`;
                     const isExpanded = isTemplateGroupExpanded(groupViewKey, parameterGroup.collapsedByDefault);
+                    const matchesVisibilityRule = doesTemplateGroupMatchVisibilityRule(
+                      parameterGroup,
+                      predicateRefDraftBindings,
+                    );
+                    const hasManualReveal = Boolean(templateGroupExpansionByKey[groupViewKey]);
+                    const isGroupContentVisible = matchesVisibilityRule
+                      ? isExpanded
+                      : hasManualReveal;
+                    const selectedBundleKey = predicateRefGroupBundleSelections[`${selectedRefTemplate.id}:${parameterGroup.key}`] ?? "";
                     return (
                       <div className="run-surface-query-builder-section" key={groupViewKey}>
                         <div className="run-surface-query-builder-card-head">
@@ -19296,18 +19759,52 @@ function RunSurfaceCollectionQueryBuilder({
                               toggleTemplateGroupExpanded(groupViewKey, parameterGroup.collapsedByDefault)}
                             type="button"
                           >
-                            {isExpanded ? "Collapse group" : "Expand group"}
+                            {isExpanded ? "Collapse group" : matchesVisibilityRule ? "Expand group" : "Reveal group"}
                           </button>
                         </div>
                         <p className="run-note">
                           {parameterGroup.collapsedByDefault
                             ? "Collapsed by default when this template is inserted."
                             : "Expanded by default when this template is inserted."}
+                          {parameterGroup.visibilityRule !== "always"
+                            ? ` · visibility ${parameterGroup.visibilityRule.replaceAll("_", " ")}`
+                            : ""}
                         </p>
                         {parameterGroup.helpNote.trim() ? (
                           <p className="run-note">{parameterGroup.helpNote}</p>
                         ) : null}
-                        {isExpanded ? (
+                        {parameterGroup.presetBundles.length ? (
+                          <div className="run-surface-query-builder-inline-grid">
+                            <label className="run-surface-query-builder-control">
+                              <span>Preset bundle</span>
+                              <select
+                                value={selectedBundleKey}
+                                onChange={(event) => {
+                                  const nextBundle =
+                                    parameterGroup.presetBundles.find((bundle) => bundle.key === event.target.value)
+                                    ?? null;
+                                  applyPredicateRefGroupPresetBundle(selectedRefTemplate.id, parameterGroup, nextBundle);
+                                }}
+                              >
+                                <option value="">No bundle</option>
+                                {parameterGroup.presetBundles.map((bundle) => (
+                                  <option key={`${parameterGroup.key}:${bundle.key}`} value={bundle.key}>
+                                    {bundle.label}
+                                  </option>
+                                ))}
+                              </select>
+                              <small>
+                                {selectedBundleKey
+                                  ? (
+                                      parameterGroup.presetBundles.find((bundle) => bundle.key === selectedBundleKey)?.helpNote
+                                      || "Applies the selected group preset bundle."
+                                    )
+                                  : "Apply a preset bundle to prefill bindings and literal values for this group."}
+                              </small>
+                            </label>
+                          </div>
+                        ) : null}
+                        {isGroupContentVisible ? (
                           <div className="run-surface-query-builder-parameter-grid">
                             {parameterGroup.parameters.map((parameter) => {
                               const rawBindingValue = predicateRefDraftBindings[parameter.key] ?? "";
@@ -19654,9 +20151,42 @@ function RunSurfaceCollectionQueryBuilder({
                                         {parameterGroup.collapsedByDefault
                                           ? "Collapsed by default in template consumers."
                                           : "Expanded by default in template consumers."}
+                                        {parameterGroup.visibilityRule !== "always"
+                                          ? ` · visibility ${parameterGroup.visibilityRule.replaceAll("_", " ")}`
+                                          : ""}
                                       </p>
                                       {parameterGroup.helpNote.trim() ? (
                                         <p className="run-note">{parameterGroup.helpNote}</p>
+                                      ) : null}
+                                      {parameterGroup.presetBundles.length ? (
+                                        <div className="run-surface-query-builder-domain-list">
+                                          {parameterGroup.presetBundles.map((bundle) => (
+                                            <div
+                                              className="run-surface-query-builder-domain-card"
+                                              key={`${template.id}:${parameterGroup.key}:bundle:${bundle.key}`}
+                                            >
+                                              <div className="run-surface-query-builder-card-head">
+                                                <strong>{bundle.label}</strong>
+                                                <span>{bundle.key}</span>
+                                              </div>
+                                              <div className="run-surface-family-chip-row">
+                                                {Object.keys(bundle.parameterValues).length ? (
+                                                  <span className="run-surface-family-chip">
+                                                    {`${Object.keys(bundle.parameterValues).length} preset value${Object.keys(bundle.parameterValues).length === 1 ? "" : "s"}`}
+                                                  </span>
+                                                ) : null}
+                                                {Object.keys(bundle.parameterBindingPresets).length ? (
+                                                  <span className="run-surface-family-chip">
+                                                    {`${Object.keys(bundle.parameterBindingPresets).length} binding preset${Object.keys(bundle.parameterBindingPresets).length === 1 ? "" : "s"}`}
+                                                  </span>
+                                                ) : null}
+                                              </div>
+                                              {bundle.helpNote.trim() ? (
+                                                <p className="run-note">{bundle.helpNote}</p>
+                                              ) : null}
+                                            </div>
+                                          ))}
+                                        </div>
                                       ) : null}
                                       {isExpanded ? (
                                         <div className="run-surface-query-builder-domain-list">
