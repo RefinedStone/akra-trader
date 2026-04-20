@@ -5480,18 +5480,36 @@
       "direction_id": "experiment-os",
       "title": "Add step-level truth table and short-circuit evaluation traces to replay explanations",
       "description": "Extend replay explanation provenance beyond matched branches and comparison locations by showing the step-level evaluation trace itself: which runtime candidate values each comparison saw, which comparisons resolved true or false, and how sibling predicate branches short-circuited or were skipped, so operators can read a truth-table style account of why each replay explanation evaluated the way it did.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is the evaluation result truth-table layer: matched branches and comparison details now ship, but operators still cannot see which runtime candidate values made each comparison true or false or how sibling branches short-circuited step by step. That is the clearest executable next task after commit 5b039e7.",
+      "priority_reason": "Completed in main session commit beb2424, which extended replay explanations with step-level truth-table rendering plus short-circuit traces across focused causal chains and active replay steps, surfaced clause or predicate ref or subgroup truth outcomes from reviewed binding provenance, explained which AND or OR child fixed the result and which siblings were skipped, and verified the UI with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-trace-evaluation-level-provenance-to-matched-predicate-branches-and-comparisons"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T07:50:00Z",
+      "updated_at": "2026-04-20T08:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from evaluation-location provenance into operator-readable execution outcomes, so replay explanations can show not just which branch matched but how runtime candidate values and branch short-circuiting produced the final truth result."
+      "direction_relation_note": "Completed the first truth-table replay explanation pass for experiment-os by making reviewed-binding provenance and subgroup short-circuit behavior readable step by step, which now leaves data-backed runtime candidate evaluation as the next trust gap."
+    },
+    {
+      "id": "planning-experiment-os-add-runtime-candidate-level-evaluation-traces-to-replay-explanations",
+      "direction_id": "experiment-os",
+      "title": "Add runtime candidate-level evaluation traces to replay explanations",
+      "description": "Build on the shipped step-level truth table and short-circuit replay explanation UI by tracing each comparison back to the actual runtime collection candidate value that was evaluated, so operators can see which concrete candidate field values made a predicate true or false instead of reading only reviewed-binding provenance or template-level relevance traces.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply says the shipped truth-table and short-circuit trace still stops at provenance relevance: operators cannot yet inspect the actual collection candidate values that each comparison evaluated or read a fully data-backed evaluation trace. That is now the clearest executable next task after commit beb2424.",
+      "depends_on": [
+        "planning-experiment-os-add-step-level-truth-table-and-short-circuit-evaluation-traces-to-replay-explanations"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T08:06:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from reviewed-binding truth-table provenance into concrete runtime data evaluation, so replay explanations can show not only which clause path mattered but exactly which candidate values made each comparison resolve true or false."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
