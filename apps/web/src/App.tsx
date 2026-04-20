@@ -15773,6 +15773,7 @@ type RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState = {
   helpNote: string;
   collapsedByDefault: boolean;
   visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+  coordinationPolicy: "manual_source_priority" | "highest_source_priority" | "sticky_auto_selection" | "manual_resolution";
   presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
 };
 
@@ -15905,6 +15906,7 @@ function mergeRunSurfaceCollectionQueryBuilderTemplateGroups(
       helpNote: existingGroup?.helpNote ?? "",
       collapsedByDefault: existingGroup?.collapsedByDefault ?? false,
       visibilityRule: existingGroup?.visibilityRule ?? "always",
+      coordinationPolicy: existingGroup?.coordinationPolicy ?? "manual_source_priority",
       presetBundles: existingGroup?.presetBundles ?? [],
     });
   });
@@ -15925,6 +15927,7 @@ function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
       helpNote: string;
       collapsedByDefault: boolean;
       visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+      coordinationPolicy: "manual_source_priority" | "highest_source_priority" | "sticky_auto_selection" | "manual_resolution";
       presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
       parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
     }
@@ -15945,6 +15948,7 @@ function groupRunSurfaceCollectionQueryBuilderTemplateParameters(
       helpNote: group?.helpNote ?? "",
       collapsedByDefault: group?.collapsedByDefault ?? false,
       visibilityRule: group?.visibilityRule ?? "always",
+      coordinationPolicy: group?.coordinationPolicy ?? "manual_source_priority",
       presetBundles: group?.presetBundles ?? [],
       parameters: [parameter],
     });
@@ -15965,6 +15969,21 @@ function sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(
     }
     return left.key.localeCompare(right.key);
   });
+}
+
+function formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(
+  policy: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"],
+) {
+  if (policy === "manual_source_priority") {
+    return "prefer manual source";
+  }
+  if (policy === "highest_source_priority") {
+    return "highest source priority";
+  }
+  if (policy === "sticky_auto_selection") {
+    return "keep current auto choice";
+  }
+  return "manual resolution";
 }
 
 function cloneRunSurfaceCollectionQueryBuilderChildState(
@@ -16809,6 +16828,12 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
             || groupRecord.visibility_rule === "value_active"
               ? groupRecord.visibility_rule
               : "always",
+          coordinationPolicy:
+            groupRecord.coordination_policy === "highest_source_priority"
+            || groupRecord.coordination_policy === "sticky_auto_selection"
+            || groupRecord.coordination_policy === "manual_resolution"
+              ? groupRecord.coordination_policy
+              : "manual_source_priority",
           presetBundles: rawPresetBundles.flatMap(([bundleKey, rawBundle]) => {
             if (!rawBundle || typeof rawBundle !== "object" || Array.isArray(rawBundle)) {
               return [];
@@ -17571,6 +17596,9 @@ function RunSurfaceCollectionQueryBuilder({
                   ...(group.visibilityRule !== "always"
                     ? { visibility_rule: group.visibilityRule }
                     : {}),
+                  ...(group.coordinationPolicy !== "manual_source_priority"
+                    ? { coordination_policy: group.coordinationPolicy }
+                    : {}),
                   ...(group.presetBundles.length
                     ? {
                         preset_bundles: Object.fromEntries(
@@ -18122,6 +18150,7 @@ function RunSurfaceCollectionQueryBuilder({
     (
       group: {
         visibilityRule: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["visibilityRule"];
+        coordinationPolicy: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"];
         parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
       },
       bindings: Record<string, string>,
@@ -18249,8 +18278,27 @@ function RunSurfaceCollectionQueryBuilder({
           bundleKey: string;
           bundleLabel: string;
         }>>,
+        conflictRequestsByGroupKey: {} as Record<string, Array<{
+          bundleKey: string;
+          bundleLabel: string;
+          targetPriority: number;
+          hasManualSource: boolean;
+          maxSourcePriority: number;
+          sourceLabels: string[];
+        }>>,
       };
     }
+    type DependencyRequest = {
+      bundleKey: string;
+      bundleLabel: string;
+      targetPriority: number;
+      sourceGroupKey: string;
+      sourceGroupLabel: string;
+      sourceBundleKey: string;
+      sourceBundleLabel: string;
+      sourcePriority: number;
+      manualSource: boolean;
+    };
     const groupMap = new Map(
       selectedRefTemplateParameterGroups.map((group) => [group.key, group] as const),
     );
@@ -18265,15 +18313,7 @@ function RunSurfaceCollectionQueryBuilder({
       resolvedSelectionsByGroupKey: Record<string, string>,
       includePredictedAutoCandidates = false,
     ) => {
-      const requestsByGroupKey: Record<string, Array<{
-        bundleKey: string;
-        sourceGroupKey: string;
-        sourceGroupLabel: string;
-        sourceBundleKey: string;
-        sourceBundleLabel: string;
-        sourcePriority: number;
-        manualSource: boolean;
-      }>> = {};
+      const requestsByGroupKey: Record<string, DependencyRequest[]> = {};
       const appendRequestsFromBundle = (
         sourceGroupKey: string,
         sourceBundleKey: string,
@@ -18293,6 +18333,8 @@ function RunSurfaceCollectionQueryBuilder({
             ...(requestsByGroupKey[dependency.groupKey] ?? []),
             {
               bundleKey: dependency.bundleKey,
+              bundleLabel: targetBundle.label,
+              targetPriority: targetBundle.priority,
               sourceGroupKey,
               sourceGroupLabel: sourceGroup.label,
               sourceBundleKey,
@@ -18326,6 +18368,67 @@ function RunSurfaceCollectionQueryBuilder({
       }
       return requestsByGroupKey;
     };
+    const aggregateDependencyRequests = (requests: DependencyRequest[]) =>
+      Object.values(
+        requests.reduce<Record<string, {
+          bundleKey: string;
+          bundleLabel: string;
+          targetPriority: number;
+          hasManualSource: boolean;
+          maxSourcePriority: number;
+          sourceLabels: string[];
+        }>>((accumulator, request) => {
+          const existing = accumulator[request.bundleKey];
+          const sourceLabel = `${request.sourceGroupLabel} → ${request.sourceBundleLabel}`;
+          if (existing) {
+            existing.hasManualSource = existing.hasManualSource || request.manualSource;
+            existing.maxSourcePriority = Math.max(existing.maxSourcePriority, request.sourcePriority);
+            if (!existing.sourceLabels.includes(sourceLabel)) {
+              existing.sourceLabels.push(sourceLabel);
+            }
+            return accumulator;
+          }
+          accumulator[request.bundleKey] = {
+            bundleKey: request.bundleKey,
+            bundleLabel: request.bundleLabel,
+            targetPriority: request.targetPriority,
+            hasManualSource: request.manualSource,
+            maxSourcePriority: request.sourcePriority,
+            sourceLabels: [sourceLabel],
+          };
+          return accumulator;
+        }, {}),
+      );
+    const sortAggregatedDependencyRequests = (
+      summaries: Array<{
+        bundleKey: string;
+        bundleLabel: string;
+        targetPriority: number;
+        hasManualSource: boolean;
+        maxSourcePriority: number;
+        sourceLabels: string[];
+      }>,
+      policy: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"],
+      stickyBundleKey: string,
+    ) => [...summaries].sort((left, right) => {
+      if (policy === "sticky_auto_selection") {
+        if (left.bundleKey === stickyBundleKey || right.bundleKey === stickyBundleKey) {
+          return Number(right.bundleKey === stickyBundleKey) - Number(left.bundleKey === stickyBundleKey);
+        }
+      }
+      if (policy === "manual_source_priority") {
+        if (Number(right.hasManualSource) !== Number(left.hasManualSource)) {
+          return Number(right.hasManualSource) - Number(left.hasManualSource);
+        }
+      }
+      if (right.maxSourcePriority !== left.maxSourcePriority) {
+        return right.maxSourcePriority - left.maxSourcePriority;
+      }
+      if (right.targetPriority !== left.targetPriority) {
+        return right.targetPriority - left.targetPriority;
+      }
+      return left.bundleLabel.localeCompare(right.bundleLabel);
+    });
     const manualSelectionsByGroupKey = Object.fromEntries(
       selectedRefTemplateParameterGroups.flatMap((group) => {
         const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
@@ -18345,22 +18448,18 @@ function RunSurfaceCollectionQueryBuilder({
         if (resolvedSelectionsByGroupKey[group.key]) {
           return;
         }
-        const dependencyRequests = [...(dependencyRequestsByGroupKey[group.key] ?? [])].sort((left, right) => {
-          if (Number(right.manualSource) !== Number(left.manualSource)) {
-            return Number(right.manualSource) - Number(left.manualSource);
-          }
-          if (right.sourcePriority !== left.sourcePriority) {
-            return right.sourcePriority - left.sourcePriority;
-          }
-          const sourceLabelComparison = left.sourceGroupLabel.localeCompare(right.sourceGroupLabel);
-          if (sourceLabelComparison !== 0) {
-            return sourceLabelComparison;
-          }
-          return left.bundleKey.localeCompare(right.bundleKey);
-        });
-        const dependencyDrivenBundle = dependencyRequests.find((request) =>
-          Boolean(getGroupBundle(group.key, request.bundleKey)),
+        const dependencyRequests = dependencyRequestsByGroupKey[group.key] ?? [];
+        const aggregatedDependencyRequests = aggregateDependencyRequests(dependencyRequests);
+        const stickyBundleKey = predicateRefGroupAutoBundleSelections[`${selectedRefTemplate.id}:${group.key}`] ?? "";
+        const sortedDependencyRequests = sortAggregatedDependencyRequests(
+          aggregatedDependencyRequests,
+          group.coordinationPolicy,
+          stickyBundleKey,
         );
+        if (sortedDependencyRequests.length > 1 && group.coordinationPolicy === "manual_resolution") {
+          return;
+        }
+        const dependencyDrivenBundle = sortedDependencyRequests[0] ?? null;
         if (dependencyDrivenBundle) {
           resolvedSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
           autoSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
@@ -18381,6 +18480,20 @@ function RunSurfaceCollectionQueryBuilder({
       });
     }
     const dependencyRequestsByGroupKey = buildDependencyRequests(resolvedSelectionsByGroupKey);
+    const conflictRequestsByGroupKey = Object.fromEntries(
+      selectedRefTemplateParameterGroups.flatMap((group) => {
+        const aggregatedDependencyRequests = aggregateDependencyRequests(
+          dependencyRequestsByGroupKey[group.key] ?? [],
+        );
+        return aggregatedDependencyRequests.length > 1
+          ? [[group.key, sortAggregatedDependencyRequests(
+              aggregatedDependencyRequests,
+              group.coordinationPolicy,
+              predicateRefGroupAutoBundleSelections[`${selectedRefTemplate.id}:${group.key}`] ?? "",
+            )]]
+          : [];
+      }),
+    );
     const unmetDependenciesByGroupKey = Object.fromEntries(
       Object.entries(resolvedSelectionsByGroupKey).flatMap(([groupKey, bundleKey]) => {
         const bundle = getGroupBundle(groupKey, bundleKey);
@@ -18416,11 +18529,13 @@ function RunSurfaceCollectionQueryBuilder({
       resolvedSelectionsByGroupKey,
       dependencyRequestsByGroupKey,
       unmetDependenciesByGroupKey,
+      conflictRequestsByGroupKey,
     };
   }, [
     doesTemplateGroupBundleMatchAutoSelectRule,
     getSortedTemplateGroupPresetBundles,
     predicateRefDraftBindings,
+    predicateRefGroupAutoBundleSelections,
     predicateRefGroupBundleSelections,
     selectedRefTemplate,
     selectedRefTemplateParameterGroups,
@@ -18774,6 +18889,7 @@ function RunSurfaceCollectionQueryBuilder({
           helpNote: groupOverride?.helpNote ?? group.helpNote,
           collapsedByDefault: groupOverride?.collapsedByDefault ?? group.collapsedByDefault,
           visibilityRule: groupOverride?.visibilityRule ?? group.visibilityRule,
+          coordinationPolicy: groupOverride?.coordinationPolicy ?? group.coordinationPolicy,
           presetBundles: groupOverride?.presetBundles ?? group.presetBundles,
         };
       }),
@@ -19001,6 +19117,7 @@ function RunSurfaceCollectionQueryBuilder({
           helpNote: "",
           collapsedByDefault: false,
           visibilityRule: "always",
+          coordinationPolicy: "manual_source_priority",
           presetBundles: [],
         };
         return {
@@ -19023,6 +19140,7 @@ function RunSurfaceCollectionQueryBuilder({
         helpNote: string;
         collapsedByDefault: boolean;
         visibilityRule: "always" | "manual" | "binding_active" | "value_active";
+        coordinationPolicy: "manual_source_priority" | "highest_source_priority" | "sticky_auto_selection" | "manual_resolution";
         presetBundles: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupPresetBundleState[];
         parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
       },
@@ -19046,6 +19164,7 @@ function RunSurfaceCollectionQueryBuilder({
           helpNote: group.helpNote,
           collapsedByDefault: group.collapsedByDefault,
           visibilityRule: group.visibilityRule,
+          coordinationPolicy: group.coordinationPolicy,
           presetBundles: group.presetBundles,
         };
         delete currentContext[group.key];
@@ -19903,6 +20022,27 @@ function RunSurfaceCollectionQueryBuilder({
                               <option value="value_active">Show when value/default is active</option>
                             </select>
                           </label>
+                          <label className="run-surface-query-builder-control">
+                            <span>Conflict policy</span>
+                            <select
+                              onChange={(event) =>
+                                updateTemplateParameterGroupDraftMetadata(
+                                  templateParameterEditorContextKey,
+                                  parameterGroup.key,
+                                  (group) => ({
+                                    ...group,
+                                    label: group.label || parameterGroup.label,
+                                    coordinationPolicy: event.target.value as RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"],
+                                  }),
+                                )}
+                              value={parameterGroup.coordinationPolicy}
+                            >
+                              <option value="manual_source_priority">Prefer manual source</option>
+                              <option value="highest_source_priority">Highest source priority</option>
+                              <option value="sticky_auto_selection">Keep current auto choice</option>
+                              <option value="manual_resolution">Require manual resolution</option>
+                            </select>
+                          </label>
                           <label className="run-surface-query-builder-checkbox">
                             <input
                               checked={parameterGroup.collapsedByDefault}
@@ -20496,6 +20636,8 @@ function RunSurfaceCollectionQueryBuilder({
                     const effectiveBundle = sortedPresetBundles.find((bundle) => bundle.key === effectiveBundleKey) ?? null;
                     const dependencyRequests =
                       coordinatedPredicateRefGroupBundleState.dependencyRequestsByGroupKey[parameterGroup.key] ?? [];
+                    const conflictRequests =
+                      coordinatedPredicateRefGroupBundleState.conflictRequestsByGroupKey[parameterGroup.key] ?? [];
                     const unmetDependencies =
                       coordinatedPredicateRefGroupBundleState.unmetDependenciesByGroupKey[parameterGroup.key] ?? [];
                     return (
@@ -20521,6 +20663,7 @@ function RunSurfaceCollectionQueryBuilder({
                           {parameterGroup.visibilityRule !== "always"
                             ? ` · visibility ${parameterGroup.visibilityRule.replaceAll("_", " ")}`
                             : ""}
+                          {` · conflict ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(parameterGroup.coordinationPolicy)}`}
                         </p>
                         {parameterGroup.helpNote.trim() ? (
                           <p className="run-note">{parameterGroup.helpNote}</p>
@@ -20532,6 +20675,15 @@ function RunSurfaceCollectionQueryBuilder({
                               .map((request) => `${request.sourceGroupLabel} → ${request.sourceBundleLabel}`)
                               .join(", ")}
                             .
+                          </p>
+                        ) : null}
+                        {conflictRequests.length ? (
+                          <p className="run-note">
+                            Conflict between{" "}
+                            {conflictRequests.map((request) => request.bundleLabel).join(", ")}
+                            {parameterGroup.coordinationPolicy === "manual_resolution"
+                              ? " · waiting for manual selection."
+                              : ` · resolved with ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(parameterGroup.coordinationPolicy)}.`}
                           </p>
                         ) : null}
                         {parameterGroup.presetBundles.length ? (
@@ -20937,6 +21089,7 @@ function RunSurfaceCollectionQueryBuilder({
                                         {parameterGroup.visibilityRule !== "always"
                                           ? ` · visibility ${parameterGroup.visibilityRule.replaceAll("_", " ")}`
                                           : ""}
+                                        {` · conflict ${formatRunSurfaceCollectionQueryBuilderCoordinationPolicyLabel(parameterGroup.coordinationPolicy)}`}
                                       </p>
                                       {parameterGroup.helpNote.trim() ? (
                                         <p className="run-note">{parameterGroup.helpNote}</p>
