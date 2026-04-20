@@ -15577,22 +15577,54 @@ type HydratedRunSurfaceCollectionQueryBuilderState = {
   fieldKey: string;
   operatorKey: string;
   builderValue: string;
+  negated: boolean;
 };
 
-function parseRunSurfaceCollectionQueryBuilderState(
-  rawExpression: string | null | undefined,
+type RunSurfaceCollectionQueryBuilderChildState =
+  | {
+      id: string;
+      kind: "clause";
+      clause: HydratedRunSurfaceCollectionQueryBuilderState;
+    }
+  | {
+      id: string;
+      kind: "predicate_ref";
+      predicateKey: string;
+      negated: boolean;
+    };
+
+type RunSurfaceCollectionQueryBuilderPredicateState = {
+  id: string;
+  key: string;
+  clause: HydratedRunSurfaceCollectionQueryBuilderState;
+};
+
+type HydratedRunSurfaceCollectionQueryBuilderExpressionState = {
+  mode: "single" | "grouped";
+  draftClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
+  groupLogic: "and" | "or";
+  expressionChildren: RunSurfaceCollectionQueryBuilderChildState[];
+  predicates: RunSurfaceCollectionQueryBuilderPredicateState[];
+};
+
+type RunSurfaceCollectionQueryBuilderEditorTarget =
+  | { kind: "draft" }
+  | { kind: "expression_clause"; childId: string }
+  | { kind: "predicate"; predicateId: string };
+
+function buildRunSurfaceCollectionQueryBuilderEntityId(prefix: string) {
+  return `${prefix}:${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function parseRunSurfaceCollectionQueryBuilderClauseState(
+  rawNode: unknown,
   contracts: RunSurfaceCollectionQueryContract[],
 ): HydratedRunSurfaceCollectionQueryBuilderState | null {
-  const trimmedExpression = rawExpression?.trim();
-  if (!trimmedExpression) {
-    return null;
-  }
   try {
-    const parsed = JSON.parse(trimmedExpression) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    if (!rawNode || typeof rawNode !== "object" || Array.isArray(rawNode)) {
       return null;
     }
-    const record = parsed as Record<string, unknown>;
+    const record = rawNode as Record<string, unknown>;
     const collectionRecord =
       record.collection && typeof record.collection === "object" && !Array.isArray(record.collection)
         ? (record.collection as Record<string, unknown>)
@@ -15603,7 +15635,10 @@ function parseRunSurfaceCollectionQueryBuilderState(
             Boolean(condition) && typeof condition === "object" && !Array.isArray(condition),
         )
       : [];
-    if (!collectionRecord || conditionRecords.length !== 1) {
+    const childRecords = Array.isArray(record.children)
+      ? record.children.filter((child) => Boolean(child))
+      : [];
+    if (!collectionRecord || conditionRecords.length !== 1 || childRecords.length) {
       return null;
     }
     const resolvedPath = getCollectionQueryStringArray(collectionRecord.path);
@@ -15642,6 +15677,7 @@ function parseRunSurfaceCollectionQueryBuilderState(
           fieldKey,
           operatorKey,
           builderValue: formatCollectionQueryBuilderValue(condition.value, field.valueType),
+          negated: record.negated === true,
         };
       }
     }
@@ -15649,6 +15685,203 @@ function parseRunSurfaceCollectionQueryBuilderState(
     return null;
   }
   return null;
+}
+
+function buildRunSurfaceCollectionQueryBuilderDefaultClauseState(
+  contracts: RunSurfaceCollectionQueryContract[],
+  preferredContractKey?: string | null,
+): HydratedRunSurfaceCollectionQueryBuilderState | null {
+  const activeContract =
+    contracts.find((contract) => contract.contract_key === preferredContractKey) ?? contracts[0] ?? null;
+  if (!activeContract) {
+    return null;
+  }
+  const schema = getRunSurfaceCollectionQuerySchemas(activeContract)[0] ?? null;
+  if (!schema) {
+    return null;
+  }
+  const parameterValues = schema.parameters.reduce<Record<string, string>>((accumulator, parameter) => {
+    const optionValues = parameter.domain?.values.length ? parameter.domain.values : parameter.examples;
+    if (optionValues[0]) {
+      accumulator[parameter.key] = optionValues[0];
+    }
+    return accumulator;
+  }, {});
+  const field = schema.elementSchema[0] ?? null;
+  const operator = field?.operators[0] ?? null;
+  if (!field || !operator) {
+    return null;
+  }
+  return {
+    contractKey: activeContract.contract_key,
+    schemaId: getCollectionQuerySchemaId(schema),
+    parameterValues,
+    quantifier: "any",
+    fieldKey: field.key,
+    operatorKey: operator.key,
+    builderValue: "",
+    negated: false,
+  };
+}
+
+function buildRunSurfaceCollectionQueryBuilderNodeFromClause(
+  clause: HydratedRunSurfaceCollectionQueryBuilderState,
+  contracts: RunSurfaceCollectionQueryContract[],
+) {
+  const activeContract =
+    contracts.find((contract) => contract.contract_key === clause.contractKey) ?? contracts[0] ?? null;
+  const activeSchema =
+    getRunSurfaceCollectionQuerySchemas(activeContract).find(
+      (schema) => getCollectionQuerySchemaId(schema) === clause.schemaId,
+    ) ?? getRunSurfaceCollectionQuerySchemas(activeContract)[0] ?? null;
+  if (!activeContract || !activeSchema) {
+    return null;
+  }
+  const field =
+    activeSchema.elementSchema.find((candidate) => candidate.key === clause.fieldKey)
+    ?? activeSchema.elementSchema[0]
+    ?? null;
+  const operator =
+    field?.operators.find((candidate) => candidate.key === clause.operatorKey)
+    ?? field?.operators[0]
+    ?? null;
+  if (!field || !operator) {
+    return null;
+  }
+  return {
+    ...(clause.negated ? { negated: true } : {}),
+    collection: {
+      path: resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues),
+      quantifier: clause.quantifier,
+    },
+    conditions: [
+      {
+        key: field.key,
+        operator: operator.key,
+        value: coerceCollectionQueryBuilderValue(clause.builderValue, field.valueType),
+      },
+    ],
+  };
+}
+
+function formatRunSurfaceCollectionQueryBuilderClauseSummary(
+  clause: HydratedRunSurfaceCollectionQueryBuilderState,
+  contracts: RunSurfaceCollectionQueryContract[],
+) {
+  const activeContract =
+    contracts.find((contract) => contract.contract_key === clause.contractKey) ?? contracts[0] ?? null;
+  const activeSchema =
+    getRunSurfaceCollectionQuerySchemas(activeContract).find(
+      (schema) => getCollectionQuerySchemaId(schema) === clause.schemaId,
+    ) ?? getRunSurfaceCollectionQuerySchemas(activeContract)[0] ?? null;
+  const field = activeSchema?.elementSchema.find((candidate) => candidate.key === clause.fieldKey) ?? null;
+  const operator = field?.operators.find((candidate) => candidate.key === clause.operatorKey) ?? null;
+  const path = activeSchema
+    ? resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues).join(".")
+    : clause.schemaId;
+  const qualifier = clause.negated ? "not " : "";
+  return `${qualifier}${clause.quantifier} ${field?.title ?? field?.key ?? clause.fieldKey} ${operator?.label ?? operator?.key ?? clause.operatorKey} @ ${path}`;
+}
+
+function parseRunSurfaceCollectionQueryBuilderExpressionState(
+  rawExpression: string | null | undefined,
+  contracts: RunSurfaceCollectionQueryContract[],
+): HydratedRunSurfaceCollectionQueryBuilderExpressionState | null {
+  const trimmedExpression = rawExpression?.trim();
+  if (!trimmedExpression) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(trimmedExpression) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return null;
+    }
+    const record = parsed as Record<string, unknown>;
+    const predicateRegistry =
+      typeof record.predicates === "object" && record.predicates !== null && !Array.isArray(record.predicates)
+        ? (record.predicates as Record<string, unknown>)
+        : {};
+    const rootNode =
+      "root" in record
+        ? record.root
+        : parsed;
+    const singleClause = parseRunSurfaceCollectionQueryBuilderClauseState(rootNode, contracts);
+    const predicates = Object.entries(predicateRegistry).flatMap(([predicateKey, node]) => {
+      const clause = parseRunSurfaceCollectionQueryBuilderClauseState(node, contracts);
+      if (!clause) {
+        return [];
+      }
+      return [
+        {
+          id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate"),
+          key: predicateKey,
+          clause,
+        } satisfies RunSurfaceCollectionQueryBuilderPredicateState,
+      ];
+    });
+    if (singleClause && !predicates.length) {
+      return {
+        mode: "single",
+        draftClause: singleClause,
+        groupLogic: "and",
+        expressionChildren: [],
+        predicates: [],
+      };
+    }
+    if (!rootNode || typeof rootNode !== "object" || Array.isArray(rootNode)) {
+      return null;
+    }
+    const rootRecord = rootNode as Record<string, unknown>;
+    const childNodes = Array.isArray(rootRecord.children) ? rootRecord.children : [];
+    const expressionChildren = childNodes.reduce<RunSurfaceCollectionQueryBuilderChildState[]>(
+      (accumulator, rawChild) => {
+        if (!rawChild || typeof rawChild !== "object" || Array.isArray(rawChild)) {
+          return accumulator;
+        }
+        const childRecord = rawChild as Record<string, unknown>;
+        if (typeof childRecord.predicate_ref === "string" && childRecord.predicate_ref) {
+          accumulator.push({
+            id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate-ref"),
+            kind: "predicate_ref",
+            predicateKey: childRecord.predicate_ref,
+            negated: childRecord.negated === true,
+          });
+          return accumulator;
+        }
+        const clause = parseRunSurfaceCollectionQueryBuilderClauseState(childRecord, contracts);
+        if (!clause) {
+          return accumulator;
+        }
+        accumulator.push({
+          id: buildRunSurfaceCollectionQueryBuilderEntityId("clause"),
+          kind: "clause",
+          clause,
+        });
+        return accumulator;
+      },
+      [],
+    );
+    const rootLogic =
+      rootRecord.logic === "or" || rootRecord.logic === "and"
+        ? rootRecord.logic
+        : "and";
+    if (!expressionChildren.length) {
+      return null;
+    }
+    return {
+      mode: "grouped",
+      draftClause:
+        expressionChildren.find((child): child is Extract<RunSurfaceCollectionQueryBuilderChildState, { kind: "clause" }> =>
+          child.kind === "clause",
+        )?.clause
+        ?? buildRunSurfaceCollectionQueryBuilderDefaultClauseState(contracts),
+      groupLogic: rootLogic,
+      expressionChildren,
+      predicates,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function getRunSurfaceCapabilityFamily(
@@ -15847,6 +16080,13 @@ function RunSurfaceCollectionQueryBuilder({
   const lastHydratedExpressionRef = useRef<string | null>(null);
   const [pendingHydratedState, setPendingHydratedState] =
     useState<HydratedRunSurfaceCollectionQueryBuilderState | null>(null);
+  const [expressionMode, setExpressionMode] = useState<"single" | "grouped">("single");
+  const [groupLogic, setGroupLogic] = useState<"and" | "or">("and");
+  const [expressionChildren, setExpressionChildren] = useState<RunSurfaceCollectionQueryBuilderChildState[]>([]);
+  const [predicates, setPredicates] = useState<RunSurfaceCollectionQueryBuilderPredicateState[]>([]);
+  const [editorTarget, setEditorTarget] = useState<RunSurfaceCollectionQueryBuilderEditorTarget>({ kind: "draft" });
+  const [predicateDraftKey, setPredicateDraftKey] = useState("");
+  const [predicateRefDraftKey, setPredicateRefDraftKey] = useState("");
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -15877,6 +16117,7 @@ function RunSurfaceCollectionQueryBuilder({
     [activeField, activeOperatorKey],
   );
   const [builderValue, setBuilderValue] = useState<string>("");
+  const [editorNegated, setEditorNegated] = useState(false);
 
   useEffect(() => {
     if (!contracts.length) {
@@ -15956,15 +16197,26 @@ function RunSurfaceCollectionQueryBuilder({
     if (normalizedExpression === lastHydratedExpressionRef.current) {
       return;
     }
-    const hydratedState = parseRunSurfaceCollectionQueryBuilderState(normalizedExpression, contracts);
+    const hydratedState = parseRunSurfaceCollectionQueryBuilderExpressionState(normalizedExpression, contracts);
     if (!hydratedState) {
       lastHydratedExpressionRef.current = normalizedExpression;
       setPendingHydratedState(null);
       return;
     }
     lastHydratedExpressionRef.current = normalizedExpression;
-    setActiveContractKey(hydratedState.contractKey);
-    setPendingHydratedState(hydratedState);
+    setExpressionMode(hydratedState.mode);
+    setGroupLogic(hydratedState.groupLogic);
+    setExpressionChildren(hydratedState.expressionChildren);
+    setPredicates(hydratedState.predicates);
+    setEditorTarget({ kind: "draft" });
+    setPredicateDraftKey("");
+    setPredicateRefDraftKey(hydratedState.predicates[0]?.key ?? "");
+    if (hydratedState.draftClause) {
+      setActiveContractKey(hydratedState.draftClause.contractKey);
+      setPendingHydratedState(hydratedState.draftClause);
+    } else {
+      setPendingHydratedState(null);
+    }
   }, [activeExpression, contracts]);
 
   useEffect(() => {
@@ -15998,8 +16250,19 @@ function RunSurfaceCollectionQueryBuilder({
     setActiveFieldKey(pendingHydratedState.fieldKey);
     setActiveOperatorKey(pendingHydratedState.operatorKey);
     setBuilderValue(pendingHydratedState.builderValue);
+    setEditorNegated(pendingHydratedState.negated);
     setPendingHydratedState(null);
   }, [activeContract?.contract_key, activeSchemaId, pendingHydratedState]);
+
+  useEffect(() => {
+    if (!predicates.length) {
+      setPredicateRefDraftKey("");
+      return;
+    }
+    if (!predicates.some((predicate) => predicate.key === predicateRefDraftKey)) {
+      setPredicateRefDraftKey(predicates[0].key);
+    }
+  }, [predicateRefDraftKey, predicates]);
 
   const resolvedCollectionPath = useMemo(
     () => (activeSchema ? resolveCollectionQueryPath(activeSchema.pathTemplate, parameterValues) : []),
@@ -16011,37 +16274,293 @@ function RunSurfaceCollectionQueryBuilder({
     [activeField, builderValue],
   );
 
+  const editorClauseState = useMemo<HydratedRunSurfaceCollectionQueryBuilderState | null>(() => {
+    if (!activeSchema || !activeField || !activeOperator) {
+      return null;
+    }
+    return {
+      contractKey: activeContract?.contract_key ?? "",
+      schemaId: getCollectionQuerySchemaId(activeSchema),
+      parameterValues,
+      quantifier,
+      fieldKey: activeField.key,
+      operatorKey: activeOperator.key,
+      builderValue,
+      negated: editorNegated,
+    };
+  }, [
+    activeContract?.contract_key,
+    activeField,
+    activeOperator,
+    activeSchema,
+    builderValue,
+    editorNegated,
+    parameterValues,
+    quantifier,
+  ]);
+
+  const setEditorFromClause = (clause: HydratedRunSurfaceCollectionQueryBuilderState) => {
+    setActiveContractKey(clause.contractKey);
+    setPendingHydratedState(clause);
+  };
+
   const expressionLabel = useMemo(() => {
     if (!activeSchema || !activeField || !activeOperator) {
       return "";
     }
-    return `${activeSchema.label} · ${quantifier} ${activeField.title ?? activeField.key} ${activeOperator.label || activeOperator.key}`;
-  }, [activeField, activeOperator, activeSchema, quantifier]);
+    return `${editorNegated ? "not " : ""}${activeSchema.label} · ${quantifier} ${activeField.title ?? activeField.key} ${activeOperator.label || activeOperator.key}`;
+  }, [activeField, activeOperator, activeSchema, editorNegated, quantifier]);
 
-  const filterExpressionPreview = useMemo(() => {
-    if (!activeSchema || !activeField || !activeOperator) {
+  const singleExpressionPreview = useMemo(() => {
+    if (!editorClauseState) {
       return "";
     }
-    return JSON.stringify(
-      {
-        collection: {
-          path: resolvedCollectionPath,
-          quantifier,
-        },
-        conditions: [
-          {
-            key: activeField.key,
-            operator: activeOperator.key,
-            value: coercedBuilderValue,
-          },
-        ],
-      },
-      null,
-      2,
-    );
-  }, [activeField, activeOperator, activeSchema, coercedBuilderValue, quantifier, resolvedCollectionPath]);
+    const node = buildRunSurfaceCollectionQueryBuilderNodeFromClause(editorClauseState, contracts);
+    return node ? JSON.stringify(node, null, 2) : "";
+  }, [contracts, editorClauseState]);
 
-  const canApplyExpression = builderValue.trim().length > 0 && Boolean(filterExpressionPreview);
+  const groupedExpressionPreview = useMemo(() => {
+    const predicateRegistry = Object.fromEntries(
+      predicates.flatMap((predicate) => {
+        const node = buildRunSurfaceCollectionQueryBuilderNodeFromClause(predicate.clause, contracts);
+        return node ? [[predicate.key, node]] : [];
+      }),
+    );
+    const rootChildren = expressionChildren.reduce<unknown[]>((accumulator, child) => {
+      if (child.kind === "predicate_ref") {
+        if (!child.predicateKey) {
+          return accumulator;
+        }
+        accumulator.push(
+          child.negated ? { predicate_ref: child.predicateKey, negated: true } : { predicate_ref: child.predicateKey },
+        );
+        return accumulator;
+      }
+      const node = buildRunSurfaceCollectionQueryBuilderNodeFromClause(child.clause, contracts);
+      if (node) {
+        accumulator.push(node);
+      }
+      return accumulator;
+    }, []);
+    if (!rootChildren.length) {
+      return "";
+    }
+    const rootNode = {
+      logic: groupLogic,
+      children: rootChildren,
+    };
+    const payload = Object.keys(predicateRegistry).length
+      ? {
+          predicates: predicateRegistry,
+          root: rootNode,
+        }
+      : rootNode;
+    return JSON.stringify(payload, null, 2);
+  }, [contracts, expressionChildren, groupLogic, predicates]);
+
+  const filterExpressionPreview = expressionMode === "grouped" ? groupedExpressionPreview : singleExpressionPreview;
+
+  const activeEditorTargetLabel = useMemo(() => {
+    if (editorTarget.kind === "expression_clause") {
+      return "Editing expression clause";
+    }
+    if (editorTarget.kind === "predicate") {
+      const predicate = predicates.find((entry) => entry.id === editorTarget.predicateId);
+      return predicate ? `Editing predicate ${predicate.key}` : "Editing predicate";
+    }
+    return expressionMode === "grouped" ? "Draft clause" : "Single-node clause";
+  }, [editorTarget, expressionMode, predicates]);
+
+  const groupedExpressionLabel = useMemo(() => {
+    const clauseCount = expressionChildren.filter((child) => child.kind === "clause").length;
+    const predicateRefCount = expressionChildren.filter((child) => child.kind === "predicate_ref").length;
+    const parts = [`${groupLogic.toUpperCase()} expression`];
+    if (clauseCount) {
+      parts.push(`${clauseCount} clause${clauseCount === 1 ? "" : "s"}`);
+    }
+    if (predicateRefCount) {
+      parts.push(`${predicateRefCount} predicate ref${predicateRefCount === 1 ? "" : "s"}`);
+    }
+    if (predicates.length) {
+      parts.push(`${predicates.length} predicate definition${predicates.length === 1 ? "" : "s"}`);
+    }
+    return parts.join(" · ");
+  }, [expressionChildren, groupLogic, predicates.length]);
+
+  const canApplyExpression = expressionMode === "grouped"
+    ? Boolean(groupedExpressionPreview)
+    : builderValue.trim().length > 0 && Boolean(singleExpressionPreview);
+
+  const applyCurrentExpression = () => {
+    if (!onApplyExpression || !editorClauseState || !filterExpressionPreview) {
+      return;
+    }
+    onApplyExpression({
+      expression: filterExpressionPreview,
+      expressionLabel: expressionMode === "grouped" ? groupedExpressionLabel : expressionLabel,
+      resolvedPath: resolvedCollectionPath,
+      quantifier,
+      fieldKey: activeField?.key ?? "",
+      operatorKey: activeOperator?.key ?? "",
+    });
+  };
+
+  const addClauseToExpression = () => {
+    if (!editorClauseState) {
+      return;
+    }
+    setExpressionChildren((current) => [
+      ...current,
+      {
+        id: buildRunSurfaceCollectionQueryBuilderEntityId("clause"),
+        kind: "clause",
+        clause: editorClauseState,
+      },
+    ]);
+    setExpressionMode("grouped");
+    setEditorTarget({ kind: "draft" });
+  };
+
+  const updateSelectedExpressionTarget = () => {
+    if (!editorClauseState) {
+      return;
+    }
+    if (editorTarget.kind === "expression_clause") {
+      setExpressionChildren((current) =>
+        current.map((child) =>
+          child.kind === "clause" && child.id === editorTarget.childId
+            ? {
+                ...child,
+                clause: editorClauseState,
+              }
+            : child,
+        ),
+      );
+      return;
+    }
+    if (editorTarget.kind === "predicate") {
+      setPredicates((current) =>
+        current.map((predicate) =>
+          predicate.id === editorTarget.predicateId
+            ? {
+                ...predicate,
+                clause: editorClauseState,
+              }
+            : predicate,
+        ),
+      );
+    }
+  };
+
+  const savePredicateFromEditor = () => {
+    if (!editorClauseState) {
+      return;
+    }
+    const trimmedKey = predicateDraftKey.trim();
+    if (!trimmedKey) {
+      return;
+    }
+    if (editorTarget.kind === "predicate") {
+      const previousPredicate = predicates.find((predicate) => predicate.id === editorTarget.predicateId) ?? null;
+      setPredicates((current) =>
+        current.map((predicate) =>
+          predicate.id === editorTarget.predicateId
+            ? {
+                ...predicate,
+                key: trimmedKey,
+                clause: editorClauseState,
+              }
+            : predicate,
+        ),
+      );
+      if (previousPredicate && previousPredicate.key !== trimmedKey) {
+        setExpressionChildren((current) =>
+          current.map((child) =>
+            child.kind === "predicate_ref" && child.predicateKey === previousPredicate.key
+              ? {
+                  ...child,
+                  predicateKey: trimmedKey,
+                }
+              : child,
+          ),
+        );
+      }
+      return;
+    }
+    setPredicates((current) => [
+      ...current,
+      {
+        id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate"),
+        key: trimmedKey,
+        clause: editorClauseState,
+      },
+    ]);
+    setPredicateDraftKey("");
+  };
+
+  const addPredicateRefToExpression = () => {
+    if (!predicateRefDraftKey) {
+      return;
+    }
+    setExpressionChildren((current) => [
+      ...current,
+      {
+        id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate-ref"),
+        kind: "predicate_ref",
+        predicateKey: predicateRefDraftKey,
+        negated: false,
+      },
+    ]);
+    setExpressionMode("grouped");
+  };
+
+  const removeExpressionChild = (childId: string) => {
+    setExpressionChildren((current) => current.filter((child) => child.id !== childId));
+    if (editorTarget.kind === "expression_clause" && editorTarget.childId === childId) {
+      setEditorTarget({ kind: "draft" });
+    }
+  };
+
+  const removePredicate = (predicateId: string) => {
+    const predicate = predicates.find((entry) => entry.id === predicateId);
+    setPredicates((current) => current.filter((entry) => entry.id !== predicateId));
+    if (predicate) {
+      setExpressionChildren((current) =>
+        current.filter((child) => child.kind !== "predicate_ref" || child.predicateKey !== predicate.key),
+      );
+    }
+    if (editorTarget.kind === "predicate" && editorTarget.predicateId === predicateId) {
+      setEditorTarget({ kind: "draft" });
+    }
+  };
+
+  const togglePredicateRefNegation = (childId: string) => {
+    setExpressionChildren((current) =>
+      current.map((child) =>
+        child.kind === "predicate_ref" && child.id === childId
+          ? {
+              ...child,
+              negated: !child.negated,
+            }
+          : child,
+      ),
+    );
+  };
+
+  const selectedPredicate =
+    editorTarget.kind === "predicate"
+      ? predicates.find((predicate) => predicate.id === editorTarget.predicateId) ?? null
+      : null;
+  const trimmedPredicateDraftKey = predicateDraftKey.trim();
+  const predicateKeyConflict = Boolean(
+    trimmedPredicateDraftKey
+    && predicates.some(
+      (predicate) =>
+        predicate.key === trimmedPredicateDraftKey
+        && !(editorTarget.kind === "predicate" && predicate.id === editorTarget.predicateId),
+    ),
+  );
+  const predicateSaveLabel = editorTarget.kind === "predicate" ? "Update predicate" : "Save as predicate";
 
   if (!contracts.length || !activeContract || !activeSchema) {
     return null;
@@ -16077,8 +16596,32 @@ function RunSurfaceCollectionQueryBuilder({
         <div className="run-surface-query-builder-card">
           <div className="run-surface-query-builder-card-head">
             <strong>Builder</strong>
-            <span>{activeSchema.collectionKind}</span>
+            <span>{activeEditorTargetLabel}</span>
           </div>
+          <div className="run-surface-query-builder-mode-row">
+            <button
+              className={`run-surface-query-builder-mode-button ${expressionMode === "single" ? "is-active" : ""}`.trim()}
+              onClick={() => {
+                setExpressionMode("single");
+                setEditorTarget({ kind: "draft" });
+              }}
+              type="button"
+            >
+              Single node
+            </button>
+            <button
+              className={`run-surface-query-builder-mode-button ${expressionMode === "grouped" ? "is-active" : ""}`.trim()}
+              onClick={() => setExpressionMode("grouped")}
+              type="button"
+            >
+              Grouped expression
+            </button>
+          </div>
+          <p className="run-note">
+            {expressionMode === "grouped"
+              ? groupedExpressionLabel
+              : expressionLabel || "Build a single collection node and apply it directly."}
+          </p>
           <div className="run-surface-query-builder-form">
             <label className="run-surface-query-builder-control">
               <span>Collection path</span>
@@ -16170,6 +16713,14 @@ function RunSurfaceCollectionQueryBuilder({
                 </select>
               </label>
             </div>
+            <label className="run-surface-query-builder-checkbox">
+              <input
+                checked={editorNegated}
+                onChange={(event) => setEditorNegated(event.target.checked)}
+                type="checkbox"
+              />
+              <span>Negate current clause</span>
+            </label>
             <label className="run-surface-query-builder-control">
               <span>Value</span>
               <input
@@ -16183,12 +16734,236 @@ function RunSurfaceCollectionQueryBuilder({
               </small>
             </label>
           </div>
+          <div className="run-surface-query-builder-actions">
+            {expressionMode === "grouped" ? (
+              <>
+                <button
+                  className="ghost-button"
+                  disabled={!editorClauseState}
+                  onClick={
+                    editorTarget.kind === "draft"
+                      ? addClauseToExpression
+                      : updateSelectedExpressionTarget
+                  }
+                  type="button"
+                >
+                  {editorTarget.kind === "draft"
+                    ? "Add clause to expression"
+                    : `Update ${editorTarget.kind === "predicate" ? "predicate" : "selected clause"}`}
+                </button>
+                {editorTarget.kind !== "draft" ? (
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setEditorTarget({ kind: "draft" });
+                      setPredicateDraftKey("");
+                    }}
+                    type="button"
+                  >
+                    Return to draft
+                  </button>
+                ) : null}
+              </>
+            ) : null}
+          </div>
+          {expressionMode === "grouped" ? (
+            <div className="run-surface-query-builder-section">
+              <div className="run-surface-query-builder-card-head">
+                <strong>Predicate refs</strong>
+                <span>{predicates.length} saved</span>
+              </div>
+              <div className="run-surface-query-builder-inline-grid">
+                <label className="run-surface-query-builder-control">
+                  <span>Predicate key</span>
+                  <input
+                    onChange={(event) => setPredicateDraftKey(event.target.value)}
+                    placeholder="high-return-orders"
+                    value={predicateDraftKey}
+                  />
+                  <small>
+                    {predicateKeyConflict
+                      ? "Choose a unique predicate key."
+                      : selectedPredicate
+                        ? `Editing predicate ${selectedPredicate.key}.`
+                        : "Save the current clause as a reusable predicate."}
+                  </small>
+                </label>
+                <label className="run-surface-query-builder-control">
+                  <span>Predicate ref</span>
+                  <select
+                    onChange={(event) => setPredicateRefDraftKey(event.target.value)}
+                    value={predicateRefDraftKey}
+                  >
+                    {predicates.length ? (
+                      predicates.map((predicate) => (
+                        <option key={predicate.id} value={predicate.key}>
+                          {predicate.key}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="">No predicates saved</option>
+                    )}
+                  </select>
+                  <small>Add a reusable predicate reference into the root group.</small>
+                </label>
+              </div>
+              <div className="run-surface-query-builder-actions">
+                <button
+                  className="ghost-button"
+                  disabled={!editorClauseState || !trimmedPredicateDraftKey || predicateKeyConflict}
+                  onClick={savePredicateFromEditor}
+                  type="button"
+                >
+                  {predicateSaveLabel}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!predicateRefDraftKey}
+                  onClick={addPredicateRefToExpression}
+                  type="button"
+                >
+                  Add predicate ref
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
         <div className="run-surface-query-builder-card">
           <div className="run-surface-query-builder-card-head">
-            <strong>Resolved metadata</strong>
+            <strong>{expressionMode === "grouped" ? "Expression structure" : "Resolved metadata"}</strong>
             <span>{activeSchema.itemKind}</span>
           </div>
+          {expressionMode === "grouped" ? (
+            <>
+              <label className="run-surface-query-builder-control">
+                <span>Root logic</span>
+                <select
+                  onChange={(event) => setGroupLogic(event.target.value as "and" | "or")}
+                  value={groupLogic}
+                >
+                  <option value="and">and</option>
+                  <option value="or">or</option>
+                </select>
+              </label>
+              <div className="run-surface-query-builder-domain-list">
+                {expressionChildren.length ? (
+                  expressionChildren.map((child, index) =>
+                    child.kind === "clause" ? (
+                      <div
+                        className={`run-surface-query-builder-domain-card ${editorTarget.kind === "expression_clause" && editorTarget.childId === child.id ? "is-active" : ""}`.trim()}
+                        key={child.id}
+                      >
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>Clause {index + 1}</strong>
+                          <span>{child.clause.quantifier}</span>
+                        </div>
+                        <p className="run-note">{formatRunSurfaceCollectionQueryBuilderClauseSummary(child.clause, contracts)}</p>
+                        <div className="run-surface-query-builder-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() => {
+                              setEditorTarget({ kind: "expression_clause", childId: child.id });
+                              setPredicateDraftKey("");
+                              setEditorFromClause(child.clause);
+                            }}
+                            type="button"
+                          >
+                            Edit clause
+                          </button>
+                          <button
+                            className="ghost-button"
+                            onClick={() => removeExpressionChild(child.id)}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="run-surface-query-builder-domain-card" key={child.id}>
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>Predicate ref</strong>
+                          <span>{child.negated ? "negated" : "linked"}</span>
+                        </div>
+                        <p className="run-note">
+                          {child.negated ? "not " : ""}
+                          {child.predicateKey}
+                        </p>
+                        <div className="run-surface-query-builder-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() => togglePredicateRefNegation(child.id)}
+                            type="button"
+                          >
+                            {child.negated ? "Clear negation" : "Negate ref"}
+                          </button>
+                          <button
+                            className="ghost-button"
+                            onClick={() => removeExpressionChild(child.id)}
+                            type="button"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ),
+                  )
+                ) : (
+                  <p className="run-note">
+                    Add clauses or predicate refs to build a grouped root expression.
+                  </p>
+                )}
+              </div>
+              <div className="run-surface-query-builder-section">
+                <div className="run-surface-query-builder-card-head">
+                  <strong>Predicate registry</strong>
+                  <span>{predicates.length}</span>
+                </div>
+                {predicates.length ? (
+                  <div className="run-surface-query-builder-domain-list">
+                    {predicates.map((predicate) => (
+                      <div
+                        className={`run-surface-query-builder-domain-card ${editorTarget.kind === "predicate" && editorTarget.predicateId === predicate.id ? "is-active" : ""}`.trim()}
+                        key={predicate.id}
+                      >
+                        <div className="run-surface-query-builder-card-head">
+                          <strong>{predicate.key}</strong>
+                          <span>predicate</span>
+                        </div>
+                        <p className="run-note">
+                          {formatRunSurfaceCollectionQueryBuilderClauseSummary(predicate.clause, contracts)}
+                        </p>
+                        <div className="run-surface-query-builder-actions">
+                          <button
+                            className="ghost-button"
+                            onClick={() => {
+                              setEditorTarget({ kind: "predicate", predicateId: predicate.id });
+                              setPredicateDraftKey(predicate.key);
+                              setEditorFromClause(predicate.clause);
+                            }}
+                            type="button"
+                          >
+                            Edit predicate
+                          </button>
+                          <button
+                            className="ghost-button"
+                            onClick={() => removePredicate(predicate.id)}
+                            type="button"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="run-note">
+                    Save a clause as a predicate to reuse it inside grouped expressions.
+                  </p>
+                )}
+              </div>
+            </>
+          ) : null}
           <p className="run-note">
             Resolved path: <code>{resolvedCollectionPath.join(".")}</code>
           </p>
@@ -16227,16 +17002,7 @@ function RunSurfaceCollectionQueryBuilder({
                 <button
                   className="ghost-button"
                   disabled={!canApplyExpression}
-                  onClick={() =>
-                    onApplyExpression({
-                      expression: filterExpressionPreview,
-                      expressionLabel,
-                      resolvedPath: resolvedCollectionPath,
-                      quantifier,
-                      fieldKey: activeField?.key ?? "",
-                      operatorKey: activeOperator?.key ?? "",
-                    })
-                  }
+                  onClick={applyCurrentExpression}
                   type="button"
                 >
                   {applyLabel}
@@ -16258,7 +17024,13 @@ function RunSurfaceCollectionQueryBuilder({
               <pre className="run-surface-query-builder-preview">{activeExpression}</pre>
             </div>
           ) : null}
-          <pre className="run-surface-query-builder-preview">{filterExpressionPreview}</pre>
+          <div className="run-surface-query-builder-active-state">
+            <div className="run-surface-query-builder-card-head">
+              <strong>Builder preview</strong>
+              <span>{expressionMode === "grouped" ? groupedExpressionLabel : expressionLabel || "single expression"}</span>
+            </div>
+            <pre className="run-surface-query-builder-preview">{filterExpressionPreview || "{}"}</pre>
+          </div>
         </div>
       </div>
     </div>

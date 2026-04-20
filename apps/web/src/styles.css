@@ -300,6 +300,27 @@ select {
   font-size: 0.92rem;
 }
 
+.run-surface-query-builder-mode-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.run-surface-query-builder-mode-button {
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(255, 255, 255, 0.76);
+  font: inherit;
+}
+
+.run-surface-query-builder-mode-button.is-active {
+  border-color: rgba(88, 217, 255, 0.34);
+  background: rgba(88, 217, 255, 0.14);
+  color: rgba(228, 248, 255, 0.96);
+}
+
 .run-surface-query-builder-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -338,6 +359,11 @@ select {
 .run-surface-query-builder-form,
 .run-surface-query-builder-parameter-grid,
 .run-surface-query-builder-domain-list {
+  display: grid;
+  gap: 10px;
+}
+
+.run-surface-query-builder-section {
   display: grid;
   gap: 10px;
 }
@@ -386,6 +412,21 @@ select {
   line-height: 1.45;
 }
 
+.run-surface-query-builder-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.run-surface-query-builder-checkbox input {
+  margin: 0;
+}
+
 .run-surface-query-builder-domain-card {
   display: grid;
   gap: 6px;
@@ -393,6 +434,11 @@ select {
   border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
+}
+
+.run-surface-query-builder-domain-card.is-active {
+  border-color: rgba(88, 217, 255, 0.32);
+  background: rgba(88, 217, 255, 0.08);
 }
 
 .run-surface-query-builder-domain-card strong {
