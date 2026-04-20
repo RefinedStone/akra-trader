@@ -51,6 +51,10 @@ This is not fully complete yet. The current wave introduces the first executable
 - Application defaults
   - keep fallback adapters and paging/remediation policy in `application_support/defaults.py`
   - keep comparison scoring policy in `application_support/comparison.py`
+- Surface policy and serialization
+  - keep run-surface enforcement, action-availability policy, and run serialization helpers in
+    `application_support/run_surfaces.py`
+  - keep `application.py` as the import-compatible facade while these helpers move out
 - Incident delivery
   - keep provider implementations in `adapters/operator_delivery.py` for now
   - move alias normalization, capability discovery, and dispatch decisions into `operator_delivery_registry.py`

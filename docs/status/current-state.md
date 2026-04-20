@@ -42,6 +42,7 @@ It is not yet a finished live trading product:
 - FastAPI backend with explicit domain, application, adapter, and runtime boundaries
 - split port contracts under `port_contracts/*` with `ports.py` kept as a compatibility shim
 - shared application fallback adapters and comparison policy moved into `application_support/*`
+- run-surface enforcement and run serialization helpers moved into `application_support/run_surfaces.py`
 - durable run storage through `SqlAlchemyRunRepository`
 - repo-local SQLite defaults with configurable Postgres support
 - native backtest execution with persisted config, metrics, orders, fills, positions, notes, equity,
