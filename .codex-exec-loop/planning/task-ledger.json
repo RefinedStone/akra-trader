@@ -5929,36 +5929,36 @@
       "direction_id": "experiment-os",
       "title": "Add copy/share UI and compact encoding for replay deep links",
       "description": "Build the first governance and ergonomics pass on top of the shipped replay deep-link contract by adding an explicit copy or share affordance and shrinking verbose replay-intent URL payloads through compact encoding, so operators can deliberately share replay focus without manually editing long query strings or hitting brittle URL-length growth as replay filters and preview focus get richer.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 90,
       "dynamic_priority_delta": 18,
-      "priority_reason": "The latest main-session reply explicitly says URL deep links are shipped in commit 179af73 and names copy or share UI plus compact encoding as the remaining direct deep-link gap. Promote this combined executable pass to `ready` so the next queued task advances replay-link usability without waiting on a broader audit-panel design.",
+      "priority_reason": "Completed in main session commit c30fc56, which switched replay intent URLs to prefer one compact `replay_intent` payload with verbose-param fallback parsing, added `Copy replay link` and `Share replay link` controls plus payload-length and result feedback in the Policy simulation panel, restored template key, scope, step, filters, and preview selection from the compact payload, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-externalize-unified-replay-intent-into-url-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:41:00Z",
+      "updated_at": "2026-04-20T10:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-link durability from raw URL persistence into operator-usable share flows and a more compact transport format, reducing friction and payload bloat as replay intent becomes a normal collaboration artifact."
+      "direction_relation_note": "Completed the first replay-link ergonomics pass for experiment-os by making shared replay intent compact enough to travel as one payload and by adding explicit copy/share affordances, which now leaves governance work such as link auditability, indirection, and privacy-safe redaction as the next shareability gap."
     },
     {
       "id": "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync",
       "direction_id": "experiment-os",
-      "title": "Add an explicit audit panel for replay intent changes",
-      "description": "Build an operator-facing audit surface for replay-intent changes across URL hydration, history navigation, and cross-tab sync so replay focus changes become reviewable and attributable instead of silently mutating the current inspection state; include enough governance cues to distinguish local edits from hydrated or synchronized intent changes without taking on the separate copy/share or compact-encoding work.",
-      "status": "proposed",
+      "title": "Add governance for shared replay links with audit trail, indirection, and redaction",
+      "description": "Build the next replay-link governance pass on top of compact copy/share deep links by adding operator-visible audit trail coverage for copy/share usage, defining whether replay links should support short-link style indirection instead of only inline payloads, and enforcing a privacy-safe redaction policy for replay intent fields so shared links become attributable, governable artifacts rather than opaque payloads.",
+      "status": "ready",
       "base_priority": 88,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply narrows the remaining governance work to an explicit audit panel for replay-intent changes, but copy or share UI plus compact encoding is the more direct next executable follow-up after 179af73. Keep this audit-focused governance task proposed until the deep-link ergonomics pass lands or the operator explicitly prioritizes attribution first.",
+      "dynamic_priority_delta": 23,
+      "priority_reason": "The latest main-session reply says commit c30fc56 finished compact replay deep links and copy/share controls, and directly names the remaining work: link copy/share audit trail, short-link style indirection, and privacy-safe redaction policy. Promote this broader governance task to `ready` as the clearest next executable queue head now that the ergonomics pass is done.",
       "depends_on": [
-        "planning-experiment-os-share-unified-replay-intent-across-history-and-tabs"
+        "planning-experiment-os-add-copy-share-ui-and-compact-encoding-for-replay-deep-links"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:42:00Z",
+      "updated_at": "2026-04-20T10:51:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Deepens experiment-os operator trust around shared replay focus by surfacing a durable, reviewable audit trail for replay-intent hydration and sync events once the core deep-link sharing ergonomics are in place."
+      "direction_relation_note": "Deepens experiment-os operator trust around shared replay links by turning compact copy/share payloads into governed artifacts with attribution, optional indirection boundaries, and explicit privacy rules suitable for broader operator handoff."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
