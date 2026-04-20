@@ -6001,36 +6001,54 @@
       "direction_id": "experiment-os",
       "title": "Extend replay link governance audit with change diffs and cross-device resolution",
       "description": "Build on the shipped replay-link governance conflict review by adding a dedicated governance-change audit trail, field-level explanations for what changed in share mode or redaction policy, and a clearer cross-device policy resolution contract so governance decisions remain inspectable beyond one tab session and travel cleanly across browser contexts.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
-      "dynamic_priority_delta": 26,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is governance audit expansion: replay-link governance sync now has conflict review and per-tab opt-out, but it still lacks dedicated governance change audit history, field-level diff explanation, and cross-device policy resolution. That is the clearest executable next task because it extends the just-shipped governance review surface directly without requiring a broader unrelated product choice first.",
+      "dynamic_priority_delta": 0,
+      "priority_reason": "Completed in main session commit 9167b07, which added governance-change audit history with diff-aware entries for share mode, redaction, and sync mode mutations, merged the audit trail across tabs via localStorage reconciliation, shipped cross-device export/import governance resolution, connected pending conflict review to the same diff-aware audit stream, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-conflict-review-and-per-tab-opt-out-for-replay-link-governance-sync"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:21:00Z",
+      "updated_at": "2026-04-20T11:24:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os replay-link governance trust by turning resolved and synced governance mutations into a more durable audit artifact with concrete policy-change explanations and a path toward portable cross-device reconciliation."
     },
     {
       "id": "planning-experiment-os-back-replay-short-links-with-portable-resolution-and-retention-controls",
       "direction_id": "experiment-os",
-      "title": "Back replay short links with portable resolution and retention controls",
-      "description": "Move indirect replay links beyond a browser-local alias registry by defining a portable short-link resolution contract and an operator-facing retention policy surface, so replay links can resolve across devices while governance makes link lifetime, persistence, and cleanup explicit instead of remaining an implicit local browser behavior.",
-      "status": "proposed",
+      "title": "Back replay short links with signed resolution and governance retention controls",
+      "description": "Move indirect replay links beyond a browser-local alias registry by defining a signed short-link resolution contract plus operator-facing governance payload retention or revocation controls, so replay links can resolve across devices while governance export or import artifacts gain explicit lifetime, invalidation, and cleanup semantics instead of remaining an implicit local browser behavior.",
+      "status": "done",
       "base_priority": 86,
-      "dynamic_priority_delta": 14,
-      "priority_reason": "The latest main-session reply narrows the immediate follow-up to governance audit expansion, including dedicated change history, field-level diff explanation, and cross-device policy resolution. Portable short-link backing still matters, but keep it proposed behind that audit pass because persistence and retention semantics should follow the stronger governance-resolution contract instead of preceding it.",
+      "dynamic_priority_delta": 19,
+      "priority_reason": "Completed in main session commit da46db9, which made replay short links carry `expiresAt` plus a signature, required `aliasId.signature` token verification before resolution, added governance retention controls and clear-retained-records UI, included retention in audit diffs and cross-device payload export/import, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
-        "planning-experiment-os-add-audit-and-governance-ui-for-replay-intent-sync"
+        "planning-experiment-os-extend-replay-link-governance-audit-with-diffs-and-cross-device-resolution"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T11:22:00Z",
+      "updated_at": "2026-04-20T11:40:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os replay-link governance from browser-scoped sharing into a portable operator artifact with explicit retention semantics, which is necessary before short-link handoff can be trusted across devices or longer-lived sessions."
+      "direction_relation_note": "Completed the next replay-link governance pass by turning browser-local alias entries into signed, retention-governed artifacts with portable governance payload support, which now leaves stronger server-backed resolution and revocation as the next trust boundary."
+    },
+    {
+      "id": "planning-experiment-os-add-server-backed-replay-alias-resolution-and-revocation",
+      "direction_id": "experiment-os",
+      "title": "Add server-backed replay alias resolution and revocation controls",
+      "description": "Extend replay short links beyond browser-local secret verification by introducing a server-backed signed indirection or alias registry contract, explicit alias revocation, and cross-device signed resolution semantics, so replay links can resolve and be invalidated across devices without trusting one browser's local signing secret as the system of record.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 20,
+      "priority_reason": "The latest main-session reply explicitly says the shipped local signed alias flow still lacks stronger resolution backing, naming server-backed signed indirection, alias revocation registry, and cross-device signed alias resolution as the remaining gap. That is the clearest executable next task and should become the next queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-back-replay-short-links-with-portable-resolution-and-retention-controls"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T11:40:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os replay-link governance from locally verified signed aliases into a stronger cross-device trust model with central revocation and portable signed resolution semantics."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
