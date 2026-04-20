@@ -19819,6 +19819,8 @@ function RunSurfaceCollectionQueryBuilder({
       traceKey: null,
     });
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
+  const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
+  const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
 
   useEffect(() => {
     if (!contracts.length) {
@@ -24396,6 +24398,7 @@ function RunSurfaceCollectionQueryBuilder({
           diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
           editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
           focusableDiffSampleKeysByItemKey: Record<string, string | null>;
+          focusableSampleKeys: string[];
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -24448,6 +24451,12 @@ function RunSurfaceCollectionQueryBuilder({
               originalSamplesByKey.has(item.key) ? item.key : null,
             ] as const),
           ),
+          focusableSampleKeys: Array.from(
+            new Set(
+              traceReevaluationPreviewDiffItems.flatMap((item) =>
+                originalSamplesByKey.has(item.key) ? [item.key] : []),
+            ),
+          ),
           drillthroughKey,
           key: `${drillthroughKey}:simulation_projection`,
           matchedCandidateLabel:
@@ -24477,6 +24486,7 @@ function RunSurfaceCollectionQueryBuilder({
           diffItems: RunSurfaceCollectionQueryRuntimeCandidatePreviewDiffItem[];
           editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
           focusableDiffSampleKeysByItemKey: Record<string, string | null>;
+          focusableSampleKeys: string[];
           drillthroughKey: string;
           key: string;
           matchedCandidateLabel: string;
@@ -24560,34 +24570,161 @@ function RunSurfaceCollectionQueryBuilder({
     simulatedPredicateRefSolverReplayAttributionByGroupKey,
   ]);
   useEffect(() => {
+    const projectedTraces = Object.values(simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey)
+      .flatMap((projection) => projection.projectedTraces);
+    if (!projectedTraces.length) {
+      if (clauseReevaluationPreviewSelection.traceKey || clauseReevaluationPreviewSelection.diffItemKey) {
+        setClauseReevaluationPreviewSelection({
+          diffItemKey: null,
+          traceKey: null,
+        });
+      }
+      return;
+    }
+    const currentTrace = clauseReevaluationPreviewSelection.traceKey
+      ? projectedTraces.find((trace) => trace.drillthroughKey === clauseReevaluationPreviewSelection.traceKey) ?? null
+      : null;
+    const currentSelectionIsValid = Boolean(
+      currentTrace
+      && (
+        !clauseReevaluationPreviewSelection.diffItemKey
+        || currentTrace.diffItems.some((item) => item.key === clauseReevaluationPreviewSelection.diffItemKey)
+      ),
+    );
+    const findSelectionForSampleKey = (sampleKey: string | null) => {
+      if (!sampleKey) {
+        return null;
+      }
+      for (const trace of projectedTraces) {
+        const matchingDiffItem = trace.diffItems.find((item) =>
+          trace.focusableDiffSampleKeysByItemKey[item.key] === sampleKey) ?? null;
+        if (matchingDiffItem) {
+          return {
+            diffItemKey: matchingDiffItem.key,
+            traceKey: trace.drillthroughKey,
+          } as const;
+        }
+        if (
+          trace.primarySampleKey === sampleKey
+          || trace.focusableSampleKeys.includes(sampleKey)
+        ) {
+          return {
+            diffItemKey: null,
+            traceKey: trace.drillthroughKey,
+          } as const;
+        }
+      }
+      return null;
+    };
+    const findSelectionForSampleKeys = (sampleKeys: string[]) => {
+      if (!sampleKeys.length) {
+        return null;
+      }
+      const scoredTraces = projectedTraces
+        .map((trace) => {
+          const matchingDiffItem = trace.diffItems.find((item) => {
+            const sampleKey = trace.focusableDiffSampleKeysByItemKey[item.key];
+            return sampleKey ? sampleKeys.includes(sampleKey) : false;
+          }) ?? null;
+          const overlapCount = sampleKeys.filter((sampleKey) =>
+            trace.primarySampleKey === sampleKey || trace.focusableSampleKeys.includes(sampleKey)).length;
+          return {
+            matchingDiffItem,
+            overlapCount,
+            trace,
+          };
+        })
+        .filter((entry) => entry.matchingDiffItem || entry.overlapCount > 0)
+        .sort((left, right) => {
+          if (left.overlapCount !== right.overlapCount) {
+            return right.overlapCount - left.overlapCount;
+          }
+          if (Boolean(left.matchingDiffItem) !== Boolean(right.matchingDiffItem)) {
+            return left.matchingDiffItem ? -1 : 1;
+          }
+          return left.trace.stepIndex - right.trace.stepIndex;
+        });
+      const bestMatch = scoredTraces[0] ?? null;
+      if (!bestMatch) {
+        return null;
+      }
+      return {
+        diffItemKey: bestMatch.matchingDiffItem?.key ?? null,
+        traceKey: bestMatch.trace.drillthroughKey,
+      } as const;
+    };
+    const editorMatchedSelection =
+      projectedTraces.find((trace) =>
+        areHydratedRunSurfaceCollectionQueryBuilderStatesEqual(trace.editorClause, editorClauseState),
+      )
+      ?? null;
+    const nextSelection =
+      findSelectionForSampleKey(focusedRuntimeCandidateSampleKey)
+      ?? findSelectionForSampleKeys(effectiveRuntimeCandidateSelectionKeys)
+      ?? (
+        pinnedRuntimeCandidateClauseOriginKey
+          ? {
+              diffItemKey: null,
+              traceKey: pinnedRuntimeCandidateClauseOriginKey,
+            } as const
+          : null
+      );
+    const resolvedSelection =
+      nextSelection
+      ?? (
+        currentSelectionIsValid
+          ? clauseReevaluationPreviewSelection
+          : null
+      )
+      ?? (
+        editorMatchedSelection
+          ? {
+              diffItemKey: null,
+              traceKey: editorMatchedSelection.drillthroughKey,
+            } as const
+          : null
+      )
+      ?? {
+        diffItemKey: null,
+        traceKey: projectedTraces[0].drillthroughKey,
+      } as const;
+    if (
+      resolvedSelection.traceKey !== clauseReevaluationPreviewSelection.traceKey
+      || resolvedSelection.diffItemKey !== clauseReevaluationPreviewSelection.diffItemKey
+    ) {
+      setClauseReevaluationPreviewSelection(resolvedSelection);
+    }
+  }, [
+    clauseReevaluationPreviewSelection,
+    editorClauseState,
+    effectiveRuntimeCandidateSelectionKeys,
+    focusedRuntimeCandidateSampleKey,
+    pinnedRuntimeCandidateClauseOriginKey,
+    simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
+  ]);
+  useEffect(() => {
     if (!clauseReevaluationPreviewSelection.traceKey) {
       return;
     }
-    const projectedTrace =
-      Object.values(simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey)
-        .flatMap((projection) => projection.projectedTraces)
-        .find((trace) => trace.drillthroughKey === clauseReevaluationPreviewSelection.traceKey)
+    const scrollTarget =
+      (
+        clauseReevaluationPreviewSelection.diffItemKey
+          ? clauseReevaluationPreviewDiffItemRefs.current.get(
+              `${clauseReevaluationPreviewSelection.traceKey}:${clauseReevaluationPreviewSelection.diffItemKey}`,
+            ) ?? null
+          : null
+      )
+      ?? clauseReevaluationPreviewTraceRefs.current.get(clauseReevaluationPreviewSelection.traceKey)
       ?? null;
-    if (!projectedTrace) {
-      setClauseReevaluationPreviewSelection({
-        diffItemKey: null,
-        traceKey: null,
-      });
+    if (!scrollTarget) {
       return;
     }
-    if (
-      clauseReevaluationPreviewSelection.diffItemKey
-      && !projectedTrace.diffItems.some((item) => item.key === clauseReevaluationPreviewSelection.diffItemKey)
-    ) {
-      setClauseReevaluationPreviewSelection((current) => (
-        current.traceKey === projectedTrace.drillthroughKey
-          ? {
-              diffItemKey: null,
-              traceKey: current.traceKey,
-            }
-          : current
-      ));
-    }
+    requestAnimationFrame(() => {
+      scrollTarget.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+    });
   }, [
     clauseReevaluationPreviewSelection,
     simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
@@ -27542,6 +27679,13 @@ function RunSurfaceCollectionQueryBuilder({
                                                   : ""
                                               }`}
                                               key={`simulation-diff-preview:${diff.groupKey}:${trace.key}`}
+                                              ref={(node) => {
+                                                if (node) {
+                                                  clauseReevaluationPreviewTraceRefs.current.set(trace.drillthroughKey, node);
+                                                  return;
+                                                }
+                                                clauseReevaluationPreviewTraceRefs.current.delete(trace.drillthroughKey);
+                                              }}
                                             >
                                               <strong>{`${trace.stepLabel} · ${trace.candidateAccessor}`}</strong>
                                               <p>{trace.candidatePath}</p>
@@ -27613,6 +27757,14 @@ function RunSurfaceCollectionQueryBuilder({
                                                           : ""
                                                       }`}
                                                       key={`simulation-diff-preview-item:${diff.groupKey}:${trace.key}:${item.key}`}
+                                                      ref={(node) => {
+                                                        const refKey = `${trace.drillthroughKey}:${item.key}`;
+                                                        if (node) {
+                                                          clauseReevaluationPreviewDiffItemRefs.current.set(refKey, node);
+                                                          return;
+                                                        }
+                                                        clauseReevaluationPreviewDiffItemRefs.current.delete(refKey);
+                                                      }}
                                                     >
                                                       <strong>{item.runId}</strong>
                                                       <p>{item.detail}</p>
