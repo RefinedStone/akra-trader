@@ -15869,16 +15869,22 @@ type PredicateRefReplayApplyConflictEntry = {
 };
 
 type PredicateRefReplayApplyConflictDiffItem = {
+  decisionKey: string;
+  editable: boolean;
   key: string;
   label: string;
   localValue: string;
   remoteValue: string;
+  relatedGroupKey?: string | null;
+  section: "summary" | "row" | "selection_snapshot" | "binding_snapshot";
 };
 
 type PredicateRefReplayApplyConflictResolutionPreview = {
   effect: string;
   entry: PredicateRefReplayApplyHistoryEntry;
-  resolution: "local" | "remote";
+  matchesLocal: boolean;
+  matchesRemote: boolean;
+  resolution: "local" | "remote" | "merged";
   rowSummaries: string[];
   snapshotSummary: string;
   title: string;
@@ -15893,6 +15899,16 @@ type PredicateRefReplayApplyConflictReview = {
   selectionSnapshotDiffs: PredicateRefReplayApplyConflictDiffItem[];
   summaryDiffs: PredicateRefReplayApplyConflictDiffItem[];
   totalDiffCount: number;
+};
+
+type PredicateRefReplayApplyConflictDraftReview = PredicateRefReplayApplyConflictReview & {
+  editableDiffCount: number;
+  hasMixedSelection: boolean;
+  hasRemoteSelection: boolean;
+  mergedEntry: PredicateRefReplayApplyHistoryEntry;
+  mergedPreview: PredicateRefReplayApplyConflictResolutionPreview;
+  selectedRemoteCount: number;
+  selectedSources: Record<string, "local" | "remote">;
 };
 
 type PredicateRefReplayApplySyncAuditEntry = {
@@ -16175,20 +16191,159 @@ function formatPredicateRefReplayApplyHistoryRowSummary(row?: PredicateRefReplay
   return `${row.currentStatus} · ${row.currentBundleLabel} → ${row.promotedBundleLabel} · simulated ${row.simulatedStatus} · ${row.simulatedBundleLabel}`;
 }
 
+function clonePredicateRefReplayApplyHistoryEntry(
+  entry: PredicateRefReplayApplyHistoryEntry,
+): PredicateRefReplayApplyHistoryEntry {
+  return {
+    ...entry,
+    rollbackSnapshot: {
+      draftBindingsByParameterKey: { ...entry.rollbackSnapshot.draftBindingsByParameterKey },
+      groupSelectionsBySelectionKey: { ...entry.rollbackSnapshot.groupSelectionsBySelectionKey },
+    },
+    rows: entry.rows.map((row) => ({ ...row })),
+  };
+}
+
+function buildPredicateRefReplayApplyConflictResolutionPreview(
+  conflict: PredicateRefReplayApplyConflictEntry,
+  entry: PredicateRefReplayApplyHistoryEntry,
+  resolution: "local" | "remote" | "merged",
+  effect: string,
+): PredicateRefReplayApplyConflictResolutionPreview {
+  const rollbackGroupCount = Object.keys(entry.rollbackSnapshot.groupSelectionsBySelectionKey).length;
+  const rollbackBindingCount = Object.keys(entry.rollbackSnapshot.draftBindingsByParameterKey).length;
+  return {
+    resolution,
+    entry,
+    title:
+      resolution === "local"
+        ? "Keep local version"
+        : resolution === "remote"
+          ? "Apply remote version"
+          : "Apply reviewed merge",
+    effect,
+    snapshotSummary: `${rollbackGroupCount} rollback groups · ${rollbackBindingCount} rollback bindings`,
+    rowSummaries: entry.rows.slice(0, 3).map(
+      (row) => `${row.groupLabel}: ${row.currentBundleLabel} → ${row.promotedBundleLabel}`,
+    ),
+    matchesLocal: arePredicateRefReplayApplyHistoryEntriesEquivalent(entry, conflict.localEntry),
+    matchesRemote: arePredicateRefReplayApplyHistoryEntriesEquivalent(entry, conflict.remoteEntry),
+  };
+}
+
+function buildPredicateRefReplayApplyConflictMergedEntry(
+  conflict: PredicateRefReplayApplyConflictEntry,
+  selectedSources: Record<string, "local" | "remote">,
+) {
+  const mergedEntry = clonePredicateRefReplayApplyHistoryEntry(conflict.localEntry);
+  const getSelectedSource = (decisionKey: string) => selectedSources[decisionKey] ?? "local";
+  const applyScalar = <K extends keyof PredicateRefReplayApplyHistoryEntry>(
+    decisionKey: string,
+    fieldKey: K,
+  ) => {
+    if (getSelectedSource(decisionKey) === "remote") {
+      mergedEntry[fieldKey] = conflict.remoteEntry[fieldKey];
+    }
+  };
+  applyScalar("summary:applied_at", "appliedAt");
+  if (getSelectedSource("summary:source_tab") === "remote") {
+    mergedEntry.sourceTabId = conflict.remoteEntry.sourceTabId ?? null;
+    mergedEntry.sourceTabLabel = conflict.remoteEntry.sourceTabLabel ?? null;
+  }
+  if (getSelectedSource("summary:last_restored_at") === "remote") {
+    mergedEntry.lastRestoredAt = conflict.remoteEntry.lastRestoredAt ?? null;
+  }
+  if (getSelectedSource("summary:last_restored_by") === "remote") {
+    mergedEntry.lastRestoredByTabId = conflict.remoteEntry.lastRestoredByTabId ?? null;
+    mergedEntry.lastRestoredByTabLabel = conflict.remoteEntry.lastRestoredByTabLabel ?? null;
+  }
+
+  const rowGroupKeys = Array.from(
+    new Set([
+      ...conflict.localEntry.rows.map((row) => row.groupKey),
+      ...conflict.remoteEntry.rows.map((row) => row.groupKey),
+    ]),
+  );
+  const mergedRows = rowGroupKeys.flatMap((groupKey) => {
+    const source = getSelectedSource(`row:${groupKey}`);
+    const sourceRow = (
+      source === "remote"
+        ? conflict.remoteEntry.rows.find((row) => row.groupKey === groupKey)
+        : conflict.localEntry.rows.find((row) => row.groupKey === groupKey)
+    ) ?? null;
+    return sourceRow ? [{ ...sourceRow }] : [];
+  });
+  mergedEntry.rows = mergedRows.sort((left, right) => left.groupKey.localeCompare(right.groupKey));
+  mergedEntry.approvedCount = mergedEntry.rows.length;
+  mergedEntry.changedCurrentCount = mergedEntry.rows.filter((row) => row.changesCurrent).length;
+  mergedEntry.matchesSimulationCount = mergedEntry.rows.filter((row) => row.matchesSimulation).length;
+
+  const applySnapshotRecord = (
+    decisionKey: string,
+    snapshotKey: string,
+    fieldKey: "groupSelectionsBySelectionKey" | "draftBindingsByParameterKey",
+  ) => {
+    const sourceRecord = (
+      getSelectedSource(decisionKey) === "remote"
+        ? conflict.remoteEntry.rollbackSnapshot[fieldKey]
+        : conflict.localEntry.rollbackSnapshot[fieldKey]
+    );
+    if (Object.prototype.hasOwnProperty.call(sourceRecord, snapshotKey)) {
+      mergedEntry.rollbackSnapshot[fieldKey][snapshotKey] = sourceRecord[snapshotKey] ?? null;
+      return;
+    }
+    delete mergedEntry.rollbackSnapshot[fieldKey][snapshotKey];
+  };
+  Array.from(
+    new Set([
+      ...Object.keys(conflict.localEntry.rollbackSnapshot.groupSelectionsBySelectionKey),
+      ...Object.keys(conflict.remoteEntry.rollbackSnapshot.groupSelectionsBySelectionKey),
+    ]),
+  ).forEach((selectionKey) => {
+    applySnapshotRecord(
+      `selection_snapshot:${selectionKey}`,
+      selectionKey,
+      "groupSelectionsBySelectionKey",
+    );
+  });
+  Array.from(
+    new Set([
+      ...Object.keys(conflict.localEntry.rollbackSnapshot.draftBindingsByParameterKey),
+      ...Object.keys(conflict.remoteEntry.rollbackSnapshot.draftBindingsByParameterKey),
+    ]),
+  ).forEach((parameterKey) => {
+    applySnapshotRecord(
+      `binding_snapshot:${parameterKey}`,
+      parameterKey,
+      "draftBindingsByParameterKey",
+    );
+  });
+  return mergedEntry;
+}
+
 function buildPredicateRefReplayApplyConflictReview(
   conflict: PredicateRefReplayApplyConflictEntry,
   localTabLabel: string,
 ): PredicateRefReplayApplyConflictReview {
   const summaryDiffs: PredicateRefReplayApplyConflictDiffItem[] = [];
-  const pushSummaryDiff = (key: string, label: string, localValue: string, remoteValue: string) => {
+  const pushSummaryDiff = (
+    key: string,
+    label: string,
+    localValue: string,
+    remoteValue: string,
+    editable = false,
+  ) => {
     if (localValue === remoteValue) {
       return;
     }
     summaryDiffs.push({
+      decisionKey: `summary:${key}`,
+      editable,
       key,
       label,
       localValue,
       remoteValue,
+      section: "summary",
     });
   };
   pushSummaryDiff(
@@ -16196,6 +16351,7 @@ function buildPredicateRefReplayApplyConflictReview(
     "Applied at",
     formatRelativeTimestampLabel(conflict.localEntry.appliedAt),
     formatRelativeTimestampLabel(conflict.remoteEntry.appliedAt),
+    true,
   );
   pushSummaryDiff(
     "approved_count",
@@ -16220,18 +16376,21 @@ function buildPredicateRefReplayApplyConflictReview(
     "Applied by",
     conflict.localEntry.sourceTabLabel ?? localTabLabel,
     conflict.remoteEntry.sourceTabLabel ?? conflict.sourceTabLabel,
+    true,
   );
   pushSummaryDiff(
     "last_restored_at",
     "Last restored",
     formatRelativeTimestampLabel(conflict.localEntry.lastRestoredAt),
     formatRelativeTimestampLabel(conflict.remoteEntry.lastRestoredAt),
+    true,
   );
   pushSummaryDiff(
     "last_restored_by",
     "Restored by",
     conflict.localEntry.lastRestoredByTabLabel ?? "Not restored",
     conflict.remoteEntry.lastRestoredByTabLabel ?? "Not restored",
+    true,
   );
 
   const rowDiffs = Array.from(
@@ -16248,10 +16407,14 @@ function buildPredicateRefReplayApplyConflictReview(
         return [];
       }
       return [{
+        decisionKey: `row:${groupKey}`,
+        editable: true,
         key: groupKey,
         label: localRow?.groupLabel ?? remoteRow?.groupLabel ?? groupKey,
         localValue: formatPredicateRefReplayApplyHistoryRowSummary(localRow),
         remoteValue: formatPredicateRefReplayApplyHistoryRowSummary(remoteRow),
+        relatedGroupKey: groupKey,
+        section: "row",
       } satisfies PredicateRefReplayApplyConflictDiffItem];
     });
 
@@ -16268,11 +16431,16 @@ function buildPredicateRefReplayApplyConflictReview(
       if (localValue === remoteValue) {
         return [];
       }
+      const relatedGroupKey = selectionKey.split(":").filter(Boolean).pop() ?? null;
       return [{
+        decisionKey: `selection_snapshot:${selectionKey}`,
+        editable: true,
         key: selectionKey,
         label: formatPredicateRefReplayApplyHistorySelectionKeyLabel(selectionKey),
         localValue: formatPredicateRefReplayApplyHistorySnapshotValue(localValue),
         remoteValue: formatPredicateRefReplayApplyHistorySnapshotValue(remoteValue),
+        relatedGroupKey,
+        section: "selection_snapshot",
       } satisfies PredicateRefReplayApplyConflictDiffItem];
     });
 
@@ -16290,10 +16458,13 @@ function buildPredicateRefReplayApplyConflictReview(
         return [];
       }
       return [{
+        decisionKey: `binding_snapshot:${parameterKey}`,
+        editable: true,
         key: parameterKey,
         label: parameterKey,
         localValue: formatPredicateRefReplayApplyHistorySnapshotValue(localValue),
         remoteValue: formatPredicateRefReplayApplyHistorySnapshotValue(remoteValue),
+        section: "binding_snapshot",
       } satisfies PredicateRefReplayApplyConflictDiffItem];
     });
 
@@ -16301,25 +16472,6 @@ function buildPredicateRefReplayApplyConflictReview(
     + rowDiffs.length
     + selectionSnapshotDiffs.length
     + bindingSnapshotDiffs.length;
-  const buildResolutionPreview = (
-    resolution: "local" | "remote",
-    entry: PredicateRefReplayApplyHistoryEntry,
-  ): PredicateRefReplayApplyConflictResolutionPreview => {
-    const rollbackGroupCount = Object.keys(entry.rollbackSnapshot.groupSelectionsBySelectionKey).length;
-    const rollbackBindingCount = Object.keys(entry.rollbackSnapshot.draftBindingsByParameterKey).length;
-    return {
-      resolution,
-      entry,
-      title: resolution === "local" ? "Keep local version" : "Apply remote version",
-      effect: resolution === "local"
-        ? `Keeps the currently active entry in this tab and ignores ${totalDiffCount} remote field-level differences.`
-        : `Replaces the active entry with ${conflict.sourceTabLabel}'s version across ${totalDiffCount} differing fields in this tab.`,
-      snapshotSummary: `${rollbackGroupCount} rollback groups · ${rollbackBindingCount} rollback bindings`,
-      rowSummaries: entry.rows.slice(0, 3).map(
-        (row) => `${row.groupLabel}: ${row.currentBundleLabel} → ${row.promotedBundleLabel}`,
-      ),
-    };
-  };
   return {
     conflict,
     summaryDiffs,
@@ -16327,8 +16479,18 @@ function buildPredicateRefReplayApplyConflictReview(
     selectionSnapshotDiffs,
     bindingSnapshotDiffs,
     totalDiffCount,
-    localPreview: buildResolutionPreview("local", conflict.localEntry),
-    remotePreview: buildResolutionPreview("remote", conflict.remoteEntry),
+    localPreview: buildPredicateRefReplayApplyConflictResolutionPreview(
+      conflict,
+      conflict.localEntry,
+      "local",
+      `Keeps the currently active entry in this tab and ignores ${totalDiffCount} remote field-level differences.`,
+    ),
+    remotePreview: buildPredicateRefReplayApplyConflictResolutionPreview(
+      conflict,
+      conflict.remoteEntry,
+      "remote",
+      `Replaces the active entry with ${conflict.sourceTabLabel}'s version across ${totalDiffCount} differing fields in this tab.`,
+    ),
   };
 }
 
@@ -18122,6 +18284,7 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, boolean>>({});
   const [bundleCoordinationSimulationFinalSummaryOpen, setBundleCoordinationSimulationFinalSummaryOpen] =
     useState(false);
+  const bundleCoordinationSimulationPanelRef = useRef<HTMLDivElement | null>(null);
   const predicateRefReplayApplyHistoryTabIdentity = useMemo(
     () => loadRunSurfaceCollectionQueryBuilderReplayApplyHistoryTabIdentity(),
     [],
@@ -18162,6 +18325,8 @@ function RunSurfaceCollectionQueryBuilder({
       loadRunSurfaceCollectionQueryBuilderReplayApplyConflicts(
         predicateRefReplayApplyHistoryTabIdentity.tabId,
       ));
+  const [predicateRefReplayApplyConflictDraftSourcesById, setPredicateRefReplayApplyConflictDraftSourcesById] =
+    useState<Record<string, Record<string, "local" | "remote">>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -19145,13 +19310,52 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [predicateRefReplayApplyConflicts, selectedRefTemplate],
   );
-  const selectedRefTemplateReplayApplyConflictReviews = useMemo(
-    () => selectedRefTemplateReplayApplyConflicts.map((conflict) =>
-      buildPredicateRefReplayApplyConflictReview(
+  const selectedRefTemplateReplayApplyConflictReviews = useMemo<PredicateRefReplayApplyConflictDraftReview[]>(
+    () => selectedRefTemplateReplayApplyConflicts.map((conflict) => {
+      const review = buildPredicateRefReplayApplyConflictReview(
         conflict,
         predicateRefReplayApplyHistoryTabIdentity.label,
-      )),
-    [predicateRefReplayApplyHistoryTabIdentity.label, selectedRefTemplateReplayApplyConflicts],
+      );
+      const editableItems = [
+        ...review.summaryDiffs,
+        ...review.rowDiffs,
+        ...review.selectionSnapshotDiffs,
+        ...review.bindingSnapshotDiffs,
+      ].filter((item) => item.editable);
+      const storedDraftSources = predicateRefReplayApplyConflictDraftSourcesById[conflict.conflictId] ?? {};
+      const selectedSources = Object.fromEntries(
+        editableItems.map((item) => [item.decisionKey, storedDraftSources[item.decisionKey] ?? "local"]),
+      ) as Record<string, "local" | "remote">;
+      const mergedEntry = buildPredicateRefReplayApplyConflictMergedEntry(conflict, selectedSources);
+      const selectedRemoteCount = Object.values(selectedSources).filter((source) => source === "remote").length;
+      const hasRemoteSelection = selectedRemoteCount > 0;
+      const hasMixedSelection = hasRemoteSelection && selectedRemoteCount < editableItems.length;
+      const mergedPreview = buildPredicateRefReplayApplyConflictResolutionPreview(
+        conflict,
+        mergedEntry,
+        "merged",
+        hasRemoteSelection
+          ? hasMixedSelection
+            ? `Applies a partial reviewed merge with ${selectedRemoteCount} remote field selections and ${editableItems.length - selectedRemoteCount} local field selections.`
+            : `Applies the fully reviewed remote version across all ${editableItems.length} editable field differences.`
+          : "Keeps the local version because no remote field selections are currently staged.",
+      );
+      return {
+        ...review,
+        editableDiffCount: editableItems.length,
+        hasMixedSelection,
+        hasRemoteSelection,
+        mergedEntry,
+        mergedPreview,
+        selectedRemoteCount,
+        selectedSources,
+      };
+    }),
+    [
+      predicateRefReplayApplyConflictDraftSourcesById,
+      predicateRefReplayApplyHistoryTabIdentity.label,
+      selectedRefTemplateReplayApplyConflicts,
+    ],
   );
   useEffect(() => {
     predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
@@ -19170,21 +19374,57 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [],
   );
+  const setPredicateRefReplayApplyConflictDraftSource = useCallback(
+    (
+      conflictId: string,
+      decisionKey: string,
+      source: "local" | "remote",
+    ) => {
+      setPredicateRefReplayApplyConflictDraftSourcesById((current) => ({
+        ...current,
+        [conflictId]: {
+          ...(current[conflictId] ?? {}),
+          [decisionKey]: source,
+        },
+      }));
+    },
+    [],
+  );
+  const resetPredicateRefReplayApplyConflictDraftSource = useCallback((conflictId: string) => {
+    setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
+      if (!current[conflictId]) {
+        return current;
+      }
+      const next = { ...current };
+      delete next[conflictId];
+      return next;
+    });
+  }, []);
   const resolvePredicateRefReplayApplyConflict = useCallback(
     (
       conflict: PredicateRefReplayApplyConflictEntry,
-      resolution: "local" | "remote",
+      resolution: "local" | "remote" | "merged",
+      mergedEntry?: PredicateRefReplayApplyHistoryEntry | null,
     ) => {
-      if (resolution === "remote") {
+      if (resolution !== "local") {
+        const nextEntry = resolution === "remote" ? conflict.remoteEntry : mergedEntry ?? conflict.localEntry;
         setPredicateRefReplayApplyHistory((current) => {
           const next = mergePredicateRefReplayApplyHistoryEntries(
             current.filter((entry) => entry.id !== conflict.entryId),
-            [conflict.remoteEntry],
+            [nextEntry],
           );
           predicateRefReplayApplyHistoryRef.current = next;
           return next;
         });
       }
+      setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
+        if (!current[conflict.conflictId]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[conflict.conflictId];
+        return next;
+      });
       setPredicateRefReplayApplyConflicts((current) =>
         current.filter((entry) => entry.conflictId !== conflict.conflictId),
       );
@@ -19194,6 +19434,8 @@ function RunSurfaceCollectionQueryBuilder({
         detail:
           resolution === "remote"
             ? `${predicateRefReplayApplyHistoryTabIdentity.label} accepted the remote replay history override from ${conflict.sourceTabLabel}.`
+            : resolution === "merged"
+              ? `${predicateRefReplayApplyHistoryTabIdentity.label} applied a reviewed replay history merge against ${conflict.sourceTabLabel}.`
             : `${predicateRefReplayApplyHistoryTabIdentity.label} kept the local replay history version over ${conflict.sourceTabLabel}.`,
         entryId: conflict.entryId,
         kind: "conflict_resolved",
@@ -19209,6 +19451,22 @@ function RunSurfaceCollectionQueryBuilder({
       predicateRefReplayApplyHistoryTabIdentity.tabId,
     ],
   );
+  useEffect(() => {
+    setPredicateRefReplayApplyConflictDraftSourcesById((current) => {
+      const activeConflictIds = new Set(predicateRefReplayApplyConflicts.map((entry) => entry.conflictId));
+      let changed = false;
+      const next = Object.fromEntries(
+        Object.entries(current).filter(([conflictId]) => {
+          const keep = activeConflictIds.has(conflictId);
+          if (!keep) {
+            changed = true;
+          }
+          return keep;
+        }),
+      );
+      return changed ? next : current;
+    });
+  }, [predicateRefReplayApplyConflicts]);
   useEffect(() => {
     const conflictedEntryIds = new Set(
       predicateRefReplayApplyConflicts.map((entry: PredicateRefReplayApplyConflictEntry) => entry.entryId),
@@ -20680,6 +20938,26 @@ function RunSurfaceCollectionQueryBuilder({
       availableSimulatedPredicateRefSolverReplayEdges,
       bundleCoordinationSimulationReplayEdgeFilter,
     ],
+  );
+  const focusReplayApplyConflictSimulationTrace = useCallback(
+    (groupKey: string) => {
+      if (!simulatedCoordinationGroups.some((group) => group.key === groupKey)) {
+        return;
+      }
+      setBundleCoordinationSimulationScope(groupKey);
+      setBundleCoordinationSimulationReplayGroupFilter(groupKey);
+      setBundleCoordinationSimulationReplayActionTypeFilter("all");
+      setBundleCoordinationSimulationReplayEdgeFilter("all");
+      setBundleCoordinationSimulationPolicy((current) => current === "current" ? "manual_resolution" : current);
+      const matchingReplayStepIndex = simulatedPredicateRefSolverReplay.findIndex((step) =>
+        step.actions.some((action) => action.groupKey === groupKey));
+      setBundleCoordinationSimulationReplayIndex(matchingReplayStepIndex >= 0 ? matchingReplayStepIndex : 0);
+      bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    },
+    [simulatedCoordinationGroups, simulatedPredicateRefSolverReplay],
   );
   useEffect(() => {
     setBundleCoordinationSimulationPromotionDecisionsByGroupKey({});
@@ -23029,7 +23307,7 @@ function RunSurfaceCollectionQueryBuilder({
                           ))}
                         </div>
                       </div>
-                      <div className="run-surface-query-builder-trace-panel is-global">
+                      <div className="run-surface-query-builder-trace-panel is-global" ref={bundleCoordinationSimulationPanelRef}>
                         <div className="run-surface-query-builder-card-head">
                           <strong>Policy simulation</strong>
                           <span className={`run-surface-query-builder-trace-status is-${simulatedPredicateRefGroupBundleState?.globalPolicyTrace.tone ?? "muted"}`}>
@@ -23741,22 +24019,94 @@ function RunSurfaceCollectionQueryBuilder({
                                                             <span>{`${section.items.length} changed`}</span>
                                                           </div>
                                                           <div className="run-surface-query-builder-trace-list">
-                                                            {section.items.map((item) => (
-                                                              <div
-                                                                className="run-surface-query-builder-trace-step is-muted"
-                                                                key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
-                                                              >
-                                                                <strong>{item.label}</strong>
-                                                                <div className="run-surface-query-builder-trace-chip-list">
-                                                                  <span className="run-surface-query-builder-trace-chip">
-                                                                    {`Local · ${item.localValue}`}
-                                                                  </span>
-                                                                  <span className="run-surface-query-builder-trace-chip is-active">
-                                                                    {`Remote · ${item.remoteValue}`}
-                                                                  </span>
+                                                            {section.items.map((item) => {
+                                                              const selectedSource = item.editable
+                                                                ? review.selectedSources[item.decisionKey] ?? "local"
+                                                                : null;
+                                                              const canTrace =
+                                                                item.relatedGroupKey
+                                                                && simulatedCoordinationGroups.some(
+                                                                  (group) => group.key === item.relatedGroupKey,
+                                                                );
+                                                              return (
+                                                                <div
+                                                                  className={`run-surface-query-builder-trace-step is-${
+                                                                    item.editable
+                                                                      ? selectedSource === "remote"
+                                                                        ? "warning"
+                                                                        : "info"
+                                                                      : "muted"
+                                                                  }`}
+                                                                  key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
+                                                                >
+                                                                  <strong>{item.label}</strong>
+                                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                                    <span className={`run-surface-query-builder-trace-chip${
+                                                                      selectedSource === "local" ? " is-active" : ""
+                                                                    }`}>
+                                                                      {`Local · ${item.localValue}`}
+                                                                    </span>
+                                                                    <span className={`run-surface-query-builder-trace-chip${
+                                                                      selectedSource === "remote" ? " is-active" : ""
+                                                                    }`}>
+                                                                      {`Remote · ${item.remoteValue}`}
+                                                                    </span>
+                                                                    {!item.editable ? (
+                                                                      <span className="run-surface-query-builder-trace-chip">
+                                                                        Derived
+                                                                      </span>
+                                                                    ) : null}
+                                                                  </div>
+                                                                  <div className="run-surface-query-builder-actions">
+                                                                    {item.editable ? (
+                                                                      <>
+                                                                        <button
+                                                                          className={`ghost-button${selectedSource === "local" ? " is-active" : ""}`}
+                                                                          onClick={() =>
+                                                                            setPredicateRefReplayApplyConflictDraftSource(
+                                                                              review.conflict.conflictId,
+                                                                              item.decisionKey,
+                                                                              "local",
+                                                                            )}
+                                                                          type="button"
+                                                                        >
+                                                                          Keep local field
+                                                                        </button>
+                                                                        <button
+                                                                          className={`ghost-button${selectedSource === "remote" ? " is-active" : ""}`}
+                                                                          onClick={() =>
+                                                                            setPredicateRefReplayApplyConflictDraftSource(
+                                                                              review.conflict.conflictId,
+                                                                              item.decisionKey,
+                                                                              "remote",
+                                                                            )}
+                                                                          type="button"
+                                                                        >
+                                                                          Accept remote field
+                                                                        </button>
+                                                                      </>
+                                                                    ) : null}
+                                                                    {canTrace ? (
+                                                                      <button
+                                                                        className="ghost-button"
+                                                                        onClick={() =>
+                                                                          focusReplayApplyConflictSimulationTrace(
+                                                                            item.relatedGroupKey ?? "",
+                                                                          )}
+                                                                        type="button"
+                                                                      >
+                                                                        Trace in simulation
+                                                                      </button>
+                                                                    ) : null}
+                                                                  </div>
+                                                                  {!item.editable && section.key === "summary" ? (
+                                                                    <p className="run-note">
+                                                                      Derived summary counts follow the replay row selection that survives resolution.
+                                                                    </p>
+                                                                  ) : null}
                                                                 </div>
-                                                              </div>
-                                                            ))}
+                                                              );
+                                                            })}
                                                           </div>
                                                         </div>
                                                       ) : null,
@@ -23765,10 +24115,25 @@ function RunSurfaceCollectionQueryBuilder({
                                                   <div className="run-surface-query-builder-trace-panel is-nested">
                                                     <div className="run-surface-query-builder-card-head">
                                                       <strong>What-if review</strong>
-                                                      <span>Local vs remote outcome</span>
+                                                      <span>Local, merged, and remote outcome</span>
+                                                    </div>
+                                                    <div className="run-surface-query-builder-trace-chip-list">
+                                                      <span className="run-surface-query-builder-trace-chip">
+                                                        {`${review.editableDiffCount} editable fields`}
+                                                      </span>
+                                                      <span className={`run-surface-query-builder-trace-chip${
+                                                        review.hasRemoteSelection ? " is-active" : ""
+                                                      }`}>
+                                                        {`${review.selectedRemoteCount} remote selections`}
+                                                      </span>
+                                                      <span className={`run-surface-query-builder-trace-chip${
+                                                        review.hasMixedSelection ? " is-active" : ""
+                                                      }`}>
+                                                        {review.hasMixedSelection ? "Partial merge staged" : "No partial merge staged"}
+                                                      </span>
                                                     </div>
                                                     <div className="run-surface-query-builder-trace-list">
-                                                      {[review.localPreview, review.remotePreview].map((preview) => (
+                                                      {[review.localPreview, review.mergedPreview, review.remotePreview].map((preview) => (
                                                         <div
                                                           className={`run-surface-query-builder-trace-step is-${
                                                             preview.resolution === "local" ? "info" : "warning"
@@ -23790,6 +24155,16 @@ function RunSurfaceCollectionQueryBuilder({
                                                             <span className="run-surface-query-builder-trace-chip">
                                                               {preview.snapshotSummary}
                                                             </span>
+                                                            {preview.matchesLocal ? (
+                                                              <span className="run-surface-query-builder-trace-chip">
+                                                                Matches local
+                                                              </span>
+                                                            ) : null}
+                                                            {preview.matchesRemote ? (
+                                                              <span className="run-surface-query-builder-trace-chip">
+                                                                Matches remote
+                                                              </span>
+                                                            ) : null}
                                                           </div>
                                                           <div className="run-surface-query-builder-trace-chip-list">
                                                             {preview.rowSummaries.length ? (
@@ -23808,17 +24183,46 @@ function RunSurfaceCollectionQueryBuilder({
                                                             )}
                                                           </div>
                                                           <div className="run-surface-query-builder-actions">
-                                                            <button
-                                                              className="ghost-button"
-                                                              onClick={() =>
-                                                                resolvePredicateRefReplayApplyConflict(
-                                                                  review.conflict,
-                                                                  preview.resolution,
-                                                                )}
-                                                              type="button"
-                                                            >
-                                                              {preview.title}
-                                                            </button>
+                                                            {preview.resolution === "merged" ? (
+                                                              <>
+                                                                <button
+                                                                  className="ghost-button"
+                                                                  disabled={!review.hasRemoteSelection}
+                                                                  onClick={() =>
+                                                                    resolvePredicateRefReplayApplyConflict(
+                                                                      review.conflict,
+                                                                      "merged",
+                                                                      review.mergedEntry,
+                                                                    )}
+                                                                  type="button"
+                                                                >
+                                                                  Apply reviewed merge
+                                                                </button>
+                                                                <button
+                                                                  className="ghost-button"
+                                                                  disabled={!review.hasRemoteSelection}
+                                                                  onClick={() =>
+                                                                    resetPredicateRefReplayApplyConflictDraftSource(
+                                                                      review.conflict.conflictId,
+                                                                    )}
+                                                                  type="button"
+                                                                >
+                                                                  Reset merge draft
+                                                                </button>
+                                                              </>
+                                                            ) : (
+                                                              <button
+                                                                className="ghost-button"
+                                                                onClick={() =>
+                                                                  resolvePredicateRefReplayApplyConflict(
+                                                                    review.conflict,
+                                                                    preview.resolution,
+                                                                  )}
+                                                                type="button"
+                                                              >
+                                                                {preview.title}
+                                                              </button>
+                                                            )}
                                                           </div>
                                                         </div>
                                                       ))}
