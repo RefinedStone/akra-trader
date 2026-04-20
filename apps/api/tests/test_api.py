@@ -362,9 +362,19 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert run_query_schema["expression_trees"]["supports_negation"] is True
   assert run_query_schema["expression_trees"]["predicate_refs"]["registry_field"] == "predicates"
   assert run_query_schema["expression_trees"]["predicate_refs"]["reference_field"] == "predicate_ref"
+  assert run_query_schema["expression_trees"]["predicate_templates"]["registry_field"] == "predicate_templates"
+  assert run_query_schema["expression_trees"]["predicate_templates"]["template_field"] == "template"
+  assert run_query_schema["expression_trees"]["predicate_templates"]["bindings_field"] == "bindings"
+  assert run_query_schema["expression_trees"]["predicate_templates"]["binding_reference_shape"] == {
+    "binding": "<parameter_name>",
+  }
   assert run_query_schema["expression_trees"]["quantified_conditions"]["field"] == "quantifier"
   assert run_query_schema["expression_trees"]["quantified_conditions"]["values"] == ["any", "all", "none"]
   assert run_query_schema["expression_trees"]["collection_nodes"]["field"] == "collection"
+  assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["path_template"] == "<collection path template>"
+  assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["bindings"] == {
+    "<parameter_key>": "<value or binding reference>",
+  }
   assert run_query_schema["expression_trees"]["collection_nodes"]["shape"]["quantifier"] == "any|all|none"
   assert "flattening nested collection-of-collection paths" in run_query_schema["expression_trees"]["collection_nodes"]["semantics"]
   assert run_query_schema["expression_trees"]["collection_schemas"][0]["path"] == ["orders"]
@@ -886,6 +896,133 @@ def test_run_query_contract_supports_predicate_references_and_quantified_list_pr
     )
     assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
     assert runs_by_symbol["XRP/USDT"] not in returned_run_ids
+
+
+def test_run_query_contract_supports_parameterized_predicate_templates_and_collection_bindings(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    runs_by_symbol: dict[str, str] = {}
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      runs_by_symbol[symbol] = response.json()["config"]["run_id"]
+
+    app = client.app.state.container.app
+    lineage_by_symbol = {
+      "BTC/USDT": {
+        "binance:BTC/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("BTC/USDT",),
+          timeframe="5m",
+          issues=("gap:btc", "stale:btc"),
+        ),
+      },
+      "ETH/USDT": {
+        "binance:ETH/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("ETH/USDT",),
+          timeframe="5m",
+          issues=("review:eth", "gap:eth"),
+        ),
+      },
+      "SOL/USDT": {
+        "binance:SOL/USDT": MarketDataLineage(
+          provider="seeded",
+          venue="binance",
+          symbols=("SOL/USDT",),
+          timeframe="5m",
+          issues=("stale:sol",),
+        ),
+      },
+    }
+    for symbol, market_data_by_symbol in lineage_by_symbol.items():
+      run = app.get_run(runs_by_symbol[symbol])
+      assert run is not None
+      run.provenance.market_data_by_symbol = market_data_by_symbol
+      app._runs.save_run(run)
+
+    filter_expression = {
+      "predicate_templates": {
+        "issue_prefix_for_symbol": {
+          "parameters": {
+            "symbol_key": {},
+            "issue_prefix": {},
+          },
+          "template": {
+            "collection": {
+              "path_template": [
+                "provenance",
+                "market_data_by_symbol",
+                "{symbol_key}",
+                "issues",
+              ],
+              "bindings": {
+                "symbol_key": {
+                  "binding": "symbol_key",
+                },
+              },
+              "quantifier": "any",
+            },
+            "logic": "and",
+            "conditions": [
+              {
+                "key": "issue_text",
+                "operator": "prefix",
+                "value": {
+                  "binding": "issue_prefix",
+                },
+              },
+            ],
+          },
+        },
+      },
+      "root": {
+        "logic": "or",
+        "children": [
+          {
+            "predicate_ref": "issue_prefix_for_symbol",
+            "bindings": {
+              "symbol_key": "binance:BTC/USDT",
+              "issue_prefix": "gap:",
+            },
+          },
+          {
+            "predicate_ref": "issue_prefix_for_symbol",
+            "bindings": {
+              "symbol_key": "binance:ETH/USDT",
+              "issue_prefix": "review:",
+            },
+          },
+        ],
+      },
+    }
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("filter_expr", json.dumps(filter_expression)),
+        ("sort", "config.run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    returned_run_ids = [item["config"]["run_id"] for item in payload]
+    assert returned_run_ids == sorted(
+      [
+        runs_by_symbol["BTC/USDT"],
+        runs_by_symbol["ETH/USDT"],
+      ]
+    )
+    assert runs_by_symbol["SOL/USDT"] not in returned_run_ids
 
 
 def test_run_query_contract_supports_quantified_nested_object_collection_predicates(tmp_path: Path) -> None:

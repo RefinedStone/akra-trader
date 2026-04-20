@@ -23092,6 +23092,7 @@ class StandaloneSurfaceFilterExpressionNode:
   negated: bool = False
   collection_path: tuple[str, ...] = ()
   collection_quantifier: str | None = None
+  collection_path_strict: bool = False
 
 
 @dataclass(frozen=True)
@@ -23406,6 +23407,8 @@ def _normalize_runtime_collection_items(value: Any) -> tuple[Any, ...] | None:
 def _resolve_runtime_collection_path_values(
   item: Any,
   path: tuple[str, ...],
+  *,
+  strict: bool = False,
 ) -> tuple[Any, ...] | None:
   def visit(current: Any, remaining_path: tuple[str, ...]) -> tuple[bool, tuple[Any, ...]]:
     if current is _RUNTIME_QUERY_MISSING:
@@ -23422,6 +23425,8 @@ def _resolve_runtime_collection_path_values(
     if isinstance(current, dict):
       if segment in current:
         return visit(current[segment], tail)
+      if strict:
+        return (False, ())
       found_any = False
       flattened_values: list[Any] = []
       for value in current.values():
@@ -23430,6 +23435,8 @@ def _resolve_runtime_collection_path_values(
         flattened_values.extend(nested_values)
       return (found_any, tuple(flattened_values))
     if isinstance(current, (list, tuple, set)):
+      if strict:
+        return (False, ())
       found_any = False
       flattened_values: list[Any] = []
       for value in current:
@@ -23485,9 +23492,10 @@ def _evaluate_runtime_filter_expression(
     collection_items = _resolve_runtime_collection_path_values(
       item,
       expression.collection_path,
+      strict=expression.collection_path_strict,
     )
     if collection_items is None:
-      return None
+      return False if expression.collection_path_strict else None
     element_expression = StandaloneSurfaceFilterExpressionNode(
       logic=expression.logic,
       conditions=expression.conditions,
