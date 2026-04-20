@@ -17225,6 +17225,12 @@ function RunSurfaceCollectionQueryBuilder({
     useState<"all" | string>("all");
   const [bundleCoordinationSimulationPromotionDecisionsByGroupKey, setBundleCoordinationSimulationPromotionDecisionsByGroupKey] =
     useState<Record<string, boolean>>({});
+  const [bundleCoordinationSimulationApprovalOpen, setBundleCoordinationSimulationApprovalOpen] =
+    useState(false);
+  const [bundleCoordinationSimulationApprovalDiffOnly, setBundleCoordinationSimulationApprovalDiffOnly] =
+    useState(true);
+  const [bundleCoordinationSimulationApprovalDecisionsByGroupKey, setBundleCoordinationSimulationApprovalDecisionsByGroupKey] =
+    useState<Record<string, boolean>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -19273,6 +19279,8 @@ function RunSurfaceCollectionQueryBuilder({
   );
   useEffect(() => {
     setBundleCoordinationSimulationPromotionDecisionsByGroupKey({});
+    setBundleCoordinationSimulationApprovalDecisionsByGroupKey({});
+    setBundleCoordinationSimulationApprovalOpen(false);
   }, [
     bundleCoordinationSimulationPolicy,
     bundleCoordinationSimulationScope,
@@ -19392,6 +19400,28 @@ function RunSurfaceCollectionQueryBuilder({
     [
       bundleCoordinationSimulationPromotionDecisionsByGroupKey,
       simulatedPredicateRefReplayPromotionPreviewRows,
+    ],
+  );
+  const visibleSimulatedPredicateRefReplayApprovalRows = useMemo(
+    () => (
+      bundleCoordinationSimulationApprovalDiffOnly
+        ? stagedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
+            row.changesCurrent || !row.matchesSimulation,
+          )
+        : stagedSimulatedPredicateRefReplayPromotionSelections
+    ),
+    [
+      bundleCoordinationSimulationApprovalDiffOnly,
+      stagedSimulatedPredicateRefReplayPromotionSelections,
+    ],
+  );
+  const approvedSimulatedPredicateRefReplayPromotionSelections = useMemo(
+    () => stagedSimulatedPredicateRefReplayPromotionSelections.filter((row) =>
+      bundleCoordinationSimulationApprovalDecisionsByGroupKey[row.group.key] ?? true,
+    ),
+    [
+      bundleCoordinationSimulationApprovalDecisionsByGroupKey,
+      stagedSimulatedPredicateRefReplayPromotionSelections,
     ],
   );
   useEffect(() => {
@@ -21733,25 +21763,26 @@ function RunSurfaceCollectionQueryBuilder({
                                   <button
                                     className="ghost-button"
                                     disabled={
-                                      !selectedRefTemplate
-                                      || !stagedSimulatedPredicateRefReplayPromotionSelections.length
+                                      !stagedSimulatedPredicateRefReplayPromotionSelections.length
                                       || simulatedPredicateRefReplayPromotionDraft.conflicts.length > 0
                                     }
                                     onClick={() => {
-                                      if (!selectedRefTemplate || !stagedSimulatedPredicateRefReplayPromotionSelections.length) {
+                                      if (!stagedSimulatedPredicateRefReplayPromotionSelections.length) {
                                         return;
                                       }
-                                      applyPredicateRefGroupPresetBundles(
-                                        selectedRefTemplate.id,
-                                        stagedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
-                                          group: row.group,
-                                          bundle: row.promotedBundle,
-                                        })),
+                                      setBundleCoordinationSimulationApprovalDecisionsByGroupKey(
+                                        Object.fromEntries(
+                                          stagedSimulatedPredicateRefReplayPromotionSelections.map((row) => [
+                                            row.group.key,
+                                            true,
+                                          ]),
+                                        ),
                                       );
+                                      setBundleCoordinationSimulationApprovalOpen(true);
                                     }}
                                     type="button"
                                   >
-                                    Promote staged replay draft
+                                    Review staged replay draft
                                   </button>
                                 </div>
                                 <input
@@ -21841,6 +21872,116 @@ function RunSurfaceCollectionQueryBuilder({
                                             </div>
                                           );
                                         })}
+                                      </div>
+                                    ) : null}
+                                    {bundleCoordinationSimulationApprovalOpen ? (
+                                      <div className="run-surface-query-builder-trace-panel is-nested">
+                                        <div className="run-surface-query-builder-card-head">
+                                          <strong>Replay apply approval</strong>
+                                          <span className="run-surface-query-builder-trace-status is-info">
+                                            {`${approvedSimulatedPredicateRefReplayPromotionSelections.length}/${stagedSimulatedPredicateRefReplayPromotionSelections.length} approved`}
+                                          </span>
+                                        </div>
+                                        <div className="run-surface-query-builder-actions">
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => setBundleCoordinationSimulationApprovalOpen(false)}
+                                            type="button"
+                                          >
+                                            Close review
+                                          </button>
+                                          <button
+                                            className="ghost-button"
+                                            disabled={
+                                              !selectedRefTemplate
+                                              || !approvedSimulatedPredicateRefReplayPromotionSelections.length
+                                            }
+                                            onClick={() => {
+                                              if (!selectedRefTemplate || !approvedSimulatedPredicateRefReplayPromotionSelections.length) {
+                                                return;
+                                              }
+                                              applyPredicateRefGroupPresetBundles(
+                                                selectedRefTemplate.id,
+                                                approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
+                                                  group: row.group,
+                                                  bundle: row.promotedBundle,
+                                                })),
+                                              );
+                                              setBundleCoordinationSimulationApprovalOpen(false);
+                                            }}
+                                            type="button"
+                                          >
+                                            Apply approved replay draft
+                                          </button>
+                                        </div>
+                                        <label className="run-surface-query-builder-checkbox">
+                                          <input
+                                            checked={bundleCoordinationSimulationApprovalDiffOnly}
+                                            onChange={(event) =>
+                                              setBundleCoordinationSimulationApprovalDiffOnly(event.target.checked)}
+                                            type="checkbox"
+                                          />
+                                          <span>Diff-only confirmation</span>
+                                        </label>
+                                        <p className="run-note">
+                                          Review the three-way comparison before apply:
+                                          current live resolution, simulated policy outcome, and promoted replay draft.
+                                        </p>
+                                        {visibleSimulatedPredicateRefReplayApprovalRows.length ? (
+                                          <div className="run-surface-query-builder-trace-list">
+                                            {visibleSimulatedPredicateRefReplayApprovalRows.map((row) => {
+                                              const isApproved =
+                                                bundleCoordinationSimulationApprovalDecisionsByGroupKey[row.group.key] ?? true;
+                                              return (
+                                                <div
+                                                  className={`run-surface-query-builder-trace-step is-${
+                                                    row.matchesSimulation
+                                                      ? "success"
+                                                      : row.changesCurrent
+                                                        ? "info"
+                                                        : "muted"
+                                                  }`}
+                                                  key={`approval-preview:${row.group.key}`}
+                                                >
+                                                  <strong>{row.group.label}</strong>
+                                                  <div className="run-surface-query-builder-trace-chip-list">
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {`Current · ${row.currentStatus} · ${row.currentBundleLabel}`}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {`Simulated · ${row.simulatedStatus} · ${row.simulatedBundleLabel}`}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip is-active">
+                                                      {`Draft · ${row.promotedBundle.label}`}
+                                                    </span>
+                                                  </div>
+                                                  <div className="run-surface-query-builder-actions">
+                                                    <button
+                                                      className={`ghost-button${isApproved ? " is-active" : ""}`}
+                                                      onClick={() =>
+                                                        setBundleCoordinationSimulationApprovalDecisionsByGroupKey((current) => ({
+                                                          ...current,
+                                                          [row.group.key]: !(current[row.group.key] ?? true),
+                                                        }))}
+                                                      type="button"
+                                                    >
+                                                      {isApproved ? "Approved" : "Rejected"}
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        ) : (
+                                          <div className="run-surface-query-builder-trace-step is-muted">
+                                            <strong>No approval rows</strong>
+                                            <p>
+                                              {bundleCoordinationSimulationApprovalDiffOnly
+                                                ? "Diff-only confirmation is hiding rows that do not differ from the current or simulated state."
+                                                : "There are no staged replay rows available for approval."}
+                                            </p>
+                                          </div>
+                                        )}
                                       </div>
                                     ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
