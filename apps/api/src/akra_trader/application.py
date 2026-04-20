@@ -25694,6 +25694,35 @@ def serialize_collection_path_spec(
   }
 
 
+def serialize_collection_query_expression_authoring() -> dict[str, Any]:
+  return {
+    "predicate_refs": {
+      "registry_field": "predicates",
+      "reference_field": "predicate_ref",
+    },
+    "predicate_templates": {
+      "registry_field": "predicate_templates",
+      "template_field": "template",
+      "parameters_field": "parameters",
+      "bindings_field": "bindings",
+      "binding_reference_shape": {
+        "binding": "<parameter_name>",
+      },
+    },
+    "collection_nodes": {
+      "field": "collection",
+      "shape": {
+        "path": "<collection path>",
+        "path_template": "<collection path template>",
+        "bindings": {
+          "<parameter_key>": "<value or binding reference>",
+        },
+        "quantifier": "any|all|none",
+      },
+    },
+  }
+
+
 def list_collection_query_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[RunSurfaceSharedContract, ...]:
@@ -25733,6 +25762,7 @@ def list_collection_query_shared_contracts(
           "surface_key": binding.surface_key,
           "route_path": binding.route_path,
           "expression_param": "filter_expr",
+          "expression_authoring": serialize_collection_query_expression_authoring(),
           "collection_schemas": [
             serialize_collection_path_spec(binding, spec)
             for spec in binding.collection_path_specs

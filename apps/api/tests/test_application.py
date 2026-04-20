@@ -13837,7 +13837,7 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
     for contract in payload["discovery"]["shared_contracts"]
   }
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v13"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v14"
   assert shared_contracts["schema:run-surface-capabilities"]["related_family_keys"] == [
     "comparison_eligibility",
     "strategy_schema",
@@ -13904,6 +13904,32 @@ def test_run_subresource_serializer_registry_exposes_typed_metadata() -> None:
   assert shared_contracts["query_collection:run_list"]["related_family_keys"] == ["collection_query"]
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["surface_key"] == "run_list"
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["expression_param"] == "filter_expr"
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["expression_authoring"] == {
+    "predicate_refs": {
+      "registry_field": "predicates",
+      "reference_field": "predicate_ref",
+    },
+    "predicate_templates": {
+      "registry_field": "predicate_templates",
+      "template_field": "template",
+      "parameters_field": "parameters",
+      "bindings_field": "bindings",
+      "binding_reference_shape": {
+        "binding": "<parameter_name>",
+      },
+    },
+    "collection_nodes": {
+      "field": "collection",
+      "shape": {
+        "path": "<collection path>",
+        "path_template": "<collection path template>",
+        "bindings": {
+          "<parameter_key>": "<value or binding reference>",
+        },
+        "quantifier": "any|all|none",
+      },
+    },
+  }
   assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["path_template"] == [
     "provenance",
     "market_data_by_symbol",
@@ -15165,7 +15191,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
     for contract in capabilities.shared_contracts
   }
   assert capabilities.comparison_eligibility_contract.scope == "run_list"
-  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v13"
+  assert shared_contracts["schema:run-surface-capabilities"].version == "run-surface-capabilities.v14"
   assert shared_contracts["schema:run-surface-capabilities"].schema_detail["family_order"] == (
     "comparison_eligibility",
     "strategy_schema",

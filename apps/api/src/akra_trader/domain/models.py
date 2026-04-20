@@ -671,7 +671,7 @@ RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
   "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
 )
-RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v13"
+RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v14"
 RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
   "eligible_metrics",
   "supporting_identity",
@@ -852,7 +852,7 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
       contract_key="family:collection_query",
       contract_kind="capability_family",
       title="Collection query discovery",
-      summary="Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+      summary="Publishes collection expression schemas, parameter domains, enum-source metadata, and parameterized predicate-template authoring metadata used by typed query builders.",
       source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
       discovery_flow="Typed query discovery panels and collection expression builders.",
       related_family_keys=("collection_query",),

@@ -611,6 +611,26 @@ type RunSurfaceCollectionQueryParameterDomainDescriptor = {
   domain: RunSurfaceCollectionQueryParameterDomain | null;
   surfaceKey: string;
 };
+type RunSurfaceCollectionQueryExpressionAuthoring = {
+  predicateRefs: {
+    registryField: string;
+    referenceField: string;
+  };
+  predicateTemplates: {
+    registryField: string;
+    templateField: string;
+    parametersField: string;
+    bindingsField: string;
+    bindingReferenceField: string;
+  };
+  collectionNodes: {
+    field: string;
+    pathField: string;
+    pathTemplateField: string;
+    bindingsField: string;
+    quantifierField: string;
+  };
+};
 
 type ComparisonScoreSection = "metrics" | "semantics" | "context";
 type ProvenanceArtifactLineDetailView = "stats" | "context";
@@ -14667,7 +14687,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       summary:
         "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
       source_of_truth: "run_surface_capabilities.discovery",
-      version: "run-surface-capabilities.v13",
+      version: "run-surface-capabilities.v14",
       related_family_keys: [
         "comparison_eligibility",
         "strategy_schema",
@@ -14737,7 +14757,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
       contract_key: "family:collection_query",
       contract_kind: "capability_family",
       title: "Collection query discovery",
-      summary: "Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+      summary: "Publishes collection expression schemas, parameter domains, enum-source metadata, and parameterized predicate-template authoring metadata used by typed query builders.",
       source_of_truth: "standalone_surface_runtime_bindings.collection_path_specs",
       version: null,
       related_family_keys: ["collection_query"],
@@ -14778,6 +14798,32 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_DISCOVERY: RunSurfaceCapabilities["discover
         surface_key: "run_list",
         route_path: "/runs",
         expression_param: "filter_expr",
+        expression_authoring: {
+          predicate_refs: {
+            registry_field: "predicates",
+            reference_field: "predicate_ref",
+          },
+          predicate_templates: {
+            registry_field: "predicate_templates",
+            template_field: "template",
+            parameters_field: "parameters",
+            bindings_field: "bindings",
+            binding_reference_shape: {
+              binding: "<parameter_name>",
+            },
+          },
+          collection_nodes: {
+            field: "collection",
+            shape: {
+              path: "<collection path>",
+              path_template: "<collection path template>",
+              bindings: {
+                "<parameter_key>": "<value or binding reference>",
+              },
+              quantifier: "any|all|none",
+            },
+          },
+        },
         collection_schemas: [
           {
             path: ["orders"],
@@ -15005,7 +15051,7 @@ const DEFAULT_RUN_SURFACE_CAPABILITY_FAMILIES: RunSurfaceCapabilityFamily[] = [
   {
     family_key: "collection_query",
     title: "Collection query discovery",
-    summary: "Publishes collection expression schemas, parameter domains, and enum-source metadata used by typed query builders.",
+    summary: "Publishes collection expression schemas, parameter domains, enum-source metadata, and parameterized predicate-template authoring metadata used by typed query builders.",
     ui_surfaces: [
       "Collection query discovery panels",
       "Collection expression builders",
@@ -15223,7 +15269,7 @@ function getRunSurfaceSharedContracts(capabilities?: RunSurfaceCapabilities | nu
       schemaContract?.summary
       ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.",
     source_of_truth: schemaContract?.source_of_truth ?? "run_surface_capabilities.discovery",
-    version: schemaContract?.version ?? "run-surface-capabilities.v13",
+    version: schemaContract?.version ?? "run-surface-capabilities.v14",
     discovery_flow: schemaContract?.discovery_flow ?? null,
     related_family_keys: schemaContract?.related_family_keys?.length
       ? schemaContract.related_family_keys
@@ -15489,6 +15535,91 @@ function getRunSurfaceCollectionQueryParameterDomains(
   });
 }
 
+function getRunSurfaceCollectionQueryExpressionAuthoring(
+  contract: RunSurfaceCollectionQueryContract | null | undefined,
+): RunSurfaceCollectionQueryExpressionAuthoring {
+  const authoringRecord =
+    contract && typeof contract.schema_detail.expression_authoring === "object"
+      ? (contract.schema_detail.expression_authoring as Record<string, unknown>)
+      : null;
+  const predicateRefsRecord =
+    authoringRecord && typeof authoringRecord.predicate_refs === "object"
+      ? (authoringRecord.predicate_refs as Record<string, unknown>)
+      : null;
+  const predicateTemplatesRecord =
+    authoringRecord && typeof authoringRecord.predicate_templates === "object"
+      ? (authoringRecord.predicate_templates as Record<string, unknown>)
+      : null;
+  const bindingReferenceShapeRecord =
+    predicateTemplatesRecord && typeof predicateTemplatesRecord.binding_reference_shape === "object"
+      ? (predicateTemplatesRecord.binding_reference_shape as Record<string, unknown>)
+      : null;
+  const collectionNodesRecord =
+    authoringRecord && typeof authoringRecord.collection_nodes === "object"
+      ? (authoringRecord.collection_nodes as Record<string, unknown>)
+      : null;
+  const collectionShapeRecord =
+    collectionNodesRecord && typeof collectionNodesRecord.shape === "object"
+      ? (collectionNodesRecord.shape as Record<string, unknown>)
+      : null;
+  return {
+    predicateRefs: {
+      registryField:
+        predicateRefsRecord && typeof predicateRefsRecord.registry_field === "string"
+          ? predicateRefsRecord.registry_field
+          : "predicates",
+      referenceField:
+        predicateRefsRecord && typeof predicateRefsRecord.reference_field === "string"
+          ? predicateRefsRecord.reference_field
+          : "predicate_ref",
+    },
+    predicateTemplates: {
+      registryField:
+        predicateTemplatesRecord && typeof predicateTemplatesRecord.registry_field === "string"
+          ? predicateTemplatesRecord.registry_field
+          : "predicate_templates",
+      templateField:
+        predicateTemplatesRecord && typeof predicateTemplatesRecord.template_field === "string"
+          ? predicateTemplatesRecord.template_field
+          : "template",
+      parametersField:
+        predicateTemplatesRecord && typeof predicateTemplatesRecord.parameters_field === "string"
+          ? predicateTemplatesRecord.parameters_field
+          : "parameters",
+      bindingsField:
+        predicateTemplatesRecord && typeof predicateTemplatesRecord.bindings_field === "string"
+          ? predicateTemplatesRecord.bindings_field
+          : "bindings",
+      bindingReferenceField:
+        bindingReferenceShapeRecord && typeof bindingReferenceShapeRecord.binding === "string"
+          ? "binding"
+          : "binding",
+    },
+    collectionNodes: {
+      field:
+        collectionNodesRecord && typeof collectionNodesRecord.field === "string"
+          ? collectionNodesRecord.field
+          : "collection",
+      pathField:
+        collectionShapeRecord && typeof collectionShapeRecord.path === "string"
+          ? "path"
+          : "path",
+      pathTemplateField:
+        collectionShapeRecord && typeof collectionShapeRecord.path_template === "string"
+          ? "path_template"
+          : "path_template",
+      bindingsField:
+        collectionShapeRecord && typeof collectionShapeRecord.bindings === "object"
+          ? "bindings"
+          : "bindings",
+      quantifierField:
+        collectionShapeRecord && typeof collectionShapeRecord.quantifier === "string"
+          ? "quantifier"
+          : "quantifier",
+    },
+  };
+}
+
 function getCollectionQuerySchemaId(schema: RunSurfaceCollectionQuerySchema) {
   return schema.pathTemplate.join(".");
 }
@@ -15574,10 +15705,12 @@ type HydratedRunSurfaceCollectionQueryBuilderState = {
   contractKey: string;
   schemaId: string;
   parameterValues: Record<string, string>;
+  parameterBindingKeys: Record<string, string>;
   quantifier: "any" | "all" | "none";
   fieldKey: string;
   operatorKey: string;
   builderValue: string;
+  valueBindingKey: string;
   negated: boolean;
 };
 
@@ -15591,6 +15724,7 @@ type RunSurfaceCollectionQueryBuilderPredicateRefState = {
   id: string;
   kind: "predicate_ref";
   predicateKey: string;
+  bindings: Record<string, string>;
   negated: boolean;
 };
 
@@ -15619,6 +15753,21 @@ type RunSurfaceCollectionQueryBuilderPredicateState = {
   node: RunSurfaceCollectionQueryBuilderChildState;
 };
 
+type RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState = {
+  key: string;
+  label: string;
+  valueType: string;
+  description: string | null;
+  options: string[];
+};
+
+type RunSurfaceCollectionQueryBuilderPredicateTemplateState = {
+  id: string;
+  key: string;
+  parameters: RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState[];
+  node: RunSurfaceCollectionQueryBuilderChildState;
+};
+
 type HydratedRunSurfaceCollectionQueryBuilderExpressionState = {
   mode: "single" | "grouped";
   draftClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
@@ -15626,12 +15775,14 @@ type HydratedRunSurfaceCollectionQueryBuilderExpressionState = {
   rootNegated: boolean;
   expressionChildren: RunSurfaceCollectionQueryBuilderChildState[];
   predicates: RunSurfaceCollectionQueryBuilderPredicateState[];
+  predicateTemplates: RunSurfaceCollectionQueryBuilderPredicateTemplateState[];
 };
 
 type RunSurfaceCollectionQueryBuilderEditorTarget =
   | { kind: "draft" }
   | { kind: "expression_clause"; childId: string }
-  | { kind: "predicate"; predicateId: string };
+  | { kind: "predicate"; predicateId: string }
+  | { kind: "template"; templateId: string };
 
 const RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID = "root";
 
@@ -15649,6 +15800,8 @@ function cloneRunSurfaceCollectionQueryBuilderChildState(
       clause: {
         ...child.clause,
         parameterValues: { ...child.clause.parameterValues },
+        parameterBindingKeys: { ...child.clause.parameterBindingKeys },
+        valueBindingKey: child.clause.valueBindingKey,
       },
     };
   }
@@ -15657,6 +15810,7 @@ function cloneRunSurfaceCollectionQueryBuilderChildState(
       id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate-ref"),
       kind: "predicate_ref",
       predicateKey: child.predicateKey,
+      bindings: { ...child.bindings },
       negated: child.negated,
     };
   }
@@ -15695,6 +15849,11 @@ function parseRunSurfaceCollectionQueryBuilderClauseState(
       return null;
     }
     const resolvedPath = getCollectionQueryStringArray(collectionRecord.path);
+    const rawPathTemplate = getCollectionQueryStringArray(collectionRecord.path_template);
+    const rawBindings =
+      collectionRecord.bindings && typeof collectionRecord.bindings === "object" && !Array.isArray(collectionRecord.bindings)
+        ? (collectionRecord.bindings as Record<string, unknown>)
+        : null;
     const quantifier =
       collectionRecord.quantifier === "all"
       || collectionRecord.quantifier === "none"
@@ -15704,13 +15863,35 @@ function parseRunSurfaceCollectionQueryBuilderClauseState(
     const condition = conditionRecords[0];
     const fieldKey = typeof condition.key === "string" ? condition.key : "";
     const operatorKey = typeof condition.operator === "string" ? condition.operator : "";
-    if (!resolvedPath.length || !fieldKey || !operatorKey) {
+    if ((!resolvedPath.length && !rawPathTemplate.length) || !fieldKey || !operatorKey) {
       return null;
     }
     for (const contract of contracts) {
       const schemas = getRunSurfaceCollectionQuerySchemas(contract);
       for (const schema of schemas) {
-        const parameterValues = resolveCollectionQueryTemplateValues(schema.pathTemplate, resolvedPath);
+        const parameterValues = rawPathTemplate.length
+          ? (
+              getCollectionQuerySchemaId(schema) === rawPathTemplate.join(".")
+                ? schema.parameters.reduce<Record<string, string>>((accumulator, parameter) => {
+                    const rawBindingValue = rawBindings?.[parameter.key];
+                    if (rawBindingValue && typeof rawBindingValue === "object" && !Array.isArray(rawBindingValue)) {
+                      return accumulator;
+                    }
+                    if (typeof rawBindingValue === "string") {
+                      accumulator[parameter.key] = rawBindingValue;
+                      return accumulator;
+                    }
+                    const optionValues = parameter.domain?.values.length
+                      ? parameter.domain.values
+                      : parameter.examples;
+                    if (optionValues[0]) {
+                      accumulator[parameter.key] = optionValues[0];
+                    }
+                    return accumulator;
+                  }, {})
+                : null
+            )
+          : resolveCollectionQueryTemplateValues(schema.pathTemplate, resolvedPath);
         if (!parameterValues) {
           continue;
         }
@@ -15722,14 +15903,35 @@ function parseRunSurfaceCollectionQueryBuilderClauseState(
         if (!operator) {
           continue;
         }
+        const parameterBindingKeys = schema.parameters.reduce<Record<string, string>>((accumulator, parameter) => {
+          const rawBindingValue = rawBindings?.[parameter.key];
+          if (
+            rawBindingValue
+            && typeof rawBindingValue === "object"
+            && !Array.isArray(rawBindingValue)
+            && typeof (rawBindingValue as Record<string, unknown>).binding === "string"
+          ) {
+            accumulator[parameter.key] = (rawBindingValue as Record<string, string>).binding;
+          }
+          return accumulator;
+        }, {});
+        const valueBindingKey =
+          condition.value
+          && typeof condition.value === "object"
+          && !Array.isArray(condition.value)
+          && typeof (condition.value as Record<string, unknown>).binding === "string"
+            ? (condition.value as Record<string, string>).binding
+            : "";
         return {
           contractKey: contract.contract_key,
           schemaId: getCollectionQuerySchemaId(schema),
           parameterValues,
+          parameterBindingKeys,
           quantifier,
           fieldKey,
           operatorKey,
-          builderValue: formatCollectionQueryBuilderValue(condition.value, field.valueType),
+          builderValue: valueBindingKey ? "" : formatCollectionQueryBuilderValue(condition.value, field.valueType),
+          valueBindingKey,
           negated: record.negated === true,
         };
       }
@@ -15769,10 +15971,12 @@ function buildRunSurfaceCollectionQueryBuilderDefaultClauseState(
     contractKey: activeContract.contract_key,
     schemaId: getCollectionQuerySchemaId(schema),
     parameterValues,
+    parameterBindingKeys: {},
     quantifier: "any",
     fieldKey: field.key,
     operatorKey: operator.key,
     builderValue: "",
+    valueBindingKey: "",
     negated: false,
   };
 }
@@ -15801,17 +16005,38 @@ function buildRunSurfaceCollectionQueryBuilderNodeFromClause(
   if (!field || !operator) {
     return null;
   }
+  const hasTemplateBindings = Object.values(clause.parameterBindingKeys).some(Boolean);
+  const collectionNode = hasTemplateBindings
+    ? {
+        path_template: activeSchema.pathTemplate,
+        bindings: activeSchema.parameters.reduce<Record<string, unknown>>((accumulator, parameter) => {
+          const bindingKey = clause.parameterBindingKeys[parameter.key]?.trim();
+          if (bindingKey) {
+            accumulator[parameter.key] = { binding: bindingKey };
+            return accumulator;
+          }
+          const literalValue = clause.parameterValues[parameter.key];
+          if (literalValue) {
+            accumulator[parameter.key] = literalValue;
+          }
+          return accumulator;
+        }, {}),
+        quantifier: clause.quantifier,
+      }
+    : {
+        path: resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues),
+        quantifier: clause.quantifier,
+      };
   return {
     ...(clause.negated ? { negated: true } : {}),
-    collection: {
-      path: resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues),
-      quantifier: clause.quantifier,
-    },
+    collection: collectionNode,
     conditions: [
       {
         key: field.key,
         operator: operator.key,
-        value: coerceCollectionQueryBuilderValue(clause.builderValue, field.valueType),
+        value: clause.valueBindingKey
+          ? { binding: clause.valueBindingKey }
+          : coerceCollectionQueryBuilderValue(clause.builderValue, field.valueType),
       },
     ],
   };
@@ -15830,10 +16055,15 @@ function formatRunSurfaceCollectionQueryBuilderClauseSummary(
   const field = activeSchema?.elementSchema.find((candidate) => candidate.key === clause.fieldKey) ?? null;
   const operator = field?.operators.find((candidate) => candidate.key === clause.operatorKey) ?? null;
   const path = activeSchema
-    ? resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues).join(".")
+    ? (
+        Object.values(clause.parameterBindingKeys).some(Boolean)
+          ? `${activeSchema.pathTemplate.join(".")} (bound)`
+          : resolveCollectionQueryPath(activeSchema.pathTemplate, clause.parameterValues).join(".")
+      )
     : clause.schemaId;
   const qualifier = clause.negated ? "not " : "";
-  return `${qualifier}${clause.quantifier} ${field?.title ?? field?.key ?? clause.fieldKey} ${operator?.label ?? operator?.key ?? clause.operatorKey} @ ${path}`;
+  const valueSuffix = clause.valueBindingKey ? ` · value via $${clause.valueBindingKey}` : "";
+  return `${qualifier}${clause.quantifier} ${field?.title ?? field?.key ?? clause.fieldKey} ${operator?.label ?? operator?.key ?? clause.operatorKey} @ ${path}${valueSuffix}`;
 }
 
 function formatRunSurfaceCollectionQueryBuilderChildSummary(
@@ -15844,7 +16074,12 @@ function formatRunSurfaceCollectionQueryBuilderChildSummary(
     return formatRunSurfaceCollectionQueryBuilderClauseSummary(child.clause, contracts);
   }
   if (child.kind === "predicate_ref") {
-    return `${child.negated ? "not " : ""}predicate ${child.predicateKey}`;
+    const bindingSummary = Object.keys(child.bindings).length
+      ? ` · ${Object.entries(child.bindings)
+          .map(([key, value]) => `${key}=${value}`)
+          .join(", ")}`
+      : "";
+    return `${child.negated ? "not " : ""}predicate ${child.predicateKey}${bindingSummary}`;
   }
   const counts = countRunSurfaceCollectionQueryBuilderChildren(child.children);
   return `${child.negated ? "not " : ""}${child.logic.toUpperCase()} subgroup · ${counts.clauses} clause${counts.clauses === 1 ? "" : "s"} · ${counts.predicateRefs} predicate ref${counts.predicateRefs === 1 ? "" : "s"} · ${counts.groups} nested group${counts.groups === 1 ? "" : "s"}`;
@@ -15859,10 +16094,32 @@ function parseRunSurfaceCollectionQueryBuilderChildState(
   }
   const childRecord = rawNode as Record<string, unknown>;
   if (typeof childRecord.predicate_ref === "string" && childRecord.predicate_ref) {
+    const rawBindings =
+      childRecord.bindings && typeof childRecord.bindings === "object" && !Array.isArray(childRecord.bindings)
+        ? (childRecord.bindings as Record<string, unknown>)
+        : null;
     return {
       id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate-ref"),
       kind: "predicate_ref",
       predicateKey: childRecord.predicate_ref,
+      bindings: rawBindings
+        ? Object.fromEntries(
+            Object.entries(rawBindings).flatMap(([key, value]) => {
+              if (typeof value === "string") {
+                return [[key, value]];
+              }
+              if (
+                value
+                && typeof value === "object"
+                && !Array.isArray(value)
+                && typeof (value as Record<string, unknown>).binding === "string"
+              ) {
+                return [[key, `$${(value as Record<string, string>).binding}`]];
+              }
+              return [];
+            }),
+          )
+        : {},
       negated: childRecord.negated === true,
     };
   }
@@ -15900,17 +16157,42 @@ function parseRunSurfaceCollectionQueryBuilderChildState(
 function buildRunSurfaceCollectionQueryBuilderNodeFromChild(
   child: RunSurfaceCollectionQueryBuilderChildState,
   contracts: RunSurfaceCollectionQueryContract[],
+  expressionAuthoring: RunSurfaceCollectionQueryExpressionAuthoring,
+  predicateTemplates: RunSurfaceCollectionQueryBuilderPredicateTemplateState[],
 ): Record<string, unknown> | null {
   if (child.kind === "predicate_ref") {
-    return child.negated
-      ? { predicate_ref: child.predicateKey, negated: true }
-      : { predicate_ref: child.predicateKey };
+    const node: Record<string, unknown> = child.negated
+      ? { [expressionAuthoring.predicateRefs.referenceField]: child.predicateKey, negated: true }
+      : { [expressionAuthoring.predicateRefs.referenceField]: child.predicateKey };
+    const referencedTemplate = predicateTemplates.find((template) => template.key === child.predicateKey) ?? null;
+    if (referencedTemplate && Object.keys(child.bindings).length) {
+      node[expressionAuthoring.predicateTemplates.bindingsField] = Object.fromEntries(
+        referencedTemplate.parameters.flatMap((parameter) => {
+          const value = child.bindings[parameter.key];
+          if (!value) {
+            return [];
+          }
+          return [[
+            parameter.key,
+            value.startsWith("$")
+              ? { [expressionAuthoring.predicateTemplates.bindingReferenceField]: value.slice(1) }
+              : coerceCollectionQueryBuilderValue(value, parameter.valueType),
+          ]];
+        }),
+      );
+    }
+    return node;
   }
   if (child.kind === "clause") {
     return buildRunSurfaceCollectionQueryBuilderNodeFromClause(child.clause, contracts);
   }
   const childNodes = child.children.reduce<Record<string, unknown>[]>((accumulator, nestedChild) => {
-    const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(nestedChild, contracts);
+    const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(
+      nestedChild,
+      contracts,
+      expressionAuthoring,
+      predicateTemplates,
+    );
     if (node) {
       accumulator.push(node);
     }
@@ -16097,6 +16379,70 @@ function removeRunSurfaceCollectionQueryBuilderPredicateRefs(
   }, []);
 }
 
+function collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(
+  clause: HydratedRunSurfaceCollectionQueryBuilderState,
+  contracts: RunSurfaceCollectionQueryContract[],
+) {
+  const activeContract =
+    contracts.find((contract) => contract.contract_key === clause.contractKey) ?? contracts[0] ?? null;
+  const activeSchema =
+    getRunSurfaceCollectionQuerySchemas(activeContract).find(
+      (schema) => getCollectionQuerySchemaId(schema) === clause.schemaId,
+    ) ?? getRunSurfaceCollectionQuerySchemas(activeContract)[0] ?? null;
+  const activeField =
+    activeSchema?.elementSchema.find((field) => field.key === clause.fieldKey)
+    ?? activeSchema?.elementSchema[0]
+    ?? null;
+  const parameterMap = new Map<string, RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState>();
+  activeSchema?.parameters.forEach((parameter) => {
+    const bindingKey = clause.parameterBindingKeys[parameter.key]?.trim();
+    if (!bindingKey) {
+      return;
+    }
+    parameterMap.set(bindingKey, {
+      key: bindingKey,
+      label: `${parameter.key} path binding`,
+      valueType: "string",
+      description: parameter.description || `Collection path binding for ${activeSchema.label}.`,
+      options: parameter.domain?.values.length ? parameter.domain.values : parameter.examples,
+    });
+  });
+  if (clause.valueBindingKey.trim()) {
+    parameterMap.set(clause.valueBindingKey.trim(), {
+      key: clause.valueBindingKey.trim(),
+      label: `${activeField?.title ?? activeField?.key ?? clause.fieldKey} value binding`,
+      valueType: activeField?.valueType ?? "string",
+      description: activeField?.description ?? "Bound condition value.",
+      options: [],
+    });
+  }
+  return parameterMap;
+}
+
+function collectRunSurfaceCollectionQueryBuilderTemplateParameters(
+  child: RunSurfaceCollectionQueryBuilderChildState,
+  contracts: RunSurfaceCollectionQueryContract[],
+) {
+  const parameterMap = new Map<string, RunSurfaceCollectionQueryBuilderPredicateTemplateParameterState>();
+  const collect = (node: RunSurfaceCollectionQueryBuilderChildState) => {
+    if (node.kind === "clause") {
+      collectRunSurfaceCollectionQueryBuilderTemplateParametersFromClause(node.clause, contracts).forEach(
+        (parameter, key) => {
+          if (!parameterMap.has(key)) {
+            parameterMap.set(key, parameter);
+          }
+        },
+      );
+      return;
+    }
+    if (node.kind === "group") {
+      node.children.forEach((nestedChild) => collect(nestedChild));
+    }
+  };
+  collect(child);
+  return Array.from(parameterMap.values());
+}
+
 function parseRunSurfaceCollectionQueryBuilderExpressionState(
   rawExpression: string | null | undefined,
   contracts: RunSurfaceCollectionQueryContract[],
@@ -16114,6 +16460,10 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
     const predicateRegistry =
       typeof record.predicates === "object" && record.predicates !== null && !Array.isArray(record.predicates)
         ? (record.predicates as Record<string, unknown>)
+        : {};
+    const predicateTemplateRegistry =
+      typeof record.predicate_templates === "object" && record.predicate_templates !== null && !Array.isArray(record.predicate_templates)
+        ? (record.predicate_templates as Record<string, unknown>)
         : {};
     const rootNode =
       "root" in record
@@ -16133,7 +16483,46 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
         } satisfies RunSurfaceCollectionQueryBuilderPredicateState,
       ];
     });
-    if (singleClause && !predicates.length) {
+    const predicateTemplates = Object.entries(predicateTemplateRegistry).flatMap(([templateKey, rawTemplate]) => {
+      if (!rawTemplate || typeof rawTemplate !== "object" || Array.isArray(rawTemplate)) {
+        return [];
+      }
+      const templateRecord = rawTemplate as Record<string, unknown>;
+      const templateNode = parseRunSurfaceCollectionQueryBuilderChildState(templateRecord.template, contracts);
+      if (!templateNode) {
+        return [];
+      }
+      const rawParameters = templateRecord.parameters;
+      const parameterKeys = Array.isArray(rawParameters)
+        ? rawParameters.filter((parameter): parameter is string => typeof parameter === "string" && Boolean(parameter))
+        : (
+            rawParameters && typeof rawParameters === "object" && !Array.isArray(rawParameters)
+              ? Object.keys(rawParameters)
+              : []
+          );
+      const inferredParameters = collectRunSurfaceCollectionQueryBuilderTemplateParameters(templateNode, contracts);
+      const inferredParameterMap = new Map(
+        inferredParameters.map((parameter) => [parameter.key, parameter] as const),
+      );
+      return [
+        {
+          id: buildRunSurfaceCollectionQueryBuilderEntityId("template"),
+          key: templateKey,
+          parameters: parameterKeys.map(
+            (parameterKey) =>
+              inferredParameterMap.get(parameterKey) ?? {
+                key: parameterKey,
+                label: parameterKey,
+                valueType: "string",
+                description: null,
+                options: [],
+              },
+          ),
+          node: templateNode,
+        } satisfies RunSurfaceCollectionQueryBuilderPredicateTemplateState,
+      ];
+    });
+    if (singleClause && !predicates.length && !predicateTemplates.length) {
       return {
         mode: "single",
         draftClause: singleClause,
@@ -16141,6 +16530,7 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
         rootNegated: false,
         expressionChildren: [],
         predicates: [],
+        predicateTemplates: [],
       };
     }
     if (!rootNode || typeof rootNode !== "object" || Array.isArray(rootNode)) {
@@ -16184,6 +16574,7 @@ function parseRunSurfaceCollectionQueryBuilderExpressionState(
       rootNegated: rootRecord.negated === true,
       expressionChildren,
       predicates,
+      predicateTemplates,
     };
   } catch {
     return null;
@@ -16391,13 +16782,20 @@ function RunSurfaceCollectionQueryBuilder({
   const [rootNegated, setRootNegated] = useState(false);
   const [expressionChildren, setExpressionChildren] = useState<RunSurfaceCollectionQueryBuilderChildState[]>([]);
   const [predicates, setPredicates] = useState<RunSurfaceCollectionQueryBuilderPredicateState[]>([]);
+  const [predicateTemplates, setPredicateTemplates] = useState<RunSurfaceCollectionQueryBuilderPredicateTemplateState[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string>(RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID);
   const [editorTarget, setEditorTarget] = useState<RunSurfaceCollectionQueryBuilderEditorTarget>({ kind: "draft" });
   const [predicateDraftKey, setPredicateDraftKey] = useState("");
+  const [templateDraftKey, setTemplateDraftKey] = useState("");
   const [predicateRefDraftKey, setPredicateRefDraftKey] = useState("");
+  const [predicateRefDraftBindings, setPredicateRefDraftBindings] = useState<Record<string, string>>({});
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
+  );
+  const expressionAuthoring = useMemo(
+    () => getRunSurfaceCollectionQueryExpressionAuthoring(activeContract),
+    [activeContract],
   );
   const collectionSchemas = useMemo(
     () => getRunSurfaceCollectionQuerySchemas(activeContract),
@@ -16413,6 +16811,7 @@ function RunSurfaceCollectionQueryBuilder({
     [activeSchemaId, collectionSchemas],
   );
   const [parameterValues, setParameterValues] = useState<Record<string, string>>({});
+  const [parameterBindingKeys, setParameterBindingKeys] = useState<Record<string, string>>({});
   const [quantifier, setQuantifier] = useState<"any" | "all" | "none">("any");
   const [activeFieldKey, setActiveFieldKey] = useState<string>("");
   const activeField = useMemo(
@@ -16425,6 +16824,7 @@ function RunSurfaceCollectionQueryBuilder({
     [activeField, activeOperatorKey],
   );
   const [builderValue, setBuilderValue] = useState<string>("");
+  const [valueBindingKey, setValueBindingKey] = useState("");
   const [editorNegated, setEditorNegated] = useState(false);
 
   useEffect(() => {
@@ -16476,6 +16876,20 @@ function RunSurfaceCollectionQueryBuilder({
   }, [activeSchema]);
 
   useEffect(() => {
+    if (!activeSchema) {
+      setParameterBindingKeys({});
+      return;
+    }
+    setParameterBindingKeys((current) =>
+      Object.fromEntries(
+        activeSchema.parameters
+          .map((parameter) => [parameter.key, current[parameter.key] ?? ""] as const)
+          .filter(([, value]) => value),
+      ),
+    );
+  }, [activeSchema]);
+
+  useEffect(() => {
     if (!activeField) {
       setActiveFieldKey("");
       return;
@@ -16517,10 +16931,17 @@ function RunSurfaceCollectionQueryBuilder({
     setRootNegated(hydratedState.rootNegated);
     setExpressionChildren(hydratedState.expressionChildren);
     setPredicates(hydratedState.predicates);
+    setPredicateTemplates(hydratedState.predicateTemplates);
     setSelectedGroupId(RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID);
     setEditorTarget({ kind: "draft" });
     setPredicateDraftKey("");
-    setPredicateRefDraftKey(hydratedState.predicates[0]?.key ?? "");
+    setTemplateDraftKey("");
+    setPredicateRefDraftKey(
+      hydratedState.predicates[0]?.key
+      ?? hydratedState.predicateTemplates[0]?.key
+      ?? "",
+    );
+    setPredicateRefDraftBindings({});
     if (hydratedState.draftClause) {
       setActiveContractKey(hydratedState.draftClause.contractKey);
       setPendingHydratedState(hydratedState.draftClause);
@@ -16560,19 +16981,37 @@ function RunSurfaceCollectionQueryBuilder({
     setActiveFieldKey(pendingHydratedState.fieldKey);
     setActiveOperatorKey(pendingHydratedState.operatorKey);
     setBuilderValue(pendingHydratedState.builderValue);
+    setParameterBindingKeys({ ...pendingHydratedState.parameterBindingKeys });
+    setValueBindingKey(pendingHydratedState.valueBindingKey);
     setEditorNegated(pendingHydratedState.negated);
     setPendingHydratedState(null);
   }, [activeContract?.contract_key, activeSchemaId, pendingHydratedState]);
 
   useEffect(() => {
-    if (!predicates.length) {
+    const availablePredicateKeys = [...predicates.map((predicate) => predicate.key), ...predicateTemplates.map((template) => template.key)];
+    if (!availablePredicateKeys.length) {
       setPredicateRefDraftKey("");
+      setPredicateRefDraftBindings({});
       return;
     }
-    if (!predicates.some((predicate) => predicate.key === predicateRefDraftKey)) {
-      setPredicateRefDraftKey(predicates[0].key);
+    if (!availablePredicateKeys.includes(predicateRefDraftKey)) {
+      setPredicateRefDraftKey(availablePredicateKeys[0]);
     }
-  }, [predicateRefDraftKey, predicates]);
+  }, [predicateRefDraftKey, predicateTemplates, predicates]);
+
+  useEffect(() => {
+    const activeTemplate =
+      predicateTemplates.find((template) => template.key === predicateRefDraftKey) ?? null;
+    if (!activeTemplate) {
+      setPredicateRefDraftBindings({});
+      return;
+    }
+    setPredicateRefDraftBindings((current) =>
+      Object.fromEntries(
+        activeTemplate.parameters.map((parameter) => [parameter.key, current[parameter.key] ?? ""]),
+      ),
+    );
+  }, [predicateRefDraftKey, predicateTemplates]);
 
   useEffect(() => {
     if (expressionMode !== "grouped") {
@@ -16610,10 +17049,12 @@ function RunSurfaceCollectionQueryBuilder({
       contractKey: activeContract?.contract_key ?? "",
       schemaId: getCollectionQuerySchemaId(activeSchema),
       parameterValues,
+      parameterBindingKeys,
       quantifier,
       fieldKey: activeField.key,
       operatorKey: activeOperator.key,
       builderValue,
+      valueBindingKey,
       negated: editorNegated,
     };
   }, [
@@ -16623,8 +17064,10 @@ function RunSurfaceCollectionQueryBuilder({
     activeSchema,
     builderValue,
     editorNegated,
+    parameterBindingKeys,
     parameterValues,
     quantifier,
+    valueBindingKey,
   ]);
 
   const setEditorFromClause = (clause: HydratedRunSurfaceCollectionQueryBuilderState) => {
@@ -16636,8 +17079,12 @@ function RunSurfaceCollectionQueryBuilder({
     if (!activeSchema || !activeField || !activeOperator) {
       return "";
     }
-    return `${editorNegated ? "not " : ""}${activeSchema.label} · ${quantifier} ${activeField.title ?? activeField.key} ${activeOperator.label || activeOperator.key}`;
-  }, [activeField, activeOperator, activeSchema, editorNegated, quantifier]);
+    const templateMarkers = [
+      ...Object.values(parameterBindingKeys).filter(Boolean).map((bindingKey) => `$${bindingKey}`),
+      ...(valueBindingKey ? [`$${valueBindingKey}`] : []),
+    ];
+    return `${editorNegated ? "not " : ""}${activeSchema.label} · ${quantifier} ${activeField.title ?? activeField.key} ${activeOperator.label || activeOperator.key}${templateMarkers.length ? ` · binds ${templateMarkers.join(", ")}` : ""}`;
+  }, [activeField, activeOperator, activeSchema, editorNegated, parameterBindingKeys, quantifier, valueBindingKey]);
 
   const singleExpressionPreview = useMemo(() => {
     if (!editorClauseState) {
@@ -16650,12 +17097,39 @@ function RunSurfaceCollectionQueryBuilder({
   const groupedExpressionPreview = useMemo(() => {
     const predicateRegistry = Object.fromEntries(
       predicates.flatMap((predicate) => {
-        const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(predicate.node, contracts);
+        const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(
+          predicate.node,
+          contracts,
+          expressionAuthoring,
+          predicateTemplates,
+        );
         return node ? [[predicate.key, node]] : [];
       }),
     );
+    const predicateTemplateRegistry = Object.fromEntries(
+      predicateTemplates.flatMap((template) => {
+        const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(
+          template.node,
+          contracts,
+          expressionAuthoring,
+          predicateTemplates,
+        );
+        if (!node) {
+          return [];
+        }
+        return [[template.key, {
+          [expressionAuthoring.predicateTemplates.templateField]: node,
+          [expressionAuthoring.predicateTemplates.parametersField]: template.parameters.map((parameter) => parameter.key),
+        }]];
+      }),
+    );
     const rootChildren = expressionChildren.reduce<Record<string, unknown>[]>((accumulator, child) => {
-      const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(child, contracts);
+      const node = buildRunSurfaceCollectionQueryBuilderNodeFromChild(
+        child,
+        contracts,
+        expressionAuthoring,
+        predicateTemplates,
+      );
       if (node) {
         accumulator.push(node);
       }
@@ -16669,14 +17143,22 @@ function RunSurfaceCollectionQueryBuilder({
       logic: groupLogic,
       children: rootChildren,
     };
-    const payload = Object.keys(predicateRegistry).length
+    const payload = (
+      Object.keys(predicateRegistry).length
+      || Object.keys(predicateTemplateRegistry).length
+    )
       ? {
-          predicates: predicateRegistry,
+          ...(Object.keys(predicateRegistry).length
+            ? { [expressionAuthoring.predicateRefs.registryField]: predicateRegistry }
+            : {}),
+          ...(Object.keys(predicateTemplateRegistry).length
+            ? { [expressionAuthoring.predicateTemplates.registryField]: predicateTemplateRegistry }
+            : {}),
           root: rootNode,
         }
       : rootNode;
     return JSON.stringify(payload, null, 2);
-  }, [contracts, expressionChildren, groupLogic, predicates, rootNegated]);
+  }, [contracts, expressionAuthoring, expressionChildren, groupLogic, predicateTemplates, predicates, rootNegated]);
 
   const filterExpressionPreview = expressionMode === "grouped" ? groupedExpressionPreview : singleExpressionPreview;
 
@@ -16688,8 +17170,12 @@ function RunSurfaceCollectionQueryBuilder({
       const predicate = predicates.find((entry) => entry.id === editorTarget.predicateId);
       return predicate ? `Editing predicate ${predicate.key}` : "Editing predicate";
     }
+    if (editorTarget.kind === "template") {
+      const template = predicateTemplates.find((entry) => entry.id === editorTarget.templateId);
+      return template ? `Editing template ${template.key}` : "Editing template";
+    }
     return expressionMode === "grouped" ? "Draft clause" : "Single-node clause";
-  }, [editorTarget, expressionMode, predicates]);
+  }, [editorTarget, expressionMode, predicateTemplates, predicates]);
 
   const groupedExpressionLabel = useMemo(() => {
     const counts = countRunSurfaceCollectionQueryBuilderChildren(expressionChildren);
@@ -16706,12 +17192,15 @@ function RunSurfaceCollectionQueryBuilder({
     if (predicates.length) {
       parts.push(`${predicates.length} predicate definition${predicates.length === 1 ? "" : "s"}`);
     }
+    if (predicateTemplates.length) {
+      parts.push(`${predicateTemplates.length} template${predicateTemplates.length === 1 ? "" : "s"}`);
+    }
     return parts.join(" · ");
-  }, [expressionChildren, groupLogic, predicates.length, rootNegated]);
+  }, [expressionChildren, groupLogic, predicateTemplates.length, predicates.length, rootNegated]);
 
   const canApplyExpression = expressionMode === "grouped"
     ? Boolean(groupedExpressionPreview)
-    : builderValue.trim().length > 0 && Boolean(singleExpressionPreview);
+    : (builderValue.trim().length > 0 || Boolean(valueBindingKey.trim())) && Boolean(singleExpressionPreview);
 
   const applyCurrentExpression = () => {
     if (!onApplyExpression || !filterExpressionPreview) {
@@ -16798,6 +17287,45 @@ function RunSurfaceCollectionQueryBuilder({
     setPredicateDraftKey("");
   };
 
+  const buildTemplateStateFromNode = (
+    key: string,
+    node: RunSurfaceCollectionQueryBuilderChildState,
+  ): RunSurfaceCollectionQueryBuilderPredicateTemplateState => ({
+    id: buildRunSurfaceCollectionQueryBuilderEntityId("template"),
+    key,
+    parameters: collectRunSurfaceCollectionQueryBuilderTemplateParameters(node, contracts),
+    node: cloneRunSurfaceCollectionQueryBuilderChildState(node),
+  });
+
+  const saveSelectedSubtreeAsTemplate = () => {
+    const trimmedKey = templateDraftKey.trim();
+    if (!trimmedKey || templateKeyConflict || !selectedSubtreeNode) {
+      return;
+    }
+    const nextTemplate = buildTemplateStateFromNode(trimmedKey, selectedSubtreeNode);
+    if (editorTarget.kind === "template") {
+      const previousTemplate = predicateTemplates.find((template) => template.id === editorTarget.templateId) ?? null;
+      setPredicateTemplates((current) =>
+        current.map((template) =>
+          template.id === editorTarget.templateId
+            ? {
+                ...nextTemplate,
+                id: template.id,
+              }
+            : template,
+        ),
+      );
+      if (previousTemplate && previousTemplate.key !== trimmedKey) {
+        setExpressionChildren((current) =>
+          replaceRunSurfaceCollectionQueryBuilderPredicateRefs(current, previousTemplate.key, trimmedKey),
+        );
+      }
+      return;
+    }
+    setPredicateTemplates((current) => [...current, nextTemplate]);
+    setTemplateDraftKey("");
+  };
+
   const updateSelectedExpressionTarget = () => {
     if (!editorClauseState) {
       return;
@@ -16821,6 +17349,23 @@ function RunSurfaceCollectionQueryBuilder({
                 },
               }
             : predicate,
+        ),
+      );
+      return;
+    }
+    if (editorTarget.kind === "template") {
+      setPredicateTemplates((current) =>
+        current.map((template) =>
+          template.id === editorTarget.templateId
+            ? {
+                ...buildTemplateStateFromNode(template.key, {
+                  id: buildRunSurfaceCollectionQueryBuilderEntityId("clause"),
+                  kind: "clause",
+                  clause: editorClauseState,
+                }),
+                id: template.id,
+              }
+            : template,
         ),
       );
     }
@@ -16873,14 +17418,63 @@ function RunSurfaceCollectionQueryBuilder({
     setPredicateDraftKey("");
   };
 
+  const saveTemplateFromEditor = () => {
+    if (!editorClauseState) {
+      return;
+    }
+    const trimmedKey = templateDraftKey.trim();
+    if (!trimmedKey || templateKeyConflict) {
+      return;
+    }
+    const nextNode: RunSurfaceCollectionQueryBuilderClauseState = {
+      id: buildRunSurfaceCollectionQueryBuilderEntityId("clause"),
+      kind: "clause",
+      clause: editorClauseState,
+    };
+    if (editorTarget.kind === "template") {
+      const previousTemplate = predicateTemplates.find((template) => template.id === editorTarget.templateId) ?? null;
+      setPredicateTemplates((current) =>
+        current.map((template) =>
+          template.id === editorTarget.templateId
+            ? {
+                ...buildTemplateStateFromNode(trimmedKey, nextNode),
+                id: template.id,
+              }
+            : template,
+        ),
+      );
+      if (previousTemplate && previousTemplate.key !== trimmedKey) {
+        setExpressionChildren((current) =>
+          replaceRunSurfaceCollectionQueryBuilderPredicateRefs(current, previousTemplate.key, trimmedKey),
+        );
+      }
+      return;
+    }
+    setPredicateTemplates((current) => [
+      ...current,
+      buildTemplateStateFromNode(trimmedKey, nextNode),
+    ]);
+    setTemplateDraftKey("");
+  };
+
   const addPredicateRefToExpression = () => {
     if (!predicateRefDraftKey) {
       return;
     }
+    const referencedTemplate =
+      predicateTemplates.find((template) => template.key === predicateRefDraftKey) ?? null;
     const nextChild: RunSurfaceCollectionQueryBuilderPredicateRefState = {
       id: buildRunSurfaceCollectionQueryBuilderEntityId("predicate-ref"),
       kind: "predicate_ref",
       predicateKey: predicateRefDraftKey,
+      bindings: referencedTemplate
+        ? Object.fromEntries(
+            referencedTemplate.parameters.flatMap((parameter) => {
+              const value = predicateRefDraftBindings[parameter.key]?.trim();
+              return value ? [[parameter.key, value]] : [];
+            }),
+          )
+        : {},
       negated: false,
     };
     setExpressionChildren((current) =>
@@ -16914,6 +17508,19 @@ function RunSurfaceCollectionQueryBuilder({
     }
   };
 
+  const removeTemplate = (templateId: string) => {
+    const template = predicateTemplates.find((entry) => entry.id === templateId);
+    setPredicateTemplates((current) => current.filter((entry) => entry.id !== templateId));
+    if (template) {
+      setExpressionChildren((current) =>
+        removeRunSurfaceCollectionQueryBuilderPredicateRefs(current, template.key),
+      );
+    }
+    if (editorTarget.kind === "template" && editorTarget.templateId === templateId) {
+      setEditorTarget({ kind: "draft" });
+    }
+  };
+
   const togglePredicateRefNegation = (childId: string) => {
     const toggleChildren = (
       children: RunSurfaceCollectionQueryBuilderChildState[],
@@ -16940,18 +17547,41 @@ function RunSurfaceCollectionQueryBuilder({
     editorTarget.kind === "predicate"
       ? predicates.find((predicate) => predicate.id === editorTarget.predicateId) ?? null
       : null;
+  const selectedTemplate =
+    editorTarget.kind === "template"
+      ? predicateTemplates.find((template) => template.id === editorTarget.templateId) ?? null
+      : null;
+  const selectedRefTemplate =
+    predicateTemplates.find((template) => template.key === predicateRefDraftKey) ?? null;
+  const canAddPredicateRef = Boolean(
+    predicateRefDraftKey
+    && (
+      !selectedRefTemplate
+      || selectedRefTemplate.parameters.every((parameter) => Boolean(predicateRefDraftBindings[parameter.key]?.trim()))
+    ),
+  );
   const selectedPredicateSupportsClauseEditing = selectedPredicate?.node.kind === "clause";
+  const selectedTemplateSupportsClauseEditing = selectedTemplate?.node.kind === "clause";
   const trimmedPredicateDraftKey = predicateDraftKey.trim();
   const predicateKeyConflict = Boolean(
     trimmedPredicateDraftKey
-    && predicates.some(
-      (predicate) =>
-        predicate.key === trimmedPredicateDraftKey
-        && !(editorTarget.kind === "predicate" && predicate.id === editorTarget.predicateId),
+    && [...predicates, ...predicateTemplates].some((entry) =>
+      entry.key === trimmedPredicateDraftKey
+      && !(editorTarget.kind === "predicate" && "id" in entry && entry.id === editorTarget.predicateId),
+    ),
+  );
+  const trimmedTemplateDraftKey = templateDraftKey.trim();
+  const templateKeyConflict = Boolean(
+    trimmedTemplateDraftKey
+    && [...predicates, ...predicateTemplates].some((entry) =>
+      entry.key === trimmedTemplateDraftKey
+      && !(editorTarget.kind === "template" && "id" in entry && entry.id === editorTarget.templateId),
     ),
   );
   const predicateSaveLabel = editorTarget.kind === "predicate" ? "Update predicate" : "Save as predicate";
   const subtreePromotionLabel = editorTarget.kind === "predicate" ? "Overwrite from target subtree" : "Promote target subtree";
+  const templateSaveLabel = editorTarget.kind === "template" ? "Update template" : "Save as template";
+  const templatePromotionLabel = editorTarget.kind === "template" ? "Overwrite template subtree" : "Promote subtree as template";
   const selectedGroup = useMemo(
     () =>
       selectedGroupId === RUN_SURFACE_COLLECTION_QUERY_ROOT_GROUP_ID
@@ -17010,6 +17640,7 @@ function RunSurfaceCollectionQueryBuilder({
               onClick={() => {
                 setEditorTarget({ kind: "expression_clause", childId: child.id });
                 setPredicateDraftKey("");
+                setTemplateDraftKey("");
                 setEditorFromClause(child.clause);
               }}
               type="button"
@@ -17028,16 +17659,15 @@ function RunSurfaceCollectionQueryBuilder({
       );
     }
     if (child.kind === "predicate_ref") {
+      const referencedTemplate =
+        predicateTemplates.find((template) => template.key === child.predicateKey) ?? null;
       return (
         <div className="run-surface-query-builder-domain-card" key={child.id}>
           <div className="run-surface-query-builder-card-head">
             <strong>Predicate ref</strong>
-            <span>{child.negated ? "negated" : "linked"}</span>
+            <span>{referencedTemplate ? "template" : child.negated ? "negated" : "linked"}</span>
           </div>
-          <p className="run-note">
-            {child.negated ? "not " : ""}
-            {child.predicateKey}
-          </p>
+          <p className="run-note">{formatRunSurfaceCollectionQueryBuilderChildSummary(child, contracts)}</p>
           <div className="run-surface-query-builder-actions">
             <button
               className="ghost-button"
@@ -17210,10 +17840,12 @@ function RunSurfaceCollectionQueryBuilder({
                     ].filter(Boolean)),
                   );
                   const enumSource = parameter.domain?.enumSource;
+                  const bindingKey = parameterBindingKeys[parameter.key] ?? "";
                   return (
                     <label className="run-surface-query-builder-control" key={parameter.key}>
                       <span>{parameter.key}</span>
                       <select
+                        disabled={Boolean(bindingKey)}
                         value={parameterValues[parameter.key] ?? ""}
                         onChange={(event) =>
                           setParameterValues((current) => ({
@@ -17227,6 +17859,32 @@ function RunSurfaceCollectionQueryBuilder({
                           </option>
                         ))}
                       </select>
+                      <label className="run-surface-query-builder-checkbox">
+                        <input
+                          checked={Boolean(bindingKey)}
+                          onChange={(event) =>
+                            setParameterBindingKeys((current) => ({
+                              ...current,
+                              [parameter.key]: event.target.checked
+                                ? current[parameter.key] || `${parameter.key}_binding`
+                                : "",
+                            }))}
+                          type="checkbox"
+                        />
+                        <span>Bind path segment</span>
+                      </label>
+                      {bindingKey ? (
+                        <input
+                          type="text"
+                          value={bindingKey}
+                          onChange={(event) =>
+                            setParameterBindingKeys((current) => ({
+                              ...current,
+                              [parameter.key]: event.target.value,
+                            }))}
+                          placeholder={`${parameter.key}_binding`}
+                        />
+                      ) : null}
                       <small>
                         {parameter.description}
                         {enumSource
@@ -17288,11 +17946,28 @@ function RunSurfaceCollectionQueryBuilder({
             <label className="run-surface-query-builder-control">
               <span>Value</span>
               <input
+                disabled={Boolean(valueBindingKey)}
                 type="text"
                 value={builderValue}
                 onChange={(event) => setBuilderValue(event.target.value)}
                 placeholder={activeField?.valueType === "string" ? "type a value" : activeField?.valueType}
               />
+              <label className="run-surface-query-builder-checkbox">
+                <input
+                  checked={Boolean(valueBindingKey)}
+                  onChange={(event) => setValueBindingKey(event.target.checked ? "value_binding" : "")}
+                  type="checkbox"
+                />
+                <span>Bind value as template parameter</span>
+              </label>
+              {valueBindingKey ? (
+                <input
+                  type="text"
+                  value={valueBindingKey}
+                  onChange={(event) => setValueBindingKey(event.target.value)}
+                  placeholder="value_binding"
+                />
+              ) : null}
               <small>
                 {activeField?.description ?? "Typed from collection element schema."}
               </small>
@@ -17328,6 +18003,7 @@ function RunSurfaceCollectionQueryBuilder({
                     onClick={() => {
                       setEditorTarget({ kind: "draft" });
                       setPredicateDraftKey("");
+                      setTemplateDraftKey("");
                     }}
                     type="button"
                   >
@@ -17340,8 +18016,8 @@ function RunSurfaceCollectionQueryBuilder({
           {expressionMode === "grouped" ? (
             <div className="run-surface-query-builder-section">
               <div className="run-surface-query-builder-card-head">
-                <strong>Predicate refs</strong>
-                <span>{predicates.length} saved</span>
+                <strong>Predicate registry</strong>
+                <span>{predicates.length + predicateTemplates.length} saved</span>
               </div>
               <div className="run-surface-query-builder-inline-grid">
                 <label className="run-surface-query-builder-control">
@@ -17362,13 +18038,30 @@ function RunSurfaceCollectionQueryBuilder({
                   </small>
                 </label>
                 <label className="run-surface-query-builder-control">
-                  <span>Predicate ref</span>
+                  <span>Template key</span>
+                  <input
+                    onChange={(event) => setTemplateDraftKey(event.target.value)}
+                    placeholder="order-threshold-template"
+                    value={templateDraftKey}
+                  />
+                  <small>
+                    {templateKeyConflict
+                      ? "Choose a unique template key."
+                      : selectedTemplate
+                        ? selectedTemplate.node.kind === "clause"
+                          ? `Editing template ${selectedTemplate.key}.`
+                          : `Updating subtree template ${selectedTemplate.key}.`
+                        : "Save bound clauses or subtrees as reusable parameterized templates."}
+                  </small>
+                </label>
+                <label className="run-surface-query-builder-control">
+                  <span>Insert ref</span>
                   <select
                     onChange={(event) => setPredicateRefDraftKey(event.target.value)}
                     value={predicateRefDraftKey}
                   >
-                    {predicates.length ? (
-                      predicates.map((predicate) => (
+                    {[...predicates, ...predicateTemplates].length ? (
+                      [...predicates, ...predicateTemplates].map((predicate) => (
                         <option key={predicate.id} value={predicate.key}>
                           {predicate.key}
                         </option>
@@ -17377,9 +18070,50 @@ function RunSurfaceCollectionQueryBuilder({
                       <option value="">No predicates saved</option>
                     )}
                   </select>
-                  <small>Add a reusable predicate reference into the root group.</small>
+                  <small>
+                    Add a reusable {expressionAuthoring.predicateRefs.referenceField} into the selected group.
+                  </small>
                 </label>
               </div>
+              {selectedRefTemplate?.parameters.length ? (
+                <div className="run-surface-query-builder-parameter-grid">
+                  {selectedRefTemplate.parameters.map((parameter) => (
+                    <label className="run-surface-query-builder-control" key={`${selectedRefTemplate.id}:${parameter.key}`}>
+                      <span>{parameter.key}</span>
+                      {parameter.options.length ? (
+                        <select
+                          value={predicateRefDraftBindings[parameter.key] ?? ""}
+                          onChange={(event) =>
+                            setPredicateRefDraftBindings((current) => ({
+                              ...current,
+                              [parameter.key]: event.target.value,
+                            }))}
+                        >
+                          {Array.from(new Set([...(parameter.options || []), predicateRefDraftBindings[parameter.key] ?? ""].filter(Boolean))).map((value) => (
+                            <option key={`${parameter.key}:${value}`} value={value}>
+                              {value}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          value={predicateRefDraftBindings[parameter.key] ?? ""}
+                          onChange={(event) =>
+                            setPredicateRefDraftBindings((current) => ({
+                              ...current,
+                              [parameter.key]: event.target.value,
+                            }))}
+                          placeholder={parameter.valueType}
+                        />
+                      )}
+                      <small>
+                        {parameter.description ?? parameter.label} · {parameter.valueType}
+                      </small>
+                    </label>
+                  ))}
+                </div>
+              ) : null}
               <div className="run-surface-query-builder-actions">
                 <button
                   className="ghost-button"
@@ -17399,7 +18133,28 @@ function RunSurfaceCollectionQueryBuilder({
                 </button>
                 <button
                   className="ghost-button"
-                  disabled={!predicateRefDraftKey}
+                  disabled={
+                    !editorClauseState
+                    || !trimmedTemplateDraftKey
+                    || templateKeyConflict
+                    || (editorTarget.kind === "template" && !selectedTemplateSupportsClauseEditing)
+                  }
+                  onClick={saveTemplateFromEditor}
+                  type="button"
+                >
+                  {templateSaveLabel}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!selectedSubtreeNode || !trimmedTemplateDraftKey || templateKeyConflict}
+                  onClick={saveSelectedSubtreeAsTemplate}
+                  type="button"
+                >
+                  {templatePromotionLabel}
+                </button>
+                <button
+                  className="ghost-button"
+                  disabled={!canAddPredicateRef}
                   onClick={addPredicateRefToExpression}
                   type="button"
                 >
@@ -17492,6 +18247,7 @@ function RunSurfaceCollectionQueryBuilder({
                                   onClick={() => {
                                     setEditorTarget({ kind: "predicate", predicateId: predicate.id });
                                     setPredicateDraftKey(predicate.key);
+                                    setTemplateDraftKey("");
                                     if (clauseNode) {
                                       setEditorFromClause(clauseNode.clause);
                                     }
@@ -17506,6 +18262,7 @@ function RunSurfaceCollectionQueryBuilder({
                                   onClick={() => {
                                     setEditorTarget({ kind: "predicate", predicateId: predicate.id });
                                     setPredicateDraftKey(predicate.key);
+                                    setTemplateDraftKey("");
                                   }}
                                   type="button"
                                 >
@@ -17528,6 +18285,86 @@ function RunSurfaceCollectionQueryBuilder({
                 ) : (
                   <p className="run-note">
                     Save a clause as a predicate to reuse it inside grouped expressions.
+                  </p>
+                )}
+              </div>
+              <div className="run-surface-query-builder-section">
+                <div className="run-surface-query-builder-card-head">
+                  <strong>Template registry</strong>
+                  <span>{predicateTemplates.length}</span>
+                </div>
+                {predicateTemplates.length ? (
+                  <div className="run-surface-query-builder-domain-list">
+                    {predicateTemplates.map((template) => (
+                      (() => {
+                        const clauseNode = template.node.kind === "clause" ? template.node : null;
+                        const isClauseTemplate = Boolean(clauseNode);
+                        return (
+                          <div
+                            className={`run-surface-query-builder-domain-card ${editorTarget.kind === "template" && editorTarget.templateId === template.id ? "is-active" : ""}`.trim()}
+                            key={template.id}
+                          >
+                            <div className="run-surface-query-builder-card-head">
+                              <strong>{template.key}</strong>
+                              <span>{isClauseTemplate ? "template" : "subtree template"}</span>
+                            </div>
+                            <p className="run-note">
+                              {formatRunSurfaceCollectionQueryBuilderChildSummary(template.node, contracts)}
+                            </p>
+                            {template.parameters.length ? (
+                              <div className="run-surface-family-chip-row">
+                                {template.parameters.map((parameter) => (
+                                  <span className="run-surface-family-chip" key={`${template.id}:${parameter.key}`}>
+                                    {parameter.key}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : null}
+                            <div className="run-surface-query-builder-actions">
+                              {isClauseTemplate ? (
+                                <button
+                                  className="ghost-button"
+                                  onClick={() => {
+                                    setEditorTarget({ kind: "template", templateId: template.id });
+                                    setTemplateDraftKey(template.key);
+                                    setPredicateDraftKey("");
+                                    if (clauseNode) {
+                                      setEditorFromClause(clauseNode.clause);
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  Edit template
+                                </button>
+                              ) : (
+                                <button
+                                  className="ghost-button"
+                                  onClick={() => {
+                                    setEditorTarget({ kind: "template", templateId: template.id });
+                                    setTemplateDraftKey(template.key);
+                                    setPredicateDraftKey("");
+                                  }}
+                                  type="button"
+                                >
+                                  Select subtree template
+                                </button>
+                              )}
+                              <button
+                                className="ghost-button"
+                                onClick={() => removeTemplate(template.id)}
+                                type="button"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ))}
+                  </div>
+                ) : (
+                  <p className="run-note">
+                    Bind clause values or collection path segments, then save them as reusable predicate templates.
                   </p>
                 )}
               </div>
@@ -17626,7 +18463,7 @@ function RunSurfaceCapabilityDiscoveryPanel({
   const schemaSummary =
     schemaContract?.summary
     ?? "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules.";
-  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v13";
+  const schemaVersion = schemaContract?.version ?? "run-surface-capabilities.v14";
   const runSubresourceSharedContracts = getRunSurfaceSubresourceContracts(capabilities);
   const collectionQueryContracts = getRunSurfaceCollectionQueryContracts(capabilities);
 
