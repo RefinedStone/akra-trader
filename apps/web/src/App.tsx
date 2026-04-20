@@ -15945,15 +15945,11 @@ function normalizePredicateRefReplayApplyHistoryEntry(value: unknown): Predicate
   };
 }
 
-function loadRunSurfaceCollectionQueryBuilderReplayApplyHistory() {
-  if (typeof window === "undefined") {
+function parseRunSurfaceCollectionQueryBuilderReplayApplyHistoryValue(raw: string | null) {
+  if (!raw) {
     return [] as PredicateRefReplayApplyHistoryEntry[];
   }
   try {
-    const raw = window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY);
-    if (!raw) {
-      return [];
-    }
     const parsed = JSON.parse(raw);
     if (
       !parsed
@@ -15973,6 +15969,24 @@ function loadRunSurfaceCollectionQueryBuilderReplayApplyHistory() {
   }
 }
 
+function loadRunSurfaceCollectionQueryBuilderReplayApplyHistory() {
+  if (typeof window === "undefined") {
+    return [] as PredicateRefReplayApplyHistoryEntry[];
+  }
+  return parseRunSurfaceCollectionQueryBuilderReplayApplyHistoryValue(
+    window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY),
+  );
+}
+
+function serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(
+  entries: PredicateRefReplayApplyHistoryEntry[],
+) {
+  return JSON.stringify({
+    version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION,
+    entries: entries.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES),
+  });
+}
+
 function persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(
   entries: PredicateRefReplayApplyHistoryEntry[],
 ) {
@@ -15982,14 +15996,46 @@ function persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(
   try {
     window.localStorage.setItem(
       RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY,
-      JSON.stringify({
-        version: RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_VERSION,
-        entries: entries.slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES),
-      }),
+      serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(entries),
     );
   } catch {
     return;
   }
+}
+
+function mergePredicateRefReplayApplyHistoryEntries(
+  currentEntries: PredicateRefReplayApplyHistoryEntry[],
+  incomingEntries: PredicateRefReplayApplyHistoryEntry[],
+) {
+  const entryById = new Map(
+    currentEntries.map((entry) => [entry.id, entry] as const),
+  );
+  incomingEntries.forEach((incomingEntry) => {
+    const currentEntry = entryById.get(incomingEntry.id);
+    if (!currentEntry) {
+      entryById.set(incomingEntry.id, incomingEntry);
+      return;
+    }
+    const currentRestoredAt = currentEntry.lastRestoredAt ? Date.parse(currentEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+    const incomingRestoredAt = incomingEntry.lastRestoredAt ? Date.parse(incomingEntry.lastRestoredAt) : Number.NEGATIVE_INFINITY;
+    if (incomingRestoredAt > currentRestoredAt) {
+      entryById.set(incomingEntry.id, incomingEntry);
+      return;
+    }
+    if (incomingRestoredAt < currentRestoredAt) {
+      entryById.set(incomingEntry.id, currentEntry);
+      return;
+    }
+    const currentAppliedAt = Date.parse(currentEntry.appliedAt);
+    const incomingAppliedAt = Date.parse(incomingEntry.appliedAt);
+    entryById.set(
+      incomingEntry.id,
+      incomingAppliedAt >= currentAppliedAt ? incomingEntry : currentEntry,
+    );
+  });
+  return Array.from(entryById.values())
+    .sort((left, right) => Date.parse(right.appliedAt) - Date.parse(left.appliedAt))
+    .slice(0, MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES);
 }
 
 function isRunSurfaceCollectionQueryBindingReferenceValue(value: string) {
@@ -17403,6 +17449,11 @@ function RunSurfaceCollectionQueryBuilder({
     useState(false);
   const [predicateRefReplayApplyHistory, setPredicateRefReplayApplyHistory] =
     useState<PredicateRefReplayApplyHistoryEntry[]>(() => loadRunSurfaceCollectionQueryBuilderReplayApplyHistory());
+  const lastPersistedPredicateRefReplayApplyHistoryRef = useRef<string | null>(
+    typeof window === "undefined"
+      ? null
+      : window.localStorage.getItem(RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY),
+  );
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18346,8 +18397,33 @@ function RunSurfaceCollectionQueryBuilder({
     [selectedRefTemplateReplayApplyHistory],
   );
   useEffect(() => {
+    const serialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(predicateRefReplayApplyHistory);
+    if (serialized === lastPersistedPredicateRefReplayApplyHistoryRef.current) {
+      return;
+    }
     persistRunSurfaceCollectionQueryBuilderReplayApplyHistory(predicateRefReplayApplyHistory);
+    lastPersistedPredicateRefReplayApplyHistoryRef.current = serialized;
   }, [predicateRefReplayApplyHistory]);
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key !== RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_STORAGE_KEY) {
+        return;
+      }
+      const remoteEntries = parseRunSurfaceCollectionQueryBuilderReplayApplyHistoryValue(event.newValue);
+      setPredicateRefReplayApplyHistory((current) => {
+        const mergedEntries = mergePredicateRefReplayApplyHistoryEntries(current, remoteEntries);
+        const currentSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(current);
+        const mergedSerialized = serializeRunSurfaceCollectionQueryBuilderReplayApplyHistory(mergedEntries);
+        lastPersistedPredicateRefReplayApplyHistoryRef.current = mergedSerialized;
+        return mergedSerialized === currentSerialized ? current : mergedEntries;
+      });
+    };
+    window.addEventListener("storage", handleStorage);
+    return () => window.removeEventListener("storage", handleStorage);
+  }, []);
   const simulatedCoordinationGroups = useMemo<ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>>(
     () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
     [selectedRefTemplateParameterGroups],
