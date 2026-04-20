@@ -10,9 +10,12 @@ Updated for the repository state as of April 21, 2026.
 ### Research and experiment surfaces
 
 - strategy catalog with native and reference lanes
+- strategy semantic metadata and parameter-contract hints carried into run-facing surfaces
 - durable run storage through SQLAlchemy
 - native backtests and reference-runtime delegation for NostalgiaForInfinity
-- presets, rerun boundaries, comparison, and richer query/filter contracts
+- presets, rerun boundaries, comparison, richer query/filter contracts, and typed query-discovery
+  metadata
+- run-surface capability contracts and shared run-subresource envelopes for action gating
 - replay-link alias governance and audit export surfaces
 
 ### Runtime ops surfaces

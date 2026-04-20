@@ -54,6 +54,10 @@ It is not yet a finished live trading product:
 - native vs reference comparison API and control-room comparison workflow
 - experiment presets with lifecycle actions, revisions, and restore flows
 - typed query/filter contracts for strategies, presets, runs, and comparison surfaces
+- shared query-discovery and run-surface capability contracts for typed query builders and run
+  subresource actions
+- strategy semantic metadata and parameter-contract hints propagated from catalog records into run
+  snapshot and provenance views
 - replay-link alias governance, audit browsing, and export-job utilities for query-builder surfaces
 - native, sandbox, and paper reruns from stored rerun boundaries with match-or-drift tracking
 
