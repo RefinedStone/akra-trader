@@ -4868,18 +4868,54 @@
       "direction_id": "experiment-os",
       "title": "Structure subtree template authoring metadata for parameter groups and help notes",
       "description": "Build on the newly persisted subtree-specific label, binding preset, and parameter ordering state by introducing a richer subtree authoring metadata model that can keep subtree-local parameter grouping and per-parameter help or note content through subtree promotion, saved template hydration, and template ref authoring, instead of stopping at flat metadata fields.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 45,
-      "priority_reason": "The latest main-session reply says the completed subtree metadata pass now preserves defaults, labels, binding presets, and order, and explicitly names the remaining gap: subtree-specific parameter grouping and per-parameter help or note metadata still are not modeled separately. That is the clearest directly executable follow-up, so promote it to the automatic queue head.",
+      "priority_reason": "Completed in main session commit cc8b092, which expanded subtree template authoring metadata beyond `defaultValue` to persist `groupName` and `helpNote`, serialized and reverse-hydrated grouped predicate-template parameters, restructured the authoring UI around group sections, exposed group/help-note context in template registry and predicate-ref binding surfaces, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push.",
       "depends_on": [
         "planning-experiment-os-persist-subtree-specific-template-authoring-metadata-beyond-default-values"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:26:00Z",
+      "updated_at": "2026-04-20T19:40:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Advances experiment-os typed-query template authoring from flat subtree-local metadata into a richer reusable authoring model, so subtree promotion and template reuse can preserve operator guidance and structure rather than only simple parameter fields."
+    },
+    {
+      "id": "planning-experiment-os-add-group-level-subtree-template-authoring-metadata-and-behavior",
+      "direction_id": "experiment-os",
+      "title": "Add group-level subtree template authoring metadata and behavior",
+      "description": "Build on the completed parameter-level `groupName` and `helpNote` metadata by introducing first-class group records for subtree template authoring, including stable group metadata plus group-level collapse and binding-preset behavior that survives subtree promotion, saved template hydration, grouped expression preview, and template-ref authoring instead of leaving groups as flat parameter annotations only.",
+      "status": "ready",
+      "base_priority": 89,
+      "dynamic_priority_delta": 46,
+      "priority_reason": "The latest main-session reply explicitly says the remaining higher-level authoring gap is above parameter-level metadata: group entities still lack their own metadata and group-level collapse or preset behavior. That is the clearest directly executable next task, so promote it to the queue head for automatic follow-through.",
+      "depends_on": [
+        "planning-experiment-os-structure-subtree-template-authoring-metadata-for-groups-and-help-notes"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:41:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os typed-query template authoring from parameter-level grouping hints into reusable higher-level group structure, so subtree templates can preserve editing intent and operator guidance at the same hierarchy operators actually author against."
+    },
+    {
+      "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
+      "direction_id": "experiment-os",
+      "title": "Richen subtree template help-note formatting beyond plain text",
+      "description": "Follow the completed parameter-level help-note persistence by deciding and implementing a richer note representation for subtree template authoring, such as lightweight formatting or structured emphasis, so operator guidance can remain expressive once group-level authoring metadata exists instead of staying constrained to flat plain-text note strings.",
+      "status": "proposed",
+      "base_priority": 88,
+      "dynamic_priority_delta": 1,
+      "priority_reason": "The latest main-session reply also mentions richer note formatting as an unfinished follow-up, but it is a less direct queue head than first-class group metadata and behavior because note representation should settle after the higher-level group authoring model is in place.",
+      "depends_on": [
+        "planning-experiment-os-add-group-level-subtree-template-authoring-metadata-and-behavior"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T19:41:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Keeps experiment-os template authoring guidance usable as subtree metadata becomes more structured by ensuring help notes can express richer operator context than a single flat string."
     },
     {
       "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
