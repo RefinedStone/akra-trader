@@ -4994,36 +4994,54 @@
       "direction_id": "experiment-os",
       "title": "Add global explanation and policy simulation layer for subtree bundle coordination",
       "description": "Build on the shipped group-level trace panel by adding a global explanation layer that summarizes the dependency graph across groups and, where useful, a policy simulation view, so operators can inspect whole-graph coordination outcomes in one place instead of piecing them together from per-group traces only.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 87,
       "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply says the remaining gap is a global explanation layer beyond the new per-group trace panel, specifically naming cross-group trace and policy simulation as missing. This is now the clearest immediate executable follow-up because the operator can proceed directly from the shipped local trace into a whole-graph summary without waiting for broader transactional coordination changes.",
+      "priority_reason": "Completed in main session commit e650a30, which added a coordination-graph explanation panel, surfaced manual anchors, dependency chains, direct auto selections, conflict hotspots, blocked groups, and idle groups as a global summary, and shipped policy simulation with override-based what-if replay, changed-group diffs, and simulated conflict or unmet-dependency reporting, then verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-policy-explanation-trace-panel-for-subtree-bundle-coordination"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:40:00Z",
+      "updated_at": "2026-04-20T22:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os subtree bundle trust from group-local explainability into whole-graph operator understanding, so coordination policy can be validated across the full dependency graph before more ambitious resolver or transactional semantics are introduced."
     },
     {
-      "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
+      "id": "planning-experiment-os-add-solver-explanation-replay-for-subtree-policy-simulation",
       "direction_id": "experiment-os",
-      "title": "Add transaction-like atomic coordination for subtree bundle sets",
-      "description": "Extend subtree group bundle coordination so a whole bundle set can be selected, validated, and applied atomically across groups, instead of partially mutating selection state while dependencies resolve one group at a time, making complex coordinated templates safer to preview and apply.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply also calls out transaction-like atomic coordination as unfinished work, but it is best sequenced behind explicit conflict resolution policy so atomic application semantics can reuse a settled policy contract instead of freezing another intermediate resolver shape.",
+      "title": "Add solver explanation replay to subtree policy simulation",
+      "description": "Deepen the new subtree bundle policy simulation layer so overridden runs can replay the full solver explanation across the dependency graph, not just report final diffs, giving operators a simulated causal trace for why groups changed, conflicted, or stayed blocked under a candidate policy.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 10,
+      "priority_reason": "The latest main-session reply says the remaining deeper execution gap is solver explanation replay across the full dependency graph. This is now the clearest immediate follow-up because the new global simulation UI already exists, and the next executable step is to make simulated outcomes explainable before adding mutating apply flows.",
       "depends_on": [
-        "planning-experiment-os-add-user-defined-conflict-resolution-policy-for-subtree-bundle-coordination"
+        "planning-experiment-os-add-global-conflict-policy-optimization-for-subtree-bundle-coordination"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T21:15:00Z",
+      "updated_at": "2026-04-20T22:10:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os subtree template composition from dependency-aware selection into atomic multi-group application semantics, reducing partial-state risk once policy-driven coordination rules are defined."
+      "direction_relation_note": "Builds experiment-os subtree coordination trust from global policy what-if summaries into fully replayable simulated solver reasoning, so operators can inspect why a policy override would reshape the graph before any state-changing promotion workflow is introduced."
+    },
+    {
+      "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
+      "direction_id": "experiment-os",
+      "title": "Add apply workflow for subtree policy simulations and atomic bundle promotion",
+      "description": "Extend subtree bundle coordination so a simulated policy outcome can be promoted into real selection state through an explicit apply workflow with atomic validation across groups, instead of stopping at what-if diffs or partially mutating selections while dependencies resolve one group at a time.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 7,
+      "priority_reason": "The latest main-session reply also calls out promoting simulation results into actual selection state as unfinished work. That follow-up remains valid, but it should stay behind the new solver explanation replay layer so operators can inspect simulated causal paths before the UI gains a state-changing apply action.",
+      "depends_on": [
+        "planning-experiment-os-add-solver-explanation-replay-for-subtree-policy-simulation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T22:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Pushes experiment-os subtree template composition from inspectable simulation into deliberate state-changing promotion semantics, so coordinated multi-group bundle changes can be applied atomically only after the simulated graph behavior is explainable."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
