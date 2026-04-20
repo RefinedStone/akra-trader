@@ -18327,6 +18327,8 @@ function RunSurfaceCollectionQueryBuilder({
       ));
   const [predicateRefReplayApplyConflictDraftSourcesById, setPredicateRefReplayApplyConflictDraftSourcesById] =
     useState<Record<string, Record<string, "local" | "remote">>>({});
+  const [predicateRefReplayApplyConflictSimulationConflictId, setPredicateRefReplayApplyConflictSimulationConflictId] =
+    useState<string | null>(null);
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -19357,6 +19359,19 @@ function RunSurfaceCollectionQueryBuilder({
       selectedRefTemplateReplayApplyConflicts,
     ],
   );
+  const activePredicateRefReplayApplyConflictSimulationReview = useMemo(
+    () => (
+      predicateRefReplayApplyConflictSimulationConflictId
+        ? selectedRefTemplateReplayApplyConflictReviews.find(
+            (review) => review.conflict.conflictId === predicateRefReplayApplyConflictSimulationConflictId,
+          ) ?? null
+        : null
+    ),
+    [
+      predicateRefReplayApplyConflictSimulationConflictId,
+      selectedRefTemplateReplayApplyConflictReviews,
+    ],
+  );
   useEffect(() => {
     predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
   }, [predicateRefReplayApplyHistory]);
@@ -19833,6 +19848,62 @@ function RunSurfaceCollectionQueryBuilder({
       sortRunSurfaceCollectionQueryBuilderTemplateGroupPresetBundles(bundles),
     [],
   );
+  const activePredicateRefReplayApplyConflictSimulationBundleOverrides = useMemo(() => {
+    if (!selectedRefTemplate || !activePredicateRefReplayApplyConflictSimulationReview) {
+      return {
+        bindingOverridesByParameterKey: {} as Record<string, string | null>,
+        groupLabelsByKey: {} as Record<string, string>,
+        selectionOverridesBySelectionKey: {} as Record<string, string | null>,
+      };
+    }
+    const selectionOverridesBySelectionKey: Record<string, string | null> = {};
+    const bindingOverridesByParameterKey: Record<string, string | null> = {};
+    const groupLabelsByKey: Record<string, string> = {};
+    activePredicateRefReplayApplyConflictSimulationReview.mergedEntry.rows.forEach((row) => {
+      const group = selectedRefTemplateParameterGroups.find((candidate) => candidate.key === row.groupKey) ?? null;
+      if (!group) {
+        return;
+      }
+      groupLabelsByKey[group.key] = group.label;
+      selectionOverridesBySelectionKey[`${selectedRefTemplate.id}:${group.key}`] = row.promotedBundleKey;
+      group.parameters.forEach((parameter) => {
+        bindingOverridesByParameterKey[parameter.key] = null;
+      });
+      const bundle =
+        getSortedTemplateGroupPresetBundles(group.presetBundles).find(
+          (candidate) => candidate.key === row.promotedBundleKey,
+        ) ?? null;
+      if (!bundle) {
+        return;
+      }
+      group.parameters.forEach((parameter) => {
+        const bindingPreset = bundle.parameterBindingPresets[parameter.key]?.trim();
+        if (bindingPreset) {
+          bindingOverridesByParameterKey[parameter.key] =
+            toRunSurfaceCollectionQueryBindingReferenceValue(bindingPreset);
+          return;
+        }
+        const parameterValue = bundle.parameterValues[parameter.key];
+        if (parameterValue?.trim()) {
+          bindingOverridesByParameterKey[parameter.key] = parameterValue;
+        }
+      });
+    });
+    return {
+      bindingOverridesByParameterKey,
+      groupLabelsByKey,
+      selectionOverridesBySelectionKey,
+    };
+  }, [
+    activePredicateRefReplayApplyConflictSimulationReview,
+    getSortedTemplateGroupPresetBundles,
+    selectedRefTemplate,
+    selectedRefTemplateParameterGroups,
+  ]);
+  const activePredicateRefReplayApplyConflictSimulationGroupKeys = useMemo(
+    () => Object.keys(activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey),
+    [activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey],
+  );
   const doesTemplateGroupMatchVisibilityRule = useCallback(
     (
       group: {
@@ -20046,11 +20117,16 @@ function RunSurfaceCollectionQueryBuilder({
     ],
   );
   const computeCoordinatedPredicateRefGroupBundleState = useCallback((
-    policyOverridesByGroupKey: Record<
-      string,
-      RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"]
-    > = {},
+    overrides: {
+      draftBindingOverridesByParameterKey?: Record<string, string | null>;
+      manualSelectionOverridesBySelectionKey?: Record<string, string | null>;
+      policyOverridesByGroupKey?: Record<
+        string,
+        RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState["coordinationPolicy"]
+      >;
+    } = {},
   ) => {
+    const policyOverridesByGroupKey = overrides.policyOverridesByGroupKey ?? {};
     type AggregatedDependencyRequest = {
       bundleKey: string;
       bundleLabel: string;
@@ -20169,6 +20245,22 @@ function RunSurfaceCollectionQueryBuilder({
     const groupMap = new Map(
       selectedRefTemplateParameterGroups.map((group) => [group.key, group] as const),
     );
+    const effectiveDraftBindings = { ...predicateRefDraftBindings };
+    Object.entries(overrides.draftBindingOverridesByParameterKey ?? {}).forEach(([parameterKey, value]) => {
+      if (value?.trim()) {
+        effectiveDraftBindings[parameterKey] = value;
+        return;
+      }
+      delete effectiveDraftBindings[parameterKey];
+    });
+    const effectiveManualSelectionsBySelectionKey = { ...predicateRefGroupBundleSelections };
+    Object.entries(overrides.manualSelectionOverridesBySelectionKey ?? {}).forEach(([selectionKey, bundleKey]) => {
+      if (bundleKey?.trim()) {
+        effectiveManualSelectionsBySelectionKey[selectionKey] = bundleKey;
+        return;
+      }
+      delete effectiveManualSelectionsBySelectionKey[selectionKey];
+    });
     const getGroupBundle = (
       groupKey: string,
       bundleKey: string,
@@ -20244,7 +20336,7 @@ function RunSurfaceCollectionQueryBuilder({
         appendRequestsFromBundle(
           sourceGroupKey,
           sourceBundleKey,
-          Boolean(predicateRefGroupBundleSelections[`${selectedRefTemplate.id}:${sourceGroupKey}`]),
+          Boolean(effectiveManualSelectionsBySelectionKey[`${selectedRefTemplate.id}:${sourceGroupKey}`]),
         );
       });
       if (includePredictedAutoCandidates) {
@@ -20253,7 +20345,7 @@ function RunSurfaceCollectionQueryBuilder({
             return;
           }
           const predictedAutoBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
-            doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings),
+            doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, effectiveDraftBindings),
           );
           if (!predictedAutoBundle) {
             return;
@@ -20313,7 +20405,7 @@ function RunSurfaceCollectionQueryBuilder({
     const manualSelectionsByGroupKey = Object.fromEntries(
       selectedRefTemplateParameterGroups.flatMap((group) => {
         const selectionKey = `${selectedRefTemplate.id}:${group.key}`;
-        const manualBundleKey = predicateRefGroupBundleSelections[selectionKey] ?? "";
+        const manualBundleKey = effectiveManualSelectionsBySelectionKey[selectionKey] ?? "";
         return getGroupBundle(group.key, manualBundleKey)
           ? [[group.key, manualBundleKey]]
           : [];
@@ -20390,7 +20482,7 @@ function RunSurfaceCollectionQueryBuilder({
           return;
         }
         const directAutoBundle = getSortedTemplateGroupPresetBundles(group.presetBundles).find((bundle) =>
-          doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings)
+          doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, effectiveDraftBindings)
           && bundle.dependencies.every((dependency) =>
             resolvedSelectionsByGroupKey[dependency.groupKey] === dependency.bundleKey,
           ),
@@ -20514,7 +20606,7 @@ function RunSurfaceCollectionQueryBuilder({
           stickyBundleKey,
         );
         const matchingAutoBundles = getSortedTemplateGroupPresetBundles(group.presetBundles).flatMap((bundle) => {
-          if (!doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, predicateRefDraftBindings)) {
+          if (!doesTemplateGroupBundleMatchAutoSelectRule(group, bundle, effectiveDraftBindings)) {
             return [];
           }
           const unmetDependencies = bundle.dependencies.flatMap((dependency) => {
@@ -20813,7 +20905,7 @@ function RunSurfaceCollectionQueryBuilder({
     () => computeCoordinatedPredicateRefGroupBundleState(),
     [computeCoordinatedPredicateRefGroupBundleState],
   );
-  const bundleCoordinationSimulationOverrides = useMemo(() => {
+  const bundleCoordinationSimulationPolicyOverrides = useMemo(() => {
     if (
       bundleCoordinationSimulationPolicy === "current"
       || !simulatedCoordinationGroups.length
@@ -20833,13 +20925,40 @@ function RunSurfaceCollectionQueryBuilder({
     bundleCoordinationSimulationScope,
     simulatedCoordinationGroups,
   ]);
+  const hasActivePredicateRefReplayApplyConflictSimulationOverride = useMemo(
+    () => Boolean(
+      activePredicateRefReplayApplyConflictSimulationReview
+      && (
+        Object.keys(activePredicateRefReplayApplyConflictSimulationBundleOverrides.selectionOverridesBySelectionKey).length
+        || Object.keys(activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey).length
+      )
+    ),
+    [
+      activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey,
+      activePredicateRefReplayApplyConflictSimulationBundleOverrides.selectionOverridesBySelectionKey,
+      activePredicateRefReplayApplyConflictSimulationReview,
+    ],
+  );
   const simulatedPredicateRefGroupBundleState = useMemo(
     () => (
-      Object.keys(bundleCoordinationSimulationOverrides).length
-        ? computeCoordinatedPredicateRefGroupBundleState(bundleCoordinationSimulationOverrides)
+      Object.keys(bundleCoordinationSimulationPolicyOverrides).length
+      || hasActivePredicateRefReplayApplyConflictSimulationOverride
+        ? computeCoordinatedPredicateRefGroupBundleState({
+            draftBindingOverridesByParameterKey:
+              activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey,
+            manualSelectionOverridesBySelectionKey:
+              activePredicateRefReplayApplyConflictSimulationBundleOverrides.selectionOverridesBySelectionKey,
+            policyOverridesByGroupKey: bundleCoordinationSimulationPolicyOverrides,
+          })
         : null
     ),
-    [bundleCoordinationSimulationOverrides, computeCoordinatedPredicateRefGroupBundleState],
+    [
+      activePredicateRefReplayApplyConflictSimulationBundleOverrides.bindingOverridesByParameterKey,
+      activePredicateRefReplayApplyConflictSimulationBundleOverrides.selectionOverridesBySelectionKey,
+      bundleCoordinationSimulationPolicyOverrides,
+      computeCoordinatedPredicateRefGroupBundleState,
+      hasActivePredicateRefReplayApplyConflictSimulationOverride,
+    ],
   );
   const simulatedPredicateRefSolverReplay = simulatedPredicateRefGroupBundleState?.solverReplay ?? [];
   const activeSimulatedPredicateRefSolverReplayIndex = simulatedPredicateRefSolverReplay.length
@@ -20939,11 +21058,27 @@ function RunSurfaceCollectionQueryBuilder({
       bundleCoordinationSimulationReplayEdgeFilter,
     ],
   );
+  useEffect(() => {
+    if (
+      !predicateRefReplayApplyConflictSimulationConflictId
+      || activePredicateRefReplayApplyConflictSimulationReview
+    ) {
+      return;
+    }
+    setPredicateRefReplayApplyConflictSimulationConflictId(null);
+  }, [
+    activePredicateRefReplayApplyConflictSimulationReview,
+    predicateRefReplayApplyConflictSimulationConflictId,
+  ]);
   const focusReplayApplyConflictSimulationTrace = useCallback(
-    (groupKey: string) => {
+    (
+      groupKey: string,
+      conflictId?: string | null,
+    ) => {
       if (!simulatedCoordinationGroups.some((group) => group.key === groupKey)) {
         return;
       }
+      setPredicateRefReplayApplyConflictSimulationConflictId(conflictId ?? null);
       setBundleCoordinationSimulationScope(groupKey);
       setBundleCoordinationSimulationReplayGroupFilter(groupKey);
       setBundleCoordinationSimulationReplayActionTypeFilter("all");
@@ -20959,6 +21094,40 @@ function RunSurfaceCollectionQueryBuilder({
     },
     [simulatedCoordinationGroups, simulatedPredicateRefSolverReplay],
   );
+  useEffect(() => {
+    if (!activePredicateRefReplayApplyConflictSimulationGroupKeys.length) {
+      return;
+    }
+    const primaryGroupKey = activePredicateRefReplayApplyConflictSimulationGroupKeys[0];
+    if (
+      bundleCoordinationSimulationScope === "all"
+      || !activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(bundleCoordinationSimulationScope)
+    ) {
+      setBundleCoordinationSimulationScope(primaryGroupKey);
+    }
+    if (
+      bundleCoordinationSimulationReplayGroupFilter === "all"
+      || !activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(bundleCoordinationSimulationReplayGroupFilter)
+    ) {
+      setBundleCoordinationSimulationReplayGroupFilter(primaryGroupKey);
+    }
+    const matchingReplayStepIndex = simulatedPredicateRefSolverReplay.findIndex((step) =>
+      step.actions.some((action) =>
+        activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(action.groupKey)));
+    if (
+      matchingReplayStepIndex >= 0
+      && !activeSimulatedPredicateRefSolverReplayStep?.actions.some((action) =>
+        activePredicateRefReplayApplyConflictSimulationGroupKeys.includes(action.groupKey))
+    ) {
+      setBundleCoordinationSimulationReplayIndex(matchingReplayStepIndex);
+    }
+  }, [
+    activePredicateRefReplayApplyConflictSimulationGroupKeys,
+    activeSimulatedPredicateRefSolverReplayStep,
+    bundleCoordinationSimulationReplayGroupFilter,
+    bundleCoordinationSimulationScope,
+    simulatedPredicateRefSolverReplay,
+  ]);
   useEffect(() => {
     setBundleCoordinationSimulationPromotionDecisionsByGroupKey({});
     setBundleCoordinationSimulationApprovalDecisionsByGroupKey({});
@@ -23346,12 +23515,52 @@ function RunSurfaceCollectionQueryBuilder({
                             </select>
                           </label>
                         </div>
+                        {activePredicateRefReplayApplyConflictSimulationReview ? (
+                          <div className="run-surface-query-builder-trace-panel is-nested">
+                            <div className="run-surface-query-builder-card-head">
+                              <strong>Collision review override</strong>
+                              <span>{activePredicateRefReplayApplyConflictSimulationReview.conflict.templateLabel}</span>
+                            </div>
+                            <div className="run-surface-query-builder-trace-chip-list">
+                              <span className="run-surface-query-builder-trace-chip is-active">
+                                {`${activePredicateRefReplayApplyConflictSimulationReview.selectedRemoteCount} remote field picks`}
+                              </span>
+                              <span className="run-surface-query-builder-trace-chip">
+                                {`${activePredicateRefReplayApplyConflictSimulationGroupKeys.length} override groups`}
+                              </span>
+                              <span className="run-surface-query-builder-trace-chip">
+                                {activePredicateRefReplayApplyConflictSimulationReview.hasMixedSelection
+                                  ? "Partial merge replay"
+                                  : activePredicateRefReplayApplyConflictSimulationReview.hasRemoteSelection
+                                    ? "Full remote replay"
+                                    : "Local replay baseline"}
+                              </span>
+                            </div>
+                            <p className="run-note">
+                              {`Simulation is currently replaying the reviewed collision draft for ${activePredicateRefReplayApplyConflictSimulationReview.conflict.sourceTabLabel} across ${activePredicateRefReplayApplyConflictSimulationGroupKeys
+                                .map((groupKey) =>
+                                  activePredicateRefReplayApplyConflictSimulationBundleOverrides.groupLabelsByKey[groupKey] ?? groupKey)
+                                .join(", ") || "no groups"}.`}
+                            </p>
+                            <div className="run-surface-query-builder-actions">
+                              <button
+                                className="ghost-button"
+                                onClick={() => setPredicateRefReplayApplyConflictSimulationConflictId(null)}
+                                type="button"
+                              >
+                                Clear review override
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                         <p className="run-note">
                           {simulatedPredicateRefGroupBundleState
                             ? (
-                                bundleCoordinationSimulationScope === "all"
-                                  ? "Simulating this policy across the whole coordination graph."
-                                  : `Simulating this policy for ${simulatedCoordinationGroups.find((group) => group.key === bundleCoordinationSimulationScope)?.label ?? "the selected group"} while leaving other groups unchanged.`
+                                activePredicateRefReplayApplyConflictSimulationReview
+                                  ? "Simulating the currently reviewed collision merge on top of the selected coordination policy."
+                                  : bundleCoordinationSimulationScope === "all"
+                                    ? "Simulating this policy across the whole coordination graph."
+                                    : `Simulating this policy for ${simulatedCoordinationGroups.find((group) => group.key === bundleCoordinationSimulationScope)?.label ?? "the selected group"} while leaving other groups unchanged.`
                               )
                             : "Pick a policy to see how the coordination graph would change without altering the current live selections."}
                         </p>
@@ -24087,16 +24296,17 @@ function RunSurfaceCollectionQueryBuilder({
                                                                       </>
                                                                     ) : null}
                                                                     {canTrace ? (
-                                                                      <button
-                                                                        className="ghost-button"
-                                                                        onClick={() =>
-                                                                          focusReplayApplyConflictSimulationTrace(
-                                                                            item.relatedGroupKey ?? "",
-                                                                          )}
-                                                                        type="button"
-                                                                      >
-                                                                        Trace in simulation
-                                                                      </button>
+                                                                        <button
+                                                                          className="ghost-button"
+                                                                          onClick={() =>
+                                                                            focusReplayApplyConflictSimulationTrace(
+                                                                              item.relatedGroupKey ?? "",
+                                                                              review.conflict.conflictId,
+                                                                            )}
+                                                                          type="button"
+                                                                        >
+                                                                          Trace in simulation
+                                                                        </button>
                                                                     ) : null}
                                                                   </div>
                                                                   {!item.editable && section.key === "summary" ? (
@@ -24185,6 +24395,36 @@ function RunSurfaceCollectionQueryBuilder({
                                                           <div className="run-surface-query-builder-actions">
                                                             {preview.resolution === "merged" ? (
                                                               <>
+                                                                <button
+                                                                  className={`ghost-button${
+                                                                    predicateRefReplayApplyConflictSimulationConflictId === review.conflict.conflictId
+                                                                      ? " is-active"
+                                                                      : ""
+                                                                  }`}
+                                                                  onClick={() => {
+                                                                    setPredicateRefReplayApplyConflictSimulationConflictId(
+                                                                      review.conflict.conflictId,
+                                                                    );
+                                                                    const firstGroupKey =
+                                                                      review.mergedEntry.rows[0]?.groupKey ?? "";
+                                                                    if (firstGroupKey) {
+                                                                      focusReplayApplyConflictSimulationTrace(
+                                                                        firstGroupKey,
+                                                                        review.conflict.conflictId,
+                                                                      );
+                                                                      return;
+                                                                    }
+                                                                    bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
+                                                                      behavior: "smooth",
+                                                                      block: "start",
+                                                                    });
+                                                                  }}
+                                                                  type="button"
+                                                                >
+                                                                  {predicateRefReplayApplyConflictSimulationConflictId === review.conflict.conflictId
+                                                                    ? "Simulation override active"
+                                                                    : "Run reviewed merge in simulation"}
+                                                                </button>
                                                                 <button
                                                                   className="ghost-button"
                                                                   disabled={!review.hasRemoteSelection}
