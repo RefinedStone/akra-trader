@@ -17175,6 +17175,33 @@ function RunSurfaceCollectionQueryBuilder({
   onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
   onClearExpression?: (() => void) | null;
 }) {
+  type PredicateRefReplayApplyHistoryRow = {
+    changesCurrent: boolean;
+    currentBundleLabel: string;
+    currentStatus: string;
+    groupKey: string;
+    groupLabel: string;
+    matchesSimulation: boolean;
+    promotedBundleKey: string;
+    promotedBundleLabel: string;
+    simulatedBundleLabel: string;
+    simulatedStatus: string;
+  };
+  type PredicateRefReplayApplyHistoryEntry = {
+    appliedAt: string;
+    approvedCount: number;
+    changedCurrentCount: number;
+    id: string;
+    matchesSimulationCount: number;
+    rollbackSnapshot: {
+      draftBindingsByParameterKey: Record<string, string | null>;
+      groupSelectionsBySelectionKey: Record<string, string | null>;
+    };
+    rows: PredicateRefReplayApplyHistoryRow[];
+    templateId: string;
+    templateLabel: string;
+    lastRestoredAt?: string | null;
+  };
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
   const lastHydratedExpressionRef = useRef<string | null>(null);
   const [pendingHydratedState, setPendingHydratedState] =
@@ -17233,6 +17260,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<Record<string, boolean>>({});
   const [bundleCoordinationSimulationFinalSummaryOpen, setBundleCoordinationSimulationFinalSummaryOpen] =
     useState(false);
+  const [predicateRefReplayApplyHistory, setPredicateRefReplayApplyHistory] =
+    useState<PredicateRefReplayApplyHistoryEntry[]>([]);
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18163,6 +18192,18 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [selectedRefTemplate],
   );
+  const selectedRefTemplateReplayApplyHistory = useMemo(
+    () => (
+      selectedRefTemplate
+        ? predicateRefReplayApplyHistory.filter((entry) => entry.templateId === selectedRefTemplate.id)
+        : []
+    ),
+    [predicateRefReplayApplyHistory, selectedRefTemplate],
+  );
+  const latestSelectedRefTemplateReplayApplyEntry = useMemo(
+    () => selectedRefTemplateReplayApplyHistory[0] ?? null,
+    [selectedRefTemplateReplayApplyHistory],
+  );
   const simulatedCoordinationGroups = useMemo<ReturnType<typeof groupRunSurfaceCollectionQueryBuilderTemplateParameters>>(
     () => selectedRefTemplateParameterGroups.filter((group) => group.presetBundles.length),
     [selectedRefTemplateParameterGroups],
@@ -18382,6 +18423,43 @@ function RunSurfaceCollectionQueryBuilder({
         });
         return next;
       });
+    },
+    [],
+  );
+  const restorePredicateRefReplayApplyHistoryEntry = useCallback(
+    (entry: PredicateRefReplayApplyHistoryEntry) => {
+      setPredicateRefGroupBundleSelections((current) => {
+        const next = { ...current };
+        Object.entries(entry.rollbackSnapshot.groupSelectionsBySelectionKey).forEach(([selectionKey, bundleKey]) => {
+          if (bundleKey?.trim()) {
+            next[selectionKey] = bundleKey;
+            return;
+          }
+          delete next[selectionKey];
+        });
+        return next;
+      });
+      setPredicateRefDraftBindings((current) => {
+        const next = { ...current };
+        Object.entries(entry.rollbackSnapshot.draftBindingsByParameterKey).forEach(([parameterKey, value]) => {
+          if (value?.trim()) {
+            next[parameterKey] = value;
+            return;
+          }
+          delete next[parameterKey];
+        });
+        return next;
+      });
+      setPredicateRefReplayApplyHistory((current) =>
+        current.map((item) =>
+          item.id === entry.id
+            ? {
+                ...item,
+                lastRestoredAt: new Date().toISOString(),
+              }
+            : item,
+        ),
+      );
     },
     [],
   );
@@ -22081,6 +22159,53 @@ function RunSurfaceCollectionQueryBuilder({
                                                 if (!selectedRefTemplate || !approvedSimulatedPredicateRefReplayPromotionSelections.length) {
                                                   return;
                                                 }
+                                                const appliedAt = new Date().toISOString();
+                                                const historyEntry: PredicateRefReplayApplyHistoryEntry = {
+                                                  appliedAt,
+                                                  approvedCount: approvedSimulatedPredicateRefReplayPromotionSummary.total,
+                                                  changedCurrentCount:
+                                                    approvedSimulatedPredicateRefReplayPromotionSummary.changesCurrentCount,
+                                                  id: `replay-apply:${selectedRefTemplate.id}:${appliedAt}`,
+                                                  matchesSimulationCount:
+                                                    approvedSimulatedPredicateRefReplayPromotionSummary.matchesSimulationCount,
+                                                  rollbackSnapshot: {
+                                                    draftBindingsByParameterKey: Object.fromEntries(
+                                                      approvedSimulatedPredicateRefReplayPromotionSelections.flatMap((row) =>
+                                                        row.group.parameters.map((parameter) => ([
+                                                          parameter.key,
+                                                          predicateRefDraftBindings[parameter.key] ?? null,
+                                                        ])),
+                                                      ),
+                                                    ),
+                                                    groupSelectionsBySelectionKey: Object.fromEntries(
+                                                      approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => {
+                                                        const selectionKey = `${selectedRefTemplate.id}:${row.group.key}`;
+                                                        return [
+                                                          selectionKey,
+                                                          predicateRefGroupBundleSelections[selectionKey] ?? null,
+                                                        ];
+                                                      }),
+                                                    ),
+                                                  },
+                                                  rows: approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
+                                                    changesCurrent: row.changesCurrent,
+                                                    currentBundleLabel: row.currentBundleLabel,
+                                                    currentStatus: row.currentStatus,
+                                                    groupKey: row.group.key,
+                                                    groupLabel: row.group.label,
+                                                    matchesSimulation: row.matchesSimulation,
+                                                    promotedBundleKey: row.promotedBundle.key,
+                                                    promotedBundleLabel: row.promotedBundle.label,
+                                                    simulatedBundleLabel: row.simulatedBundleLabel,
+                                                    simulatedStatus: row.simulatedStatus,
+                                                  })),
+                                                  templateId: selectedRefTemplate.id,
+                                                  templateLabel: selectedRefTemplate.key,
+                                                };
+                                                setPredicateRefReplayApplyHistory((current) => [
+                                                  historyEntry,
+                                                  ...current,
+                                                ].slice(0, 12));
                                                 applyPredicateRefGroupPresetBundles(
                                                   selectedRefTemplate.id,
                                                   approvedSimulatedPredicateRefReplayPromotionSelections.map((row) => ({
@@ -22096,6 +22221,73 @@ function RunSurfaceCollectionQueryBuilder({
                                               Apply approved replay draft
                                             </button>
                                           </div>
+                                        </div>
+                                      </div>
+                                    ) : null}
+                                    {selectedRefTemplateReplayApplyHistory.length ? (
+                                      <div className="run-surface-query-builder-trace-panel is-nested">
+                                        <div className="run-surface-query-builder-card-head">
+                                          <strong>Replay apply history</strong>
+                                          <span>{`${selectedRefTemplateReplayApplyHistory.length} entries`}</span>
+                                        </div>
+                                        <p className="run-note">
+                                          Each confirmed replay apply stores a rollback snapshot of the affected manual bundle
+                                          selections and draft bindings for this template.
+                                        </p>
+                                        {latestSelectedRefTemplateReplayApplyEntry ? (
+                                          <div className="run-surface-query-builder-actions">
+                                            <button
+                                              className="ghost-button"
+                                              onClick={() =>
+                                                restorePredicateRefReplayApplyHistoryEntry(
+                                                  latestSelectedRefTemplateReplayApplyEntry,
+                                                )}
+                                              type="button"
+                                            >
+                                              Roll back latest replay apply
+                                            </button>
+                                          </div>
+                                        ) : null}
+                                        <div className="run-surface-query-builder-trace-list">
+                                          {selectedRefTemplateReplayApplyHistory.map((entry) => (
+                                            <div
+                                              className={`run-surface-query-builder-trace-step is-${
+                                                entry.lastRestoredAt ? "muted" : "info"
+                                              }`}
+                                              key={entry.id}
+                                            >
+                                              <strong>{entry.templateLabel}</strong>
+                                              <p>
+                                                {`${entry.approvedCount} approved rows · ${entry.changedCurrentCount} changed current · ${entry.matchesSimulationCount} matched simulated · ${formatRelativeTimestampLabel(entry.appliedAt)}`}
+                                              </p>
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                {entry.rows.map((row) => (
+                                                  <span
+                                                    className={`run-surface-query-builder-trace-chip${
+                                                      row.matchesSimulation ? " is-active" : ""
+                                                    }`}
+                                                    key={`${entry.id}:${row.groupKey}`}
+                                                  >
+                                                    {`${row.groupLabel}: ${row.currentBundleLabel} → ${row.promotedBundleLabel}`}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                              <div className="run-surface-query-builder-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => restorePredicateRefReplayApplyHistoryEntry(entry)}
+                                                  type="button"
+                                                >
+                                                  Restore snapshot
+                                                </button>
+                                              </div>
+                                              <p className="run-note">
+                                                {entry.lastRestoredAt
+                                                  ? `Last restored ${formatRelativeTimestampLabel(entry.lastRestoredAt)}.`
+                                                  : "Snapshot available for rollback."}
+                                              </p>
+                                            </div>
+                                          ))}
                                         </div>
                                       </div>
                                     ) : null}
