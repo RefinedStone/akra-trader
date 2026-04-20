@@ -101,6 +101,8 @@ It is not yet a finished live trading product:
 - route-aware React control-room shell with dedicated workspace routing metadata and shell layout
   modules under `apps/web/src/app/*`
 - workspace-level panel grouping now lives under `apps/web/src/routes/*`
+- shared control-room type/constant definitions now live in `apps/web/src/controlRoomDefinitions.ts`
+- shared control-room transport helpers now live in `apps/web/src/controlRoomApi.ts`
 - dense feature content is still mostly in one large control-room file, but shell/routing concerns
   and route-level panel selection are no longer defined inline with all feature rendering
 - separate histories for backtest, sandbox, paper, and live modes
@@ -115,6 +117,8 @@ It is not yet a finished live trading product:
   payload-centric persistence
 - the control room now has route and shell boundaries, but workspace feature modules still need to
   be extracted out of `App.tsx`
+- the top-level control-room file no longer owns its full type/constant and API helper context, but
+  it still owns too much feature-local state and dense rendering logic
 - standalone surface binding catalogs are isolated from the executor now, but the catalog module is
   still broad and should split further by bounded flow
 - sandbox workers exist, but recent decisions, lag interpretation, and active-session-first operator

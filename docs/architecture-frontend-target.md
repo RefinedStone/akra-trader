@@ -14,6 +14,8 @@ This wave introduces the first routing skeleton:
 - shell/header/nav layout moved into `apps/web/src/app/WorkspaceShell.tsx`
 - workspace panel grouping moved into `apps/web/src/routes/*`
 - `App.tsx` now delegates active route composition to `WorkspaceRouteContent.tsx`
+- shared control-room types/constants moved into `apps/web/src/controlRoomDefinitions.ts`
+- transport helpers moved into `apps/web/src/controlRoomApi.ts`
 
 The large control-room feature file still exists, but the top-level app shell is no longer the place
 where routing and presentation structure are decided.
@@ -59,13 +61,15 @@ where routing and presentation structure are decided.
   - keep overview, research, runtime ops, and guarded-live panel grouping in `src/routes/*`
 - remaining giant feature body
   - dense feature JSX still lives mostly in `App.tsx`
+  - top-level control-room type/constant and API helper context no longer lives inline in that file
   - next waves should split those panels into feature-owned modules behind each route
 
 ## Remaining Pressure Points
 
 - `App.tsx` still owns too much feature state and JSX.
 - route modules now own panel grouping, but they do not yet own their own data loading or feature-local state.
-- feature-local API clients and shared types are still mixed into the control-room file.
+- shared types/constants and API helpers now have their own modules, but feature-local clients and
+  dense rendering logic are still mixed into the control-room file.
 - comparison/history tooling is still large enough to deserve its own subsystem.
 
 ## Done Criteria For This Track
