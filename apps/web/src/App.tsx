@@ -15868,6 +15868,33 @@ type PredicateRefReplayApplyConflictEntry = {
   templateLabel: string;
 };
 
+type PredicateRefReplayApplyConflictDiffItem = {
+  key: string;
+  label: string;
+  localValue: string;
+  remoteValue: string;
+};
+
+type PredicateRefReplayApplyConflictResolutionPreview = {
+  effect: string;
+  entry: PredicateRefReplayApplyHistoryEntry;
+  resolution: "local" | "remote";
+  rowSummaries: string[];
+  snapshotSummary: string;
+  title: string;
+};
+
+type PredicateRefReplayApplyConflictReview = {
+  bindingSnapshotDiffs: PredicateRefReplayApplyConflictDiffItem[];
+  conflict: PredicateRefReplayApplyConflictEntry;
+  localPreview: PredicateRefReplayApplyConflictResolutionPreview;
+  remotePreview: PredicateRefReplayApplyConflictResolutionPreview;
+  rowDiffs: PredicateRefReplayApplyConflictDiffItem[];
+  selectionSnapshotDiffs: PredicateRefReplayApplyConflictDiffItem[];
+  summaryDiffs: PredicateRefReplayApplyConflictDiffItem[];
+  totalDiffCount: number;
+};
+
 type PredicateRefReplayApplySyncAuditEntry = {
   at: string;
   auditId: string;
@@ -16120,6 +16147,189 @@ function arePredicateRefReplayApplyHistoryEntriesEquivalent(
 ) {
   return serializeComparablePredicateRefReplayApplyHistoryEntry(left)
     === serializeComparablePredicateRefReplayApplyHistoryEntry(right);
+}
+
+function serializeComparablePredicateRefReplayApplyHistoryRow(row?: PredicateRefReplayApplyHistoryRow | null) {
+  if (!row) {
+    return "";
+  }
+  return JSON.stringify(row);
+}
+
+function formatPredicateRefReplayApplyHistorySnapshotValue(value?: string | null) {
+  if (value === null || value === undefined) {
+    return "clear";
+  }
+  return value || '""';
+}
+
+function formatPredicateRefReplayApplyHistorySelectionKeyLabel(selectionKey: string) {
+  const parts = selectionKey.split(":").filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : selectionKey;
+}
+
+function formatPredicateRefReplayApplyHistoryRowSummary(row?: PredicateRefReplayApplyHistoryRow | null) {
+  if (!row) {
+    return "No replay row in this version.";
+  }
+  return `${row.currentStatus} · ${row.currentBundleLabel} → ${row.promotedBundleLabel} · simulated ${row.simulatedStatus} · ${row.simulatedBundleLabel}`;
+}
+
+function buildPredicateRefReplayApplyConflictReview(
+  conflict: PredicateRefReplayApplyConflictEntry,
+  localTabLabel: string,
+): PredicateRefReplayApplyConflictReview {
+  const summaryDiffs: PredicateRefReplayApplyConflictDiffItem[] = [];
+  const pushSummaryDiff = (key: string, label: string, localValue: string, remoteValue: string) => {
+    if (localValue === remoteValue) {
+      return;
+    }
+    summaryDiffs.push({
+      key,
+      label,
+      localValue,
+      remoteValue,
+    });
+  };
+  pushSummaryDiff(
+    "applied_at",
+    "Applied at",
+    formatRelativeTimestampLabel(conflict.localEntry.appliedAt),
+    formatRelativeTimestampLabel(conflict.remoteEntry.appliedAt),
+  );
+  pushSummaryDiff(
+    "approved_count",
+    "Approved rows",
+    String(conflict.localEntry.approvedCount),
+    String(conflict.remoteEntry.approvedCount),
+  );
+  pushSummaryDiff(
+    "changed_current_count",
+    "Changed current",
+    String(conflict.localEntry.changedCurrentCount),
+    String(conflict.remoteEntry.changedCurrentCount),
+  );
+  pushSummaryDiff(
+    "matches_simulation_count",
+    "Matched simulated",
+    String(conflict.localEntry.matchesSimulationCount),
+    String(conflict.remoteEntry.matchesSimulationCount),
+  );
+  pushSummaryDiff(
+    "source_tab",
+    "Applied by",
+    conflict.localEntry.sourceTabLabel ?? localTabLabel,
+    conflict.remoteEntry.sourceTabLabel ?? conflict.sourceTabLabel,
+  );
+  pushSummaryDiff(
+    "last_restored_at",
+    "Last restored",
+    formatRelativeTimestampLabel(conflict.localEntry.lastRestoredAt),
+    formatRelativeTimestampLabel(conflict.remoteEntry.lastRestoredAt),
+  );
+  pushSummaryDiff(
+    "last_restored_by",
+    "Restored by",
+    conflict.localEntry.lastRestoredByTabLabel ?? "Not restored",
+    conflict.remoteEntry.lastRestoredByTabLabel ?? "Not restored",
+  );
+
+  const rowDiffs = Array.from(
+    new Set([
+      ...conflict.localEntry.rows.map((row) => row.groupKey),
+      ...conflict.remoteEntry.rows.map((row) => row.groupKey),
+    ]),
+  )
+    .sort((left, right) => left.localeCompare(right))
+    .flatMap((groupKey) => {
+      const localRow = conflict.localEntry.rows.find((row) => row.groupKey === groupKey) ?? null;
+      const remoteRow = conflict.remoteEntry.rows.find((row) => row.groupKey === groupKey) ?? null;
+      if (serializeComparablePredicateRefReplayApplyHistoryRow(localRow) === serializeComparablePredicateRefReplayApplyHistoryRow(remoteRow)) {
+        return [];
+      }
+      return [{
+        key: groupKey,
+        label: localRow?.groupLabel ?? remoteRow?.groupLabel ?? groupKey,
+        localValue: formatPredicateRefReplayApplyHistoryRowSummary(localRow),
+        remoteValue: formatPredicateRefReplayApplyHistoryRowSummary(remoteRow),
+      } satisfies PredicateRefReplayApplyConflictDiffItem];
+    });
+
+  const selectionSnapshotDiffs = Array.from(
+    new Set([
+      ...Object.keys(conflict.localEntry.rollbackSnapshot.groupSelectionsBySelectionKey),
+      ...Object.keys(conflict.remoteEntry.rollbackSnapshot.groupSelectionsBySelectionKey),
+    ]),
+  )
+    .sort((left, right) => left.localeCompare(right))
+    .flatMap((selectionKey) => {
+      const localValue = conflict.localEntry.rollbackSnapshot.groupSelectionsBySelectionKey[selectionKey] ?? null;
+      const remoteValue = conflict.remoteEntry.rollbackSnapshot.groupSelectionsBySelectionKey[selectionKey] ?? null;
+      if (localValue === remoteValue) {
+        return [];
+      }
+      return [{
+        key: selectionKey,
+        label: formatPredicateRefReplayApplyHistorySelectionKeyLabel(selectionKey),
+        localValue: formatPredicateRefReplayApplyHistorySnapshotValue(localValue),
+        remoteValue: formatPredicateRefReplayApplyHistorySnapshotValue(remoteValue),
+      } satisfies PredicateRefReplayApplyConflictDiffItem];
+    });
+
+  const bindingSnapshotDiffs = Array.from(
+    new Set([
+      ...Object.keys(conflict.localEntry.rollbackSnapshot.draftBindingsByParameterKey),
+      ...Object.keys(conflict.remoteEntry.rollbackSnapshot.draftBindingsByParameterKey),
+    ]),
+  )
+    .sort((left, right) => left.localeCompare(right))
+    .flatMap((parameterKey) => {
+      const localValue = conflict.localEntry.rollbackSnapshot.draftBindingsByParameterKey[parameterKey] ?? null;
+      const remoteValue = conflict.remoteEntry.rollbackSnapshot.draftBindingsByParameterKey[parameterKey] ?? null;
+      if (localValue === remoteValue) {
+        return [];
+      }
+      return [{
+        key: parameterKey,
+        label: parameterKey,
+        localValue: formatPredicateRefReplayApplyHistorySnapshotValue(localValue),
+        remoteValue: formatPredicateRefReplayApplyHistorySnapshotValue(remoteValue),
+      } satisfies PredicateRefReplayApplyConflictDiffItem];
+    });
+
+  const totalDiffCount = summaryDiffs.length
+    + rowDiffs.length
+    + selectionSnapshotDiffs.length
+    + bindingSnapshotDiffs.length;
+  const buildResolutionPreview = (
+    resolution: "local" | "remote",
+    entry: PredicateRefReplayApplyHistoryEntry,
+  ): PredicateRefReplayApplyConflictResolutionPreview => {
+    const rollbackGroupCount = Object.keys(entry.rollbackSnapshot.groupSelectionsBySelectionKey).length;
+    const rollbackBindingCount = Object.keys(entry.rollbackSnapshot.draftBindingsByParameterKey).length;
+    return {
+      resolution,
+      entry,
+      title: resolution === "local" ? "Keep local version" : "Apply remote version",
+      effect: resolution === "local"
+        ? `Keeps the currently active entry in this tab and ignores ${totalDiffCount} remote field-level differences.`
+        : `Replaces the active entry with ${conflict.sourceTabLabel}'s version across ${totalDiffCount} differing fields in this tab.`,
+      snapshotSummary: `${rollbackGroupCount} rollback groups · ${rollbackBindingCount} rollback bindings`,
+      rowSummaries: entry.rows.slice(0, 3).map(
+        (row) => `${row.groupLabel}: ${row.currentBundleLabel} → ${row.promotedBundleLabel}`,
+      ),
+    };
+  };
+  return {
+    conflict,
+    summaryDiffs,
+    rowDiffs,
+    selectionSnapshotDiffs,
+    bindingSnapshotDiffs,
+    totalDiffCount,
+    localPreview: buildResolutionPreview("local", conflict.localEntry),
+    remotePreview: buildResolutionPreview("remote", conflict.remoteEntry),
+  };
 }
 
 function normalizePredicateRefReplayApplySyncAuditEntry(value: unknown): PredicateRefReplayApplySyncAuditEntry | null {
@@ -18934,6 +19144,14 @@ function RunSurfaceCollectionQueryBuilder({
         : predicateRefReplayApplyConflicts
     ),
     [predicateRefReplayApplyConflicts, selectedRefTemplate],
+  );
+  const selectedRefTemplateReplayApplyConflictReviews = useMemo(
+    () => selectedRefTemplateReplayApplyConflicts.map((conflict) =>
+      buildPredicateRefReplayApplyConflictReview(
+        conflict,
+        predicateRefReplayApplyHistoryTabIdentity.label,
+      )),
+    [predicateRefReplayApplyHistoryTabIdentity.label, selectedRefTemplateReplayApplyConflicts],
   );
   useEffect(() => {
     predicateRefReplayApplyHistoryRef.current = predicateRefReplayApplyHistory;
@@ -23440,47 +23658,171 @@ function RunSurfaceCollectionQueryBuilder({
                                               Resolve each collision to decide which version stays active in this tab.
                                             </p>
                                             <div className="run-surface-query-builder-trace-list">
-                                              {selectedRefTemplateReplayApplyConflicts.map((conflict) => (
+                                              {selectedRefTemplateReplayApplyConflictReviews.map((review) => (
                                                 <div
                                                   className="run-surface-query-builder-trace-step is-warning"
-                                                  key={conflict.conflictId}
+                                                  key={review.conflict.conflictId}
                                                 >
-                                                  <strong>{conflict.templateLabel}</strong>
+                                                  <strong>{review.conflict.templateLabel}</strong>
                                                   <p>
-                                                    {`Detected ${formatRelativeTimestampLabel(conflict.detectedAt)} from ${conflict.sourceTabLabel}.`}
+                                                    {`Detected ${formatRelativeTimestampLabel(review.conflict.detectedAt)} from ${review.conflict.sourceTabLabel}.`}
                                                   </p>
                                                   <div className="run-surface-query-builder-trace-chip-list">
                                                     <span className="run-surface-query-builder-trace-chip">
-                                                      {`Local · ${conflict.localEntry.approvedCount} rows · ${conflict.localEntry.sourceTabLabel ?? predicateRefReplayApplyHistoryTabIdentity.label}`}
+                                                      {`Local · ${review.conflict.localEntry.approvedCount} rows · ${review.conflict.localEntry.sourceTabLabel ?? predicateRefReplayApplyHistoryTabIdentity.label}`}
                                                     </span>
                                                     <span className="run-surface-query-builder-trace-chip is-active">
-                                                      {`Remote · ${conflict.remoteEntry.approvedCount} rows · ${conflict.sourceTabLabel}`}
+                                                      {`Remote · ${review.conflict.remoteEntry.approvedCount} rows · ${review.conflict.sourceTabLabel}`}
+                                                    </span>
+                                                    <span className="run-surface-query-builder-trace-chip">
+                                                      {`${review.totalDiffCount} differing fields`}
                                                     </span>
                                                   </div>
                                                   <div className="run-surface-query-builder-trace-chip-list">
-                                                    {conflict.remoteEntry.rows.map((row) => (
-                                                      <span className="run-surface-query-builder-trace-chip" key={`${conflict.conflictId}:${row.groupKey}`}>
+                                                    {review.conflict.remoteEntry.rows.map((row) => (
+                                                      <span className="run-surface-query-builder-trace-chip" key={`${review.conflict.conflictId}:${row.groupKey}`}>
                                                         {`${row.groupLabel}: ${row.promotedBundleLabel}`}
                                                       </span>
                                                     ))}
                                                   </div>
-                                                  <div className="run-surface-query-builder-actions">
-                                                    <button
-                                                      className="ghost-button"
-                                                      onClick={() =>
-                                                        resolvePredicateRefReplayApplyConflict(conflict, "local")}
-                                                      type="button"
-                                                    >
-                                                      Keep local version
-                                                    </button>
-                                                    <button
-                                                      className="ghost-button"
-                                                      onClick={() =>
-                                                        resolvePredicateRefReplayApplyConflict(conflict, "remote")}
-                                                      type="button"
-                                                    >
-                                                      Apply remote version
-                                                    </button>
+                                                  <div className="run-surface-query-builder-trace-panel is-nested">
+                                                    <div className="run-surface-query-builder-card-head">
+                                                      <strong>Field-level diff</strong>
+                                                      <span>{`${review.totalDiffCount} changed fields`}</span>
+                                                    </div>
+                                                    <div className="run-surface-query-builder-trace-chip-list">
+                                                      {review.summaryDiffs.length ? (
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {`${review.summaryDiffs.length} summary`}
+                                                        </span>
+                                                      ) : null}
+                                                      {review.rowDiffs.length ? (
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {`${review.rowDiffs.length} replay rows`}
+                                                        </span>
+                                                      ) : null}
+                                                      {review.selectionSnapshotDiffs.length ? (
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {`${review.selectionSnapshotDiffs.length} rollback groups`}
+                                                        </span>
+                                                      ) : null}
+                                                      {review.bindingSnapshotDiffs.length ? (
+                                                        <span className="run-surface-query-builder-trace-chip">
+                                                          {`${review.bindingSnapshotDiffs.length} draft bindings`}
+                                                        </span>
+                                                      ) : null}
+                                                    </div>
+                                                    {[
+                                                      {
+                                                        key: "summary",
+                                                        label: "Summary fields",
+                                                        items: review.summaryDiffs,
+                                                      },
+                                                      {
+                                                        key: "rows",
+                                                        label: "Replay rows",
+                                                        items: review.rowDiffs,
+                                                      },
+                                                      {
+                                                        key: "selection",
+                                                        label: "Rollback groups",
+                                                        items: review.selectionSnapshotDiffs,
+                                                      },
+                                                      {
+                                                        key: "binding",
+                                                        label: "Draft bindings",
+                                                        items: review.bindingSnapshotDiffs,
+                                                      },
+                                                    ].map((section) =>
+                                                      section.items.length ? (
+                                                        <div className="run-surface-query-builder-trace-panel is-nested" key={`${review.conflict.conflictId}:${section.key}`}>
+                                                          <div className="run-surface-query-builder-card-head">
+                                                            <strong>{section.label}</strong>
+                                                            <span>{`${section.items.length} changed`}</span>
+                                                          </div>
+                                                          <div className="run-surface-query-builder-trace-list">
+                                                            {section.items.map((item) => (
+                                                              <div
+                                                                className="run-surface-query-builder-trace-step is-muted"
+                                                                key={`${review.conflict.conflictId}:${section.key}:${item.key}`}
+                                                              >
+                                                                <strong>{item.label}</strong>
+                                                                <div className="run-surface-query-builder-trace-chip-list">
+                                                                  <span className="run-surface-query-builder-trace-chip">
+                                                                    {`Local · ${item.localValue}`}
+                                                                  </span>
+                                                                  <span className="run-surface-query-builder-trace-chip is-active">
+                                                                    {`Remote · ${item.remoteValue}`}
+                                                                  </span>
+                                                                </div>
+                                                              </div>
+                                                            ))}
+                                                          </div>
+                                                        </div>
+                                                      ) : null,
+                                                    )}
+                                                  </div>
+                                                  <div className="run-surface-query-builder-trace-panel is-nested">
+                                                    <div className="run-surface-query-builder-card-head">
+                                                      <strong>What-if review</strong>
+                                                      <span>Local vs remote outcome</span>
+                                                    </div>
+                                                    <div className="run-surface-query-builder-trace-list">
+                                                      {[review.localPreview, review.remotePreview].map((preview) => (
+                                                        <div
+                                                          className={`run-surface-query-builder-trace-step is-${
+                                                            preview.resolution === "local" ? "info" : "warning"
+                                                          }`}
+                                                          key={`${review.conflict.conflictId}:${preview.resolution}`}
+                                                        >
+                                                          <strong>{preview.title}</strong>
+                                                          <p>{preview.effect}</p>
+                                                          <div className="run-surface-query-builder-trace-chip-list">
+                                                            <span className="run-surface-query-builder-trace-chip">
+                                                              {`${preview.entry.approvedCount} approved rows`}
+                                                            </span>
+                                                            <span className="run-surface-query-builder-trace-chip">
+                                                              {`${preview.entry.changedCurrentCount} changed current`}
+                                                            </span>
+                                                            <span className="run-surface-query-builder-trace-chip">
+                                                              {`${preview.entry.matchesSimulationCount} matched simulated`}
+                                                            </span>
+                                                            <span className="run-surface-query-builder-trace-chip">
+                                                              {preview.snapshotSummary}
+                                                            </span>
+                                                          </div>
+                                                          <div className="run-surface-query-builder-trace-chip-list">
+                                                            {preview.rowSummaries.length ? (
+                                                              preview.rowSummaries.map((summary, index) => (
+                                                                <span
+                                                                  className="run-surface-query-builder-trace-chip"
+                                                                  key={`${review.conflict.conflictId}:${preview.resolution}:row:${index}`}
+                                                                >
+                                                                  {summary}
+                                                                </span>
+                                                              ))
+                                                            ) : (
+                                                              <span className="run-surface-query-builder-trace-chip">
+                                                                No replay rows recorded
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                          <div className="run-surface-query-builder-actions">
+                                                            <button
+                                                              className="ghost-button"
+                                                              onClick={() =>
+                                                                resolvePredicateRefReplayApplyConflict(
+                                                                  review.conflict,
+                                                                  preview.resolution,
+                                                                )}
+                                                              type="button"
+                                                            >
+                                                              {preview.title}
+                                                            </button>
+                                                          </div>
+                                                        </div>
+                                                      ))}
+                                                    </div>
                                                   </div>
                                                 </div>
                                               ))}
