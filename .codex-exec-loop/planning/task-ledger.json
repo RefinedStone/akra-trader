@@ -4342,18 +4342,54 @@
       "direction_id": "experiment-os",
       "title": "Extend standalone runtime bindings to run launch or rerun and remaining explicit read routes",
       "description": "Build on the completed run-scoped mutation and item-CRUD rollout by moving the remaining explicit application-call routes the main session identified onto the shared standalone binding dispatcher, especially run launch or rerun actions plus any leftover non-item list or detail routes that still bypass binding-driven registration, so the runtime binding abstraction covers the last obvious explicit API pockets instead of stopping at mutable item endpoints.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 33,
-      "priority_reason": "The latest main-session reply says commit 0dfaf66 finished run-scoped stop or live-order mutation and preset item CRUD binding coverage, and explicitly names the remaining gap as start or rerun families plus some non-item explicit list or detail routes still using direct application calls. That makes this the clearest executable next queue head for builtin next-task progression.",
+      "priority_reason": "Completed in main session commit 6d70655, which extended standalone runtime bindings across run launch, rerun, compare, backtest item, market-data status, and remaining explicit discovery or read routes, routed those APIs through `dispatch_standalone_binding(...)`, removed the separate explicit `/runs/backtests/{run_id}` handler in favor of binding-driven registration, and verified the change with `python -m py_compile`, targeted `pytest`, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-extend-standalone-runtime-bindings-to-run-scoped-mutations-and-resource-item-crud"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T00:10:00Z",
+      "updated_at": "2026-04-21T00:20:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Carries experiment-os runtime-binding generalization past run-scoped mutation and item CRUD coverage into the remaining launch, rerun, and read-side explicit routes, aiming to eliminate the last direct application-call API wiring around experiment runtime entry points."
+    },
+    {
+      "id": "planning-experiment-os-extend-runtime-binding-abstraction-to-remaining-complex-mutation-families",
+      "direction_id": "experiment-os",
+      "title": "Extend runtime binding abstraction to remaining complex mutation families",
+      "description": "Build on the completed standalone binding rollout by onboarding the remaining API mutation families with comparatively complex path or body combinations onto the same binding-driven execution model, so the next layer of bespoke request parsing and action dispatch stops living in explicit application handlers even when routes need richer payload or path-shape metadata.",
+      "status": "ready",
+      "base_priority": 88,
+      "dynamic_priority_delta": 34,
+      "priority_reason": "The latest main-session reply says run launch or rerun plus the last obvious explicit read routes are now bound, and explicitly identifies the remaining executable gap as other mutation families with more complex path or body combinations that still are not covered by the same abstraction. That makes this the clearest next queue head for builtin next-task progression.",
+      "depends_on": [
+        "planning-experiment-os-extend-standalone-runtime-bindings-to-run-launch-rerun-and-remaining-explicit-read-routes"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Continues experiment-os runtime-binding generalization beyond the now-covered launch, rerun, and read surfaces into the remaining mutation families whose request shapes still keep bespoke handler logic outside the shared binding contract."
+    },
+    {
+      "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
+      "direction_id": "experiment-os",
+      "title": "Unify non-standalone endpoints under shared runtime-binding contracts",
+      "description": "After the standalone surface rollout reaches the remaining complex mutation families, evaluate and execute the larger convergence step of moving non-standalone endpoints onto the same or a closely related contract-driven runtime binding abstraction, so API execution semantics stop diverging between standalone and non-standalone route families.",
+      "status": "proposed",
+      "base_priority": 87,
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply says the broader unfinished generalization is that non-standalone endpoints have not yet been unified under the same abstraction. That follow-up is valid, but it is a wider architectural pass than the immediately executable remaining mutation-family rollout, so keep it proposed behind the next concrete binding expansion.",
+      "depends_on": [
+        "planning-experiment-os-extend-runtime-binding-abstraction-to-remaining-complex-mutation-families"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:20:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
     },
     {
       "id": "planning-experiment-os-add-runtime-policy-evaluation-from-run-surface-capability-contracts",
