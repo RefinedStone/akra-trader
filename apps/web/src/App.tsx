@@ -17221,6 +17221,8 @@ function RunSurfaceCollectionQueryBuilder({
     useState<"all" | string>("all");
   const [bundleCoordinationSimulationReplayActionTypeFilter, setBundleCoordinationSimulationReplayActionTypeFilter] =
     useState<"all" | "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle">("all");
+  const [bundleCoordinationSimulationReplayEdgeFilter, setBundleCoordinationSimulationReplayEdgeFilter] =
+    useState<"all" | string>("all");
   const activeContract = useMemo(
     () => contracts.find((contract) => contract.contract_key === activeContractKey) ?? contracts[0] ?? null,
     [activeContractKey, contracts],
@@ -18189,6 +18191,13 @@ function RunSurfaceCollectionQueryBuilder({
     selectedRefTemplate?.id,
   ]);
   useEffect(() => {
+    setBundleCoordinationSimulationReplayEdgeFilter("all");
+  }, [
+    bundleCoordinationSimulationPolicy,
+    bundleCoordinationSimulationScope,
+    selectedRefTemplate?.id,
+  ]);
+  useEffect(() => {
     if (!simulatedCoordinationGroups.length) {
       setBundleCoordinationSimulationReplayGroupFilter("all");
       return;
@@ -18357,6 +18366,18 @@ function RunSurfaceCollectionQueryBuilder({
       };
     };
     type SolverReplayAction = {
+      dependencyEdges: Array<{
+        key: string;
+        label: string;
+        sourceGroupKey: string;
+        sourceGroupLabel: string;
+        sourceBundleKey: string;
+        sourceBundleLabel: string;
+        targetGroupKey: string;
+        targetGroupLabel: string;
+        targetBundleKey: string;
+        targetBundleLabel: string;
+      }>;
       groupKey: string;
       groupLabel: string;
       type: "manual_anchor" | "dependency_selection" | "direct_auto_selection" | "conflict_blocked" | "idle";
@@ -18441,6 +18462,31 @@ function RunSurfaceCollectionQueryBuilder({
     const getCoordinationPolicy = (
       group: RunSurfaceCollectionQueryBuilderPredicateTemplateGroupState,
     ) => policyOverridesByGroupKey[group.key] ?? group.coordinationPolicy;
+    const buildDependencyEdges = (
+      requests: DependencyRequest[],
+      targetGroupKey: string,
+    ) => Object.values(
+      requests.reduce<Record<string, SolverReplayAction["dependencyEdges"][number]>>((accumulator, request) => {
+        const targetGroup = groupMap.get(targetGroupKey);
+        const edgeKey = `${request.sourceGroupKey}:${request.sourceBundleKey}->${targetGroupKey}:${request.bundleKey}`;
+        if (accumulator[edgeKey]) {
+          return accumulator;
+        }
+        accumulator[edgeKey] = {
+          key: edgeKey,
+          label: `${request.sourceGroupLabel} → ${request.sourceBundleLabel} => ${targetGroup?.label ?? targetGroupKey} → ${request.bundleLabel}`,
+          sourceGroupKey: request.sourceGroupKey,
+          sourceGroupLabel: request.sourceGroupLabel,
+          sourceBundleKey: request.sourceBundleKey,
+          sourceBundleLabel: request.sourceBundleLabel,
+          targetGroupKey,
+          targetGroupLabel: targetGroup?.label ?? targetGroupKey,
+          targetBundleKey: request.bundleKey,
+          targetBundleLabel: request.bundleLabel,
+        };
+        return accumulator;
+      }, {}),
+    );
     const buildDependencyRequests = (
       resolvedSelectionsByGroupKey: Record<string, string>,
       includePredictedAutoCandidates = false,
@@ -18569,6 +18615,7 @@ function RunSurfaceCollectionQueryBuilder({
         const manualBundle = manualBundleKey ? getGroupBundle(group.key, manualBundleKey) : null;
         return manualBundle
           ? [{
+              dependencyEdges: [],
               groupKey: group.key,
               groupLabel: group.label,
               type: "manual_anchor" as const,
@@ -18600,6 +18647,7 @@ function RunSurfaceCollectionQueryBuilder({
         );
         if (sortedDependencyRequests.length > 1 && coordinationPolicy === "manual_resolution") {
           iterationActions.push({
+            dependencyEdges: buildDependencyEdges(dependencyRequests, group.key),
             groupKey: group.key,
             groupLabel: group.label,
             type: "conflict_blocked",
@@ -18612,6 +18660,10 @@ function RunSurfaceCollectionQueryBuilder({
           resolvedSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
           autoSelectionsByGroupKey[group.key] = dependencyDrivenBundle.bundleKey;
           iterationActions.push({
+            dependencyEdges: buildDependencyEdges(
+              dependencyRequests.filter((request) => request.bundleKey === dependencyDrivenBundle.bundleKey),
+              group.key,
+            ),
             groupKey: group.key,
             groupLabel: group.label,
             type: "dependency_selection",
@@ -18629,7 +18681,28 @@ function RunSurfaceCollectionQueryBuilder({
         if (directAutoBundle) {
           resolvedSelectionsByGroupKey[group.key] = directAutoBundle.key;
           autoSelectionsByGroupKey[group.key] = directAutoBundle.key;
+          const directAutoDependencyEdges = directAutoBundle.dependencies.flatMap((dependency) => {
+            const sourceBundleKey = resolvedSelectionsByGroupKey[dependency.groupKey];
+            const sourceGroup = groupMap.get(dependency.groupKey);
+            const sourceBundle = getGroupBundle(dependency.groupKey, sourceBundleKey);
+            if (!sourceGroup || !sourceBundle) {
+              return [];
+            }
+            return [{
+              key: `${dependency.groupKey}:${sourceBundleKey}->${group.key}:${directAutoBundle.key}`,
+              label: `${sourceGroup.label} → ${sourceBundle.label} => ${group.label} → ${directAutoBundle.label}`,
+              sourceGroupKey: dependency.groupKey,
+              sourceGroupLabel: sourceGroup.label,
+              sourceBundleKey,
+              sourceBundleLabel: sourceBundle.label,
+              targetGroupKey: group.key,
+              targetGroupLabel: group.label,
+              targetBundleKey: directAutoBundle.key,
+              targetBundleLabel: directAutoBundle.label,
+            }];
+          });
           iterationActions.push({
+            dependencyEdges: directAutoDependencyEdges,
             groupKey: group.key,
             groupLabel: group.label,
             type: "direct_auto_selection",
@@ -18642,6 +18715,7 @@ function RunSurfaceCollectionQueryBuilder({
           return;
         }
         iterationActions.push({
+          dependencyEdges: [],
           groupKey: group.key,
           groupLabel: group.label,
           type: "idle",
@@ -19065,6 +19139,30 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [simulatedPredicateRefSolverReplay],
   );
+  const availableSimulatedPredicateRefSolverReplayEdges = useMemo(
+    () => Object.values(
+      simulatedPredicateRefSolverReplay.reduce<Record<string, {
+        key: string;
+        label: string;
+        sourceGroupKey: string;
+        sourceGroupLabel: string;
+        sourceBundleKey: string;
+        sourceBundleLabel: string;
+        targetGroupKey: string;
+        targetGroupLabel: string;
+        targetBundleKey: string;
+        targetBundleLabel: string;
+      }>>((accumulator, step) => {
+        step.actions.forEach((action) => {
+          action.dependencyEdges.forEach((edge) => {
+            accumulator[edge.key] = edge;
+          });
+        });
+        return accumulator;
+      }, {}),
+    ),
+    [simulatedPredicateRefSolverReplay],
+  );
   const activeSimulatedPredicateRefSolverReplayFilteredActions = useMemo(
     () => (
       activeSimulatedPredicateRefSolverReplayStep
@@ -19082,6 +19180,12 @@ function RunSurfaceCollectionQueryBuilder({
               ) {
                 return false;
               }
+              if (
+                bundleCoordinationSimulationReplayEdgeFilter !== "all"
+                && !action.dependencyEdges.some((edge) => edge.key === bundleCoordinationSimulationReplayEdgeFilter)
+              ) {
+                return false;
+              }
               return true;
             })
           )
@@ -19089,6 +19193,7 @@ function RunSurfaceCollectionQueryBuilder({
     ),
     [
       bundleCoordinationSimulationReplayActionTypeFilter,
+      bundleCoordinationSimulationReplayEdgeFilter,
       activeSimulatedPredicateRefSolverReplayStep,
       bundleCoordinationSimulationReplayGroupFilter,
     ],
@@ -19105,6 +19210,18 @@ function RunSurfaceCollectionQueryBuilder({
       simulatedCoordinationGroups,
     ],
   );
+  const activeSimulatedPredicateRefSolverReplayFilteredEdge = useMemo(
+    () => (
+      bundleCoordinationSimulationReplayEdgeFilter === "all"
+        ? null
+        : availableSimulatedPredicateRefSolverReplayEdges.find((edge) => edge.key === bundleCoordinationSimulationReplayEdgeFilter)
+          ?? null
+    ),
+    [
+      availableSimulatedPredicateRefSolverReplayEdges,
+      bundleCoordinationSimulationReplayEdgeFilter,
+    ],
+  );
   useEffect(() => {
     if (
       bundleCoordinationSimulationReplayActionTypeFilter !== "all"
@@ -19115,6 +19232,17 @@ function RunSurfaceCollectionQueryBuilder({
   }, [
     availableSimulatedPredicateRefSolverReplayActionTypes,
     bundleCoordinationSimulationReplayActionTypeFilter,
+  ]);
+  useEffect(() => {
+    if (
+      bundleCoordinationSimulationReplayEdgeFilter !== "all"
+      && !availableSimulatedPredicateRefSolverReplayEdges.some((edge) => edge.key === bundleCoordinationSimulationReplayEdgeFilter)
+    ) {
+      setBundleCoordinationSimulationReplayEdgeFilter("all");
+    }
+  }, [
+    availableSimulatedPredicateRefSolverReplayEdges,
+    bundleCoordinationSimulationReplayEdgeFilter,
   ]);
   const simulatedPredicateRefGroupBundleDiffs = useMemo(() => {
     if (!simulatedPredicateRefGroupBundleState) {
@@ -21413,6 +21541,21 @@ function RunSurfaceCollectionQueryBuilder({
                                       ))}
                                     </select>
                                   </label>
+                                  <label className="run-surface-query-builder-control">
+                                    <span>Dependency edge filter</span>
+                                    <select
+                                      value={bundleCoordinationSimulationReplayEdgeFilter}
+                                      onChange={(event) =>
+                                        setBundleCoordinationSimulationReplayEdgeFilter(event.target.value)}
+                                    >
+                                      <option value="all">All dependency edges</option>
+                                      {availableSimulatedPredicateRefSolverReplayEdges.map((edge) => (
+                                        <option key={`solver-edge:${edge.key}`} value={edge.key}>
+                                          {edge.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </label>
                                 </div>
                                 <input
                                   className="run-surface-query-builder-trace-slider"
@@ -21438,6 +21581,11 @@ function RunSurfaceCollectionQueryBuilder({
                                         {`Showing only ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions in this replay step.`}
                                       </p>
                                     ) : null}
+                                    {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
+                                      <p className="run-note">
+                                        {`Tracing dependency edge ${activeSimulatedPredicateRefSolverReplayFilteredEdge.label} across replay steps.`}
+                                      </p>
+                                    ) : null}
                                     <div className="run-surface-query-builder-trace-chip-list">
                                       {simulatedCoordinationGroups.map((group) => {
                                         const resolvedBundleKey =
@@ -21461,6 +21609,16 @@ function RunSurfaceCollectionQueryBuilder({
                                         );
                                       })}
                                     </div>
+                                    {activeSimulatedPredicateRefSolverReplayFilteredEdge ? (
+                                      <div className="run-surface-query-builder-trace-chip-list">
+                                        <span className="run-surface-query-builder-trace-chip is-active">
+                                          {`Source: ${activeSimulatedPredicateRefSolverReplayFilteredEdge.sourceGroupLabel} → ${activeSimulatedPredicateRefSolverReplayFilteredEdge.sourceBundleLabel}`}
+                                        </span>
+                                        <span className="run-surface-query-builder-trace-chip is-active">
+                                          {`Target: ${activeSimulatedPredicateRefSolverReplayFilteredEdge.targetGroupLabel} → ${activeSimulatedPredicateRefSolverReplayFilteredEdge.targetBundleLabel}`}
+                                        </span>
+                                      </div>
+                                    ) : null}
                                     <div className="run-surface-query-builder-trace-list">
                                       {activeSimulatedPredicateRefSolverReplayFilteredActions.length ? (
                                         activeSimulatedPredicateRefSolverReplayFilteredActions.map((action) => (
@@ -21476,6 +21634,23 @@ function RunSurfaceCollectionQueryBuilder({
                                           >
                                             <strong>{`${action.groupLabel} · ${action.type.replaceAll("_", " ")}`}</strong>
                                             <p>{action.detail}</p>
+                                            {action.dependencyEdges.length ? (
+                                              <div className="run-surface-query-builder-trace-chip-list">
+                                                {action.dependencyEdges.map((edge) => (
+                                                  <span
+                                                    className={`run-surface-query-builder-trace-chip${
+                                                      bundleCoordinationSimulationReplayEdgeFilter === "all"
+                                                      || bundleCoordinationSimulationReplayEdgeFilter === edge.key
+                                                        ? " is-active"
+                                                        : ""
+                                                    }`}
+                                                    key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:${edge.key}`}
+                                                  >
+                                                    {edge.label}
+                                                  </span>
+                                                ))}
+                                              </div>
+                                            ) : null}
                                           </div>
                                         ))
                                       ) : (
@@ -21485,13 +21660,29 @@ function RunSurfaceCollectionQueryBuilder({
                                             {activeSimulatedPredicateRefSolverReplayFilteredGroup
                                               ? (
                                                   bundleCoordinationSimulationReplayActionTypeFilter !== "all"
-                                                    ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
-                                                    : `This replay step did not produce any coordination actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
+                                                    ? (
+                                                        bundleCoordinationSimulationReplayEdgeFilter !== "all"
+                                                          ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label} on the selected dependency edge.`
+                                                          : `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
+                                                      )
+                                                    : (
+                                                        bundleCoordinationSimulationReplayEdgeFilter !== "all"
+                                                          ? `This replay step did not produce any coordination actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label} on the selected dependency edge.`
+                                                          : `This replay step did not produce any coordination actions for ${activeSimulatedPredicateRefSolverReplayFilteredGroup.label}.`
+                                                      )
                                                 )
                                               : (
                                                   bundleCoordinationSimulationReplayActionTypeFilter !== "all"
-                                                    ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions.`
-                                                    : "This replay step did not produce any new coordination actions."
+                                                    ? (
+                                                        bundleCoordinationSimulationReplayEdgeFilter !== "all"
+                                                          ? `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions on the selected dependency edge.`
+                                                          : `This replay step did not produce any ${bundleCoordinationSimulationReplayActionTypeFilter.replaceAll("_", " ")} actions.`
+                                                      )
+                                                    : (
+                                                        bundleCoordinationSimulationReplayEdgeFilter !== "all"
+                                                          ? "This replay step did not produce any actions on the selected dependency edge."
+                                                          : "This replay step did not produce any new coordination actions."
+                                                      )
                                                 )}
                                           </p>
                                         </div>
