@@ -5228,18 +5228,36 @@
       "direction_id": "experiment-os",
       "title": "Add sync governance controls for replay apply history",
       "description": "Build on the shipped tab-identity and sync audit trail UI by defining and surfacing replay apply history sync governance in-product: make the conflict resolution policy explicit for concurrent apply or restore mutations and add per-tab mute or filter controls so operators can manage remote sync noise without losing the audit trail.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 12,
-      "priority_reason": "The latest main-session reply explicitly names the remaining work as a sync governance layer: replay apply history now shows tab identity and local or remote audit entries, but operators still lack a conflict resolution policy and per-tab mute or filter controls. That makes governance controls the clearest executable next task with no extra operator decision required.",
+      "priority_reason": "Completed in main session commit 754b782, which added session-scoped `Remote sync mode` controls with `Live merge`, `Audit only`, and `Mute remote` behavior, added `Audit filter` narrowing for `all/local/remote/apply/restore`, preserved cross-tab history via localStorage union writes plus mode-aware `storage` reconciliation, surfaced governance controls and filtered sync audit in the replay history panel, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-tab-identity-and-sync-audit-for-replay-apply-history"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:10:01Z",
+      "updated_at": "2026-04-20T06:25:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay-apply trust from explained synchronization into governed synchronization, so concurrent tabs have operator-visible conflict semantics and manageable remote-event noise instead of only passive audit attribution."
+      "direction_relation_note": "Completed the replay-history governance baseline by making cross-tab apply and restore propagation operator-configurable and auditable per tab, which now leaves conflict-aware handling for same-entry override races as the clearest next trust gap."
+    },
+    {
+      "id": "planning-experiment-os-add-conflict-aware-governance-for-replay-apply-history-overrides",
+      "direction_id": "experiment-os",
+      "title": "Add conflict-aware governance for replay apply history override collisions",
+      "description": "Build on the shipped replay sync governance controls by detecting when multiple tabs produce competing apply or restore overrides against the same replay history entry, then surface a reviewable conflict state plus manual resolution flow so same-entry races are not reduced to passive mode handling or silent last-writer behavior.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 12,
+      "priority_reason": "The latest main-session reply explicitly says the remaining gap is conflict-aware governance: `Live merge`, `Audit only`, and `Mute remote` now govern remote event intake, but same-entry override collisions still lack conflict review and manual resolution. That makes override-collision governance the clearest executable next task with no extra operator decision required.",
+      "depends_on": [
+        "planning-experiment-os-add-sync-governance-controls-for-replay-apply-history"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T06:25:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os replay-apply trust from configurable remote sync behavior into explicit collision handling, so concurrent tabs can reconcile same-entry apply or restore overrides deliberately instead of relying on coarse mode semantics."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
@@ -5249,13 +5267,13 @@
       "status": "proposed",
       "base_priority": 85,
       "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply explicitly keeps history export or import on the table after reload persistence shipped, but that follow-up still needs a product-shape choice between portable transfer, profile-scoped sync, and retention posture. Keep it proposed behind the more direct real-time cross-tab coordination task.",
+      "priority_reason": "The latest main-session reply now narrows the direct next gap to conflict-aware governance for same-entry override collisions. Portable replay-history retention remains valid follow-up work, but it still needs a product-shape choice between export/import, profile-scoped sync, and retention posture, so keep it proposed behind the executable conflict-governance pass.",
       "depends_on": [
         "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T06:45:00Z",
+      "updated_at": "2026-04-20T06:25:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Extends experiment-os replay-apply durability from local browser persistence into a portable or account-scoped audit artifact, helping replay rollback evidence survive beyond one device or browser context."
     },
