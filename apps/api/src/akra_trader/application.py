@@ -23039,6 +23039,7 @@ class StandaloneSurfaceFilterParamSpec:
   constraints: StandaloneSurfaceFilterConstraintSpec | None = None
   openapi: StandaloneSurfaceFilterOpenAPISpec | None = None
   operators: tuple[StandaloneSurfaceFilterOperatorSpec, ...] = ()
+  value_path: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -23046,6 +23047,7 @@ class StandaloneSurfaceFilterCondition:
   key: str
   operator: str
   value: Any
+  group: str | None = None
 
 
 @dataclass(frozen=True)
@@ -23179,6 +23181,69 @@ def _normalize_runtime_datetime_filter_value(value: Any) -> datetime | None:
   return value.astimezone(UTC)
 
 
+_RUNTIME_QUERY_MISSING = object()
+
+
+def _default_runtime_query_value_path(
+  key: str,
+  explicit_path: tuple[str, ...] = (),
+) -> tuple[str, ...]:
+  if explicit_path:
+    return explicit_path
+  return tuple(segment for segment in key.split(".") if segment)
+
+
+def _resolve_runtime_query_path_value(
+  item: Any,
+  path: tuple[str, ...],
+) -> Any:
+  current = item
+  for segment in path:
+    if current is None:
+      return None
+    if isinstance(current, dict):
+      if segment not in current:
+        return _RUNTIME_QUERY_MISSING
+      current = current[segment]
+      continue
+    if not hasattr(current, segment):
+      return _RUNTIME_QUERY_MISSING
+    current = getattr(current, segment)
+  return current
+
+
+def _build_runtime_filter_getters(
+  filter_specs: tuple[StandaloneSurfaceFilterParamSpec, ...],
+  *,
+  overrides: dict[str, Callable[[Any], Any]] | None = None,
+) -> dict[str, Callable[[Any], Any]]:
+  getters: dict[str, Callable[[Any], Any]] = {}
+  for spec in filter_specs:
+    path = _default_runtime_query_value_path(spec.key, spec.value_path)
+    if not path:
+      continue
+    getters[spec.key] = lambda item, path=path: _resolve_runtime_query_path_value(item, path)
+  if overrides:
+    getters.update(overrides)
+  return getters
+
+
+def _build_runtime_sort_getters(
+  sort_specs: tuple[StandaloneSurfaceSortFieldSpec, ...],
+  *,
+  overrides: dict[str, Callable[[Any], Any]] | None = None,
+) -> dict[str, Callable[[Any], Any]]:
+  getters: dict[str, Callable[[Any], Any]] = {}
+  for spec in sort_specs:
+    path = _default_runtime_query_value_path(spec.key, spec.value_path)
+    if not path:
+      continue
+    getters[spec.key] = lambda item, path=path: _resolve_runtime_query_path_value(item, path)
+  if overrides:
+    getters.update(overrides)
+  return getters
+
+
 def _evaluate_runtime_filter_condition(
   candidate_value: Any,
   *,
@@ -23223,28 +23288,83 @@ def _evaluate_runtime_filter_condition(
   raise ValueError(f"Unsupported runtime filter operator: {operator}")
 
 
+def _evaluate_runtime_filter_conditions(
+  item: Any,
+  conditions: tuple[StandaloneSurfaceFilterCondition, ...] | list[StandaloneSurfaceFilterCondition],
+  *,
+  filter_getters: dict[str, Callable[[Any], Any]],
+  require_known_conditions: bool,
+) -> bool:
+  known_conditions = 0
+  for condition in conditions:
+    getter = filter_getters.get(condition.key)
+    if getter is None:
+      continue
+    candidate_value = getter(item)
+    if candidate_value is _RUNTIME_QUERY_MISSING:
+      continue
+    known_conditions += 1
+    if not _evaluate_runtime_filter_condition(
+      candidate_value,
+      operator=condition.operator,
+      operand=condition.value,
+    ):
+      return False
+  if require_known_conditions and known_conditions == 0:
+    return False
+  return True
+
+
 def _apply_runtime_query_contract(
   items: list[Any],
   *,
   filters: dict[str, Any] | None,
-  filter_getters: dict[str, Callable[[Any], Any]],
-  sort_getters: dict[str, Callable[[Any], Any]],
+  filter_specs: tuple[StandaloneSurfaceFilterParamSpec, ...] = (),
+  sort_specs: tuple[StandaloneSurfaceSortFieldSpec, ...] = (),
+  filter_getter_overrides: dict[str, Callable[[Any], Any]] | None = None,
+  sort_getter_overrides: dict[str, Callable[[Any], Any]] | None = None,
 ) -> list[Any]:
   conditions = _extract_runtime_filter_conditions(filters)
   sort_terms = _extract_runtime_sort_terms(filters)
+  filter_getters = _build_runtime_filter_getters(
+    filter_specs,
+    overrides=filter_getter_overrides,
+  )
+  sort_getters = _build_runtime_sort_getters(
+    sort_specs,
+    overrides=sort_getter_overrides,
+  )
   resolved = list(items)
   if conditions:
+    ungrouped_conditions = tuple(
+      condition
+      for condition in conditions
+      if condition.group is None
+    )
+    grouped_conditions: dict[str, list[StandaloneSurfaceFilterCondition]] = {}
+    for condition in conditions:
+      if condition.group is None:
+        continue
+      grouped_conditions.setdefault(condition.group, []).append(condition)
     resolved = [
       item
       for item in resolved
-      if all(
-        _evaluate_runtime_filter_condition(
-          filter_getters[condition.key](item),
-          operator=condition.operator,
-          operand=condition.value,
+      if _evaluate_runtime_filter_conditions(
+        item,
+        ungrouped_conditions,
+        filter_getters=filter_getters,
+        require_known_conditions=False,
+      ) and (
+        not grouped_conditions
+        or any(
+          _evaluate_runtime_filter_conditions(
+            item,
+            group_conditions,
+            filter_getters=filter_getters,
+            require_known_conditions=True,
+          )
+          for group_conditions in grouped_conditions.values()
         )
-        for condition in conditions
-        if condition.key in filter_getters
       )
     ]
   for term in reversed(sort_terms):
@@ -23269,100 +23389,49 @@ def _run_metric_query_value(run: RunRecord, key: str) -> float | int | None:
 def _apply_runtime_query_to_strategies(
   strategies: list[StrategyMetadata],
   filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
 ) -> list[StrategyMetadata]:
   return _apply_runtime_query_contract(
     strategies,
     filters=filters,
-    filter_getters={
-      "lane": lambda strategy: strategy.runtime,
-      "lifecycle_stage": lambda strategy: strategy.lifecycle.stage,
-      "version": lambda strategy: strategy.version,
-      "registered_at": lambda strategy: strategy.lifecycle.registered_at,
-    },
-    sort_getters={
-      "strategy_id": lambda strategy: strategy.strategy_id,
-      "runtime": lambda strategy: strategy.runtime,
-      "registered_at": lambda strategy: strategy.lifecycle.registered_at,
-      "lifecycle.registered_at": lambda strategy: strategy.lifecycle.registered_at,
-    },
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
   )
 
 
 def _apply_runtime_query_to_presets(
   presets: list[ExperimentPreset],
   filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
 ) -> list[ExperimentPreset]:
   return _apply_runtime_query_contract(
     presets,
     filters=filters,
-    filter_getters={
-      "strategy_id": lambda preset: preset.strategy_id,
-      "timeframe": lambda preset: preset.timeframe,
-      "lifecycle_stage": lambda preset: preset.lifecycle.stage,
-      "created_at": lambda preset: preset.created_at,
-      "updated_at": lambda preset: preset.updated_at,
-    },
-    sort_getters={
-      "updated_at": lambda preset: preset.updated_at,
-      "created_at": lambda preset: preset.created_at,
-      "preset_id": lambda preset: preset.preset_id,
-      "timestamps.updated_at": lambda preset: preset.updated_at,
-      "timestamps.created_at": lambda preset: preset.created_at,
-    },
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
   )
 
 
 def _apply_runtime_query_to_runs(
   runs: list[RunRecord],
   filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
 ) -> list[RunRecord]:
   return _apply_runtime_query_contract(
     runs,
     filters=filters,
-    filter_getters={
-      "mode": lambda run: run.config.mode.value,
-      "strategy_id": lambda run: run.config.strategy_id,
-      "strategy_version": lambda run: run.config.strategy_version,
-      "rerun_boundary_id": lambda run: run.provenance.rerun_boundary_id,
-      "preset_id": lambda run: run.provenance.experiment.preset_id,
-      "benchmark_family": lambda run: run.provenance.experiment.benchmark_family,
-      "dataset_identity": (
-        lambda run: run.provenance.market_data.dataset_identity
-        if run.provenance.market_data is not None
-        else None
-      ),
-      "started_at": lambda run: run.started_at,
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
+    filter_getter_overrides={
       "updated_at": _run_effective_updated_at,
-      "initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
-      "ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
-      "exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
-      "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
-      "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
-      "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
-      "trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
-      "tag": lambda run: run.provenance.experiment.tags,
-    },
-    sort_getters={
-      "updated_at": _run_effective_updated_at,
-      "started_at": lambda run: run.started_at,
-      "run_id": lambda run: run.config.run_id,
-      "initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
-      "ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
-      "exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
-      "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
-      "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
-      "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
-      "trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
-      "config.run_id": lambda run: run.config.run_id,
-      "timing.started_at": lambda run: run.started_at,
       "timing.updated_at": _run_effective_updated_at,
-      "metrics.initial_cash": lambda run: _run_metric_query_value(run, "initial_cash"),
-      "metrics.ending_equity": lambda run: _run_metric_query_value(run, "ending_equity"),
-      "metrics.exposure_pct": lambda run: _run_metric_query_value(run, "exposure_pct"),
-      "metrics.total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
-      "metrics.max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
-      "metrics.win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
-      "metrics.trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
+    },
+    sort_getter_overrides={
+      "updated_at": _run_effective_updated_at,
+      "timing.updated_at": _run_effective_updated_at,
     },
   )
 
@@ -23370,6 +23439,8 @@ def _apply_runtime_query_to_runs(
 def _apply_runtime_query_to_comparison(
   comparison: RunComparison,
   filters: dict[str, Any] | None,
+  *,
+  binding: StandaloneSurfaceRuntimeBinding,
 ) -> RunComparison:
   run_order_index = {
     run_id: index
@@ -23378,20 +23449,21 @@ def _apply_runtime_query_to_comparison(
   narratives = _apply_runtime_query_contract(
     list(comparison.narratives),
     filters=filters,
-    filter_getters={
-      "run_id": lambda narrative: narrative.run_id,
+    filter_specs=binding.filter_param_specs,
+    sort_specs=binding.sort_field_specs,
+    filter_getter_overrides={
       "narrative_score": lambda narrative: narrative.insight_score,
     },
-    sort_getters={
+    sort_getter_overrides={
       "run_id_order": lambda narrative: run_order_index.get(
         narrative.run_id,
         len(run_order_index),
       ),
-      "narrative_score": lambda narrative: narrative.insight_score,
       "narratives.run_id_order": lambda narrative: run_order_index.get(
         narrative.run_id,
         len(run_order_index),
       ),
+      "narrative_score": lambda narrative: narrative.insight_score,
       "narratives.insight_score": lambda narrative: narrative.insight_score,
     },
   )
@@ -23620,6 +23692,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single runtime lane value.",
           ),
         ),
+        value_path=("runtime",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "lifecycle_stage",
@@ -23638,6 +23711,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single lifecycle stage.",
           ),
         ),
+        value_path=("lifecycle", "stage"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "version",
@@ -23661,6 +23735,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a version prefix such as a major or minor line.",
           ),
         ),
+        value_path=("version",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "registered_at",
@@ -23672,6 +23747,7 @@ def list_standalone_surface_runtime_bindings(
           examples=("2025-01-01T00:00:00+00:00",),
         ),
         operators=_build_datetime_range_filter_operators("strategy registration time"),
+        value_path=("lifecycle", "registered_at"),
       ),
     ),
     sort_field_specs=(
@@ -23739,6 +23815,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single strategy identifier.",
           ),
         ),
+        value_path=("strategy_id",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "timeframe",
@@ -23757,6 +23834,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single configured timeframe.",
           ),
         ),
+        value_path=("timeframe",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "lifecycle_stage",
@@ -23775,6 +23853,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single lifecycle stage.",
           ),
         ),
+        value_path=("lifecycle", "stage"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "created_at",
@@ -23786,6 +23865,7 @@ def list_standalone_surface_runtime_bindings(
           examples=("2025-01-01T00:00:00+00:00",),
         ),
         operators=_build_datetime_range_filter_operators("preset creation time"),
+        value_path=("created_at",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "updated_at",
@@ -23797,6 +23877,7 @@ def list_standalone_surface_runtime_bindings(
           examples=("2025-01-02T00:00:00+00:00",),
         ),
         operators=_build_datetime_range_filter_operators("preset update time"),
+        value_path=("updated_at",),
       ),
     ),
     sort_field_specs=(
@@ -23955,6 +24036,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single run mode.",
           ),
         ),
+        value_path=("config", "mode", "value"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "strategy_id",
@@ -23973,6 +24055,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single strategy identifier.",
           ),
         ),
+        value_path=("config", "strategy_id"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "strategy_version",
@@ -23996,6 +24079,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a strategy version prefix.",
           ),
         ),
+        value_path=("config", "strategy_version"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "rerun_boundary_id",
@@ -24013,6 +24097,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single rerun boundary identifier.",
           ),
         ),
+        value_path=("provenance", "rerun_boundary_id"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "preset_id",
@@ -24031,6 +24116,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single preset identifier.",
           ),
         ),
+        value_path=("provenance", "experiment", "preset_id"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "benchmark_family",
@@ -24049,6 +24135,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a single benchmark family tag.",
           ),
         ),
+        value_path=("provenance", "experiment", "benchmark_family"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "dataset_identity",
@@ -24071,6 +24158,7 @@ def list_standalone_surface_runtime_bindings(
             description="Matches a dataset identity prefix.",
           ),
         ),
+        value_path=("provenance", "market_data", "dataset_identity"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "started_at",
@@ -24082,6 +24170,7 @@ def list_standalone_surface_runtime_bindings(
           examples=("2025-01-01T00:00:00+00:00",),
         ),
         operators=_build_datetime_range_filter_operators("run start time"),
+        value_path=("started_at",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "updated_at",
@@ -24105,6 +24194,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(10000.0,),
         ),
         operators=_build_numeric_range_filter_operators("run initial cash"),
+        value_path=("metrics", "initial_cash"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "ending_equity",
@@ -24117,6 +24207,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(11250.0,),
         ),
         operators=_build_numeric_range_filter_operators("run ending equity"),
+        value_path=("metrics", "ending_equity"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "exposure_pct",
@@ -24129,6 +24220,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(45.0,),
         ),
         operators=_build_numeric_range_filter_operators("run exposure percentage"),
+        value_path=("metrics", "exposure_pct"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "total_return_pct",
@@ -24140,6 +24232,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(10.0,),
         ),
         operators=_build_numeric_range_filter_operators("run total return percentage"),
+        value_path=("metrics", "total_return_pct"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "max_drawdown_pct",
@@ -24152,6 +24245,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(15.0,),
         ),
         operators=_build_numeric_range_filter_operators("run max drawdown percentage"),
+        value_path=("metrics", "max_drawdown_pct"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "win_rate_pct",
@@ -24164,6 +24258,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(60.0,),
         ),
         operators=_build_numeric_range_filter_operators("run win-rate percentage"),
+        value_path=("metrics", "win_rate_pct"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "trade_count",
@@ -24176,6 +24271,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(10,),
         ),
         operators=_build_numeric_range_filter_operators("run trade count"),
+        value_path=("metrics", "trade_count"),
       ),
       StandaloneSurfaceFilterParamSpec(
         "tag",
@@ -24200,6 +24296,7 @@ def list_standalone_surface_runtime_bindings(
             value_shape="list",
           ),
         ),
+        value_path=("provenance", "experiment", "tags"),
       ),
     ),
     sort_field_specs=(
@@ -24385,6 +24482,7 @@ def list_standalone_surface_runtime_bindings(
             value_shape="list",
           ),
         ),
+        value_path=("run_id",),
       ),
       StandaloneSurfaceFilterParamSpec(
         "intent",
@@ -24414,6 +24512,7 @@ def list_standalone_surface_runtime_bindings(
           examples=(5.0,),
         ),
         operators=_build_numeric_range_filter_operators("comparison narrative score"),
+        value_path=("insight_score",),
       ),
     ),
     sort_field_specs=(
@@ -24768,6 +24867,7 @@ def execute_standalone_surface_binding(
           version=resolved_filters.get("version"),
         ),
         resolved_filters,
+        binding=binding,
       )
     ]
   if binding.binding_kind == "reference_catalog_discovery":
@@ -24782,6 +24882,7 @@ def execute_standalone_surface_binding(
           lifecycle_stage=resolved_filters.get("lifecycle_stage"),
         ),
         resolved_filters,
+        binding=binding,
       )
     ]
   if binding.binding_kind == "preset_catalog_create":
@@ -24859,6 +24960,7 @@ def execute_standalone_surface_binding(
           tags=resolved_filters.get("tag") or [],
         ),
         resolved_filters,
+        binding=binding,
       )
     ]
   if binding.binding_kind == "run_compare":
@@ -24868,6 +24970,7 @@ def execute_standalone_surface_binding(
         intent=resolved_filters.get("intent"),
       ),
       resolved_filters,
+      binding=binding,
     )
     return serialize_run_comparison(
       comparison,

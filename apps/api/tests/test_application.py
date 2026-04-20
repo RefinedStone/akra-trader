@@ -13983,10 +13983,15 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
   assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].key == "lane"
+  assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].value_path == ("runtime",)
   assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[0].openapi.description == (
     "Filter strategies by runtime lane."
   )
   assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[-1].key == "registered_at"
+  assert bindings_by_key["strategy_catalog_discovery"].filter_param_specs[-1].value_path == (
+    "lifecycle",
+    "registered_at",
+  )
   assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[0].key == "strategy_id"
   assert bindings_by_key["strategy_catalog_discovery"].sort_field_specs[-1].key == "lifecycle.registered_at"
   assert bindings_by_key["reference_catalog_discovery"].route_path == "/references"
@@ -14002,6 +14007,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["run_list"].filter_keys[-1] == "tag"
   assert bindings_by_key["run_list"].filter_param_specs[-1].key == "tag"
   assert bindings_by_key["run_list"].filter_param_specs[0].openapi.title == "Run mode"
+  assert bindings_by_key["run_list"].filter_param_specs[0].value_path == ("config", "mode", "value")
   assert any(spec.key == "started_at" for spec in bindings_by_key["run_list"].filter_param_specs)
   assert any(spec.key == "initial_cash" for spec in bindings_by_key["run_list"].filter_param_specs)
   run_total_return_spec = next(
@@ -14009,6 +14015,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     for spec in bindings_by_key["run_list"].filter_param_specs
     if spec.key == "total_return_pct"
   )
+  assert run_total_return_spec.value_path == ("metrics", "total_return_pct")
   assert [operator.key for operator in run_total_return_spec.operators] == ["eq", "gt", "ge", "lt", "le"]
   run_trade_count_spec = next(
     spec
@@ -14033,6 +14040,7 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     for spec in bindings_by_key["run_compare"].filter_param_specs
     if spec.key == "narrative_score"
   )
+  assert compare_score_spec.value_path == ("insight_score",)
   assert [operator.key for operator in compare_score_spec.operators] == ["eq", "gt", "ge", "lt", "le"]
   assert bindings_by_key["run_compare"].sort_field_specs[1].key == "narrative_score"
   assert bindings_by_key["run_compare"].sort_field_specs[-1].key == "narratives.insight_score"

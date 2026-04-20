@@ -207,10 +207,15 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
     return None
   return {
     "x-akra-query-schema": {
+      "grouped_filters": {
+        "param_pattern": "group__<group_key>__<filter_key>__<operator>",
+        "semantics": "Ungrouped filters are ANDed together. Grouped filters are ANDed within a group and ORed across groups.",
+      },
       "filters": [
         {
           "key": spec.key,
           "value_type": _describe_filter_value_type(spec.annotation),
+          "value_path": list(spec.value_path),
           "operators": [
             {
               "key": operator.key,
@@ -325,6 +330,31 @@ def _coerce_filter_query_values(
   return coerced_value
 
 
+def _parse_grouped_filter_query_key(
+  raw_key: str,
+  *,
+  alias: str,
+  default_operator: str,
+  supported_operators: dict[str, Any],
+) -> tuple[str, str] | None:
+  if not raw_key.startswith("group__"):
+    return None
+  parts = raw_key.split("__")
+  if len(parts) < 3:
+    return None
+  _, group_key, *remainder = parts
+  if not group_key or not remainder:
+    return None
+  operator_key = default_operator
+  alias_key = "__".join(remainder)
+  if remainder[-1] in supported_operators:
+    operator_key = remainder[-1]
+    alias_key = "__".join(remainder[:-1])
+  if alias_key != alias:
+    return None
+  return group_key, operator_key
+
+
 def _has_meaningful_filter_value(value: Any) -> bool:
   if value is None:
     return False
@@ -367,6 +397,28 @@ def _build_runtime_query_filters(
           )
         )
       for raw_key in query_params.keys():
+        grouped = _parse_grouped_filter_query_key(
+          raw_key,
+          alias=alias,
+          default_operator=default_operator,
+          supported_operators=supported_operators,
+        )
+        if grouped is not None:
+          group_key, operator_key = grouped
+          operator_spec = supported_operators[operator_key]
+          conditions.append(
+            StandaloneSurfaceFilterCondition(
+              key=spec.key,
+              operator=operator_key,
+              value=_coerce_filter_query_values(
+                spec,
+                value_shape=operator_spec.value_shape,
+                values=query_params.getlist(raw_key),
+              ),
+              group=group_key,
+            )
+          )
+          continue
         if not raw_key.startswith(f"{alias}__"):
           continue
         operator_key = raw_key.split("__", 1)[1]
