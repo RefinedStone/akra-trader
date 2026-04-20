@@ -274,6 +274,10 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "preset_id",
     "benchmark_family",
     "dataset_identity",
+    "total_return_pct",
+    "max_drawdown_pct",
+    "win_rate_pct",
+    "trade_count",
     "tag",
     "sort",
     "app",
@@ -282,6 +286,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "request",
     "run_id",
     "intent",
+    "narrative_score",
     "sort",
     "app",
   )
@@ -335,19 +340,39 @@ def test_query_bound_routes_expose_openapi_metadata(tmp_path: Path) -> None:
   assert compare_params["intent"]["schema"]["title"] == "Comparison intent"
 
   run_query_schema = openapi["paths"]["/api/runs"]["get"]["x-akra-query-schema"]
+  total_return_filter = next(item for item in run_query_schema["filters"] if item["key"] == "total_return_pct")
+  assert [operator["key"] for operator in total_return_filter["operators"]] == [
+    "eq",
+    "gt",
+    "ge",
+    "lt",
+    "le",
+  ]
   tag_filter = next(item for item in run_query_schema["filters"] if item["key"] == "tag")
   assert [operator["key"] for operator in tag_filter["operators"]] == ["contains_all", "contains_any"]
   assert run_query_schema["sort_fields"][0]["key"] == "updated_at"
   assert run_query_schema["sort_fields"][0]["default_direction"] == "desc"
+  assert any(field["key"] == "trade_count" for field in run_query_schema["sort_fields"])
   run_sort_param = next(
     param for param in openapi["paths"]["/api/runs"]["get"]["parameters"]
     if param["name"] == "sort"
   )
   assert run_sort_param["description"] == "Sort fields in `<field>` or `<field>:<direction>` format."
+  assert _first_non_null_schema_branch(runs_params["trade_count"]["schema"])["minimum"] == 0
+  assert runs_params["total_return_pct"]["schema"]["title"] == "Total return %"
 
   compare_query_schema = openapi["paths"]["/api/runs/compare"]["get"]["x-akra-query-schema"]
   assert compare_query_schema["filters"][0]["operators"][0]["key"] == "include"
+  compare_score_filter = next(item for item in compare_query_schema["filters"] if item["key"] == "narrative_score")
+  assert [operator["key"] for operator in compare_score_filter["operators"]] == [
+    "eq",
+    "gt",
+    "ge",
+    "lt",
+    "le",
+  ]
   assert compare_query_schema["sort_fields"][1]["key"] == "narrative_score"
+  assert compare_params["narrative_score"]["schema"]["title"] == "Narrative score"
 
   market_data_params = {
     param["name"]: param
@@ -425,6 +450,57 @@ def test_run_query_contract_applies_tag_operator_and_sort(tmp_path: Path) -> Non
   ]
 
 
+def test_run_query_contract_applies_numeric_range_filters_and_multi_field_sort(tmp_path: Path) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    run_ids: list[str] = []
+    for symbol in ("BTC/USDT", "ETH/USDT", "SOL/USDT", "XRP/USDT"):
+      response = client.post(
+        "/api/runs/backtests",
+        json={
+          "strategy_id": "ma_cross_v1",
+          "symbol": symbol,
+          "timeframe": "5m",
+        },
+      )
+      assert response.status_code == 200
+      run_ids.append(response.json()["config"]["run_id"])
+
+    app = client.app.state.container.app
+    metric_overrides = {
+      run_ids[0]: {"total_return_pct": 18.0, "trade_count": 4},
+      run_ids[1]: {"total_return_pct": 12.0, "trade_count": 4},
+      run_ids[2]: {"total_return_pct": 12.0, "trade_count": 4},
+      run_ids[3]: {"total_return_pct": 22.0, "trade_count": 2},
+    }
+    for run_id, metrics in metric_overrides.items():
+      run = app.get_run(run_id)
+      assert run is not None
+      run.metrics.update(metrics)
+      app._runs.save_run(run)
+
+    response = client.get(
+      "/api/runs",
+      params=[
+        ("total_return_pct__ge", "10"),
+        ("trade_count__ge", "2"),
+        ("sort", "trade_count:desc"),
+        ("sort", "total_return_pct:asc"),
+        ("sort", "run_id:asc"),
+      ],
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    expected_leading_ids = [
+      *sorted((run_ids[1], run_ids[2])),
+      run_ids[0],
+      run_ids[3],
+    ]
+    assert [item["config"]["run_id"] for item in payload[:4]] == expected_leading_ids
+    assert all(item["metrics"]["total_return_pct"] >= 10 for item in payload[:4])
+    assert all(item["metrics"]["trade_count"] >= 2 for item in payload[:4])
+
+
 def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Path) -> None:
   client = build_client(tmp_path / "runs.sqlite3")
   run_ids: list[str] = []
@@ -456,6 +532,63 @@ def test_compare_query_contract_applies_runtime_sort_to_narratives(tmp_path: Pat
   payload = response.json()
   scores = [item["insight_score"] for item in payload["narratives"]]
   assert scores == sorted(scores)
+
+
+def test_compare_query_contract_applies_numeric_range_filter_and_multi_field_sort(tmp_path: Path) -> None:
+  client = build_client(tmp_path / "runs.sqlite3")
+  run_ids: list[str] = []
+  for short_window in (5, 8, 13):
+    response = client.post(
+      "/api/runs/backtests",
+      json={
+        "strategy_id": "ma_cross_v1",
+        "symbol": "BTC/USDT",
+        "timeframe": "5m",
+        "parameters": {"short_window": short_window, "long_window": 21},
+      },
+    )
+    assert response.status_code == 200
+    run_ids.append(response.json()["config"]["run_id"])
+
+  base_payload = client.get(
+    "/api/runs/compare",
+    params=[
+      ("run_id", run_ids[0]),
+      ("run_id", run_ids[1]),
+      ("run_id", run_ids[2]),
+      ("intent", "strategy_tuning"),
+    ],
+  ).json()
+  threshold = sorted(item["insight_score"] for item in base_payload["narratives"])[1]
+
+  response = client.get(
+    "/api/runs/compare",
+    params=[
+      ("run_id", run_ids[0]),
+      ("run_id", run_ids[1]),
+      ("run_id", run_ids[2]),
+      ("intent", "strategy_tuning"),
+      ("narrative_score__ge", str(threshold)),
+      ("sort", "narrative_score:asc"),
+      ("sort", "run_id_order:desc"),
+    ],
+  )
+
+  assert response.status_code == 200
+  payload = response.json()
+  expected = sorted(
+    (
+      item
+      for item in base_payload["narratives"]
+      if item["insight_score"] >= threshold
+    ),
+    key=lambda item: (
+      item["insight_score"],
+      -run_ids.index(item["run_id"]),
+    ),
+  )
+  assert [item["run_id"] for item in payload["narratives"]] == [item["run_id"] for item in expected]
+  assert all(item["insight_score"] >= threshold for item in payload["narratives"])
 
 
 def test_list_references_returns_catalog_entries(tmp_path: Path) -> None:

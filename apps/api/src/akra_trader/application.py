@@ -23052,6 +23052,38 @@ class StandaloneSurfaceSortTerm:
   direction: str = "asc"
 
 
+def _build_numeric_range_filter_operators(
+  subject: str,
+) -> tuple[StandaloneSurfaceFilterOperatorSpec, ...]:
+  return (
+    StandaloneSurfaceFilterOperatorSpec(
+      key="eq",
+      label="Equals",
+      description=f"Matches {subject} exactly.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="gt",
+      label="Greater than",
+      description=f"Matches {subject} values greater than the requested threshold.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="ge",
+      label="Greater than or equal",
+      description=f"Matches {subject} values greater than or equal to the requested threshold.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="lt",
+      label="Less than",
+      description=f"Matches {subject} values lower than the requested threshold.",
+    ),
+    StandaloneSurfaceFilterOperatorSpec(
+      key="le",
+      label="Less than or equal",
+      description=f"Matches {subject} values lower than or equal to the requested threshold.",
+    ),
+  )
+
+
 def _extract_runtime_filter_conditions(
   filters: dict[str, Any] | None,
 ) -> tuple[StandaloneSurfaceFilterCondition, ...]:
@@ -23097,6 +23129,14 @@ def _normalize_runtime_sort_value(value: Any) -> tuple[int, Any]:
   return (0, value)
 
 
+def _normalize_runtime_numeric_filter_value(value: Any) -> float | int | None:
+  if isinstance(value, bool) or not isinstance(value, Number):
+    return None
+  if isinstance(value, int):
+    return value
+  return float(value)
+
+
 def _evaluate_runtime_filter_condition(
   candidate_value: Any,
   *,
@@ -23118,6 +23158,18 @@ def _evaluate_runtime_filter_condition(
   if operator == "include":
     operand_values = tuple(operand or ())
     return candidate_value in operand_values
+  if operator in {"gt", "ge", "lt", "le"}:
+    candidate_number = _normalize_runtime_numeric_filter_value(candidate_value)
+    operand_number = _normalize_runtime_numeric_filter_value(operand)
+    if candidate_number is None or operand_number is None:
+      return False
+    if operator == "gt":
+      return candidate_number > operand_number
+    if operator == "ge":
+      return candidate_number >= operand_number
+    if operator == "lt":
+      return candidate_number < operand_number
+    return candidate_number <= operand_number
   raise ValueError(f"Unsupported runtime filter operator: {operator}")
 
 
@@ -23158,6 +23210,10 @@ def _apply_runtime_query_contract(
 
 def _run_effective_updated_at(run: RunRecord) -> datetime:
   return run.ended_at or run.started_at
+
+
+def _run_metric_query_value(run: RunRecord, key: str) -> float | int | None:
+  return _coerce_metric_value(run.metrics.get(key))
 
 
 def _apply_runtime_query_to_strategies(
@@ -23219,12 +23275,20 @@ def _apply_runtime_query_to_runs(
         if run.provenance.market_data is not None
         else None
       ),
+      "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
+      "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
+      "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
+      "trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
       "tag": lambda run: run.provenance.experiment.tags,
     },
     sort_getters={
       "updated_at": _run_effective_updated_at,
       "started_at": lambda run: run.started_at,
       "run_id": lambda run: run.config.run_id,
+      "total_return_pct": lambda run: _run_metric_query_value(run, "total_return_pct"),
+      "max_drawdown_pct": lambda run: _run_metric_query_value(run, "max_drawdown_pct"),
+      "win_rate_pct": lambda run: _run_metric_query_value(run, "win_rate_pct"),
+      "trade_count": lambda run: _run_metric_query_value(run, "trade_count"),
     },
   )
 
@@ -23233,26 +23297,25 @@ def _apply_runtime_query_to_comparison(
   comparison: RunComparison,
   filters: dict[str, Any] | None,
 ) -> RunComparison:
-  sort_terms = _extract_runtime_sort_terms(filters)
-  if not sort_terms:
-    return comparison
-  narratives = list(comparison.narratives)
   run_order_index = {
     run_id: index
     for index, run_id in enumerate(comparison.requested_run_ids)
   }
-  for term in reversed(sort_terms):
-    if term.key == "narrative_score":
-      narratives.sort(
-        key=lambda narrative: _normalize_runtime_sort_value(narrative.insight_score),
-        reverse=term.direction == "desc",
-      )
-      continue
-    if term.key == "run_id_order":
-      narratives.sort(
-        key=lambda narrative: run_order_index.get(narrative.run_id, len(run_order_index)),
-        reverse=term.direction == "desc",
-      )
+  narratives = _apply_runtime_query_contract(
+    list(comparison.narratives),
+    filters=filters,
+    filter_getters={
+      "run_id": lambda narrative: narrative.run_id,
+      "narrative_score": lambda narrative: narrative.insight_score,
+    },
+    sort_getters={
+      "run_id_order": lambda narrative: run_order_index.get(
+        narrative.run_id,
+        len(run_order_index),
+      ),
+      "narrative_score": lambda narrative: narrative.insight_score,
+    },
+  )
   return replace(comparison, narratives=tuple(narratives))
 
 
@@ -23718,6 +23781,10 @@ def list_standalone_surface_runtime_bindings(
       "preset_id",
       "benchmark_family",
       "dataset_identity",
+      "total_return_pct",
+      "max_drawdown_pct",
+      "win_rate_pct",
+      "trade_count",
       "tag",
     ),
     filter_param_specs=(
@@ -23856,6 +23923,53 @@ def list_standalone_surface_runtime_bindings(
         ),
       ),
       StandaloneSurfaceFilterParamSpec(
+        "total_return_pct",
+        float | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Total return %",
+          description="Filter runs by realized total return percentage.",
+          examples=(10.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run total return percentage"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "max_drawdown_pct",
+        float | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Max drawdown %",
+          description="Filter runs by realized max drawdown percentage.",
+          examples=(15.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run max drawdown percentage"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "win_rate_pct",
+        float | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0, le=100),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Win rate %",
+          description="Filter runs by realized win-rate percentage.",
+          examples=(60.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("run win-rate percentage"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "trade_count",
+        int | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=0),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Trade count",
+          description="Filter runs by realized trade count.",
+          examples=(10,),
+        ),
+        operators=_build_numeric_range_filter_operators("run trade count"),
+      ),
+      StandaloneSurfaceFilterParamSpec(
         "tag",
         list[str],
         default_factory=list,
@@ -23898,6 +24012,29 @@ def list_standalone_surface_runtime_bindings(
         label="Run ID",
         description="Sorts runs by run identifier.",
       ),
+      StandaloneSurfaceSortFieldSpec(
+        key="total_return_pct",
+        label="Total return %",
+        description="Sorts runs by realized total return percentage.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="max_drawdown_pct",
+        label="Max drawdown %",
+        description="Sorts runs by realized max drawdown percentage.",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="win_rate_pct",
+        label="Win rate %",
+        description="Sorts runs by realized win-rate percentage.",
+        default_direction="desc",
+      ),
+      StandaloneSurfaceSortFieldSpec(
+        key="trade_count",
+        label="Trade count",
+        description="Sorts runs by realized trade count.",
+        default_direction="desc",
+      ),
     ),
   )
   run_compare_binding = StandaloneSurfaceRuntimeBinding(
@@ -23907,7 +24044,7 @@ def list_standalone_surface_runtime_bindings(
     response_title="Compare runs",
     scope="app",
     binding_kind="run_compare",
-    filter_keys=("run_id", "intent"),
+    filter_keys=("run_id", "intent", "narrative_score"),
     filter_param_specs=(
       StandaloneSurfaceFilterParamSpec(
         "run_id",
@@ -23944,6 +24081,17 @@ def list_standalone_surface_runtime_bindings(
             description="Uses a single comparison intent profile.",
           ),
         ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "narrative_score",
+        float | None,
+        default=None,
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Narrative score",
+          description="Filter comparison narratives by computed insight score.",
+          examples=(5.0,),
+        ),
+        operators=_build_numeric_range_filter_operators("comparison narrative score"),
       ),
     ),
     sort_field_specs=(

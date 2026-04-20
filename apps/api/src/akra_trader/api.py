@@ -2,7 +2,13 @@ from __future__ import annotations
 
 from datetime import datetime
 import inspect
+from numbers import Number
+import re
+from types import UnionType
 from typing import Any
+from typing import Union
+from typing import get_args
+from typing import get_origin
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -228,16 +234,71 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
   }
 
 
+def _resolve_filter_scalar_annotation(annotation: Any) -> Any:
+  origin = get_origin(annotation)
+  if origin in {list, tuple}:
+    args = tuple(arg for arg in get_args(annotation) if arg is not Ellipsis)
+    if args:
+      return _resolve_filter_scalar_annotation(args[0])
+  if origin in {UnionType, Union}:
+    args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
+    if len(args) == 1:
+      return _resolve_filter_scalar_annotation(args[0])
+  return annotation
+
+
+def _coerce_filter_scalar_value(annotation: Any, raw_value: str) -> Any:
+  resolved_annotation = _resolve_filter_scalar_annotation(annotation)
+  if resolved_annotation is int:
+    return int(raw_value)
+  if resolved_annotation is float:
+    return float(raw_value)
+  return raw_value
+
+
+def _validate_filter_query_value(
+  spec: StandaloneSurfaceFilterParamSpec,
+  value: Any,
+) -> None:
+  if value is None or spec.constraints is None:
+    return
+  if isinstance(value, (list, tuple, set)):
+    for item in value:
+      _validate_filter_query_value(spec, item)
+    return
+  if isinstance(value, str):
+    if spec.constraints.min_length is not None and len(value) < spec.constraints.min_length:
+      raise ValueError(f"Filter value for {spec.key} is shorter than {spec.constraints.min_length}.")
+    if spec.constraints.max_length is not None and len(value) > spec.constraints.max_length:
+      raise ValueError(f"Filter value for {spec.key} is longer than {spec.constraints.max_length}.")
+    if spec.constraints.pattern is not None and re.fullmatch(spec.constraints.pattern, value) is None:
+      raise ValueError(f"Filter value for {spec.key} does not match the required pattern.")
+    return
+  if isinstance(value, Number) and not isinstance(value, bool):
+    if spec.constraints.ge is not None and value < spec.constraints.ge:
+      raise ValueError(f"Filter value for {spec.key} must be >= {spec.constraints.ge}.")
+    if spec.constraints.le is not None and value > spec.constraints.le:
+      raise ValueError(f"Filter value for {spec.key} must be <= {spec.constraints.le}.")
+
+
 def _coerce_filter_query_values(
   spec: StandaloneSurfaceFilterParamSpec,
+  *,
+  value_shape: str,
   values: list[str],
 ) -> Any:
-  origin = getattr(spec.annotation, "__origin__", None)
-  if origin in {list, tuple} or spec.annotation == list[str]:
-    return list(values)
+  if value_shape == "list":
+    coerced_values = [
+      _coerce_filter_scalar_value(spec.annotation, raw_value)
+      for raw_value in values
+    ]
+    _validate_filter_query_value(spec, coerced_values)
+    return coerced_values
   if not values:
     return None
-  return values[-1]
+  coerced_value = _coerce_filter_scalar_value(spec.annotation, values[-1])
+  _validate_filter_query_value(spec, coerced_value)
+  return coerced_value
 
 
 def _has_meaningful_filter_value(value: Any) -> bool:
@@ -268,7 +329,7 @@ def _build_runtime_query_filters(
     for spec in binding.filter_param_specs:
       alias = spec.openapi.alias if spec.openapi and spec.openapi.alias else spec.key
       supported_operators = {
-        operator.key
+        operator.key: operator
         for operator in spec.operators
       }
       default_operator = spec.operators[0].key if spec.operators else "eq"
@@ -287,11 +348,16 @@ def _build_runtime_query_filters(
         operator_key = raw_key.split("__", 1)[1]
         if operator_key not in supported_operators:
           raise ValueError(f"Unsupported filter operator for {spec.key}: {operator_key}")
+        operator_spec = supported_operators[operator_key]
         conditions.append(
           StandaloneSurfaceFilterCondition(
             key=spec.key,
             operator=operator_key,
-            value=_coerce_filter_query_values(spec, query_params.getlist(raw_key)),
+            value=_coerce_filter_query_values(
+              spec,
+              value_shape=operator_spec.value_shape,
+              values=query_params.getlist(raw_key),
+            ),
           )
         )
     if conditions:
