@@ -490,6 +490,15 @@ select {
   text-transform: uppercase;
 }
 
+.run-surface-query-builder-trace-chip.is-active {
+  background: rgba(88, 217, 255, 0.14);
+  color: rgba(214, 246, 255, 0.96);
+}
+
+.run-surface-query-builder-trace-chip.is-muted {
+  opacity: 0.58;
+}
+
 .run-surface-query-builder-trace-slider {
   width: 100%;
   accent-color: rgba(88, 217, 255, 0.88);
