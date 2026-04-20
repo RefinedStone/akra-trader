@@ -19813,6 +19813,11 @@ function RunSurfaceCollectionQueryBuilder({
     useState<RunSurfaceCollectionQueryRuntimeCandidateArtifactSelection | null>(null);
   const [focusedRuntimeCandidateSampleKey, setFocusedRuntimeCandidateSampleKey] =
     useState<string | null>(null);
+  const [clauseReevaluationPreviewSelection, setClauseReevaluationPreviewSelection] =
+    useState<{ diffItemKey: string | null; traceKey: string | null }>({
+      diffItemKey: null,
+      traceKey: null,
+    });
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -20083,6 +20088,10 @@ function RunSurfaceCollectionQueryBuilder({
       setPredicateDraftKey("");
       setTemplateDraftKey("");
       setPinnedRuntimeCandidateClauseOriginKey(originTraceKey ?? null);
+      setClauseReevaluationPreviewSelection({
+        diffItemKey: null,
+        traceKey: originTraceKey ?? null,
+      });
       setEditorFromClause(clause);
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
@@ -23750,6 +23759,15 @@ function RunSurfaceCollectionQueryBuilder({
     () => Array.from(runtimeCandidateTraceByKey.values()).flatMap((trace) => trace.allValues),
     [runtimeCandidateTraceByKey],
   );
+  const runtimeCandidateSampleByKey = useMemo(
+    () => new Map(
+      allRuntimeCandidateSamples.map((sample) => [
+        buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(sample),
+        sample,
+      ] as const),
+    ),
+    [allRuntimeCandidateSamples],
+  );
   const activeRuntimeCandidateMatchKeys = useMemo(
     () => Array.from(
       new Set(
@@ -24032,24 +24050,44 @@ function RunSurfaceCollectionQueryBuilder({
     ],
   );
   const focusRuntimeCandidateReplayTrace = useCallback((params: {
+    diffItemKey?: string | null;
     sampleKey?: string | null;
     stepIndex: number;
     traceKey: string;
   }) => {
-    const { sampleKey = null, stepIndex, traceKey } = params;
+    const { diffItemKey = null, sampleKey = null, stepIndex, traceKey } = params;
     setBundleCoordinationSimulationReplayIndex(stepIndex >= 0 ? stepIndex : 0);
     setRuntimeCandidateTraceDrillthroughByKey((current) => ({
       ...current,
       [traceKey]: true,
     }));
+    setClauseReevaluationPreviewSelection({
+      diffItemKey,
+      traceKey,
+    });
     if (sampleKey) {
       setFocusedRuntimeCandidateSampleKey(sampleKey);
+      const sample = runtimeCandidateSampleByKey.get(sampleKey) ?? null;
+      if (
+        sample
+        && onFocusRuntimeCandidateRunContext
+        && sample.runContextSection
+        && sample.runContextComponentKey
+      ) {
+        onFocusRuntimeCandidateRunContext(sample, {
+          artifactHoverKey: resolveRuntimeCandidateSampleArtifactHoverKey(sample),
+        });
+      }
     }
     bundleCoordinationSimulationPanelRef.current?.scrollIntoView({
       behavior: "smooth",
       block: "start",
     });
-  }, []);
+  }, [
+    onFocusRuntimeCandidateRunContext,
+    resolveRuntimeCandidateSampleArtifactHoverKey,
+    runtimeCandidateSampleByKey,
+  ]);
   useEffect(() => {
     if (!activePredicateRefReplayApplyConflictSimulationGroupKeys.length) {
       return;
@@ -24362,6 +24400,7 @@ function RunSurfaceCollectionQueryBuilder({
           key: string;
           matchedCandidateLabel: string;
           matchedRunLabel: string;
+          primarySampleKey: string | null;
           stepIndex: number;
           stepLabel: string;
         }>;
@@ -24415,6 +24454,13 @@ function RunSurfaceCollectionQueryBuilder({
             `${traceReevaluationPreview.sampleMatchCount}/${traceReevaluationPreview.sampleTotalCount} matched`,
           matchedRunLabel:
             `${matchedRunCount}/${traceReevaluationPreview.runOutcomes.length} runs true`,
+          primarySampleKey:
+            traceReevaluationPreviewDiffItems.find((item) => originalSamplesByKey.has(item.key))?.key
+            ?? (
+              candidateTrace.allValues[0]
+                ? buildRunSurfaceCollectionQueryRuntimeCandidateSampleKey(candidateTrace.allValues[0])
+                : null
+            ),
           stepIndex: entry.stepIndex,
           stepLabel: entry.stepLabel,
         }];
@@ -24435,6 +24481,7 @@ function RunSurfaceCollectionQueryBuilder({
           key: string;
           matchedCandidateLabel: string;
           matchedRunLabel: string;
+          primarySampleKey: string | null;
           stepIndex: number;
           stepLabel: string;
         }>;
@@ -24511,6 +24558,39 @@ function RunSurfaceCollectionQueryBuilder({
     simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
     simulatedPredicateRefGroupBundleState,
     simulatedPredicateRefSolverReplayAttributionByGroupKey,
+  ]);
+  useEffect(() => {
+    if (!clauseReevaluationPreviewSelection.traceKey) {
+      return;
+    }
+    const projectedTrace =
+      Object.values(simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey)
+        .flatMap((projection) => projection.projectedTraces)
+        .find((trace) => trace.drillthroughKey === clauseReevaluationPreviewSelection.traceKey)
+      ?? null;
+    if (!projectedTrace) {
+      setClauseReevaluationPreviewSelection({
+        diffItemKey: null,
+        traceKey: null,
+      });
+      return;
+    }
+    if (
+      clauseReevaluationPreviewSelection.diffItemKey
+      && !projectedTrace.diffItems.some((item) => item.key === clauseReevaluationPreviewSelection.diffItemKey)
+    ) {
+      setClauseReevaluationPreviewSelection((current) => (
+        current.traceKey === projectedTrace.drillthroughKey
+          ? {
+              diffItemKey: null,
+              traceKey: current.traceKey,
+            }
+          : current
+      ));
+    }
+  }, [
+    clauseReevaluationPreviewSelection,
+    simulatedPredicateRefGroupClauseReevaluationProjectionByGroupKey,
   ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
@@ -27456,7 +27536,11 @@ function RunSurfaceCollectionQueryBuilder({
                                         <div className="run-surface-query-builder-trace-list">
                                           {diff.clauseReevaluationProjection.projectedTraces.slice(0, 3).map((trace) => (
                                             <div
-                                              className="run-surface-query-builder-trace-step is-info"
+                                              className={`run-surface-query-builder-trace-step is-info${
+                                                clauseReevaluationPreviewSelection.traceKey === trace.drillthroughKey
+                                                  ? " is-linked"
+                                                  : ""
+                                              }`}
                                               key={`simulation-diff-preview:${diff.groupKey}:${trace.key}`}
                                             >
                                               <strong>{`${trace.stepLabel} · ${trace.candidateAccessor}`}</strong>
@@ -27484,12 +27568,19 @@ function RunSurfaceCollectionQueryBuilder({
                                                 }`}>
                                                   {`${trace.changedCandidateCount} changed candidates`}
                                                 </span>
+                                                {clauseReevaluationPreviewSelection.traceKey === trace.drillthroughKey ? (
+                                                  <span className="run-surface-query-builder-trace-chip is-active">
+                                                    Linked preview trace
+                                                  </span>
+                                                ) : null}
                                               </div>
                                               <div className="run-surface-query-builder-actions">
                                                 <button
                                                   className="ghost-button"
                                                   onClick={() =>
                                                     focusRuntimeCandidateReplayTrace({
+                                                      diffItemKey: null,
+                                                      sampleKey: trace.primarySampleKey,
                                                       stepIndex: trace.stepIndex,
                                                       traceKey: trace.drillthroughKey,
                                                     })}
@@ -27515,17 +27606,31 @@ function RunSurfaceCollectionQueryBuilder({
                                                 <div className="run-surface-query-builder-trace-list">
                                                   {trace.diffItems.slice(0, 3).map((item) => (
                                                     <div
-                                                      className="run-surface-query-builder-trace-step is-info"
+                                                      className={`run-surface-query-builder-trace-step is-info${
+                                                        clauseReevaluationPreviewSelection.traceKey === trace.drillthroughKey
+                                                        && clauseReevaluationPreviewSelection.diffItemKey === item.key
+                                                          ? " is-linked"
+                                                          : ""
+                                                      }`}
                                                       key={`simulation-diff-preview-item:${diff.groupKey}:${trace.key}:${item.key}`}
                                                     >
                                                       <strong>{item.runId}</strong>
                                                       <p>{item.detail}</p>
+                                                      {clauseReevaluationPreviewSelection.traceKey === trace.drillthroughKey
+                                                      && clauseReevaluationPreviewSelection.diffItemKey === item.key ? (
+                                                        <div className="run-surface-query-builder-trace-chip-list">
+                                                          <span className="run-surface-query-builder-trace-chip is-active">
+                                                            Linked preview diff
+                                                          </span>
+                                                        </div>
+                                                      ) : null}
                                                       <div className="run-surface-query-builder-actions">
                                                         {trace.focusableDiffSampleKeysByItemKey[item.key] ? (
                                                           <button
                                                             className="ghost-button"
                                                             onClick={() =>
                                                               focusRuntimeCandidateReplayTrace({
+                                                                diffItemKey: item.key,
                                                                 sampleKey: trace.focusableDiffSampleKeysByItemKey[item.key],
                                                                 stepIndex: trace.stepIndex,
                                                                 traceKey: trace.drillthroughKey,
@@ -27538,11 +27643,16 @@ function RunSurfaceCollectionQueryBuilder({
                                                         {trace.editorClause ? (
                                                           <button
                                                             className="ghost-button"
-                                                            onClick={() =>
+                                                            onClick={() => {
+                                                              setClauseReevaluationPreviewSelection({
+                                                                diffItemKey: item.key,
+                                                                traceKey: trace.drillthroughKey,
+                                                              });
                                                               focusRuntimeCandidateClauseEditor(
                                                                 trace.editorClause,
                                                                 trace.drillthroughKey,
-                                                              )}
+                                                              );
+                                                            }}
                                                             type="button"
                                                           >
                                                             Focus clause editor
