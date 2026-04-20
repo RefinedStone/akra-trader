@@ -3147,6 +3147,15 @@ const COMPARISON_FOCUS_ARTIFACT_LINE_HOVER_SEARCH_PARAM = "compare_focus_artifac
 const COMPARISON_FOCUS_ARTIFACT_LINE_SCRUB_SEARCH_PARAM = "compare_focus_artifact_line_scrub";
 const COMPARISON_FOCUS_TOOLTIP_SEARCH_PARAM = "compare_focus_tooltip";
 const COMPARISON_FOCUS_ARTIFACT_HOVER_SEARCH_PARAM = "compare_focus_artifact_hover";
+const REPLAY_INTENT_TEMPLATE_SEARCH_PARAM = "replay_template";
+const REPLAY_INTENT_SCOPE_SEARCH_PARAM = "replay_scope";
+const REPLAY_INTENT_STEP_SEARCH_PARAM = "replay_step";
+const REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM = "replay_group";
+const REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM = "replay_action";
+const REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM = "replay_edge";
+const REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM = "replay_preview_group";
+const REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM = "replay_preview_trace";
+const REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM = "replay_preview_diff";
 const ALL_FILTER_VALUE = "__all__";
 const MAX_COMPARISON_RUNS = 4;
 const MAX_VISIBLE_COMPARISON_TOOLTIP_CONFLICT_SESSION_SUMMARIES = 5;
@@ -17496,6 +17505,135 @@ function buildRunSurfaceCollectionQueryBuilderReplayIntentBrowserState(
   return nextState;
 }
 
+function isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null | undefined,
+) {
+  if (!intent) {
+    return true;
+  }
+  return (
+    intent.replayScope === "all"
+    && intent.replayIndex === 0
+    && intent.replayGroupFilter === "all"
+    && intent.replayActionTypeFilter === "all"
+    && intent.replayEdgeFilter === "all"
+    && intent.previewSelection.groupKey === null
+    && intent.previewSelection.traceKey === null
+    && intent.previewSelection.diffItemKey === null
+  );
+}
+
+function loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl(): {
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null;
+  templateKey: string | null;
+} | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+  const params = new URL(window.location.href).searchParams;
+  const templateKey = params.get(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM)?.trim() ?? "";
+  const hasReplayParam = [
+    REPLAY_INTENT_TEMPLATE_SEARCH_PARAM,
+    REPLAY_INTENT_SCOPE_SEARCH_PARAM,
+    REPLAY_INTENT_STEP_SEARCH_PARAM,
+    REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM,
+    REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM,
+    REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM,
+    REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM,
+    REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM,
+    REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM,
+  ].some((key) => params.has(key));
+  if (!hasReplayParam) {
+    return null;
+  }
+  const replayActionTypeFilterRaw = params.get(REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM)?.trim() ?? "";
+  const replayActionTypeFilter:
+    RunSurfaceCollectionQueryBuilderReplayIntentSnapshot["replayActionTypeFilter"]
+    | undefined =
+      replayActionTypeFilterRaw === "all"
+      || replayActionTypeFilterRaw === "manual_anchor"
+      || replayActionTypeFilterRaw === "dependency_selection"
+      || replayActionTypeFilterRaw === "direct_auto_selection"
+      || replayActionTypeFilterRaw === "conflict_blocked"
+      || replayActionTypeFilterRaw === "idle"
+        ? replayActionTypeFilterRaw
+        : undefined;
+  const intent = normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot({
+    previewSelection: {
+      diffItemKey: params.get(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM)?.trim() ?? null,
+      groupKey: params.get(REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM)?.trim() ?? null,
+      traceKey: params.get(REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM)?.trim() ?? null,
+    },
+    replayActionTypeFilter,
+    replayEdgeFilter: params.get(REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM)?.trim() ?? undefined,
+    replayGroupFilter: params.get(REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM)?.trim() ?? undefined,
+    replayIndex: (() => {
+      const raw = params.get(REPLAY_INTENT_STEP_SEARCH_PARAM);
+      if (raw === null) {
+        return undefined;
+      }
+      const parsed = Number(raw);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    })(),
+    replayScope: params.get(REPLAY_INTENT_SCOPE_SEARCH_PARAM)?.trim() ?? undefined,
+  });
+  return {
+    intent,
+    templateKey: templateKey || null,
+  };
+}
+
+function buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
+  templateKey: string | null | undefined,
+  intent: RunSurfaceCollectionQueryBuilderReplayIntentSnapshot | null,
+  baseHref?: string,
+) {
+  const url =
+    typeof window !== "undefined"
+      ? new URL(baseHref ?? window.location.href)
+      : new URL(baseHref ?? "http://localhost/");
+  const params = url.searchParams;
+  params.delete(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_SCOPE_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_STEP_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM);
+  params.delete(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM);
+  const normalizedIntent = normalizeRunSurfaceCollectionQueryBuilderReplayIntentSnapshot(intent);
+  if (templateKey?.trim() && normalizedIntent && !isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(normalizedIntent)) {
+    params.set(REPLAY_INTENT_TEMPLATE_SEARCH_PARAM, templateKey.trim());
+    if (normalizedIntent.replayScope !== "all") {
+      params.set(REPLAY_INTENT_SCOPE_SEARCH_PARAM, normalizedIntent.replayScope);
+    }
+    if (normalizedIntent.replayIndex > 0) {
+      params.set(REPLAY_INTENT_STEP_SEARCH_PARAM, String(normalizedIntent.replayIndex));
+    }
+    if (normalizedIntent.replayGroupFilter !== "all") {
+      params.set(REPLAY_INTENT_GROUP_FILTER_SEARCH_PARAM, normalizedIntent.replayGroupFilter);
+    }
+    if (normalizedIntent.replayActionTypeFilter !== "all") {
+      params.set(REPLAY_INTENT_ACTION_FILTER_SEARCH_PARAM, normalizedIntent.replayActionTypeFilter);
+    }
+    if (normalizedIntent.replayEdgeFilter !== "all") {
+      params.set(REPLAY_INTENT_EDGE_FILTER_SEARCH_PARAM, normalizedIntent.replayEdgeFilter);
+    }
+    if (normalizedIntent.previewSelection.groupKey) {
+      params.set(REPLAY_INTENT_PREVIEW_GROUP_SEARCH_PARAM, normalizedIntent.previewSelection.groupKey);
+    }
+    if (normalizedIntent.previewSelection.traceKey) {
+      params.set(REPLAY_INTENT_PREVIEW_TRACE_SEARCH_PARAM, normalizedIntent.previewSelection.traceKey);
+    }
+    if (normalizedIntent.previewSelection.diffItemKey) {
+      params.set(REPLAY_INTENT_PREVIEW_DIFF_SEARCH_PARAM, normalizedIntent.previewSelection.diffItemKey);
+    }
+  }
+  const nextSearch = params.toString();
+  return `${url.pathname}${nextSearch ? `?${nextSearch}` : ""}${url.hash}`;
+}
+
 function persistRunSurfaceCollectionQueryBuilderReplayIntent(
   state: Omit<RunSurfaceCollectionQueryBuilderReplayIntentState, "version">,
 ) {
@@ -20079,6 +20217,9 @@ function RunSurfaceCollectionQueryBuilder({
       traceKey: null,
     });
   const lastHydratedReplayIntentTemplateIdRef = useRef<string | null>(null);
+  const [replayIntentUrlTemplateKey, setReplayIntentUrlTemplateKey] = useState<string | null>(
+    () => loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl()?.templateKey ?? null,
+  );
   const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
   const clauseReevaluationPreviewTraceRefs = useRef(new Map<string, HTMLDivElement>());
   const clauseReevaluationPreviewDiffItemRefs = useRef(new Map<string, HTMLDivElement>());
@@ -20254,6 +20395,18 @@ function RunSurfaceCollectionQueryBuilder({
       setPredicateRefDraftKey(availablePredicateKeys[0]);
     }
   }, [predicateRefDraftKey, predicateTemplates, predicates]);
+
+  useEffect(() => {
+    if (!replayIntentUrlTemplateKey) {
+      return;
+    }
+    const matchingTemplate =
+      predicateTemplates.find((template) => template.key === replayIntentUrlTemplateKey) ?? null;
+    if (!matchingTemplate || matchingTemplate.key === predicateRefDraftKey) {
+      return;
+    }
+    setPredicateRefDraftKey(matchingTemplate.key);
+  }, [predicateRefDraftKey, predicateTemplates, replayIntentUrlTemplateKey]);
 
   useEffect(() => {
     const activeTemplate =
@@ -25069,6 +25222,7 @@ function RunSurfaceCollectionQueryBuilder({
   ]);
   useEffect(() => {
     const templateId = selectedRefTemplate?.id ?? null;
+    const templateKey = selectedRefTemplate?.key ?? null;
     if (!templateId) {
       lastHydratedReplayIntentTemplateIdRef.current = null;
       return;
@@ -25077,18 +25231,22 @@ function RunSurfaceCollectionQueryBuilder({
       return;
     }
     lastHydratedReplayIntentTemplateIdRef.current = templateId;
+    const urlIntentState = loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl();
     const browserIntentState =
       typeof window === "undefined"
         ? null
         : readRunSurfaceCollectionQueryBuilderReplayIntentBrowserState(window.history.state);
     const nextIntent =
-      browserIntentState?.templateId === templateId
-        ? browserIntentState.intent
-        : loadRunSurfaceCollectionQueryBuilderReplayIntent(templateId);
+      urlIntentState?.templateKey === templateKey
+        ? urlIntentState.intent
+        : browserIntentState?.templateId === templateId
+          ? browserIntentState.intent
+          : loadRunSurfaceCollectionQueryBuilderReplayIntent(templateId);
     applyRunSurfaceCollectionQueryBuilderReplayIntent(nextIntent);
-  }, [applyRunSurfaceCollectionQueryBuilderReplayIntent, selectedRefTemplate?.id]);
+  }, [applyRunSurfaceCollectionQueryBuilderReplayIntent, selectedRefTemplate?.id, selectedRefTemplate?.key]);
   useEffect(() => {
     const templateId = selectedRefTemplate?.id ?? null;
+    const templateKey = selectedRefTemplate?.key ?? null;
     if (!templateId) {
       return;
     }
@@ -25099,6 +25257,10 @@ function RunSurfaceCollectionQueryBuilder({
     if (typeof window === "undefined") {
       return;
     }
+    const nextUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
+      templateKey,
+      currentRunSurfaceCollectionQueryBuilderReplayIntent,
+    );
     const currentBrowserState = readRunSurfaceCollectionQueryBuilderReplayIntentBrowserState(window.history.state);
     const needsBrowserUpdate =
       currentBrowserState?.templateId !== templateId
@@ -25106,9 +25268,18 @@ function RunSurfaceCollectionQueryBuilder({
         currentBrowserState?.intent ?? null,
         currentRunSurfaceCollectionQueryBuilderReplayIntent,
       );
-    if (!needsBrowserUpdate) {
+    const currentUrl = buildRunSurfaceCollectionQueryBuilderReplayIntentUrl(
+      loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl()?.templateKey ?? null,
+      loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl()?.intent ?? null,
+    );
+    if (!needsBrowserUpdate && currentUrl === nextUrl) {
       return;
     }
+    setReplayIntentUrlTemplateKey(
+      isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(currentRunSurfaceCollectionQueryBuilderReplayIntent)
+        ? null
+        : (templateKey ?? null),
+    );
     const nextHistoryState = buildRunSurfaceCollectionQueryBuilderReplayIntentBrowserState(
       window.history.state,
       templateId,
@@ -25117,11 +25288,12 @@ function RunSurfaceCollectionQueryBuilder({
     window.history.replaceState(
       nextHistoryState,
       typeof document !== "undefined" ? document.title : "",
-      `${window.location.pathname}${window.location.search}${window.location.hash}`,
+      nextUrl,
     );
   }, [
     currentRunSurfaceCollectionQueryBuilderReplayIntent,
     selectedRefTemplate?.id,
+    selectedRefTemplate?.key,
   ]);
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -25169,15 +25341,32 @@ function RunSurfaceCollectionQueryBuilder({
       return;
     }
     const handlePopState = (event: PopStateEvent) => {
+      const urlIntentState = loadRunSurfaceCollectionQueryBuilderReplayIntentFromUrl();
+      setReplayIntentUrlTemplateKey(urlIntentState?.templateKey ?? null);
       const templateId = selectedRefTemplate?.id ?? null;
+      const templateKey = selectedRefTemplate?.key ?? null;
+      if (urlIntentState?.templateKey && urlIntentState.templateKey !== templateKey) {
+        setPredicateRefDraftKey(urlIntentState.templateKey);
+        return;
+      }
       if (!templateId) {
         return;
       }
       const browserState = readRunSurfaceCollectionQueryBuilderReplayIntentBrowserState(event.state);
-      if (!browserState || browserState.templateId !== templateId) {
+      const nextIntent =
+        urlIntentState?.templateKey === templateKey
+          ? urlIntentState.intent
+          : (
+              browserState && browserState.templateId === templateId
+                ? browserState.intent
+                : null
+            );
+      if (!nextIntent) {
+        if (!isDefaultRunSurfaceCollectionQueryBuilderReplayIntent(currentRunSurfaceCollectionQueryBuilderReplayIntent)) {
+          applyRunSurfaceCollectionQueryBuilderReplayIntent(null);
+        }
         return;
       }
-      const nextIntent = browserState.intent;
       if (areRunSurfaceCollectionQueryBuilderReplayIntentsEqual(
         nextIntent,
         currentRunSurfaceCollectionQueryBuilderReplayIntent,
@@ -25192,6 +25381,7 @@ function RunSurfaceCollectionQueryBuilder({
     applyRunSurfaceCollectionQueryBuilderReplayIntent,
     currentRunSurfaceCollectionQueryBuilderReplayIntent,
     selectedRefTemplate?.id,
+    selectedRefTemplate?.key,
   ]);
   useEffect(() => {
     if (!selectedRefTemplate) {
