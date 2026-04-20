@@ -5462,18 +5462,36 @@
       "direction_id": "experiment-os",
       "title": "Trace evaluation-level provenance to matched predicate branches and parameter comparisons",
       "description": "Deepen replay explanation provenance beyond clause and binding source locations by showing which predicate branch, parameter comparison, or equivalent evaluation-level AST fragment actually produced the truthy match for each reviewed-field explanation, so operators can inspect not just authored source locations but the exact semantic test that fired.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 17,
-      "priority_reason": "The latest main-session reply explicitly says the remaining work is deeper AST semantics: clause and binding-source provenance now ship, but the UI still cannot show which predicate branch or parameter comparison produced the truthy evaluation. That is the clearest executable next task after commit 18dc115.",
+      "priority_reason": "Completed in main session commit 5b039e7, which extended replay explanation provenance down to matched predicate branches and parameter comparisons, recursively followed nested predicate templates, surfaced active branch and comparison binding details in the focused causal chain and active replay step, and verified the change with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before push to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-trace-replay-explanation-provenance-back-to-template-clause-and-binding-locations"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T07:37:58Z",
+      "updated_at": "2026-04-20T07:50:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from authored source-location provenance into evaluation semantics, so operators can verify the exact predicate branch or comparison that made a clause match rather than only the clause that contained it."
+      "direction_relation_note": "Completed the evaluation-semantic provenance layer for experiment-os replay-apply explanation trust, so operators can now inspect the matched predicate branches and parameter comparisons that caused each explanation instead of stopping at authored clause locations."
+    },
+    {
+      "id": "planning-experiment-os-add-step-level-truth-table-and-short-circuit-evaluation-traces-to-replay-explanations",
+      "direction_id": "experiment-os",
+      "title": "Add step-level truth table and short-circuit evaluation traces to replay explanations",
+      "description": "Extend replay explanation provenance beyond matched branches and comparison locations by showing the step-level evaluation trace itself: which runtime candidate values each comparison saw, which comparisons resolved true or false, and how sibling predicate branches short-circuited or were skipped, so operators can read a truth-table style account of why each replay explanation evaluated the way it did.",
+      "status": "ready",
+      "base_priority": 87,
+      "dynamic_priority_delta": 18,
+      "priority_reason": "The latest main-session reply explicitly says the remaining work is the evaluation result truth-table layer: matched branches and comparison details now ship, but operators still cannot see which runtime candidate values made each comparison true or false or how sibling branches short-circuited step by step. That is the clearest executable next task after commit 5b039e7.",
+      "depends_on": [
+        "planning-experiment-os-trace-evaluation-level-provenance-to-matched-predicate-branches-and-comparisons"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-20T07:50:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Extends experiment-os replay-apply explanation trust from evaluation-location provenance into operator-readable execution outcomes, so replay explanations can show not just which branch matched but how runtime candidate values and branch short-circuiting produced the final truth result."
     },
     {
       "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
