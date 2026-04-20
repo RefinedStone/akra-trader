@@ -9,9 +9,13 @@ from datetime import datetime
 from datetime import timedelta
 from numbers import Number
 import re
+from types import UnionType
 from typing import Any
 from typing import Callable
 from typing import Iterable
+from typing import Union
+from typing import get_args
+from typing import get_origin
 from uuid import uuid4
 
 from akra_trader.domain.models import RunComparison
@@ -23063,6 +23067,9 @@ class StandaloneSurfaceCollectionPathParameterSpec:
   kind: str
   description: str
   examples: tuple[str, ...] = ()
+  domain_key: str = ""
+  domain_source: str = ""
+  domain_values: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -24642,6 +24649,8 @@ def list_standalone_surface_runtime_bindings(
             kind="dynamic_map_key",
             description="Symbol-keyed lineage entry inside `market_data_by_symbol`.",
             examples=("binance:BTC/USDT",),
+            domain_key="market_data_symbol_key",
+            domain_source="run.provenance.market_data_by_symbol",
           ),
         ),
       ),
@@ -25556,6 +25565,130 @@ def serialize_standalone_surface_response(
   )
 
 
+def _describe_standalone_filter_value_type(annotation: Any) -> str:
+  origin = get_origin(annotation)
+  if origin in {list, tuple}:
+    args = tuple(arg for arg in get_args(annotation) if arg is not Ellipsis)
+    if args:
+      return f"list[{_describe_standalone_filter_value_type(args[0])}]"
+  if origin in {UnionType, Union}:
+    args = tuple(arg for arg in get_args(annotation) if arg is not type(None))
+    if len(args) == 1:
+      return _describe_standalone_filter_value_type(args[0])
+  if annotation is int:
+    return "integer"
+  if annotation is float:
+    return "number"
+  if annotation is datetime:
+    return "datetime"
+  return "string"
+
+
+def serialize_standalone_filter_param_spec(
+  spec: StandaloneSurfaceFilterParamSpec,
+) -> dict[str, Any]:
+  return {
+    "key": spec.key,
+    "query_exposed": spec.query_exposed,
+    "value_type": _describe_standalone_filter_value_type(spec.annotation),
+    "value_path": list(spec.value_path),
+    "value_root": spec.value_root,
+    "title": spec.openapi.title if spec.openapi is not None else None,
+    "description": spec.openapi.description if spec.openapi is not None else None,
+    "operators": [
+      {
+        "key": operator.key,
+        "label": operator.label,
+        "description": operator.description,
+        "value_shape": operator.value_shape,
+      }
+      for operator in spec.operators
+    ],
+  }
+
+
+def serialize_collection_path_parameter_spec(
+  spec: StandaloneSurfaceCollectionPathParameterSpec,
+) -> dict[str, Any]:
+  payload = {
+    "key": spec.key,
+    "kind": spec.kind,
+    "description": spec.description,
+    "examples": list(spec.examples),
+  }
+  if spec.domain_key or spec.domain_source or spec.domain_values:
+    payload["domain"] = {
+      "key": spec.domain_key or None,
+      "source": spec.domain_source or None,
+      "values": list(spec.domain_values),
+    }
+  return payload
+
+
+def serialize_collection_path_spec(
+  binding: StandaloneSurfaceRuntimeBinding,
+  spec: StandaloneSurfaceCollectionPathSpec,
+) -> dict[str, Any]:
+  filter_specs_by_key = {
+    filter_spec.key: filter_spec
+    for filter_spec in binding.filter_param_specs
+  }
+  return {
+    "path": list(spec.path),
+    "path_template": list(spec.path_template or spec.path),
+    "label": spec.label,
+    "collection_kind": spec.collection_kind,
+    "item_kind": spec.item_kind,
+    "filter_keys": list(spec.filter_keys),
+    "description": spec.description,
+    "parameters": [
+      serialize_collection_path_parameter_spec(parameter)
+      for parameter in spec.parameters
+    ],
+    "element_schema": [
+      serialize_standalone_filter_param_spec(filter_specs_by_key[filter_key])
+      for filter_key in spec.filter_keys
+      if filter_key in filter_specs_by_key
+    ],
+  }
+
+
+def list_collection_query_shared_contracts(
+  capabilities: RunSurfaceCapabilities | None = None,
+) -> tuple[RunSurfaceSharedContract, ...]:
+  resolved_capabilities = capabilities or RunSurfaceCapabilities()
+  contracts: list[RunSurfaceSharedContract] = []
+  for binding in list_standalone_surface_runtime_bindings(resolved_capabilities):
+    if not binding.collection_path_specs:
+      continue
+    contracts.append(
+      RunSurfaceSharedContract(
+        contract_key=f"query_collection:{binding.surface_key}",
+        contract_kind="query_collection_schema",
+        title=f"{binding.response_title} collection query schema",
+        summary=(
+          "Advertises typed collection expression schemas, element fields, and parameter domain metadata "
+          f"for the `{binding.surface_key}` surface."
+        ),
+        source_of_truth="standalone_surface_runtime_bindings.collection_path_specs",
+        member_keys=tuple(
+          f"collection:{'.'.join(spec.path_template or spec.path)}"
+          for spec in binding.collection_path_specs
+        ),
+        schema_detail={
+          "surface_key": binding.surface_key,
+          "route_path": binding.route_path,
+          "expression_param": "filter_expr",
+          "collection_schemas": [
+            serialize_collection_path_spec(binding, spec)
+            for spec in binding.collection_path_specs
+          ],
+        },
+      )
+    )
+  return tuple(contracts)
+
+
 def list_run_surface_shared_contracts(
   capabilities: RunSurfaceCapabilities | None = None,
 ) -> tuple[RunSurfaceSharedContract, ...]:
@@ -25613,7 +25746,10 @@ def serialize_run_surface_shared_contracts(
       "member_keys": list(contract.member_keys),
       "schema_detail": normalize_schema_detail(contract.schema_detail),
     }
-    for contract in list_run_surface_shared_contracts(capabilities)
+    for contract in (
+      list_run_surface_shared_contracts(capabilities)
+      + list_collection_query_shared_contracts(capabilities)
+    )
   ]
 
 

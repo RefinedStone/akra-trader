@@ -668,10 +668,10 @@ class RunSurfaceSharedContract:
 
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
-  "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, "
-  "operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
+  "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
+  "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
 )
-RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v10"
+RUN_SURFACE_CAPABILITY_SCHEMA_VERSION = "run-surface-capabilities.v11"
 RUN_SURFACE_CAPABILITY_GROUP_ORDER = (
   "eligible_metrics",
   "supporting_identity",
@@ -688,6 +688,9 @@ RUN_SURFACE_SUBRESOURCE_CONTRACT_KEYS = (
   "subresource:orders",
   "subresource:positions",
   "subresource:metrics",
+)
+RUN_SURFACE_COLLECTION_QUERY_CONTRACT_KEYS = (
+  "query_collection:run_list",
 )
 
 
@@ -709,6 +712,7 @@ def default_run_surface_shared_contracts() -> tuple[RunSurfaceSharedContract, ..
         "comparison_eligibility_group_order": RUN_SURFACE_CAPABILITY_GROUP_ORDER,
         "family_order": RUN_SURFACE_CAPABILITY_FAMILY_ORDER,
         "run_subresource_contract_keys": RUN_SURFACE_SUBRESOURCE_CONTRACT_KEYS,
+        "collection_query_contract_keys": RUN_SURFACE_COLLECTION_QUERY_CONTRACT_KEYS,
       },
     ),
     RunSurfaceSharedContract(

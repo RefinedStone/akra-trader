@@ -26,6 +26,8 @@ from akra_trader.application import list_standalone_surface_runtime_bindings
 from akra_trader.application import StandaloneSurfaceFilterCondition
 from akra_trader.application import TradingApplication
 from akra_trader.application import execute_standalone_surface_binding
+from akra_trader.application import serialize_collection_path_spec
+from akra_trader.application import serialize_standalone_filter_param_spec
 from akra_trader.application import StandaloneSurfaceFilterParamSpec
 from akra_trader.application import StandaloneSurfaceSortTerm
 from akra_trader.application import StandaloneSurfaceRuntimeBinding
@@ -224,66 +226,6 @@ def _build_filter_expression_query_default() -> Any:
   )
 
 
-def _serialize_filter_operator_schema(operator: Any) -> dict[str, Any]:
-  return {
-    "key": operator.key,
-    "label": operator.label,
-    "description": operator.description,
-    "value_shape": operator.value_shape,
-  }
-
-
-def _serialize_filter_param_schema(
-  spec: StandaloneSurfaceFilterParamSpec,
-) -> dict[str, Any]:
-  return {
-    "key": spec.key,
-    "query_exposed": spec.query_exposed,
-    "value_type": _describe_filter_value_type(spec.annotation),
-    "value_path": list(spec.value_path),
-    "value_root": spec.value_root,
-    "title": spec.openapi.title if spec.openapi else None,
-    "description": spec.openapi.description if spec.openapi else None,
-    "operators": [
-      _serialize_filter_operator_schema(operator)
-      for operator in spec.operators
-    ],
-  }
-
-
-def _serialize_collection_schema(
-  binding: StandaloneSurfaceRuntimeBinding,
-  spec: StandaloneSurfaceCollectionPathSpec,
-) -> dict[str, Any]:
-  filter_specs_by_key = {
-    filter_spec.key: filter_spec
-    for filter_spec in binding.filter_param_specs
-  }
-  return {
-    "path": list(spec.path),
-    "path_template": list(spec.path_template or spec.path),
-    "label": spec.label,
-    "collection_kind": spec.collection_kind,
-    "item_kind": spec.item_kind,
-    "filter_keys": list(spec.filter_keys),
-    "description": spec.description,
-    "parameters": [
-      {
-        "key": parameter.key,
-        "kind": parameter.kind,
-        "description": parameter.description,
-        "examples": list(parameter.examples),
-      }
-      for parameter in spec.parameters
-    ],
-    "element_schema": [
-      _serialize_filter_param_schema(filter_specs_by_key[filter_key])
-      for filter_key in spec.filter_keys
-      if filter_key in filter_specs_by_key
-    ],
-  }
-
-
 def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict[str, Any] | None:
   if not binding.filter_param_specs and not binding.sort_field_specs:
     return None
@@ -316,7 +258,7 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
           "semantics": "Evaluates the node against collection elements, flattening nested collection-of-collection paths, and folds the results with the declared quantifier.",
         },
         "collection_schemas": [
-          _serialize_collection_schema(binding, spec)
+          serialize_collection_path_spec(binding, spec)
           for spec in binding.collection_path_specs
         ],
         "condition_shape": {
@@ -338,7 +280,7 @@ def _build_route_openapi_extra(binding: StandaloneSurfaceRuntimeBinding) -> dict
         },
       },
       "filters": [
-        _serialize_filter_param_schema(spec)
+        serialize_standalone_filter_param_spec(spec)
         for spec in binding.filter_param_specs
       ],
       "sort_fields": [

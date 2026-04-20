@@ -1362,10 +1362,11 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
   assert shared_contracts["schema:run-surface-capabilities"]["contract_kind"] == "schema_metadata"
   assert shared_contracts["schema:run-surface-capabilities"]["title"] == "Run-surface capability contract"
   assert shared_contracts["schema:run-surface-capabilities"]["summary"] == (
-    "Shared capability surface for comparison boundaries, strategy schema discovery, provenance semantics, "
-    "operational run controls, machine-readable policy enforcement, and surface-level enforcement rules."
+    "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
+    "provenance semantics, operational run controls, machine-readable policy enforcement, and surface-level "
+    "enforcement rules."
   )
-  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v10"
+  assert shared_contracts["schema:run-surface-capabilities"]["version"] == "run-surface-capabilities.v11"
   assert shared_contracts["schema:run-surface-capabilities"]["schema_detail"] == {
     "comparison_eligibility_group_order": [
       "eligible_metrics",
@@ -1384,6 +1385,23 @@ def test_run_surface_capabilities_endpoint_returns_shared_eligibility_contract(t
       "subresource:positions",
       "subresource:metrics",
     ],
+    "collection_query_contract_keys": [
+      "query_collection:run_list",
+    ],
+  }
+  assert shared_contracts["query_collection:run_list"]["contract_kind"] == "query_collection_schema"
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["surface_key"] == "run_list"
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["expression_param"] == "filter_expr"
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["path_template"] == [
+    "provenance",
+    "market_data_by_symbol",
+    "{symbol_key}",
+    "issues",
+  ]
+  assert shared_contracts["query_collection:run_list"]["schema_detail"]["collection_schemas"][1]["parameters"][0]["domain"] == {
+    "key": "market_data_symbol_key",
+    "source": "run.provenance.market_data_by_symbol",
+    "values": [],
   }
   assert shared_contracts["family:strategy_schema"]["contract_kind"] == "capability_family"
   assert shared_contracts["family:strategy_schema"]["discovery_flow"] == (
