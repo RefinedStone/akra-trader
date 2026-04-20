@@ -5066,36 +5066,36 @@
       "direction_id": "experiment-os",
       "title": "Add time-sliced dependency edge filtering to subtree solver replay",
       "description": "Extend subtree solver replay beyond group and action-type filters so operators can isolate dependency edges active at a selected replay step or slice of solver time, making causality across bundle dependencies easier to inspect before any state-changing draft-apply flow is introduced.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 88,
       "dynamic_priority_delta": 13,
-      "priority_reason": "The latest main-session reply says replay filtering still lacks time-sliced dependency edge filtering and explicitly frames replay filtering as the next stage after group and action-type support shipped. This is the clearest executable queue head because it continues the non-mutating replay-inspection track before filtered replay steps can be promoted into manual override draft state.",
+      "priority_reason": "Completed in main session commit 5439eec, which added dependency edge metadata to replay actions, shipped a replay-side dependency edge filter plus source or target summary chips and action-card edge chips, applied the edge filter together with group and action-type filters, updated empty-state copy for combined conditions, and verified with `cd apps/web && npx tsc --noEmit` plus `git diff --check -- apps/web/src/App.tsx apps/web/src/styles.css` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-add-action-type-filtering-to-subtree-solver-replay"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:50:00Z",
+      "updated_at": "2026-04-20T23:05:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Deepens experiment-os subtree coordination explainability by letting operators inspect which dependency edges mattered at a chosen replay moment, preserving replay as a trust-building causal analysis surface before any mutation-capable apply workflow is introduced."
     },
     {
       "id": "planning-experiment-os-add-transaction-like-atomic-coordination-for-subtree-bundle-sets",
       "direction_id": "experiment-os",
-      "title": "Add apply workflow for subtree policy simulations and atomic bundle promotion",
-      "description": "Extend subtree bundle coordination so a simulated policy outcome can be promoted into real selection state through an explicit apply workflow with atomic validation across groups, instead of stopping at what-if diffs or partially mutating selections while dependencies resolve one group at a time.",
-      "status": "proposed",
+      "title": "Promote filtered subtree solver replay edges into manual override draft",
+      "description": "Extend subtree solver replay so the currently filtered dependency-edge slice can be applied into selection diff or manual override draft state with explicit preview and validation, instead of stopping at non-mutating inspection after group, action-type, and edge filtering.",
+      "status": "ready",
       "base_priority": 87,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply still calls out promoting a filtered replay step into manual override draft state as unfinished work, but replay filtering still has a more immediate executable gap: time-sliced dependency edge filtering. Keep the apply workflow proposed until the replay navigation layer can isolate not just groups and action types but also the dependency edges active at the selected solver moment.",
+      "dynamic_priority_delta": 14,
+      "priority_reason": "The latest main-session reply says time-sliced dependency edge filtering shipped in commit 5439eec and directly names the missing next step: promote the filtered dependency-edge replay result into selection diff or manual override draft state. This is now the clearest executable queue head because the replay-inspection track is complete enough to feed a concrete apply flow.",
       "depends_on": [
-        "planning-experiment-os-add-action-type-filtering-to-subtree-solver-replay"
+        "planning-experiment-os-add-time-sliced-dependency-edge-filtering-to-subtree-solver-replay"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T22:50:00Z",
+      "updated_at": "2026-04-20T23:05:00Z",
       "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os subtree template composition from inspectable simulation into deliberate state-changing promotion semantics, so coordinated multi-group bundle changes can be applied atomically only after the simulated graph behavior is explainable."
+      "direction_relation_note": "Bridges experiment-os subtree coordination from explainable replay inspection into deliberate draft-promotion semantics, so operators can carry a filtered causal slice forward into editable selection state before any broader atomic apply workflow is finalized."
     },
     {
       "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
