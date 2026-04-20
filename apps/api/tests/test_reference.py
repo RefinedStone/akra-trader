@@ -253,7 +253,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   ]
   assert any(binding["binding_kind"] == "market_data_issue" for binding in best_pair_bindings)
   assert any(
-    binding["candidate_id"] == "market_data_issue:btc usdt:btc usdt"
+    binding["candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
     for binding in best_pair_bindings
   )
   assert all(
@@ -295,7 +295,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   ]
   assert any(binding["binding_kind"] == "market_data_issue" for binding in snapshot_best_pair_bindings)
   assert any(
-    binding["candidate_id"] == "market_data_issue:btc usdt:btc usdt"
+    binding["candidate_id"] == "[\"market_data_issue\",\"BTC/USDT\",\"BTC/USDT\"]"
     for binding in snapshot_best_pair_bindings
   )
   assert all(

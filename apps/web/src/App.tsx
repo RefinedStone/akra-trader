@@ -16336,18 +16336,17 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateReplayId(params: {
   ) {
     return null;
   }
-  const normalizedSymbol = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
-    normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(
-      resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "",
-    ),
+  const canonicalSymbol = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactBindingSymbolKey(
+    resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "",
   );
+  const canonicalValue = String(candidateValueRaw).trim();
   const normalizedValue = normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
-    candidateValueRaw,
+    canonicalValue,
   );
-  if (!normalizedSymbol || !normalizedValue) {
+  if (!canonicalSymbol || !normalizedValue) {
     return null;
   }
-  return `market_data_issue:${normalizedSymbol}:${normalizedValue}`;
+  return JSON.stringify(["market_data_issue", canonicalSymbol, canonicalValue]);
 }
 
 function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactCandidateBindings(value: unknown) {

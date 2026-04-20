@@ -1338,7 +1338,7 @@ class FreqtradeReferenceAdapter:
     bindings: list[dict[str, Any]] = []
     seen: set[tuple[str, str | None]] = set()
 
-    def add(symbol_key: str, candidate_value: str | None) -> None:
+    def add(symbol_key: str, candidate_value: str | None, candidate_id: str | None = None) -> None:
       normalized_symbol = self._normalize_artifact_candidate_binding_symbol_key(symbol_key)
       if not normalized_symbol:
         return
@@ -1347,10 +1347,6 @@ class FreqtradeReferenceAdapter:
       if key in seen:
         return
       seen.add(key)
-      candidate_id = self._build_artifact_candidate_binding_id(
-        symbol_key=normalized_symbol,
-        candidate_value=normalized_value,
-      )
       bindings.append({
         "binding_kind": "market_data_issue",
         "candidate_id": candidate_id,
@@ -1361,9 +1357,17 @@ class FreqtradeReferenceAdapter:
 
     for symbol_key in symbol_keys:
       add(symbol_key, None)
-      for candidate_value in candidate_values:
+      for candidate_entry in candidate_values:
+        candidate_value = candidate_entry["value"]
         if self._artifact_candidate_value_mentions_symbol(candidate_value, symbol_key):
-          add(symbol_key, candidate_value)
+          add(
+            symbol_key,
+            candidate_value,
+            self._build_artifact_candidate_binding_id(
+              symbol_key=symbol_key,
+              candidate_value=candidate_entry["candidate_id_source"],
+            ) if candidate_entry["candidate_id_source"] is not None else None,
+          )
     return bindings
 
   def _collect_artifact_candidate_binding_values(
@@ -1372,11 +1376,11 @@ class FreqtradeReferenceAdapter:
     label_key: str,
     value: Any,
     section_key: str | None = None,
-  ) -> list[str]:
-    collected: list[str] = []
+  ) -> list[dict[str, str | None]]:
+    collected: list[dict[str, str | None]] = []
     seen: set[str] = set()
 
-    def add(candidate: str | None) -> None:
+    def add(candidate: str | None, *, canonical: bool = False) -> None:
       if candidate is None:
         return
       normalized = candidate.strip()
@@ -1386,22 +1390,25 @@ class FreqtradeReferenceAdapter:
       if not key or key in seen:
         return
       seen.add(key)
-      collected.append(normalized)
+      collected.append({
+        "candidate_id_source": normalized if canonical else None,
+        "value": normalized,
+      })
 
     add(self._stringify_artifact_source_value(value))
 
     if isinstance(value, (str, int, float, bool)):
-      add(str(value))
+      add(str(value), canonical=isinstance(value, str))
     elif isinstance(value, dict):
       for nested_key, nested_value in value.items():
         formatted_key = self._format_artifact_source_label(str(nested_key))
         if isinstance(nested_value, (str, int, float, bool)):
           add(f"{formatted_key}: {nested_value}")
-          add(str(nested_value))
+          add(str(nested_value), canonical=isinstance(nested_value, str))
     elif isinstance(value, (list, tuple, set)):
       for item in value:
         if isinstance(item, (str, int, float, bool)):
-          add(str(item))
+          add(str(item), canonical=isinstance(item, str))
 
     add(self._format_artifact_source_label(label_key))
     if section_key is not None:
@@ -1461,19 +1468,25 @@ class FreqtradeReferenceAdapter:
     normalized_bare_symbol = self._normalize_artifact_source_search_text(bare_symbol)
     return bool(normalized_bare_symbol and normalized_bare_symbol in normalized_candidate)
 
+  @staticmethod
   def _build_artifact_candidate_binding_id(
-    self,
     *,
     symbol_key: str,
     candidate_value: str | None,
   ) -> str | None:
     if candidate_value is None:
       return None
-    normalized_symbol = self._normalize_artifact_source_search_text(symbol_key)
-    normalized_value = self._normalize_artifact_source_search_text(candidate_value)
-    if not normalized_symbol or not normalized_value:
+    trimmed = candidate_value.strip()
+    if not trimmed:
       return None
-    return f"market_data_issue:{normalized_symbol}:{normalized_value}"
+    normalized_symbol = FreqtradeReferenceAdapter._normalize_artifact_candidate_binding_symbol_key(symbol_key)
+    if normalized_symbol is None:
+      return None
+    return json.dumps(
+      ["market_data_issue", normalized_symbol, trimmed],
+      ensure_ascii=False,
+      separators=(",", ":"),
+    )
 
   def _collect_artifact_source_search_texts(
     self,
