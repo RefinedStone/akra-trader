@@ -16108,6 +16108,33 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
       const candidateValue = candidateValueRaw === RUN_SURFACE_COLLECTION_RUNTIME_MISSING
         ? `Missing ${accessorLabel}`
         : formatCollectionQueryBuilderValue(candidateValueRaw, field.valueType);
+      const orderRecord =
+        collectionItem.value && typeof collectionItem.value === "object" && !Array.isArray(collectionItem.value)
+          ? (collectionItem.value as Record<string, unknown>)
+          : null;
+      const orderId = typeof orderRecord?.order_id === "string" ? orderRecord.order_id : null;
+      const symbolKey =
+        resolvedPath[0] === "provenance"
+        && resolvedPath[1] === "market_data_by_symbol"
+        && resolvedPath[3] === "issues"
+          ? (resolvedParameterValues.symbol_key?.trim() || resolvedPath[2] || "")
+          : "";
+      const runContext =
+        resolvedPath[0] === "orders" && orderId
+          ? {
+              componentKey: "trade_count",
+              label: `Order ${orderId}`,
+              section: "metrics" as const,
+              subFocusKey: buildComparisonRunListOrderPreviewSubFocusKey(orderId, "instrument"),
+            }
+          : symbolKey
+            ? {
+                componentKey: "provenance_richness",
+                label: `Data lineage ${symbolKey}`,
+                section: "context" as const,
+                subFocusKey: buildComparisonRunListDataSymbolSubFocusKey(symbolKey, "issues"),
+              }
+            : null;
       allValues.push({
         candidatePath,
         candidateValue,
@@ -16118,6 +16145,10 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateSamples(params: {
           } ${comparedValueLabel}.`,
         result,
         runId: run.config.run_id,
+        runContextComponentKey: runContext?.componentKey ?? null,
+        runContextLabel: runContext?.label ?? null,
+        runContextSection: runContext?.section ?? null,
+        runContextSubFocusKey: runContext?.subFocusKey ?? null,
       });
     });
     const quantifierResult = evaluateRunSurfaceCollectionQueryRuntimeQuantifierOutcome(
@@ -18548,6 +18579,10 @@ type RunSurfaceCollectionQueryRuntimeCandidateSample = {
   detail: string;
   result: boolean;
   runId: string;
+  runContextComponentKey: string | null;
+  runContextLabel: string | null;
+  runContextSection: ComparisonScoreSection | null;
+  runContextSubFocusKey: string | null;
 };
 
 type RunSurfaceCollectionQueryRuntimeQuantifierOutcome = {
@@ -18564,6 +18599,7 @@ type RunSurfaceCollectionQueryRuntimeCandidateTrace = {
   candidatePath: string;
   comparedValue: string;
   detail: string;
+  editorClause: HydratedRunSurfaceCollectionQueryBuilderState | null;
   location: string;
   quantifier: "any" | "all" | "none";
   result: boolean;
@@ -18583,6 +18619,7 @@ function RunSurfaceCollectionQueryBuilder({
   runtimeRuns = [],
   onApplyExpression,
   onClearExpression,
+  onFocusRuntimeCandidateRunContext,
 }: {
   contracts: RunSurfaceCollectionQueryContract[];
   compact?: boolean;
@@ -18592,6 +18629,7 @@ function RunSurfaceCollectionQueryBuilder({
   runtimeRuns?: Run[];
   onApplyExpression?: (payload: RunSurfaceCollectionQueryBuilderApplyPayload) => void;
   onClearExpression?: (() => void) | null;
+  onFocusRuntimeCandidateRunContext?: ((sample: RunSurfaceCollectionQueryRuntimeCandidateSample) => void) | null;
 }) {
   const [activeContractKey, setActiveContractKey] = useState<string>(contracts[0]?.contract_key ?? "");
   const lastHydratedExpressionRef = useRef<string | null>(null);
@@ -18738,6 +18776,7 @@ function RunSurfaceCollectionQueryBuilder({
   const [editorNegated, setEditorNegated] = useState(false);
   const [runtimeCandidateTraceDrillthroughByKey, setRuntimeCandidateTraceDrillthroughByKey] =
     useState<Record<string, boolean>>({});
+  const builderEditorCardRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!contracts.length) {
@@ -18994,6 +19033,27 @@ function RunSurfaceCollectionQueryBuilder({
     setActiveContractKey(clause.contractKey);
     setPendingHydratedState(clause);
   };
+
+  const focusRuntimeCandidateClauseEditor = useCallback(
+    (clause: HydratedRunSurfaceCollectionQueryBuilderState | null) => {
+      if (!clause) {
+        return;
+      }
+      setEditorTarget({ kind: "draft" });
+      setPredicateDraftKey("");
+      setTemplateDraftKey("");
+      setEditorFromClause(clause);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          builderEditorCardRef.current?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        });
+      });
+    },
+    [],
+  );
 
   const buildRuntimeCandidateTraceDrillthroughKey = useCallback(
     (
@@ -22052,6 +22112,7 @@ function RunSurfaceCollectionQueryBuilder({
               + (comparisonNotes.length
                 ? `Resolved inputs: ${comparisonNotes.join(" · ")}`
                 : "No reviewed binding reached the candidate inputs for this clause."),
+            editorClause: child.clause,
             location: clauseLocation,
             quantifier: child.clause.quantifier,
             result: directMatch,
@@ -22096,6 +22157,7 @@ function RunSurfaceCollectionQueryBuilder({
                 candidatePath: predicateLocation,
                 comparedValue: "No matching binding",
                 detail: "Predicate reference has no reviewed binding flowing into its runtime parameters.",
+                editorClause: null,
                 location: predicateLocation,
                 quantifier: "any",
                 result: false,
@@ -22139,6 +22201,7 @@ function RunSurfaceCollectionQueryBuilder({
                 candidatePath: predicateLocation,
                 comparedValue: "Cycle guard",
                 detail: "Predicate reference matched but nested runtime candidate replay stopped at a cycle guard.",
+                editorClause: null,
                 location: predicateLocation,
                 quantifier: "any",
                 result: true,
@@ -22172,6 +22235,7 @@ function RunSurfaceCollectionQueryBuilder({
                 candidatePath: predicateLocation,
                 comparedValue: "Template missing",
                 detail: "Predicate reference matched and no nested template definition was available for runtime candidate replay.",
+                editorClause: null,
                 location: predicateLocation,
                 quantifier: "any",
                 result: true,
@@ -22220,6 +22284,7 @@ function RunSurfaceCollectionQueryBuilder({
                     .map(([bindingKey, referenceKey]) =>
                       `${bindingKey} <- $${referenceKey} (${bindingContextByKey[referenceKey] ?? "$" + referenceKey})`)
                     .join(" · ")}.`,
+                editorClause: null,
                 location: predicateLocation,
                 quantifier: "any",
                 result: predicateResult,
@@ -22340,6 +22405,7 @@ function RunSurfaceCollectionQueryBuilder({
             detail:
               `${child.logic.toUpperCase()} subgroup ${child.negated ? "negates " : ""}combines child runtime candidate rows. `
               + (stopReason ? `Resolution stopped early because ${stopReason}.` : "Every child candidate row was evaluated."),
+            editorClause: null,
             location: `${templateKey}.node.${pathSegments.join(".")}`,
             quantifier: "any",
             result: resolvedGroupResult,
@@ -24063,7 +24129,7 @@ function RunSurfaceCollectionQueryBuilder({
       </div>
       <p className="run-note">{activeContract.summary}</p>
       <div className="run-surface-query-builder-grid">
-        <div className="run-surface-query-builder-card">
+        <div className="run-surface-query-builder-card" ref={builderEditorCardRef}>
           <div className="run-surface-query-builder-card-head">
             <strong>Builder</strong>
             <span>{activeEditorTargetLabel}</span>
@@ -25375,6 +25441,17 @@ function RunSurfaceCollectionQueryBuilder({
                                                           {candidateTrace.result ? "matched" : "not matched"}
                                                         </span>
                                                       </div>
+                                                      {candidateTrace.editorClause ? (
+                                                        <div className="run-surface-query-builder-actions">
+                                                          <button
+                                                            className="ghost-button"
+                                                            onClick={() => focusRuntimeCandidateClauseEditor(candidateTrace.editorClause)}
+                                                            type="button"
+                                                          >
+                                                            Load clause into editor
+                                                          </button>
+                                                        </div>
+                                                      ) : null}
                                                       {candidateTrace.runOutcomes.length ? (
                                                         <div className="run-surface-query-builder-trace-panel is-nested">
                                                           <div className="run-surface-query-builder-card-head">
@@ -25424,6 +25501,19 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     {sample.result ? "matched" : "not matched"}
                                                                   </span>
                                                                 </div>
+                                                                {onFocusRuntimeCandidateRunContext && sample.runContextSection && sample.runContextComponentKey ? (
+                                                                  <div className="run-surface-query-builder-actions">
+                                                                    <button
+                                                                      className="ghost-button"
+                                                                      onClick={() => onFocusRuntimeCandidateRunContext(sample)}
+                                                                      type="button"
+                                                                    >
+                                                                      {sample.runContextLabel
+                                                                        ? `Open ${sample.runContextLabel}`
+                                                                        : "Open run context"}
+                                                                    </button>
+                                                                  </div>
+                                                                ) : null}
                                                               </div>
                                                             ))}
                                                           </div>
@@ -26995,6 +27085,17 @@ function RunSurfaceCollectionQueryBuilder({
                                                                     </span>
                                                                   ) : null}
                                                                 </div>
+                                                                {candidateTrace.editorClause ? (
+                                                                  <div className="run-surface-query-builder-actions">
+                                                                    <button
+                                                                      className="ghost-button"
+                                                                      onClick={() => focusRuntimeCandidateClauseEditor(candidateTrace.editorClause)}
+                                                                      type="button"
+                                                                    >
+                                                                      Load clause into editor
+                                                                    </button>
+                                                                  </div>
+                                                                ) : null}
                                                                 {previewSamples.length ? (
                                                                   <div className="run-surface-query-builder-trace-chip-list">
                                                                     {previewSamples.map((sample) => (
@@ -27031,6 +27132,46 @@ function RunSurfaceCollectionQueryBuilder({
                                                                         Collapse drill-through
                                                                       </button>
                                                                     ) : null}
+                                                                  </div>
+                                                                ) : null}
+                                                                {drillthroughOpen && previewSamples.length ? (
+                                                                  <div className="run-surface-query-builder-trace-panel is-nested">
+                                                                    <div className="run-surface-query-builder-card-head">
+                                                                      <strong>Concrete payload drill-through</strong>
+                                                                      <span>{previewSamples.length}</span>
+                                                                    </div>
+                                                                    <div className="run-surface-query-builder-trace-list">
+                                                                      {previewSamples.map((sample) => (
+                                                                        <div
+                                                                          className={`run-surface-query-builder-trace-step is-${sample.result ? "success" : "muted"}`}
+                                                                          key={`${activeSimulatedPredicateRefSolverReplayStep.key}:${action.groupKey}:causal-candidate-detail:${sample.runId}:${sample.candidatePath}`}
+                                                                        >
+                                                                          <strong>{sample.candidatePath}</strong>
+                                                                          <p>{sample.detail}</p>
+                                                                          <div className="run-surface-query-builder-trace-chip-list">
+                                                                            <span className="run-surface-query-builder-trace-chip">
+                                                                              {sample.candidateValue}
+                                                                            </span>
+                                                                            <span className={`run-surface-query-builder-trace-chip${sample.result ? " is-active" : ""}`}>
+                                                                              {sample.result ? "matched" : "not matched"}
+                                                                            </span>
+                                                                          </div>
+                                                                          {onFocusRuntimeCandidateRunContext && sample.runContextSection && sample.runContextComponentKey ? (
+                                                                            <div className="run-surface-query-builder-actions">
+                                                                              <button
+                                                                                className="ghost-button"
+                                                                                onClick={() => onFocusRuntimeCandidateRunContext(sample)}
+                                                                                type="button"
+                                                                              >
+                                                                                {sample.runContextLabel
+                                                                                  ? `Open ${sample.runContextLabel}`
+                                                                                  : "Open run context"}
+                                                                              </button>
+                                                                            </div>
+                                                                          ) : null}
+                                                                        </div>
+                                                                      ))}
+                                                                    </div>
                                                                   </div>
                                                                 ) : null}
                                                               </div>
@@ -28692,6 +28833,40 @@ function RunSection({
       options?.historyMode,
     );
   };
+  const focusRunListRuntimeCandidateContext = (
+    sample: RunSurfaceCollectionQueryRuntimeCandidateSample,
+  ) => {
+    if (
+      comparison
+      && sample.runContextSection
+      && sample.runContextComponentKey
+    ) {
+      handleRunListScoreLinkSelection(
+        sample.runId,
+        sample.runContextSection,
+        sample.runContextComponentKey,
+        {
+          subFocusKey: sample.runContextSubFocusKey,
+        },
+      );
+      return;
+    }
+    const scrollOptions: ScrollIntoViewOptions = {
+      behavior: "smooth",
+      block: "nearest",
+    };
+    if (sample.runContextSubFocusKey) {
+      const subFocusTarget = runListSubFocusRefs.current.get(
+        `${sample.runId}:${sample.runContextSubFocusKey}`,
+      );
+      if (subFocusTarget) {
+        subFocusTarget.scrollIntoView(scrollOptions);
+        return;
+      }
+    }
+    const cardTarget = runListCardRefs.current.get(sample.runId);
+    cardTarget?.scrollIntoView(scrollOptions);
+  };
   const renderWorkspaceReviewSignalMicroState = (params: {
     interactionId: string;
     hoverOptions: Array<{ key: string; label: string; copy: string }>;
@@ -29129,6 +29304,7 @@ function RunSection({
                 contracts={collectionQueryContracts}
                 onApplyExpression={applyCollectionQueryExpression}
                 onClearExpression={filter.filter_expr ? clearCollectionQueryExpression : null}
+                onFocusRuntimeCandidateRunContext={focusRunListRuntimeCandidateContext}
                 runtimeRuns={runs}
               />
             ) : null}
