@@ -337,6 +337,7 @@ class BenchmarkArtifact:
   summary: dict[str, Any] = field(default_factory=dict)
   sections: dict[str, Any] = field(default_factory=dict)
   summary_source_path: str | None = None
+  source_locations: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

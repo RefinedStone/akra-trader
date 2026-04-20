@@ -14397,6 +14397,7 @@ def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:
   assert "runtime_log_root" in artifact_kinds
   assert all(isinstance(artifact.summary, dict) for artifact in run.provenance.benchmark_artifacts)
   assert all(isinstance(artifact.sections, dict) for artifact in run.provenance.benchmark_artifacts)
+  assert all(isinstance(artifact.source_locations, dict) for artifact in run.provenance.benchmark_artifacts)
   assert run.provenance.market_data is not None
   assert run.provenance.market_data.provider == "freqtrade_reference"
   assert run.provenance.market_data.dataset_identity is None
@@ -15138,6 +15139,7 @@ def test_compare_runs_returns_side_by_side_native_and_reference_summary(tmp_path
   assert comparison.runs[1].benchmark_artifacts
   assert all(isinstance(artifact.summary, dict) for artifact in comparison.runs[1].benchmark_artifacts)
   assert all(isinstance(artifact.sections, dict) for artifact in comparison.runs[1].benchmark_artifacts)
+  assert all(isinstance(artifact.source_locations, dict) for artifact in comparison.runs[1].benchmark_artifacts)
   assert len(comparison.narratives) == 1
   assert comparison.narratives[0].comparison_type == "native_vs_reference"
   assert comparison.narratives[0].run_id == reference_run.config.run_id

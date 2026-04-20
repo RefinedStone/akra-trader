@@ -242,6 +242,10 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert root_artifact.summary["market_change_pct"] == 11.2
   assert root_artifact.summary["timeframe"] == "5m"
   assert root_artifact.summary_source_path == str(snapshot_path)
+  assert root_artifact.source_locations["summary"]["trade_count"]["source_path"] == str(snapshot_path)
+  assert "42" in root_artifact.source_locations["summary"]["trade_count"]["searchable_texts"]
+  assert root_artifact.source_locations["sections"]["pair_metrics"][0]["line_key"] == "count"
+  assert root_artifact.source_locations["sections"]["pair_metrics"][0]["line_index"] == 0
   assert root_artifact.sections["strategy_comparison"]["count"] == 2
   assert root_artifact.sections["pair_metrics"]["best"]["label"] == "BTC/USDT"
   assert root_artifact.sections["exit_reason_metrics"]["preview"][0]["label"] == "roi"
@@ -253,6 +257,10 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert manifest_artifact.summary["strategy_name"] == "NostalgiaForInfinityX7"
   assert manifest_artifact.summary["backtest_start_at"] == "2024-01-01T00:00:00+00:00"
   assert manifest_artifact.summary_source_path == str(manifest_path)
+  assert manifest_artifact.source_locations["summary"]["run_id"]["source_path"] == str(manifest_path)
+  assert "freqtrade-backtest-001" in manifest_artifact.source_locations["summary"]["run_id"]["searchable_texts"]
+  assert manifest_artifact.source_locations["sections"]["metadata"][0]["line_key"] == "run_id"
+  assert manifest_artifact.source_locations["sections"]["metadata"][0]["line_index"] == 0
   assert manifest_artifact.sections["metadata"]["timeframe_detail"] == "1m"
   assert manifest_artifact.sections["metadata"]["notes"] == "fixture manifest"
 
@@ -262,6 +270,10 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert snapshot_artifact.summary["market_change_pct"] == 11.2
   assert snapshot_artifact.summary["timeframe"] == "5m"
   assert snapshot_artifact.summary_source_path == str(snapshot_path)
+  assert snapshot_artifact.source_locations["summary"]["trade_count"]["source_path"] == str(snapshot_path)
+  assert "42" in snapshot_artifact.source_locations["summary"]["trade_count"]["searchable_texts"]
+  assert snapshot_artifact.source_locations["sections"]["pair_metrics"][0]["line_key"] == "count"
+  assert snapshot_artifact.source_locations["sections"]["pair_metrics"][0]["line_index"] == 0
   assert snapshot_artifact.sections["pair_metrics"]["total"]["trade_count"] == 42
   assert snapshot_artifact.sections["enter_tag_metrics"]["preview"][0]["label"] == "dip_buy"
   assert snapshot_artifact.sections["periodic_breakdown"]["day"]["worst"]["profit_total_abs"] == -25.0
@@ -271,6 +283,7 @@ def test_reference_adapter_enriches_benchmark_artifacts_from_manifest_and_summar
   assert log_artifact.summary == {}
   assert log_artifact.sections == {}
   assert log_artifact.summary_source_path is None
+  assert log_artifact.source_locations == {}
 
 
 def test_reference_adapter_uses_manifest_summary_for_zip_snapshots(tmp_path: Path) -> None:

@@ -228,6 +228,11 @@ class FreqtradeReferenceAdapter:
       label = "Benchmark result table"
 
     summary, sections, summary_source_path = self._summarize_artifact(path, kind)
+    source_locations = self._build_artifact_source_locations(
+      summary=summary,
+      sections=sections,
+      source_path=summary_source_path or str(path),
+    )
     return BenchmarkArtifact(
       kind=kind,
       label=label,
@@ -238,6 +243,7 @@ class FreqtradeReferenceAdapter:
       summary=summary,
       sections=sections,
       summary_source_path=summary_source_path,
+      source_locations=source_locations,
     )
 
   def _summarize_artifact(
@@ -1231,6 +1237,155 @@ class FreqtradeReferenceAdapter:
   def _merge_sections(target: dict[str, Any], source: dict[str, Any]) -> None:
     for key, value in source.items():
       target[key] = value
+
+  def _build_artifact_source_locations(
+    self,
+    *,
+    summary: dict[str, Any],
+    sections: dict[str, Any],
+    source_path: str,
+  ) -> dict[str, Any]:
+    summary_locations = {
+      key: self._build_artifact_summary_source_location(
+        label_key=key,
+        value=value,
+        source_path=source_path,
+      )
+      for key, value in summary.items()
+    }
+    section_locations = {
+      section_key: [
+        self._build_artifact_section_source_location(
+          section_key=section_key,
+          line_key=line_key,
+          line_index=line_index,
+          value=value,
+          source_path=source_path,
+        )
+        for line_index, (line_key, value) in enumerate(section.items())
+      ]
+      for section_key, section in sections.items()
+      if isinstance(section, dict)
+    }
+    if not summary_locations and not section_locations:
+      return {}
+    return {
+      "summary": summary_locations,
+      "sections": section_locations,
+    }
+
+  def _build_artifact_summary_source_location(
+    self,
+    *,
+    label_key: str,
+    value: Any,
+    source_path: str,
+  ) -> dict[str, Any]:
+    return {
+      "label_key": label_key,
+      "searchable_texts": self._collect_artifact_source_search_texts(label_key=label_key, value=value),
+      "source_path": source_path,
+    }
+
+  def _build_artifact_section_source_location(
+    self,
+    *,
+    section_key: str,
+    line_key: str,
+    line_index: int,
+    value: Any,
+    source_path: str,
+  ) -> dict[str, Any]:
+    return {
+      "line_index": line_index,
+      "line_key": line_key,
+      "searchable_texts": self._collect_artifact_source_search_texts(
+        label_key=line_key,
+        value=value,
+        section_key=section_key,
+      ),
+      "section_key": section_key,
+      "source_path": source_path,
+    }
+
+  def _collect_artifact_source_search_texts(
+    self,
+    *,
+    label_key: str,
+    value: Any,
+    section_key: str | None = None,
+  ) -> list[str]:
+    collected: list[str] = []
+    seen: set[str] = set()
+
+    def add(candidate: str | None) -> None:
+      if candidate is None:
+        return
+      normalized = self._normalize_artifact_source_search_text(candidate)
+      if not normalized or normalized in seen:
+        return
+      seen.add(normalized)
+      collected.append(candidate)
+
+    add(self._format_artifact_source_label(label_key))
+    if section_key is not None:
+      add(self._format_artifact_source_label(section_key))
+    add(self._stringify_artifact_source_value(value))
+
+    def visit(candidate: Any) -> None:
+      if candidate in (None, ""):
+        return
+      if isinstance(candidate, bool):
+        add("true" if candidate else "false")
+        return
+      if isinstance(candidate, (int, float, str)):
+        add(str(candidate))
+        return
+      if isinstance(candidate, dict):
+        for nested_key, nested_value in candidate.items():
+          formatted_key = self._format_artifact_source_label(str(nested_key))
+          add(formatted_key)
+          if isinstance(nested_value, (str, int, float, bool)):
+            add(f"{formatted_key} {nested_value}")
+          visit(nested_value)
+        return
+      if isinstance(candidate, (list, tuple, set)):
+        for item in candidate:
+          visit(item)
+
+    visit(value)
+    return collected
+
+  @staticmethod
+  def _format_artifact_source_label(key: str) -> str:
+    return key.replace("_", " ")
+
+  @staticmethod
+  def _normalize_artifact_source_search_text(value: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", value.lower())).strip()
+
+  def _stringify_artifact_source_value(self, value: Any) -> str | None:
+    if value in (None, ""):
+      return None
+    if isinstance(value, bool):
+      return "true" if value else "false"
+    if isinstance(value, (str, int, float)):
+      return str(value)
+    if isinstance(value, dict):
+      rendered = [
+        f"{self._format_artifact_source_label(str(key))}={nested}"
+        for key, nested_value in value.items()
+        if (nested := self._stringify_artifact_source_value(nested_value)) is not None
+      ]
+      return ", ".join(rendered) if rendered else None
+    if isinstance(value, (list, tuple, set)):
+      rendered = [
+        nested
+        for item in value
+        if (nested := self._stringify_artifact_source_value(item)) is not None
+      ]
+      return " | ".join(rendered) if rendered else None
+    return str(value)
 
   @staticmethod
   def _set_summary_entry(summary: dict[str, Any], key: str, value: Any) -> None:

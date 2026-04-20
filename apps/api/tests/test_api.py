@@ -5285,6 +5285,7 @@ def test_compare_runs_endpoint_returns_native_and_reference_benchmark_payload(tm
   assert all("summary" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   assert all("sections" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   assert all("summary_source_path" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
+  assert all("source_locations" in artifact for artifact in payload["runs"][1]["benchmark_artifacts"])
   metric_rows = {row["key"]: row for row in payload["metric_rows"]}
   assert metric_rows["total_return_pct"]["annotation"].startswith(
     "Tuning read: return deltas show optimization edge versus the baseline."

@@ -182,6 +182,26 @@ type BenchmarkArtifact = {
   summary: Record<string, unknown>;
   sections?: Record<string, Record<string, unknown>>;
   summary_source_path?: string | null;
+  source_locations?: {
+    summary?: Record<
+      string,
+      {
+        label_key?: string | null;
+        searchable_texts?: string[] | null;
+        source_path?: string | null;
+      }
+    > | null;
+    sections?: Record<
+      string,
+      Array<{
+        line_index?: number | null;
+        line_key?: string | null;
+        searchable_texts?: string[] | null;
+        section_key?: string | null;
+        source_path?: string | null;
+      }>
+    > | null;
+  } | null;
 };
 
 type RunListBoundaryContract = {
@@ -16258,27 +16278,46 @@ function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(valu
   return Array.from(collected);
 }
 
+function collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMetadataMatchTexts(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((entry) => (typeof entry === "string"
+      ? normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(entry)
+      : ""))
+    .filter(Boolean);
+}
+
 function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSummaryMatchEntries(
   artifact: BenchmarkArtifact,
 ) {
   return Object.entries(artifact.summary)
     .map(([summaryKey, rawValue]) => {
+      const metadataEntry = artifact.source_locations?.summary?.[summaryKey];
+      const labelKey =
+        typeof metadataEntry?.label_key === "string" && metadataEntry.label_key.trim()
+          ? metadataEntry.label_key
+          : summaryKey;
       const visibleText = formatBenchmarkArtifactSummaryValue(summaryKey, rawValue);
       if (!visibleText) {
         return null;
       }
       const searchableTexts = [
+        ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMetadataMatchTexts(
+          metadataEntry?.searchable_texts,
+        ),
         normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(visibleText),
         normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
-          formatBenchmarkArtifactSummaryLabel(summaryKey),
+          formatBenchmarkArtifactSummaryLabel(labelKey),
         ),
         ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
       ].filter(Boolean);
       return {
         hoverKey: buildComparisonProvenanceArtifactSummaryHoverKey(artifact.path, summaryKey),
         kind: "summary" as const,
-        labelKey: summaryKey,
-        searchableTexts,
+        labelKey,
+        searchableTexts: Array.from(new Set(searchableTexts)),
         visibleText,
       };
     })
@@ -16298,6 +16337,65 @@ function buildRunSurfaceCollectionQueryRuntimeCandidateArtifactSectionMatchEntri
     .flatMap(([sectionKey, sectionValue]) => {
       if (!sectionValue || typeof sectionValue !== "object" || Array.isArray(sectionValue)) {
         return [];
+      }
+      const metadataEntries = artifact.source_locations?.sections?.[sectionKey];
+      if (Array.isArray(metadataEntries) && metadataEntries.length) {
+        const structuredEntries = metadataEntries
+          .map((metadataEntry, fallbackLineIndex) => {
+            const lineKey =
+              typeof metadataEntry?.line_key === "string" && metadataEntry.line_key.trim()
+                ? metadataEntry.line_key
+                : "";
+            if (!lineKey) {
+              return null;
+            }
+            const rawValue = (sectionValue as Record<string, unknown>)[lineKey];
+            const inlineValue = formatBenchmarkArtifactSectionValue(rawValue);
+            if (inlineValue === null) {
+              return null;
+            }
+            const lineIndex =
+              typeof metadataEntry?.line_index === "number"
+                ? metadataEntry.line_index
+                : fallbackLineIndex;
+            const visibleText = `${formatBenchmarkArtifactSummaryLabel(lineKey)}: ${inlineValue}`;
+            const searchableTexts = [
+              ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMetadataMatchTexts(
+                metadataEntry?.searchable_texts,
+              ),
+              normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(visibleText),
+              normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+                formatBenchmarkArtifactSectionLabel(sectionKey),
+              ),
+              normalizeRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchText(
+                formatBenchmarkArtifactSummaryLabel(lineKey),
+              ),
+              ...collectRunSurfaceCollectionQueryRuntimeCandidateArtifactMatchTexts(rawValue),
+            ].filter(Boolean);
+            return {
+              hoverKey: buildComparisonProvenanceArtifactSectionLineHoverKey(
+                artifact.path,
+                sectionKey,
+                lineIndex,
+              ),
+              kind: "section_line" as const,
+              labelKey: lineKey,
+              searchableTexts: Array.from(new Set(searchableTexts)),
+              sectionKey,
+              visibleText,
+            };
+          })
+          .filter((entry): entry is {
+            hoverKey: string;
+            kind: "section_line";
+            labelKey: string;
+            searchableTexts: string[];
+            sectionKey: string;
+            visibleText: string;
+          } => entry !== null);
+        if (structuredEntries.length) {
+          return structuredEntries;
+        }
       }
       const sectionEntries = Object.entries(sectionValue)
         .map(([lineKey, rawValue]) => {
