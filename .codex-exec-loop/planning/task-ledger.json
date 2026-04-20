@@ -509,14 +509,14 @@
       "description": "Build dedicated facet or discovery endpoints for presets, benchmark packs, datasets, tags, and typed query capabilities so control-room filters or other clients can discover durable metadata options and query semantics directly instead of relying on freeform input fields or route-local knowledge over stored run metadata.",
       "status": "proposed",
       "base_priority": 90,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply keeps a consumer-facing query discovery endpoint on the follow-up list, but it also says the newly declared operator and sort schema is not yet connected to runtime parsing or evaluation. Keep discovery proposed behind that executable runtime-integration step so discovery does not publish semantics the runtime still ignores.",
+      "dynamic_priority_delta": 6,
+      "priority_reason": "The latest main-session reply still calls out capability discovery and query-schema reuse as unfinished, but it also narrows the more immediate execution gap further: runtime support now exists for the current list and compare surfaces, while numeric range operators and richer multi-field sort coverage are still missing. Keep discovery proposed behind that broader runtime-query pass so a dedicated endpoint does not advertise semantics that only part of the read surface actually executes.",
       "depends_on": [
-        "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
+        "planning-experiment-os-expand-typed-query-runtime-to-range-operators-and-multi-field-sort"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T01:35:00Z",
+      "updated_at": "2026-04-21T02:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Supports the experiment-os goal of operator-friendly, queryable experiment retrieval by turning metadata filter inputs and typed query capabilities into discoverable product surfaces instead of implicit API knowledge."
     },
@@ -4432,18 +4432,36 @@
       "direction_id": "experiment-os",
       "title": "Connect typed query schema to runtime sort parsing and filter evaluation",
       "description": "Take the newly declared query operator and sort metadata beyond OpenAPI exposure by wiring sort query parameters plus operator-specific filter parsing and evaluation into the application runtime, so runs list, compare, and adjacent read surfaces enforce the same machine-readable contract they now advertise.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 89,
       "dynamic_priority_delta": 39,
-      "priority_reason": "The latest main-session reply explicitly says the declaration and OpenAPI exposure are done, while actual sort query parameter handling and operator-specific parsing or evaluation are still not connected at runtime. That makes runtime execution of the typed query contract the clearest immediate queued task.",
+      "priority_reason": "Completed in main session commit 70e8d2f, which wired typed query operator parsing and sort registration into the runtime, applied declared filter and sort evaluation across strategy, preset, run list, and run compare surfaces, and verified the change with `python -m py_compile`, two targeted pytest groups, and `git diff --check` before pushing to `origin/main`.",
       "depends_on": [
         "planning-experiment-os-declare-sort-and-filter-operator-schema-in-typed-query-spec"
       ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T01:35:00Z",
+      "updated_at": "2026-04-21T02:10:00Z",
       "source_turn_id": null,
       "direction_relation_note": "Closes the gap between experiment-os query schema declaration and actual runtime behavior, which is necessary before client discovery or broader binding convergence can rely on the typed query contract as an executable interface."
+    },
+    {
+      "id": "planning-experiment-os-expand-typed-query-runtime-to-range-operators-and-multi-field-sort",
+      "direction_id": "experiment-os",
+      "title": "Expand typed query runtime coverage to numeric range operators and multi-field sort",
+      "description": "Extend the newly connected typed query runtime beyond the current list and compare surface coverage by supporting numeric range-style operators and richer multi-field sort semantics in the declared query contract, so broader experiment read paths execute more of the machine-readable schema instead of stopping at the first operator and single-sort pass.",
+      "status": "ready",
+      "base_priority": 90,
+      "dynamic_priority_delta": 38,
+      "priority_reason": "The latest main-session reply says the typed query contract now executes on current list and compare surfaces, but numeric range operators and richer multi-field sort are still missing. That is the clearest immediately executable next step before turning query schema reuse into a dedicated discovery endpoint or broader model.",
+      "depends_on": [
+        "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
+      ],
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T02:10:00Z",
+      "source_turn_id": null,
+      "direction_relation_note": "Advances experiment-os queryability from basic operator-aware runtime execution toward a broader typed contract that can support richer filtering and ordering semantics before dedicated discovery surfaces publish it as reusable API capability."
     },
     {
       "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
