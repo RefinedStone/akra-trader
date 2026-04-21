@@ -258,36 +258,36 @@
       "direction_id": "runtime-ops",
       "title": "Preserve provider-specific source provenance for restored market_context fields",
       "description": "Refine provider pull normalization and provenance capture so restored market_context fields record which provider-native block and field supplied symbol, symbols, timeframe, and primary_focus claims instead of collapsing them into a single generic normalized source.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 82,
       "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:25:00+09:00",
+      "updated_at": "2026-04-21T23:35:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-readback-provenance"
       ],
-      "direction_relation_note": "The latest main-session reply says normalized readback is complete in commit ace4bbe and explicitly calls out preserving provider-specific source provenance as the next remaining backend step before analytics or export surfaces consume this data.",
-      "priority_reason": "This is the clearest next executable task because builtin next-task needs one immediate continuation and the main session directly prioritizes finer-grained provider source provenance ahead of downstream reporting surfaces."
+      "direction_relation_note": "Completed on main in commit ea10a84 with provider_recovery.market_context_provenance added across domain models, operator delivery normalization, and application sync so restored symbol, symbols, timeframe, and primary_focus claims retain provider-native scope and path detail such as PagerDuty custom_details.*, Opsgenie details.*, and incident.io metadata.* origins.",
+      "priority_reason": "Closed after targeted operator_delivery, application sync, and API pytest coverage plus compileall verification and docs status updates landed; the next immediate work is consuming this preserved provenance in operator-facing surfaces."
     },
     {
       "id": "task-b1-provider-market-context-analytics-export",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Expose provider market_context provenance in analytics and export surfaces",
-      "description": "Thread normalized provider-returned market_context provenance into analytics, export, or operator-facing reporting surfaces so downstream incident handoff and audit workflows can inspect where each symbol, timeframe, and primary-focus claim came from.",
-      "status": "proposed",
+      "title": "Consume provider market_context provenance in control-room drill-down and export surfaces",
+      "description": "Thread the preserved provider-returned market_context provenance into control-room drill-down, analytics, and export/reporting surfaces so operators can inspect which vendor-native field supplied each symbol, symbols, timeframe, and primary_focus claim during incident triage and handoff workflows.",
+      "status": "ready",
       "base_priority": 78,
-      "dynamic_priority_delta": 10,
+      "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T23:25:00+09:00",
+      "updated_at": "2026-04-21T23:35:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-source-provenance-detail"
       ],
-      "direction_relation_note": "The latest main-session reply keeps analytics and export hookup as a valid downstream follow-up, but it should now follow the finer-grained provider source provenance work so reporting can expose durable per-field origin detail instead of a flattened normalized source.",
-      "priority_reason": "This remains concrete follow-up work, but it stays proposed behind the new provenance-detail backend step so queue execution preserves one deterministic next task and avoids building reporting on a partially flattened provenance contract."
+      "direction_relation_note": "The latest main-session reply says provenance preservation is complete in commit ea10a84 and explicitly names the remaining consumer surfaces as control room, analytics/export, and operator drill-down, so this existing reporting task is broadened to cover the full operator-visible consumption slice instead of analytics alone.",
+      "priority_reason": "This is now the clearest next executable task because builtin next-task needs one immediate continuation and the main session directly identifies these consumer surfaces as the remaining work after the backend provenance contract shipped."
     },
     {
       "id": "task-b1-multi-symbol-risk-scoring-expansion",
