@@ -69,7 +69,8 @@ creation.
 - operator actions already reach sandbox stop, live stop, cancel/replace, reconciliation, recovery,
   and incident workflows
 - runtime operator workflows now include focused lineage-history and ingestion-job triage for the
-  currently selected market-data instrument
+  currently selected market-data instrument, plus alert-linked focus routing and inline lineage
+  incident history
 
 ### Remaining work
 

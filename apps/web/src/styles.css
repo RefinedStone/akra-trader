@@ -2355,6 +2355,56 @@ select {
   gap: 8px;
 }
 
+.market-data-inline-focus-button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(19, 117, 236, 0.18);
+  border-radius: 999px;
+  background: rgba(19, 117, 236, 0.06);
+  color: var(--blue);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 160ms ease, transform 160ms ease;
+}
+
+.market-data-inline-focus-button:hover {
+  transform: translateY(-1px);
+  background: rgba(19, 117, 236, 0.12);
+}
+
+.market-data-incident-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid var(--line);
+  background: var(--surface-subtle);
+  color: var(--muted);
+}
+
+.market-data-incident-badge.is-critical {
+  border-color: rgba(221, 60, 68, 0.18);
+  background: rgba(221, 60, 68, 0.08);
+  color: var(--red);
+}
+
+.market-data-incident-badge.is-warning {
+  border-color: rgba(246, 185, 79, 0.22);
+  background: rgba(246, 185, 79, 0.12);
+  color: #8a5a00;
+}
+
+.market-data-incident-badge.is-neutral {
+  border-color: rgba(19, 117, 236, 0.18);
+  background: rgba(19, 117, 236, 0.06);
+  color: var(--blue);
+}
+
 .progress-stack {
   display: grid;
   gap: 4px;

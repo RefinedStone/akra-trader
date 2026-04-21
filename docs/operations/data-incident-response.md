@@ -15,7 +15,8 @@ unclear dataset lineage.
 - market-data health and sync status surfaces
 - normalized market-data lineage history and ingestion-job history query surfaces
 - control-room triage workflow that binds the currently selected instrument to lineage and
-  ingestion history review
+  ingestion history review, auto-links runtime alerts into that focus, and keeps a merged lineage
+  incident history in view
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

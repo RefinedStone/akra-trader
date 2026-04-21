@@ -1738,6 +1738,314 @@ function formatWorkflowToken(value?: string | null) {
   return value.replaceAll("_", " ");
 }
 
+type LinkedMarketInstrumentContext = {
+  instrument: MarketDataStatus["instruments"][number];
+  focusKey: string;
+  symbol: string;
+  timeframe: string;
+  matchReason: string;
+};
+
+type MarketDataLinkableAlertRecord = {
+  alert_id?: string | null;
+  category?: string | null;
+  summary: string;
+  detail: string;
+  run_id?: string | null;
+  session_id?: string | null;
+  source?: string | null;
+  provider_recovery_symbols?: string[];
+  provider_recovery_timeframe?: string | null;
+};
+
+type MarketDataIncidentHistoryEntry = {
+  entryId: string;
+  occurredAt: string;
+  sourceLabel: string;
+  statusLabel: string;
+  summary: string;
+  detail: string;
+  tone: "critical" | "warning" | "neutral";
+};
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function normalizeMarketSymbol(value: string) {
+  return value.trim().toUpperCase();
+}
+
+function buildMarketSymbolSearchVariants(symbol: string) {
+  const normalized = normalizeMarketSymbol(symbol);
+  return Array.from(new Set([normalized, normalized.replaceAll("/", ""), normalized.replaceAll("-", "")])).filter(
+    (variant) => variant.length > 0,
+  );
+}
+
+function matchesMarketSymbolInText(text: string, symbol: string) {
+  const upperText = text.toUpperCase();
+  return buildMarketSymbolSearchVariants(symbol).some((variant) => upperText.includes(variant));
+}
+
+function dedupeMarketDataInstruments(
+  candidates: MarketDataStatus["instruments"][number][],
+) {
+  return Array.from(
+    new Map(
+      candidates.map((instrument) => [buildMarketDataInstrumentFocusKey(instrument), instrument]),
+    ).values(),
+  );
+}
+
+function pickPreferredMarketDataInstrument(
+  candidates: MarketDataStatus["instruments"][number][],
+) {
+  const deduped = dedupeMarketDataInstruments(candidates);
+  if (!deduped.length) {
+    return null;
+  }
+  return deduped.find((instrument) => isMarketDataInstrumentAtRisk(instrument)) ?? deduped[0];
+}
+
+function extractMatchingMarketTimeframe(
+  text: string,
+  marketStatus: MarketDataStatus,
+) {
+  const knownTimeframes = Array.from(
+    new Set(marketStatus.instruments.map((instrument) => instrument.timeframe)),
+  ).sort((left, right) => right.length - left.length);
+  return (
+    knownTimeframes.find((timeframe) =>
+      new RegExp(`(^|[^A-Za-z0-9])${escapeRegExp(timeframe)}($|[^A-Za-z0-9])`, "i").test(text),
+    )
+    ?? null
+  );
+}
+
+function extractMatchingMarketSymbols(
+  text: string,
+  marketStatus: MarketDataStatus,
+) {
+  const knownSymbols = Array.from(
+    new Set(marketStatus.instruments.map((instrument) => resolveMarketDataSymbol(instrument.instrument_id))),
+  );
+  return knownSymbols.filter((symbol) => matchesMarketSymbolInText(text, symbol));
+}
+
+function buildLinkedMarketInstrumentContext(
+  instrument: MarketDataStatus["instruments"][number],
+  matchReason: string,
+): LinkedMarketInstrumentContext {
+  return {
+    instrument,
+    focusKey: buildMarketDataInstrumentFocusKey(instrument),
+    symbol: resolveMarketDataSymbol(instrument.instrument_id),
+    timeframe: instrument.timeframe,
+    matchReason,
+  };
+}
+
+function resolveInstrumentsBySymbolsAndTimeframe(args: {
+  marketStatus: MarketDataStatus;
+  symbols: string[];
+  timeframe?: string | null;
+}) {
+  const { marketStatus, symbols, timeframe } = args;
+  const symbolSet = new Set(symbols.map((symbol) => normalizeMarketSymbol(symbol)));
+  return marketStatus.instruments.filter((instrument) => {
+    if (!symbolSet.has(normalizeMarketSymbol(resolveMarketDataSymbol(instrument.instrument_id)))) {
+      return false;
+    }
+    return timeframe ? instrument.timeframe === timeframe : true;
+  });
+}
+
+function resolveMarketDataInstrumentLink(args: {
+  guardedLive: GuardedLiveStatus | null;
+  liveRuns: Run[];
+  marketStatus: MarketDataStatus | null;
+  record: MarketDataLinkableAlertRecord;
+  runById: Map<string, Run>;
+}) {
+  const { guardedLive, liveRuns, marketStatus, record, runById } = args;
+  if (!marketStatus) {
+    return null;
+  }
+
+  const category = record.category?.trim() ?? "";
+  const run = record.run_id ? runById.get(record.run_id) : undefined;
+  if (run) {
+    const runInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: run.config.symbols,
+        timeframe: run.config.timeframe,
+      }),
+    );
+    if (runInstrument) {
+      return buildLinkedMarketInstrumentContext(runInstrument, "run_context");
+    }
+  }
+
+  if (record.provider_recovery_symbols?.length) {
+    const providerRecoveryInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: record.provider_recovery_symbols,
+        timeframe: record.provider_recovery_timeframe,
+      }),
+    );
+    if (providerRecoveryInstrument) {
+      return buildLinkedMarketInstrumentContext(providerRecoveryInstrument, "provider_recovery");
+    }
+  }
+
+  const combinedText = `${record.summary} ${record.detail}`.trim();
+  const matchedSymbols = extractMatchingMarketSymbols(combinedText, marketStatus);
+  const guardedLiveTimeframe = guardedLive?.session_handoff.kline_snapshot?.timeframe ?? null;
+  const guardedLiveSymbol =
+    guardedLive?.session_handoff.symbol
+    ?? guardedLive?.ownership.symbol
+    ?? guardedLive?.order_book.symbol
+    ?? guardedLive?.session_restore.symbol
+    ?? null;
+  const matchedTimeframe = extractMatchingMarketTimeframe(combinedText, marketStatus) ?? guardedLiveTimeframe;
+
+  if (matchedSymbols.length && matchedTimeframe) {
+    const exactInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: matchedSymbols,
+        timeframe: matchedTimeframe,
+      }),
+    );
+    if (exactInstrument) {
+      return buildLinkedMarketInstrumentContext(exactInstrument, "symbol_timeframe_match");
+    }
+  }
+
+  if (record.source === "guarded_live" && guardedLiveSymbol && matchedTimeframe) {
+    const guardedLiveInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: [guardedLiveSymbol],
+        timeframe: matchedTimeframe,
+      }),
+    );
+    if (guardedLiveInstrument) {
+      return buildLinkedMarketInstrumentContext(guardedLiveInstrument, "guarded_live_context");
+    }
+  }
+
+  if (matchedSymbols.length) {
+    const symbolInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: matchedSymbols,
+      }),
+    );
+    if (symbolInstrument) {
+      return buildLinkedMarketInstrumentContext(symbolInstrument, "symbol_match");
+    }
+  }
+
+  const isMarketDataRecord =
+    category.startsWith("market_data_")
+    || combinedText.toLowerCase().includes("market-data");
+  if (isMarketDataRecord && matchedTimeframe) {
+    const liveSymbolSet = new Set(
+      liveRuns.flatMap((liveRun) => liveRun.config.symbols.map((symbol) => normalizeMarketSymbol(symbol))),
+    );
+    let timeframeCandidates = marketStatus.instruments.filter(
+      (instrument) => instrument.timeframe === matchedTimeframe,
+    );
+    if (liveSymbolSet.size > 0) {
+      const liveScopedCandidates = timeframeCandidates.filter((instrument) =>
+        liveSymbolSet.has(normalizeMarketSymbol(resolveMarketDataSymbol(instrument.instrument_id))),
+      );
+      if (liveScopedCandidates.length) {
+        timeframeCandidates = liveScopedCandidates;
+      }
+    }
+    const timeframeInstrument = pickPreferredMarketDataInstrument(timeframeCandidates);
+    if (timeframeInstrument) {
+      return buildLinkedMarketInstrumentContext(timeframeInstrument, "timeframe_market_data_match");
+    }
+  }
+
+  if (record.source === "guarded_live" && guardedLiveSymbol) {
+    const guardedLiveInstrument = pickPreferredMarketDataInstrument(
+      resolveInstrumentsBySymbolsAndTimeframe({
+        marketStatus,
+        symbols: [guardedLiveSymbol],
+        timeframe: guardedLiveTimeframe,
+      }),
+    );
+    if (guardedLiveInstrument) {
+      return buildLinkedMarketInstrumentContext(guardedLiveInstrument, "guarded_live_symbol");
+    }
+  }
+
+  return null;
+}
+
+function getAlertLinkPriority(alert: Pick<OperatorVisibility["alerts"][number], "category" | "severity" | "detected_at">) {
+  const categoryRank = alert.category.startsWith("market_data_") ? 2 : alert.category === "worker_failure" ? 1 : 0;
+  const severityRank = alert.severity === "critical" ? 2 : alert.severity === "warning" ? 1 : 0;
+  const detectedAt = Date.parse(alert.detected_at);
+  return {
+    categoryRank,
+    severityRank,
+    detectedAt: Number.isFinite(detectedAt) ? detectedAt : Number.NEGATIVE_INFINITY,
+  };
+}
+
+function compareAlertLinkPriority(
+  left: Pick<OperatorVisibility["alerts"][number], "category" | "severity" | "detected_at">,
+  right: Pick<OperatorVisibility["alerts"][number], "category" | "severity" | "detected_at">,
+) {
+  const leftPriority = getAlertLinkPriority(left);
+  const rightPriority = getAlertLinkPriority(right);
+  return (
+    rightPriority.categoryRank - leftPriority.categoryRank
+    || rightPriority.severityRank - leftPriority.severityRank
+    || rightPriority.detectedAt - leftPriority.detectedAt
+  );
+}
+
+function resolveAutoLinkedMarketInstrument(args: {
+  guardedLive: GuardedLiveStatus | null;
+  liveRuns: Run[];
+  marketStatus: MarketDataStatus | null;
+  operatorVisibility: OperatorVisibility | null;
+  runById: Map<string, Run>;
+}) {
+  const { guardedLive, liveRuns, marketStatus, operatorVisibility, runById } = args;
+  if (!marketStatus || !operatorVisibility) {
+    return null;
+  }
+  const linkedAlerts = operatorVisibility.alerts
+    .map((alert) => ({
+      alert,
+      link: resolveMarketDataInstrumentLink({
+        guardedLive,
+        liveRuns,
+        marketStatus,
+        record: alert,
+        runById,
+      }),
+    }))
+    .filter(
+      (entry): entry is {
+        alert: OperatorVisibility["alerts"][number];
+        link: LinkedMarketInstrumentContext;
+      } => entry.link !== null,
+    )
+    .sort((left, right) => compareAlertLinkPriority(left.alert, right.alert));
+  return linkedAlerts[0]?.link.instrument ?? null;
+}
+
 export default function App() {
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [references, setReferences] = useState<ReferenceSource[]>([]);
@@ -2041,9 +2349,20 @@ export default function App() {
       setPaperRuns(paperResponse);
       setLiveRuns(liveResponse);
       setMarketStatus(marketResponse);
+      const runtimeRunMap = new Map(
+        [...sandboxResponse, ...paperResponse, ...liveResponse].map((run) => [run.config.run_id, run]),
+      );
+      const autoLinkedInstrument = resolveAutoLinkedMarketInstrument({
+        guardedLive: guardedLiveResponse,
+        liveRuns: liveResponse,
+        marketStatus: marketResponse,
+        operatorVisibility: operatorResponse,
+        runById: runtimeRunMap,
+      });
       const preferredMarketInstrument = resolvePreferredMarketDataInstrument(
         marketResponse,
-        activeMarketInstrumentKey,
+        activeMarketInstrumentKey
+        ?? (autoLinkedInstrument ? buildMarketDataInstrumentFocusKey(autoLinkedInstrument) : null),
       );
       setActiveMarketInstrumentKey(
         preferredMarketInstrument
@@ -2965,12 +3284,266 @@ export default function App() {
     [marketStatus],
   );
 
+  const runtimeRunById = useMemo(
+    () =>
+      new Map(
+        [...sandboxRuns, ...paperRuns, ...liveRuns].map((run) => [run.config.run_id, run]),
+      ),
+    [liveRuns, paperRuns, sandboxRuns],
+  );
+
+  const operatorAlertById = useMemo(() => {
+    const alertMap = new Map<
+      string,
+      OperatorVisibility["alerts"][number] | OperatorVisibility["alert_history"][number]
+    >();
+    if (!operatorVisibility) {
+      return alertMap;
+    }
+    operatorVisibility.alert_history.forEach((alert) => {
+      alertMap.set(alert.alert_id, alert);
+    });
+    operatorVisibility.alerts.forEach((alert) => {
+      alertMap.set(alert.alert_id, alert);
+    });
+    return alertMap;
+  }, [operatorVisibility]);
+
+  const linkedOperatorAlerts = useMemo(
+    () =>
+      operatorVisibility?.alerts.map((alert) => ({
+        alert,
+        link: resolveMarketDataInstrumentLink({
+          guardedLive,
+          liveRuns,
+          marketStatus,
+          record: alert,
+          runById: runtimeRunById,
+        }),
+      })) ?? [],
+    [guardedLive, liveRuns, marketStatus, operatorVisibility, runtimeRunById],
+  );
+
+  const linkedOperatorAlertHistory = useMemo(
+    () =>
+      operatorVisibility?.alert_history.map((alert) => ({
+        alert,
+        link: resolveMarketDataInstrumentLink({
+          guardedLive,
+          liveRuns,
+          marketStatus,
+          record: alert,
+          runById: runtimeRunById,
+        }),
+      })) ?? [],
+    [guardedLive, liveRuns, marketStatus, operatorVisibility, runtimeRunById],
+  );
+
+  const linkedOperatorIncidentEvents = useMemo(
+    () =>
+      operatorVisibility?.incident_events.map((event) => {
+        const alertContext = operatorAlertById.get(event.alert_id);
+        return {
+          event,
+          link: resolveMarketDataInstrumentLink({
+            guardedLive,
+            liveRuns,
+            marketStatus,
+            record: {
+              alert_id: event.alert_id,
+              category: alertContext?.category ?? null,
+              summary: event.summary,
+              detail: event.detail,
+              run_id: event.run_id ?? alertContext?.run_id ?? null,
+              session_id: event.session_id ?? alertContext?.session_id ?? null,
+              source: event.source ?? alertContext?.source ?? null,
+              provider_recovery_symbols: event.remediation.provider_recovery.symbols,
+              provider_recovery_timeframe: event.remediation.provider_recovery.timeframe,
+            },
+            runById: runtimeRunById,
+          }),
+        };
+      }) ?? [],
+    [guardedLive, liveRuns, marketStatus, operatorAlertById, operatorVisibility, runtimeRunById],
+  );
+
+  const linkedOperatorAlertById = useMemo(
+    () => new Map(linkedOperatorAlerts.map((entry) => [entry.alert.alert_id, entry.link])),
+    [linkedOperatorAlerts],
+  );
+
+  const linkedOperatorAlertHistoryById = useMemo(
+    () => new Map(linkedOperatorAlertHistory.map((entry) => [entry.alert.alert_id, entry.link])),
+    [linkedOperatorAlertHistory],
+  );
+
+  const linkedOperatorIncidentEventById = useMemo(
+    () => new Map(linkedOperatorIncidentEvents.map((entry) => [entry.event.event_id, entry.link])),
+    [linkedOperatorIncidentEvents],
+  );
+
+  const autoLinkedMarketInstrument = useMemo(
+    () =>
+      resolveAutoLinkedMarketInstrument({
+        guardedLive,
+        liveRuns,
+        marketStatus,
+        operatorVisibility,
+        runById: runtimeRunById,
+      }),
+    [guardedLive, liveRuns, marketStatus, operatorVisibility, runtimeRunById],
+  );
+
   const activeMarketInstrument = useMemo(() => {
     if (!marketStatus) {
       return null;
     }
     return resolvePreferredMarketDataInstrument(marketStatus, activeMarketInstrumentKey);
   }, [activeMarketInstrumentKey, marketStatus]);
+
+  const activeMarketInstrumentFocusKey = activeMarketInstrument
+    ? buildMarketDataInstrumentFocusKey(activeMarketInstrument)
+    : null;
+
+  const focusedLinkedOperatorAlerts = useMemo(
+    () =>
+      activeMarketInstrumentFocusKey
+        ? linkedOperatorAlerts.filter((entry) => entry.link?.focusKey === activeMarketInstrumentFocusKey)
+        : [],
+    [activeMarketInstrumentFocusKey, linkedOperatorAlerts],
+  );
+
+  const focusedLinkedOperatorAlertHistory = useMemo(
+    () =>
+      activeMarketInstrumentFocusKey
+        ? linkedOperatorAlertHistory.filter((entry) => entry.link?.focusKey === activeMarketInstrumentFocusKey)
+        : [],
+    [activeMarketInstrumentFocusKey, linkedOperatorAlertHistory],
+  );
+
+  const focusedLinkedOperatorIncidentEvents = useMemo(
+    () =>
+      activeMarketInstrumentFocusKey
+        ? linkedOperatorIncidentEvents.filter((entry) => entry.link?.focusKey === activeMarketInstrumentFocusKey)
+        : [],
+    [activeMarketInstrumentFocusKey, linkedOperatorIncidentEvents],
+  );
+
+  const focusedMarketIncidentHistory = useMemo(() => {
+    if (!activeMarketInstrument) {
+      return [] as MarketDataIncidentHistoryEntry[];
+    }
+
+    const entries: MarketDataIncidentHistoryEntry[] = [];
+
+    focusedLinkedOperatorAlerts.forEach(({ alert }) => {
+      entries.push({
+        entryId: `alert:${alert.alert_id}`,
+        occurredAt: alert.detected_at,
+        sourceLabel: "Active alert",
+        statusLabel: `${formatWorkflowToken(alert.severity)} / ${formatWorkflowToken(alert.category)}`,
+        summary: alert.summary,
+        detail: `${alert.detail} Delivery: ${alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}.`,
+        tone: alert.severity === "critical" ? "critical" : "warning",
+      });
+    });
+
+    focusedLinkedOperatorAlertHistory.forEach(({ alert }) => {
+      entries.push({
+        entryId: `alert-history:${alert.alert_id}:${alert.status}`,
+        occurredAt: alert.resolved_at ?? alert.detected_at,
+        sourceLabel: alert.status === "resolved" ? "Resolved alert" : "Alert history",
+        statusLabel: `${formatWorkflowToken(alert.status)} / ${formatWorkflowToken(alert.category)}`,
+        summary: alert.summary,
+        detail: `${alert.detail} Detected ${formatTimestamp(alert.detected_at)}.`,
+        tone:
+          alert.status === "resolved"
+            ? "neutral"
+            : alert.severity === "critical"
+              ? "critical"
+              : "warning",
+      });
+    });
+
+    focusedLinkedOperatorIncidentEvents.forEach(({ event }) => {
+      const remediationDetail =
+        event.remediation.state !== "not_applicable"
+          ? ` Remediation: ${formatWorkflowToken(event.remediation.state)}${event.remediation.summary ? ` / ${event.remediation.summary}` : ""}.`
+          : "";
+      entries.push({
+        entryId: `incident:${event.event_id}`,
+        occurredAt: event.timestamp,
+        sourceLabel: "Incident event",
+        statusLabel: `${formatWorkflowToken(event.kind)} / ${formatWorkflowToken(event.severity)}`,
+        summary: event.summary,
+        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}`,
+        tone: event.severity === "critical" ? "critical" : "warning",
+      });
+    });
+
+    marketDataLineageHistory.forEach((record, index) => {
+      const isReviewSignal =
+        index === 0
+        || record.sync_status !== "synced"
+        || record.failure_count_24h > 0
+        || record.gap_window_count > 0
+        || record.issues.length > 0;
+      if (!isReviewSignal) {
+        return;
+      }
+      const issueSummary = record.issues.length
+        ? record.issues.join(", ")
+        : `${record.failure_count_24h} failures / 24h${record.gap_window_count ? ` · ${record.gap_window_count} gaps` : ""}`;
+      entries.push({
+        entryId: `lineage:${record.history_id}`,
+        occurredAt: record.recorded_at,
+        sourceLabel: "Lineage snapshot",
+        statusLabel: `${formatWorkflowToken(record.sync_status)} / ${formatWorkflowToken(record.validation_claim)}`,
+        summary: `${record.symbol} ${record.timeframe} lineage snapshot recorded.`,
+        detail: `${issueSummary || "No lineage issues recorded."} Window: ${formatRange(record.first_timestamp, record.last_timestamp)}.`,
+        tone:
+          record.sync_status === "error" || record.failure_count_24h > 0
+            ? "critical"
+            : record.sync_status !== "synced" || record.gap_window_count > 0 || record.issues.length > 0
+              ? "warning"
+              : "neutral",
+      });
+    });
+
+    marketDataIngestionJobs.forEach((job, index) => {
+      const isWorkflowSignal = index === 0 || job.status !== "succeeded" || Boolean(job.last_error);
+      if (!isWorkflowSignal) {
+        return;
+      }
+      entries.push({
+        entryId: `ingestion:${job.job_id}`,
+        occurredAt: job.finished_at,
+        sourceLabel: "Ingestion job",
+        statusLabel: `${formatWorkflowToken(job.status)} / ${formatWorkflowToken(job.operation)}`,
+        summary: `${job.symbol} ${job.timeframe} ingestion ${formatWorkflowToken(job.operation)} completed.`,
+        detail: `${job.fetched_candle_count} candles fetched in ${job.duration_ms} ms.${job.last_error ? ` Error: ${job.last_error}.` : ""}`,
+        tone: job.status === "succeeded" ? "neutral" : "warning",
+      });
+    });
+
+    return entries
+      .sort((left, right) => {
+        const leftTimestamp = Date.parse(left.occurredAt);
+        const rightTimestamp = Date.parse(right.occurredAt);
+        return (
+          (Number.isFinite(rightTimestamp) ? rightTimestamp : Number.NEGATIVE_INFINITY)
+          - (Number.isFinite(leftTimestamp) ? leftTimestamp : Number.NEGATIVE_INFINITY)
+        );
+      })
+      .slice(0, 10);
+  }, [
+    activeMarketInstrument,
+    focusedLinkedOperatorAlertHistory,
+    focusedLinkedOperatorAlerts,
+    focusedLinkedOperatorIncidentEvents,
+    marketDataIngestionJobs,
+    marketDataLineageHistory,
+  ]);
 
   const focusedMarketWorkflowSummary = useMemo(() => {
     if (!activeMarketInstrument) {
@@ -2992,10 +3565,22 @@ export default function App() {
       ingestionJobCount: marketDataIngestionJobs.length,
       failedJobCount,
       reviewSnapshotCount,
+      linkedAlertCount: focusedLinkedOperatorAlerts.length,
+      linkedHistoryCount: focusedLinkedOperatorAlertHistory.length,
+      linkedIncidentCount: focusedLinkedOperatorIncidentEvents.length,
+      incidentHistoryCount: focusedMarketIncidentHistory.length,
       latestLineage,
       latestJob,
     };
-  }, [activeMarketInstrument, marketDataIngestionJobs, marketDataLineageHistory]);
+  }, [
+    activeMarketInstrument,
+    focusedLinkedOperatorAlertHistory.length,
+    focusedLinkedOperatorAlerts.length,
+    focusedLinkedOperatorIncidentEvents.length,
+    focusedMarketIncidentHistory.length,
+    marketDataIngestionJobs,
+    marketDataLineageHistory,
+  ]);
 
   const operatorSummary = useMemo(() => {
     if (!operatorVisibility) {
@@ -4228,7 +4813,7 @@ export default function App() {
                 defaultOpen={true}
                 summary={
                   activeMarketInstrument && focusedMarketWorkflowSummary
-                    ? `${focusedMarketWorkflowSummary.lineageCount} lineage snapshots · ${focusedMarketWorkflowSummary.ingestionJobCount} ingestion jobs for ${focusedMarketWorkflowSummary.focusLabel}.`
+                    ? `${focusedMarketWorkflowSummary.lineageCount} lineage snapshots · ${focusedMarketWorkflowSummary.ingestionJobCount} ingestion jobs · ${focusedMarketWorkflowSummary.linkedAlertCount} linked alerts for ${focusedMarketWorkflowSummary.focusLabel}.`
                     : "Select a market-data instrument to inspect lineage and ingestion workflow history."
                 }
                 title="Data incident triage"
@@ -4246,8 +4831,10 @@ export default function App() {
                             : marketDataWorkflowError
                               ? `History load failed: ${marketDataWorkflowError}`
                               : focusedMarketWorkflowSummary?.latestLineage
-                                ? `Latest lineage snapshot recorded ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)} with ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)} claim.`
-                                : "No lineage or ingestion history recorded for the current focus."}
+                                ? `Latest lineage snapshot recorded ${formatTimestamp(focusedMarketWorkflowSummary.latestLineage.recorded_at)} with ${formatWorkflowToken(focusedMarketWorkflowSummary.latestLineage.validation_claim)} claim. ${focusedMarketWorkflowSummary.linkedAlertCount} active alert(s) and ${focusedMarketWorkflowSummary.linkedIncidentCount} incident event(s) are linked to this focus.`
+                                : autoLinkedMarketInstrument
+                                  ? `Runtime alerts currently resolve to ${resolveMarketDataSymbol(autoLinkedMarketInstrument.instrument_id)} · ${autoLinkedMarketInstrument.timeframe}, but no lineage history has been recorded yet.`
+                                  : "No lineage or ingestion history recorded for the current focus."}
                         </p>
                       </div>
                       {incidentFocusedInstruments.length ? (
@@ -4301,6 +4888,14 @@ export default function App() {
                                 ? `${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.status)} / ${formatWorkflowToken(focusedMarketWorkflowSummary.latestJob.operation)}`
                                 : "n/a"}
                             </strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Linked alerts</span>
+                            <strong>{focusedMarketWorkflowSummary.linkedAlertCount}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Incident history</span>
+                            <strong>{focusedMarketWorkflowSummary.incidentHistoryCount}</strong>
                           </div>
                         </div>
                         <div className="status-grid-two-column">
@@ -4390,6 +4985,40 @@ export default function App() {
                             )}
                           </div>
                         </div>
+                        <div>
+                          <h3>Lineage incident history</h3>
+                          {focusedMarketIncidentHistory.length ? (
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>When</th>
+                                  <th>Source</th>
+                                  <th>Signal</th>
+                                  <th>Detail</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {focusedMarketIncidentHistory.map((entry) => (
+                                  <tr key={entry.entryId}>
+                                    <td>{formatTimestamp(entry.occurredAt)}</td>
+                                    <td>
+                                      <span className={`market-data-incident-badge is-${entry.tone}`.trim()}>
+                                        {entry.sourceLabel}
+                                      </span>
+                                    </td>
+                                    <td>{entry.statusLabel}</td>
+                                    <td>
+                                      <strong>{entry.summary}</strong>
+                                      <p className="run-lineage-symbol-copy">{entry.detail}</p>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <p className="empty-state">No alert-linked lineage incident history recorded for this focus.</p>
+                          )}
+                        </div>
                       </>
                     ) : (
                       <p className="empty-state">No market-data instrument is currently selected for triage.</p>
@@ -4419,21 +5048,35 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {operatorVisibility.alerts.map((alert) => (
-                            <tr key={alert.alert_id}>
-                              <td>{alert.severity}</td>
-                              <td>{alert.category}</td>
-                              <td>
-                                <strong>{alert.summary}</strong>
-                                <p className="run-lineage-symbol-copy">{alert.detail}</p>
-                                <p className="run-lineage-symbol-copy">
-                                  Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
-                                </p>
-                              </td>
-                              <td>{formatTimestamp(alert.detected_at)}</td>
-                              <td>{alert.run_id ?? "n/a"}</td>
-                            </tr>
-                          ))}
+                          {operatorVisibility.alerts.map((alert) => {
+                            const linkedInstrument = linkedOperatorAlertById.get(alert.alert_id) ?? null;
+                            return (
+                              <tr key={alert.alert_id}>
+                                <td>{alert.severity}</td>
+                                <td>{alert.category}</td>
+                                <td>
+                                  <strong>{alert.summary}</strong>
+                                  <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                                  <p className="run-lineage-symbol-copy">
+                                    Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                                  </p>
+                                  {linkedInstrument ? (
+                                    <button
+                                      className="market-data-inline-focus-button"
+                                      onClick={() => {
+                                        void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                      }}
+                                      type="button"
+                                    >
+                                      Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                    </button>
+                                  ) : null}
+                                </td>
+                                <td>{formatTimestamp(alert.detected_at)}</td>
+                                <td>{alert.run_id ?? "n/a"}</td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     ) : (
@@ -4488,126 +5131,140 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {operatorVisibility.incident_events.slice(0, 8).map((event) => (
-                        <tr key={`incident-${event.event_id}`}>
-                          <td>{formatTimestamp(event.timestamp)}</td>
-                          <td>{event.kind}</td>
-                          <td>{event.severity}</td>
-                          <td>
-                            <strong>{event.summary}</strong>
-                            <p className="run-lineage-symbol-copy">{event.detail}</p>
-                            <p className="run-lineage-symbol-copy">
-                              Delivery: {event.delivery_state}
-                              {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
-                            </p>
-                            <p className="run-lineage-symbol-copy">
-                              Ack: {event.acknowledgment_state}
-                              {event.acknowledged_by ? ` by ${event.acknowledged_by}` : ""}
-                              {event.acknowledged_at ? ` at ${formatTimestamp(event.acknowledged_at)}` : ""}
-                            </p>
-                            <p className="run-lineage-symbol-copy">
-                              Escalation: level {event.escalation_level} / {event.escalation_state}
-                              {event.last_escalated_by ? ` by ${event.last_escalated_by}` : ""}
-                              {event.last_escalated_at ? ` at ${formatTimestamp(event.last_escalated_at)}` : ""}
-                            </p>
-                            <p className="run-lineage-symbol-copy">
-                              External: {event.external_status}
-                              {event.external_provider ? ` via ${event.external_provider}` : ""}
-                              {event.external_reference ? ` (${event.external_reference})` : ""}
-                              {event.external_last_synced_at
-                                ? ` at ${formatTimestamp(event.external_last_synced_at)}`
-                                : ""}
-                            </p>
-                            <p className="run-lineage-symbol-copy">
-                              Paging: {event.paging_status}
-                              {event.paging_policy_id ? ` via ${event.paging_policy_id}` : ""}
-                              {event.paging_provider ? ` (${event.paging_provider})` : ""}
-                            </p>
-                            <p className="run-lineage-symbol-copy">
-                              Provider workflow: {event.provider_workflow_state}
-                              {event.provider_workflow_action ? ` / ${event.provider_workflow_action}` : ""}
-                              {event.provider_workflow_reference ? ` (${event.provider_workflow_reference})` : ""}
-                              {event.provider_workflow_last_attempted_at
-                                ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
-                                : ""}
-                            </p>
-                            {event.remediation.state !== "not_applicable" ? (
-                              <>
-                                <p className="run-lineage-symbol-copy">
-                                  Remediation: {event.remediation.state}
-                                  {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
-                                  {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
-                                  {event.remediation.requested_by ? ` by ${event.remediation.requested_by}` : ""}
-                                  {event.remediation.last_attempted_at
-                                    ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
-                                    : ""}
-                                </p>
-                                {Object.keys(event.remediation.provider_payload).length ? (
+                      {operatorVisibility.incident_events.slice(0, 8).map((event) => {
+                        const linkedInstrument = linkedOperatorIncidentEventById.get(event.event_id) ?? null;
+                        return (
+                          <tr key={`incident-${event.event_id}`}>
+                            <td>{formatTimestamp(event.timestamp)}</td>
+                            <td>{event.kind}</td>
+                            <td>{event.severity}</td>
+                            <td>
+                              <strong>{event.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{event.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {event.delivery_state}
+                                {event.delivery_targets.length ? ` via ${event.delivery_targets.join(", ")}` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Ack: {event.acknowledgment_state}
+                                {event.acknowledged_by ? ` by ${event.acknowledged_by}` : ""}
+                                {event.acknowledged_at ? ` at ${formatTimestamp(event.acknowledged_at)}` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Escalation: level {event.escalation_level} / {event.escalation_state}
+                                {event.last_escalated_by ? ` by ${event.last_escalated_by}` : ""}
+                                {event.last_escalated_at ? ` at ${formatTimestamp(event.last_escalated_at)}` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                External: {event.external_status}
+                                {event.external_provider ? ` via ${event.external_provider}` : ""}
+                                {event.external_reference ? ` (${event.external_reference})` : ""}
+                                {event.external_last_synced_at
+                                  ? ` at ${formatTimestamp(event.external_last_synced_at)}`
+                                  : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Paging: {event.paging_status}
+                                {event.paging_policy_id ? ` via ${event.paging_policy_id}` : ""}
+                                {event.paging_provider ? ` (${event.paging_provider})` : ""}
+                              </p>
+                              <p className="run-lineage-symbol-copy">
+                                Provider workflow: {event.provider_workflow_state}
+                                {event.provider_workflow_action ? ` / ${event.provider_workflow_action}` : ""}
+                                {event.provider_workflow_reference ? ` (${event.provider_workflow_reference})` : ""}
+                                {event.provider_workflow_last_attempted_at
+                                  ? ` at ${formatTimestamp(event.provider_workflow_last_attempted_at)}`
+                                  : ""}
+                              </p>
+                              {linkedInstrument ? (
+                                <button
+                                  className="market-data-inline-focus-button"
+                                  onClick={() => {
+                                    void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                  }}
+                                  type="button"
+                                >
+                                  Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                </button>
+                              ) : null}
+                              {event.remediation.state !== "not_applicable" ? (
+                                <>
                                   <p className="run-lineage-symbol-copy">
-                                    Provider recovery payload: {formatParameterMap(event.remediation.provider_payload)}
-                                    {event.remediation.provider_payload_updated_at
-                                      ? ` at ${formatTimestamp(event.remediation.provider_payload_updated_at)}`
+                                    Remediation: {event.remediation.state}
+                                    {event.remediation.summary ? ` / ${event.remediation.summary}` : ""}
+                                    {event.remediation.runbook ? ` (${event.remediation.runbook})` : ""}
+                                    {event.remediation.requested_by ? ` by ${event.remediation.requested_by}` : ""}
+                                    {event.remediation.last_attempted_at
+                                      ? ` at ${formatTimestamp(event.remediation.last_attempted_at)}`
                                       : ""}
                                   </p>
-                                ) : null}
-                                {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
-                                  <>
+                                  {Object.keys(event.remediation.provider_payload).length ? (
                                     <p className="run-lineage-symbol-copy">
-                                      Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
-                                      {event.remediation.provider_recovery.job_id
-                                        ? ` / job ${event.remediation.provider_recovery.job_id}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.channels.length
-                                        ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.symbols.length
-                                        ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.timeframe
-                                        ? ` / ${event.remediation.provider_recovery.timeframe}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.verification.state !== "unknown"
-                                        ? ` / verification ${event.remediation.provider_recovery.verification.state}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.updated_at
-                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
+                                      Provider recovery payload: {formatParameterMap(event.remediation.provider_payload)}
+                                      {event.remediation.provider_payload_updated_at
+                                        ? ` at ${formatTimestamp(event.remediation.provider_payload_updated_at)}`
                                         : ""}
                                     </p>
-                                    <p className="run-lineage-symbol-copy">
-                                      Recovery machine: {event.remediation.provider_recovery.status_machine.state}
-                                      {` / workflow ${event.remediation.provider_recovery.status_machine.workflow_state}`}
-                                      {event.remediation.provider_recovery.status_machine.workflow_action
-                                        ? ` (${event.remediation.provider_recovery.status_machine.workflow_action})`
-                                        : ""}
-                                      {` / job ${event.remediation.provider_recovery.status_machine.job_state}`}
-                                      {` / sync ${event.remediation.provider_recovery.status_machine.sync_state}`}
-                                      {event.remediation.provider_recovery.status_machine.attempt_number
-                                        ? ` / attempt ${event.remediation.provider_recovery.status_machine.attempt_number}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.status_machine.last_event_kind
-                                        ? ` / event ${event.remediation.provider_recovery.status_machine.last_event_kind}`
-                                        : ""}
-                                      {event.remediation.provider_recovery.status_machine.last_event_at
-                                        ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
-                                        : ""}
-                                    </p>
-                                    {formatProviderRecoveryTelemetry(event.remediation.provider_recovery) ? (
+                                  ) : null}
+                                  {event.remediation.provider_recovery.lifecycle_state !== "not_synced" ? (
+                                    <>
                                       <p className="run-lineage-symbol-copy">
-                                        {formatProviderRecoveryTelemetry(event.remediation.provider_recovery)}
+                                        Provider recovery: {event.remediation.provider_recovery.lifecycle_state}
+                                        {event.remediation.provider_recovery.job_id
+                                          ? ` / job ${event.remediation.provider_recovery.job_id}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.channels.length
+                                          ? ` / channels ${event.remediation.provider_recovery.channels.join(", ")}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.symbols.length
+                                          ? ` / symbols ${event.remediation.provider_recovery.symbols.join(", ")}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.timeframe
+                                          ? ` / ${event.remediation.provider_recovery.timeframe}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.verification.state !== "unknown"
+                                          ? ` / verification ${event.remediation.provider_recovery.verification.state}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.updated_at
+                                          ? ` at ${formatTimestamp(event.remediation.provider_recovery.updated_at)}`
+                                          : ""}
                                       </p>
-                                    ) : null}
-                                    {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
                                       <p className="run-lineage-symbol-copy">
-                                        {formatProviderRecoverySchema(event.remediation.provider_recovery)}
+                                        Recovery machine: {event.remediation.provider_recovery.status_machine.state}
+                                        {` / workflow ${event.remediation.provider_recovery.status_machine.workflow_state}`}
+                                        {event.remediation.provider_recovery.status_machine.workflow_action
+                                          ? ` (${event.remediation.provider_recovery.status_machine.workflow_action})`
+                                          : ""}
+                                        {` / job ${event.remediation.provider_recovery.status_machine.job_state}`}
+                                        {` / sync ${event.remediation.provider_recovery.status_machine.sync_state}`}
+                                        {event.remediation.provider_recovery.status_machine.attempt_number
+                                          ? ` / attempt ${event.remediation.provider_recovery.status_machine.attempt_number}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.status_machine.last_event_kind
+                                          ? ` / event ${event.remediation.provider_recovery.status_machine.last_event_kind}`
+                                          : ""}
+                                        {event.remediation.provider_recovery.status_machine.last_event_at
+                                          ? ` at ${formatTimestamp(event.remediation.provider_recovery.status_machine.last_event_at)}`
+                                          : ""}
                                       </p>
-                                    ) : null}
-                                  </>
-                                ) : null}
-                              </>
-                            ) : null}
-                          </td>
-                        </tr>
-                      ))}
+                                      {formatProviderRecoveryTelemetry(event.remediation.provider_recovery) ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          {formatProviderRecoveryTelemetry(event.remediation.provider_recovery)}
+                                        </p>
+                                      ) : null}
+                                      {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          {formatProviderRecoverySchema(event.remediation.provider_recovery)}
+                                        </p>
+                                      ) : null}
+                                    </>
+                                  ) : null}
+                                </>
+                              ) : null}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
@@ -4631,21 +5288,35 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {operatorVisibility.alert_history.slice(0, 8).map((alert) => (
-                        <tr key={`history-${alert.alert_id}`}>
-                          <td>{alert.status}</td>
-                          <td>{alert.severity}</td>
-                          <td>
-                            <strong>{alert.summary}</strong>
-                            <p className="run-lineage-symbol-copy">{alert.detail}</p>
-                            <p className="run-lineage-symbol-copy">
-                              Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
-                            </p>
-                          </td>
-                          <td>{formatTimestamp(alert.detected_at)}</td>
-                          <td>{formatTimestamp(alert.resolved_at ?? null)}</td>
-                        </tr>
-                      ))}
+                      {operatorVisibility.alert_history.slice(0, 8).map((alert) => {
+                        const linkedInstrument = linkedOperatorAlertHistoryById.get(alert.alert_id) ?? null;
+                        return (
+                          <tr key={`history-${alert.alert_id}`}>
+                            <td>{alert.status}</td>
+                            <td>{alert.severity}</td>
+                            <td>
+                              <strong>{alert.summary}</strong>
+                              <p className="run-lineage-symbol-copy">{alert.detail}</p>
+                              <p className="run-lineage-symbol-copy">
+                                Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
+                              </p>
+                              {linkedInstrument ? (
+                                <button
+                                  className="market-data-inline-focus-button"
+                                  onClick={() => {
+                                    void handleMarketInstrumentFocus(linkedInstrument.instrument);
+                                  }}
+                                  type="button"
+                                >
+                                  Focus triage: {linkedInstrument.symbol} · {linkedInstrument.timeframe}
+                                </button>
+                              ) : null}
+                            </td>
+                            <td>{formatTimestamp(alert.detected_at)}</td>
+                            <td>{formatTimestamp(alert.resolved_at ?? null)}</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
