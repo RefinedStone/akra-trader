@@ -641,6 +641,7 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "filter_expr",
     "category",
     "status",
+    "narrative_facet",
     "limit",
     "offset",
     "app",
@@ -1230,6 +1231,9 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
         "provider_label": "pagerduty",
         "vendor_field": "custom_details.market_context",
         "market_data_provider": "binance",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
         "window_days": 14,
         "result_limit": 12,
       },
@@ -1240,6 +1244,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert preset_response.status_code == 200
   preset_payload = preset_response.json()
   assert preset_payload["query"]["focus_scope"] == "current_focus"
+  assert preset_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
 
   list_presets_response = client.get(
     "/api/operator/provider-provenance-analytics/presets",
@@ -1257,7 +1262,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
       "description": "Shared drift dashboard view.",
       "preset_id": preset_payload["preset_id"],
       "layout": {
-        "highlight_panel": "drift",
+        "highlight_panel": "scheduler_alerts",
         "show_rollups": True,
         "show_time_series": True,
         "show_recent_exports": False,
@@ -1268,11 +1273,12 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   )
   assert view_response.status_code == 200
   view_payload = view_response.json()
-  assert view_payload["layout"]["highlight_panel"] == "drift"
+  assert view_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert view_payload["query"]["scheduler_alert_status"] == "resolved"
 
   list_views_response = client.get(
     "/api/operator/provider-provenance-analytics/views",
-    params={"preset_id": preset_payload["preset_id"], "highlight_panel": "drift", "limit": 10},
+    params={"preset_id": preset_payload["preset_id"], "highlight_panel": "scheduler_alerts", "limit": 10},
   )
   assert list_views_response.status_code == 200
   list_views_payload = list_views_response.json()
@@ -3541,6 +3547,10 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
       "/api/operator/provider-provenance-analytics/scheduler-alerts",
       params={"category": "scheduler_lag", "status": "resolved", "limit": 1, "offset": 1},
     )
+    narrative_page_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-alerts",
+      params={"category": "scheduler_lag", "narrative_facet": "post_resolution_recovery", "limit": 10, "offset": 0},
+    )
 
   assert first_page_response.status_code == 200
   first_page_payload = first_page_response.json()
@@ -3557,6 +3567,15 @@ def test_operator_provider_provenance_scheduler_alert_history_endpoint_paginates
   assert second_page_payload["returned"] == 1
   assert second_page_payload["previous_offset"] == 0
   assert second_page_payload["items"][0]["timeline_position"] == 1
+
+  assert narrative_page_response.status_code == 200
+  narrative_page_payload = narrative_page_response.json()
+  assert narrative_page_payload["query"]["narrative_facet"] == "post_resolution_recovery"
+  assert narrative_page_payload["returned"] >= 1
+  assert all(
+    item["narrative"]["has_post_resolution_history"]
+    for item in narrative_page_payload["items"]
+  )
 
 
 def test_operator_visibility_endpoint_can_reconstruct_mixed_status_scheduler_narrative(

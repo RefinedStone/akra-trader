@@ -1286,12 +1286,14 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
   query: {
     category?: string | null;
     status?: string | null;
+    narrative_facet?: string | null;
     limit: number;
     offset: number;
   };
   available_filters: {
     categories: string[];
     statuses: string[];
+    narrative_facets: string[];
   };
   summary: {
     total_occurrences: number;
@@ -1304,7 +1306,21 @@ export type ProviderProvenanceSchedulerAlertHistoryPayload = {
       resolved_count: number;
     }[];
   };
-  items: OperatorAlertEntry[];
+  items: (OperatorAlertEntry & {
+    narrative: {
+      facet?: string | null;
+      facet_flags: string[];
+      narrative_mode?: string | null;
+      can_reconstruct_narrative: boolean;
+      has_post_resolution_history: boolean;
+      occurrence_record_count: number;
+      post_resolution_record_count: number;
+      status_sequence: string[];
+      post_resolution_status_sequence: string[];
+      narrative_window_ended_at?: string | null;
+      next_occurrence_detected_at?: string | null;
+    };
+  })[];
   total: number;
   returned: number;
   has_more: boolean;
@@ -1484,13 +1500,22 @@ export type ProviderProvenanceAnalyticsWorkspaceQuery = {
   venue?: string | null;
   requested_by_tab_id?: string | null;
   status?: string | null;
+  scheduler_alert_category?: string | null;
+  scheduler_alert_status?: string | null;
+  scheduler_alert_narrative_facet?: string | null;
   search?: string | null;
   result_limit: number;
   window_days: number;
 };
 
 export type ProviderProvenanceDashboardLayout = {
-  highlight_panel: "overview" | "drift" | "burn_up" | "rollups" | "recent_exports";
+  highlight_panel:
+    | "overview"
+    | "drift"
+    | "burn_up"
+    | "rollups"
+    | "recent_exports"
+    | "scheduler_alerts";
   show_rollups: boolean;
   show_time_series: boolean;
   show_recent_exports: boolean;

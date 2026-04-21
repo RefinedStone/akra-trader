@@ -370,6 +370,11 @@ const defaultMarketDataProvenanceExportFilterState: MarketDataProvenanceExportFi
 };
 
 type ProviderProvenanceAnalyticsScope = "current_focus" | "all_focuses";
+type ProviderProvenanceSchedulerOccurrenceNarrativeFacet =
+  | "all_occurrences"
+  | "resolved_narratives"
+  | "post_resolution_recovery"
+  | "recurring_occurrences";
 
 type ProviderProvenanceAnalyticsQueryState = {
   scope: ProviderProvenanceAnalyticsScope;
@@ -377,6 +382,9 @@ type ProviderProvenanceAnalyticsQueryState = {
   vendor_field: string;
   market_data_provider: string;
   requested_by_tab_id: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet: ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
   search_query: string;
   window_days: number;
 };
@@ -399,6 +407,9 @@ const defaultProviderProvenanceAnalyticsQueryState: ProviderProvenanceAnalyticsQ
   vendor_field: ALL_FILTER_VALUE,
   market_data_provider: ALL_FILTER_VALUE,
   requested_by_tab_id: ALL_FILTER_VALUE,
+  scheduler_alert_category: ALL_FILTER_VALUE,
+  scheduler_alert_status: ALL_FILTER_VALUE,
+  scheduler_alert_narrative_facet: "all_occurrences",
   search_query: "",
   window_days: 14,
 };
@@ -2220,6 +2231,15 @@ function formatProviderProvenanceAnalyticsQuerySummary(
     query.vendor_field !== ALL_FILTER_VALUE ? `vendor field ${query.vendor_field}` : null,
     query.market_data_provider !== ALL_FILTER_VALUE ? `market data ${query.market_data_provider}` : null,
     query.requested_by_tab_id !== ALL_FILTER_VALUE ? `requester ${query.requested_by_tab_id}` : null,
+    query.scheduler_alert_category !== ALL_FILTER_VALUE
+      ? `scheduler category ${query.scheduler_alert_category}`
+      : null,
+    query.scheduler_alert_status !== ALL_FILTER_VALUE
+      ? `scheduler status ${query.scheduler_alert_status}`
+      : null,
+    query.scheduler_alert_narrative_facet !== "all_occurrences"
+      ? `scheduler ${formatProviderProvenanceSchedulerNarrativeFacet(query.scheduler_alert_narrative_facet)}`
+      : null,
     query.search_query.trim() ? `search ${query.search_query.trim()}` : null,
   ].filter((value): value is string => Boolean(value));
   return parts.join(" / ");
@@ -2233,6 +2253,7 @@ function normalizeProviderProvenanceDashboardLayoutState(
       layout?.highlight_panel === "drift"
       || layout?.highlight_panel === "burn_up"
       || layout?.highlight_panel === "rollups"
+      || layout?.highlight_panel === "scheduler_alerts"
       || layout?.highlight_panel === "recent_exports"
         ? layout.highlight_panel
         : "overview",
@@ -2259,6 +2280,15 @@ function buildProviderProvenanceAnalyticsWorkspaceQuery(
     ...(query.vendor_field !== ALL_FILTER_VALUE ? { vendor_field: query.vendor_field } : {}),
     ...(query.market_data_provider !== ALL_FILTER_VALUE ? { market_data_provider: query.market_data_provider } : {}),
     ...(query.requested_by_tab_id !== ALL_FILTER_VALUE ? { requested_by_tab_id: query.requested_by_tab_id } : {}),
+    ...(query.scheduler_alert_category !== ALL_FILTER_VALUE
+      ? { scheduler_alert_category: query.scheduler_alert_category }
+      : {}),
+    ...(query.scheduler_alert_status !== ALL_FILTER_VALUE
+      ? { scheduler_alert_status: query.scheduler_alert_status }
+      : {}),
+    ...(query.scheduler_alert_narrative_facet !== "all_occurrences"
+      ? { scheduler_alert_narrative_facet: query.scheduler_alert_narrative_facet }
+      : {}),
     ...(query.search_query.trim() ? { search: query.search_query.trim() } : {}),
     result_limit: 12,
     window_days: query.window_days,
@@ -2276,12 +2306,38 @@ function buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(
     vendor_field: query.vendor_field ?? ALL_FILTER_VALUE,
     market_data_provider: query.market_data_provider ?? ALL_FILTER_VALUE,
     requested_by_tab_id: query.requested_by_tab_id ?? ALL_FILTER_VALUE,
+    scheduler_alert_category: query.scheduler_alert_category ?? ALL_FILTER_VALUE,
+    scheduler_alert_status: query.scheduler_alert_status ?? ALL_FILTER_VALUE,
+    scheduler_alert_narrative_facet:
+      query.scheduler_alert_narrative_facet === "resolved_narratives"
+      || query.scheduler_alert_narrative_facet === "post_resolution_recovery"
+      || query.scheduler_alert_narrative_facet === "recurring_occurrences"
+        ? query.scheduler_alert_narrative_facet
+        : "all_occurrences",
     search_query: query.search ?? "",
     window_days:
       typeof query.window_days === "number" && Number.isFinite(query.window_days)
         ? Math.max(3, Math.min(Math.round(query.window_days), 90))
         : 14,
   };
+}
+
+function formatProviderProvenanceSchedulerNarrativeFacet(
+  facet: ProviderProvenanceSchedulerOccurrenceNarrativeFacet | string,
+) {
+  if (facet === "resolved_narratives" || facet === "resolved_narrative") {
+    return "resolved narratives";
+  }
+  if (facet === "post_resolution_recovery") {
+    return "post-resolution recovery";
+  }
+  if (facet === "recurring_occurrences" || facet === "recurring_occurrence") {
+    return "recurring occurrences";
+  }
+  if (facet === "current_snapshot") {
+    return "current snapshot";
+  }
+  return "all occurrences";
 }
 
 function resolveProviderProvenanceSeriesBarWidth(value: number, maxValue: number) {
@@ -2964,10 +3020,6 @@ export default function App() {
     useState<string | null>(null);
   const [providerProvenanceSchedulerAlertHistoryOffset, setProviderProvenanceSchedulerAlertHistoryOffset] =
     useState(0);
-  const [providerProvenanceSchedulerAlertHistoryCategory, setProviderProvenanceSchedulerAlertHistoryCategory] =
-    useState(ALL_FILTER_VALUE);
-  const [providerProvenanceSchedulerAlertHistoryStatus, setProviderProvenanceSchedulerAlertHistoryStatus] =
-    useState(ALL_FILTER_VALUE);
   const [providerProvenanceSchedulerDrilldownBucketKey, setProviderProvenanceSchedulerDrilldownBucketKey] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerExports, setProviderProvenanceSchedulerExports] =
@@ -3145,6 +3197,7 @@ export default function App() {
   const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerAlertHistoryRequestIdRef = useRef(0);
   const providerProvenanceSchedulerExportRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerAutomationRef = useRef<HTMLDivElement | null>(null);
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
     () =>
       selectedProviderProvenanceSchedulerExportHistory?.job
@@ -4442,9 +4495,10 @@ export default function App() {
     void loadProviderProvenanceSchedulerSurfaces();
   }, [
     providerProvenanceAnalyticsQuery.window_days,
-    providerProvenanceSchedulerAlertHistoryCategory,
     providerProvenanceSchedulerAlertHistoryOffset,
-    providerProvenanceSchedulerAlertHistoryStatus,
+    providerProvenanceAnalyticsQuery.scheduler_alert_category,
+    providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
+    providerProvenanceAnalyticsQuery.scheduler_alert_status,
     providerProvenanceSchedulerHistoryOffset,
     providerProvenanceSchedulerDrilldownBucketKey,
   ]);
@@ -4527,6 +4581,19 @@ export default function App() {
       providerProvenanceSchedulerAlertHistory?.available_filters.statuses.length
         ? providerProvenanceSchedulerAlertHistory.available_filters.statuses
         : ["active", "resolved"],
+    [providerProvenanceSchedulerAlertHistory],
+  );
+
+  const providerProvenanceSchedulerAlertNarrativeFacetOptions = useMemo(
+    () =>
+      providerProvenanceSchedulerAlertHistory?.available_filters.narrative_facets.length
+        ? providerProvenanceSchedulerAlertHistory.available_filters.narrative_facets
+        : [
+            "all_occurrences",
+            "resolved_narratives",
+            "post_resolution_recovery",
+            "recurring_occurrences",
+          ],
     [providerProvenanceSchedulerAlertHistory],
   );
 
@@ -5202,12 +5269,16 @@ export default function App() {
         }),
         listProviderProvenanceSchedulerAlertHistory({
           category:
-            providerProvenanceSchedulerAlertHistoryCategory !== ALL_FILTER_VALUE
-              ? providerProvenanceSchedulerAlertHistoryCategory
+            providerProvenanceAnalyticsQuery.scheduler_alert_category !== ALL_FILTER_VALUE
+              ? providerProvenanceAnalyticsQuery.scheduler_alert_category
               : undefined,
           status:
-            providerProvenanceSchedulerAlertHistoryStatus !== ALL_FILTER_VALUE
-              ? providerProvenanceSchedulerAlertHistoryStatus
+            providerProvenanceAnalyticsQuery.scheduler_alert_status !== ALL_FILTER_VALUE
+              ? providerProvenanceAnalyticsQuery.scheduler_alert_status
+              : undefined,
+          narrativeFacet:
+            providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet !== "all_occurrences"
+              ? providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet
               : undefined,
           limit: schedulerHistoryLimit,
           offset: providerProvenanceSchedulerAlertHistoryOffset,
@@ -5773,6 +5844,7 @@ export default function App() {
     setProviderProvenanceAnalyticsQuery(
       buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(entry.query),
     );
+    setProviderProvenanceSchedulerAlertHistoryOffset(0);
     if (includeLayout && "layout" in entry) {
       setProviderProvenanceDashboardLayout(
         normalizeProviderProvenanceDashboardLayoutState(entry.layout),
@@ -5787,6 +5859,39 @@ export default function App() {
     } else {
       setProviderProvenanceWorkspaceFeedback(`${feedbackLabel} applied to the shared analytics workbench.`);
     }
+    if (
+      includeLayout
+      && "layout" in entry
+      && entry.layout.highlight_panel === "scheduler_alerts"
+    ) {
+      requestAnimationFrame(() => {
+        providerProvenanceSchedulerAutomationRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+      });
+    }
+  }
+
+  function stageProviderProvenanceSchedulerNarrativeView() {
+    const facetLabel = formatProviderProvenanceSchedulerNarrativeFacet(
+      providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
+    );
+    setProviderProvenanceDashboardLayout((current) => ({
+      ...current,
+      highlight_panel: "scheduler_alerts",
+    }));
+    setProviderProvenanceViewDraft((current) => ({
+      ...current,
+      name: current.name.trim() ? current.name : `Scheduler ${facetLabel} board`,
+      description:
+        current.description.trim()
+        ? current.description
+        : `Saved scheduler occurrence view for ${facetLabel}.`,
+    }));
+    setProviderProvenanceWorkspaceFeedback(
+      "Scheduler occurrence narrative view staged. Save view to persist the current facet and filters.",
+    );
   }
 
   async function saveCurrentProviderProvenancePreset() {
@@ -7904,6 +8009,7 @@ export default function App() {
                                               event.target.value === "drift"
                                               || event.target.value === "burn_up"
                                               || event.target.value === "rollups"
+                                              || event.target.value === "scheduler_alerts"
                                               || event.target.value === "recent_exports"
                                                 ? event.target.value
                                                 : "overview",
@@ -7915,6 +8021,7 @@ export default function App() {
                                         <option value="drift">Drift</option>
                                         <option value="burn_up">Burn-up</option>
                                         <option value="rollups">Rollups</option>
+                                        <option value="scheduler_alerts">Scheduler alerts</option>
                                         <option value="recent_exports">Recent exports</option>
                                       </select>
                                     </label>
@@ -8486,7 +8593,14 @@ export default function App() {
                                 </p>
                               ) : null}
                               {providerProvenanceSchedulerCurrent ? (
-                                <div className="market-data-provenance-shared-history">
+                                <div
+                                  className={`market-data-provenance-shared-history ${
+                                    providerProvenanceDashboardLayout.highlight_panel === "scheduler_alerts"
+                                      ? "is-highlighted"
+                                      : ""
+                                  }`.trim()}
+                                  ref={providerProvenanceSchedulerAutomationRef}
+                                >
                                   <div className="market-data-provenance-history-head">
                                     <strong>Scheduler automation</strong>
                                     <p>
@@ -8978,14 +9092,22 @@ export default function App() {
                                         {formatWorkflowToken(entry.category)} {entry.total} total · {entry.resolved_count} resolved
                                       </span>
                                     ))}
+                                    <span className="run-filter-summary-chip">
+                                      Facet {formatProviderProvenanceSchedulerNarrativeFacet(
+                                        providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet,
+                                      )}
+                                    </span>
                                   </div>
                                   <div className="market-data-provenance-history-actions">
                                     <label className="run-form-field">
                                       <span>Category</span>
                                       <select
-                                        value={providerProvenanceSchedulerAlertHistoryCategory}
+                                        value={providerProvenanceAnalyticsQuery.scheduler_alert_category}
                                         onChange={(event) => {
-                                          setProviderProvenanceSchedulerAlertHistoryCategory(event.target.value);
+                                          setProviderProvenanceAnalyticsQuery((current) => ({
+                                            ...current,
+                                            scheduler_alert_category: event.target.value,
+                                          }));
                                           setProviderProvenanceSchedulerAlertHistoryOffset(0);
                                         }}
                                       >
@@ -9000,9 +9122,12 @@ export default function App() {
                                     <label className="run-form-field">
                                       <span>Status</span>
                                       <select
-                                        value={providerProvenanceSchedulerAlertHistoryStatus}
+                                        value={providerProvenanceAnalyticsQuery.scheduler_alert_status}
                                         onChange={(event) => {
-                                          setProviderProvenanceSchedulerAlertHistoryStatus(event.target.value);
+                                          setProviderProvenanceAnalyticsQuery((current) => ({
+                                            ...current,
+                                            scheduler_alert_status: event.target.value,
+                                          }));
                                           setProviderProvenanceSchedulerAlertHistoryOffset(0);
                                         }}
                                       >
@@ -9014,6 +9139,41 @@ export default function App() {
                                         ))}
                                       </select>
                                     </label>
+                                    <label className="run-form-field">
+                                      <span>Narrative facet</span>
+                                      <select
+                                        value={providerProvenanceAnalyticsQuery.scheduler_alert_narrative_facet}
+                                        onChange={(event) => {
+                                          setProviderProvenanceAnalyticsQuery((current) => ({
+                                            ...current,
+                                            scheduler_alert_narrative_facet:
+                                              event.target.value === "resolved_narratives"
+                                              || event.target.value === "post_resolution_recovery"
+                                              || event.target.value === "recurring_occurrences"
+                                                ? event.target.value
+                                                : "all_occurrences",
+                                          }));
+                                          setProviderProvenanceSchedulerAlertHistoryOffset(0);
+                                        }}
+                                      >
+                                        {providerProvenanceSchedulerAlertNarrativeFacetOptions.map((value) => (
+                                          <option key={`provider-scheduler-alert-facet-${value}`} value={value}>
+                                            {formatProviderProvenanceSchedulerNarrativeFacet(
+                                              value as ProviderProvenanceSchedulerOccurrenceNarrativeFacet,
+                                            )}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <button
+                                      className="ghost-button"
+                                      onClick={() => {
+                                        stageProviderProvenanceSchedulerNarrativeView();
+                                      }}
+                                      type="button"
+                                    >
+                                      Stage saved view
+                                    </button>
                                     <button
                                       className="ghost-button"
                                       disabled={!providerProvenanceSchedulerAlertHistory?.previous_offset && providerProvenanceSchedulerAlertHistoryOffset === 0}
@@ -9066,6 +9226,9 @@ export default function App() {
                                       <tbody>
                                         {providerProvenanceSchedulerAlertTimelineItems.map((alert) => {
                                           const timelineSummary = formatProviderProvenanceSchedulerTimelineSummary(alert);
+                                          const narrativeFacetLabel = formatProviderProvenanceSchedulerNarrativeFacet(
+                                            alert.narrative.facet ?? "all_occurrences",
+                                          );
                                           return (
                                             <tr key={`provider-scheduler-alert-timeline-${getOperatorAlertOccurrenceKey(alert)}`}>
                                               <td>
@@ -9076,6 +9239,9 @@ export default function App() {
                                                 {timelineSummary ? (
                                                   <p className="run-lineage-symbol-copy">{timelineSummary}</p>
                                                 ) : null}
+                                                <p className="run-lineage-symbol-copy">
+                                                  Narrative {narrativeFacetLabel} · {alert.narrative.occurrence_record_count} occurrence record(s)
+                                                </p>
                                               </td>
                                               <td>
                                                 <strong>{formatTimestamp(alert.detected_at)}</strong>
@@ -9085,6 +9251,11 @@ export default function App() {
                                                 {alert.occurrence_id ? (
                                                   <p className="run-lineage-symbol-copy">{alert.occurrence_id}</p>
                                                 ) : null}
+                                                {alert.narrative.can_reconstruct_narrative ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Sequence {alert.narrative.status_sequence.join(" → ") || "n/a"}
+                                                  </p>
+                                                ) : null}
                                               </td>
                                               <td>
                                                 <strong>{alert.summary}</strong>
@@ -9092,6 +9263,21 @@ export default function App() {
                                                 <p className="run-lineage-symbol-copy">
                                                   Delivery: {alert.delivery_targets.length ? alert.delivery_targets.join(", ") : "n/a"}
                                                 </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {alert.narrative.can_reconstruct_narrative
+                                                    ? `Narrative mode ${formatWorkflowToken(alert.narrative.narrative_mode ?? "mixed_status_post_resolution")} · post-resolution ${alert.narrative.post_resolution_record_count} record(s)`
+                                                    : "Active occurrence uses the current scheduler snapshot until it resolves."}
+                                                </p>
+                                                {alert.narrative.has_post_resolution_history ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Post-resolution sequence {alert.narrative.post_resolution_status_sequence.join(" → ") || "n/a"} · window ended {formatTimestamp(alert.narrative.narrative_window_ended_at ?? null)}
+                                                  </p>
+                                                ) : null}
+                                                {alert.narrative.next_occurrence_detected_at ? (
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Next recurrence detected {formatTimestamp(alert.narrative.next_occurrence_detected_at)}
+                                                  </p>
+                                                ) : null}
                                                 <div className="market-data-provenance-history-actions">
                                                   <button
                                                     className="ghost-button"

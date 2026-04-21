@@ -663,6 +663,7 @@ def execute_standalone_surface_binding(
     payload = app.get_provider_provenance_scheduler_alert_history_page(
       category=resolved_filters.get("category"),
       status=resolved_filters.get("status"),
+      narrative_facet=resolved_filters.get("narrative_facet"),
       limit=resolved_filters.get("limit", 25),
       offset=resolved_filters.get("offset", 0),
     )

@@ -1745,6 +1745,12 @@ def test_provider_provenance_scheduler_alert_history_page_paginates_occurrences(
     limit=1,
     offset=1,
   )
+  narrative_page = app.get_provider_provenance_scheduler_alert_history_page(
+    category="scheduler_lag",
+    narrative_facet="post_resolution_recovery",
+    limit=10,
+    offset=0,
+  )
 
   assert first_page["query"]["category"] == "scheduler_lag"
   assert first_page["query"]["status"] == "resolved"
@@ -1752,11 +1758,17 @@ def test_provider_provenance_scheduler_alert_history_page_paginates_occurrences(
   assert first_page["returned"] == 1
   assert first_page["next_offset"] == 1
   assert first_page["summary"]["by_category"][0]["category"] == "scheduler_lag"
-  assert first_page["items"][0].timeline_position == 2
-  assert first_page["items"][0].timeline_total == 2
+  assert first_page["items"][0]["alert"].timeline_position == 2
+  assert first_page["items"][0]["alert"].timeline_total == 2
   assert second_page["returned"] == 1
   assert second_page["previous_offset"] == 0
-  assert second_page["items"][0].timeline_position == 1
+  assert second_page["items"][0]["alert"].timeline_position == 1
+  assert narrative_page["query"]["narrative_facet"] == "post_resolution_recovery"
+  assert narrative_page["returned"] >= 1
+  assert all(
+    bool(item["narrative"]["has_post_resolution_history"])
+    for item in narrative_page["items"]
+  )
 
 
 def test_provider_provenance_scheduler_alert_history_binding_serializes_occurrences(
@@ -1803,16 +1815,25 @@ def test_provider_provenance_scheduler_alert_history_binding_serializes_occurren
   payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_alert_history"],
     app=app,
-    filters={"category": "scheduler_lag", "status": "resolved", "limit": 10, "offset": 0},
+    filters={
+      "category": "scheduler_lag",
+      "status": "resolved",
+      "narrative_facet": "post_resolution_recovery",
+      "limit": 10,
+      "offset": 0,
+    },
   )
 
   assert payload["query"]["category"] == "scheduler_lag"
   assert payload["query"]["status"] == "resolved"
+  assert payload["query"]["narrative_facet"] == "post_resolution_recovery"
   assert payload["summary"]["total_occurrences"] == 1
   assert payload["summary"]["resolved_count"] == 1
   assert payload["returned"] == 1
   assert payload["items"][0]["category"] == "scheduler_lag"
   assert payload["items"][0]["status"] == "resolved"
+  assert payload["available_filters"]["narrative_facets"][0] == "all_occurrences"
+  assert payload["items"][0]["narrative"]["has_post_resolution_history"] is True
   assert payload["items"][0]["occurrence_id"]
   assert payload["items"][0]["timeline_total"] == 1
 
@@ -15275,6 +15296,9 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[0].key == (
     "category"
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[2].key == (
+    "narrative_facet"
+  )
   assert bindings_by_key["operator_provider_provenance_scheduler_alert_history"].filter_param_specs[-1].key == (
     "offset"
   )
@@ -16244,6 +16268,9 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
         "provider_label": "pagerduty",
         "vendor_field": "custom_details.market_context",
         "market_data_provider": "binance",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "post_resolution_recovery",
         "window_days": 14,
         "result_limit": 12,
       },
@@ -16253,6 +16280,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert preset_payload["query"]["focus_scope"] == "current_focus"
   assert preset_payload["focus"]["symbol"] == "BTC/USDT"
+  assert preset_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
 
   preset_list_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_analytics_preset_list"],
@@ -16270,7 +16298,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "description": "Shared drift dashboard view.",
       "preset_id": preset_payload["preset_id"],
       "layout": {
-        "highlight_panel": "drift",
+        "highlight_panel": "scheduler_alerts",
         "show_rollups": True,
         "show_time_series": True,
         "show_recent_exports": False,
@@ -16280,12 +16308,13 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
     },
   )
   assert view_payload["preset_id"] == preset_payload["preset_id"]
-  assert view_payload["layout"]["highlight_panel"] == "drift"
+  assert view_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert view_payload["query"]["scheduler_alert_status"] == "resolved"
 
   view_list_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_dashboard_view_list"],
     app=app,
-    filters={"preset_id": preset_payload["preset_id"], "highlight_panel": "drift", "limit": 10},
+    filters={"preset_id": preset_payload["preset_id"], "highlight_panel": "scheduler_alerts", "limit": 10},
   )
   assert view_list_payload["total"] == 1
   assert view_list_payload["items"][0]["view_id"] == view_payload["view_id"]

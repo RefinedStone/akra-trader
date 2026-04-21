@@ -175,6 +175,9 @@ It is not yet a finished live trading product:
 - resolved scheduler occurrences can now export mixed-status post-resolution narratives, so the
   shared scheduler artifact can capture recovery, healthy stabilization, and other intervening
   statuses instead of only the original lag/failure rows
+- that scheduler occurrence workspace now also exposes a narrative facet plus a saved-view staging
+  flow, so teams can preserve post-resolution recovery or recurring-occurrence review layouts as
+  shared dashboard views instead of rebuilding those filters by hand
 
 ### Operator discipline baseline
 

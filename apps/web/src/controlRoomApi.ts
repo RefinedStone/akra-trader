@@ -364,6 +364,7 @@ export async function listProviderProvenanceSchedulerHealthHistory(params: {
 export async function listProviderProvenanceSchedulerAlertHistory(params: {
   category?: string;
   status?: string;
+  narrativeFacet?: string;
   limit?: number;
   offset?: number;
 } = {}) {
@@ -373,6 +374,9 @@ export async function listProviderProvenanceSchedulerAlertHistory(params: {
   }
   if (params.status?.trim()) {
     searchParams.set("status", params.status.trim());
+  }
+  if (params.narrativeFacet?.trim()) {
+    searchParams.set("narrative_facet", params.narrativeFacet.trim());
   }
   if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
     searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);

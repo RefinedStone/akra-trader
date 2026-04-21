@@ -2415,6 +2415,13 @@ select {
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.market-data-provenance-shared-history.is-highlighted {
+  padding: 16px;
+  border: 1px solid rgba(24, 191, 191, 0.28);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(24, 191, 191, 0.08), rgba(19, 117, 236, 0.03));
+}
+
 .market-data-provenance-time-series-grid {
   margin-top: 14px;
 }

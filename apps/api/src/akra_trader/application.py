@@ -3552,6 +3552,18 @@ class TradingApplication:
         if isinstance(query.get("status"), str) and query.get("status").strip()
         else None
       ),
+      "scheduler_alert_category": cls._normalize_provider_provenance_scheduler_alert_history_category(
+        query.get("scheduler_alert_category")
+      ),
+      "scheduler_alert_status": cls._normalize_provider_provenance_scheduler_alert_history_status(
+        query.get("scheduler_alert_status")
+      ),
+      "scheduler_alert_narrative_facet": (
+        cls._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+          query.get("scheduler_alert_narrative_facet")
+        )
+        or "all_occurrences"
+      ),
       "search": (
         query.get("search").strip()
         if isinstance(query.get("search"), str) and query.get("search").strip()
@@ -3587,7 +3599,14 @@ class TradingApplication:
     normalized_highlight_panel = (
       highlight_panel.strip()
       if isinstance(highlight_panel, str)
-      and highlight_panel.strip() in {"overview", "drift", "burn_up", "rollups", "recent_exports"}
+      and highlight_panel.strip() in {
+        "overview",
+        "drift",
+        "burn_up",
+        "rollups",
+        "recent_exports",
+        "scheduler_alerts",
+      }
       else "overview"
     )
     return {
@@ -3669,6 +3688,29 @@ class TradingApplication:
       f"vendor field {query['vendor_field']}" if isinstance(query.get("vendor_field"), str) else None,
       f"market data {query['market_data_provider']}" if isinstance(query.get("market_data_provider"), str) else None,
       f"requester {query['requested_by_tab_id']}" if isinstance(query.get("requested_by_tab_id"), str) else None,
+      (
+        f"scheduler category {query['scheduler_alert_category']}"
+        if isinstance(query.get("scheduler_alert_category"), str)
+        else None
+      ),
+      (
+        f"scheduler status {query['scheduler_alert_status']}"
+        if isinstance(query.get("scheduler_alert_status"), str)
+        else None
+      ),
+      (
+        "scheduler post-resolution recovery"
+        if query.get("scheduler_alert_narrative_facet") == "post_resolution_recovery"
+        else (
+          "scheduler recurring occurrences"
+          if query.get("scheduler_alert_narrative_facet") == "recurring_occurrences"
+          else (
+            "scheduler resolved narratives"
+            if query.get("scheduler_alert_narrative_facet") == "resolved_narratives"
+            else None
+          )
+        )
+      ),
       f"search {query['search']}" if isinstance(query.get("search"), str) else None,
     ]
     return " / ".join(part for part in parts if isinstance(part, str) and part)
@@ -3799,6 +3841,9 @@ class TradingApplication:
           normalized_query.get("vendor_field"),
           normalized_query.get("market_data_provider"),
           normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("scheduler_alert_category"),
+          normalized_query.get("scheduler_alert_status"),
+          normalized_query.get("scheduler_alert_narrative_facet"),
           normalized_query.get("search"),
         ),
         search=search,
@@ -3899,7 +3944,14 @@ class TradingApplication:
     normalized_highlight_panel = (
       highlight_panel.strip()
       if isinstance(highlight_panel, str)
-      and highlight_panel.strip() in {"overview", "drift", "burn_up", "rollups", "recent_exports"}
+      and highlight_panel.strip() in {
+        "overview",
+        "drift",
+        "burn_up",
+        "rollups",
+        "recent_exports",
+        "scheduler_alerts",
+      }
       else None
     )
     normalized_limit = max(1, min(limit, 200))
@@ -3930,6 +3982,9 @@ class TradingApplication:
           normalized_query.get("vendor_field"),
           normalized_query.get("market_data_provider"),
           normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("scheduler_alert_category"),
+          normalized_query.get("scheduler_alert_status"),
+          normalized_query.get("scheduler_alert_narrative_facet"),
           normalized_query.get("search"),
           normalized_layout.get("highlight_panel"),
         ),
@@ -4124,6 +4179,9 @@ class TradingApplication:
           normalized_query.get("vendor_field"),
           normalized_query.get("market_data_provider"),
           normalized_query.get("requested_by_tab_id"),
+          normalized_query.get("scheduler_alert_category"),
+          normalized_query.get("scheduler_alert_status"),
+          normalized_query.get("scheduler_alert_narrative_facet"),
           normalized_query.get("search"),
           normalized_layout.get("highlight_panel"),
         ),
@@ -26726,6 +26784,206 @@ class TradingApplication:
       return normalized
     return None
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+    narrative_facet: str | None,
+  ) -> str | None:
+    if not isinstance(narrative_facet, str):
+      return None
+    normalized = narrative_facet.strip().lower()
+    if normalized in {
+      "all_occurrences",
+      "resolved_narratives",
+      "post_resolution_recovery",
+      "recurring_occurrences",
+    }:
+      return normalized
+    return None
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_occurrence_detected_at(
+    *,
+    target_status: str,
+    snapshot: ProviderProvenanceSchedulerHealth,
+  ) -> datetime:
+    if target_status == "lagging":
+      return snapshot.oldest_due_at or snapshot.generated_at
+    return (
+      snapshot.last_failure_at
+      or snapshot.last_cycle_finished_at
+      or snapshot.last_cycle_started_at
+      or snapshot.generated_at
+    )
+
+  @staticmethod
+  def _compress_provider_provenance_scheduler_status_sequence(
+    records: Iterable[ProviderProvenanceSchedulerHealthRecord],
+  ) -> tuple[str, ...]:
+    sequence: list[str] = []
+    for record in records:
+      if not sequence or sequence[-1] != record.status:
+        sequence.append(record.status)
+    return tuple(sequence)
+
+  def _build_provider_provenance_scheduler_alert_occurrence_rows(
+    self,
+    *,
+    current_time: datetime,
+  ) -> tuple[dict[str, Any], ...]:
+    self._prune_provider_provenance_scheduler_health_records()
+    records = tuple(
+      sorted(
+        self._list_provider_provenance_scheduler_health_records(),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    if not records:
+      return ()
+    current_health = self.get_provider_provenance_scheduler_health()
+    occurrence_rows: list[dict[str, Any]] = []
+    for target_status in ("lagging", "failed"):
+      status_rows: list[dict[str, Any]] = []
+      index = 0
+      while index < len(records):
+        if records[index].status != target_status:
+          index += 1
+          continue
+        start_index = index
+        end_index = index
+        while end_index + 1 < len(records) and records[end_index + 1].status == target_status:
+          end_index += 1
+        latest_record = records[end_index]
+        latest_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(latest_record)
+        alert = self._build_provider_provenance_scheduler_operator_alert(
+          health=latest_snapshot,
+          current_time=current_time,
+        )
+        if alert is not None:
+          first_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+            records[start_index]
+          )
+          detected_at = self._build_provider_provenance_scheduler_occurrence_detected_at(
+            target_status=target_status,
+            snapshot=first_snapshot,
+          )
+          is_active_occurrence = end_index == len(records) - 1 and current_health.status == target_status
+          resolved_at = (
+            None
+            if is_active_occurrence
+            else (
+              records[end_index + 1].recorded_at
+              if end_index + 1 < len(records)
+              else current_time
+            )
+          )
+          next_occurrence_start_index: int | None = None
+          search_index = end_index + 1
+          while search_index < len(records):
+            if records[search_index].status == target_status:
+              next_occurrence_start_index = search_index
+              break
+            search_index += 1
+          narrative_end_index = (
+            next_occurrence_start_index - 1
+            if next_occurrence_start_index is not None
+            else len(records) - 1
+          )
+          occurrence_records = tuple(records[start_index:end_index + 1])
+          post_resolution_records = (
+            tuple(records[end_index + 1:narrative_end_index + 1])
+            if resolved_at is not None and end_index + 1 <= narrative_end_index
+            else ()
+          )
+          narrative_records = (*occurrence_records, *post_resolution_records)
+          next_occurrence_detected_at = (
+            self._build_provider_provenance_scheduler_occurrence_detected_at(
+              target_status=target_status,
+              snapshot=self._provider_provenance_scheduler_health_snapshot_from_record(
+                records[next_occurrence_start_index]
+              ),
+            )
+            if next_occurrence_start_index is not None
+            else None
+          )
+          primary_facet = "current_snapshot" if is_active_occurrence else "resolved_narrative"
+          facet_flags: list[str] = [primary_facet]
+          if post_resolution_records:
+            primary_facet = "post_resolution_recovery"
+            if "resolved_narrative" not in facet_flags:
+              facet_flags.append("resolved_narrative")
+            facet_flags.append("post_resolution_recovery")
+          status_rows.append(
+            {
+              "alert": replace(
+                alert,
+                detected_at=detected_at,
+                occurrence_id=self._build_operator_alert_occurrence_id(
+                  alert_id=alert.alert_id,
+                  detected_at=detected_at,
+                  resolved_at=resolved_at,
+                ),
+                timeline_key=alert.category,
+                timeline_position=len(status_rows) + 1,
+                status="active" if is_active_occurrence else "resolved",
+                resolved_at=resolved_at,
+              ),
+              "narrative": {
+                "facet": primary_facet,
+                "facet_flags": tuple(facet_flags),
+                "narrative_mode": (
+                  "matched_status"
+                  if is_active_occurrence
+                  else "mixed_status_post_resolution"
+                ),
+                "can_reconstruct_narrative": not is_active_occurrence,
+                "has_post_resolution_history": bool(post_resolution_records),
+                "occurrence_record_count": len(occurrence_records),
+                "post_resolution_record_count": len(post_resolution_records),
+                "status_sequence": self._compress_provider_provenance_scheduler_status_sequence(
+                  narrative_records
+                ),
+                "post_resolution_status_sequence": (
+                  self._compress_provider_provenance_scheduler_status_sequence(
+                    post_resolution_records
+                  )
+                  if post_resolution_records
+                  else ()
+                ),
+                "narrative_window_ended_at": (
+                  narrative_records[-1].recorded_at if narrative_records else resolved_at
+                ),
+                "next_occurrence_detected_at": next_occurrence_detected_at,
+              },
+            }
+          )
+        index = end_index + 1
+      total_occurrences = len(status_rows)
+      for row in status_rows:
+        alert = row["alert"]
+        narrative = dict(row["narrative"])
+        facet_flags = list(narrative.get("facet_flags", ()))
+        if total_occurrences > 1:
+          facet_flags.append("recurring_occurrence")
+          if (
+            narrative.get("facet") == "resolved_narrative"
+            and not narrative.get("has_post_resolution_history")
+          ):
+            narrative["facet"] = "recurring_occurrence"
+        narrative["facet_flags"] = tuple(dict.fromkeys(facet_flags))
+        row["alert"] = replace(alert, timeline_total=total_occurrences)
+        row["narrative"] = narrative
+        occurrence_rows.append(row)
+    return tuple(
+      sorted(
+        occurrence_rows,
+        key=lambda row: (
+          row["alert"].resolved_at or row["alert"].detected_at,
+          row["alert"].detected_at,
+        ),
+        reverse=True,
+      )
+    )
+
   def list_provider_provenance_scheduler_health_history(
     self,
     *,
@@ -26791,22 +27049,49 @@ class TradingApplication:
     *,
     category: str | None = None,
     status: str | None = None,
+    narrative_facet: str | None = None,
     limit: int = 25,
     offset: int = 0,
   ) -> dict[str, Any]:
     current_time = self._clock()
-    history = self._build_provider_provenance_scheduler_alert_history(
+    history_rows = self._build_provider_provenance_scheduler_alert_occurrence_rows(
       current_time=current_time,
     )
+    history = tuple(row["alert"] for row in history_rows)
     normalized_category = self._normalize_provider_provenance_scheduler_alert_history_category(category)
     normalized_status = self._normalize_provider_provenance_scheduler_alert_history_status(status)
+    normalized_narrative_facet = self._normalize_provider_provenance_scheduler_alert_history_narrative_facet(
+      narrative_facet
+    )
     normalized_limit = max(1, min(limit, 200))
     normalized_offset = max(offset, 0)
     filtered_history = [
-      alert
-      for alert in history
-      if (normalized_category is None or alert.category == normalized_category)
-      and (normalized_status is None or alert.status == normalized_status)
+      row
+      for row in history_rows
+      if (
+        normalized_category is None
+        or row["alert"].category == normalized_category
+      )
+      and (
+        normalized_status is None
+        or row["alert"].status == normalized_status
+      )
+      and (
+        normalized_narrative_facet is None
+        or (
+          normalized_narrative_facet == "resolved_narratives"
+          and bool(row["narrative"].get("can_reconstruct_narrative"))
+        )
+        or (
+          normalized_narrative_facet == "post_resolution_recovery"
+          and bool(row["narrative"].get("has_post_resolution_history"))
+        )
+        or (
+          normalized_narrative_facet == "recurring_occurrences"
+          and "recurring_occurrence" in row["narrative"].get("facet_flags", ())
+        )
+        or normalized_narrative_facet == "all_occurrences"
+      )
     ]
     total = len(filtered_history)
     items = filtered_history[normalized_offset:normalized_offset + normalized_limit]
@@ -26852,12 +27137,19 @@ class TradingApplication:
       "query": {
         "category": normalized_category,
         "status": normalized_status,
+        "narrative_facet": normalized_narrative_facet or "all_occurrences",
         "limit": normalized_limit,
         "offset": normalized_offset,
       },
       "available_filters": {
         "categories": categories,
         "statuses": statuses,
+        "narrative_facets": (
+          "all_occurrences",
+          "resolved_narratives",
+          "post_resolution_recovery",
+          "recurring_occurrences",
+        ),
       },
       "summary": {
         "total_occurrences": len(history),
@@ -27974,83 +28266,10 @@ class TradingApplication:
     *,
     current_time: datetime,
   ) -> tuple[OperatorAlert, ...]:
-    self._prune_provider_provenance_scheduler_health_records()
-    records = tuple(
-      sorted(
-        self._list_provider_provenance_scheduler_health_records(),
-        key=lambda record: (record.recorded_at, record.record_id),
-      )
-    )
-    if not records:
-      return ()
-    current_health = self.get_provider_provenance_scheduler_health()
-    history_rows: list[OperatorAlert] = []
-    for target_status in ("lagging", "failed"):
-      status_occurrences: list[OperatorAlert] = []
-      index = 0
-      while index < len(records):
-        if records[index].status != target_status:
-          index += 1
-          continue
-        start_index = index
-        end_index = index
-        while end_index + 1 < len(records) and records[end_index + 1].status == target_status:
-          end_index += 1
-        latest_record = records[end_index]
-        latest_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(latest_record)
-        alert = self._build_provider_provenance_scheduler_operator_alert(
-          health=latest_snapshot,
-          current_time=current_time,
-        )
-        if alert is not None:
-          first_record = records[start_index]
-          first_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(first_record)
-          detected_at = (
-            first_snapshot.oldest_due_at or first_snapshot.generated_at
-            if target_status == "lagging"
-            else (
-              first_snapshot.last_failure_at
-              or first_snapshot.last_cycle_finished_at
-              or first_snapshot.last_cycle_started_at
-              or first_snapshot.generated_at
-            )
-          )
-          is_active_occurrence = end_index == len(records) - 1 and current_health.status == target_status
-          resolved_at = (
-            None
-            if is_active_occurrence
-            else (
-              records[end_index + 1].recorded_at
-              if end_index + 1 < len(records)
-              else current_time
-            )
-          )
-          status_occurrences.append(
-            replace(
-              alert,
-              detected_at=detected_at,
-              occurrence_id=self._build_operator_alert_occurrence_id(
-                alert_id=alert.alert_id,
-                detected_at=detected_at,
-                resolved_at=resolved_at,
-              ),
-              timeline_key=alert.category,
-              timeline_position=len(status_occurrences) + 1,
-              status="active" if is_active_occurrence else "resolved",
-              resolved_at=resolved_at,
-            )
-          )
-        index = end_index + 1
-      total_occurrences = len(status_occurrences)
-      history_rows.extend(
-        replace(alert, timeline_total=total_occurrences)
-        for alert in status_occurrences
-      )
     return tuple(
-      sorted(
-        history_rows,
-        key=lambda alert: (alert.resolved_at or alert.detected_at, alert.detected_at),
-        reverse=True,
+      row["alert"]
+      for row in self._build_provider_provenance_scheduler_alert_occurrence_rows(
+        current_time=current_time,
       )
     )
 
@@ -29500,12 +29719,16 @@ def serialize_provider_provenance_scheduler_alert_history(
     "query": {
       "category": query.get("category"),
       "status": query.get("status"),
+      "narrative_facet": query.get("narrative_facet"),
       "limit": int(query.get("limit", 25)),
       "offset": int(query.get("offset", 0)),
     },
     "available_filters": {
       "categories": list(payload.get("available_filters", {}).get("categories", ())),
       "statuses": list(payload.get("available_filters", {}).get("statuses", ())),
+      "narrative_facets": list(
+        payload.get("available_filters", {}).get("narrative_facets", ())
+      ),
     },
     "summary": {
       "total_occurrences": int(summary.get("total_occurrences", 0)),
@@ -29522,8 +29745,71 @@ def serialize_provider_provenance_scheduler_alert_history(
       ],
     },
     "items": [
-      serialize_operator_alert(alert)
-      for alert in items
+      {
+        **serialize_operator_alert(
+          item.get("alert") if isinstance(item, dict) else item
+        ),
+        "narrative": {
+          "facet": (
+            item.get("narrative", {}).get("facet")
+            if isinstance(item, dict)
+            else None
+          ),
+          "facet_flags": list(
+            item.get("narrative", {}).get("facet_flags", ())
+            if isinstance(item, dict)
+            else ()
+          ),
+          "narrative_mode": (
+            item.get("narrative", {}).get("narrative_mode")
+            if isinstance(item, dict)
+            else None
+          ),
+          "can_reconstruct_narrative": bool(
+            item.get("narrative", {}).get("can_reconstruct_narrative", False)
+            if isinstance(item, dict)
+            else False
+          ),
+          "has_post_resolution_history": bool(
+            item.get("narrative", {}).get("has_post_resolution_history", False)
+            if isinstance(item, dict)
+            else False
+          ),
+          "occurrence_record_count": int(
+            item.get("narrative", {}).get("occurrence_record_count", 0)
+            if isinstance(item, dict)
+            else 0
+          ),
+          "post_resolution_record_count": int(
+            item.get("narrative", {}).get("post_resolution_record_count", 0)
+            if isinstance(item, dict)
+            else 0
+          ),
+          "status_sequence": list(
+            item.get("narrative", {}).get("status_sequence", ())
+            if isinstance(item, dict)
+            else ()
+          ),
+          "post_resolution_status_sequence": list(
+            item.get("narrative", {}).get("post_resolution_status_sequence", ())
+            if isinstance(item, dict)
+            else ()
+          ),
+          "narrative_window_ended_at": (
+            item.get("narrative", {}).get("narrative_window_ended_at").isoformat()
+            if isinstance(item, dict)
+            and isinstance(item.get("narrative", {}).get("narrative_window_ended_at"), datetime)
+            else None
+          ),
+          "next_occurrence_detected_at": (
+            item.get("narrative", {}).get("next_occurrence_detected_at").isoformat()
+            if isinstance(item, dict)
+            and isinstance(item.get("narrative", {}).get("next_occurrence_detected_at"), datetime)
+            else None
+          ),
+        },
+      }
+      for item in items
     ],
     "total": int(payload.get("total", 0)),
     "returned": int(payload.get("returned", 0)),

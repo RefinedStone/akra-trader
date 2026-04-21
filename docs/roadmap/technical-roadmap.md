@@ -122,6 +122,9 @@ creation.
 - resolved scheduler exports can now switch into a mixed-status post-resolution narrative, so the
   exported artifact can carry recovery and stabilization context instead of only the original
   alert-status slice
+- scheduler occurrence review now also has a narrative facet plus saved-view staging, so shared
+  dashboard views can reopen post-resolution recovery or recurring-occurrence review without
+  rebuilding the scheduler filters by hand
 
 ### Remaining work
 
