@@ -549,36 +549,54 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Add per-category scheduler alert occurrence timeline for resolved history rows",
       "description": "Extend scheduler alert history beyond the latest row per category so operators can browse and select multiple resolved lag or failure occurrences within the same category, then reconstruct exports from the exact occurrence they need.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 75,
       "dynamic_priority_delta": 23,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:35:00+09:00",
+      "updated_at": "2026-04-22T03:49:34+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-historical-alert-export-reconstruction"
       ],
-      "direction_relation_note": "The latest main-session reply says resolved scheduler alert rows can now reconstruct historical exports, but alert_history still exposes only the latest row per category, so repeated resolved occurrences cannot yet be distinguished or selected from a timeline.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply identifies occurrence-level timeline selection as the clearest immediately executable follow-up after historical reconstruction shipped."
+      "direction_relation_note": "Completed on main in commit 5e2e348 with scheduler lagging and failed history rows grouped by occurrence segment, new occurrence_id or timeline_key or timeline_position or timeline_total fields through application and API models, and control-room consumers keyed by occurrence timeline instead of alert_id so repeated resolved occurrences no longer collapse together.",
+      "priority_reason": "Closed after targeted pytest coverage for multi-occurrence reconstruction, compileall verification, web typecheck and build, docs updates, commit, and push all landed; the latest main-session reply now leaves a standalone paginated scheduler-only history surface and mixed-status narrative export as the next explicit gaps."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-only-history-surface",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add paginated scheduler-only history surface for occurrence timelines",
+      "description": "Promote the new occurrence-based scheduler alert history into a dedicated scheduler-only history surface with pagination and query controls so operators can inspect lagging or failed occurrence timelines outside the shared operator alert history panel.",
+      "status": "done",
+      "base_priority": 76,
+      "dynamic_priority_delta": 24,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T15:05:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-alert-occurrence-timeline"
+      ],
+      "direction_relation_note": "Completed on main in commit 9eaf79e with a dedicated /api/operator/provider-provenance-analytics/scheduler-alerts occurrence endpoint plus control-room scheduler automation consumers that expose category or status filters, pagination, occurrence timeline metadata, and reconstruct or escalate actions from the scheduler-only history surface.",
+      "priority_reason": "Closed after backend surfaces, control-room wiring, targeted pytest, compileall, web typecheck or build, docs updates, commit, and push all landed; the latest main-session reply now leaves mixed-status narrative export and deeper server-side occurrence search as the remaining explicit follow-ups."
     },
     {
       "id": "task-b1-provider-market-context-mixed-status-narrative-artifact",
       "direction_id": "operator-trust-and-discipline",
       "title": "Export full mixed-status post-resolution scheduler narratives",
       "description": "Add a separate export artifact that reconstructs the full mixed-status scheduler story around a resolved alert window, not just the persisted records matching the alert status, so operators can hand off post-resolution narratives with both incident and recovery context.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 74,
-      "dynamic_priority_delta": 21,
+      "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:35:00+09:00",
+      "updated_at": "2026-04-22T15:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-historical-alert-export-reconstruction"
       ],
-      "direction_relation_note": "The latest main-session reply says reconstructed exports currently center on persisted scheduler records that match the alert status only, so there is still no dedicated artifact for a mixed-status post-resolution narrative that spans failure, lag, and recovery context together.",
-      "priority_reason": "This is a clear executable follow-up from the latest main-session reply, but it stays proposed behind the occurrence timeline so builtin next-task advances through the more immediate history-selection gap before expanding artifact semantics."
+      "direction_relation_note": "The latest main-session reply says the new scheduler-only history surface now supports category or status filters and paged occurrence reconstruction, but export flows still reuse the scheduler health artifact shape and do not yet produce an occurrence-surface-specific mixed-status narrative that includes both incident and recovery context.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and this is now the first explicit remaining follow-up named in the latest main-session reply after the scheduler-only occurrence history surface shipped."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -655,20 +673,20 @@
     {
       "id": "task-b1-provider-market-context-subhour-scheduler-query-surface",
       "direction_id": "operator-trust-and-discipline",
-      "title": "Add sub-hour scheduler drill-down and deeper server-side query surfaces",
-      "description": "Extend scheduler health analytics beyond the new day-to-hour drill-down by adding sub-hour granularity and deeper server-side query controls so operators can inspect automation lag or backlog spikes below hourly buckets without relying on oversized client-side payloads.",
+      "title": "Add deeper server-side search for scheduler occurrence timelines",
+      "description": "Extend the new scheduler-only occurrence history surface with deeper server-side search and narrative-oriented query controls beyond category or status filters so operators can isolate specific occurrence windows, recovery stories, and related scheduler records without relying on oversized client-side scans.",
       "status": "proposed",
       "base_priority": 75,
-      "dynamic_priority_delta": 18,
+      "dynamic_priority_delta": 20,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:20:00+09:00",
+      "updated_at": "2026-04-22T15:05:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-hourly-drilldown"
+        "task-b1-provider-market-context-scheduler-only-history-surface"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says scheduler drill-down now stops at day-to-hour buckets after commit e5554a0, leaving sub-hour granularity and a deeper server-side query surface as the second remaining follow-up.",
-      "priority_reason": "Keep this proposed behind scheduler export productization so builtin next-task follows the explicit main-session order while preserving the deeper analytics continuation as the next clear option."
+      "direction_relation_note": "The latest main-session reply says the scheduler-only occurrence timeline now supports category or status filters and pagination, but deeper server-side search and richer occurrence-history querying are still missing from that new surface.",
+      "priority_reason": "This is executable follow-up work, but it stays proposed behind the mixed-status narrative artifact so builtin next-task follows the explicit remaining-work order from the latest main-session reply before expanding the query model."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
