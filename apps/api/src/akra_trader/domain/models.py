@@ -917,6 +917,31 @@ class ProviderProvenanceScheduledReportAuditRecord:
   detail: str = ""
 
 
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerHealth:
+  generated_at: datetime
+  enabled: bool = True
+  status: str = "starting"
+  summary: str = ""
+  interval_seconds: int = 60
+  batch_limit: int = 25
+  last_cycle_started_at: datetime | None = None
+  last_cycle_finished_at: datetime | None = None
+  last_success_at: datetime | None = None
+  last_failure_at: datetime | None = None
+  last_error: str | None = None
+  cycle_count: int = 0
+  success_count: int = 0
+  failure_count: int = 0
+  consecutive_failure_count: int = 0
+  last_executed_count: int = 0
+  total_executed_count: int = 0
+  due_report_count: int = 0
+  oldest_due_at: datetime | None = None
+  max_due_lag_seconds: int = 0
+  issues: tuple[str, ...] = ()
+
+
 RUN_SURFACE_CAPABILITY_SCHEMA_TITLE = "Run-surface capability contract"
 RUN_SURFACE_CAPABILITY_SCHEMA_SUMMARY = (
   "Shared capability surface for comparison boundaries, strategy schema discovery, collection query discovery, "
@@ -3055,6 +3080,7 @@ class OperatorVisibility:
   incident_events: tuple[OperatorIncidentEvent, ...] = ()
   delivery_history: tuple[OperatorIncidentDelivery, ...] = ()
   audit_events: tuple[OperatorAuditEvent, ...] = ()
+  provider_provenance_scheduler: ProviderProvenanceSchedulerHealth | None = None
 
 
 @dataclass(frozen=True)

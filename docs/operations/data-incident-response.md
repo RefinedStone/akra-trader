@@ -45,6 +45,9 @@ unclear dataset lineage.
   scheduled provenance reports, report audit trails, background due-run execution, and manual
   controls so teams can reuse the same triage and analytics framing across shifts instead of
   rebuilding filters locally
+- operator visibility now also emits provider-provenance scheduler lag and failure alerts plus a
+  scheduler-health snapshot, so automation drift shows up in the same operator review loop as
+  runtime incidents
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

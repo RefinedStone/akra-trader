@@ -147,6 +147,8 @@ It is not yet a finished live trading product:
 - provider provenance analytics now also supports server-side saved presets, shared dashboard
   views, scheduled provenance reports with background due-run execution plus manual controls, and
   report audit history so the analytics workbench is no longer browser-local only
+- operator visibility now also exposes provider-provenance scheduler health with lag/failure
+  alerts and audit events, so background report automation is observable alongside runtime faults
 
 ### Operator discipline baseline
 

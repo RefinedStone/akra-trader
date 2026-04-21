@@ -12,19 +12,17 @@ class FakeScheduledReportRunner:
     self.calls: list[dict[str, Any]] = []
     self.executed = Event()
 
-  def run_due_provider_provenance_scheduled_reports(
+  def execute_provider_provenance_scheduler_cycle(
     self,
     *,
     source_tab_id: str | None = None,
     source_tab_label: str | None = None,
-    due_before: object | None = None,
     limit: int = 25,
   ) -> dict[str, Any]:
     self.calls.append(
       {
         "source_tab_id": source_tab_id,
         "source_tab_label": source_tab_label,
-        "due_before": due_before,
         "limit": limit,
       }
     )

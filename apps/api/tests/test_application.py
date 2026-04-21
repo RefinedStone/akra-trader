@@ -1081,6 +1081,48 @@ def test_operator_visibility_flags_stale_sandbox_worker_runtime(tmp_path: Path) 
   assert visibility.audit_events[0].run_id == run.config.run_id
 
 
+def test_operator_visibility_surfaces_provider_provenance_scheduler_lag(tmp_path: Path) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 11, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
+  report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
+  overdue_at = clock.current - timedelta(minutes=10)
+  app._save_provider_provenance_scheduled_report_record(
+    replace(report_a, next_run_at=overdue_at)
+  )
+  app._save_provider_provenance_scheduled_report_record(
+    replace(report_b, next_run_at=overdue_at)
+  )
+
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  visibility = app.get_operator_visibility()
+
+  assert visibility.provider_provenance_scheduler is not None
+  assert visibility.provider_provenance_scheduler.status == "lagging"
+  assert visibility.provider_provenance_scheduler.due_report_count == 1
+  assert visibility.provider_provenance_scheduler.max_due_lag_seconds == 600
+  assert any(alert.category == "scheduler_lag" for alert in visibility.alerts)
+  assert any(
+    event.kind == "provider_provenance_scheduler_lagging"
+    for event in visibility.audit_events
+  )
+
+
 def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
   monkeypatch,
   tmp_path: Path,
@@ -1127,6 +1169,45 @@ def test_operator_visibility_surfaces_worker_failure_and_operator_stop_audit(
 
   assert stopped is not None
   assert any(event.kind == "sandbox_worker_stopped" for event in stopped_visibility.audit_events)
+
+
+def test_operator_visibility_surfaces_provider_provenance_scheduler_failure(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+  )
+
+  def fail_scheduler(*args, **kwargs):
+    raise RuntimeError("scheduler crash")
+
+  monkeypatch.setattr(app, "run_due_provider_provenance_scheduled_reports", fail_scheduler)
+  with pytest.raises(RuntimeError, match="scheduler crash"):
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+  visibility = app.get_operator_visibility()
+
+  assert visibility.provider_provenance_scheduler is not None
+  assert visibility.provider_provenance_scheduler.status == "failed"
+  assert visibility.provider_provenance_scheduler.last_error == "scheduler crash"
+  assert any(alert.category == "scheduler_failure" for alert in visibility.alerts)
+  assert any(
+    event.kind == "provider_provenance_scheduler_failed"
+    for event in visibility.audit_events
+  )
 
 
 def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(

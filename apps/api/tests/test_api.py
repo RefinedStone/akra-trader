@@ -3169,6 +3169,47 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
   assert any(event["kind"] == "sandbox_worker_failed" for event in payload["audit_events"])
 
 
+def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
+  tmp_path: Path,
+) -> None:
+  with build_client(tmp_path / "runs.sqlite3") as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+
+    report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
+    report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
+    overdue_at = fixed_time - timedelta(minutes=10)
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report_a, next_run_at=overdue_at)
+    )
+    app._save_provider_provenance_scheduled_report_record(
+      replace(report_b, next_run_at=overdue_at)
+    )
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+    response = client.get("/api/operator/visibility")
+
+  assert response.status_code == 200
+  payload = response.json()
+  assert payload["provider_provenance_scheduler"]["status"] == "lagging"
+  assert payload["provider_provenance_scheduler"]["due_report_count"] == 1
+  lag_alert = next(
+    alert for alert in payload["alerts"]
+    if alert["category"] == "scheduler_lag"
+  )
+  assert lag_alert["severity"] == "critical"
+  assert any(
+    event["kind"] == "provider_provenance_scheduler_lagging"
+    for event in payload["audit_events"]
+  )
+
+
 def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_path: Path) -> None:
   with build_client(tmp_path / "runs.sqlite3", guarded_live_execution_enabled=True) as client:
     app = client.app.state.container.app

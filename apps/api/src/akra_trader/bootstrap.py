@@ -499,6 +499,15 @@ def build_container(settings: Settings) -> Container:
     sandbox_worker_heartbeat_timeout_seconds=settings.sandbox_worker_heartbeat_timeout_seconds,
     guarded_live_worker_heartbeat_interval_seconds=settings.guarded_live_worker_heartbeat_interval_seconds,
     guarded_live_worker_heartbeat_timeout_seconds=settings.guarded_live_worker_heartbeat_timeout_seconds,
+    provider_provenance_report_scheduler_enabled=(
+      settings.provider_provenance_report_scheduler_enabled
+    ),
+    provider_provenance_report_scheduler_interval_seconds=(
+      settings.provider_provenance_report_scheduler_interval_seconds
+    ),
+    provider_provenance_report_scheduler_batch_limit=(
+      settings.provider_provenance_report_scheduler_batch_limit
+    ),
     operator_alert_delivery_max_attempts=settings.operator_alert_delivery_max_attempts,
     operator_alert_delivery_initial_backoff_seconds=settings.operator_alert_delivery_initial_backoff_seconds,
     operator_alert_delivery_max_backoff_seconds=settings.operator_alert_delivery_max_backoff_seconds,

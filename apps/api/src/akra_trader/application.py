@@ -13,6 +13,7 @@ import io
 import json
 from numbers import Number
 import re
+from threading import Lock
 from typing import Any
 from typing import Callable
 from typing import Iterable
@@ -34,6 +35,7 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -297,6 +299,9 @@ class TradingApplication:
     sandbox_worker_heartbeat_timeout_seconds: int = 45,
     guarded_live_worker_heartbeat_interval_seconds: int = 15,
     guarded_live_worker_heartbeat_timeout_seconds: int = 45,
+    provider_provenance_report_scheduler_enabled: bool = True,
+    provider_provenance_report_scheduler_interval_seconds: int = 60,
+    provider_provenance_report_scheduler_batch_limit: int = 25,
     operator_alert_delivery_max_attempts: int = 4,
     operator_alert_delivery_initial_backoff_seconds: int = 15,
     operator_alert_delivery_max_backoff_seconds: int = 300,
@@ -344,6 +349,17 @@ class TradingApplication:
     )
     self._guarded_live_worker_heartbeat_timeout_seconds = (
       guarded_live_worker_heartbeat_timeout_seconds
+    )
+    self._provider_provenance_report_scheduler_enabled = (
+      provider_provenance_report_scheduler_enabled
+    )
+    self._provider_provenance_report_scheduler_interval_seconds = max(
+      provider_provenance_report_scheduler_interval_seconds,
+      1,
+    )
+    self._provider_provenance_report_scheduler_batch_limit = max(
+      provider_provenance_report_scheduler_batch_limit,
+      1,
     )
     self._operator_alert_delivery_max_attempts = max(operator_alert_delivery_max_attempts, 1)
     self._operator_alert_delivery_initial_backoff_seconds = max(
@@ -404,6 +420,19 @@ class TradingApplication:
     self._provider_provenance_dashboard_views: dict[str, ProviderProvenanceDashboardViewRecord] = {}
     self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
+    self._provider_provenance_scheduler_health_lock = Lock()
+    self._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=self._clock(),
+      enabled=self._provider_provenance_report_scheduler_enabled,
+      status="starting" if self._provider_provenance_report_scheduler_enabled else "disabled",
+      summary=(
+        "Background scheduler has not completed a provider provenance automation cycle yet."
+        if self._provider_provenance_report_scheduler_enabled
+        else "Background scheduler is disabled for provider provenance automation."
+      ),
+      interval_seconds=self._provider_provenance_report_scheduler_interval_seconds,
+      batch_limit=self._provider_provenance_report_scheduler_batch_limit,
+    )
 
   def list_strategies(
     self,
@@ -3744,6 +3773,92 @@ class TradingApplication:
       "items": results,
     }
 
+  def execute_provider_provenance_scheduler_cycle(
+    self,
+    *,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+    limit: int | None = None,
+  ) -> dict[str, Any]:
+    started_at = self._clock()
+    normalized_limit = max(
+      1,
+      min(
+        limit if isinstance(limit, int) and limit > 0 else self._provider_provenance_report_scheduler_batch_limit,
+        100,
+      ),
+    )
+    with self._provider_provenance_scheduler_health_lock:
+      self._provider_provenance_scheduler_health = replace(
+        self._provider_provenance_scheduler_health,
+        generated_at=started_at,
+        last_cycle_started_at=started_at,
+      )
+    try:
+      result = self.run_due_provider_provenance_scheduled_reports(
+        source_tab_id=source_tab_id,
+        source_tab_label=source_tab_label,
+        limit=normalized_limit,
+      )
+    except Exception as exc:
+      finished_at = self._clock()
+      with self._provider_provenance_scheduler_health_lock:
+        snapshot = self._provider_provenance_scheduler_health
+        self._provider_provenance_scheduler_health = replace(
+          snapshot,
+          generated_at=finished_at,
+          status="failed",
+          summary="Background scheduler failed while executing due provider provenance reports.",
+          last_cycle_finished_at=finished_at,
+          last_failure_at=finished_at,
+          last_error=str(exc),
+          cycle_count=snapshot.cycle_count + 1,
+          failure_count=snapshot.failure_count + 1,
+          consecutive_failure_count=snapshot.consecutive_failure_count + 1,
+          issues=("Scheduler cycle raised an exception before due reports completed.",),
+        )
+      raise
+
+    finished_at = self._clock()
+    due_report_count, oldest_due_at, max_due_lag_seconds = (
+      self._summarize_provider_provenance_scheduler_due_reports(reference_time=finished_at)
+    )
+    with self._provider_provenance_scheduler_health_lock:
+      snapshot = self._provider_provenance_scheduler_health
+      issues: list[str] = []
+      status = "healthy"
+      summary = "Background scheduler is healthy for provider provenance automation."
+      if (
+        due_report_count > 0
+        and max_due_lag_seconds >= self._provider_provenance_scheduler_warning_lag_seconds()
+      ):
+        status = "lagging"
+        summary = "Background scheduler is lagging on due provider provenance reports."
+        issues.append(
+          f"{due_report_count} due report(s) remain after the latest cycle; oldest due lag is {max_due_lag_seconds}s."
+        )
+      executed_count = int(result.get("executed_count", 0))
+      self._provider_provenance_scheduler_health = replace(
+        snapshot,
+        generated_at=finished_at,
+        status=status,
+        summary=summary,
+        last_cycle_started_at=started_at,
+        last_cycle_finished_at=finished_at,
+        last_success_at=finished_at,
+        last_error=None,
+        cycle_count=snapshot.cycle_count + 1,
+        success_count=snapshot.success_count + 1,
+        consecutive_failure_count=0,
+        last_executed_count=executed_count,
+        total_executed_count=snapshot.total_executed_count + executed_count,
+        due_report_count=due_report_count,
+        oldest_due_at=oldest_due_at,
+        max_due_lag_seconds=max_due_lag_seconds,
+        issues=tuple(issues),
+      )
+    return result
+
   def list_provider_provenance_scheduled_report_history(
     self,
     report_id: str,
@@ -4050,11 +4165,14 @@ class TradingApplication:
     sandbox_alerts, sandbox_audit_events = self._collect_sandbox_operator_visibility(
       current_time=current_time
     )
+    scheduler_health, scheduler_alerts, scheduler_audit_events = (
+      self._collect_provider_provenance_scheduler_operator_visibility(current_time=current_time)
+    )
     guarded_live_state, live_alerts = self._refresh_guarded_live_alert_state(
       current_time=current_time
     )
-    alerts = [*sandbox_alerts, *live_alerts]
-    audit_events = [*sandbox_audit_events, *guarded_live_state.audit_events]
+    alerts = [*sandbox_alerts, *live_alerts, *scheduler_alerts]
+    audit_events = [*sandbox_audit_events, *guarded_live_state.audit_events, *scheduler_audit_events]
     incident_events = tuple(
       sorted(guarded_live_state.incident_events, key=lambda event: event.timestamp, reverse=True)
     )
@@ -4074,6 +4192,7 @@ class TradingApplication:
       incident_events=incident_events,
       delivery_history=delivery_history,
       audit_events=tuple(audit_events),
+      provider_provenance_scheduler=scheduler_health,
     )
 
   def get_guarded_live_status(self) -> GuardedLiveStatus:
@@ -25376,6 +25495,175 @@ class TradingApplication:
       reverse=True,
     )
     return tuple(merged)
+
+  def _provider_provenance_scheduler_warning_lag_seconds(self) -> int:
+    return max(self._provider_provenance_report_scheduler_interval_seconds * 2, 120)
+
+  def _provider_provenance_scheduler_critical_lag_seconds(self) -> int:
+    return max(self._provider_provenance_report_scheduler_interval_seconds * 5, 300)
+
+  def _provider_provenance_scheduler_stale_cycle_seconds(self) -> int:
+    return max(self._provider_provenance_report_scheduler_interval_seconds * 3, 180)
+
+  def _summarize_provider_provenance_scheduler_due_reports(
+    self,
+    *,
+    reference_time: datetime,
+  ) -> tuple[int, datetime | None, int]:
+    due_records = [
+      record
+      for record in self._list_provider_provenance_scheduled_report_records()
+      if record.status == "scheduled"
+      and record.next_run_at is not None
+      and record.next_run_at <= reference_time
+    ]
+    if not due_records:
+      return 0, None, 0
+    oldest_due_at = min(record.next_run_at for record in due_records if record.next_run_at is not None)
+    max_due_lag_seconds = max(int((reference_time - oldest_due_at).total_seconds()), 0)
+    return len(due_records), oldest_due_at, max_due_lag_seconds
+
+  def get_provider_provenance_scheduler_health(self) -> ProviderProvenanceSchedulerHealth:
+    current_time = self._clock()
+    with self._provider_provenance_scheduler_health_lock:
+      snapshot = self._provider_provenance_scheduler_health
+    due_report_count, oldest_due_at, max_due_lag_seconds = (
+      self._summarize_provider_provenance_scheduler_due_reports(reference_time=current_time)
+    )
+    issues: list[str] = []
+    status = snapshot.status
+    summary = snapshot.summary
+
+    if not snapshot.enabled:
+      status = "disabled"
+      summary = "Background scheduler is disabled for provider provenance automation."
+    else:
+      last_cycle_reference = snapshot.last_cycle_finished_at or snapshot.last_cycle_started_at
+      latest_failure_is_current = (
+        snapshot.last_failure_at is not None
+        and (
+          snapshot.last_success_at is None
+          or snapshot.last_failure_at >= snapshot.last_success_at
+        )
+      )
+      if latest_failure_is_current:
+        status = "failed"
+        summary = "Background scheduler failed while executing due provider provenance reports."
+        if snapshot.last_error:
+          issues.append(f"Last scheduler error: {snapshot.last_error}")
+      elif last_cycle_reference is None:
+        status = "starting"
+        summary = "Background scheduler has not completed a provider provenance automation cycle yet."
+        issues.append("No scheduler cycle has completed yet.")
+      else:
+        cycle_age_seconds = max(int((current_time - last_cycle_reference).total_seconds()), 0)
+        if cycle_age_seconds > self._provider_provenance_scheduler_stale_cycle_seconds():
+          status = "failed"
+          summary = "Background scheduler has stopped cycling for provider provenance automation."
+          issues.append(
+            f"Last completed scheduler cycle was {cycle_age_seconds}s ago, beyond the {self._provider_provenance_scheduler_stale_cycle_seconds()}s stale threshold."
+          )
+        elif (
+          due_report_count > 0
+          and max_due_lag_seconds >= self._provider_provenance_scheduler_warning_lag_seconds()
+        ):
+          status = "lagging"
+          summary = "Background scheduler is lagging on due provider provenance reports."
+          issues.append(
+            f"{due_report_count} due report(s) remain; oldest due lag is {max_due_lag_seconds}s."
+          )
+        else:
+          status = "healthy"
+          summary = "Background scheduler is healthy for provider provenance automation."
+
+    return replace(
+      snapshot,
+      generated_at=current_time,
+      status=status,
+      summary=summary,
+      due_report_count=due_report_count,
+      oldest_due_at=oldest_due_at,
+      max_due_lag_seconds=max_due_lag_seconds,
+      issues=tuple(issues),
+    )
+
+  def _collect_provider_provenance_scheduler_operator_visibility(
+    self,
+    *,
+    current_time: datetime,
+  ) -> tuple[ProviderProvenanceSchedulerHealth, list[OperatorAlert], list[OperatorAuditEvent]]:
+    health = self.get_provider_provenance_scheduler_health()
+    alerts: list[OperatorAlert] = []
+    audit_events: list[OperatorAuditEvent] = []
+
+    if health.status == "lagging":
+      severity = (
+        "critical"
+        if health.max_due_lag_seconds >= self._provider_provenance_scheduler_critical_lag_seconds()
+        else "warning"
+      )
+      alerts.append(
+        OperatorAlert(
+          alert_id="provider-provenance:scheduler-lag",
+          severity=severity,
+          category="scheduler_lag",
+          summary="Provider provenance report scheduler is lagging.",
+          detail=(
+            f"{health.due_report_count} due report(s) remain. "
+            f"Oldest due at {health.oldest_due_at.isoformat() if health.oldest_due_at is not None else 'n/a'} "
+            f"with {health.max_due_lag_seconds}s lag. "
+            f"Last successful cycle: {health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}."
+          ),
+          detected_at=health.oldest_due_at or health.generated_at,
+          source="runtime",
+        )
+      )
+      audit_events.append(
+        OperatorAuditEvent(
+          event_id=f"audit:provider_provenance_scheduler_lagging:{health.generated_at.isoformat()}",
+          timestamp=health.generated_at,
+          actor="system",
+          kind="provider_provenance_scheduler_lagging",
+          summary="Provider provenance report scheduler lag detected.",
+          detail=health.summary,
+          source="runtime",
+        )
+      )
+    elif health.status == "failed":
+      detected_at = (
+        health.last_failure_at
+        or health.last_cycle_finished_at
+        or health.last_cycle_started_at
+        or current_time
+      )
+      alerts.append(
+        OperatorAlert(
+          alert_id="provider-provenance:scheduler-failure",
+          severity="critical",
+          category="scheduler_failure",
+          summary="Provider provenance report scheduler is failing.",
+          detail=(
+            f"{health.summary} Last success: "
+            f"{health.last_success_at.isoformat() if health.last_success_at is not None else 'n/a'}. "
+            f"Last error: {health.last_error or 'n/a'}."
+          ),
+          detected_at=detected_at,
+          source="runtime",
+        )
+      )
+      audit_events.append(
+        OperatorAuditEvent(
+          event_id=f"audit:provider_provenance_scheduler_failed:{detected_at.isoformat()}",
+          timestamp=detected_at,
+          actor="system",
+          kind="provider_provenance_scheduler_failed",
+          summary="Provider provenance report scheduler failure detected.",
+          detail=health.summary + (f" Error: {health.last_error}." if health.last_error else ""),
+          source="runtime",
+        )
+      )
+
+    return health, alerts, audit_events
 
   def _build_operator_alerts_for_run(
     self,

@@ -96,6 +96,8 @@ creation.
 - provider provenance analytics now also persists saved presets, shared dashboard views, and
   scheduled provenance reports with background due-run execution, manual controls, and audit
   history, so analytics state is durable across operators rather than pinned to one browser tab
+- runtime operator visibility now also surfaces provider-provenance scheduler health plus lag and
+  failure alerts, so automation regressions can share the same operational channel as worker faults
 
 ### Remaining work
 

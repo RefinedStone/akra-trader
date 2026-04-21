@@ -10,12 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class ProviderProvenanceScheduledReportRunner(Protocol):
-  def run_due_provider_provenance_scheduled_reports(
+  def execute_provider_provenance_scheduler_cycle(
     self,
     *,
     source_tab_id: str | None = None,
     source_tab_label: str | None = None,
-    due_before: object | None = None,
     limit: int = 25,
   ) -> dict[str, Any]: ...
 
@@ -58,7 +57,7 @@ class ProviderProvenanceReportSchedulerJob:
       self._task = None
 
   def run_due_reports_once(self) -> dict[str, Any]:
-    result = self._application.run_due_provider_provenance_scheduled_reports(
+    result = self._application.execute_provider_provenance_scheduler_cycle(
       source_tab_id=self.SOURCE_TAB_ID,
       source_tab_label=self.SOURCE_TAB_LABEL,
       limit=self._batch_limit,
