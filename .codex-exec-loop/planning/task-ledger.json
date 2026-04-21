@@ -585,18 +585,74 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Export full mixed-status post-resolution scheduler narratives",
       "description": "Add a separate export artifact that reconstructs the full mixed-status scheduler story around a resolved alert window, not just the persisted records matching the alert status, so operators can hand off post-resolution narratives with both incident and recovery context.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 74,
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T15:05:00+09:00",
+      "updated_at": "2026-04-22T15:13:03+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-historical-alert-export-reconstruction"
       ],
-      "direction_relation_note": "The latest main-session reply says the new scheduler-only history surface now supports category or status filters and paged occurrence reconstruction, but export flows still reuse the scheduler health artifact shape and do not yet produce an occurrence-surface-specific mixed-status narrative that includes both incident and recovery context.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and this is now the first explicit remaining follow-up named in the latest main-session reply after the scheduler-only occurrence history surface shipped."
+      "direction_relation_note": "Completed on main in commit 645f111 with narrative_mode wired through resolved scheduler reconstruction exports so mixed_status_post_resolution now emits selected_occurrence plus post_resolution_history, status_sequence, narrative_window bounds, JSON narrative metadata, and CSV narrative_phase rows across API and control-room flows.",
+      "priority_reason": "Closed after targeted pytest coverage, compileall verification, web typecheck and build, docs updates, commit, and push all landed; the latest main-session reply now leaves occurrence-surface narrative productization and longer stitched cross-incident reporting as the direct follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-narrative-saved-view-surface",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add scheduler occurrence narrative facet and saved-view workflow",
+      "description": "Productize the new mixed-status narrative export on the scheduler occurrence surface itself by adding a dedicated narrative facet or saved-view workflow so operators can manage, revisit, and launch narrative-oriented occurrence exports without relying on generic reconstruct buttons alone.",
+      "status": "done",
+      "base_priority": 76,
+      "dynamic_priority_delta": 25,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T15:30:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-mixed-status-narrative-artifact",
+        "task-b1-provider-market-context-scheduler-only-history-surface"
+      ],
+      "direction_relation_note": "Completed on main in commit 9be2e2e with scheduler occurrence narrative_facet filtering, occurrence narrative previews, saved provider provenance preset or view or report query persistence for scheduler category or status or facet, scheduler_alerts dashboard highlight restoration, and Stage saved view workflow wired into the control-room scheduler occurrence area.",
+      "priority_reason": "Closed after targeted pytest coverage for provider_provenance_scheduler and provider_provenance_workspace, web typecheck and build, compileall verification, docs status updates, commit, and push all landed; the latest main-session reply now leaves a scheduler occurrence-specific registry or named narrative template layer plus stitched multi-occurrence artifacts or deeper search as the explicit follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-narrative-registry-templates",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add scheduler occurrence narrative registry and named templates",
+      "description": "Promote the new scheduler narrative saved-view workflow into a dedicated scheduler occurrence registry with named narrative templates so operators can reuse stable narrative lenses without depending only on generic provider provenance preset or view or report records.",
+      "status": "ready",
+      "base_priority": 76,
+      "dynamic_priority_delta": 26,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T15:30:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-narrative-saved-view-surface"
+      ],
+      "direction_relation_note": "The latest main-session reply says scheduler narrative filters now persist through the generic provider provenance preset or view or report model, but there is still no scheduler occurrence-specific registry or named narrative template layer above that workflow.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with the next queued task and the latest main-session reply names the missing scheduler occurrence registry or named template layer as the first remaining executable gap after commit 9be2e2e."
+    },
+    {
+      "id": "task-b1-provider-market-context-cross-incident-narrative-reporting",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add stitched cross-incident scheduler narrative analytics and reporting",
+      "description": "Extend the new mixed-status scheduler narrative exports beyond one occurrence window by adding stitched multi-occurrence artifacts and cross-incident analytics so operators can review longer recovery patterns and repeated scheduler incidents in one narrative output.",
+      "status": "proposed",
+      "base_priority": 74,
+      "dynamic_priority_delta": 22,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T15:30:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-mixed-status-narrative-artifact",
+        "task-b1-provider-market-context-scheduler-narrative-saved-view-surface"
+      ],
+      "direction_relation_note": "The latest main-session reply says narrative facets currently stop at single-occurrence preview and page-level filtering, and there is still no stitched multi-occurrence narrative artifact for repeated scheduler incidents even after the saved-view workflow landed.",
+      "priority_reason": "This remains a clear follow-up, but it stays proposed behind the newly explicit scheduler occurrence registry or named template queue head so builtin next-task advances through narrative productization before cross-incident artifact expansion."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -677,16 +733,17 @@
       "description": "Extend the new scheduler-only occurrence history surface with deeper server-side search and narrative-oriented query controls beyond category or status filters so operators can isolate specific occurrence windows, recovery stories, and related scheduler records without relying on oversized client-side scans.",
       "status": "proposed",
       "base_priority": 75,
-      "dynamic_priority_delta": 20,
+      "dynamic_priority_delta": 18,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T15:05:00+09:00",
+      "updated_at": "2026-04-22T15:30:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-only-history-surface"
+        "task-b1-provider-market-context-scheduler-only-history-surface",
+        "task-b1-provider-market-context-scheduler-narrative-saved-view-surface"
       ],
-      "direction_relation_note": "The latest main-session reply says the scheduler-only occurrence timeline now supports category or status filters and pagination, but deeper server-side search and richer occurrence-history querying are still missing from that new surface.",
-      "priority_reason": "This is executable follow-up work, but it stays proposed behind the mixed-status narrative artifact so builtin next-task follows the explicit remaining-work order from the latest main-session reply before expanding the query model."
+      "direction_relation_note": "The latest main-session reply says scheduler narrative facets currently cover only single-occurrence preview and page-level filtering, so deeper server-side search across occurrence timelines remains unbuilt even after the saved-view workflow landed.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the new scheduler occurrence registry or named template queue head and the stitched multi-occurrence artifact gap so builtin next-task follows the latest operator-facing continuation order."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
