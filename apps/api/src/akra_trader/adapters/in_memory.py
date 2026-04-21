@@ -33,7 +33,9 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
@@ -287,9 +289,17 @@ class InMemoryRunRepository(RunRepositoryPort):
       str,
       ProviderProvenanceSchedulerNarrativeTemplateRecord,
     ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_template_revisions: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+    ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_registry: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_registry_revisions: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
     self._provider_provenance_scheduler_health_records: OrderedDict[str, ProviderProvenanceSchedulerHealthRecord] = OrderedDict()
@@ -745,6 +755,30 @@ class InMemoryRunRepository(RunRepositoryPort):
   ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord | None:
     return self._provider_provenance_scheduler_narrative_templates.get(template_id)
 
+  def save_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord:
+    self._provider_provenance_scheduler_narrative_template_revisions[record.revision_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_template_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_template_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord | None:
+    return self._provider_provenance_scheduler_narrative_template_revisions.get(revision_id)
+
   def save_provider_provenance_scheduler_narrative_registry_entry(
     self,
     record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
@@ -768,6 +802,30 @@ class InMemoryRunRepository(RunRepositoryPort):
     registry_id: str,
   ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord | None:
     return self._provider_provenance_scheduler_narrative_registry.get(registry_id)
+
+  def save_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord:
+    self._provider_provenance_scheduler_narrative_registry_revisions[record.revision_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_registry_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_registry_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
+    return self._provider_provenance_scheduler_narrative_registry_revisions.get(revision_id)
 
   def save_provider_provenance_scheduled_report_audit_record(
     self,

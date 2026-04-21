@@ -1560,6 +1560,48 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_narrative_template_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_update",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_id}",
+    route_name="update_operator_provider_provenance_scheduler_narrative_template",
+    response_title="Update provider provenance scheduler narrative template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_update",
+    methods=("PATCH",),
+    path_param_keys=("template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_template_update",
+  )
+  operator_provider_provenance_scheduler_narrative_template_delete_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_delete",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_id}/delete",
+    route_name="delete_operator_provider_provenance_scheduler_narrative_template",
+    response_title="Delete provider provenance scheduler narrative template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_delete",
+    methods=("POST",),
+    path_param_keys=("template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_template_delete",
+  )
+  operator_provider_provenance_scheduler_narrative_template_revision_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_revision_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_id}/revisions",
+    route_name="list_operator_provider_provenance_scheduler_narrative_template_revisions",
+    response_title="List provider provenance scheduler narrative template revisions",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_revision_list",
+    path_param_keys=("template_id",),
+  )
+  operator_provider_provenance_scheduler_narrative_template_revision_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_template_revision_restore",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_id}/revisions/{revision_id}/restore",
+    route_name="restore_operator_provider_provenance_scheduler_narrative_template_revision",
+    response_title="Restore provider provenance scheduler narrative template revision",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_template_revision_restore",
+    methods=("POST",),
+    path_param_keys=("template_id", "revision_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_template_revision_restore",
+  )
   operator_provider_provenance_scheduler_narrative_registry_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_registry_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry",
@@ -1657,6 +1699,48 @@ def build_standalone_surface_runtime_bindings(
         ),
       ),
     ),
+  )
+  operator_provider_provenance_scheduler_narrative_registry_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_update",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_id}",
+    route_name="update_operator_provider_provenance_scheduler_narrative_registry_entry",
+    response_title="Update provider provenance scheduler narrative registry entry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_update",
+    methods=("PATCH",),
+    path_param_keys=("registry_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_update",
+  )
+  operator_provider_provenance_scheduler_narrative_registry_delete_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_delete",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_id}/delete",
+    route_name="delete_operator_provider_provenance_scheduler_narrative_registry_entry",
+    response_title="Delete provider provenance scheduler narrative registry entry",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_delete",
+    methods=("POST",),
+    path_param_keys=("registry_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_delete",
+  )
+  operator_provider_provenance_scheduler_narrative_registry_revision_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_revision_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_id}/revisions",
+    route_name="list_operator_provider_provenance_scheduler_narrative_registry_revisions",
+    response_title="List provider provenance scheduler narrative registry revisions",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_revision_list",
+    path_param_keys=("registry_id",),
+  )
+  operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_registry_revision_restore",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_id}/revisions/{revision_id}/restore",
+    route_name="restore_operator_provider_provenance_scheduler_narrative_registry_revision",
+    response_title="Restore provider provenance scheduler narrative registry revision",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_registry_revision_restore",
+    methods=("POST",),
+    path_param_keys=("registry_id", "revision_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_revision_restore",
   )
   operator_provider_provenance_scheduled_report_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduled_report_create",
@@ -3331,8 +3415,16 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_dashboard_view_list_binding,
     operator_provider_provenance_scheduler_narrative_template_create_binding,
     operator_provider_provenance_scheduler_narrative_template_list_binding,
+    operator_provider_provenance_scheduler_narrative_template_update_binding,
+    operator_provider_provenance_scheduler_narrative_template_delete_binding,
+    operator_provider_provenance_scheduler_narrative_template_revision_list_binding,
+    operator_provider_provenance_scheduler_narrative_template_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_registry_create_binding,
     operator_provider_provenance_scheduler_narrative_registry_list_binding,
+    operator_provider_provenance_scheduler_narrative_registry_update_binding,
+    operator_provider_provenance_scheduler_narrative_registry_delete_binding,
+    operator_provider_provenance_scheduler_narrative_registry_revision_list_binding,
+    operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding,
     operator_provider_provenance_scheduled_report_create_binding,
     operator_provider_provenance_scheduled_report_list_binding,
     operator_provider_provenance_scheduled_report_run_binding,

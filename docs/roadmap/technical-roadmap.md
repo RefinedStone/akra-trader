@@ -125,6 +125,9 @@ creation.
 - scheduler occurrence review now also has a narrative facet plus dedicated templates and named
   registry boards, so shared scheduler review lenses can reopen post-resolution recovery or
   recurring-occurrence analysis without rebuilding the filters by hand
+- those scheduler narrative templates and boards now also support edit/delete/version workflow,
+  so the saved scheduler review layer can evolve with durable revision restore instead of only
+  appending new one-off entries
 
 ### Remaining work
 

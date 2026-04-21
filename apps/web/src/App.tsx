@@ -58,6 +58,8 @@ import {
   createProviderProvenanceSchedulerNarrativeTemplate,
   createProviderProvenanceScheduledReport,
   approveProviderProvenanceExportJob,
+  deleteProviderProvenanceSchedulerNarrativeRegistryEntry,
+  deleteProviderProvenanceSchedulerNarrativeTemplate,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   createRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJob,
   downloadProviderProvenanceExportJob,
@@ -75,7 +77,9 @@ import {
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
   listProviderProvenanceSchedulerNarrativeRegistryEntries,
+  listProviderProvenanceSchedulerNarrativeRegistryRevisions,
   listProviderProvenanceSchedulerNarrativeTemplates,
+  listProviderProvenanceSchedulerNarrativeTemplateRevisions,
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
@@ -87,9 +91,13 @@ import {
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   pruneRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
   resolveRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
+  restoreProviderProvenanceSchedulerNarrativeRegistryRevision,
+  restoreProviderProvenanceSchedulerNarrativeTemplateRevision,
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
+  updateProviderProvenanceSchedulerNarrativeRegistryEntry,
+  updateProviderProvenanceSchedulerNarrativeTemplate,
   updateProviderProvenanceExportJobPolicy,
 } from "./controlRoomApi";
 
@@ -293,7 +301,11 @@ import type {
   ProviderProvenanceSchedulerHealthAnalyticsPayload,
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
+  ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry,
+  ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeTemplateEntry,
+  ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry,
+  ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProvenanceArtifactLineDetailView,
@@ -2317,7 +2329,9 @@ function buildProviderProvenanceAnalyticsQueryStateFromWorkspaceQuery(
   query: ProviderProvenanceAnalyticsPresetEntry["query"]
     | ProviderProvenanceDashboardViewEntry["query"]
     | ProviderProvenanceSchedulerNarrativeTemplateEntry["query"]
+    | ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry["query"]
     | ProviderProvenanceSchedulerNarrativeRegistryEntry["query"]
+    | ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry["query"]
     | ProviderProvenanceScheduledReportEntry["query"],
 ): ProviderProvenanceAnalyticsQueryState {
   return {
@@ -2988,10 +3002,14 @@ export default function App() {
   );
   const [providerProvenanceSchedulerNarrativeTemplateDraft, setProviderProvenanceSchedulerNarrativeTemplateDraft] =
     useState(defaultProviderProvenanceWorkspaceDraft);
+  const [editingProviderProvenanceSchedulerNarrativeTemplateId, setEditingProviderProvenanceSchedulerNarrativeTemplateId] =
+    useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeRegistryDraft, setProviderProvenanceSchedulerNarrativeRegistryDraft] =
     useState<ProviderProvenanceSchedulerNarrativeRegistryDraftState>(
       defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
     );
+  const [editingProviderProvenanceSchedulerNarrativeRegistryId, setEditingProviderProvenanceSchedulerNarrativeRegistryId] =
+    useState<string | null>(null);
   const [providerProvenanceViewDraft, setProviderProvenanceViewDraft] = useState(() => ({
     ...defaultProviderProvenanceWorkspaceDraft,
     preset_id: "",
@@ -3016,11 +3034,27 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeTemplatesError, setProviderProvenanceSchedulerNarrativeTemplatesError] =
     useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeTemplateId, setSelectedProviderProvenanceSchedulerNarrativeTemplateId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeTemplateHistory, setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory] =
+    useState<ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerNarrativeTemplateHistoryLoading, setProviderProvenanceSchedulerNarrativeTemplateHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeTemplateHistoryError, setProviderProvenanceSchedulerNarrativeTemplateHistoryError] =
+    useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeRegistryEntries, setProviderProvenanceSchedulerNarrativeRegistryEntries] =
     useState<ProviderProvenanceSchedulerNarrativeRegistryEntry[]>([]);
   const [providerProvenanceSchedulerNarrativeRegistryEntriesLoading, setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading] =
     useState(false);
   const [providerProvenanceSchedulerNarrativeRegistryEntriesError, setProviderProvenanceSchedulerNarrativeRegistryEntriesError] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeRegistryId, setSelectedProviderProvenanceSchedulerNarrativeRegistryId] =
+    useState<string | null>(null);
+  const [selectedProviderProvenanceSchedulerNarrativeRegistryHistory, setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory] =
+    useState<ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload | null>(null);
+  const [providerProvenanceSchedulerNarrativeRegistryHistoryLoading, setProviderProvenanceSchedulerNarrativeRegistryHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeRegistryHistoryError, setProviderProvenanceSchedulerNarrativeRegistryHistoryError] =
     useState<string | null>(null);
   const [providerProvenanceScheduledReports, setProviderProvenanceScheduledReports] =
     useState<ProviderProvenanceScheduledReportEntry[]>([]);
@@ -5720,6 +5754,22 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeTemplates(templatePayload.items);
       setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
+      if (
+        selectedProviderProvenanceSchedulerNarrativeTemplateId
+        && !templatePayload.items.some((entry) => entry.template_id === selectedProviderProvenanceSchedulerNarrativeTemplateId)
+      ) {
+        setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
+        setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
+        setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+      }
+      if (
+        selectedProviderProvenanceSchedulerNarrativeRegistryId
+        && !narrativeRegistryPayload.items.some((entry) => entry.registry_id === selectedProviderProvenanceSchedulerNarrativeRegistryId)
+      ) {
+        setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
+        setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
+        setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+      }
       setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => (
         current.template_id
         && !templatePayload.items.some((entry) => entry.template_id === current.template_id)
@@ -5744,6 +5794,10 @@ export default function App() {
       setProviderProvenanceSchedulerNarrativeTemplates([]);
       setProviderProvenanceSchedulerNarrativeRegistryEntries([]);
       setProviderProvenanceScheduledReports([]);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
       setProviderProvenanceAnalyticsPresetsError(message);
       setProviderProvenanceDashboardViewsError(message);
       setProviderProvenanceSchedulerNarrativeTemplatesError(message);
@@ -5903,7 +5957,9 @@ export default function App() {
       | ProviderProvenanceAnalyticsPresetEntry
       | ProviderProvenanceDashboardViewEntry
       | ProviderProvenanceSchedulerNarrativeTemplateEntry
+      | ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry
       | ProviderProvenanceSchedulerNarrativeRegistryEntry
+      | ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry
       | ProviderProvenanceScheduledReportEntry,
     options: {
       includeLayout: boolean;
@@ -5987,6 +6043,18 @@ export default function App() {
     );
   }
 
+  function resetProviderProvenanceSchedulerNarrativeTemplateDraft() {
+    setEditingProviderProvenanceSchedulerNarrativeTemplateId(null);
+    setProviderProvenanceSchedulerNarrativeTemplateDraft(defaultProviderProvenanceWorkspaceDraft);
+  }
+
+  function resetProviderProvenanceSchedulerNarrativeRegistryDraft() {
+    setEditingProviderProvenanceSchedulerNarrativeRegistryId(null);
+    setProviderProvenanceSchedulerNarrativeRegistryDraft(
+      defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
+    );
+  }
+
   async function saveCurrentProviderProvenanceSchedulerNarrativeTemplate() {
     if (!providerProvenanceSchedulerNarrativeTemplateDraft.name.trim()) {
       setProviderProvenanceWorkspaceFeedback("Enter a template name before saving the current scheduler narrative lens.");
@@ -5997,23 +6065,43 @@ export default function App() {
       return;
     }
     try {
-      const createdTemplate = await createProviderProvenanceSchedulerNarrativeTemplate({
-        name: providerProvenanceSchedulerNarrativeTemplateDraft.name.trim(),
-        description: providerProvenanceSchedulerNarrativeTemplateDraft.description.trim(),
-        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
-          providerProvenanceAnalyticsQuery,
-          activeMarketInstrument,
-        ),
-        createdByTabId: comparisonHistoryTabIdentity.tabId,
-        createdByTabLabel: comparisonHistoryTabIdentity.label,
-      });
-      setProviderProvenanceSchedulerNarrativeTemplateDraft(defaultProviderProvenanceWorkspaceDraft);
+      const templateQuery = buildProviderProvenanceAnalyticsWorkspaceQuery(
+        providerProvenanceAnalyticsQuery,
+        activeMarketInstrument,
+      );
+      const savedTemplate = editingProviderProvenanceSchedulerNarrativeTemplateId
+        ? await updateProviderProvenanceSchedulerNarrativeTemplate({
+            templateId: editingProviderProvenanceSchedulerNarrativeTemplateId,
+            name: providerProvenanceSchedulerNarrativeTemplateDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeTemplateDraft.description.trim(),
+            query: templateQuery,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+            reason: "scheduler_narrative_template_manual_edit",
+          })
+        : await createProviderProvenanceSchedulerNarrativeTemplate({
+            name: providerProvenanceSchedulerNarrativeTemplateDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeTemplateDraft.description.trim(),
+            query: templateQuery,
+            createdByTabId: comparisonHistoryTabIdentity.tabId,
+            createdByTabLabel: comparisonHistoryTabIdentity.label,
+          });
+      resetProviderProvenanceSchedulerNarrativeTemplateDraft();
       setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
         ...current,
-        template_id: createdTemplate.template_id,
+        template_id: savedTemplate.template_id,
       }));
       await loadProviderProvenanceWorkspaceRegistry();
-      setProviderProvenanceWorkspaceFeedback(`Saved scheduler narrative template ${createdTemplate.name}.`);
+      if (selectedProviderProvenanceSchedulerNarrativeTemplateId === savedTemplate.template_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(
+          savedTemplate.template_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(history);
+        setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `${editingProviderProvenanceSchedulerNarrativeTemplateId ? "Updated" : "Saved"} scheduler narrative template ${savedTemplate.name}.`,
+      );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler narrative template save failed: ${(error as Error).message}`,
@@ -6031,30 +6119,250 @@ export default function App() {
       return;
     }
     try {
-      const createdEntry = await createProviderProvenanceSchedulerNarrativeRegistryEntry({
-        name: providerProvenanceSchedulerNarrativeRegistryDraft.name.trim(),
-        description: providerProvenanceSchedulerNarrativeRegistryDraft.description.trim(),
-        query: buildProviderProvenanceAnalyticsWorkspaceQuery(
-          providerProvenanceAnalyticsQuery,
-          activeMarketInstrument,
-        ),
-        layout: {
-          ...providerProvenanceDashboardLayout,
-          highlight_panel: "scheduler_alerts",
-        },
-        templateId: providerProvenanceSchedulerNarrativeRegistryDraft.template_id.trim() || undefined,
-        createdByTabId: comparisonHistoryTabIdentity.tabId,
-        createdByTabLabel: comparisonHistoryTabIdentity.label,
-      });
-      setProviderProvenanceSchedulerNarrativeRegistryDraft({
-        ...defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
-        template_id: createdEntry.template_id ?? "",
-      });
+      const registryQuery = buildProviderProvenanceAnalyticsWorkspaceQuery(
+        providerProvenanceAnalyticsQuery,
+        activeMarketInstrument,
+      );
+      const registryLayout = {
+        ...providerProvenanceDashboardLayout,
+        highlight_panel: "scheduler_alerts" as const,
+      };
+      const savedEntry = editingProviderProvenanceSchedulerNarrativeRegistryId
+        ? await updateProviderProvenanceSchedulerNarrativeRegistryEntry({
+            registryId: editingProviderProvenanceSchedulerNarrativeRegistryId,
+            name: providerProvenanceSchedulerNarrativeRegistryDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeRegistryDraft.description.trim(),
+            query: registryQuery,
+            layout: registryLayout,
+            templateId: providerProvenanceSchedulerNarrativeRegistryDraft.template_id.trim() || null,
+            actorTabId: comparisonHistoryTabIdentity.tabId,
+            actorTabLabel: comparisonHistoryTabIdentity.label,
+            reason: "scheduler_narrative_registry_manual_edit",
+          })
+        : await createProviderProvenanceSchedulerNarrativeRegistryEntry({
+            name: providerProvenanceSchedulerNarrativeRegistryDraft.name.trim(),
+            description: providerProvenanceSchedulerNarrativeRegistryDraft.description.trim(),
+            query: registryQuery,
+            layout: registryLayout,
+            templateId: providerProvenanceSchedulerNarrativeRegistryDraft.template_id.trim() || undefined,
+            createdByTabId: comparisonHistoryTabIdentity.tabId,
+            createdByTabLabel: comparisonHistoryTabIdentity.label,
+          });
+      resetProviderProvenanceSchedulerNarrativeRegistryDraft();
       await loadProviderProvenanceWorkspaceRegistry();
-      setProviderProvenanceWorkspaceFeedback(`Saved scheduler narrative registry ${createdEntry.name}.`);
+      if (selectedProviderProvenanceSchedulerNarrativeRegistryId === savedEntry.registry_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(
+          savedEntry.registry_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(history);
+        setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `${editingProviderProvenanceSchedulerNarrativeRegistryId ? "Updated" : "Saved"} scheduler narrative registry ${savedEntry.name}.`,
+      );
     } catch (error) {
       setProviderProvenanceWorkspaceFeedback(
         `Scheduler narrative registry save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function editProviderProvenanceSchedulerNarrativeTemplate(
+    entry: ProviderProvenanceSchedulerNarrativeTemplateEntry,
+  ) {
+    if (entry.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore a template revision before editing a deleted scheduler narrative template.");
+      return;
+    }
+    setEditingProviderProvenanceSchedulerNarrativeTemplateId(entry.template_id);
+    setProviderProvenanceSchedulerNarrativeTemplateDraft({
+      name: entry.name,
+      description: entry.description,
+    });
+    await applyProviderProvenanceWorkspaceQuery(entry, {
+      includeLayout: false,
+      forceSchedulerHighlight: true,
+      feedbackLabel: `Editing scheduler template ${entry.name}`,
+    });
+  }
+
+  async function editProviderProvenanceSchedulerNarrativeRegistryEntry(
+    entry: ProviderProvenanceSchedulerNarrativeRegistryEntry,
+  ) {
+    if (entry.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore a registry revision before editing a deleted scheduler narrative board.");
+      return;
+    }
+    setEditingProviderProvenanceSchedulerNarrativeRegistryId(entry.registry_id);
+    setProviderProvenanceSchedulerNarrativeRegistryDraft({
+      name: entry.name,
+      description: entry.description,
+      template_id: entry.template_id ?? "",
+    });
+    await applyProviderProvenanceWorkspaceQuery(entry, {
+      includeLayout: true,
+      feedbackLabel: `Editing scheduler registry ${entry.name}`,
+    });
+  }
+
+  async function toggleProviderProvenanceSchedulerNarrativeTemplateHistory(templateId: string) {
+    if (
+      selectedProviderProvenanceSchedulerNarrativeTemplateId === templateId
+      && selectedProviderProvenanceSchedulerNarrativeTemplateHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
+      setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerNarrativeTemplateId(templateId);
+    setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(null);
+    setProviderProvenanceSchedulerNarrativeTemplateHistoryLoading(true);
+    setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(templateId);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(payload);
+    } catch (error) {
+      setProviderProvenanceSchedulerNarrativeTemplateHistoryError((error as Error).message);
+    } finally {
+      setProviderProvenanceSchedulerNarrativeTemplateHistoryLoading(false);
+    }
+  }
+
+  async function toggleProviderProvenanceSchedulerNarrativeRegistryHistory(registryId: string) {
+    if (
+      selectedProviderProvenanceSchedulerNarrativeRegistryId === registryId
+      && selectedProviderProvenanceSchedulerNarrativeRegistryHistory
+    ) {
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryId(null);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
+      setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+      return;
+    }
+    setSelectedProviderProvenanceSchedulerNarrativeRegistryId(registryId);
+    setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(null);
+    setProviderProvenanceSchedulerNarrativeRegistryHistoryLoading(true);
+    setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+    try {
+      const payload = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(registryId);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(payload);
+    } catch (error) {
+      setProviderProvenanceSchedulerNarrativeRegistryHistoryError((error as Error).message);
+    } finally {
+      setProviderProvenanceSchedulerNarrativeRegistryHistoryLoading(false);
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerNarrativeTemplateHistoryRevision(
+    entry: ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry,
+  ) {
+    try {
+      const restored = await restoreProviderProvenanceSchedulerNarrativeTemplateRevision({
+        templateId: entry.template_id,
+        revisionId: entry.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_template_revision_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(entry.template_id);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateId(entry.template_id);
+      setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(history);
+      setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
+      setProviderProvenanceWorkspaceFeedback(`Restored scheduler narrative template ${restored.name} from revision ${entry.revision_id}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative template restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function restoreProviderProvenanceSchedulerNarrativeRegistryHistoryRevision(
+    entry: ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry,
+  ) {
+    try {
+      const restored = await restoreProviderProvenanceSchedulerNarrativeRegistryRevision({
+        registryId: entry.registry_id,
+        revisionId: entry.revision_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_registry_revision_restore_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      const history = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(entry.registry_id);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryId(entry.registry_id);
+      setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(history);
+      setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
+      setProviderProvenanceWorkspaceFeedback(`Restored scheduler narrative registry ${restored.name} from revision ${entry.revision_id}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative registry restore failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function removeProviderProvenanceSchedulerNarrativeTemplate(
+    entry: ProviderProvenanceSchedulerNarrativeTemplateEntry,
+  ) {
+    if (entry.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(`Scheduler narrative template ${entry.name} is already deleted.`);
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete scheduler narrative template ${entry.name}?`)) {
+      return;
+    }
+    try {
+      await deleteProviderProvenanceSchedulerNarrativeTemplate({
+        templateId: entry.template_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_template_deleted_from_control_room",
+      });
+      if (editingProviderProvenanceSchedulerNarrativeTemplateId === entry.template_id) {
+        resetProviderProvenanceSchedulerNarrativeTemplateDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerNarrativeTemplateId === entry.template_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeTemplateRevisions(entry.template_id);
+        setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory(history);
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted scheduler narrative template ${entry.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative template delete failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function removeProviderProvenanceSchedulerNarrativeRegistry(
+    entry: ProviderProvenanceSchedulerNarrativeRegistryEntry,
+  ) {
+    if (entry.status === "deleted") {
+      setProviderProvenanceWorkspaceFeedback(`Scheduler narrative registry ${entry.name} is already deleted.`);
+      return;
+    }
+    if (typeof window !== "undefined" && !window.confirm(`Delete scheduler narrative registry ${entry.name}?`)) {
+      return;
+    }
+    try {
+      await deleteProviderProvenanceSchedulerNarrativeRegistryEntry({
+        registryId: entry.registry_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_registry_deleted_from_control_room",
+      });
+      if (editingProviderProvenanceSchedulerNarrativeRegistryId === entry.registry_id) {
+        resetProviderProvenanceSchedulerNarrativeRegistryDraft();
+      }
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerNarrativeRegistryId === entry.registry_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeRegistryRevisions(entry.registry_id);
+        setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory(history);
+      }
+      setProviderProvenanceWorkspaceFeedback(`Deleted scheduler narrative registry ${entry.name}.`);
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler narrative registry delete failed: ${(error as Error).message}`,
       );
     }
   }
@@ -8501,15 +8809,28 @@ export default function App() {
                                     </label>
                                     <label>
                                       <span>Action</span>
-                                      <button
-                                        className="ghost-button"
-                                        onClick={() => {
-                                          void saveCurrentProviderProvenanceSchedulerNarrativeTemplate();
-                                        }}
-                                        type="button"
-                                      >
-                                        Save template
-                                      </button>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={() => {
+                                            void saveCurrentProviderProvenanceSchedulerNarrativeTemplate();
+                                          }}
+                                          type="button"
+                                        >
+                                          {editingProviderProvenanceSchedulerNarrativeTemplateId ? "Save changes" : "Save template"}
+                                        </button>
+                                        {editingProviderProvenanceSchedulerNarrativeTemplateId ? (
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              resetProviderProvenanceSchedulerNarrativeTemplateDraft();
+                                            }}
+                                            type="button"
+                                          >
+                                            Cancel edit
+                                          </button>
+                                        ) : null}
+                                      </div>
                                     </label>
                                   </div>
                                   {providerProvenanceSchedulerNarrativeTemplatesLoading ? (
@@ -8544,27 +8865,64 @@ export default function App() {
                                             <td>
                                               <strong>{entry.filter_summary}</strong>
                                               <p className="run-lineage-symbol-copy">
-                                                Updated {formatTimestamp(entry.updated_at)}
+                                                {formatWorkflowToken(entry.status)} · {entry.revision_count} revision(s)
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                Updated {formatTimestamp(entry.updated_at)}{entry.deleted_at ? ` · deleted ${formatTimestamp(entry.deleted_at)}` : ""}
                                               </p>
                                             </td>
                                             <td>
-                                              <button
-                                                className="ghost-button"
-                                                onClick={() => {
-                                                  setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
-                                                    ...current,
-                                                    template_id: entry.template_id,
-                                                  }));
-                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
-                                                    includeLayout: false,
-                                                    forceSchedulerHighlight: true,
-                                                    feedbackLabel: `Scheduler template ${entry.name}`,
-                                                  });
-                                                }}
-                                                type="button"
-                                              >
-                                                Apply
-                                              </button>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  disabled={entry.status !== "active"}
+                                                  onClick={() => {
+                                                    setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                                      ...current,
+                                                      template_id: entry.template_id,
+                                                    }));
+                                                    void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                      includeLayout: false,
+                                                      forceSchedulerHighlight: true,
+                                                      feedbackLabel: `Scheduler template ${entry.name}`,
+                                                    });
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Apply
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void editProviderProvenanceSchedulerNarrativeTemplate(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  disabled={entry.status !== "active"}
+                                                  onClick={() => {
+                                                    void removeProviderProvenanceSchedulerNarrativeTemplate(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Delete
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void toggleProviderProvenanceSchedulerNarrativeTemplateHistory(entry.template_id);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  {selectedProviderProvenanceSchedulerNarrativeTemplateId === entry.template_id
+                                                    && selectedProviderProvenanceSchedulerNarrativeTemplateHistory
+                                                    ? "Hide versions"
+                                                    : "Versions"}
+                                                </button>
+                                              </div>
                                             </td>
                                           </tr>
                                         ))}
@@ -8573,6 +8931,76 @@ export default function App() {
                                   ) : (
                                     <p className="empty-state">No scheduler narrative templates saved yet.</p>
                                   )}
+                                  {selectedProviderProvenanceSchedulerNarrativeTemplateId ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Template revision history</strong>
+                                        <p>Inspect immutable snapshots, apply them to the workbench, or restore them as the active template.</p>
+                                      </div>
+                                      {providerProvenanceSchedulerNarrativeTemplateHistoryLoading ? (
+                                        <p className="empty-state">Loading template revisions…</p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerNarrativeTemplateHistoryError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Template revision history failed: {providerProvenanceSchedulerNarrativeTemplateHistoryError}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceSchedulerNarrativeTemplateHistory ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>When</th>
+                                              <th>Snapshot</th>
+                                              <th>Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {selectedProviderProvenanceSchedulerNarrativeTemplateHistory.history.map((entry) => (
+                                              <tr key={entry.revision_id}>
+                                                <td>
+                                                  <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.recorded_by_tab_label ?? entry.recorded_by_tab_id ?? "unknown tab"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.action)} · {formatWorkflowToken(entry.status)}</strong>
+                                                  <p className="run-lineage-symbol-copy">{entry.filter_summary}</p>
+                                                  <p className="run-lineage-symbol-copy">{entry.reason}</p>
+                                                </td>
+                                                <td>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                          includeLayout: false,
+                                                          forceSchedulerHighlight: true,
+                                                          feedbackLabel: `Template revision ${entry.revision_id}`,
+                                                        });
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Apply snapshot
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void restoreProviderProvenanceSchedulerNarrativeTemplateHistoryRevision(entry);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Restore revision
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
@@ -8629,15 +9057,28 @@ export default function App() {
                                     </label>
                                     <label>
                                       <span>Action</span>
-                                      <button
-                                        className="ghost-button"
-                                        onClick={() => {
-                                          void saveCurrentProviderProvenanceSchedulerNarrativeRegistryEntry();
-                                        }}
-                                        type="button"
-                                      >
-                                        Save registry
-                                      </button>
+                                      <div className="market-data-provenance-history-actions">
+                                        <button
+                                          className="ghost-button"
+                                          onClick={() => {
+                                            void saveCurrentProviderProvenanceSchedulerNarrativeRegistryEntry();
+                                          }}
+                                          type="button"
+                                        >
+                                          {editingProviderProvenanceSchedulerNarrativeRegistryId ? "Save changes" : "Save registry"}
+                                        </button>
+                                        {editingProviderProvenanceSchedulerNarrativeRegistryId ? (
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              resetProviderProvenanceSchedulerNarrativeRegistryDraft();
+                                            }}
+                                            type="button"
+                                          >
+                                            Cancel edit
+                                          </button>
+                                        ) : null}
+                                      </div>
                                     </label>
                                   </div>
                                   {providerProvenanceSchedulerNarrativeRegistryEntriesLoading ? (
@@ -8675,26 +9116,60 @@ export default function App() {
                                                 Highlight {entry.layout.highlight_panel} · {entry.focus.symbol ?? "all symbols"} · {entry.focus.timeframe ?? "all windows"}
                                               </p>
                                               <p className="run-lineage-symbol-copy">
-                                                Updated {formatTimestamp(entry.updated_at)}
+                                                {formatWorkflowToken(entry.status)} · {entry.revision_count} revision(s) · updated {formatTimestamp(entry.updated_at)}
                                               </p>
                                             </td>
                                             <td>
-                                              <button
-                                                className="ghost-button"
-                                                onClick={() => {
-                                                  setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
-                                                    ...current,
-                                                    template_id: entry.template_id ?? "",
-                                                  }));
-                                                  void applyProviderProvenanceWorkspaceQuery(entry, {
-                                                    includeLayout: true,
-                                                    feedbackLabel: `Narrative registry ${entry.name}`,
-                                                  });
-                                                }}
-                                                type="button"
-                                              >
-                                                Apply
-                                              </button>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  disabled={entry.status !== "active"}
+                                                  onClick={() => {
+                                                    setProviderProvenanceSchedulerNarrativeRegistryDraft((current) => ({
+                                                      ...current,
+                                                      template_id: entry.template_id ?? "",
+                                                    }));
+                                                    void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                      includeLayout: true,
+                                                      feedbackLabel: `Narrative registry ${entry.name}`,
+                                                    });
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Apply
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void editProviderProvenanceSchedulerNarrativeRegistryEntry(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Edit
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  disabled={entry.status !== "active"}
+                                                  onClick={() => {
+                                                    void removeProviderProvenanceSchedulerNarrativeRegistry(entry);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Delete
+                                                </button>
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    void toggleProviderProvenanceSchedulerNarrativeRegistryHistory(entry.registry_id);
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  {selectedProviderProvenanceSchedulerNarrativeRegistryId === entry.registry_id
+                                                    && selectedProviderProvenanceSchedulerNarrativeRegistryHistory
+                                                    ? "Hide versions"
+                                                    : "Versions"}
+                                                </button>
+                                              </div>
                                             </td>
                                           </tr>
                                         ))}
@@ -8703,6 +9178,78 @@ export default function App() {
                                   ) : (
                                     <p className="empty-state">No scheduler narrative registry entries saved yet.</p>
                                   )}
+                                  {selectedProviderProvenanceSchedulerNarrativeRegistryId ? (
+                                    <div className="market-data-provenance-shared-history">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Registry revision history</strong>
+                                        <p>Review saved board revisions, apply them to the workbench, or restore them as the active shared scheduler board.</p>
+                                      </div>
+                                      {providerProvenanceSchedulerNarrativeRegistryHistoryLoading ? (
+                                        <p className="empty-state">Loading registry revisions…</p>
+                                      ) : null}
+                                      {providerProvenanceSchedulerNarrativeRegistryHistoryError ? (
+                                        <p className="market-data-workflow-feedback">
+                                          Registry revision history failed: {providerProvenanceSchedulerNarrativeRegistryHistoryError}
+                                        </p>
+                                      ) : null}
+                                      {selectedProviderProvenanceSchedulerNarrativeRegistryHistory ? (
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>When</th>
+                                              <th>Snapshot</th>
+                                              <th>Action</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {selectedProviderProvenanceSchedulerNarrativeRegistryHistory.history.map((entry) => (
+                                              <tr key={entry.revision_id}>
+                                                <td>
+                                                  <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {entry.recorded_by_tab_label ?? entry.recorded_by_tab_id ?? "unknown tab"}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(entry.action)} · {formatWorkflowToken(entry.status)}</strong>
+                                                  <p className="run-lineage-symbol-copy">{entry.filter_summary}</p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {providerProvenanceSchedulerNarrativeTemplateNameMap.get(entry.template_id ?? "") ?? "No template link"} · highlight {entry.layout.highlight_panel}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">{entry.reason}</p>
+                                                </td>
+                                                <td>
+                                                  <div className="market-data-provenance-history-actions">
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void applyProviderProvenanceWorkspaceQuery(entry, {
+                                                          includeLayout: true,
+                                                          feedbackLabel: `Registry revision ${entry.revision_id}`,
+                                                        });
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Apply snapshot
+                                                    </button>
+                                                    <button
+                                                      className="ghost-button"
+                                                      onClick={() => {
+                                                        void restoreProviderProvenanceSchedulerNarrativeRegistryHistoryRevision(entry);
+                                                      }}
+                                                      type="button"
+                                                    >
+                                                      Restore revision
+                                                    </button>
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      ) : null}
+                                    </div>
+                                  ) : null}
                                 </div>
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">

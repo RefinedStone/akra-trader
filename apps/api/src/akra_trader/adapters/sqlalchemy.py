@@ -34,7 +34,9 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
@@ -204,6 +206,15 @@ provider_provenance_scheduler_narrative_templates = Table(
   Column("created_by_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_template_revisions = Table(
+  "provider_provenance_scheduler_narrative_template_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("template_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_registry = Table(
   "provider_provenance_scheduler_narrative_registry",
   metadata,
@@ -212,6 +223,15 @@ provider_provenance_scheduler_narrative_registry = Table(
   Column("template_id", String, nullable=True, index=True),
   Column("updated_at", String, nullable=False, index=True),
   Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
+provider_provenance_scheduler_narrative_registry_revisions = Table(
+  "provider_provenance_scheduler_narrative_registry_revisions",
+  metadata,
+  Column("revision_id", String, primary_key=True),
+  Column("registry_id", String, nullable=False, index=True),
+  Column("action", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
 provider_provenance_scheduled_report_audit_records = Table(
@@ -272,8 +292,14 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _provider_provenance_scheduler_narrative_template_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeTemplateRecord
   )
+  _provider_provenance_scheduler_narrative_template_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord
+  )
   _provider_provenance_scheduler_narrative_registry_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeRegistryRecord
+  )
+  _provider_provenance_scheduler_narrative_registry_revision_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
   )
   _provider_provenance_scheduled_report_audit_adapter = TypeAdapter(ProviderProvenanceScheduledReportAuditRecord)
   _provider_provenance_scheduler_health_record_adapter = TypeAdapter(ProviderProvenanceSchedulerHealthRecord)
@@ -1149,6 +1175,67 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       row["payload"]
     )
 
+  def save_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord:
+    payload = self._provider_provenance_scheduler_narrative_template_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "template_id": record.template_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_template_revisions.c.revision_id).where(
+          provider_provenance_scheduler_narrative_template_revisions.c.revision_id == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_narrative_template_revisions).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_template_revisions)
+          .where(provider_provenance_scheduler_narrative_template_revisions.c.revision_id == record.revision_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_template_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord, ...]:
+    statement = select(provider_provenance_scheduler_narrative_template_revisions.c.payload).order_by(
+      provider_provenance_scheduler_narrative_template_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_template_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_template_revision_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_narrative_template_revisions.c.payload).where(
+          provider_provenance_scheduler_narrative_template_revisions.c.revision_id == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_template_revision_adapter.validate_python(
+      row["payload"]
+    )
+
   def save_provider_provenance_scheduler_narrative_registry_entry(
     self,
     record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
@@ -1208,6 +1295,67 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
     if row is None:
       return None
     return self._provider_provenance_scheduler_narrative_registry_adapter.validate_python(
+      row["payload"]
+    )
+
+  def save_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord:
+    payload = self._provider_provenance_scheduler_narrative_registry_revision_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "revision_id": record.revision_id,
+      "registry_id": record.registry_id,
+      "action": record.action,
+      "recorded_at": record.recorded_at.isoformat(),
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_registry_revisions.c.revision_id).where(
+          provider_provenance_scheduler_narrative_registry_revisions.c.revision_id == record.revision_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_narrative_registry_revisions).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_registry_revisions)
+          .where(provider_provenance_scheduler_narrative_registry_revisions.c.revision_id == record.revision_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_registry_revisions(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord, ...]:
+    statement = select(provider_provenance_scheduler_narrative_registry_revisions.c.payload).order_by(
+      provider_provenance_scheduler_narrative_registry_revisions.c.recorded_at.desc(),
+      provider_provenance_scheduler_narrative_registry_revisions.c.revision_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_registry_revision_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_narrative_registry_revisions.c.payload).where(
+          provider_provenance_scheduler_narrative_registry_revisions.c.revision_id == revision_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_registry_revision_adapter.validate_python(
       row["payload"]
     )
 
@@ -1445,10 +1593,16 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_provider_provenance_scheduler_narrative_templates_name", "name"),
         ("ix_provider_provenance_scheduler_narrative_templates_updated_at", "updated_at"),
         ("ix_provider_provenance_scheduler_narrative_templates_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduler_narrative_template_revisions_template_id", "template_id"),
+        ("ix_provider_provenance_scheduler_narrative_template_revisions_action", "action"),
+        ("ix_provider_provenance_scheduler_narrative_template_revisions_recorded_at", "recorded_at"),
         ("ix_provider_provenance_scheduler_narrative_registry_name", "name"),
         ("ix_provider_provenance_scheduler_narrative_registry_template_id", "template_id"),
         ("ix_provider_provenance_scheduler_narrative_registry_updated_at", "updated_at"),
         ("ix_provider_provenance_scheduler_narrative_registry_created_by_tab_id", "created_by_tab_id"),
+        ("ix_provider_provenance_scheduler_narrative_registry_revisions_registry_id", "registry_id"),
+        ("ix_provider_provenance_scheduler_narrative_registry_revisions_action", "action"),
+        ("ix_provider_provenance_scheduler_narrative_registry_revisions_recorded_at", "recorded_at"),
         ("ix_provider_provenance_scheduled_report_audit_records_report_id", "report_id"),
         ("ix_provider_provenance_scheduled_report_audit_records_action", "action"),
         ("ix_provider_provenance_scheduled_report_audit_records_recorded_at", "recorded_at"),

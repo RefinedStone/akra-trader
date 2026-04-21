@@ -613,6 +613,26 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "limit",
     "app",
   )
+  assert tuple(inspect.signature(routes["update_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
+    "template_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["delete_operator_provider_provenance_scheduler_narrative_template"].endpoint).parameters) == (
+    "template_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_narrative_template_revisions"].endpoint).parameters) == (
+    "template_id",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["restore_operator_provider_provenance_scheduler_narrative_template_revision"].endpoint).parameters) == (
+    "template_id",
+    "revision_id",
+    "request",
+    "app",
+  )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduler_narrative_registry_entry"].endpoint).parameters) == (
     "request",
     "app",
@@ -627,6 +647,26 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
     "narrative_facet",
     "search",
     "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["update_operator_provider_provenance_scheduler_narrative_registry_entry"].endpoint).parameters) == (
+    "registry_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["delete_operator_provider_provenance_scheduler_narrative_registry_entry"].endpoint).parameters) == (
+    "registry_id",
+    "request",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_narrative_registry_revisions"].endpoint).parameters) == (
+    "registry_id",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["restore_operator_provider_provenance_scheduler_narrative_registry_revision"].endpoint).parameters) == (
+    "registry_id",
+    "revision_id",
+    "request",
     "app",
   )
   assert tuple(inspect.signature(routes["create_operator_provider_provenance_scheduled_report"].endpoint).parameters) == (
@@ -1345,6 +1385,65 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   list_templates_payload = list_templates_response.json()
   assert list_templates_payload["total"] == 1
   assert list_templates_payload["items"][0]["template_id"] == template_payload["template_id"]
+  assert list_templates_payload["items"][0]["revision_count"] == 1
+
+  update_template_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_payload['template_id']}",
+    json={
+      "name": "Lag recovery narrative v2",
+      "description": "Updated post-resolution lag recovery lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "recurring_occurrences",
+        "window_days": 21,
+        "result_limit": 12,
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "refined_scheduler_recovery_lens",
+    },
+  )
+  assert update_template_response.status_code == 200
+  updated_template_payload = update_template_response.json()
+  assert updated_template_payload["revision_count"] == 2
+  assert updated_template_payload["query"]["scheduler_alert_narrative_facet"] == "recurring_occurrences"
+
+  template_revisions_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_payload['template_id']}/revisions",
+  )
+  assert template_revisions_response.status_code == 200
+  template_revisions_payload = template_revisions_response.json()
+  assert [item["action"] for item in template_revisions_payload["history"][:2]] == ["updated", "created"]
+  created_template_revision_id = template_revisions_payload["history"][-1]["revision_id"]
+
+  delete_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_payload['template_id']}/delete",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "retire_superseded_template",
+    },
+  )
+  assert delete_template_response.status_code == 200
+  deleted_template_payload = delete_template_response.json()
+  assert deleted_template_payload["status"] == "deleted"
+  assert deleted_template_payload["revision_count"] == 3
+
+  restore_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-templates/{template_payload['template_id']}/revisions/{created_template_revision_id}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_baseline_template",
+    },
+  )
+  assert restore_template_response.status_code == 200
+  restored_template_payload = restore_template_response.json()
+  assert restored_template_payload["status"] == "active"
+  assert restored_template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
+  assert restored_template_payload["revision_count"] == 4
 
   registry_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
@@ -1377,6 +1476,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   registry_payload = registry_response.json()
   assert registry_payload["template_id"] == template_payload["template_id"]
   assert registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert registry_payload["revision_count"] == 1
 
   list_registry_response = client.get(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
@@ -1391,6 +1491,64 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   list_registry_payload = list_registry_response.json()
   assert list_registry_payload["total"] == 1
   assert list_registry_payload["items"][0]["registry_id"] == registry_payload["registry_id"]
+
+  update_registry_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_payload['registry_id']}",
+    json={
+      "name": "Lag recovery board v2",
+      "description": "Updated shared scheduler narrative board.",
+      "layout": {
+        "highlight_panel": "drift",
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": True,
+      },
+      "template_id": "",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "switch_to_template_free_board",
+    },
+  )
+  assert update_registry_response.status_code == 200
+  updated_registry_payload = update_registry_response.json()
+  assert updated_registry_payload["revision_count"] == 2
+  assert updated_registry_payload["template_id"] is None
+  assert updated_registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+
+  registry_revisions_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_payload['registry_id']}/revisions",
+  )
+  assert registry_revisions_response.status_code == 200
+  registry_revisions_payload = registry_revisions_response.json()
+  assert [item["action"] for item in registry_revisions_payload["history"][:2]] == ["updated", "created"]
+  created_registry_revision_id = registry_revisions_payload["history"][-1]["revision_id"]
+
+  delete_registry_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_payload['registry_id']}/delete",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "retire_registry_board",
+    },
+  )
+  assert delete_registry_response.status_code == 200
+  deleted_registry_payload = delete_registry_response.json()
+  assert deleted_registry_payload["status"] == "deleted"
+  assert deleted_registry_payload["revision_count"] == 3
+
+  restore_registry_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-registry/{registry_payload['registry_id']}/revisions/{created_registry_revision_id}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_linked_registry",
+    },
+  )
+  assert restore_registry_response.status_code == 200
+  restored_registry_payload = restore_registry_response.json()
+  assert restored_registry_payload["status"] == "active"
+  assert restored_registry_payload["template_id"] == template_payload["template_id"]
+  assert restored_registry_payload["revision_count"] == 4
 
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",

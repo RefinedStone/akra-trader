@@ -1572,13 +1572,19 @@ export type ProviderProvenanceSchedulerNarrativeTemplateEntry = {
   template_id: string;
   name: string;
   description: string;
+  status: "active" | "deleted" | string;
   query: ProviderProvenanceAnalyticsWorkspaceQuery;
   focus: ProviderProvenanceWorkspaceFocus;
   filter_summary: string;
   created_at: string;
   updated_at: string;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerNarrativeTemplateListPayload = {
@@ -1586,24 +1592,76 @@ export type ProviderProvenanceSchedulerNarrativeTemplateListPayload = {
   total: number;
 };
 
+export type ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry = {
+  revision_id: string;
+  template_id: string;
+  action: string;
+  reason: string;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  status: "active" | "deleted" | string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  recorded_at: string;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload = {
+  template: ProviderProvenanceSchedulerNarrativeTemplateEntry;
+  history: ProviderProvenanceSchedulerNarrativeTemplateRevisionEntry[];
+};
+
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {
   registry_id: string;
   name: string;
   description: string;
   template_id?: string | null;
+  status: "active" | "deleted" | string;
   query: ProviderProvenanceAnalyticsWorkspaceQuery;
   focus: ProviderProvenanceWorkspaceFocus;
   filter_summary: string;
   layout: ProviderProvenanceDashboardLayout;
   created_at: string;
   updated_at: string;
+  current_revision_id?: string | null;
+  revision_count: number;
   created_by_tab_id?: string | null;
   created_by_tab_label?: string | null;
+  deleted_at?: string | null;
+  deleted_by_tab_id?: string | null;
+  deleted_by_tab_label?: string | null;
 };
 
 export type ProviderProvenanceSchedulerNarrativeRegistryListPayload = {
   items: ProviderProvenanceSchedulerNarrativeRegistryEntry[];
   total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry = {
+  revision_id: string;
+  registry_id: string;
+  action: string;
+  reason: string;
+  source_revision_id?: string | null;
+  name: string;
+  description: string;
+  template_id?: string | null;
+  status: "active" | "deleted" | string;
+  query: ProviderProvenanceAnalyticsWorkspaceQuery;
+  focus: ProviderProvenanceWorkspaceFocus;
+  filter_summary: string;
+  layout: ProviderProvenanceDashboardLayout;
+  recorded_at: string;
+  recorded_by_tab_id?: string | null;
+  recorded_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload = {
+  registry: ProviderProvenanceSchedulerNarrativeRegistryEntry;
+  history: ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry[];
 };
 
 export type ProviderProvenanceScheduledReportEntry = {

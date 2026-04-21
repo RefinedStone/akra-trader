@@ -19,8 +19,10 @@ import type {
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryListPayload,
+  ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeTemplateEntry,
   ProviderProvenanceSchedulerNarrativeTemplateListPayload,
+  ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProviderProvenanceScheduledReportListPayload,
@@ -649,6 +651,76 @@ export async function listProviderProvenanceSchedulerNarrativeTemplates(params: 
   );
 }
 
+export async function updateProviderProvenanceSchedulerNarrativeTemplate(params: {
+  templateId: string;
+  name?: string;
+  description?: string;
+  query?: Record<string, unknown>;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-templates/${encodeURIComponent(params.templateId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(params.name !== undefined ? { name: params.name } : {}),
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.query !== undefined ? { query: params.query } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerNarrativeTemplate(params: {
+  templateId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-templates/${encodeURIComponent(params.templateId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeTemplateRevisions(templateId: string) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-templates/${encodeURIComponent(templateId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerNarrativeTemplateRevision(params: {
+  templateId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeTemplateEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-templates/${encodeURIComponent(params.templateId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
 export async function createProviderProvenanceSchedulerNarrativeRegistryEntry(params: {
   name: string;
   description?: string;
@@ -709,6 +781,80 @@ export async function listProviderProvenanceSchedulerNarrativeRegistryEntries(pa
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryListPayload>(
     `/operator/provider-provenance-analytics/scheduler-narrative-registry${suffix}`,
+  );
+}
+
+export async function updateProviderProvenanceSchedulerNarrativeRegistryEntry(params: {
+  registryId: string;
+  name?: string;
+  description?: string;
+  query?: Record<string, unknown>;
+  layout?: ProviderProvenanceDashboardLayout;
+  templateId?: string | null;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-registry/${encodeURIComponent(params.registryId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(params.name !== undefined ? { name: params.name } : {}),
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.query !== undefined ? { query: params.query } : {}),
+        ...(params.layout !== undefined ? { layout: params.layout } : {}),
+        ...(params.templateId !== undefined ? { template_id: params.templateId } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerNarrativeRegistryEntry(params: {
+  registryId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-registry/${encodeURIComponent(params.registryId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeRegistryRevisions(registryId: string) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-registry/${encodeURIComponent(registryId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerNarrativeRegistryRevision(params: {
+  registryId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeRegistryEntry>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-registry/${encodeURIComponent(params.registryId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
   );
 }
 

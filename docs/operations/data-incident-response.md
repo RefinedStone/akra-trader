@@ -75,6 +75,9 @@ unclear dataset lineage.
 - the same scheduler occurrence table now also carries a narrative facet and can stage dedicated
   scheduler narrative templates plus named registry boards, so cross-shift review can reopen the
   same post-resolution or recurring-occurrence lens instead of rebuilding filters manually
+- those saved scheduler narrative templates and boards now also support edit, delete, and
+  revision-restore workflow, so teams can correct or retire shared review lenses without losing
+  the previous incident-handoff snapshot
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

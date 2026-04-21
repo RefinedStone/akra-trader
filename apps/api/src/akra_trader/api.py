@@ -258,6 +258,27 @@ class OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest(BaseMode
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerNarrativeTemplateUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  query: dict[str, Any] | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_template_updated"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeTemplateDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_template_deleted"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_template_revision_restored"
+
+
 class OperatorProviderProvenanceSchedulerNarrativeRegistryCreateRequest(BaseModel):
   name: str
   description: str = ""
@@ -266,6 +287,29 @@ class OperatorProviderProvenanceSchedulerNarrativeRegistryCreateRequest(BaseMode
   template_id: str | None = None
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
+
+
+class OperatorProviderProvenanceSchedulerNarrativeRegistryUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  query: dict[str, Any] | None = None
+  layout: dict[str, Any] | None = None
+  template_id: str | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_registry_updated"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeRegistryDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_registry_deleted"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_registry_revision_restored"
 
 
 class OperatorProviderProvenanceScheduledReportCreateRequest(BaseModel):
@@ -309,8 +353,32 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
     OperatorProviderProvenanceSchedulerNarrativeTemplateCreateRequest,
     {},
   ),
+  "operator_provider_provenance_scheduler_narrative_template_update": (
+    OperatorProviderProvenanceSchedulerNarrativeTemplateUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_template_delete": (
+    OperatorProviderProvenanceSchedulerNarrativeTemplateDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_template_revision_restore": (
+    OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest,
+    {},
+  ),
   "operator_provider_provenance_scheduler_narrative_registry_create": (
     OperatorProviderProvenanceSchedulerNarrativeRegistryCreateRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_registry_update": (
+    OperatorProviderProvenanceSchedulerNarrativeRegistryUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_registry_delete": (
+    OperatorProviderProvenanceSchedulerNarrativeRegistryDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_registry_revision_restore": (
+    OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest,
     {},
   ),
   "operator_provider_provenance_scheduled_report_create": (OperatorProviderProvenanceScheduledReportCreateRequest, {}),

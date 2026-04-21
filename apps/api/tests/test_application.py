@@ -15144,8 +15144,16 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_dashboard_view_list",
     "operator_provider_provenance_scheduler_narrative_template_create",
     "operator_provider_provenance_scheduler_narrative_template_list",
+    "operator_provider_provenance_scheduler_narrative_template_update",
+    "operator_provider_provenance_scheduler_narrative_template_delete",
+    "operator_provider_provenance_scheduler_narrative_template_revision_list",
+    "operator_provider_provenance_scheduler_narrative_template_revision_restore",
     "operator_provider_provenance_scheduler_narrative_registry_create",
     "operator_provider_provenance_scheduler_narrative_registry_list",
+    "operator_provider_provenance_scheduler_narrative_registry_update",
+    "operator_provider_provenance_scheduler_narrative_registry_delete",
+    "operator_provider_provenance_scheduler_narrative_registry_revision_list",
+    "operator_provider_provenance_scheduler_narrative_registry_revision_restore",
     "operator_provider_provenance_scheduled_report_create",
     "operator_provider_provenance_scheduled_report_list",
     "operator_provider_provenance_scheduled_report_run",
@@ -15282,10 +15290,32 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"].filter_param_specs[3].key
     == "narrative_facet"
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_update"].methods == ("PATCH",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_delete"].path_param_keys == (
+    "template_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_revision_list"].route_path.endswith(
+    "/scheduler-narrative-templates/{template_id}/revisions"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_template_revision_restore"].path_param_keys == (
+    "template_id",
+    "revision_id",
+  )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"].methods == ("POST",)
   assert (
     bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"].filter_param_specs[0].key
     == "template_id"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_update"].methods == ("PATCH",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_delete"].path_param_keys == (
+    "registry_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_list"].route_path.endswith(
+    "/scheduler-narrative-registry/{registry_id}/revisions"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_restore"].path_param_keys == (
+    "registry_id",
+    "revision_id",
   )
   assert bindings_by_key["operator_provider_provenance_scheduled_report_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduled_report_list"].filter_param_specs[1].key == (
@@ -16360,6 +16390,70 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert template_list_payload["total"] == 1
   assert template_list_payload["items"][0]["template_id"] == template_payload["template_id"]
+  assert template_list_payload["items"][0]["revision_count"] == 1
+
+  updated_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_update"],
+    app=app,
+    path_params={"template_id": template_payload["template_id"]},
+    request_payload={
+      "name": "Lag recovery narrative v2",
+      "description": "Updated post-resolution lag recovery lens.",
+      "query": {
+        "focus_scope": "all_focuses",
+        "scheduler_alert_category": "scheduler_lag",
+        "scheduler_alert_status": "resolved",
+        "scheduler_alert_narrative_facet": "recurring_occurrences",
+        "window_days": 21,
+        "result_limit": 12,
+      },
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "refined_scheduler_recovery_lens",
+    },
+  )
+  assert updated_template_payload["name"] == "Lag recovery narrative v2"
+  assert updated_template_payload["query"]["scheduler_alert_narrative_facet"] == "recurring_occurrences"
+  assert updated_template_payload["revision_count"] == 2
+
+  template_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_revision_list"],
+    app=app,
+    path_params={"template_id": template_payload["template_id"]},
+  )
+  assert template_revision_payload["template"]["template_id"] == template_payload["template_id"]
+  assert [item["action"] for item in template_revision_payload["history"][:2]] == ["updated", "created"]
+  created_template_revision_id = template_revision_payload["history"][-1]["revision_id"]
+
+  deleted_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_delete"],
+    app=app,
+    path_params={"template_id": template_payload["template_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "retire_superseded_template",
+    },
+  )
+  assert deleted_template_payload["status"] == "deleted"
+  assert deleted_template_payload["revision_count"] == 3
+
+  restored_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_revision_restore"],
+    app=app,
+    path_params={
+      "template_id": template_payload["template_id"],
+      "revision_id": created_template_revision_id,
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_baseline_template",
+    },
+  )
+  assert restored_template_payload["status"] == "active"
+  assert restored_template_payload["query"]["scheduler_alert_narrative_facet"] == "post_resolution_recovery"
+  assert restored_template_payload["revision_count"] == 4
 
   registry_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"],
@@ -16391,6 +16485,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert registry_payload["template_id"] == template_payload["template_id"]
   assert registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert registry_payload["revision_count"] == 1
 
   registry_list_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"],
@@ -16404,6 +16499,68 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert registry_list_payload["total"] == 1
   assert registry_list_payload["items"][0]["registry_id"] == registry_payload["registry_id"]
+
+  updated_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_update"],
+    app=app,
+    path_params={"registry_id": registry_payload["registry_id"]},
+    request_payload={
+      "name": "Lag recovery board v2",
+      "description": "Updated shared scheduler narrative board.",
+      "layout": {
+        "highlight_panel": "drift",
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": True,
+      },
+      "template_id": "",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "switch_to_template_free_board",
+    },
+  )
+  assert updated_registry_payload["name"] == "Lag recovery board v2"
+  assert updated_registry_payload["template_id"] is None
+  assert updated_registry_payload["layout"]["highlight_panel"] == "scheduler_alerts"
+  assert updated_registry_payload["revision_count"] == 2
+
+  registry_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_list"],
+    app=app,
+    path_params={"registry_id": registry_payload["registry_id"]},
+  )
+  assert [item["action"] for item in registry_revision_payload["history"][:2]] == ["updated", "created"]
+  created_registry_revision_id = registry_revision_payload["history"][-1]["revision_id"]
+
+  deleted_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_delete"],
+    app=app,
+    path_params={"registry_id": registry_payload["registry_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "retire_registry_board",
+    },
+  )
+  assert deleted_registry_payload["status"] == "deleted"
+  assert deleted_registry_payload["revision_count"] == 3
+
+  restored_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_restore"],
+    app=app,
+    path_params={
+      "registry_id": registry_payload["registry_id"],
+      "revision_id": created_registry_revision_id,
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "restore_linked_registry",
+    },
+  )
+  assert restored_registry_payload["status"] == "active"
+  assert restored_registry_payload["template_id"] == template_payload["template_id"]
+  assert restored_registry_payload["revision_count"] == 4
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

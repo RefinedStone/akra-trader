@@ -38,7 +38,9 @@ from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -433,9 +435,17 @@ class TradingApplication:
       str,
       ProviderProvenanceSchedulerNarrativeTemplateRecord,
     ] = {}
+    self._provider_provenance_scheduler_narrative_template_revisions: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+    ] = {}
     self._provider_provenance_scheduler_narrative_registry: dict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_registry_revisions: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
     ] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
     self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
@@ -1709,6 +1719,39 @@ class TradingApplication:
       )
     )
 
+  def _save_provider_provenance_scheduler_narrative_template_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord:
+    save_revision = getattr(self._runs, "save_provider_provenance_scheduler_narrative_template_revision", None)
+    if callable(save_revision):
+      return save_revision(record)
+    self._provider_provenance_scheduler_narrative_template_revisions[record.revision_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_template_revision_record(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord | None:
+    get_revision = getattr(self._runs, "get_provider_provenance_scheduler_narrative_template_revision", None)
+    if callable(get_revision):
+      return get_revision(revision_id)
+    return self._provider_provenance_scheduler_narrative_template_revisions.get(revision_id)
+
+  def _list_provider_provenance_scheduler_narrative_template_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord, ...]:
+    list_revisions = getattr(self._runs, "list_provider_provenance_scheduler_narrative_template_revisions", None)
+    if callable(list_revisions):
+      return tuple(list_revisions())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_template_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
   def _save_provider_provenance_scheduler_narrative_registry_record(
     self,
     record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
@@ -1738,6 +1781,39 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_narrative_registry.values(),
         key=lambda record: (record.updated_at, record.registry_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_registry_revision_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord:
+    save_revision = getattr(self._runs, "save_provider_provenance_scheduler_narrative_registry_revision", None)
+    if callable(save_revision):
+      return save_revision(record)
+    self._provider_provenance_scheduler_narrative_registry_revisions[record.revision_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_registry_revision_record(
+    self,
+    revision_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
+    get_revision = getattr(self._runs, "get_provider_provenance_scheduler_narrative_registry_revision", None)
+    if callable(get_revision):
+      return get_revision(revision_id)
+    return self._provider_provenance_scheduler_narrative_registry_revisions.get(revision_id)
+
+  def _list_provider_provenance_scheduler_narrative_registry_revision_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord, ...]:
+    list_revisions = getattr(self._runs, "list_provider_provenance_scheduler_narrative_registry_revisions", None)
+    if callable(list_revisions):
+      return tuple(list_revisions())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_registry_revisions.values(),
+        key=lambda record: (record.recorded_at, record.revision_id),
         reverse=True,
       )
     )
@@ -3704,6 +3780,153 @@ class TradingApplication:
     }
 
   @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_record_status(
+    value: str | None,
+  ) -> str:
+    normalized_value = value.strip() if isinstance(value, str) else ""
+    return "deleted" if normalized_value == "deleted" else "active"
+
+  def _build_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord:
+    revision_count = sum(
+      1
+      for revision in self._list_provider_provenance_scheduler_narrative_template_revision_records()
+      if revision.template_id == record.template_id
+    )
+    return ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord(
+      revision_id=f"{record.template_id}:r{revision_count + 1:04d}",
+      template_id=record.template_id,
+      action=action,
+      reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
+      name=record.name,
+      description=record.description,
+      query=deepcopy(record.query),
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      recorded_at=recorded_at,
+      source_revision_id=source_revision_id,
+      recorded_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      recorded_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+
+  def _record_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    revision = self._save_provider_provenance_scheduler_narrative_template_revision_record(
+      self._build_provider_provenance_scheduler_narrative_template_revision(
+        record=record,
+        action=action,
+        reason=reason,
+        recorded_at=recorded_at,
+        source_revision_id=source_revision_id,
+        actor_tab_id=actor_tab_id,
+        actor_tab_label=actor_tab_label,
+      )
+    )
+    return self._save_provider_provenance_scheduler_narrative_template_record(
+      replace(
+        record,
+        current_revision_id=revision.revision_id,
+        revision_count=int(record.revision_count or 0) + 1,
+      )
+    )
+
+  def _build_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord:
+    revision_count = sum(
+      1
+      for revision in self._list_provider_provenance_scheduler_narrative_registry_revision_records()
+      if revision.registry_id == record.registry_id
+    )
+    return ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord(
+      revision_id=f"{record.registry_id}:r{revision_count + 1:04d}",
+      registry_id=record.registry_id,
+      action=action,
+      reason=reason.strip() if isinstance(reason, str) and reason.strip() else action,
+      name=record.name,
+      description=record.description,
+      query=deepcopy(record.query),
+      layout=deepcopy(record.layout),
+      template_id=record.template_id,
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
+      recorded_at=recorded_at,
+      source_revision_id=source_revision_id,
+      recorded_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      recorded_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+
+  def _record_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    *,
+    record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+    action: str,
+    reason: str,
+    recorded_at: datetime,
+    source_revision_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    revision = self._save_provider_provenance_scheduler_narrative_registry_revision_record(
+      self._build_provider_provenance_scheduler_narrative_registry_revision(
+        record=record,
+        action=action,
+        reason=reason,
+        recorded_at=recorded_at,
+        source_revision_id=source_revision_id,
+        actor_tab_id=actor_tab_id,
+        actor_tab_label=actor_tab_label,
+      )
+    )
+    return self._save_provider_provenance_scheduler_narrative_registry_record(
+      replace(
+        record,
+        current_revision_id=revision.revision_id,
+        revision_count=int(record.revision_count or 0) + 1,
+      )
+    )
+
+  @staticmethod
   def _normalize_provider_provenance_scheduled_report_cadence(
     value: str | None,
   ) -> str:
@@ -4117,6 +4340,7 @@ class TradingApplication:
       ),
       description=description.strip() if isinstance(description, str) else "",
       query=self._normalize_provider_provenance_analytics_query_payload(query),
+      status="active",
       created_at=now,
       updated_at=now,
       created_by_tab_id=(
@@ -4130,7 +4354,109 @@ class TradingApplication:
         else None
       ),
     )
-    return self._save_provider_provenance_scheduler_narrative_template_record(record)
+    return self._record_provider_provenance_scheduler_narrative_template_revision(
+      record=record,
+      action="created",
+      reason="scheduler_narrative_template_created",
+      recorded_at=now,
+      actor_tab_id=record.created_by_tab_id,
+      actor_tab_label=record.created_by_tab_label,
+    )
+
+  def update_provider_provenance_scheduler_narrative_template(
+    self,
+    template_id: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    query: dict[str, Any] | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_template_updated",
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    current = self.get_provider_provenance_scheduler_narrative_template(template_id)
+    if current.status == "deleted":
+      raise RuntimeError(
+        "Deleted scheduler narrative templates must be restored from a revision before editing."
+      )
+    updated_name = (
+      self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler narrative template name",
+      )
+      if isinstance(name, str)
+      else current.name
+    )
+    updated_description = (
+      description.strip()
+      if isinstance(description, str)
+      else current.description
+    )
+    updated_query = (
+      self._normalize_provider_provenance_analytics_query_payload(query)
+      if isinstance(query, dict)
+      else current.query
+    )
+    if (
+      updated_name == current.name
+      and updated_description == current.description
+      and updated_query == current.query
+    ):
+      return current
+    updated = replace(
+      current,
+      name=updated_name,
+      description=updated_description,
+      query=updated_query,
+      updated_at=self._clock(),
+    )
+    return self._record_provider_provenance_scheduler_narrative_template_revision(
+      record=updated,
+      action="updated",
+      reason=reason,
+      recorded_at=updated.updated_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
+
+  def delete_provider_provenance_scheduler_narrative_template(
+    self,
+    template_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_template_deleted",
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    current = self.get_provider_provenance_scheduler_narrative_template(template_id)
+    if current.status == "deleted":
+      return current
+    deleted_at = self._clock()
+    deleted = replace(
+      current,
+      status="deleted",
+      updated_at=deleted_at,
+      deleted_at=deleted_at,
+      deleted_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      deleted_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+    return self._record_provider_provenance_scheduler_narrative_template_revision(
+      record=deleted,
+      action="deleted",
+      reason=reason,
+      recorded_at=deleted_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
 
   def list_provider_provenance_scheduler_narrative_templates(
     self,
@@ -4179,6 +4505,7 @@ class TradingApplication:
           record.template_id,
           record.name,
           record.description,
+          record.status,
           record.created_by_tab_id,
           record.created_by_tab_label,
           normalized_query.get("focus_key"),
@@ -4207,7 +4534,61 @@ class TradingApplication:
       raise LookupError("Provider provenance scheduler narrative template not found.")
     return replace(
       record,
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
       query=self._normalize_provider_provenance_analytics_query_payload(record.query),
+    )
+
+  def list_provider_provenance_scheduler_narrative_template_revisions(
+    self,
+    template_id: str,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord, ...]:
+    current = self.get_provider_provenance_scheduler_narrative_template(template_id)
+    revisions = [
+      replace(
+        revision,
+        status=self._normalize_provider_provenance_scheduler_narrative_record_status(revision.status),
+        query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+      )
+      for revision in self._list_provider_provenance_scheduler_narrative_template_revision_records()
+      if revision.template_id == current.template_id
+    ]
+    return tuple(revisions)
+
+  def restore_provider_provenance_scheduler_narrative_template_revision(
+    self,
+    template_id: str,
+    revision_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_template_revision_restored",
+  ) -> ProviderProvenanceSchedulerNarrativeTemplateRecord:
+    current = self.get_provider_provenance_scheduler_narrative_template(template_id)
+    revision = self._load_provider_provenance_scheduler_narrative_template_revision_record(
+      revision_id.strip()
+    )
+    if revision is None or revision.template_id != current.template_id:
+      raise LookupError("Provider provenance scheduler narrative template revision not found.")
+    restored_at = self._clock()
+    restored = replace(
+      current,
+      name=revision.name,
+      description=revision.description,
+      query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+      status="active",
+      updated_at=restored_at,
+      deleted_at=None,
+      deleted_by_tab_id=None,
+      deleted_by_tab_label=None,
+    )
+    return self._record_provider_provenance_scheduler_narrative_template_revision(
+      record=restored,
+      action="restored",
+      reason=reason,
+      recorded_at=restored_at,
+      source_revision_id=revision.revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
     )
 
   def create_provider_provenance_scheduler_narrative_registry_entry(
@@ -4232,6 +4613,8 @@ class TradingApplication:
       if normalized_template_id is not None
       else None
     )
+    if template_record is not None and template_record.status != "active":
+      raise ValueError("Scheduler narrative registry entries can only link active templates.")
     resolved_query = (
       query
       if isinstance(query, dict) and query
@@ -4248,6 +4631,7 @@ class TradingApplication:
       query=self._normalize_provider_provenance_analytics_query_payload(resolved_query),
       layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(layout),
       template_id=normalized_template_id,
+      status="active",
       created_at=now,
       updated_at=now,
       created_by_tab_id=(
@@ -4261,7 +4645,132 @@ class TradingApplication:
         else None
       ),
     )
-    return self._save_provider_provenance_scheduler_narrative_registry_record(record)
+    return self._record_provider_provenance_scheduler_narrative_registry_revision(
+      record=record,
+      action="created",
+      reason="scheduler_narrative_registry_created",
+      recorded_at=now,
+      actor_tab_id=record.created_by_tab_id,
+      actor_tab_label=record.created_by_tab_label,
+    )
+
+  def update_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    registry_id: str,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    query: dict[str, Any] | None = None,
+    layout: dict[str, Any] | None = None,
+    template_id: str | None = None,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_registry_updated",
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    current = self.get_provider_provenance_scheduler_narrative_registry_entry(registry_id)
+    if current.status == "deleted":
+      raise RuntimeError(
+        "Deleted scheduler narrative registry entries must be restored from a revision before editing."
+      )
+    normalized_template_id = (
+      template_id.strip() or None
+      if isinstance(template_id, str)
+      else current.template_id
+    )
+    template_record = (
+      self.get_provider_provenance_scheduler_narrative_template(normalized_template_id)
+      if normalized_template_id is not None
+      else None
+    )
+    if template_record is not None and template_record.status != "active":
+      raise ValueError("Scheduler narrative registry entries can only link active templates.")
+    updated_name = (
+      self._normalize_provider_provenance_workspace_name(
+        name,
+        field_name="scheduler narrative registry name",
+      )
+      if isinstance(name, str)
+      else current.name
+    )
+    updated_description = (
+      description.strip()
+      if isinstance(description, str)
+      else current.description
+    )
+    updated_query = (
+      self._normalize_provider_provenance_analytics_query_payload(query)
+      if isinstance(query, dict)
+      else current.query
+    )
+    updated_layout = (
+      self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(layout)
+      if isinstance(layout, dict)
+      else current.layout
+    )
+    if (
+      updated_name == current.name
+      and updated_description == current.description
+      and updated_query == current.query
+      and updated_layout == current.layout
+      and normalized_template_id == current.template_id
+    ):
+      return current
+    updated = replace(
+      current,
+      name=updated_name,
+      description=updated_description,
+      query=updated_query,
+      layout=updated_layout,
+      template_id=normalized_template_id,
+      updated_at=self._clock(),
+    )
+    return self._record_provider_provenance_scheduler_narrative_registry_revision(
+      record=updated,
+      action="updated",
+      reason=reason,
+      recorded_at=updated.updated_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
+
+  def delete_provider_provenance_scheduler_narrative_registry_entry(
+    self,
+    registry_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_registry_deleted",
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    current = self.get_provider_provenance_scheduler_narrative_registry_entry(registry_id)
+    if current.status == "deleted":
+      return current
+    deleted_at = self._clock()
+    deleted = replace(
+      current,
+      status="deleted",
+      updated_at=deleted_at,
+      deleted_at=deleted_at,
+      deleted_by_tab_id=(
+        actor_tab_id.strip()
+        if isinstance(actor_tab_id, str) and actor_tab_id.strip()
+        else None
+      ),
+      deleted_by_tab_label=(
+        actor_tab_label.strip()
+        if isinstance(actor_tab_label, str) and actor_tab_label.strip()
+        else None
+      ),
+    )
+    return self._record_provider_provenance_scheduler_narrative_registry_revision(
+      record=deleted,
+      action="deleted",
+      reason=reason,
+      recorded_at=deleted_at,
+      source_revision_id=current.current_revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
+    )
 
   def list_provider_provenance_scheduler_narrative_registry_entries(
     self,
@@ -4321,6 +4830,7 @@ class TradingApplication:
           record.registry_id,
           record.name,
           record.description,
+          record.status,
           record.template_id,
           record.created_by_tab_id,
           record.created_by_tab_label,
@@ -4351,10 +4861,78 @@ class TradingApplication:
       raise LookupError("Provider provenance scheduler narrative registry entry not found.")
     return replace(
       record,
+      status=self._normalize_provider_provenance_scheduler_narrative_record_status(record.status),
       query=self._normalize_provider_provenance_analytics_query_payload(record.query),
       layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
         record.layout
       ),
+    )
+
+  def list_provider_provenance_scheduler_narrative_registry_revisions(
+    self,
+    registry_id: str,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord, ...]:
+    current = self.get_provider_provenance_scheduler_narrative_registry_entry(registry_id)
+    revisions = [
+      replace(
+        revision,
+        status=self._normalize_provider_provenance_scheduler_narrative_record_status(revision.status),
+        query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+        layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+          revision.layout
+        ),
+      )
+      for revision in self._list_provider_provenance_scheduler_narrative_registry_revision_records()
+      if revision.registry_id == current.registry_id
+    ]
+    return tuple(revisions)
+
+  def restore_provider_provenance_scheduler_narrative_registry_revision(
+    self,
+    registry_id: str,
+    revision_id: str,
+    *,
+    actor_tab_id: str | None = None,
+    actor_tab_label: str | None = None,
+    reason: str = "scheduler_narrative_registry_revision_restored",
+  ) -> ProviderProvenanceSchedulerNarrativeRegistryRecord:
+    current = self.get_provider_provenance_scheduler_narrative_registry_entry(registry_id)
+    revision = self._load_provider_provenance_scheduler_narrative_registry_revision_record(
+      revision_id.strip()
+    )
+    if revision is None or revision.registry_id != current.registry_id:
+      raise LookupError("Provider provenance scheduler narrative registry revision not found.")
+    template_record = (
+      self.get_provider_provenance_scheduler_narrative_template(revision.template_id)
+      if revision.template_id is not None
+      else None
+    )
+    if template_record is not None and template_record.status != "active":
+      raise ValueError("Scheduler narrative registry entries can only link active templates.")
+    restored_at = self._clock()
+    restored = replace(
+      current,
+      name=revision.name,
+      description=revision.description,
+      query=self._normalize_provider_provenance_analytics_query_payload(revision.query),
+      layout=self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+        revision.layout
+      ),
+      template_id=revision.template_id,
+      status="active",
+      updated_at=restored_at,
+      deleted_at=None,
+      deleted_by_tab_id=None,
+      deleted_by_tab_label=None,
+    )
+    return self._record_provider_provenance_scheduler_narrative_registry_revision(
+      record=restored,
+      action="restored",
+      reason=reason,
+      recorded_at=restored_at,
+      source_revision_id=revision.revision_id,
+      actor_tab_id=actor_tab_id,
+      actor_tab_label=actor_tab_label,
     )
 
   def create_provider_provenance_scheduled_report(
@@ -29875,6 +30453,9 @@ def serialize_provider_provenance_scheduler_narrative_template_record(
     "template_id": record.template_id,
     "name": record.name,
     "description": record.description,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
     "query": deepcopy(normalized_query),
     "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
     "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
@@ -29882,8 +30463,13 @@ def serialize_provider_provenance_scheduler_narrative_template_record(
     ),
     "created_at": record.created_at.isoformat(),
     "updated_at": record.updated_at.isoformat(),
+    "current_revision_id": record.current_revision_id,
+    "revision_count": int(record.revision_count),
     "created_by_tab_id": record.created_by_tab_id,
     "created_by_tab_label": record.created_by_tab_label,
+    "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+    "deleted_by_tab_id": record.deleted_by_tab_id,
+    "deleted_by_tab_label": record.deleted_by_tab_label,
   }
 
 
@@ -29896,6 +30482,47 @@ def serialize_provider_provenance_scheduler_narrative_template_list(
       for record in records
     ],
     "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_template_revision_record(
+  record: ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  return {
+    "revision_id": record.revision_id,
+    "template_id": record.template_id,
+    "action": record.action,
+    "reason": record.reason,
+    "source_revision_id": record.source_revision_id,
+    "name": record.name,
+    "description": record.description,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "recorded_at": record.recorded_at.isoformat(),
+    "recorded_by_tab_id": record.recorded_by_tab_id,
+    "recorded_by_tab_label": record.recorded_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_template_revision_list(
+  record: ProviderProvenanceSchedulerNarrativeTemplateRecord,
+  revisions: tuple[ProviderProvenanceSchedulerNarrativeTemplateRevisionRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "template": serialize_provider_provenance_scheduler_narrative_template_record(record),
+    "history": [
+      serialize_provider_provenance_scheduler_narrative_template_revision_record(revision)
+      for revision in revisions
+    ],
   }
 
 
@@ -29915,6 +30542,9 @@ def serialize_provider_provenance_scheduler_narrative_registry_record(
     "name": record.name,
     "description": record.description,
     "template_id": record.template_id,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
     "query": deepcopy(normalized_query),
     "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
     "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
@@ -29923,8 +30553,13 @@ def serialize_provider_provenance_scheduler_narrative_registry_record(
     "layout": deepcopy(normalized_layout),
     "created_at": record.created_at.isoformat(),
     "updated_at": record.updated_at.isoformat(),
+    "current_revision_id": record.current_revision_id,
+    "revision_count": int(record.revision_count),
     "created_by_tab_id": record.created_by_tab_id,
     "created_by_tab_label": record.created_by_tab_label,
+    "deleted_at": record.deleted_at.isoformat() if record.deleted_at else None,
+    "deleted_by_tab_id": record.deleted_by_tab_id,
+    "deleted_by_tab_label": record.deleted_by_tab_label,
   }
 
 
@@ -29937,6 +30572,54 @@ def serialize_provider_provenance_scheduler_narrative_registry_list(
       for record in records
     ],
     "total": len(records),
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_revision_record(
+  record: ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+) -> dict[str, Any]:
+  normalized_query = TradingApplication._normalize_provider_provenance_analytics_query_payload(
+    record.query
+  )
+  normalized_layout = (
+    TradingApplication._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(
+      record.layout
+    )
+  )
+  return {
+    "revision_id": record.revision_id,
+    "registry_id": record.registry_id,
+    "action": record.action,
+    "reason": record.reason,
+    "source_revision_id": record.source_revision_id,
+    "name": record.name,
+    "description": record.description,
+    "template_id": record.template_id,
+    "status": TradingApplication._normalize_provider_provenance_scheduler_narrative_record_status(
+      record.status
+    ),
+    "query": deepcopy(normalized_query),
+    "focus": TradingApplication._build_provider_provenance_workspace_focus_payload(normalized_query),
+    "filter_summary": TradingApplication._build_provider_provenance_analytics_filter_summary(
+      normalized_query
+    ),
+    "layout": deepcopy(normalized_layout),
+    "recorded_at": record.recorded_at.isoformat(),
+    "recorded_by_tab_id": record.recorded_by_tab_id,
+    "recorded_by_tab_label": record.recorded_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_revision_list(
+  record: ProviderProvenanceSchedulerNarrativeRegistryRecord,
+  revisions: tuple[ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "registry": serialize_provider_provenance_scheduler_narrative_registry_record(record),
+    "history": [
+      serialize_provider_provenance_scheduler_narrative_registry_revision_record(revision)
+      for revision in revisions
+    ],
   }
 
 

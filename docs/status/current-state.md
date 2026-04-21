@@ -179,6 +179,9 @@ It is not yet a finished live trading product:
   templates and narrative-registry boards, so teams can preserve post-resolution recovery or
   recurring-occurrence review layouts as reusable scheduler lenses instead of rebuilding those
   filters by hand
+- those scheduler templates and registry boards now also carry edit, delete, and revision-restore
+  workflow, so operators can evolve or retire saved narrative lenses without losing prior
+  snapshots
 
 ### Operator discipline baseline
 

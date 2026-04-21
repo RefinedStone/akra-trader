@@ -125,12 +125,20 @@ def serialize_provider_provenance_scheduler_narrative_template_list(*args, **kwa
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_template_revision_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_template_revision_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduler_narrative_registry_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_record')(*args, **kwargs)
 
 
 def serialize_provider_provenance_scheduler_narrative_registry_list(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_list')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_registry_revision_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_registry_revision_list')(*args, **kwargs)
 
 
 def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
@@ -634,6 +642,47 @@ def execute_standalone_surface_binding(
         limit=resolved_filters.get("limit", 50),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_update":
+    return serialize_provider_provenance_scheduler_narrative_template_record(
+      app.update_provider_provenance_scheduler_narrative_template(
+        resolved_path_params["template_id"],
+        name=resolved_payload.get("name"),
+        description=resolved_payload.get("description"),
+        query=resolved_payload.get("query"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_template_updated"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_delete":
+    return serialize_provider_provenance_scheduler_narrative_template_record(
+      app.delete_provider_provenance_scheduler_narrative_template(
+        resolved_path_params["template_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_template_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_revision_list":
+    template = app.get_provider_provenance_scheduler_narrative_template(
+      resolved_path_params["template_id"]
+    )
+    return serialize_provider_provenance_scheduler_narrative_template_revision_list(
+      template,
+      app.list_provider_provenance_scheduler_narrative_template_revisions(
+        resolved_path_params["template_id"]
+      ),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_revision_restore":
+    return serialize_provider_provenance_scheduler_narrative_template_record(
+      app.restore_provider_provenance_scheduler_narrative_template_revision(
+        resolved_path_params["template_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_template_revision_restored"),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_create":
     return serialize_provider_provenance_scheduler_narrative_registry_record(
       app.create_provider_provenance_scheduler_narrative_registry_entry(
@@ -656,6 +705,49 @@ def execute_standalone_surface_binding(
         narrative_facet=resolved_filters.get("narrative_facet"),
         search=resolved_filters.get("search"),
         limit=resolved_filters.get("limit", 50),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_update":
+    return serialize_provider_provenance_scheduler_narrative_registry_record(
+      app.update_provider_provenance_scheduler_narrative_registry_entry(
+        resolved_path_params["registry_id"],
+        name=resolved_payload.get("name"),
+        description=resolved_payload.get("description"),
+        query=resolved_payload.get("query"),
+        layout=resolved_payload.get("layout"),
+        template_id=resolved_payload.get("template_id"),
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_registry_updated"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_delete":
+    return serialize_provider_provenance_scheduler_narrative_registry_record(
+      app.delete_provider_provenance_scheduler_narrative_registry_entry(
+        resolved_path_params["registry_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_registry_deleted"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_revision_list":
+    registry = app.get_provider_provenance_scheduler_narrative_registry_entry(
+      resolved_path_params["registry_id"]
+    )
+    return serialize_provider_provenance_scheduler_narrative_registry_revision_list(
+      registry,
+      app.list_provider_provenance_scheduler_narrative_registry_revisions(
+        resolved_path_params["registry_id"]
+      ),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_revision_restore":
+    return serialize_provider_provenance_scheduler_narrative_registry_record(
+      app.restore_provider_provenance_scheduler_narrative_registry_revision(
+        resolved_path_params["registry_id"],
+        resolved_path_params["revision_id"],
+        actor_tab_id=resolved_payload.get("actor_tab_id"),
+        actor_tab_label=resolved_payload.get("actor_tab_label"),
+        reason=resolved_payload.get("reason", "scheduler_narrative_registry_revision_restored"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduled_report_create":
