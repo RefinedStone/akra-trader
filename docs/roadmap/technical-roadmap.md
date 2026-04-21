@@ -81,6 +81,8 @@ creation.
   normalized market context for downstream incident tooling
 - provider workflow pull normalization now restores returned `primary_focus` market context into
   incident and provider-recovery state rather than keeping only raw target lists
+- provider workflow action payloads and note/message text now expose a dedicated `market_context`
+  block so downstream timelines keep the selected symbol/timeframe explicit
 
 ### Remaining work
 

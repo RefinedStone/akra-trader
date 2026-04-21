@@ -130,6 +130,8 @@ It is not yet a finished live trading product:
   normalized `symbol`/`symbols`/`timeframe` plus `primary_focus` context for downstream routing
 - provider workflow pull snapshots and remediation sync now restore returned `primary_focus`
   market context back into normalized incident and provider-recovery fields
+- provider workflow action payloads now include an explicit `market_context` block, and workflow
+  notes/messages print that block separately from generic action context for operator/provider audit
 
 ### Operator discipline baseline
 

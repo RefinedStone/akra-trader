@@ -352,6 +352,19 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
       "job_id": "pd-job-1",
       "channels": ["kline", "depth"],
       "verification": {"state": "passed"},
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+        "primary_focus": {
+          "symbol": "ETH/USDT",
+          "timeframe": "5m",
+          "candidate_symbols": ["ETH/USDT"],
+          "candidate_count": 1,
+          "policy": "single_symbol_context",
+          "reason": "Single-symbol remediation for ETH/USDT.",
+        },
+      },
     },
   )
 
@@ -380,6 +393,9 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   remediate_payload = json.loads(remediate_request[2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["note"]["content"]
   assert "market_data.sync_recent" in remediate_payload["note"]["content"]
+  assert "Market context:" in remediate_payload["note"]["content"]
+  assert '"symbol": "ETH/USDT"' in remediate_payload["note"]["content"]
+  assert '"timeframe": "5m"' in remediate_payload["note"]["content"]
   assert '"job_id": "pd-job-1"' in remediate_payload["note"]["content"]
   assert '"channels": ["kline", "depth"]' in remediate_payload["note"]["content"]
   assert incident.remediation.provider_recovery.status_machine.state == "not_requested"

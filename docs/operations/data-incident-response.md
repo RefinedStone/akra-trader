@@ -27,6 +27,8 @@ unclear dataset lineage.
   so downstream incident systems do not need to reconstruct the lead symbol from free-form text
 - when a provider returns that market context during workflow pull or remediation sync, Akra now
   restores it into normalized incident fields instead of dropping the selected focus on re-entry
+- provider workflow actions now also send a dedicated `market_context` block and render it as an
+  explicit note/message section, so provider timelines preserve the selected symbol/timeframe
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

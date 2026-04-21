@@ -1833,6 +1833,24 @@ def test_market_data_incidents_request_remediation_and_provider_workflow(
     workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
     for workflow_event_id, provider, action, _ in delivery.workflow_attempts
   )
+  workflow_payload = next(
+    payload
+    for workflow_event_id, provider, action, payload in delivery.workflow_payloads
+    if workflow_event_id == incident.event_id and provider == "pagerduty" and action == "remediate"
+  )
+  assert workflow_payload["market_context"] == {
+    "symbol": "ETH/USDT",
+    "symbols": ["ETH/USDT"],
+    "timeframe": "5m",
+    "primary_focus": {
+      "symbol": "ETH/USDT",
+      "timeframe": "5m",
+      "candidate_symbols": ["ETH/USDT"],
+      "candidate_count": 1,
+      "policy": "single_symbol_context",
+      "reason": "Alert context resolved to one market-data instrument.",
+    },
+  }
   remediation_delivery = next(
     record
     for record in guarded_live_status.delivery_history

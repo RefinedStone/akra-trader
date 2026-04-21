@@ -11869,6 +11869,7 @@ class TradingApplication:
     existing_timeframe: str | None = None,
     existing_primary_focus: OperatorAlertPrimaryFocus | None = None,
   ) -> dict[str, str | tuple[str, ...] | OperatorAlertPrimaryFocus | None]:
+    market_context_payload = self._extract_payload_mapping(payload.get("market_context"))
     verification_payload = self._extract_payload_mapping(payload.get("verification"))
     target_payload = self._extract_payload_mapping(payload.get("target"))
     targets_payload = self._extract_payload_mapping(payload.get("targets"))
@@ -11878,12 +11879,15 @@ class TradingApplication:
       payload.get("recovery"),
     )
     primary_focus_payload = self._merge_payload_mappings(
+      market_context_payload.get("primary_focus"),
       payload.get("primary_focus"),
       targets_payload.get("primary_focus"),
       target_payload.get("primary_focus"),
       provider_recovery_payload.get("primary_focus"),
     )
     symbols = self._extract_string_tuple(
+      market_context_payload.get("symbols"),
+      market_context_payload.get("symbol"),
       payload.get("symbols"),
       payload.get("symbol"),
       targets_payload.get("symbols"),
@@ -11912,6 +11916,7 @@ class TradingApplication:
     primary_focus = self._build_operator_alert_primary_focus(
       primary_symbol=self._first_non_empty_string(
         primary_focus_payload.get("symbol"),
+        market_context_payload.get("symbol"),
         payload.get("symbol"),
         targets_payload.get("symbol"),
         target_payload.get("symbol"),
@@ -11923,6 +11928,7 @@ class TradingApplication:
       candidate_symbols=candidate_symbols,
       timeframe=self._first_non_empty_string(
         primary_focus_payload.get("timeframe"),
+        market_context_payload.get("timeframe"),
         payload.get("timeframe"),
         payload.get("target_timeframe"),
         targets_payload.get("timeframe"),
@@ -11941,6 +11947,7 @@ class TradingApplication:
     )
     return self._build_operator_alert_market_context(
       symbol=self._first_non_empty_string(
+        market_context_payload.get("symbol"),
         payload.get("symbol"),
         targets_payload.get("symbol"),
         target_payload.get("symbol"),
@@ -11950,6 +11957,7 @@ class TradingApplication:
       ),
       symbols=symbols,
       timeframe=self._first_non_empty_string(
+        market_context_payload.get("timeframe"),
         payload.get("timeframe"),
         payload.get("target_timeframe"),
         targets_payload.get("timeframe"),
@@ -15862,6 +15870,28 @@ class TradingApplication:
     payload: dict[str, Any] | None = None,
   ) -> dict[str, Any]:
     remediation = incident.remediation
+    payload_context = self._normalize_incident_workflow_payload(payload)
+    payload_market_context = self._extract_operator_alert_market_context_from_workflow_payload(
+      payload=payload_context,
+      existing_symbol=(
+        incident.symbol
+        or (
+          remediation.provider_recovery.primary_focus.symbol
+          if remediation.provider_recovery.primary_focus is not None
+          else None
+        )
+      ),
+      existing_symbols=incident.symbols or remediation.provider_recovery.symbols,
+      existing_timeframe=(
+        incident.timeframe
+        or (
+          remediation.provider_recovery.primary_focus.timeframe
+          if remediation.provider_recovery.primary_focus is not None
+          else remediation.provider_recovery.timeframe
+        )
+      ),
+      existing_primary_focus=incident.primary_focus or remediation.provider_recovery.primary_focus,
+    )
     workflow_payload: dict[str, Any] = {
       "action": action,
       "actor": actor,
@@ -15876,6 +15906,12 @@ class TradingApplication:
         "run_id": incident.run_id,
         "session_id": incident.session_id,
       },
+      "market_context": self._serialize_operator_alert_market_context_payload(
+        symbol=payload_market_context["symbol"],
+        symbols=payload_market_context["symbols"],
+        timeframe=payload_market_context["timeframe"],
+        primary_focus=payload_market_context["primary_focus"],
+      ),
     }
     if remediation.state != "not_applicable":
       workflow_payload["remediation"] = {
@@ -15902,8 +15938,8 @@ class TradingApplication:
         ),
         "provider_recovery": asdict(remediation.provider_recovery),
       }
-    if payload:
-      workflow_payload["provider_context"] = self._normalize_incident_workflow_payload(payload)
+    if payload_context:
+      workflow_payload["provider_context"] = payload_context
     return workflow_payload
 
   def run_backtest(
@@ -23019,6 +23055,45 @@ class TradingApplication:
         primary_symbol=normalized_symbol,
         symbols=normalized_symbols,
         timeframe=normalized_timeframe,
+      ),
+    }
+
+  @staticmethod
+  def _serialize_operator_alert_primary_focus_payload(
+    primary_focus: OperatorAlertPrimaryFocus | None,
+  ) -> dict[str, Any] | None:
+    if primary_focus is None:
+      return None
+    return {
+      "symbol": primary_focus.symbol,
+      "timeframe": primary_focus.timeframe,
+      "candidate_symbols": list(primary_focus.candidate_symbols),
+      "candidate_count": primary_focus.candidate_count,
+      "policy": primary_focus.policy,
+      "reason": primary_focus.reason,
+    }
+
+  @classmethod
+  def _serialize_operator_alert_market_context_payload(
+    cls,
+    *,
+    symbol: str | None = None,
+    symbols: tuple[str, ...] | list[str] = (),
+    timeframe: str | None = None,
+    primary_focus: OperatorAlertPrimaryFocus | None = None,
+  ) -> dict[str, Any]:
+    market_context = cls._build_operator_alert_market_context(
+      symbol=symbol,
+      symbols=symbols,
+      timeframe=timeframe,
+      primary_focus=primary_focus,
+    )
+    return {
+      "symbol": market_context["symbol"],
+      "symbols": list(market_context["symbols"]),
+      "timeframe": market_context["timeframe"],
+      "primary_focus": cls._serialize_operator_alert_primary_focus_payload(
+        market_context["primary_focus"]
       ),
     }
 

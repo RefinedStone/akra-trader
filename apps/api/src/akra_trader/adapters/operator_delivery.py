@@ -28586,11 +28586,75 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       return parsed.astimezone(UTC) if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
     return None
 
-  @staticmethod
-  def _format_workflow_payload_context(payload: dict[str, Any] | None) -> str:
+  @classmethod
+  def _extract_workflow_market_context_payload(
+    cls,
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any] | None:
+    if not payload:
+      return None
+    payload_mapping = cls._extract_mapping(payload)
+    market_context = cls._extract_mapping(payload_mapping.get("market_context"))
+    if not market_context:
+      return None
+    primary_focus = cls._build_primary_focus_payload_from_sources(
+      market_context.get("primary_focus")
+    )
+    symbols = cls._normalize_market_context_symbols(
+      market_context.get("symbols"),
+      market_context.get("symbol"),
+      primary_focus.get("candidate_symbols") if primary_focus is not None else (),
+      primary_focus.get("symbol") if primary_focus is not None else None,
+    )
+    symbol = cls._normalize_market_context_symbol(
+      cls._first_non_empty_string(
+        market_context.get("symbol"),
+        primary_focus.get("symbol") if primary_focus is not None else None,
+      )
+    )
+    if symbol is None and len(symbols) == 1:
+      symbol = symbols[0]
+    timeframe = cls._normalize_market_context_timeframe(
+      cls._first_non_empty_string(
+        market_context.get("timeframe"),
+        primary_focus.get("timeframe") if primary_focus is not None else None,
+      )
+    )
+    if primary_focus is None and (symbol is not None or timeframe is not None or symbols):
+      primary_focus = cls._build_primary_focus_payload_from_sources(
+        {
+          "symbol": symbol,
+          "timeframe": timeframe,
+          "candidate_symbols": symbols,
+        }
+      )
+    if symbol is None and timeframe is None and not symbols and primary_focus is None:
+      return None
+    return {
+      "symbol": symbol,
+      "symbols": symbols,
+      "timeframe": timeframe,
+      "primary_focus": primary_focus,
+    }
+
+  @classmethod
+  def _format_workflow_payload_context(cls, payload: dict[str, Any] | None) -> str:
     if not payload:
       return ""
-    return f" Context: {json.dumps(payload, default=str, sort_keys=True)}"
+    payload_mapping = dict(cls._extract_mapping(payload))
+    market_context = cls._extract_workflow_market_context_payload(payload_mapping)
+    if "market_context" in payload_mapping:
+      payload_mapping.pop("market_context")
+    fragments: list[str] = []
+    if market_context is not None:
+      fragments.append(
+        f" Market context: {json.dumps(market_context, default=str, sort_keys=True)}"
+      )
+    if payload_mapping:
+      fragments.append(
+        f" Context: {json.dumps(payload_mapping, default=str, sort_keys=True)}"
+      )
+    return "".join(fragments)
 
   @staticmethod
   def _map_blameless_severity(severity: str) -> str:
