@@ -34,6 +34,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -235,6 +236,19 @@ provider_provenance_scheduler_narrative_registry_revisions = Table(
   Column("recorded_at", String, nullable=False, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_narrative_governance_policy_templates = Table(
+  "provider_provenance_scheduler_narrative_governance_policy_templates",
+  metadata,
+  Column("policy_template_id", String, primary_key=True),
+  Column("name", String, nullable=False, index=True),
+  Column("item_type_scope", String, nullable=False, index=True),
+  Column("action_scope", String, nullable=False, index=True),
+  Column("approval_lane", String, nullable=False, index=True),
+  Column("approval_priority", String, nullable=False, index=True),
+  Column("updated_at", String, nullable=False, index=True),
+  Column("created_by_tab_id", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 provider_provenance_scheduler_narrative_governance_plans = Table(
   "provider_provenance_scheduler_narrative_governance_plans",
   metadata,
@@ -242,6 +256,9 @@ provider_provenance_scheduler_narrative_governance_plans = Table(
   Column("item_type", String, nullable=False, index=True),
   Column("action", String, nullable=False, index=True),
   Column("status", String, nullable=False, index=True),
+  Column("policy_template_id", String, nullable=True, index=True),
+  Column("approval_lane", String, nullable=False, index=True),
+  Column("approval_priority", String, nullable=False, index=True),
   Column("updated_at", String, nullable=False, index=True),
   Column("created_by_tab_id", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
@@ -312,6 +329,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   )
   _provider_provenance_scheduler_narrative_registry_revision_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
+  )
+  _provider_provenance_scheduler_narrative_governance_policy_template_adapter = TypeAdapter(
+    ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
   )
   _provider_provenance_scheduler_narrative_governance_plan_adapter = TypeAdapter(
     ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
@@ -1374,6 +1394,82 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       row["payload"]
     )
 
+  def save_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    payload = self._provider_provenance_scheduler_narrative_governance_policy_template_adapter.dump_python(
+      record,
+      mode="json",
+    )
+    row = {
+      "policy_template_id": record.policy_template_id,
+      "name": record.name,
+      "item_type_scope": record.item_type_scope,
+      "action_scope": record.action_scope,
+      "approval_lane": record.approval_lane,
+      "approval_priority": record.approval_priority,
+      "updated_at": record.updated_at.isoformat(),
+      "created_by_tab_id": record.created_by_tab_id,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_templates.c.policy_template_id).where(
+          provider_provenance_scheduler_narrative_governance_policy_templates.c.policy_template_id
+          == record.policy_template_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(
+          insert(provider_provenance_scheduler_narrative_governance_policy_templates).values(**row)
+        )
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_narrative_governance_policy_templates)
+          .where(
+            provider_provenance_scheduler_narrative_governance_policy_templates.c.policy_template_id
+            == record.policy_template_id
+          )
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_templates(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...]:
+    statement = select(
+      provider_provenance_scheduler_narrative_governance_policy_templates.c.payload
+    ).order_by(
+      provider_provenance_scheduler_narrative_governance_policy_templates.c.updated_at.desc(),
+      provider_provenance_scheduler_narrative_governance_policy_templates.c.policy_template_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_narrative_governance_policy_template_adapter.validate_python(
+        row["payload"]
+      )
+      for row in rows
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    policy_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord | None:
+    with self._engine.connect() as connection:
+      row = connection.execute(
+        select(provider_provenance_scheduler_narrative_governance_policy_templates.c.payload).where(
+          provider_provenance_scheduler_narrative_governance_policy_templates.c.policy_template_id
+          == policy_template_id
+        )
+      ).mappings().first()
+    if row is None:
+      return None
+    return self._provider_provenance_scheduler_narrative_governance_policy_template_adapter.validate_python(
+      row["payload"]
+    )
+
   def save_provider_provenance_scheduler_narrative_governance_plan(
     self,
     record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
@@ -1387,6 +1483,9 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       "item_type": record.item_type,
       "action": record.action,
       "status": record.status,
+      "policy_template_id": record.policy_template_id,
+      "approval_lane": record.approval_lane,
+      "approval_priority": record.approval_priority,
       "updated_at": record.updated_at.isoformat(),
       "created_by_tab_id": record.created_by_tab_id,
       "payload": payload,

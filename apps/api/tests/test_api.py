@@ -1750,6 +1750,36 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert all(item["template_id"] == template_payload["template_id"] for item in list_updated_registry_payload["items"])
   assert all(item["layout"]["show_recent_exports"] is True for item in list_updated_registry_payload["items"])
 
+  governance_policy_template_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates",
+    json={
+      "name": "Shift lead staged updates",
+      "description": "Reusable high-priority update lane.",
+      "item_type_scope": "any",
+      "action_scope": "update",
+      "approval_lane": "shift_lead",
+      "approval_priority": "high",
+      "guidance": "Review with the active shift lead before apply.",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert governance_policy_template_response.status_code == 200
+  governance_policy_template_payload = governance_policy_template_response.json()
+  assert governance_policy_template_payload["approval_lane"] == "shift_lead"
+  assert governance_policy_template_payload["approval_priority"] == "high"
+
+  governance_policy_template_list_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates",
+    params={"action_scope": "update", "approval_priority": "high", "limit": 10},
+  )
+  assert governance_policy_template_list_response.status_code == 200
+  governance_policy_template_list_payload = governance_policy_template_list_response.json()
+  assert governance_policy_template_list_payload["total"] == 1
+  assert governance_policy_template_list_payload["items"][0]["policy_template_id"] == (
+    governance_policy_template_payload["policy_template_id"]
+  )
+
   template_governance_plan_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
     json={
@@ -1763,6 +1793,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
       "query_patch": {
         "scheduler_alert_status": "resolved",
       },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
     },
   )
   assert template_governance_plan_response.status_code == 200
@@ -1770,6 +1801,9 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert template_governance_plan_payload["status"] == "previewed"
   assert template_governance_plan_payload["preview_changed_count"] == 2
   assert template_governance_plan_payload["rollback_ready_count"] == 2
+  assert template_governance_plan_payload["approval_lane"] == "shift_lead"
+  assert template_governance_plan_payload["approval_priority"] == "high"
+  assert template_governance_plan_payload["policy_template_id"] == governance_policy_template_payload["policy_template_id"]
 
   list_governance_plans_response = client.get(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -1847,12 +1881,14 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
       "layout_patch": {
         "show_time_series": True,
       },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
     },
   )
   assert registry_governance_plan_response.status_code == 200
   registry_governance_plan_payload = registry_governance_plan_response.json()
   assert registry_governance_plan_payload["status"] == "previewed"
   assert registry_governance_plan_payload["preview_changed_count"] == 2
+  assert registry_governance_plan_payload["policy_template_name"] == "Shift lead staged updates"
 
   approve_registry_governance_plan_response = client.post(
     f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans/{registry_governance_plan_payload['plan_id']}/approve",

@@ -1043,12 +1043,33 @@ class ProviderProvenanceSchedulerNarrativeGovernancePreviewItem:
 
 
 @dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+  policy_template_id: str
+  name: str
+  description: str = ""
+  item_type_scope: str = "any"
+  action_scope: str = "any"
+  approval_lane: str = "general"
+  approval_priority: str = "normal"
+  guidance: str | None = None
+  created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  created_by_tab_id: str | None = None
+  created_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
 class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
   plan_id: str
   item_type: str
   action: str
   reason: str
   status: str = "previewed"
+  policy_template_id: str | None = None
+  policy_template_name: str | None = None
+  approval_lane: str = "general"
+  approval_priority: str = "normal"
+  policy_guidance: str | None = None
   request_payload: dict[str, Any] = field(default_factory=dict)
   target_ids: tuple[str, ...] = ()
   preview_requested_count: int = 0

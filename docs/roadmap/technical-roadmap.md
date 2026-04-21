@@ -136,6 +136,9 @@ creation.
 - scheduler narrative batch governance now also has a staged plan layer with diff preview,
   explicit approval, apply-time drift protection, and rollback to captured revisions, so shared
   review-lens changes are auditable before they mutate the saved workspace state
+- that staged governance layer now also has reusable policy templates and an approval queue view,
+  so lane/priority defaults can be reused across scheduler plan previews and pending work can be
+  reviewed as a queue instead of only an undifferentiated plan table
 
 ### Remaining work
 

@@ -56,6 +56,7 @@ import {
   createProviderProvenanceAnalyticsPreset,
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
+  createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   createProviderProvenanceSchedulerNarrativeGovernancePlan,
   createProviderProvenanceSchedulerNarrativeRegistryEntry,
   createProviderProvenanceSchedulerNarrativeTemplate,
@@ -79,6 +80,7 @@ import {
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
   listProviderProvenanceDashboardViews,
+  listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates,
   listProviderProvenanceSchedulerNarrativeGovernancePlans,
   listProviderProvenanceSchedulerNarrativeRegistryEntries,
   listProviderProvenanceSchedulerNarrativeRegistryRevisions,
@@ -307,6 +309,7 @@ import type {
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionEntry,
   ProviderProvenanceSchedulerNarrativeRegistryRevisionListPayload,
@@ -469,6 +472,36 @@ function buildProviderProvenanceSchedulerExportPolicyDraft(
   };
 }
 
+function getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank(
+  priority?: string | null,
+) {
+  switch (priority) {
+    case "critical":
+      return 3;
+    case "high":
+      return 2;
+    case "normal":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function getProviderProvenanceSchedulerNarrativeGovernanceQueueState(
+  plan: Pick<ProviderProvenanceSchedulerNarrativeGovernancePlan, "queue_state" | "status">,
+) {
+  if (plan.queue_state?.trim()) {
+    return plan.queue_state;
+  }
+  if (plan.status === "previewed") {
+    return "pending_approval";
+  }
+  if (plan.status === "approved") {
+    return "ready_to_apply";
+  }
+  return "completed";
+}
+
 function isProviderProvenanceSchedulerAlertCategory(category?: string | null) {
   return category === "scheduler_lag" || category === "scheduler_failure";
 }
@@ -597,6 +630,44 @@ const defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft: ProviderProv
   show_time_series: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
   show_recent_exports: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
 };
+
+type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState = {
+  name: string;
+  description: string;
+  item_type_scope: "any" | "template" | "registry";
+  action_scope: "any" | "delete" | "restore" | "update";
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical";
+  guidance: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft:
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState = {
+    name: "",
+    description: "",
+    item_type_scope: "any",
+    action_scope: "any",
+    approval_lane: "general",
+    approval_priority: "normal",
+    guidance: "",
+  };
+
+type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
+  queue_state: typeof ALL_FILTER_VALUE | "pending_approval" | "ready_to_apply" | "completed";
+  item_type: typeof ALL_FILTER_VALUE | "template" | "registry";
+  approval_lane: string;
+  approval_priority: string;
+  policy_template_id: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
+  ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
+    queue_state: ALL_FILTER_VALUE,
+    item_type: ALL_FILTER_VALUE,
+    approval_lane: ALL_FILTER_VALUE,
+    approval_priority: ALL_FILTER_VALUE,
+    policy_template_id: ALL_FILTER_VALUE,
+  };
 
 type ProviderProvenanceReportDraftState = {
   name: string;
@@ -3143,6 +3214,24 @@ export default function App() {
     useState(false);
   const [providerProvenanceSchedulerNarrativeRegistryHistoryError, setProviderProvenanceSchedulerNarrativeRegistryHistoryError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplates, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate[]>([]);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplatesError, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft, setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft,
+    );
+  const [providerProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId, setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId] =
+    useState("");
+  const [providerProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId, setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId] =
+    useState("");
+  const [providerProvenanceSchedulerNarrativeGovernanceQueueFilter, setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter] =
+    useState<ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState>(
+      defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter,
+    );
   const [providerProvenanceSchedulerNarrativeGovernancePlans, setProviderProvenanceSchedulerNarrativeGovernancePlans] =
     useState<ProviderProvenanceSchedulerNarrativeGovernancePlan[]>([]);
   const [providerProvenanceSchedulerNarrativeGovernancePlansLoading, setProviderProvenanceSchedulerNarrativeGovernancePlansLoading] =
@@ -3410,6 +3499,86 @@ export default function App() {
     [
       providerProvenanceSchedulerNarrativeGovernancePlans,
       selectedProviderProvenanceSchedulerNarrativeGovernancePlanId,
+    ],
+  );
+  const providerProvenanceSchedulerNarrativeGovernanceQueueSummary = useMemo(
+    () => ({
+      pending_approval_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
+        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "pending_approval",
+      ).length,
+      ready_to_apply_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
+        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "ready_to_apply",
+      ).length,
+      completed_count: providerProvenanceSchedulerNarrativeGovernancePlans.filter(
+        (entry) => getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry) === "completed",
+      ).length,
+    }),
+    [providerProvenanceSchedulerNarrativeGovernancePlans],
+  );
+  const filteredProviderProvenanceSchedulerNarrativeGovernancePlans = useMemo(
+    () =>
+      [...providerProvenanceSchedulerNarrativeGovernancePlans]
+        .filter((entry) => {
+          const queueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(entry);
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state !== ALL_FILTER_VALUE
+            && queueState !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type !== ALL_FILTER_VALUE
+            && entry.item_type !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane !== ALL_FILTER_VALUE
+            && entry.approval_lane !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority !== ALL_FILTER_VALUE
+            && entry.approval_priority !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id !== ALL_FILTER_VALUE
+            && (entry.policy_template_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id
+          ) {
+            return false;
+          }
+          return true;
+        })
+        .sort((left, right) => {
+          const leftQueueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(left);
+          const rightQueueState = getProviderProvenanceSchedulerNarrativeGovernanceQueueState(right);
+          const queueOrder = (queueState: string) => {
+            if (queueState === "pending_approval") {
+              return 0;
+            }
+            if (queueState === "ready_to_apply") {
+              return 1;
+            }
+            return 2;
+          };
+          const queueDelta = queueOrder(leftQueueState) - queueOrder(rightQueueState);
+          if (queueDelta !== 0) {
+            return queueDelta;
+          }
+          const priorityDelta =
+            getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank(right.approval_priority)
+            - getProviderProvenanceSchedulerNarrativeGovernanceQueuePriorityRank(left.approval_priority);
+          if (priorityDelta !== 0) {
+            return priorityDelta;
+          }
+          return right.updated_at.localeCompare(left.updated_at);
+        }),
+    [
+      providerProvenanceSchedulerNarrativeGovernancePlans,
+      providerProvenanceSchedulerNarrativeGovernanceQueueFilter,
     ],
   );
   const selectedProviderProvenanceSchedulerExportEntry = useMemo(
@@ -5870,27 +6039,39 @@ export default function App() {
     setProviderProvenanceDashboardViewsLoading(true);
     setProviderProvenanceSchedulerNarrativeTemplatesLoading(true);
     setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(true);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading(true);
     setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(true);
     setProviderProvenanceScheduledReportsLoading(true);
     setProviderProvenanceAnalyticsPresetsError(null);
     setProviderProvenanceDashboardViewsError(null);
     setProviderProvenanceSchedulerNarrativeTemplatesError(null);
     setProviderProvenanceSchedulerNarrativeRegistryEntriesError(null);
+    setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError(null);
     setProviderProvenanceSchedulerNarrativeGovernancePlansError(null);
     setProviderProvenanceScheduledReportsError(null);
     try {
-      const [presetPayload, viewPayload, templatePayload, narrativeRegistryPayload, governancePlanPayload, reportPayload] = await Promise.all([
+      const [
+        presetPayload,
+        viewPayload,
+        templatePayload,
+        narrativeRegistryPayload,
+        governancePolicyTemplatePayload,
+        governancePlanPayload,
+        reportPayload,
+      ] = await Promise.all([
         listProviderProvenanceAnalyticsPresets({ limit: 24 }),
         listProviderProvenanceDashboardViews({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeTemplates({ limit: 24 }),
         listProviderProvenanceSchedulerNarrativeRegistryEntries({ limit: 24 }),
-        listProviderProvenanceSchedulerNarrativeGovernancePlans({ limit: 16 }),
+        listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates({ limit: 24 }),
+        listProviderProvenanceSchedulerNarrativeGovernancePlans({ limit: 24 }),
         listProviderProvenanceScheduledReports({ limit: 24 }),
       ]);
       setProviderProvenanceAnalyticsPresets(presetPayload.items);
       setProviderProvenanceDashboardViews(viewPayload.items);
       setProviderProvenanceSchedulerNarrativeTemplates(templatePayload.items);
       setProviderProvenanceSchedulerNarrativeRegistryEntries(narrativeRegistryPayload.items);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates(governancePolicyTemplatePayload.items);
       setProviderProvenanceSchedulerNarrativeGovernancePlans(governancePlanPayload.items);
       setProviderProvenanceScheduledReports(reportPayload.items);
       if (!selectedProviderProvenanceSchedulerNarrativeGovernancePlanId && governancePlanPayload.items.length) {
@@ -5953,6 +6134,7 @@ export default function App() {
       setProviderProvenanceDashboardViews([]);
       setProviderProvenanceSchedulerNarrativeTemplates([]);
       setProviderProvenanceSchedulerNarrativeRegistryEntries([]);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates([]);
       setProviderProvenanceSchedulerNarrativeGovernancePlans([]);
       setProviderProvenanceScheduledReports([]);
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
@@ -5966,6 +6148,7 @@ export default function App() {
       setProviderProvenanceDashboardViewsError(message);
       setProviderProvenanceSchedulerNarrativeTemplatesError(message);
       setProviderProvenanceSchedulerNarrativeRegistryEntriesError(message);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesError(message);
       setProviderProvenanceSchedulerNarrativeGovernancePlansError(message);
       setProviderProvenanceScheduledReportsError(message);
     } finally {
@@ -5973,6 +6156,7 @@ export default function App() {
       setProviderProvenanceDashboardViewsLoading(false);
       setProviderProvenanceSchedulerNarrativeTemplatesLoading(false);
       setProviderProvenanceSchedulerNarrativeRegistryEntriesLoading(false);
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading(false);
       setProviderProvenanceSchedulerNarrativeGovernancePlansLoading(false);
       setProviderProvenanceScheduledReportsLoading(false);
     }
@@ -6696,6 +6880,43 @@ export default function App() {
     }
   }
 
+  async function saveProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate() {
+    if (!providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.name.trim()) {
+      setProviderProvenanceWorkspaceFeedback("Enter a policy template name before saving scheduler governance defaults.");
+      return;
+    }
+    try {
+      const savedTemplate = await createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate({
+        name: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.name.trim(),
+        description: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.description.trim(),
+        itemTypeScope: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.item_type_scope,
+        actionScope: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.action_scope,
+        approvalLane: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.approval_lane.trim(),
+        approvalPriority: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.approval_priority,
+        guidance: providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.guidance.trim(),
+        createdByTabId: comparisonHistoryTabIdentity.tabId,
+        createdByTabLabel: comparisonHistoryTabIdentity.label,
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft(
+        defaultProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft,
+      );
+      if (savedTemplate.item_type_scope !== "registry") {
+        setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(savedTemplate.policy_template_id);
+      }
+      if (savedTemplate.item_type_scope !== "template") {
+        setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId(savedTemplate.policy_template_id);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `Saved governance policy template ${savedTemplate.name} for ${formatWorkflowToken(savedTemplate.approval_lane)} / ${formatWorkflowToken(savedTemplate.approval_priority)} review.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Scheduler governance policy template save failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
   async function runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance(
     action: "delete" | "restore" | "update",
   ) {
@@ -6725,6 +6946,7 @@ export default function App() {
             ? providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append
             : undefined,
         queryPatch,
+        policyTemplateId: providerProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId || undefined,
       });
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
@@ -6787,6 +7009,7 @@ export default function App() {
         clearTemplateLink:
           action === "update"
           && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id === CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE,
+        policyTemplateId: providerProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId || undefined,
       });
       await loadProviderProvenanceWorkspaceRegistry();
       setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(plan.plan_id);
@@ -9103,6 +9326,207 @@ export default function App() {
                                 </div>
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
+                                    <strong>Governance policy templates</strong>
+                                    <p>Save reusable approval-lane and priority defaults for scheduler governance previews.</p>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Name</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            name: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Shift-lead cleanup"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.name}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Description</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            description: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="high-signal delete workflow"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.description}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Item scope</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            item_type_scope:
+                                              event.target.value === "template" || event.target.value === "registry"
+                                                ? event.target.value
+                                                : "any",
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.item_type_scope}
+                                      >
+                                        <option value="any">Any item</option>
+                                        <option value="template">Templates</option>
+                                        <option value="registry">Registry</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Action scope</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            action_scope:
+                                              event.target.value === "delete"
+                                              || event.target.value === "restore"
+                                              || event.target.value === "update"
+                                                ? event.target.value
+                                                : "any",
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.action_scope}
+                                      >
+                                        <option value="any">Any action</option>
+                                        <option value="update">Update</option>
+                                        <option value="delete">Delete</option>
+                                        <option value="restore">Restore</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Approval lane</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            approval_lane: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="shift_lead"
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.approval_lane}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Priority</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            approval_priority:
+                                              event.target.value === "low"
+                                              || event.target.value === "high"
+                                              || event.target.value === "critical"
+                                                ? event.target.value
+                                                : "normal",
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.approval_priority}
+                                      >
+                                        <option value="low">Low</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="high">High</option>
+                                        <option value="critical">Critical</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Guidance</span>
+                                      <input
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft((current) => ({
+                                            ...current,
+                                            guidance: event.target.value,
+                                          }))
+                                        }
+                                        placeholder="Review with shift lead before apply."
+                                        type="text"
+                                        value={providerProvenanceSchedulerNarrativeGovernancePolicyTemplateDraft.guidance}
+                                      />
+                                    </label>
+                                    <label>
+                                      <span>Action</span>
+                                      <button
+                                        className="ghost-button"
+                                        onClick={() => {
+                                          void saveProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate();
+                                        }}
+                                        type="button"
+                                      >
+                                        Save policy
+                                      </button>
+                                    </label>
+                                  </div>
+                                  {providerProvenanceSchedulerNarrativeGovernancePolicyTemplatesLoading ? (
+                                    <p className="empty-state">Loading governance policy templates…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeGovernancePolicyTemplatesError ? (
+                                    <p className="market-data-workflow-feedback">
+                                      Governance policy template registry load failed: {providerProvenanceSchedulerNarrativeGovernancePolicyTemplatesError}
+                                    </p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Template</th>
+                                          <th>Scope</th>
+                                          <th>Action</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates.map((entry) => (
+                                          <tr key={entry.policy_template_id}>
+                                            <td>
+                                              <strong>{entry.name}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.description || "No description."}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.guidance || "No guidance."}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>
+                                                {formatWorkflowToken(entry.item_type_scope)} · {formatWorkflowToken(entry.action_scope)}
+                                              </strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <div className="market-data-provenance-history-actions">
+                                                <button
+                                                  className="ghost-button"
+                                                  onClick={() => {
+                                                    if (entry.item_type_scope !== "registry") {
+                                                      setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(entry.policy_template_id);
+                                                    }
+                                                    if (entry.item_type_scope !== "template") {
+                                                      setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId(entry.policy_template_id);
+                                                    }
+                                                  }}
+                                                  type="button"
+                                                >
+                                                  Use defaults
+                                                </button>
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No governance policy templates saved yet.</p>
+                                  )}
+                                </div>
+                                <div className="provider-provenance-workspace-card">
+                                  <div className="market-data-provenance-history-head">
                                     <strong>Saved analytics presets</strong>
                                     <p>Save the current analytics query as a server-side preset and re-apply it later.</p>
                                   </div>
@@ -9402,6 +9826,24 @@ export default function App() {
                                         </span>
                                       </div>
                                       <div className="market-data-provenance-history-actions">
+                                        <label>
+                                          <span>Policy</span>
+                                          <select
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(event.target.value);
+                                            }}
+                                            value={providerProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId}
+                                          >
+                                            <option value="">No policy template</option>
+                                            {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                              .filter((entry) => entry.item_type_scope === "any" || entry.item_type_scope === "template")
+                                              .map((entry) => (
+                                                <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                  {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </label>
                                         <button
                                           className="ghost-button"
                                           onClick={toggleAllProviderProvenanceSchedulerNarrativeTemplateSelections}
@@ -9878,6 +10320,24 @@ export default function App() {
                                         </span>
                                       </div>
                                       <div className="market-data-provenance-history-actions">
+                                        <label>
+                                          <span>Policy</span>
+                                          <select
+                                            onChange={(event) => {
+                                              setProviderProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId(event.target.value);
+                                            }}
+                                            value={providerProvenanceSchedulerNarrativeRegistryGovernancePolicyTemplateId}
+                                          >
+                                            <option value="">No policy template</option>
+                                            {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates
+                                              .filter((entry) => entry.item_type_scope === "any" || entry.item_type_scope === "registry")
+                                              .map((entry) => (
+                                                <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                                  {entry.name} · {formatWorkflowToken(entry.approval_lane)} · {formatWorkflowToken(entry.approval_priority)}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </label>
                                         <button
                                           className="ghost-button"
                                           onClick={toggleAllProviderProvenanceSchedulerNarrativeRegistrySelections}
@@ -10345,8 +10805,119 @@ export default function App() {
                                 </div>
                                 <div className="provider-provenance-workspace-card">
                                   <div className="market-data-provenance-history-head">
-                                    <strong>Governance plans</strong>
-                                    <p>Review bulk diff previews, stage approval, apply the saved plan, and roll back to the captured pre-apply revisions.</p>
+                                    <strong>Approval queue</strong>
+                                    <p>Review staged scheduler governance plans by lane and priority, approve them, then apply or roll back against the captured revision snapshot.</p>
+                                  </div>
+                                  <div className="provider-provenance-governance-summary">
+                                    <strong>
+                                      Pending {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.pending_approval_count} · Ready {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.ready_to_apply_count} · Completed {providerProvenanceSchedulerNarrativeGovernanceQueueSummary.completed_count}
+                                    </strong>
+                                    <span>
+                                      Filtered queue rows: {filteredProviderProvenanceSchedulerNarrativeGovernancePlans.length}
+                                    </span>
+                                  </div>
+                                  <div className="filter-bar">
+                                    <label>
+                                      <span>Queue state</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            queue_state:
+                                              event.target.value === "pending_approval"
+                                              || event.target.value === "ready_to_apply"
+                                              || event.target.value === "completed"
+                                                ? event.target.value
+                                                : ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.queue_state}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All queue states</option>
+                                        <option value="pending_approval">Pending approval</option>
+                                        <option value="ready_to_apply">Ready to apply</option>
+                                        <option value="completed">Completed</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Item type</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            item_type:
+                                              event.target.value === "template" || event.target.value === "registry"
+                                                ? event.target.value
+                                                : ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.item_type}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All item types</option>
+                                        <option value="template">Templates</option>
+                                        <option value="registry">Registry</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Lane</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            approval_lane: event.target.value || ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_lane}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All lanes</option>
+                                        {Array.from(new Set(providerProvenanceSchedulerNarrativeGovernancePlans.map((entry) => entry.approval_lane))).sort().map((lane) => (
+                                          <option key={lane} value={lane}>
+                                            {formatWorkflowToken(lane)}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Priority</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            approval_priority: event.target.value || ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.approval_priority}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All priorities</option>
+                                        <option value="low">Low</option>
+                                        <option value="normal">Normal</option>
+                                        <option value="high">High</option>
+                                        <option value="critical">Critical</option>
+                                      </select>
+                                    </label>
+                                    <label>
+                                      <span>Policy template</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            policy_template_id:
+                                              event.target.value === ""
+                                                ? ""
+                                                : event.target.value || ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All policy templates</option>
+                                        <option value="">No policy template</option>
+                                        {providerProvenanceSchedulerNarrativeGovernancePolicyTemplates.map((entry) => (
+                                          <option key={entry.policy_template_id} value={entry.policy_template_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
                                   </div>
                                   {providerProvenanceSchedulerNarrativeGovernancePlansLoading ? (
                                     <p className="empty-state">Loading governance plans…</p>
@@ -10356,7 +10927,7 @@ export default function App() {
                                       Governance plan registry load failed: {providerProvenanceSchedulerNarrativeGovernancePlansError}
                                     </p>
                                   ) : null}
-                                  {providerProvenanceSchedulerNarrativeGovernancePlans.length ? (
+                                  {filteredProviderProvenanceSchedulerNarrativeGovernancePlans.length ? (
                                     <table className="data-table">
                                       <thead>
                                         <tr>
@@ -10366,7 +10937,7 @@ export default function App() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {providerProvenanceSchedulerNarrativeGovernancePlans.map((plan) => (
+                                        {filteredProviderProvenanceSchedulerNarrativeGovernancePlans.map((plan) => (
                                           <tr
                                             key={plan.plan_id}
                                             className={
@@ -10380,10 +10951,13 @@ export default function App() {
                                                 {formatWorkflowToken(plan.action)} {plan.item_type}
                                               </strong>
                                               <p className="run-lineage-symbol-copy">
-                                                {shortenIdentifier(plan.plan_id, 10)} · {formatWorkflowToken(plan.status)}
+                                                {shortenIdentifier(plan.plan_id, 10)} · {formatWorkflowToken(getProviderProvenanceSchedulerNarrativeGovernanceQueueState(plan))}
                                               </p>
                                               <p className="run-lineage-symbol-copy">
                                                 {plan.created_by_tab_label ?? plan.created_by_tab_id ?? "unknown tab"} · {formatTimestamp(plan.updated_at)}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {formatWorkflowToken(plan.approval_lane)} · {formatWorkflowToken(plan.approval_priority)}{plan.policy_template_name ? ` · ${plan.policy_template_name}` : ""}
                                               </p>
                                             </td>
                                             <td>
@@ -10408,7 +10982,7 @@ export default function App() {
                                       </tbody>
                                     </table>
                                   ) : (
-                                    <p className="empty-state">No staged scheduler governance plans yet.</p>
+                                    <p className="empty-state">No scheduler governance plans match the current approval queue filters.</p>
                                   )}
                                   {selectedProviderProvenanceSchedulerNarrativeGovernancePlan ? (
                                     <div className="market-data-provenance-shared-history">
@@ -10423,11 +10997,21 @@ export default function App() {
                                       <div className="provider-provenance-governance-summary">
                                         <strong>{selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rollback_summary}</strong>
                                         <span>
+                                          {formatWorkflowToken(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approval_lane)} · {formatWorkflowToken(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approval_priority)}
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_template_name
+                                            ? ` · ${selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_template_name}`
+                                            : ""}{" "}
+                                          · {" "}
                                           Approval {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at) : "pending"} · {" "}
                                           Apply {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at) : "not applied"} · {" "}
                                           Rollback {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at) : "not rolled back"}
                                         </span>
                                       </div>
+                                      {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_guidance ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          Guidance: {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_guidance}
+                                        </p>
+                                      ) : null}
                                       <div className="market-data-provenance-history-actions">
                                         <button
                                           className="ghost-button"

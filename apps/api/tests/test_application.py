@@ -15156,6 +15156,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_registry_bulk_governance",
     "operator_provider_provenance_scheduler_narrative_registry_revision_list",
     "operator_provider_provenance_scheduler_narrative_registry_revision_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_create",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
@@ -15325,6 +15327,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_revision_restore"].path_param_keys == (
     "registry_id",
     "revision_id",
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_create"].methods == ("POST",)
+  assert (
+    bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_list"].filter_param_specs[0].key
+    == "item_type_scope"
   )
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
@@ -16763,6 +16770,34 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert all(item["template_id"] == template_payload["template_id"] for item in updated_registry_list_payload["items"])
   assert all(item["layout"]["show_recent_exports"] is True for item in updated_registry_list_payload["items"])
 
+  governance_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_create"],
+    app=app,
+    request_payload={
+      "name": "Shift lead staged updates",
+      "description": "Reusable high-priority update lane.",
+      "item_type_scope": "any",
+      "action_scope": "update",
+      "approval_lane": "shift_lead",
+      "approval_priority": "high",
+      "guidance": "Review with the active shift lead before apply.",
+      "created_by_tab_id": "tab_ops",
+      "created_by_tab_label": "Ops desk",
+    },
+  )
+  assert governance_policy_template_payload["approval_lane"] == "shift_lead"
+  assert governance_policy_template_payload["approval_priority"] == "high"
+
+  governance_policy_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_list"],
+    app=app,
+    filters={"action_scope": "update", "approval_priority": "high", "limit": 10},
+  )
+  assert governance_policy_template_list_payload["total"] == 1
+  assert governance_policy_template_list_payload["items"][0]["policy_template_id"] == (
+    governance_policy_template_payload["policy_template_id"]
+  )
+
   template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
     app=app,
@@ -16777,11 +16812,15 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "query_patch": {
         "scheduler_alert_status": "resolved",
       },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
     },
   )
   assert template_governance_plan_payload["status"] == "previewed"
   assert template_governance_plan_payload["preview_changed_count"] == 2
   assert template_governance_plan_payload["rollback_ready_count"] == 2
+  assert template_governance_plan_payload["policy_template_id"] == governance_policy_template_payload["policy_template_id"]
+  assert template_governance_plan_payload["approval_lane"] == "shift_lead"
+  assert template_governance_plan_payload["approval_priority"] == "high"
   assert any("name" in item["changed_fields"] for item in template_governance_plan_payload["preview_items"])
 
   governance_plan_list_payload = execute_standalone_surface_binding(
@@ -16856,10 +16895,12 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
       "layout_patch": {
         "show_time_series": True,
       },
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
     },
   )
   assert registry_governance_plan_payload["status"] == "previewed"
   assert registry_governance_plan_payload["preview_changed_count"] == 2
+  assert registry_governance_plan_payload["policy_template_name"] == "Shift lead staged updates"
   assert any(
     "template_id" in item["changed_fields"] or "layout" in item["changed_fields"]
     for item in registry_governance_plan_payload["preview_items"]

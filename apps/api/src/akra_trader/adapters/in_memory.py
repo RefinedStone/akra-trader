@@ -33,6 +33,7 @@ from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeTemplateRecord
@@ -301,6 +302,10 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_scheduler_narrative_registry_revisions: OrderedDict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+    ] = OrderedDict()
+    self._provider_provenance_scheduler_narrative_governance_policy_templates: OrderedDict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
     ] = OrderedDict()
     self._provider_provenance_scheduler_narrative_governance_plans: OrderedDict[
       str,
@@ -831,6 +836,30 @@ class InMemoryRunRepository(RunRepositoryPort):
     revision_id: str,
   ) -> ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord | None:
     return self._provider_provenance_scheduler_narrative_registry_revisions.get(revision_id)
+
+  def save_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    self._provider_provenance_scheduler_narrative_governance_policy_templates[record.policy_template_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_templates(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_policy_templates.values(),
+        key=lambda record: (record.updated_at, record.policy_template_id),
+        reverse=True,
+      )
+    )
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    policy_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord | None:
+    return self._provider_provenance_scheduler_narrative_governance_policy_templates.get(policy_template_id)
 
   def save_provider_provenance_scheduler_narrative_governance_plan(
     self,

@@ -1762,6 +1762,93 @@ def build_standalone_surface_runtime_bindings(
     path_param_keys=("registry_id", "revision_id"),
     request_payload_kind="operator_provider_provenance_scheduler_narrative_registry_revision_restore",
   )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_create_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_create",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates",
+    route_name="create_operator_provider_provenance_scheduler_narrative_governance_policy_template",
+    response_title="Create provider provenance scheduler narrative governance policy template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_create",
+    methods=("POST",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_create",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_policy_templates",
+    response_title="List provider provenance scheduler narrative governance policy templates",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_list",
+    filter_keys=("item_type_scope", "action_scope", "approval_lane", "approval_priority", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "item_type_scope",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Item type scope",
+          description="Filter scheduler governance policy templates by template, registry, or any scope.",
+          examples=("template",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action_scope",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Action scope",
+          description="Filter scheduler governance policy templates by update, delete, restore, or any scope.",
+          examples=("update",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "approval_lane",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Approval lane",
+          description="Filter scheduler governance policy templates by approval lane.",
+          examples=("shift_lead",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "approval_priority",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Approval priority",
+          description="Filter scheduler governance policy templates by queue priority.",
+          examples=("high",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler governance policy templates by name, scope, lane, or guidance text.",
+          examples=("cleanup",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler governance policy templates to return.",
+          examples=(50,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_governance_plan_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -3534,6 +3621,8 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_registry_bulk_governance_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_list_binding,
     operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_create_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_approve_binding,

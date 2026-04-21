@@ -1649,12 +1649,38 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePreviewItem = {
   proposed_snapshot: Record<string, unknown>;
 };
 
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate = {
+  policy_template_id: string;
+  name: string;
+  description: string;
+  item_type_scope: "any" | "template" | "registry" | string;
+  action_scope: "any" | "delete" | "restore" | "update" | string;
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical" | string;
+  guidance?: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by_tab_id?: string | null;
+  created_by_tab_label?: string | null;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload = {
+  items: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate[];
+  total: number;
+};
+
 export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
   plan_id: string;
   item_type: "template" | "registry" | string;
   action: "delete" | "restore" | "update" | "rollback" | string;
   reason: string;
   status: "previewed" | "approved" | "applied" | "rolled_back" | string;
+  queue_state: "pending_approval" | "ready_to_apply" | "completed" | string;
+  policy_template_id?: string | null;
+  policy_template_name?: string | null;
+  approval_lane: string;
+  approval_priority: "low" | "normal" | "high" | "critical" | string;
+  policy_guidance?: string | null;
   request_payload: Record<string, unknown>;
   target_ids: string[];
   preview_requested_count: number;
@@ -1686,6 +1712,9 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
 export type ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload = {
   items: ProviderProvenanceSchedulerNarrativeGovernancePlan[];
   total: number;
+  pending_approval_count: number;
+  ready_to_apply_count: number;
+  completed_count: number;
 };
 
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {

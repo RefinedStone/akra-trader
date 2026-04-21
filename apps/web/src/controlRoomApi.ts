@@ -19,6 +19,8 @@ import type {
   ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryListPayload,
@@ -941,6 +943,9 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
   layoutPatch?: Record<string, unknown>;
   templateId?: string;
   clearTemplateLink?: boolean;
+  policyTemplateId?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
 }) {
   return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePlan>(
     "/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -960,8 +965,74 @@ export async function createProviderProvenanceSchedulerNarrativeGovernancePlan(p
         ...(params.layoutPatch ? { layout_patch: params.layoutPatch } : {}),
         ...(params.templateId?.trim() ? { template_id: params.templateId.trim() } : {}),
         ...(params.clearTemplateLink ? { clear_template_link: true } : {}),
+        ...(params.policyTemplateId?.trim() ? { policy_template_id: params.policyTemplateId.trim() } : {}),
+        ...(params.approvalLane?.trim() ? { approval_lane: params.approvalLane.trim() } : {}),
+        ...(params.approvalPriority?.trim() ? { approval_priority: params.approvalPriority.trim() } : {}),
       }),
     },
+  );
+}
+
+export async function createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate(params: {
+  name: string;
+  description?: string;
+  itemTypeScope?: string;
+  actionScope?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  guidance?: string;
+  createdByTabId?: string;
+  createdByTabLabel?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate>(
+    "/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        name: params.name,
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.itemTypeScope?.trim() ? { item_type_scope: params.itemTypeScope.trim() } : {}),
+        ...(params.actionScope?.trim() ? { action_scope: params.actionScope.trim() } : {}),
+        ...(params.approvalLane?.trim() ? { approval_lane: params.approvalLane.trim() } : {}),
+        ...(params.approvalPriority?.trim() ? { approval_priority: params.approvalPriority.trim() } : {}),
+        ...(params.guidance?.trim() ? { guidance: params.guidance.trim() } : {}),
+        ...(params.createdByTabId?.trim() ? { created_by_tab_id: params.createdByTabId.trim() } : {}),
+        ...(params.createdByTabLabel?.trim() ? { created_by_tab_label: params.createdByTabLabel.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplates(params: {
+  itemTypeScope?: string;
+  actionScope?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.itemTypeScope?.trim()) {
+    searchParams.set("item_type_scope", params.itemTypeScope.trim());
+  }
+  if (params.actionScope?.trim()) {
+    searchParams.set("action_scope", params.actionScope.trim());
+  }
+  if (params.approvalLane?.trim()) {
+    searchParams.set("approval_lane", params.approvalLane.trim());
+  }
+  if (params.approvalPriority?.trim()) {
+    searchParams.set("approval_priority", params.approvalPriority.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates${suffix}`,
   );
 }
 

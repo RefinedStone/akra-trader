@@ -40,6 +40,7 @@ from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeBulkGovernanceResult
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePlanRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeGovernancePreviewItem
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord
@@ -450,6 +451,10 @@ class TradingApplication:
     self._provider_provenance_scheduler_narrative_registry_revisions: dict[
       str,
       ProviderProvenanceSchedulerNarrativeRegistryRevisionRecord,
+    ] = {}
+    self._provider_provenance_scheduler_narrative_governance_policy_templates: dict[
+      str,
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
     ] = {}
     self._provider_provenance_scheduler_narrative_governance_plans: dict[
       str,
@@ -1822,6 +1827,51 @@ class TradingApplication:
       sorted(
         self._provider_provenance_scheduler_narrative_registry_revisions.values(),
         key=lambda record: (record.recorded_at, record.revision_id),
+        reverse=True,
+      )
+    )
+
+  def _save_provider_provenance_scheduler_narrative_governance_policy_template_record(
+    self,
+    record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    save_record = getattr(
+      self._runs,
+      "save_provider_provenance_scheduler_narrative_governance_policy_template",
+      None,
+    )
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_narrative_governance_policy_templates[record.policy_template_id] = record
+    return record
+
+  def _load_provider_provenance_scheduler_narrative_governance_policy_template_record(
+    self,
+    policy_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord | None:
+    get_record = getattr(
+      self._runs,
+      "get_provider_provenance_scheduler_narrative_governance_policy_template",
+      None,
+    )
+    if callable(get_record):
+      return get_record(policy_template_id)
+    return self._provider_provenance_scheduler_narrative_governance_policy_templates.get(policy_template_id)
+
+  def _list_provider_provenance_scheduler_narrative_governance_policy_template_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...]:
+    list_records = getattr(
+      self._runs,
+      "list_provider_provenance_scheduler_narrative_governance_policy_templates",
+      None,
+    )
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_narrative_governance_policy_templates.values(),
+        key=lambda record: (record.updated_at, record.policy_template_id),
         reverse=True,
       )
     )
@@ -5889,6 +5939,192 @@ class TradingApplication:
       raise ValueError("Unsupported scheduler narrative governance item type.")
     return normalized
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_item_type_scope(
+    item_type_scope: str | None,
+  ) -> str:
+    normalized = (
+      item_type_scope.strip().lower()
+      if isinstance(item_type_scope, str) and item_type_scope.strip()
+      else "any"
+    )
+    if normalized not in {"any", "template", "registry"}:
+      raise ValueError("Unsupported scheduler narrative governance policy item-type scope.")
+    return normalized
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_action_scope(
+    action_scope: str | None,
+  ) -> str:
+    normalized = (
+      action_scope.strip().lower()
+      if isinstance(action_scope, str) and action_scope.strip()
+      else "any"
+    )
+    if normalized not in {"any", "delete", "restore", "update"}:
+      raise ValueError("Unsupported scheduler narrative governance policy action scope.")
+    return normalized
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
+    approval_lane: str | None,
+  ) -> str:
+    raw = (
+      approval_lane.strip().lower()
+      if isinstance(approval_lane, str) and approval_lane.strip()
+      else "general"
+    )
+    normalized = re.sub(r"[^a-z0-9]+", "_", raw).strip("_")
+    return normalized or "general"
+
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
+    approval_priority: str | None,
+  ) -> str:
+    normalized = (
+      approval_priority.strip().lower()
+      if isinstance(approval_priority, str) and approval_priority.strip()
+      else "normal"
+    )
+    if normalized not in {"low", "normal", "high", "critical"}:
+      raise ValueError("Unsupported scheduler narrative governance approval priority.")
+    return normalized
+
+  @staticmethod
+  def _build_provider_provenance_scheduler_narrative_governance_queue_state(
+    status: str,
+  ) -> str:
+    normalized = status.strip().lower()
+    if normalized == "previewed":
+      return "pending_approval"
+    if normalized == "approved":
+      return "ready_to_apply"
+    return "completed"
+
+  def create_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    *,
+    name: str,
+    description: str = "",
+    item_type_scope: str | None = None,
+    action_scope: str | None = None,
+    approval_lane: str | None = None,
+    approval_priority: str | None = None,
+    guidance: str | None = None,
+    created_by_tab_id: str | None = None,
+    created_by_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    now = self._clock()
+    return self._save_provider_provenance_scheduler_narrative_governance_policy_template_record(
+      ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord(
+        policy_template_id=uuid4().hex[:12],
+        name=self._normalize_provider_provenance_workspace_name(
+          name,
+          field_name="scheduler narrative governance policy template name",
+        ),
+        description=description.strip() if isinstance(description, str) else "",
+        item_type_scope=self._normalize_provider_provenance_scheduler_narrative_governance_item_type_scope(
+          item_type_scope
+        ),
+        action_scope=self._normalize_provider_provenance_scheduler_narrative_governance_action_scope(
+          action_scope
+        ),
+        approval_lane=self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
+          approval_lane
+        ),
+        approval_priority=self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
+          approval_priority
+        ),
+        guidance=guidance.strip() if isinstance(guidance, str) and guidance.strip() else None,
+        created_at=now,
+        updated_at=now,
+        created_by_tab_id=(
+          created_by_tab_id.strip()
+          if isinstance(created_by_tab_id, str) and created_by_tab_id.strip()
+          else None
+        ),
+        created_by_tab_label=(
+          created_by_tab_label.strip()
+          if isinstance(created_by_tab_label, str) and created_by_tab_label.strip()
+          else None
+        ),
+      )
+    )
+
+  def list_provider_provenance_scheduler_narrative_governance_policy_templates(
+    self,
+    *,
+    item_type_scope: str | None = None,
+    action_scope: str | None = None,
+    approval_lane: str | None = None,
+    approval_priority: str | None = None,
+    search: str | None = None,
+    limit: int = 50,
+  ) -> tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...]:
+    normalized_item_type_scope = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_item_type_scope(item_type_scope)
+      if isinstance(item_type_scope, str) and item_type_scope.strip()
+      else None
+    )
+    normalized_action_scope = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_action_scope(action_scope)
+      if isinstance(action_scope, str) and action_scope.strip()
+      else None
+    )
+    normalized_approval_lane = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(approval_lane)
+      if isinstance(approval_lane, str) and approval_lane.strip()
+      else None
+    )
+    normalized_approval_priority = (
+      self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(approval_priority)
+      if isinstance(approval_priority, str) and approval_priority.strip()
+      else None
+    )
+    normalized_limit = max(1, min(limit, 200))
+    filtered: list[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord] = []
+    for record in self._list_provider_provenance_scheduler_narrative_governance_policy_template_records():
+      if normalized_item_type_scope is not None and record.item_type_scope != normalized_item_type_scope:
+        continue
+      if normalized_action_scope is not None and record.action_scope != normalized_action_scope:
+        continue
+      if normalized_approval_lane is not None and record.approval_lane != normalized_approval_lane:
+        continue
+      if normalized_approval_priority is not None and record.approval_priority != normalized_approval_priority:
+        continue
+      if not self._matches_provider_provenance_workspace_search(
+        values=(
+          record.policy_template_id,
+          record.name,
+          record.description,
+          record.item_type_scope,
+          record.action_scope,
+          record.approval_lane,
+          record.approval_priority,
+          record.guidance,
+          record.created_by_tab_id,
+          record.created_by_tab_label,
+        ),
+        search=search,
+      ):
+        continue
+      filtered.append(record)
+    return tuple(filtered[:normalized_limit])
+
+  def get_provider_provenance_scheduler_narrative_governance_policy_template(
+    self,
+    policy_template_id: str,
+  ) -> ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
+    normalized_policy_template_id = policy_template_id.strip()
+    if not normalized_policy_template_id:
+      raise LookupError("Provider provenance scheduler narrative governance policy template not found.")
+    record = self._load_provider_provenance_scheduler_narrative_governance_policy_template_record(
+      normalized_policy_template_id
+    )
+    if record is None:
+      raise LookupError("Provider provenance scheduler narrative governance policy template not found.")
+    return record
+
   def create_provider_provenance_scheduler_narrative_governance_plan(
     self,
     *,
@@ -5905,6 +6141,9 @@ class TradingApplication:
     layout_patch: dict[str, Any] | None = None,
     template_id: str | None = None,
     clear_template_link: bool = False,
+    policy_template_id: str | None = None,
+    approval_lane: str | None = None,
+    approval_priority: str | None = None,
   ) -> ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
     normalized_item_type = self._normalize_provider_provenance_scheduler_narrative_governance_item_type(
       item_type
@@ -6023,6 +6262,25 @@ class TradingApplication:
       request_payload["template_id"] = template_id.strip()
     if clear_template_link:
       request_payload["clear_template_link"] = True
+    resolved_policy_template = (
+      self.get_provider_provenance_scheduler_narrative_governance_policy_template(policy_template_id)
+      if isinstance(policy_template_id, str) and policy_template_id.strip()
+      else None
+    )
+    if resolved_policy_template is not None:
+      if resolved_policy_template.item_type_scope not in {"any", normalized_item_type}:
+        raise ValueError("Selected scheduler governance policy template does not support this item type.")
+      if resolved_policy_template.action_scope not in {"any", normalized_action}:
+        raise ValueError("Selected scheduler governance policy template does not support this action.")
+      request_payload["policy_template_id"] = resolved_policy_template.policy_template_id
+    resolved_approval_lane = self._normalize_provider_provenance_scheduler_narrative_governance_approval_lane(
+      approval_lane if approval_lane is not None else resolved_policy_template.approval_lane if resolved_policy_template is not None else None
+    )
+    resolved_approval_priority = self._normalize_provider_provenance_scheduler_narrative_governance_approval_priority(
+      approval_priority if approval_priority is not None else resolved_policy_template.approval_priority if resolved_policy_template is not None else None
+    )
+    request_payload["approval_lane"] = resolved_approval_lane
+    request_payload["approval_priority"] = resolved_approval_priority
     now = self._clock()
     return self._save_provider_provenance_scheduler_narrative_governance_plan_record(
       ProviderProvenanceSchedulerNarrativeGovernancePlanRecord(
@@ -6031,6 +6289,17 @@ class TradingApplication:
         action=normalized_action,
         reason=resolved_reason,
         status="previewed",
+        policy_template_id=(
+          resolved_policy_template.policy_template_id if resolved_policy_template is not None else None
+        ),
+        policy_template_name=(
+          resolved_policy_template.name if resolved_policy_template is not None else None
+        ),
+        approval_lane=resolved_approval_lane,
+        approval_priority=resolved_approval_priority,
+        policy_guidance=(
+          resolved_policy_template.guidance if resolved_policy_template is not None else None
+        ),
         request_payload=request_payload,
         target_ids=normalized_ids,
         preview_requested_count=len(normalized_ids),
@@ -32092,6 +32361,37 @@ def serialize_provider_provenance_scheduler_narrative_governance_preview_item(
   }
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_policy_template_record(
+  record: ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord,
+) -> dict[str, Any]:
+  return {
+    "policy_template_id": record.policy_template_id,
+    "name": record.name,
+    "description": record.description,
+    "item_type_scope": record.item_type_scope,
+    "action_scope": record.action_scope,
+    "approval_lane": record.approval_lane,
+    "approval_priority": record.approval_priority,
+    "guidance": record.guidance,
+    "created_at": record.created_at.isoformat(),
+    "updated_at": record.updated_at.isoformat(),
+    "created_by_tab_id": record.created_by_tab_id,
+    "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_policy_template_list(
+  records: tuple[ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord, ...],
+) -> dict[str, Any]:
+  return {
+    "items": [
+      serialize_provider_provenance_scheduler_narrative_governance_policy_template_record(record)
+      for record in records
+    ],
+    "total": len(records),
+  }
+
+
 def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
   record: ProviderProvenanceSchedulerNarrativeGovernancePlanRecord,
 ) -> dict[str, Any]:
@@ -32101,6 +32401,14 @@ def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
     "action": record.action,
     "reason": record.reason,
     "status": record.status,
+    "queue_state": TradingApplication._build_provider_provenance_scheduler_narrative_governance_queue_state(
+      record.status
+    ),
+    "policy_template_id": record.policy_template_id,
+    "policy_template_name": record.policy_template_name,
+    "approval_lane": record.approval_lane,
+    "approval_priority": record.approval_priority,
+    "policy_guidance": record.policy_guidance,
     "request_payload": deepcopy(record.request_payload),
     "target_ids": list(record.target_ids),
     "preview_requested_count": record.preview_requested_count,
@@ -32144,12 +32452,18 @@ def serialize_provider_provenance_scheduler_narrative_governance_plan_record(
 def serialize_provider_provenance_scheduler_narrative_governance_plan_list(
   records: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...],
 ) -> dict[str, Any]:
+  pending_approval_count = sum(1 for record in records if record.status == "previewed")
+  ready_to_apply_count = sum(1 for record in records if record.status == "approved")
+  completed_count = sum(1 for record in records if record.status in {"applied", "rolled_back"})
   return {
     "items": [
       serialize_provider_provenance_scheduler_narrative_governance_plan_record(record)
       for record in records
     ],
     "total": len(records),
+    "pending_approval_count": pending_approval_count,
+    "ready_to_apply_count": ready_to_apply_count,
+    "completed_count": completed_count,
   }
 
 

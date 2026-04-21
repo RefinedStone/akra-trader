@@ -87,6 +87,9 @@ unclear dataset lineage.
 - those same bulk edits now stage a governance plan first, showing per-entry diffs, requiring an
   explicit approval step before apply, and keeping rollback targets tied to the captured
   pre-approval revisions if the shared scheduler review lens needs to be reverted
+- the scheduler governance layer now also supports reusable policy templates and an approval queue,
+  so shift leads can stage named lane/priority defaults for repeated handoff flows and review
+  pending vs ready-to-apply narrative plans without scanning a flat plan registry
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

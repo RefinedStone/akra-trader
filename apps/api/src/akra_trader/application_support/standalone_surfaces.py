@@ -153,6 +153,14 @@ def serialize_provider_provenance_scheduler_narrative_governance_plan_list(*args
   return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_plan_list')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_narrative_governance_policy_template_record(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_template_record')(*args, **kwargs)
+
+
+def serialize_provider_provenance_scheduler_narrative_governance_policy_template_list(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_narrative_governance_policy_template_list')(*args, **kwargs)
+
+
 def serialize_provider_provenance_scheduled_report_record(*args, **kwargs):
   return _application_symbol('serialize_provider_provenance_scheduled_report_record')(*args, **kwargs)
 
@@ -793,6 +801,31 @@ def execute_standalone_surface_binding(
         reason=resolved_payload.get("reason", "scheduler_narrative_registry_revision_restored"),
       )
     )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_template_create":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_template_record(
+      app.create_provider_provenance_scheduler_narrative_governance_policy_template(
+        name=resolved_payload.get("name", ""),
+        description=resolved_payload.get("description", ""),
+        item_type_scope=resolved_payload.get("item_type_scope"),
+        action_scope=resolved_payload.get("action_scope"),
+        approval_lane=resolved_payload.get("approval_lane"),
+        approval_priority=resolved_payload.get("approval_priority"),
+        guidance=resolved_payload.get("guidance"),
+        created_by_tab_id=resolved_payload.get("created_by_tab_id"),
+        created_by_tab_label=resolved_payload.get("created_by_tab_label"),
+      )
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_policy_template_list":
+    return serialize_provider_provenance_scheduler_narrative_governance_policy_template_list(
+      app.list_provider_provenance_scheduler_narrative_governance_policy_templates(
+        item_type_scope=resolved_filters.get("item_type_scope"),
+        action_scope=resolved_filters.get("action_scope"),
+        approval_lane=resolved_filters.get("approval_lane"),
+        approval_priority=resolved_filters.get("approval_priority"),
+        search=resolved_filters.get("search"),
+        limit=resolved_filters.get("limit", 50),
+      )
+    )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_create":
     return serialize_provider_provenance_scheduler_narrative_governance_plan_record(
       app.create_provider_provenance_scheduler_narrative_governance_plan(
@@ -809,6 +842,9 @@ def execute_standalone_surface_binding(
         layout_patch=resolved_payload.get("layout_patch"),
         template_id=resolved_payload.get("template_id"),
         clear_template_link=bool(resolved_payload.get("clear_template_link", False)),
+        policy_template_id=resolved_payload.get("policy_template_id"),
+        approval_lane=resolved_payload.get("approval_lane"),
+        approval_priority=resolved_payload.get("approval_priority"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_governance_plan_list":
