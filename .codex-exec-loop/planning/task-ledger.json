@@ -456,18 +456,55 @@
       "direction_id": "runtime-ops",
       "title": "Productize scheduler health export delivery, audit trail, and escalation workflows",
       "description": "Turn the new direct scheduler-health JSON or CSV export into an operator-grade delivery flow by adding team-shared registry or audit capture, scheduled delivery or push paths, and escalation-oriented action surfaces so automation stalls can be handed off and reviewed like other runtime failures.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:20:00+09:00",
+      "updated_at": "2026-04-22T02:32:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-history-trend-dashboard"
       ],
-      "direction_relation_note": "The latest main-session reply says commit e5554a0 added direct scheduler-health JSON or CSV export plus hourly drill-down, but export productization is still missing: there is no team-shared registry, audit trail, scheduled delivery, or escalation-oriented handoff flow around those scheduler analytics artifacts.",
-      "priority_reason": "Promoted to ready because the just-completed scheduler analytics slice explicitly leaves export delivery, auditability, and scheduled handoff as the first remaining follow-up, so builtin next-task should continue there before opening another deeper query surface."
+      "direction_relation_note": "Completed on main in commit 39f0629 with scheduler-health exports stored in the shared registry, delivery and escalation audit metadata persisted on export jobs and audit records, configured operator delivery-target escalation, and control-room workflows for Share export, audit trail review, and Escalate.",
+      "priority_reason": "Closed after backend registry and escalation plumbing, control-room workflow integration, targeted pytest and compileall coverage, web typecheck/build verification, docs updates, commit, and push all landed; the latest main-session reply says the remaining immediate gaps are policy-layer routing or approval controls and automatic alert-to-escalation triggering."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-routing-approval-policy",
+      "direction_id": "runtime-ops",
+      "title": "Add per-export routing and approval policy for scheduler health escalations",
+      "description": "Extend the new scheduler-health export delivery and escalation workflow with per-export routing policy plus optional approval or escalation policy controls so automation stalls do not rely only on globally configured operator delivery targets.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 23,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T02:32:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-escalation-delivery-linking"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says scheduler export escalation currently uses configured operator delivery targets only, leaving per-export routing policy and approval or escalation policy layering as the first direct follow-up on top of the newly shipped workflow.",
+      "priority_reason": "Promoted to ready because the main-session reply lists this policy-layer gap first in the Remains section, making it the clearest deterministic continuation for builtin next-task after export delivery and escalation productization shipped."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-alert-trigger-linking",
+      "direction_id": "runtime-ops",
+      "title": "Trigger scheduler export escalation workflows directly from lag and failure alerts",
+      "description": "Connect scheduler lag and failure alert evaluation to the new shared export and escalation workflow so repeated or severe automation issues can automatically generate handoff artifacts and escalation attempts without waiting for manual operator action.",
+      "status": "proposed",
+      "base_priority": 76,
+      "dynamic_priority_delta": 21,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T02:32:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-escalation-delivery-linking",
+        "task-b1-provider-market-context-scheduler-health-alerting"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says automatic lag or failure alerting still does not directly trigger the newly productized export-escalation workflow, so alert-to-handoff linking remains a separate executable follow-up.",
+      "priority_reason": "This is clear executable follow-up work, but it stays proposed behind the policy-layer routing task so the queue hardens escalation governance before enabling automatic trigger paths."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
