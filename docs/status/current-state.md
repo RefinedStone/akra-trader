@@ -138,7 +138,8 @@ It is not yet a finished live trading product:
   third-party incident systems
 - restored provider market context now also preserves provider-specific source provenance for the
   normalized `symbol`, `symbols`, `timeframe`, and `primary_focus` fields carried in provider
-  recovery state
+  recovery state, and the control-room incident drill-down plus triage export now surface that
+  provenance directly to operators
 
 ### Operator discipline baseline
 

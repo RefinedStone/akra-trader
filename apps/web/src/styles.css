@@ -2363,6 +2363,27 @@ select {
   gap: 8px;
 }
 
+.market-data-workflow-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+}
+
+.market-data-workflow-export-copy {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.market-data-workflow-feedback {
+  margin: 0;
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
+
 .market-data-inline-focus-button {
   margin-top: 10px;
   padding: 8px 12px;
@@ -2387,6 +2408,11 @@ select {
   font-family: "IBM Plex Mono", monospace;
   font-size: 0.76rem;
   line-height: 1.45;
+}
+
+.market-data-provider-provenance-copy {
+  color: var(--cyan);
+  font-family: "IBM Plex Mono", monospace;
 }
 
 .market-data-incident-badge {

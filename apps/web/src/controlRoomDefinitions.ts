@@ -982,6 +982,20 @@ export type MarketDataIngestionJobRecord = {
   last_error?: string | null;
 };
 
+export type OperatorAlertMarketContextFieldProvenance = {
+  scope?: string | null;
+  path?: string | null;
+};
+
+export type OperatorAlertMarketContextProvenance = {
+  provider?: string | null;
+  vendor_field?: string | null;
+  symbol?: OperatorAlertMarketContextFieldProvenance | null;
+  symbols?: OperatorAlertMarketContextFieldProvenance | null;
+  timeframe?: OperatorAlertMarketContextFieldProvenance | null;
+  primary_focus?: OperatorAlertMarketContextFieldProvenance | null;
+};
+
 export type OperatorAlertPrimaryFocus = {
   symbol?: string | null;
   timeframe?: string | null;
@@ -1093,6 +1107,7 @@ export type OperatorVisibility = {
         channels: string[];
         symbols: string[];
         timeframe?: string | null;
+        market_context_provenance?: OperatorAlertMarketContextProvenance | null;
         updated_at?: string | null;
         verification: {
           state: string;

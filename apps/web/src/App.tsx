@@ -237,6 +237,7 @@ import type {
   MarketDataIngestionJobRecord,
   MarketDataLineageHistoryRecord,
   MarketDataStatus,
+  OperatorAlertMarketContextProvenance,
   OperatorAlertPrimaryFocus,
   OperatorVisibility,
   PendingTouchGapWindowSweepState,
@@ -1777,6 +1778,11 @@ type MarketDataIncidentHistoryEntry = {
   tone: "critical" | "warning" | "neutral";
 };
 
+type ProviderRecoveryMarketContextSummary = {
+  summary: string;
+  fieldSummaries: string[];
+};
+
 type MarketDataPrimaryFocusSelection = {
   instrument: MarketDataStatus["instruments"][number];
   candidateCount: number;
@@ -1784,6 +1790,67 @@ type MarketDataPrimaryFocusSelection = {
   primaryFocusPolicy: string;
   primaryFocusReason: string;
 };
+
+function formatMarketContextFieldProvenance(
+  label: string,
+  provenance?: OperatorAlertMarketContextProvenance["symbol"] | null,
+) {
+  if (!provenance) {
+    return null;
+  }
+  const scope = provenance.scope?.trim() || null;
+  const path = provenance.path?.trim() || null;
+  if (!scope && !path) {
+    return null;
+  }
+  return `${label} ${scope && path ? `${scope} -> ${path}` : scope ?? path}`;
+}
+
+function summarizeProviderRecoveryMarketContextProvenance(providerRecovery: {
+  provider?: string | null;
+  market_context_provenance?: OperatorAlertMarketContextProvenance | null;
+}): ProviderRecoveryMarketContextSummary | null {
+  const provenance = providerRecovery.market_context_provenance;
+  if (!provenance) {
+    return null;
+  }
+  const fieldSummaries = [
+    formatMarketContextFieldProvenance("symbol", provenance.symbol),
+    formatMarketContextFieldProvenance("symbols", provenance.symbols),
+    formatMarketContextFieldProvenance("timeframe", provenance.timeframe),
+    formatMarketContextFieldProvenance("primary focus", provenance.primary_focus),
+  ].filter((value): value is string => Boolean(value));
+  const summaryLead = [
+    provenance.provider?.trim() || providerRecovery.provider?.trim() || null,
+    provenance.vendor_field?.trim() ? `via ${provenance.vendor_field.trim()}` : null,
+  ].filter(Boolean);
+  const parts = [
+    summaryLead.length ? summaryLead.join(" ") : null,
+    ...fieldSummaries,
+  ].filter((value): value is string => Boolean(value));
+  if (!parts.length) {
+    return null;
+  }
+  return {
+    summary: `Market-context provenance: ${parts.join(" / ")}`,
+    fieldSummaries,
+  };
+}
+
+function serializeLinkedMarketInstrumentContext(link: LinkedMarketInstrumentContext | null) {
+  if (!link) {
+    return null;
+  }
+  return {
+    symbol: link.symbol,
+    timeframe: link.timeframe,
+    match_reason: link.matchReason,
+    candidate_count: link.candidateCount,
+    candidate_labels: link.candidateLabels,
+    primary_focus_policy: link.primaryFocusPolicy,
+    primary_focus_reason: link.primaryFocusReason,
+  };
+}
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -2330,6 +2397,7 @@ export default function App() {
   const [activeMarketInstrumentKey, setActiveMarketInstrumentKey] = useState<string | null>(null);
   const [marketDataWorkflowLoading, setMarketDataWorkflowLoading] = useState(false);
   const [marketDataWorkflowError, setMarketDataWorkflowError] = useState<string | null>(null);
+  const [marketDataWorkflowExportFeedback, setMarketDataWorkflowExportFeedback] = useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -3766,6 +3834,9 @@ export default function App() {
         event.remediation.state !== "not_applicable"
           ? ` Remediation: ${formatWorkflowToken(event.remediation.state)}${event.remediation.summary ? ` / ${event.remediation.summary}` : ""}.`
           : "";
+      const providerProvenanceSummary = summarizeProviderRecoveryMarketContextProvenance(
+        event.remediation.provider_recovery,
+      )?.summary;
       const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(link);
       entries.push({
         entryId: `incident:${event.event_id}`,
@@ -3773,7 +3844,7 @@ export default function App() {
         sourceLabel: "Incident event",
         statusLabel: `${formatWorkflowToken(event.kind)} / ${formatWorkflowToken(event.severity)}`,
         summary: event.summary,
-        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
+        detail: `${event.detail} Ack: ${formatWorkflowToken(event.acknowledgment_state)}. Escalation: level ${event.escalation_level} / ${formatWorkflowToken(event.escalation_state)}.${remediationDetail}${providerProvenanceSummary ? ` ${providerProvenanceSummary}.` : ""}${primaryFocusNote ? ` ${primaryFocusNote}` : ""}`,
         tone: event.severity === "critical" ? "critical" : "warning",
       });
     });
@@ -3878,6 +3949,119 @@ export default function App() {
     focusedMarketIncidentHistory.length,
     marketDataIngestionJobs,
     marketDataLineageHistory,
+  ]);
+
+  const focusedMarketProviderProvenanceCount = useMemo(
+    () =>
+      focusedLinkedOperatorIncidentEvents.filter(
+        ({ event }) => summarizeProviderRecoveryMarketContextProvenance(event.remediation.provider_recovery) !== null,
+      ).length,
+    [focusedLinkedOperatorIncidentEvents],
+  );
+
+  const focusedMarketWorkflowExportPayload = useMemo(() => {
+    if (!activeMarketInstrument || !marketStatus) {
+      return null;
+    }
+    return {
+      focus: {
+        provider: marketStatus.provider,
+        venue: marketStatus.venue,
+        instrument_id: activeMarketInstrument.instrument_id,
+        symbol: resolveMarketDataSymbol(activeMarketInstrument.instrument_id),
+        timeframe: activeMarketInstrument.timeframe,
+        sync_status: activeMarketInstrument.sync_status,
+        linked_alert_count: focusedLinkedOperatorAlerts.length,
+        linked_alert_history_count: focusedLinkedOperatorAlertHistory.length,
+        linked_incident_count: focusedLinkedOperatorIncidentEvents.length,
+        provider_provenance_incident_count: focusedMarketProviderProvenanceCount,
+        lineage_snapshot_count: marketDataLineageHistory.length,
+        ingestion_job_count: marketDataIngestionJobs.length,
+      },
+      alerts: focusedLinkedOperatorAlerts.map(({ alert, link }) => ({
+        alert_id: alert.alert_id,
+        severity: alert.severity,
+        category: alert.category,
+        summary: alert.summary,
+        detail: alert.detail,
+        detected_at: alert.detected_at,
+        status: alert.status,
+        source: alert.source,
+        delivery_targets: alert.delivery_targets,
+        symbol: alert.symbol ?? null,
+        symbols: alert.symbols,
+        timeframe: alert.timeframe ?? null,
+        primary_focus: alert.primary_focus ?? null,
+        triage_focus_link: serializeLinkedMarketInstrumentContext(link),
+      })),
+      alert_history: focusedLinkedOperatorAlertHistory.map(({ alert, link }) => ({
+        alert_id: alert.alert_id,
+        severity: alert.severity,
+        category: alert.category,
+        summary: alert.summary,
+        detail: alert.detail,
+        detected_at: alert.detected_at,
+        resolved_at: alert.resolved_at ?? null,
+        status: alert.status,
+        source: alert.source,
+        delivery_targets: alert.delivery_targets,
+        symbol: alert.symbol ?? null,
+        symbols: alert.symbols,
+        timeframe: alert.timeframe ?? null,
+        primary_focus: alert.primary_focus ?? null,
+        triage_focus_link: serializeLinkedMarketInstrumentContext(link),
+      })),
+      incident_events: focusedLinkedOperatorIncidentEvents.map(({ event, link }) => ({
+        event_id: event.event_id,
+        alert_id: event.alert_id,
+        timestamp: event.timestamp,
+        kind: event.kind,
+        severity: event.severity,
+        summary: event.summary,
+        detail: event.detail,
+        source: event.source,
+        external_provider: event.external_provider ?? null,
+        external_reference: event.external_reference ?? null,
+        provider_workflow_reference: event.provider_workflow_reference ?? null,
+        acknowledgment_state: event.acknowledgment_state,
+        escalation_state: event.escalation_state,
+        escalation_level: event.escalation_level,
+        remediation_state: event.remediation.state,
+        triage_focus_link: serializeLinkedMarketInstrumentContext(link),
+        provider_recovery: {
+          lifecycle_state: event.remediation.provider_recovery.lifecycle_state,
+          provider: event.remediation.provider_recovery.provider ?? null,
+          job_id: event.remediation.provider_recovery.job_id ?? null,
+          reference: event.remediation.provider_recovery.reference ?? null,
+          workflow_reference: event.remediation.provider_recovery.workflow_reference ?? null,
+          channels: event.remediation.provider_recovery.channels,
+          symbols: event.remediation.provider_recovery.symbols,
+          timeframe: event.remediation.provider_recovery.timeframe ?? null,
+          verification_state: event.remediation.provider_recovery.verification.state,
+          market_context_provenance:
+            event.remediation.provider_recovery.market_context_provenance ?? null,
+          market_context_provenance_fields:
+            summarizeProviderRecoveryMarketContextProvenance(event.remediation.provider_recovery)?.fieldSummaries
+            ?? [],
+          market_context_provenance_summary:
+            summarizeProviderRecoveryMarketContextProvenance(event.remediation.provider_recovery)?.summary
+            ?? null,
+        },
+      })),
+      lineage_history: marketDataLineageHistory,
+      ingestion_jobs: marketDataIngestionJobs,
+      merged_incident_history: focusedMarketIncidentHistory,
+    };
+  }, [
+    activeMarketInstrument,
+    focusedLinkedOperatorAlertHistory,
+    focusedLinkedOperatorAlerts,
+    focusedLinkedOperatorIncidentEvents,
+    focusedMarketIncidentHistory,
+    focusedMarketProviderProvenanceCount,
+    marketDataIngestionJobs,
+    marketDataLineageHistory,
+    marketStatus,
   ]);
 
   const operatorSummary = useMemo(() => {
@@ -4056,7 +4240,36 @@ export default function App() {
     instrument: MarketDataStatus["instruments"][number],
   ) {
     setActiveMarketInstrumentKey(buildMarketDataInstrumentFocusKey(instrument));
+    setMarketDataWorkflowExportFeedback(null);
     await loadMarketDataWorkflow(instrument);
+  }
+
+  async function copyFocusedMarketWorkflowExport() {
+    if (!focusedMarketWorkflowExportPayload || !focusedMarketWorkflowSummary) {
+      setMarketDataWorkflowExportFeedback("Select a triage focus before exporting provider provenance.");
+      return;
+    }
+    if (!navigator.clipboard?.writeText) {
+      setMarketDataWorkflowExportFeedback("Clipboard is unavailable. Copy the export from dev tools instead.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(
+        JSON.stringify(
+          {
+            exported_at: new Date().toISOString(),
+            ...focusedMarketWorkflowExportPayload,
+          },
+          null,
+          2,
+        ),
+      );
+      setMarketDataWorkflowExportFeedback(
+        `Copied triage export for ${focusedMarketWorkflowSummary.focusLabel} with ${focusedMarketProviderProvenanceCount} provider provenance incident(s).`,
+      );
+    } catch {
+      setMarketDataWorkflowExportFeedback("Clipboard copy failed for the triage export.");
+    }
   }
 
   async function handlePresetSubmit(event: FormEvent) {
@@ -5160,6 +5373,29 @@ export default function App() {
                           })}
                         </div>
                       ) : null}
+                      {activeMarketInstrument && focusedMarketWorkflowSummary ? (
+                        <div className="market-data-workflow-action-row">
+                          <button
+                            className="ghost-button"
+                            onClick={() => {
+                              void copyFocusedMarketWorkflowExport();
+                            }}
+                            type="button"
+                          >
+                            Copy triage export
+                          </button>
+                          <span className="market-data-workflow-export-copy">
+                            {focusedMarketProviderProvenanceCount
+                              ? `${focusedMarketProviderProvenanceCount} linked incident(s) include provider market-context provenance.`
+                              : "No linked incident currently exposes provider market-context provenance."}
+                          </span>
+                        </div>
+                      ) : null}
+                      {marketDataWorkflowExportFeedback ? (
+                        <p className="market-data-workflow-feedback">
+                          {marketDataWorkflowExportFeedback}
+                        </p>
+                      ) : null}
                     </div>
                     {activeMarketInstrument && focusedMarketWorkflowSummary ? (
                       <>
@@ -5445,6 +5681,10 @@ export default function App() {
                       {operatorVisibility.incident_events.slice(0, 8).map((event) => {
                         const linkedInstrument = linkedOperatorIncidentEventById.get(event.event_id) ?? null;
                         const primaryFocusNote = formatLinkedMarketPrimaryFocusNote(linkedInstrument);
+                        const providerRecoveryProvenanceSummary =
+                          summarizeProviderRecoveryMarketContextProvenance(
+                            event.remediation.provider_recovery,
+                          )?.summary ?? null;
                         return (
                           <tr key={`incident-${event.event_id}`}>
                             <td>{formatTimestamp(event.timestamp)}</td>
@@ -5574,6 +5814,11 @@ export default function App() {
                                       {formatProviderRecoverySchema(event.remediation.provider_recovery) ? (
                                         <p className="run-lineage-symbol-copy">
                                           {formatProviderRecoverySchema(event.remediation.provider_recovery)}
+                                        </p>
+                                      ) : null}
+                                      {providerRecoveryProvenanceSummary ? (
+                                        <p className="run-lineage-symbol-copy market-data-provider-provenance-copy">
+                                          {providerRecoveryProvenanceSummary}
                                         </p>
                                       ) : null}
                                     </>
@@ -6711,7 +6956,12 @@ export default function App() {
                         </tr>
                       </thead>
                       <tbody>
-                        {guardedLive.incident_events.slice(0, 8).map((event) => (
+                        {guardedLive.incident_events.slice(0, 8).map((event) => {
+                          const providerRecoveryProvenanceSummary =
+                            summarizeProviderRecoveryMarketContextProvenance(
+                              event.remediation.provider_recovery,
+                            )?.summary ?? null;
+                          return (
                           <tr key={`guarded-live-incident-${event.event_id}`}>
                             <td>{formatTimestamp(event.timestamp)}</td>
                             <td>{event.kind}</td>
@@ -6837,6 +7087,11 @@ export default function App() {
                                           {formatProviderRecoverySchema(event.remediation.provider_recovery)}
                                         </p>
                                       ) : null}
+                                      {providerRecoveryProvenanceSummary ? (
+                                        <p className="run-lineage-symbol-copy market-data-provider-provenance-copy">
+                                          {providerRecoveryProvenanceSummary}
+                                        </p>
+                                      ) : null}
                                     </>
                                   ) : null}
                                 </>
@@ -6885,7 +7140,8 @@ export default function App() {
                               )}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   ) : (
