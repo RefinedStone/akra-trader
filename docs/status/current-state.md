@@ -202,6 +202,10 @@ It is not yet a finished live trading product:
 - those governance policy catalogs now also support edit/delete/revision restore, shared audit, and
   bulk governance updates in the control room, so catalog lifecycle is durable instead of being a
   create/list-only preset layer
+- those same policy catalogs can now also capture reusable template+registry governance hierarchies
+  and stage them straight into the approval queue, with catalog-linked plan metadata so operators
+  can review a whole staged hierarchy by its source catalog instead of treating each preview as
+  orphaned queue work
 
 ### Operator discipline baseline
 

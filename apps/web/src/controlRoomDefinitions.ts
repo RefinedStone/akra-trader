@@ -1737,6 +1737,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog = {
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
   guidance?: string | null;
+  hierarchy_steps: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep[];
   status: "active" | "deleted" | string;
   created_at: string;
   updated_at: string;
@@ -1771,6 +1772,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionE
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
   guidance?: string | null;
+  hierarchy_steps: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep[];
   status: "active" | "deleted" | string;
   recorded_at: string;
   recorded_by_tab_id?: string | null;
@@ -1802,6 +1804,7 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditReco
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
   guidance?: string | null;
+  hierarchy_steps: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep[];
   actor_tab_id?: string | null;
   actor_tab_label?: string | null;
 };
@@ -1809,6 +1812,20 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditReco
 export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditListPayload = {
   items: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord[];
   total: number;
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep = {
+  item_type: "template" | "registry" | string;
+  action: "update" | string;
+  item_ids: string[];
+  item_names: string[];
+  name_prefix?: string | null;
+  name_suffix?: string | null;
+  description_append?: string | null;
+  query_patch: Record<string, unknown>;
+  layout_patch: Record<string, unknown>;
+  template_id?: string | null;
+  clear_template_link: boolean;
 };
 
 export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
@@ -1820,9 +1837,15 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePlan = {
   queue_state: "pending_approval" | "ready_to_apply" | "completed" | string;
   policy_template_id?: string | null;
   policy_template_name?: string | null;
+  policy_catalog_id?: string | null;
+  policy_catalog_name?: string | null;
   approval_lane: string;
   approval_priority: "low" | "normal" | "high" | "critical" | string;
   policy_guidance?: string | null;
+  hierarchy_key?: string | null;
+  hierarchy_name?: string | null;
+  hierarchy_position?: number | null;
+  hierarchy_total?: number | null;
   request_payload: Record<string, unknown>;
   target_ids: string[];
   preview_requested_count: number;
@@ -1876,6 +1899,16 @@ export type ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult = {
   skipped_count: number;
   failed_count: number;
   results: ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult[];
+};
+
+export type ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogStageResult = {
+  catalog_id: string;
+  catalog_name: string;
+  hierarchy_key: string;
+  hierarchy_name: string;
+  plan_count: number;
+  summary: string;
+  plans: ProviderProvenanceSchedulerNarrativeGovernancePlan[];
 };
 
 export type ProviderProvenanceSchedulerNarrativeRegistryEntry = {

@@ -1119,6 +1119,7 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRecord:
   approval_lane: str = "general"
   approval_priority: str = "normal"
   guidance: str | None = None
+  hierarchy_steps: tuple["ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep", ...] = ()
   status: str = "active"
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -1148,6 +1149,7 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionRecord:
   approval_lane: str = "general"
   approval_priority: str = "normal"
   guidance: str | None = None
+  hierarchy_steps: tuple["ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep", ...] = ()
   status: str = "active"
   recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   source_revision_id: str | None = None
@@ -1176,8 +1178,24 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord:
   approval_lane: str = "general"
   approval_priority: str = "normal"
   guidance: str | None = None
+  hierarchy_steps: tuple["ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep", ...] = ()
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep:
+  item_type: str
+  action: str = "update"
+  item_ids: tuple[str, ...] = ()
+  item_names: tuple[str, ...] = ()
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] = field(default_factory=dict)
+  layout_patch: dict[str, Any] = field(default_factory=dict)
+  template_id: str | None = None
+  clear_template_link: bool = False
 
 
 @dataclass(frozen=True)
@@ -1189,9 +1207,15 @@ class ProviderProvenanceSchedulerNarrativeGovernancePlanRecord:
   status: str = "previewed"
   policy_template_id: str | None = None
   policy_template_name: str | None = None
+  policy_catalog_id: str | None = None
+  policy_catalog_name: str | None = None
   approval_lane: str = "general"
   approval_priority: str = "normal"
   policy_guidance: str | None = None
+  hierarchy_key: str | None = None
+  hierarchy_name: str | None = None
+  hierarchy_position: int | None = None
+  hierarchy_total: int | None = None
   request_payload: dict[str, Any] = field(default_factory=dict)
   target_ids: tuple[str, ...] = ()
   preview_requested_count: int = 0
@@ -1239,6 +1263,17 @@ class ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult:
   skipped_count: int = 0
   failed_count: int = 0
   results: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanBatchItemResult, ...] = ()
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogStageResult:
+  catalog_id: str
+  catalog_name: str
+  hierarchy_key: str
+  hierarchy_name: str
+  plan_count: int = 0
+  summary: str = ""
+  plans: tuple[ProviderProvenanceSchedulerNarrativeGovernancePlanRecord, ...] = ()
 
 
 @dataclass(frozen=True)

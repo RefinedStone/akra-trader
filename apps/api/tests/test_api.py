@@ -2178,6 +2178,63 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert batch_apply_payload["succeeded_count"] == 2
   assert all(item["status"] == "applied" for item in batch_apply_payload["results"] if item["plan"])
 
+  capture_catalog_hierarchy_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/hierarchy",
+    json={
+      "hierarchy_steps": [
+        {
+          "item_type": "template",
+          "item_ids": [template_payload["template_id"]],
+          "name_suffix": " / catalog",
+          "query_patch": {
+            "scheduler_alert_status": "resolved",
+          },
+        },
+        {
+          "item_type": "registry",
+          "item_ids": [registry_payload["registry_id"]],
+          "layout_patch": {
+            "show_recent_exports": True,
+          },
+        },
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "capture_catalog_hierarchy",
+    },
+  )
+  assert capture_catalog_hierarchy_response.status_code == 200
+  captured_catalog_hierarchy_payload = capture_catalog_hierarchy_response.json()
+  assert len(captured_catalog_hierarchy_payload["hierarchy_steps"]) == 2
+
+  stage_catalog_hierarchy_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-catalogs/{governance_policy_catalog_payload['catalog_id']}/stage",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_catalog_hierarchy",
+    },
+  )
+  assert stage_catalog_hierarchy_response.status_code == 200
+  staged_catalog_hierarchy_payload = stage_catalog_hierarchy_response.json()
+  assert staged_catalog_hierarchy_payload["plan_count"] == 2
+  assert all(
+    item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+    for item in staged_catalog_hierarchy_payload["plans"]
+  )
+
+  governance_plan_catalog_slice_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
+    params={"policy_catalog_id": governance_policy_catalog_payload["catalog_id"], "limit": 10},
+  )
+  assert governance_plan_catalog_slice_response.status_code == 200
+  governance_plan_catalog_slice_payload = governance_plan_catalog_slice_response.json()
+  assert governance_plan_catalog_slice_payload["total"] >= 2
+  assert all(
+    item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+    for item in governance_plan_catalog_slice_payload["items"][:2]
+  )
+
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",
     json={

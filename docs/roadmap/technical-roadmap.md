@@ -145,8 +145,10 @@ creation.
   higher-level governance policy catalogs can bundle linked templates into reusable queue/default
   presets instead of rebuilding the same selection set by hand
 - those policy catalogs now also have lifecycle, audit, and bulk-governance surfaces, but catalog
-  governance still does not yet include stitched multi-occurrence narrative artifacts or deeper
-  server-side narrative search
+  governance now also includes reusable staged-plan hierarchies that can be captured from the
+  current template/registry workbench and replayed back into the approval queue as catalog-linked
+  plans; stitched multi-occurrence narrative artifacts and deeper server-side narrative search are
+  still not built
 
 ### Remaining work
 

@@ -15171,6 +15171,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_list",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_revision_restore",
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
@@ -15378,6 +15380,12 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key[
     "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_audit_list"
   ].filter_param_specs[0].key == "catalog_id"
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture"
+  ].path_param_keys == ("catalog_id",)
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"
+  ].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
@@ -17249,6 +17257,66 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert batch_apply_payload["succeeded_count"] == 2
   assert all(item["status"] == "applied" for item in batch_apply_payload["results"] if item["plan"])
+
+  captured_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_hierarchy_capture"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+    request_payload={
+      "hierarchy_steps": [
+        {
+          "item_type": "template",
+          "item_ids": [template_payload["template_id"]],
+          "name_suffix": " / catalog",
+          "query_patch": {
+            "scheduler_alert_status": "resolved",
+          },
+        },
+        {
+          "item_type": "registry",
+          "item_ids": [registry_payload["registry_id"]],
+          "layout_patch": {
+            "show_recent_exports": True,
+          },
+        },
+      ],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "capture_catalog_hierarchy",
+    },
+  )
+  assert len(captured_governance_policy_catalog_payload["hierarchy_steps"]) == 2
+
+  staged_governance_policy_catalog_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_catalog_stage"],
+    app=app,
+    path_params={"catalog_id": governance_policy_catalog_payload["catalog_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "stage_catalog_hierarchy",
+    },
+  )
+  assert staged_governance_policy_catalog_payload["plan_count"] == 2
+  assert all(
+    item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+    for item in staged_governance_policy_catalog_payload["plans"]
+  )
+  assert {
+    item["hierarchy_position"]
+    for item in staged_governance_policy_catalog_payload["plans"]
+  } == {1, 2}
+
+  governance_plan_catalog_slice_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"],
+    app=app,
+    filters={"policy_catalog_id": governance_policy_catalog_payload["catalog_id"], "limit": 10},
+  )
+  assert governance_plan_catalog_slice_payload["total"] >= 2
+  assert all(
+    item["policy_catalog_id"] == governance_policy_catalog_payload["catalog_id"]
+    for item in governance_plan_catalog_slice_payload["items"][:2]
+  )
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

@@ -98,6 +98,9 @@ unclear dataset lineage.
 - those policy catalogs now also expose revision history, team audit, and bulk lifecycle controls,
   so handoff presets can be edited, deleted, restored, and batch-retired without leaving the
   operator workspace
+- those same policy catalogs can now capture reusable template/registry governance hierarchies and
+  stage them directly into the approval queue, so a shift handoff can repopulate a catalog-linked
+  review stack in one action instead of re-previewing each plan manually
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

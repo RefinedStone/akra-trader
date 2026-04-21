@@ -57,6 +57,7 @@ import {
   createProviderProvenanceDashboardView,
   createProviderProvenanceExportJob,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy,
   createProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
   createProviderProvenanceSchedulerNarrativeGovernancePlan,
   createProviderProvenanceSchedulerNarrativeRegistryEntry,
@@ -113,6 +114,7 @@ import {
   revokeRunSurfaceCollectionQueryBuilderServerReplayLinkAlias,
   runProviderProvenanceSchedulerNarrativeGovernancePlanBatchAction,
   runProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogBulkGovernance,
+  stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   runDueProviderProvenanceScheduledReports,
   runProviderProvenanceScheduledReport,
   updateProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
@@ -324,6 +326,7 @@ import type {
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePlanBatchResult,
+  ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogAuditRecord,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisionEntry,
@@ -524,6 +527,30 @@ function getProviderProvenanceSchedulerNarrativeGovernanceQueueState(
   return "completed";
 }
 
+function formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(
+  steps: ProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyStep[],
+) {
+  if (!steps.length) {
+    return "No reusable hierarchy captured.";
+  }
+  return `${steps.length} step(s): ${steps
+    .map((step) => `${formatWorkflowToken(step.item_type)} ${step.item_ids.length}`)
+    .join(" · ")}`;
+}
+
+function formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(
+  plan: Pick<
+    ProviderProvenanceSchedulerNarrativeGovernancePlan,
+    "hierarchy_position" | "hierarchy_total" | "hierarchy_name"
+  >,
+) {
+  if (!plan.hierarchy_total) {
+    return null;
+  }
+  const label = `${plan.hierarchy_position ?? 1} of ${plan.hierarchy_total}`;
+  return plan.hierarchy_name ? `${plan.hierarchy_name} · ${label}` : label;
+}
+
 function isProviderProvenanceSchedulerAlertCategory(category?: string | null) {
   return category === "scheduler_lag" || category === "scheduler_failure";
 }
@@ -708,16 +735,18 @@ type ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
   approval_lane: string;
   approval_priority: string;
   policy_template_id: string;
+  policy_catalog_id: string;
 };
 
 const defaultProviderProvenanceSchedulerNarrativeGovernanceQueueFilter:
   ProviderProvenanceSchedulerNarrativeGovernanceQueueFilterState = {
     queue_state: ALL_FILTER_VALUE,
-    item_type: ALL_FILTER_VALUE,
-    approval_lane: ALL_FILTER_VALUE,
-    approval_priority: ALL_FILTER_VALUE,
-    policy_template_id: ALL_FILTER_VALUE,
-  };
+  item_type: ALL_FILTER_VALUE,
+  approval_lane: ALL_FILTER_VALUE,
+  approval_priority: ALL_FILTER_VALUE,
+  policy_template_id: ALL_FILTER_VALUE,
+  policy_catalog_id: ALL_FILTER_VALUE,
+};
 
 type ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditFilterState = {
   policy_template_id: string;
@@ -3723,6 +3752,12 @@ export default function App() {
           if (
             providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id !== ALL_FILTER_VALUE
             && (entry.policy_template_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_template_id
+          ) {
+            return false;
+          }
+          if (
+            providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id !== ALL_FILTER_VALUE
+            && (entry.policy_catalog_id ?? "") !== providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id
           ) {
             return false;
           }
@@ -7394,6 +7429,7 @@ export default function App() {
       approval_lane: catalog.approval_lane || ALL_FILTER_VALUE,
       approval_priority: catalog.approval_priority || ALL_FILTER_VALUE,
       policy_template_id: catalog.default_policy_template_id ?? ALL_FILTER_VALUE,
+      policy_catalog_id: catalog.catalog_id,
     });
     if (catalog.item_type_scope !== "registry" && catalog.default_policy_template_id) {
       setProviderProvenanceSchedulerNarrativeTemplateGovernancePolicyTemplateId(
@@ -7411,6 +7447,158 @@ export default function App() {
     setProviderProvenanceWorkspaceFeedback(
       `Applied governance policy catalog ${catalog.name} to the approval queue and governance defaults.`,
     );
+  }
+
+  function buildProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps() {
+    const steps: Array<{
+      itemType: "template" | "registry";
+      itemIds: string[];
+      namePrefix?: string;
+      nameSuffix?: string;
+      descriptionAppend?: string;
+      queryPatch?: Record<string, unknown>;
+      layoutPatch?: Record<string, unknown>;
+      templateId?: string;
+      clearTemplateLink?: boolean;
+    }> = [];
+    const templateQueryPatch = buildProviderProvenanceSchedulerNarrativeTemplateBulkQueryPatch();
+    if (
+      selectedProviderProvenanceSchedulerNarrativeTemplateIds.length
+      && (
+        providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix
+        || providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_suffix
+        || providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append.trim()
+        || templateQueryPatch
+      )
+    ) {
+      steps.push({
+        itemType: "template",
+        itemIds: selectedProviderProvenanceSchedulerNarrativeTemplateIds,
+        ...(providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix
+          ? { namePrefix: providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix }
+          : {}),
+        ...(providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_suffix
+          ? { nameSuffix: providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_suffix }
+          : {}),
+        ...(providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append.trim()
+          ? { descriptionAppend: providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append.trim() }
+          : {}),
+        ...(templateQueryPatch ? { queryPatch: templateQueryPatch } : {}),
+      });
+    }
+    const registryQueryPatch = buildProviderProvenanceSchedulerNarrativeRegistryBulkQueryPatch();
+    const registryLayoutPatch = buildProviderProvenanceSchedulerNarrativeRegistryBulkLayoutPatch();
+    const registryTemplateId =
+      providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+      && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id !== CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE
+        ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id
+        : undefined;
+    const clearRegistryTemplateLink =
+      providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id === CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE;
+    if (
+      selectedProviderProvenanceSchedulerNarrativeRegistryIds.length
+      && (
+        providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix
+        || providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_suffix
+        || providerProvenanceSchedulerNarrativeRegistryBulkDraft.description_append.trim()
+        || registryQueryPatch
+        || registryLayoutPatch
+        || registryTemplateId
+        || clearRegistryTemplateLink
+      )
+    ) {
+      steps.push({
+        itemType: "registry",
+        itemIds: selectedProviderProvenanceSchedulerNarrativeRegistryIds,
+        ...(providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix
+          ? { namePrefix: providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix }
+          : {}),
+        ...(providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_suffix
+          ? { nameSuffix: providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_suffix }
+          : {}),
+        ...(providerProvenanceSchedulerNarrativeRegistryBulkDraft.description_append.trim()
+          ? { descriptionAppend: providerProvenanceSchedulerNarrativeRegistryBulkDraft.description_append.trim() }
+          : {}),
+        ...(registryQueryPatch ? { queryPatch: registryQueryPatch } : {}),
+        ...(registryLayoutPatch ? { layoutPatch: registryLayoutPatch } : {}),
+        ...(registryTemplateId ? { templateId: registryTemplateId } : {}),
+        ...(clearRegistryTemplateLink ? { clearTemplateLink: true } : {}),
+      });
+    }
+    return steps;
+  }
+
+  async function captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyForCatalog(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    if (catalog.status !== "active") {
+      setProviderProvenanceWorkspaceFeedback("Restore the governance policy catalog before capturing a reusable hierarchy.");
+      return;
+    }
+    const hierarchySteps = buildProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchySteps();
+    if (!hierarchySteps.length) {
+      setProviderProvenanceWorkspaceFeedback(
+        "Select template or registry governance updates first so the policy catalog can capture a reusable hierarchy.",
+      );
+      return;
+    }
+    try {
+      const updated = await captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy({
+        catalogId: catalog.catalog_id,
+        hierarchySteps,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_hierarchy_capture_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      if (selectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogId === catalog.catalog_id) {
+        const history = await listProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogRevisions(
+          catalog.catalog_id,
+        );
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistory(history);
+        setProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHistoryError(null);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `Captured reusable hierarchy on governance policy catalog ${updated.name}. ${formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(updated.hierarchy_steps)}`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog hierarchy capture failed: ${(error as Error).message}`,
+      );
+    }
+  }
+
+  async function stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(
+    catalog: ProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog,
+  ) {
+    if (!catalog.hierarchy_steps.length) {
+      setProviderProvenanceWorkspaceFeedback("Capture a reusable hierarchy on this governance policy catalog before staging it.");
+      return;
+    }
+    try {
+      const result = await stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog({
+        catalogId: catalog.catalog_id,
+        actorTabId: comparisonHistoryTabIdentity.tabId,
+        actorTabLabel: comparisonHistoryTabIdentity.label,
+        reason: "scheduler_narrative_governance_policy_catalog_stage_from_control_room",
+      });
+      await loadProviderProvenanceWorkspaceRegistry();
+      setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+        ...current,
+        queue_state: ALL_FILTER_VALUE,
+        policy_catalog_id: catalog.catalog_id,
+      }));
+      if (result.plans.length) {
+        setSelectedProviderProvenanceSchedulerNarrativeGovernancePlanId(result.plans[0].plan_id);
+      }
+      setProviderProvenanceWorkspaceFeedback(
+        `${result.summary} Selected queue filter now follows policy catalog ${catalog.name}.`,
+      );
+    } catch (error) {
+      setProviderProvenanceWorkspaceFeedback(
+        `Governance policy catalog staging failed: ${(error as Error).message}`,
+      );
+    }
   }
 
   function editProviderProvenanceSchedulerNarrativeGovernancePolicyCatalog(
@@ -10983,6 +11171,9 @@ export default function App() {
                                                 <p className="run-lineage-symbol-copy">
                                                   {formatWorkflowToken(catalog.status)} · {catalog.revision_count} revision(s) · updated {formatTimestamp(catalog.updated_at)}
                                                 </p>
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(catalog.hierarchy_steps)}
+                                                </p>
                                               </td>
                                               <td>
                                                 <strong>{catalog.default_policy_template_name ?? "No default template"}</strong>
@@ -11007,6 +11198,26 @@ export default function App() {
                                                     type="button"
                                                   >
                                                     Apply catalog
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={catalog.status !== "active"}
+                                                    onClick={() => {
+                                                      void captureProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchyForCatalog(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Capture hierarchy
+                                                  </button>
+                                                  <button
+                                                    className="ghost-button"
+                                                    disabled={catalog.status !== "active" || !catalog.hierarchy_steps.length}
+                                                    onClick={() => {
+                                                      void stageProviderProvenanceSchedulerNarrativeGovernancePolicyCatalogHierarchy(catalog);
+                                                    }}
+                                                    type="button"
+                                                  >
+                                                    Stage queue
                                                   </button>
                                                   <button
                                                     className="ghost-button"
@@ -11090,6 +11301,9 @@ export default function App() {
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     {formatWorkflowToken(entry.status)} · {formatWorkflowToken(entry.approval_lane)} / {formatWorkflowToken(entry.approval_priority)}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(entry.hierarchy_steps)}
                                                   </p>
                                                 </td>
                                                 <td>
@@ -11176,6 +11390,8 @@ export default function App() {
                                             <option value={ALL_FILTER_VALUE}>All actions</option>
                                             <option value="created">Created</option>
                                             <option value="updated">Updated</option>
+                                            <option value="hierarchy_captured">Hierarchy captured</option>
+                                            <option value="staged">Staged</option>
                                             <option value="deleted">Deleted</option>
                                             <option value="restored">Restored</option>
                                           </select>
@@ -11257,6 +11473,9 @@ export default function App() {
                                                   </p>
                                                   <p className="run-lineage-symbol-copy">
                                                     revision {entry.revision_id ?? "n/a"}{entry.source_revision_id ? ` · from ${shortenIdentifier(entry.source_revision_id, 10)}` : ""}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    {formatProviderProvenanceSchedulerNarrativeGovernanceHierarchySummary(entry.hierarchy_steps)}
                                                   </p>
                                                 </td>
                                                 <td>
@@ -12721,6 +12940,29 @@ export default function App() {
                                         ))}
                                       </select>
                                     </label>
+                                    <label>
+                                      <span>Policy catalog</span>
+                                      <select
+                                        onChange={(event) =>
+                                          setProviderProvenanceSchedulerNarrativeGovernanceQueueFilter((current) => ({
+                                            ...current,
+                                            policy_catalog_id:
+                                              event.target.value === ""
+                                                ? ""
+                                                : event.target.value || ALL_FILTER_VALUE,
+                                          }))
+                                        }
+                                        value={providerProvenanceSchedulerNarrativeGovernanceQueueFilter.policy_catalog_id}
+                                      >
+                                        <option value={ALL_FILTER_VALUE}>All policy catalogs</option>
+                                        <option value="">No policy catalog</option>
+                                        {providerProvenanceSchedulerNarrativeGovernancePolicyCatalogs.map((entry) => (
+                                          <option key={entry.catalog_id} value={entry.catalog_id}>
+                                            {entry.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
                                   </div>
                                   {providerProvenanceSchedulerNarrativeGovernancePlansLoading ? (
                                     <p className="empty-state">Loading governance plans…</p>
@@ -12781,8 +13023,18 @@ export default function App() {
                                                 {plan.created_by_tab_label ?? plan.created_by_tab_id ?? "unknown tab"} · {formatTimestamp(plan.updated_at)}
                                               </p>
                                               <p className="run-lineage-symbol-copy">
-                                                {formatWorkflowToken(plan.approval_lane)} · {formatWorkflowToken(plan.approval_priority)}{plan.policy_template_name ? ` · ${plan.policy_template_name}` : ""}
+                                                {formatWorkflowToken(plan.approval_lane)} · {formatWorkflowToken(plan.approval_priority)}{plan.policy_template_name ? ` · ${plan.policy_template_name}` : ""}{plan.policy_catalog_name ? ` · ${plan.policy_catalog_name}` : ""}
                                               </p>
+                                              {formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(plan) ? (
+                                                <p className="run-lineage-symbol-copy">
+                                                  {formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(plan)}
+                                                </p>
+                                              ) : null}
+                                              {plan.policy_catalog_name ? (
+                                                <p className="run-lineage-symbol-copy">
+                                                  Source catalog {plan.policy_catalog_name}
+                                                </p>
+                                              ) : null}
                                             </td>
                                             <td>
                                               <strong>{formatProviderProvenanceSchedulerNarrativeGovernancePlanSummary(plan)}</strong>
@@ -12825,12 +13077,20 @@ export default function App() {
                                           {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_template_name
                                             ? ` · ${selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_template_name}`
                                             : ""}{" "}
+                                          {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_catalog_name
+                                            ? ` · ${selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_catalog_name}`
+                                            : ""}{" "}
                                           · {" "}
                                           Approval {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.approved_at) : "pending"} · {" "}
                                           Apply {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.applied_at) : "not applied"} · {" "}
                                           Rollback {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at ? formatTimestamp(selectedProviderProvenanceSchedulerNarrativeGovernancePlan.rolled_back_at) : "not rolled back"}
                                         </span>
                                       </div>
+                                      {formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(selectedProviderProvenanceSchedulerNarrativeGovernancePlan) ? (
+                                        <p className="run-lineage-symbol-copy">
+                                          Hierarchy: {formatProviderProvenanceSchedulerNarrativeGovernancePlanHierarchyPosition(selectedProviderProvenanceSchedulerNarrativeGovernancePlan)}
+                                        </p>
+                                      ) : null}
                                       {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_guidance ? (
                                         <p className="run-lineage-symbol-copy">
                                           Guidance: {selectedProviderProvenanceSchedulerNarrativeGovernancePlan.policy_guidance}
