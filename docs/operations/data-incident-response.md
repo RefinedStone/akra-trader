@@ -81,6 +81,9 @@ unclear dataset lineage.
 - the same scheduler narrative workspace now also has bulk governance controls, so shift leads
   can review, delete, or restore multiple saved templates and boards during cleanup without
   repeating one-by-one actions
+- that bulk governance flow now also supports advanced batch edits for metadata, query filters,
+  registry template links, and board layout flags, so the saved scheduler review layer can be
+  re-aligned during incident handoff without reopening each entry individually
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

@@ -697,11 +697,15 @@ export async function deleteProviderProvenanceSchedulerNarrativeTemplate(params:
 }
 
 export async function bulkGovernProviderProvenanceSchedulerNarrativeTemplates(params: {
-  action: "delete" | "restore";
+  action: "delete" | "restore" | "update";
   templateIds: string[];
   actorTabId?: string;
   actorTabLabel?: string;
   reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
 }) {
   return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
     "/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
@@ -713,6 +717,10 @@ export async function bulkGovernProviderProvenanceSchedulerNarrativeTemplates(pa
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix?.trim() ? { name_prefix: params.namePrefix.trim() } : {}),
+        ...(params.nameSuffix?.trim() ? { name_suffix: params.nameSuffix.trim() } : {}),
+        ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
+        ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
       }),
     },
   );
@@ -856,11 +864,18 @@ export async function deleteProviderProvenanceSchedulerNarrativeRegistryEntry(pa
 }
 
 export async function bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries(params: {
-  action: "delete" | "restore";
+  action: "delete" | "restore" | "update";
   registryIds: string[];
   actorTabId?: string;
   actorTabLabel?: string;
   reason?: string;
+  namePrefix?: string;
+  nameSuffix?: string;
+  descriptionAppend?: string;
+  queryPatch?: Record<string, unknown>;
+  layoutPatch?: Record<string, unknown>;
+  templateId?: string;
+  clearTemplateLink?: boolean;
 }) {
   return fetchJson<ProviderProvenanceSchedulerNarrativeBulkGovernanceResult>(
     "/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
@@ -872,6 +887,13 @@ export async function bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntr
         ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
         ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
         ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+        ...(params.namePrefix?.trim() ? { name_prefix: params.namePrefix.trim() } : {}),
+        ...(params.nameSuffix?.trim() ? { name_suffix: params.nameSuffix.trim() } : {}),
+        ...(params.descriptionAppend?.trim() ? { description_append: params.descriptionAppend.trim() } : {}),
+        ...(params.queryPatch ? { query_patch: params.queryPatch } : {}),
+        ...(params.layoutPatch ? { layout_patch: params.layoutPatch } : {}),
+        ...(params.templateId?.trim() ? { template_id: params.templateId.trim() } : {}),
+        ...(params.clearTemplateLink ? { clear_template_link: true } : {}),
       }),
     },
   );

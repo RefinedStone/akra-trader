@@ -16509,6 +16509,37 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert bulk_restore_template_payload["applied_count"] == 2
   assert all(item["status"] == "active" for item in bulk_restore_template_payload["results"])
 
+  bulk_update_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "update",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_update",
+      "name_prefix": "Gov / ",
+      "description_append": "bulk-reviewed",
+      "query_patch": {
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "active",
+        "scheduler_alert_narrative_facet": "recurring_occurrences",
+        "window_days": 10,
+        "result_limit": 9,
+      },
+    },
+  )
+  assert bulk_update_template_payload["action"] == "update"
+  assert bulk_update_template_payload["applied_count"] == 2
+  updated_template_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_template_list"],
+    app=app,
+    filters={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert updated_template_list_payload["total"] == 2
+  assert all(item["name"].startswith("Gov / ") for item in updated_template_list_payload["items"])
+  assert all(item["description"].endswith("bulk-reviewed") for item in updated_template_list_payload["items"])
+
   registry_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_create"],
     app=app,
@@ -16670,6 +16701,49 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert bulk_restore_registry_payload["action"] == "restore"
   assert bulk_restore_registry_payload["applied_count"] == 2
   assert all(item["status"] == "active" for item in bulk_restore_registry_payload["results"])
+
+  bulk_update_registry_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_bulk_governance"],
+    app=app,
+    request_payload={
+      "action": "update",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_update",
+      "name_suffix": " / governed",
+      "description_append": "shared",
+      "template_id": template_payload["template_id"],
+      "query_patch": {
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "active",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 11,
+        "result_limit": 7,
+      },
+      "layout_patch": {
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": True,
+      },
+    },
+  )
+  assert bulk_update_registry_payload["action"] == "update"
+  assert bulk_update_registry_payload["applied_count"] == 2
+  updated_registry_list_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_registry_list"],
+    app=app,
+    filters={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_failure",
+      "narrative_facet": "resolved_narratives",
+      "limit": 10,
+    },
+  )
+  assert updated_registry_list_payload["total"] == 2
+  assert all(item["name"].endswith(" / governed") for item in updated_registry_list_payload["items"])
+  assert all(item["template_id"] == template_payload["template_id"] for item in updated_registry_list_payload["items"])
+  assert all(item["layout"]["show_recent_exports"] is True for item in updated_registry_list_payload["items"])
 
   report_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduled_report_create"],

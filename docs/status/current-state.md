@@ -185,6 +185,9 @@ It is not yet a finished live trading product:
 - those same scheduler templates and registry boards now also support bulk governance, so control
   room operators can select, delete, or restore multiple saved review lenses in one workflow
   instead of repeating single-entry maintenance
+- that bulk governance layer now also supports advanced batch edits, so operators can patch saved
+  scheduler narrative names, descriptions, query filters, and shared-board links/layout flags
+  across multiple entries in one pass
 
 ### Operator discipline baseline
 

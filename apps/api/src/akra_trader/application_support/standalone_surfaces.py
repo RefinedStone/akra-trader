@@ -675,6 +675,10 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_template_revision_list":
@@ -752,6 +756,13 @@ def execute_standalone_surface_binding(
         actor_tab_id=resolved_payload.get("actor_tab_id"),
         actor_tab_label=resolved_payload.get("actor_tab_label"),
         reason=resolved_payload.get("reason"),
+        name_prefix=resolved_payload.get("name_prefix"),
+        name_suffix=resolved_payload.get("name_suffix"),
+        description_append=resolved_payload.get("description_append"),
+        query_patch=resolved_payload.get("query_patch"),
+        layout_patch=resolved_payload.get("layout_patch"),
+        template_id=resolved_payload.get("template_id"),
+        clear_template_link=bool(resolved_payload.get("clear_template_link", False)),
       )
     )
   if binding.binding_kind == "operator_provider_provenance_scheduler_narrative_registry_revision_list":

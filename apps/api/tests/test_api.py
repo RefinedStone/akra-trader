@@ -1506,6 +1506,40 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert bulk_restore_templates_payload["applied_count"] == 2
   assert all(item["status"] == "active" for item in bulk_restore_templates_payload["results"])
 
+  bulk_update_templates_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates/bulk-governance",
+    json={
+      "action": "update",
+      "template_ids": [template_payload["template_id"], bulk_template_payload["template_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_template_governance_update",
+      "name_prefix": "Gov / ",
+      "description_append": "bulk-reviewed",
+      "query_patch": {
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "active",
+        "scheduler_alert_narrative_facet": "recurring_occurrences",
+        "window_days": 10,
+        "result_limit": 9,
+      },
+    },
+  )
+  assert bulk_update_templates_response.status_code == 200
+  bulk_update_templates_payload = bulk_update_templates_response.json()
+  assert bulk_update_templates_payload["action"] == "update"
+  assert bulk_update_templates_payload["applied_count"] == 2
+
+  list_updated_templates_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-templates",
+    params={"category": "scheduler_failure", "narrative_facet": "recurring_occurrences", "limit": 10},
+  )
+  assert list_updated_templates_response.status_code == 200
+  list_updated_templates_payload = list_updated_templates_response.json()
+  assert list_updated_templates_payload["total"] == 2
+  assert all(item["name"].startswith("Gov / ") for item in list_updated_templates_payload["items"])
+  assert all(item["description"].endswith("bulk-reviewed") for item in list_updated_templates_payload["items"])
+
   registry_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
     json={
@@ -1669,6 +1703,52 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert bulk_restore_registry_payload["action"] == "restore"
   assert bulk_restore_registry_payload["applied_count"] == 2
   assert all(item["status"] == "active" for item in bulk_restore_registry_payload["results"])
+
+  bulk_update_registry_response = client.post(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry/bulk-governance",
+    json={
+      "action": "update",
+      "registry_ids": [registry_payload["registry_id"], bulk_registry_payload["registry_id"]],
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "bulk_registry_governance_update",
+      "name_suffix": " / governed",
+      "description_append": "shared",
+      "template_id": template_payload["template_id"],
+      "query_patch": {
+        "scheduler_alert_category": "scheduler_failure",
+        "scheduler_alert_status": "active",
+        "scheduler_alert_narrative_facet": "resolved_narratives",
+        "window_days": 11,
+        "result_limit": 7,
+      },
+      "layout_patch": {
+        "show_rollups": True,
+        "show_time_series": False,
+        "show_recent_exports": True,
+      },
+    },
+  )
+  assert bulk_update_registry_response.status_code == 200
+  bulk_update_registry_payload = bulk_update_registry_response.json()
+  assert bulk_update_registry_payload["action"] == "update"
+  assert bulk_update_registry_payload["applied_count"] == 2
+
+  list_updated_registry_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-registry",
+    params={
+      "template_id": template_payload["template_id"],
+      "category": "scheduler_failure",
+      "narrative_facet": "resolved_narratives",
+      "limit": 10,
+    },
+  )
+  assert list_updated_registry_response.status_code == 200
+  list_updated_registry_payload = list_updated_registry_response.json()
+  assert list_updated_registry_payload["total"] == 2
+  assert all(item["name"].endswith(" / governed") for item in list_updated_registry_payload["items"])
+  assert all(item["template_id"] == template_payload["template_id"] for item in list_updated_registry_payload["items"])
+  assert all(item["layout"]["show_recent_exports"] is True for item in list_updated_registry_payload["items"])
 
   report_response = client.post(
     "/api/operator/provider-provenance-analytics/reports",

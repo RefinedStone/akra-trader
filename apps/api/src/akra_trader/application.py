@@ -4611,6 +4611,51 @@ class TradingApplication:
         break
     return tuple(normalized)
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+    value: str | None,
+    *,
+    preserve_outer_spacing: bool = False,
+  ) -> str | None:
+    if not isinstance(value, str):
+      return None
+    stripped = value.strip()
+    if not stripped:
+      return None
+    return value if preserve_outer_spacing else stripped
+
+  def _build_provider_provenance_scheduler_narrative_bulk_template_query(
+    self,
+    current_query: dict[str, Any],
+    query_patch: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    if not isinstance(query_patch, dict) or not query_patch:
+      return current_query
+    merged = deepcopy(current_query)
+    for key in (
+      "scheduler_alert_category",
+      "scheduler_alert_status",
+      "scheduler_alert_narrative_facet",
+      "result_limit",
+      "window_days",
+    ):
+      if key in query_patch:
+        merged[key] = query_patch[key]
+    return self._normalize_provider_provenance_analytics_query_payload(merged)
+
+  def _build_provider_provenance_scheduler_narrative_bulk_registry_layout(
+    self,
+    current_layout: dict[str, Any],
+    layout_patch: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    if not isinstance(layout_patch, dict) or not layout_patch:
+      return current_layout
+    merged = deepcopy(current_layout)
+    for key in ("show_rollups", "show_time_series", "show_recent_exports"):
+      if key in layout_patch:
+        merged[key] = layout_patch[key]
+    return self._normalize_provider_provenance_scheduler_narrative_registry_layout_payload(merged)
+
   def _find_latest_active_provider_provenance_scheduler_narrative_template_revision(
     self,
     template_id: str,
@@ -4630,20 +4675,47 @@ class TradingApplication:
     actor_tab_id: str | None = None,
     actor_tab_label: str | None = None,
     reason: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
   ) -> ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
     normalized_action = action.strip().lower()
-    if normalized_action not in {"delete", "restore"}:
+    if normalized_action not in {"delete", "restore", "update"}:
       raise ValueError("Unsupported scheduler narrative template bulk action.")
     normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(template_ids)
+    normalized_name_prefix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_prefix,
+      preserve_outer_spacing=True,
+    )
+    normalized_name_suffix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_suffix,
+      preserve_outer_spacing=True,
+    )
+    normalized_description_append = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      description_append
+    )
     resolved_reason = (
       reason.strip()
       if isinstance(reason, str) and reason.strip()
       else (
         "scheduler_narrative_template_bulk_deleted"
         if normalized_action == "delete"
-        else "scheduler_narrative_template_bulk_restored"
+        else (
+          "scheduler_narrative_template_bulk_restored"
+          if normalized_action == "restore"
+          else "scheduler_narrative_template_bulk_updated"
+        )
       )
     )
+    if (
+      normalized_action == "update"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(query_patch, dict)
+    ):
+      raise ValueError("No scheduler narrative template bulk update fields were provided.")
     results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
     applied_count = 0
     skipped_count = 0
@@ -4671,7 +4743,7 @@ class TradingApplication:
             actor_tab_label=actor_tab_label,
             reason=resolved_reason,
           )
-        else:
+        elif normalized_action == "restore":
           if current.status != "deleted":
             skipped_count += 1
             results.append(
@@ -4708,6 +4780,58 @@ class TradingApplication:
             actor_tab_label=actor_tab_label,
             reason=resolved_reason,
           )
+        else:
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.template_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Template is deleted; restore it before applying bulk edits.",
+              )
+            )
+            continue
+          updated_name = (
+            f"{normalized_name_prefix or ''}{current.name}{normalized_name_suffix or ''}"
+          )
+          updated_description = (
+            f"{current.description} {normalized_description_append}".strip()
+            if normalized_description_append is not None
+            else current.description
+          )
+          updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+            current.query,
+            query_patch,
+          )
+          if (
+            updated_name == current.name
+            and updated_description == current.description
+            and updated_query == current.query
+          ):
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.template_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Template already matches the requested bulk edits.",
+              )
+            )
+            continue
+          updated = self.update_provider_provenance_scheduler_narrative_template(
+            template_id,
+            name=updated_name,
+            description=updated_description,
+            query=updated_query,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
         applied_count += 1
         results.append(
           ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
@@ -4719,7 +4843,11 @@ class TradingApplication:
             message=(
               "Template deleted."
               if normalized_action == "delete"
-              else "Template restored from the latest active revision."
+              else (
+                "Template restored from the latest active revision."
+                if normalized_action == "restore"
+                else "Template updated with the requested bulk governance patch."
+              )
             ),
           )
         )
@@ -5106,20 +5234,53 @@ class TradingApplication:
     actor_tab_id: str | None = None,
     actor_tab_label: str | None = None,
     reason: str | None = None,
+    name_prefix: str | None = None,
+    name_suffix: str | None = None,
+    description_append: str | None = None,
+    query_patch: dict[str, Any] | None = None,
+    layout_patch: dict[str, Any] | None = None,
+    template_id: str | None = None,
+    clear_template_link: bool = False,
   ) -> ProviderProvenanceSchedulerNarrativeBulkGovernanceResult:
     normalized_action = action.strip().lower()
-    if normalized_action not in {"delete", "restore"}:
+    if normalized_action not in {"delete", "restore", "update"}:
       raise ValueError("Unsupported scheduler narrative registry bulk action.")
     normalized_ids = self._normalize_provider_provenance_scheduler_narrative_bulk_ids(registry_ids)
+    normalized_name_prefix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_prefix,
+      preserve_outer_spacing=True,
+    )
+    normalized_name_suffix = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      name_suffix,
+      preserve_outer_spacing=True,
+    )
+    normalized_description_append = self._normalize_provider_provenance_scheduler_narrative_bulk_text_patch(
+      description_append
+    )
     resolved_reason = (
       reason.strip()
       if isinstance(reason, str) and reason.strip()
       else (
         "scheduler_narrative_registry_bulk_deleted"
         if normalized_action == "delete"
-        else "scheduler_narrative_registry_bulk_restored"
+        else (
+          "scheduler_narrative_registry_bulk_restored"
+          if normalized_action == "restore"
+          else "scheduler_narrative_registry_bulk_updated"
+        )
       )
     )
+    if (
+      normalized_action == "update"
+      and normalized_name_prefix is None
+      and normalized_name_suffix is None
+      and normalized_description_append is None
+      and not isinstance(query_patch, dict)
+      and not isinstance(layout_patch, dict)
+      and template_id is None
+      and not clear_template_link
+    ):
+      raise ValueError("No scheduler narrative registry bulk update fields were provided.")
     results: list[ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult] = []
     applied_count = 0
     skipped_count = 0
@@ -5147,7 +5308,7 @@ class TradingApplication:
             actor_tab_label=actor_tab_label,
             reason=resolved_reason,
           )
-        else:
+        elif normalized_action == "restore":
           if current.status != "deleted":
             skipped_count += 1
             results.append(
@@ -5184,6 +5345,75 @@ class TradingApplication:
             actor_tab_label=actor_tab_label,
             reason=resolved_reason,
           )
+        else:
+          if current.status == "deleted":
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.registry_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Registry is deleted; restore it before applying bulk edits.",
+              )
+            )
+            continue
+          updated_name = (
+            f"{normalized_name_prefix or ''}{current.name}{normalized_name_suffix or ''}"
+          )
+          updated_description = (
+            f"{current.description} {normalized_description_append}".strip()
+            if normalized_description_append is not None
+            else current.description
+          )
+          updated_query = self._build_provider_provenance_scheduler_narrative_bulk_template_query(
+            current.query,
+            query_patch,
+          )
+          updated_layout = self._build_provider_provenance_scheduler_narrative_bulk_registry_layout(
+            current.layout,
+            layout_patch,
+          )
+          updated_template_id = (
+            None
+            if clear_template_link
+            else (
+              template_id.strip()
+              if isinstance(template_id, str) and template_id.strip()
+              else current.template_id
+            )
+          )
+          if (
+            updated_name == current.name
+            and updated_description == current.description
+            and updated_query == current.query
+            and updated_layout == current.layout
+            and updated_template_id == current.template_id
+          ):
+            skipped_count += 1
+            results.append(
+              ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
+                item_id=current.registry_id,
+                item_name=current.name,
+                outcome="skipped",
+                status=current.status,
+                current_revision_id=current.current_revision_id,
+                message="Registry already matches the requested bulk edits.",
+              )
+            )
+            continue
+          updated = self.update_provider_provenance_scheduler_narrative_registry_entry(
+            registry_id,
+            name=updated_name,
+            description=updated_description,
+            query=updated_query,
+            layout=updated_layout,
+            template_id=updated_template_id,
+            actor_tab_id=actor_tab_id,
+            actor_tab_label=actor_tab_label,
+            reason=resolved_reason,
+          )
         applied_count += 1
         results.append(
           ProviderProvenanceSchedulerNarrativeBulkGovernanceItemResult(
@@ -5195,7 +5425,11 @@ class TradingApplication:
             message=(
               "Registry deleted."
               if normalized_action == "delete"
-              else "Registry restored from the latest active revision."
+              else (
+                "Registry restored from the latest active revision."
+                if normalized_action == "restore"
+                else "Registry updated with the requested bulk governance patch."
+              )
             ),
           )
         )

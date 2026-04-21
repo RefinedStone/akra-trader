@@ -279,6 +279,10 @@ class OperatorProviderProvenanceSchedulerNarrativeTemplateBulkGovernanceRequest(
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
 
 
 class OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest(BaseModel):
@@ -320,6 +324,13 @@ class OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest(
   actor_tab_id: str | None = None
   actor_tab_label: str | None = None
   reason: str | None = None
+  name_prefix: str | None = None
+  name_suffix: str | None = None
+  description_append: str | None = None
+  query_patch: dict[str, Any] | None = None
+  layout_patch: dict[str, Any] | None = None
+  template_id: str | None = None
+  clear_template_link: bool = False
 
 
 class OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest(BaseModel):
@@ -379,7 +390,7 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_template_bulk_governance": (
     OperatorProviderProvenanceSchedulerNarrativeTemplateBulkGovernanceRequest,
-    {},
+    {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_template_revision_restore": (
     OperatorProviderProvenanceSchedulerNarrativeTemplateRevisionRestoreRequest,
@@ -399,7 +410,7 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_registry_bulk_governance": (
     OperatorProviderProvenanceSchedulerNarrativeRegistryBulkGovernanceRequest,
-    {},
+    {"exclude_unset": True},
   ),
   "operator_provider_provenance_scheduler_narrative_registry_revision_restore": (
     OperatorProviderProvenanceSchedulerNarrativeRegistryRevisionRestoreRequest,

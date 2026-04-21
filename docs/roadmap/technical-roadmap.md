@@ -130,6 +130,9 @@ creation.
   appending new one-off entries
 - that saved scheduler review layer now also has bulk governance workflow, so operators can clean
   up or reinstate multiple narrative templates and boards without repeating single-item actions
+- the same governance workflow now also supports advanced batch edits, so teams can patch metadata,
+  scheduler query filters, registry template links, and board layout flags across multiple saved
+  scheduler review entries in one step
 
 ### Remaining work
 

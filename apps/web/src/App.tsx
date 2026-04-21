@@ -518,6 +518,38 @@ const defaultProviderProvenanceWorkspaceDraft = {
   description: "",
 };
 
+const KEEP_CURRENT_BULK_GOVERNANCE_VALUE = "__keep_current__";
+const CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE = "__clear_template_link__";
+
+type ProviderProvenanceSchedulerNarrativeBulkToggleValue =
+  | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+  | "enable"
+  | "disable";
+
+type ProviderProvenanceSchedulerNarrativeTemplateBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft: ProviderProvenanceSchedulerNarrativeTemplateBulkDraftState = {
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
+  scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  window_days: "",
+  result_limit: "",
+};
+
 type ProviderProvenanceSchedulerNarrativeRegistryDraftState = {
   name: string;
   description: string;
@@ -528,6 +560,38 @@ const defaultProviderProvenanceSchedulerNarrativeRegistryDraft: ProviderProvenan
   name: "",
   description: "",
   template_id: "",
+};
+
+type ProviderProvenanceSchedulerNarrativeRegistryBulkDraftState = {
+  name_prefix: string;
+  name_suffix: string;
+  description_append: string;
+  scheduler_alert_category: string;
+  scheduler_alert_status: string;
+  scheduler_alert_narrative_facet:
+    | typeof KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    | ProviderProvenanceSchedulerOccurrenceNarrativeFacet;
+  window_days: string;
+  result_limit: string;
+  template_id: string;
+  show_rollups: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+  show_time_series: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+  show_recent_exports: ProviderProvenanceSchedulerNarrativeBulkToggleValue;
+};
+
+const defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft: ProviderProvenanceSchedulerNarrativeRegistryBulkDraftState = {
+  name_prefix: "",
+  name_suffix: "",
+  description_append: "",
+  scheduler_alert_category: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_status: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  scheduler_alert_narrative_facet: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  window_days: "",
+  result_limit: "",
+  template_id: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_rollups: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_time_series: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+  show_recent_exports: KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
 };
 
 type ProviderProvenanceReportDraftState = {
@@ -3005,11 +3069,19 @@ export default function App() {
   );
   const [providerProvenanceSchedulerNarrativeTemplateDraft, setProviderProvenanceSchedulerNarrativeTemplateDraft] =
     useState(defaultProviderProvenanceWorkspaceDraft);
+  const [providerProvenanceSchedulerNarrativeTemplateBulkDraft, setProviderProvenanceSchedulerNarrativeTemplateBulkDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeTemplateBulkDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft,
+    );
   const [editingProviderProvenanceSchedulerNarrativeTemplateId, setEditingProviderProvenanceSchedulerNarrativeTemplateId] =
     useState<string | null>(null);
   const [providerProvenanceSchedulerNarrativeRegistryDraft, setProviderProvenanceSchedulerNarrativeRegistryDraft] =
     useState<ProviderProvenanceSchedulerNarrativeRegistryDraftState>(
       defaultProviderProvenanceSchedulerNarrativeRegistryDraft,
+    );
+  const [providerProvenanceSchedulerNarrativeRegistryBulkDraft, setProviderProvenanceSchedulerNarrativeRegistryBulkDraft] =
+    useState<ProviderProvenanceSchedulerNarrativeRegistryBulkDraftState>(
+      defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft,
     );
   const [editingProviderProvenanceSchedulerNarrativeRegistryId, setEditingProviderProvenanceSchedulerNarrativeRegistryId] =
     useState<string | null>(null);
@@ -3040,7 +3112,7 @@ export default function App() {
   const [selectedProviderProvenanceSchedulerNarrativeTemplateIds, setSelectedProviderProvenanceSchedulerNarrativeTemplateIds] =
     useState<string[]>([]);
   const [providerProvenanceSchedulerNarrativeTemplateBulkAction, setProviderProvenanceSchedulerNarrativeTemplateBulkAction] =
-    useState<"delete" | "restore" | null>(null);
+    useState<"delete" | "restore" | "update" | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeTemplateId, setSelectedProviderProvenanceSchedulerNarrativeTemplateId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeTemplateHistory, setSelectedProviderProvenanceSchedulerNarrativeTemplateHistory] =
@@ -3058,7 +3130,7 @@ export default function App() {
   const [selectedProviderProvenanceSchedulerNarrativeRegistryIds, setSelectedProviderProvenanceSchedulerNarrativeRegistryIds] =
     useState<string[]>([]);
   const [providerProvenanceSchedulerNarrativeRegistryBulkAction, setProviderProvenanceSchedulerNarrativeRegistryBulkAction] =
-    useState<"delete" | "restore" | null>(null);
+    useState<"delete" | "restore" | "update" | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeRegistryId, setSelectedProviderProvenanceSchedulerNarrativeRegistryId] =
     useState<string | null>(null);
   const [selectedProviderProvenanceSchedulerNarrativeRegistryHistory, setSelectedProviderProvenanceSchedulerNarrativeRegistryHistory] =
@@ -6151,6 +6223,105 @@ export default function App() {
     return `${formatWorkflowToken(result.action)} ${label}: ${parts.join(" · ")}.${firstFailure?.message ? ` ${firstFailure.message}` : ""}`;
   }
 
+  function buildProviderProvenanceSchedulerNarrativeTemplateBulkQueryPatch() {
+    const patch: Record<string, unknown> = {};
+    if (
+      providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_category
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_category =
+        providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_category === ALL_FILTER_VALUE
+          ? null
+          : providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_category;
+    }
+    if (
+      providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_status
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_status =
+        providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_status === ALL_FILTER_VALUE
+          ? null
+          : providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_status;
+    }
+    if (
+      providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_narrative_facet
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_narrative_facet =
+        providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_narrative_facet;
+    }
+    if (providerProvenanceSchedulerNarrativeTemplateBulkDraft.window_days.trim()) {
+      const windowDays = Number(providerProvenanceSchedulerNarrativeTemplateBulkDraft.window_days);
+      if (Number.isFinite(windowDays)) {
+        patch.window_days = Math.max(3, Math.min(Math.round(windowDays), 90));
+      }
+    }
+    if (providerProvenanceSchedulerNarrativeTemplateBulkDraft.result_limit.trim()) {
+      const resultLimit = Number(providerProvenanceSchedulerNarrativeTemplateBulkDraft.result_limit);
+      if (Number.isFinite(resultLimit)) {
+        patch.result_limit = Math.max(1, Math.min(Math.round(resultLimit), 50));
+      }
+    }
+    return Object.keys(patch).length ? patch : undefined;
+  }
+
+  function buildProviderProvenanceSchedulerNarrativeRegistryBulkQueryPatch() {
+    const patch: Record<string, unknown> = {};
+    if (
+      providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_category
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_category =
+        providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_category === ALL_FILTER_VALUE
+          ? null
+          : providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_category;
+    }
+    if (
+      providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_status
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_status =
+        providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_status === ALL_FILTER_VALUE
+          ? null
+          : providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_status;
+    }
+    if (
+      providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_narrative_facet
+      !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+    ) {
+      patch.scheduler_alert_narrative_facet =
+        providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_narrative_facet;
+    }
+    if (providerProvenanceSchedulerNarrativeRegistryBulkDraft.window_days.trim()) {
+      const windowDays = Number(providerProvenanceSchedulerNarrativeRegistryBulkDraft.window_days);
+      if (Number.isFinite(windowDays)) {
+        patch.window_days = Math.max(3, Math.min(Math.round(windowDays), 90));
+      }
+    }
+    if (providerProvenanceSchedulerNarrativeRegistryBulkDraft.result_limit.trim()) {
+      const resultLimit = Number(providerProvenanceSchedulerNarrativeRegistryBulkDraft.result_limit);
+      if (Number.isFinite(resultLimit)) {
+        patch.result_limit = Math.max(1, Math.min(Math.round(resultLimit), 50));
+      }
+    }
+    return Object.keys(patch).length ? patch : undefined;
+  }
+
+  function buildProviderProvenanceSchedulerNarrativeRegistryBulkLayoutPatch() {
+    const patch: Record<string, unknown> = {};
+    if (providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_rollups !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE) {
+      patch.show_rollups = providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_rollups === "enable";
+    }
+    if (providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_time_series !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE) {
+      patch.show_time_series = providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_time_series === "enable";
+    }
+    if (providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_recent_exports !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE) {
+      patch.show_recent_exports =
+        providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_recent_exports === "enable";
+    }
+    return Object.keys(patch).length ? patch : undefined;
+  }
+
   async function saveCurrentProviderProvenanceSchedulerNarrativeTemplate() {
     if (!providerProvenanceSchedulerNarrativeTemplateDraft.name.trim()) {
       setProviderProvenanceWorkspaceFeedback("Enter a template name before saving the current scheduler narrative lens.");
@@ -6464,7 +6635,7 @@ export default function App() {
   }
 
   async function runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance(
-    action: "delete" | "restore",
+    action: "delete" | "restore" | "update",
   ) {
     if (!selectedProviderProvenanceSchedulerNarrativeTemplateIds.length) {
       setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative templates first.");
@@ -6482,12 +6653,24 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeTemplateBulkAction(action);
     try {
       const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeTemplateIds];
+      const queryPatch = action === "update"
+        ? buildProviderProvenanceSchedulerNarrativeTemplateBulkQueryPatch()
+        : undefined;
       const result = await bulkGovernProviderProvenanceSchedulerNarrativeTemplates({
         action,
         templateIds: selectedIds,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
         reason: `scheduler_narrative_template_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update" ? providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix : undefined,
+        nameSuffix:
+          action === "update" ? providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_suffix : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append
+            : undefined,
+        queryPatch,
       });
       if (
         action === "delete"
@@ -6508,6 +6691,11 @@ export default function App() {
         setProviderProvenanceSchedulerNarrativeTemplateHistoryError(null);
       }
       setSelectedProviderProvenanceSchedulerNarrativeTemplateIds([]);
+      if (action === "update") {
+        setProviderProvenanceSchedulerNarrativeTemplateBulkDraft(
+          defaultProviderProvenanceSchedulerNarrativeTemplateBulkDraft,
+        );
+      }
       setProviderProvenanceWorkspaceFeedback(
         formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
       );
@@ -6521,7 +6709,7 @@ export default function App() {
   }
 
   async function runProviderProvenanceSchedulerNarrativeRegistryBulkGovernance(
-    action: "delete" | "restore",
+    action: "delete" | "restore" | "update",
   ) {
     if (!selectedProviderProvenanceSchedulerNarrativeRegistryIds.length) {
       setProviderProvenanceWorkspaceFeedback("Select one or more scheduler narrative registry entries first.");
@@ -6539,12 +6727,37 @@ export default function App() {
     setProviderProvenanceSchedulerNarrativeRegistryBulkAction(action);
     try {
       const selectedIds = [...selectedProviderProvenanceSchedulerNarrativeRegistryIds];
+      const queryPatch = action === "update"
+        ? buildProviderProvenanceSchedulerNarrativeRegistryBulkQueryPatch()
+        : undefined;
+      const layoutPatch = action === "update"
+        ? buildProviderProvenanceSchedulerNarrativeRegistryBulkLayoutPatch()
+        : undefined;
       const result = await bulkGovernProviderProvenanceSchedulerNarrativeRegistryEntries({
         action,
         registryIds: selectedIds,
         actorTabId: comparisonHistoryTabIdentity.tabId,
         actorTabLabel: comparisonHistoryTabIdentity.label,
         reason: `scheduler_narrative_registry_bulk_${action}_from_control_room`,
+        namePrefix:
+          action === "update" ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix : undefined,
+        nameSuffix:
+          action === "update" ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_suffix : undefined,
+        descriptionAppend:
+          action === "update"
+            ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.description_append
+            : undefined,
+        queryPatch,
+        layoutPatch,
+        templateId:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id !== KEEP_CURRENT_BULK_GOVERNANCE_VALUE
+          && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id !== CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE
+            ? providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id
+            : undefined,
+        clearTemplateLink:
+          action === "update"
+          && providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id === CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE,
       });
       if (
         action === "delete"
@@ -6565,6 +6778,11 @@ export default function App() {
         setProviderProvenanceSchedulerNarrativeRegistryHistoryError(null);
       }
       setSelectedProviderProvenanceSchedulerNarrativeRegistryIds([]);
+      if (action === "update") {
+        setProviderProvenanceSchedulerNarrativeRegistryBulkDraft(
+          defaultProviderProvenanceSchedulerNarrativeRegistryBulkDraft,
+        );
+      }
       setProviderProvenanceWorkspaceFeedback(
         formatProviderProvenanceSchedulerNarrativeBulkGovernanceFeedback(result),
       );
@@ -9091,6 +9309,163 @@ export default function App() {
                                       </div>
                                     </div>
                                   ) : null}
+                                  {providerProvenanceSchedulerNarrativeTemplates.length ? (
+                                    <div className="provider-provenance-governance-editor">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Advanced bulk edits</strong>
+                                        <p>Apply metadata or scheduler-lens patches to the selected templates in one pass.</p>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Ops / "
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / v2"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="reviewed in shift handoff"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Category</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_category: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_category}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All categories</option>
+                                            <option value="scheduler_lag">scheduler lag</option>
+                                            <option value="scheduler_failure">scheduler failure</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Status</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_status: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_status}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All statuses</option>
+                                            <option value="active">active</option>
+                                            <option value="resolved">resolved</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Facet</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_narrative_facet:
+                                                  event.target.value === "resolved_narratives"
+                                                  || event.target.value === "post_resolution_recovery"
+                                                  || event.target.value === "recurring_occurrences"
+                                                  || event.target.value === "all_occurrences"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.scheduler_alert_narrative_facet}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="all_occurrences">all occurrences</option>
+                                            <option value="resolved_narratives">resolved narratives</option>
+                                            <option value="post_resolution_recovery">post-resolution recovery</option>
+                                            <option value="recurring_occurrences">recurring occurrences</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Window days</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                window_days: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.window_days}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Result limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeTemplateBulkDraft((current) => ({
+                                                ...current,
+                                                result_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeTemplateBulkDraft.result_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <div className="market-data-provenance-history-actions">
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerNarrativeTemplateIds.length || providerProvenanceSchedulerNarrativeTemplateBulkAction !== null}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerNarrativeTemplateBulkGovernance("update");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerNarrativeTemplateBulkAction === "update"
+                                                ? "Applying…"
+                                                : "Apply bulk edit"}
+                                            </button>
+                                          </div>
+                                        </label>
+                                      </div>
+                                    </div>
+                                  ) : null}
                                   {providerProvenanceSchedulerNarrativeTemplatesLoading ? (
                                     <p className="empty-state">Loading scheduler narrative templates…</p>
                                   ) : null}
@@ -9407,6 +9782,242 @@ export default function App() {
                                             ? "Restoring…"
                                             : "Restore selected"}
                                         </button>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  {providerProvenanceSchedulerNarrativeRegistryEntries.length ? (
+                                    <div className="provider-provenance-governance-editor">
+                                      <div className="market-data-provenance-history-head">
+                                        <strong>Advanced bulk edits</strong>
+                                        <p>Apply metadata, query, template-link, or board-layout patches to the selected registries.</p>
+                                      </div>
+                                      <div className="filter-bar">
+                                        <label>
+                                          <span>Name prefix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                name_prefix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="Ops / "
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_prefix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Name suffix</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                name_suffix: event.target.value,
+                                              }))
+                                            }
+                                            placeholder=" / board"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.name_suffix}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Description append</span>
+                                          <input
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                description_append: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="shared governance update"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.description_append}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Category</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_category: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_category}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All categories</option>
+                                            <option value="scheduler_lag">scheduler lag</option>
+                                            <option value="scheduler_failure">scheduler failure</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Status</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_status: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_status}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={ALL_FILTER_VALUE}>All statuses</option>
+                                            <option value="active">active</option>
+                                            <option value="resolved">resolved</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Facet</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                scheduler_alert_narrative_facet:
+                                                  event.target.value === "resolved_narratives"
+                                                  || event.target.value === "post_resolution_recovery"
+                                                  || event.target.value === "recurring_occurrences"
+                                                  || event.target.value === "all_occurrences"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.scheduler_alert_narrative_facet}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="all_occurrences">all occurrences</option>
+                                            <option value="resolved_narratives">resolved narratives</option>
+                                            <option value="post_resolution_recovery">post-resolution recovery</option>
+                                            <option value="recurring_occurrences">recurring occurrences</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Template link</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                template_id: event.target.value,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.template_id}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value={CLEAR_TEMPLATE_LINK_BULK_GOVERNANCE_VALUE}>Clear link</option>
+                                            {providerProvenanceSchedulerNarrativeTemplates
+                                              .filter((entry) => entry.status === "active")
+                                              .map((entry) => (
+                                                <option key={entry.template_id} value={entry.template_id}>
+                                                  {entry.name}
+                                                </option>
+                                              ))}
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Rollups</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                show_rollups:
+                                                  event.target.value === "enable" || event.target.value === "disable"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_rollups}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="enable">Enable</option>
+                                            <option value="disable">Disable</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Time series</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                show_time_series:
+                                                  event.target.value === "enable" || event.target.value === "disable"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_time_series}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="enable">Enable</option>
+                                            <option value="disable">Disable</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Recent exports</span>
+                                          <select
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                show_recent_exports:
+                                                  event.target.value === "enable" || event.target.value === "disable"
+                                                    ? event.target.value
+                                                    : KEEP_CURRENT_BULK_GOVERNANCE_VALUE,
+                                              }))
+                                            }
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.show_recent_exports}
+                                          >
+                                            <option value={KEEP_CURRENT_BULK_GOVERNANCE_VALUE}>Keep current</option>
+                                            <option value="enable">Enable</option>
+                                            <option value="disable">Disable</option>
+                                          </select>
+                                        </label>
+                                        <label>
+                                          <span>Window days</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                window_days: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.window_days}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Result limit</span>
+                                          <input
+                                            inputMode="numeric"
+                                            onChange={(event) =>
+                                              setProviderProvenanceSchedulerNarrativeRegistryBulkDraft((current) => ({
+                                                ...current,
+                                                result_limit: event.target.value,
+                                              }))
+                                            }
+                                            placeholder="keep"
+                                            type="text"
+                                            value={providerProvenanceSchedulerNarrativeRegistryBulkDraft.result_limit}
+                                          />
+                                        </label>
+                                        <label>
+                                          <span>Action</span>
+                                          <div className="market-data-provenance-history-actions">
+                                            <button
+                                              className="ghost-button"
+                                              disabled={!selectedProviderProvenanceSchedulerNarrativeRegistryIds.length || providerProvenanceSchedulerNarrativeRegistryBulkAction !== null}
+                                              onClick={() => {
+                                                void runProviderProvenanceSchedulerNarrativeRegistryBulkGovernance("update");
+                                              }}
+                                              type="button"
+                                            >
+                                              {providerProvenanceSchedulerNarrativeRegistryBulkAction === "update"
+                                                ? "Applying…"
+                                                : "Apply bulk edit"}
+                                            </button>
+                                          </div>
+                                        </label>
                                       </div>
                                     </div>
                                   ) : null}
