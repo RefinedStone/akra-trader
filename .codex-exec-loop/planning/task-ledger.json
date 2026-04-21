@@ -2,743 +2,129 @@
   "version": 1,
   "tasks": [
     {
-      "id": "planning-experiment-os-reference-strategy-typed-override-semantics",
+      "id": "task-b1-dataset-boundary-contract",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Define canonical dataset-boundary contract and rerun validation categories",
+      "description": "Establish the single canonical dataset-boundary contract for rerun validation and classify the validation result categories needed to defend deterministic rerun claims.",
+      "status": "ready",
+      "base_priority": 100,
+      "dynamic_priority_delta": 15,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:00:00+09:00",
+      "source_turn_id": null,
+      "direction_relation_note": "Batch 1 first slice from the execution board and explicitly called out as the immediate next step in the latest main-session reply.",
+      "priority_reason": "This is the clearest next executable gate because later lineage and experiment tasks rely on a stable rerun-boundary contract."
+    },
+    {
+      "id": "task-b1-lineage-mismatch-taxonomy",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Classify lineage mismatches and define operator-visible summary surface",
+      "description": "Replace generic drift handling with a lineage mismatch taxonomy and the normalized summary surface needed to expose mismatch meaning to operators.",
+      "status": "proposed",
+      "base_priority": 92,
+      "dynamic_priority_delta": 8,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:00:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-dataset-boundary-contract"
+      ],
+      "direction_relation_note": "Directly follows the first Batch 1 slice in the execution board and closes the second immediate gap in the data-trust direction.",
+      "priority_reason": "Should start right after the canonical boundary contract because mismatch classes depend on what counts as the authoritative boundary."
+    },
+    {
+      "id": "task-b1-lineage-query-surfaces",
+      "direction_id": "data-trust-and-lineage",
+      "title": "Add ingestion-job history and normalized lineage query surfaces",
+      "description": "Plan the follow-up slice that makes ingestion-job history and normalized lineage queries first-class so operators can inspect provenance without payload-heavy or shell-based workflows.",
+      "status": "proposed",
+      "base_priority": 84,
+      "dynamic_priority_delta": 4,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-21T00:00:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-dataset-boundary-contract",
+        "task-b1-lineage-mismatch-taxonomy"
+      ],
+      "direction_relation_note": "Completes the remaining immediate gap named in the data-trust direction detail doc and Batch 1 execution board.",
+      "priority_reason": "This is still Batch 1 work, but it should follow the contract and taxonomy so the normalized query surface reflects the final lineage model."
+    },
+    {
+      "id": "task-b1-durable-strategy-registry",
       "direction_id": "experiment-os",
-      "title": "Advertise typed override schemas for reference strategy semantics",
-      "description": "Deepen reference strategy `catalog_semantics` so reference delegates can publish parameter-level typed override schema and contract details instead of stopping at the current high-level execution model and parameter contract summary.",
+      "title": "Design durable strategy registry schema and repository contract",
+      "description": "Move custom strategy registration from process-local state into a durable registry contract with queryable records, repository semantics, and restart-safe identity.",
       "status": "proposed",
       "base_priority": 90,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says reference strategies still do not advertise parameter-level typed override schema. This is concrete follow-up work, but propagating the already-available catalog semantics into run provenance is the stronger immediate queue head.",
-      "depends_on": [
-        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
-      ],
+      "dynamic_priority_delta": 6,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:35:00Z",
+      "updated_at": "2026-04-21T00:00:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "Improves experiment-os strategy catalog fidelity by making reference delegate semantics precise enough for operators and downstream diff tooling to inspect override contracts at parameter level."
+      "depends_on": [
+        "task-b1-dataset-boundary-contract"
+      ],
+      "direction_relation_note": "This is the first Experiment OS slice in the fixed Batch 1 order from the execution board and latest main-session reply.",
+      "priority_reason": "It is the registry foundation for lifecycle durability, promotion state, and normalized experiment queries."
     },
     {
-      "id": "planning-experiment-os-imported-strategy-domain-vocabulary-extraction",
+      "id": "task-b1-strategy-lifecycle-durability",
       "direction_id": "experiment-os",
-      "title": "Extract imported strategy domain vocabulary into catalog semantics",
-      "description": "Move imported strategy semantics beyond registration metadata and advertised schema shape by extracting or deriving module-level domain vocabulary that can describe strategy intent for imported classes with less manual operator interpretation.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says imported strategy semantics still do not automatically extract module-level domain vocabulary. This is valid follow-up, but it should stay behind run-provenance propagation and reference override-schema depth because those are more direct continuations of the shipped catalog-semantics work.",
-      "depends_on": [
-        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Pushes experiment-os imported strategy support beyond structural schema hints toward richer strategy-intent semantics that can feed preset review and operator decision surfaces."
-    },
-    {
-      "id": "planning-experiment-os-launch-form-strategy-semantic-help",
-      "direction_id": "experiment-os",
-      "title": "Surface strategy semantics and provenance history in launch and preset selection flows",
-      "description": "Reuse shipped strategy semantic metadata and run provenance history inside the launch form and preset picker so operators can see strategy-aware helper copy while editing bundles and can reverse-reference prior run semantic context when deciding what to launch next.",
-      "status": "proposed",
-      "base_priority": 90,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says launch form and preset picker flows still do not reverse-reference run provenance semantic history. This remains concrete follow-up work, but extending the just-shipped run semantics into comparison and artifact review surfaces is the stronger immediate queue head.",
-      "depends_on": [
-        "planning-experiment-os-strategy-catalog-semantic-metadata-for-imported-strategies"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:51:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Improves experiment-os operator guidance by moving strategy-aware parameter meaning earlier in the workflow, where preset bundles are authored rather than only reviewed after revisions."
-    },
-    {
-      "id": "planning-experiment-os-preset-domain-value-formatting",
-      "direction_id": "experiment-os",
-      "title": "Render preset diff values with domain formats for percentages, ratios, and bars",
-      "description": "Format raw preset diff values using domain-aware renderers such as percent, ratio, leverage, bars, and timeframe displays so semantic labels are paired with readable before and after values instead of only raw primitives.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says percentage, ratio, and bars-style formatting is still missing. This is executable follow-up work, but the strategy-specific semantic vocabulary pass is the clearer next queue head because it improves meaning interpretation before display-format polish.",
-      "depends_on": [
-        "planning-experiment-os-preset-domain-semantic-labeling"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:10:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Improves experiment-os preset diff readability by pairing semantic intent labels with operator-friendly value presentation for common trading parameter units."
-    },
-    {
-      "id": "planning-experiment-os-enrich-preset-schema-metadata",
-      "direction_id": "experiment-os",
-      "title": "Enrich preset schema metadata with enum, unit, maximum, and description",
-      "description": "Extend backend preset or strategy schema payloads so parameter metadata consistently includes richer fields such as enum, unit, maximum, and description, reducing how much preset diff semantics and hints must infer from key-token heuristics alone.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says backend schema metadata is still sparse and that richer enum, unit, maximum, and description fields would make semantic labels more accurate. This is a concrete cross-stack follow-up, but the strategy-specific frontend interpretation pass is the more immediate next queued task.",
-      "depends_on": [
-        "planning-experiment-os-preset-domain-semantic-labeling"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T10:10:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Strengthens experiment-os preset review fidelity by making richer schema semantics durable backend data instead of mostly frontend inference."
-    },
-    {
-      "id": "planning-experiment-os-preset-formal-nested-schema-interpretation",
-      "direction_id": "experiment-os",
-      "title": "Interpret nested preset parameter objects with formal schema traversal",
-      "description": "Replace the current top-level leaf-path schema attachment with formal nested schema traversal so object-valued preset parameters inherit the correct child schema meaning, validation context, and semantic labels throughout revision, restore, and draft-conflict diff rendering.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says nested parameter objects still do not receive formal schema interpretation and currently borrow only top-level parameter schema on leaf diffs. This is concrete follow-up work, but domain semantic labeling is the more immediate queue head because it improves operator meaning across the existing diff path before deeper schema traversal work.",
-      "depends_on": [
-        "planning-experiment-os-preset-domain-semantic-labeling"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:55:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Closes the remaining experiment-os preset diff correctness gap for nested parameter shapes so semantic labels and schema-derived restore guidance stay accurate beyond flat top-level bundles."
-    },
-    {
-      "id": "planning-experiment-os-preset-array-diff-fidelity",
-      "direction_id": "experiment-os",
-      "title": "Deepen preset semantic diffs for array reorder and duplicate tracking",
-      "description": "Build beyond the current primitive-list added or removed summary so preset semantic diffs can distinguish reorder-only changes, duplicate count drift, and other array-shape changes that currently collapse into coarse list summaries.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly notes that array diffs still stop at primitive-list summaries and do not yet track reorder or duplicate semantics. This is concrete follow-up work, but schema-aware field meaning is the more important next queue head because it improves every diff review rather than a narrower subset of array-heavy presets.",
-      "depends_on": [
-        "planning-experiment-os-preset-semantic-parameter-diff"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:40:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Improves experiment-os preset change review fidelity by making list-like parameter edits distinguish structural churn from real value additions or removals."
-    },
-    {
-      "id": "planning-experiment-os-preset-object-level-diff-summary",
-      "direction_id": "experiment-os",
-      "title": "Add object-level summary cards on top of leaf-path preset diffs",
-      "description": "Complement the new leaf-path semantic comparison output with object-level summary cards for nested parameter additions, removals, and grouped edits so large preset diffs stay scannable before operators drill into individual leaves.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says nested object changes are now expanded to leaf paths but still lack object-level summary cards. That is valid executable follow-up, but it should stay behind schema-aware meaning and richer array semantics because those gaps affect correctness before summary polish.",
-      "depends_on": [
-        "planning-experiment-os-preset-semantic-parameter-diff"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:40:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os preset comparisons readable at scale by layering grouped object summaries over the now-correct leaf-path semantic diff output."
-    },
-    {
-      "id": "planning-experiment-os-preset-draft-persistence-and-cross-session-restore-guard",
-      "direction_id": "experiment-os",
-      "title": "Persist preset drafts across sessions and extend restore guards beyond the active form",
-      "description": "Build on the new restore conflict preview by persisting preset edit drafts per preset across reloads or sessions, then surface restore-conflict guards against those durable draft snapshots so unsaved work is not only protected when the current form state happens to still be mounted.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says draft conflict handling currently covers only the active preset form and does not persist drafts across sessions. That is a concrete follow-up, but semantic-aware diffing is the more immediate continuation of the just-shipped structured comparison work.",
-      "depends_on": [
-        "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends preset restore safety from the mounted control-room form into durable operator workflows where draft work may survive page reloads or session breaks."
-    },
-    {
-      "id": "planning-experiment-os-preset-restore-post-action-polish",
-      "direction_id": "experiment-os",
-      "title": "Polish preset restore completion with focus and scroll handoff",
-      "description": "Finish the preset restore workflow with post-restore focus, scroll, or equivalent completion cues that carry the operator directly to the fields or sections affected by the restored revision, reducing disorientation after confirmation succeeds.",
-      "status": "proposed",
-      "base_priority": 86,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out missing auto focus or scroll behavior after restore. This is valid executable polish, but it should stay behind semantic-aware diffing and durable draft protection because those gaps are more important to safe review.",
-      "depends_on": [
-        "planning-experiment-os-preset-revision-structured-diff-and-draft-guard"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Improves operator trust in mutable preset workflows by making restore completion states legible and navigable immediately after a revision is applied."
-    },
-    {
-      "id": "planning-experiment-os-preset-revision-filter-persistence",
-      "direction_id": "experiment-os",
-      "title": "Persist preset revision filters in URL or durable view state",
-      "description": "Promote the new revision search and action filters from local-only UI state into URL-backed or otherwise durable view state so operators can reload, share, or navigate long preset timelines without losing their revision-history slice.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Revision filter persistence remains a useful preset-history follow-up, but the latest main-session reply points to more immediate restore-polish work first: semantic-aware parameter diffs, broader draft protection, and post-restore navigation cues.",
-      "depends_on": [
-        "planning-experiment-os-preset-revision-diff-model"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends the preset revision control-room workflow from session-local convenience into a durable operator navigation surface that supports revisit and sharing."
-    },
-    {
-      "id": "planning-experiment-os-preset-lifecycle-mode-gating",
-      "direction_id": "experiment-os",
-      "title": "Gate launch modes using preset lifecycle stage",
-      "description": "Turn preset lifecycle stages into enforceable launch policy so benchmark, sandbox, paper, or later live-adjacent modes can require the right preset stage instead of treating lifecycle as display-only metadata with only archived hard-blocked.",
-      "status": "proposed",
-      "base_priority": 91,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Lifecycle stage gating is still a valid experiment-os follow-up, but the latest main-session reply gives a more immediate concrete continuation in preset revision UX hardening: diff visibility, restore confirmation, and revision filtering.",
-      "depends_on": [
-        "planning-experiment-os-preset-bundle-management"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:05:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Advances the experiment-os goal that lifecycle and promotion state drive real operator decisions and execution boundaries rather than remaining informative metadata."
-    },
-    {
-      "id": "planning-experiment-os-benchmark-pack-model",
-      "direction_id": "experiment-os",
-      "title": "Promote benchmark family metadata into a durable benchmark pack model",
-      "description": "Replace the current run-level benchmark_family string with durable benchmark pack records and selection semantics, and link presets or strategies to those packs and explicit strategy-version pins so benchmark lanes, comparison defaults, and promotion decisions use a first-class experiment model instead of loosely coupled metadata.",
-      "status": "proposed",
-      "base_priority": 91,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Benchmark-pack modeling remains valid, but it is no longer the most immediate follow-up because the latest main-session reply directly enumerates unfinished preset revision UX work that can be executed next.",
-      "depends_on": [
-        "planning-experiment-os-queryable-metadata"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T09:05:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os beyond filterable metadata by making benchmark configuration a durable object that can anchor comparison and promotion workflows."
-    },
-    {
-      "id": "planning-experiment-os-reconcile-legacy-paper-runs-from-sandbox-history",
-      "direction_id": "experiment-os",
-      "title": "Reconcile legacy paper runs that were stored under sandbox history",
-      "description": "Decide how to handle pre-RunMode.PAPER replay history that was persisted as sandbox without mode metadata, then add the chosen migration, annotation, or operator-facing caveat so legacy paper runs do not silently disappear or remain misclassified after the storage split.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out that old sandbox-stored paper runs cannot be auto-classified, but the correct migration or disclosure policy still needs operator-product judgment before it should be auto-executed.",
-      "depends_on": [
-        "planning-experiment-os-separate-paper-replay-history-from-sandbox-alias"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Preserves experiment-os trust in run history by making the post-split paper lane honest about legacy ambiguity instead of relying on silent misclassification."
-    },
-    {
-      "id": "planning-operator-trust-paper-replay-audit-and-approval-metadata",
-      "direction_id": "operator-trust-and-discipline",
-      "title": "Attach paper replay audit trail and approval metadata to operator actions",
-      "description": "Add paper-specific operator-event capture, approval or acknowledgement metadata, and control-room visibility for rerun-boundary paper actions so replay decisions leave a durable audit trail instead of only changing run history.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out missing paper-specific audit trail and approval metadata, but the storage-model separation for paper history is the more immediate executable queue head.",
-      "depends_on": [
-        "planning-experiment-os-surface-paper-rerun-boundary-action"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T05:20:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Advances operator trust by making paper replay actions explainable, reviewable, and durable in operator-visible records rather than implicit UI-triggered side effects."
-    },
-    {
-      "id": "planning-experiment-os-cross-mode-rerun-translation-model",
-      "direction_id": "experiment-os",
-      "title": "Model cross-mode reruns as explicit drift or matched translation",
-      "description": "Decide whether rerun-boundary identity should remain mode-specific with explicit drift notes, or whether backtest-to-sandbox and backtest-to-paper replays need a first-class matched-translation model with new provenance semantics and operator wording.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply says current cross-mode drift behavior is intentional but leaves open whether matched translation should be modeled separately, so this remains a valid follow-up that still needs product and provenance-shape judgment.",
-      "depends_on": [
-        "planning-experiment-os-expand-rerun-boundary-workflow-beyond-backtests"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:50:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Clarifies the experiment-os contract for how stored boundaries map across execution lanes, keeping provenance and operator interpretation coherent as replay support expands."
-    },
-    {
-      "id": "planning-experiment-os-rerun-boundary-indexing",
-      "direction_id": "experiment-os",
-      "title": "Make rerun-boundary lookup durable and indexable in SQL storage",
-      "description": "Move rerun_boundary_id and related summary fields out of payload-only filtering into durable SQL summary columns or indexes so common rerun-boundary queries do not depend on in-memory scans as run volume grows.",
-      "status": "proposed",
-      "base_priority": 90,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out payload-scan-based boundary lookup as remaining work, but scope expansion of the rerun flow is the more direct queue-head follow-up before storage optimization.",
-      "depends_on": [
-        "planning-experiment-os-explicit-rerun-from-boundary"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Supports the experiment-os goal of queryable experiment metadata by promoting rerun-boundary access from payload scans to durable storage paths."
-    },
-    {
-      "id": "planning-experiment-os-strategy-lifecycle-registration",
-      "direction_id": "experiment-os",
-      "title": "Make strategy lifecycle and registration durable across restarts",
-      "description": "Replace the current process-local strategy registration behavior with durable strategy records and lifecycle states such as draft, benchmark candidate, sandbox candidate, live candidate, and archived so promotion decisions become queryable product state instead of static metadata.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Gate 1 and Program Phase 1 still require durable lifecycle state, but the latest main-session reply surfaced more immediate rerun workflow and rerun-boundary storage follow-ups ahead of lifecycle work.",
-      "depends_on": [
-        "planning-data-trust-dataset-identity-hardening",
-        "planning-experiment-os-queryable-metadata"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T00:15:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Directly targets the experiment-os success criterion that strategy registration and lifecycle state remain durable and queryable across restarts."
-    },
-    {
-      "id": "planning-runtime-ops-paper-launch-request-surface",
-      "direction_id": "runtime-ops",
-      "title": "Replace replay-shaped paper launch fields with a paper-specific request surface",
-      "description": "Stop reusing sandbox replay request fields such as replay_bars for paper launch priming, and define a paper-specific API contract and UI wording that matches current-snapshot session startup rather than replay semantics.",
+      "title": "Wire durable lifecycle and promotion state into strategy records and filters",
+      "description": "Extend the strategy registry plan with durable lifecycle and promotion records that remain queryable across restart and flow into common experiment filters.",
       "status": "proposed",
       "base_priority": 82,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly calls out that paper launch still reuses replay_bars for its priming window, but worker-session semantics are the more immediate executable follow-up.",
-      "depends_on": [
-        "planning-runtime-ops-separate-paper-execution-from-sandbox-preview-engine"
-      ],
+      "dynamic_priority_delta": 3,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:05:00Z",
+      "updated_at": "2026-04-21T00:00:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps runtime-ops and operator wording coherent by making the paper launch contract reflect paper-session semantics instead of lingering replay terminology."
-    },
-    {
-      "id": "planning-operator-trust-provider-native-remediation-telemetry-mirroring",
-      "direction_id": "operator-trust-and-discipline",
-      "title": "Mirror provider-private remediation phase graphs and native metrics 1:1",
-      "description": "Build on the now-broader provider-managed remediation set through Intercom by deepening the local typed recovery model so provider-authoritative sync, workflow sync, direct polling, typed recovery schemas, native phase graphs, and paging-provider inference can preserve provider-private remediation-engine phase graphs, richer native metrics, and engine-owned state machines 1:1 instead of collapsing them into the current progress or step or attempt or run or message summary shape.",
-      "status": "proposed",
-      "base_priority": 78,
-      "dynamic_priority_delta": -4,
-      "priority_reason": "This remains a valid Program 5 follow-up after the Intercom expansion, but the newly documented global implementation order puts Research Core first and keeps deeper provider-native telemetry mirroring behind the current experiment-os baseline work.",
       "depends_on": [
-        "planning-operator-trust-direct-provider-remediation-endpoint-polling"
+        "task-b1-durable-strategy-registry"
       ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T03:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends operator trust beyond summary telemetry by preserving deeper provider-native remediation semantics once authoritative engine endpoints, typed recovery schemas, workflow sync, phase graphs, and paging-provider inference are already generalized across the current provider set through Intercom."
+      "direction_relation_note": "Matches the lifecycle and promotion durability slice listed after the durable registry in the Batch 1 ordering.",
+      "priority_reason": "Should not be `ready` until the durable registry contract exists, because lifecycle semantics depend on persistent strategy identity."
     },
     {
-      "id": "planning-operator-trust-expand-provider-managed-remediation-beyond-intercom",
-      "direction_id": "operator-trust-and-discipline",
-      "title": "Expand provider-managed remediation coverage beyond Intercom",
-      "description": "Build on the completed PagerDuty, Opsgenie, incident.io, FireHydrant, Rootly, Blameless, xMatters, ServiceNow, Squadcast, BigPanda, Grafana OnCall, Zenduty, Splunk On-Call, Jira Service Management, PagerTree, AlertOps, SIGNL4, iLert, Better Stack, OnPage, All Quiet, Moogsoft, Spike.sh, DutyCalls, IncidentHub, OpsRamp, Resolver, OpenDuty, Cabot, HaloITSM, incidentmanager.io, OneUptime, Squzy, Crises Control, Freshservice, ManageEngine ServiceDesk Plus, SysAid, BMC Helix, SolarWinds Service Desk, TOPdesk, InvGate Service Desk, Freshdesk, HappyFox, Zendesk, Zoho Desk, Help Scout, Kayako, and Intercom adapters by adding at least one more incident provider-managed remediation integration or by extracting a cleaner provider-extension seam, so authoritative recovery-engine polling, workflow sync, typed schema handling, native phase graphs, and lifecycle synchronization do not stop at the current forty-eight providers.",
+      "id": "task-b1-experiment-summary-artifacts",
+      "direction_id": "experiment-os",
+      "title": "Define normalized experiment summary, artifact registry, and export registry model",
+      "description": "Plan the normalized experiment summary model plus artifact and export registry paths so common Experiment OS queries stop depending on payload-only scans.",
       "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": -6,
-      "priority_reason": "The latest main-session reply says the planning baseline is now reconciled and implementation should resume from Research Core first. Another provider-breadth expansion is still executable, but it should stay queued behind experiment-os core work and the subsequent Operations Core and Safe Execution streams described in the updated docs.",
-      "depends_on": [
-        "planning-operator-trust-expand-provider-managed-remediation-beyond-kayako"
-      ],
+      "dynamic_priority_delta": 2,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-19T03:35:00Z",
+      "updated_at": "2026-04-21T00:00:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps operator trust moving toward provider-agnostic recovery ownership, but now as the next implementation stream after the planning baseline is re-aligned to the documented Program mapping and priority rules."
-    },
-    {
-      "id": "planning-guarded-live-venue-native-replace-flow",
-      "direction_id": "guarded-live-execution",
-      "title": "Decide whether guarded-live replace must use venue-native amend semantics",
-      "description": "Evaluate whether the current cancel-plus-new-limit replace flow is sufficient for guarded-live candidacy or whether venue-native atomic amend support is required, then implement the chosen contract with matching audit and operator wording if native amend semantics are mandatory.",
-      "status": "proposed",
-      "base_priority": 76,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply still explicitly calls out venue-native amend flow as unfinished wider live-path coverage after commit 073e0bb, but the richer market-data freshness-policy incident semantics are the clearer immediate queue head because they continue the just-finished durable-incident work directly.",
       "depends_on": [
-        "planning-guarded-live-active-order-management-controls"
+        "task-b1-durable-strategy-registry"
       ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T13:25:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Keeps guarded-live candidacy explicit about whether order replacement semantics must match venue-native amend guarantees before live exposure management is considered complete."
+      "direction_relation_note": "Corresponds to the experiment summary, artifact, and export registry slice called out in the execution board and direction detail doc.",
+      "priority_reason": "This remains immediate Batch 1 work, but it should follow the registry foundation so strategy identity and lifecycle can anchor common query paths."
     },
     {
-      "id": "planning-data-trust-venue-specific-market-data-normalization",
-      "direction_id": "data-trust-and-lineage",
-      "title": "Deepen venue-specific market-data normalization beyond the shared ccxt OHLCV path",
-      "description": "Build on the new multi-venue ccxt market-data wiring by defining the next venue-specific normalization and deeper channel coverage boundaries, so Binance, Coinbase, and Kraken do not all appear equally supported when the current live and sync path is still centered on the shallow shared OHLCV contract.",
-      "status": "proposed",
-      "base_priority": 84,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "The latest main-session reply explicitly says the newly generalized provider layer still relies on a shallow ccxt OHLCV path and lacks deeper venue-specific channels or normalization, but the broader guarded-live alerting and durable delivery gap is the clearer immediate executable queue head.",
-      "depends_on": [
-        "planning-guarded-live-market-data-provider-generalization"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-17T06:20:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Keeps the data-trust direction honest about venue breadth by separating shared ccxt wiring progress from the still-missing exchange-specific normalization and richer ingestion guarantees."
-    },
-    {
-      "id": "planning-intelligence-research-trace-replay-fallback",
-      "direction_id": "intelligence-research-lane",
-      "title": "Keep the LLM lane isolated until trace, replay, and fallback are real features",
-      "description": "Implement the minimum research-lane substrate for prompt versioning, raw trace storage, replay or evaluation hooks, and mandatory deterministic fallback or human review so DecisionEnginePort stops being only an interface skeleton.",
-      "status": "proposed",
-      "base_priority": 72,
-      "dynamic_priority_delta": 0,
-      "priority_reason": "Current-state lists LLM isolation with trace storage, replay, and fallback as Immediate Next Priority 5, but the roadmap treats it as downstream of research-core and runtime-operability foundations.",
-      "depends_on": [
-        "planning-data-trust-dataset-identity-hardening"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-16T19:20:10Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Matches the intelligence-research-lane success criteria that every intelligence run be traceable and blocked from promotion without fallback or review."
-    },
-    {
-      "id": "planning-experiment-os-implement-native-host-receivers-for-manual-gap-picker-haptic-contracts",
+      "id": "task-b1-benchmark-pack-promotion-artifacts",
       "direction_id": "experiment-os",
-      "title": "Implement native host receivers for manual gap-picker haptic contracts",
-      "description": "Carry the now-stable manual gap-window picker haptic contract into the actual host shells by wiring native-side receivers for the `akra-trader:haptic-feedback` envelope and `akraTouchFeedback` handler in each supported container, so the web app's activation feedback path is backed by concrete shell implementations instead of stopping at emitted bridge messages.",
-      "status": "blocked",
-      "base_priority": 89,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "Main session commit 38e4780 finished the in-repo host receiver shim by centralizing the `akra-trader:haptic-feedback` and `akraTouchFeedback` contract in `apps/web/src/touchFeedback.ts`, but the reply also says the actual iOS or Android native wrappers still live outside this repository. Keep the task blocked here until a real native shell project is available to consume the emitted contract.",
-      "depends_on": [
-        "planning-experiment-os-align-manual-gap-window-picker-haptics-to-concrete-host-shell-contracts"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T19:25:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os touch gesture trust from a web-side contract definition into end-to-end shell behavior, which is required before operators inside native containers can rely on the picker's haptic activation feedback."
-    },
-    {
-      "id": "planning-experiment-os-differentiate-touch-hold-feedback-by-cancellation-reason-in-manual-gap-window-picker",
-      "direction_id": "experiment-os",
-      "title": "Differentiate touch hold feedback by cancellation reason in the manual gap-window picker",
-      "description": "Refine the new touch hold-progress feedback so the manual gap-window picker can present different visual or motion outcomes for sweep activation, movement cancellation, and tap completion instead of one shared CSS-duration rail, making the touch interaction explain why the hold did or did not promote into sweep mode.",
+      "title": "Make benchmark-pack and promotion-review artifacts first-class",
+      "description": "Add the follow-up slice that promotes benchmark-pack and promotion-review artifacts from loose payloads into first-class Experiment OS records.",
       "status": "proposed",
-      "base_priority": 85,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply says the hold progress is still CSS-duration based and does not yet vary feedback by touch cancellation reason. That is a valid follow-up, but it is a refinement pass after the more direct platform-feedback gap and may still need a UX choice about which cancellation reasons deserve distinct variants.",
-      "depends_on": [
-        "planning-experiment-os-add-hold-progress-feedback-to-manual-gap-window-picker-touch-sweep"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:20:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os mobile gesture polish moving past generic timing feedback toward reason-aware touch outcomes that better explain whether sweep selection armed, canceled, or resolved as an ordinary tap."
-    },
-    {
-      "id": "planning-experiment-os-decide-whether-manual-gap-picker-open-state-should-restore-after-reload",
-      "direction_id": "experiment-os",
-      "title": "Decide whether manual gap-picker UI state should restore after reload",
-      "description": "Decide whether the ordinary control-room gap-window picker should restore transient UI state such as open or closed visibility and the local range or sweep anchor after reload, or whether only the selected subset should remain durable, so picker persistence behavior is an explicit product contract instead of an incidental local-state detail.",
-      "status": "proposed",
-      "base_priority": 84,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply says the touch drag anchor and hold state remain picker-local gesture state and still do not restore across sessions, alongside the existing open-state question. That persistence gap is real, but it still needs a product decision about which transient picker UI state should survive reload versus stay intentionally ephemeral, so keep it proposed.",
-      "depends_on": [
-        "planning-experiment-os-add-manual-gap-window-picker-outside-conflict-review"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T18:10:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Captures the remaining persistence-contract question around the new manual gap picker so experiment-os workspace behavior stays intentional across reload and resume flows."
-    },
-    {
-      "id": "planning-experiment-os-expand-workspace-conflict-audit-beyond-control-room-browser-state",
-      "direction_id": "experiment-os",
-      "title": "Extend workspace conflict audit beyond control-room browser state",
-      "description": "Expand the new workspace-state audit and resolution pattern beyond the control-room comparison surfaces to other meaningful local browser state that should participate in shared sync metadata, so browser context outside the control room no longer remains entirely outside the manual review contract.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply says browser state outside the control room still does not enter the new audit and resolution flow. That follow-up is valid, but it still needs an operator or product choice about which non-control-room browser state belongs in shared sync and which should stay local-only, so keep it proposed.",
-      "depends_on": [
-        "planning-experiment-os-extend-manual-conflict-review-beyond-comparison-history-panel-preferences"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T02:15:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os operator trust from one control-room workspace-state sync contract into a clearer product boundary for what browser context should be shared, audited, and manually reconciled across tabs."
-    },
-    {
-      "id": "planning-experiment-os-add-portable-or-profile-scoped-sync-for-comparison-history-state",
-      "direction_id": "experiment-os",
-      "title": "Add export/import or profile-scoped retention for comparison history state and audit trails",
-      "description": "Extend the durable comparison history panel beyond device-local browser storage and tab-session audit logs by supporting explicit export or import, profile-scoped sync, or another portable retention contract for comparison history state plus sync or conflict audit trails, so operators can carry curated timelines and their operational context across browser contexts without relying on one localStorage bucket and one sessionStorage scope.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The latest main-session reply explicitly says the new audit trail remains tab-session scoped and still lacks export or import and longer-term retention. That follow-up remains valid, but it still needs a product-shape choice between portable transfer, profile-scoped sync, and retention posture, so keep it proposed behind the now-clear conflict-resolution workflow.",
-      "depends_on": [
-        "planning-experiment-os-add-tab-identity-and-conflict-audit-for-comparison-history-state"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-19T15:55:48Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os comparison-history durability from one browser's local recovery model and one tab's audit scope into a portable or account-scoped operator artifact, which helps comparison review and sync forensics survive beyond one device, profile, or session."
-    },
-    {
-      "id": "planning-experiment-os-decide-whether-to-reconstruct-browser-history-from-persisted-comparison-timeline",
-      "direction_id": "experiment-os",
-      "title": "Decide whether persisted comparison timelines should synthesize browser history",
-      "description": "Evaluate whether the restored comparison shadow timeline should remain an internal session model or also synthesize browser back-stack entries after reload, including the UX and correctness tradeoffs of recreating browser history from persisted panel state rather than leaving full history-stack reconstruction out of scope.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 3,
-      "priority_reason": "The latest main-session reply explicitly says reload now restores the shadow timeline but does not rebuild the browser's full history stack. That gap is real, but it is a product and navigation-contract decision rather than the next automatic executable queue head.",
-      "depends_on": [
-        "planning-experiment-os-persist-comparison-history-snapshots-across-reload"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:05:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Captures the remaining browser-navigation contract question left after reload persistence shipped, so experiment-os comparison durability can explicitly choose whether to stop at shadow-timeline recovery or model full history reconstruction."
-    },
-    {
-      "id": "planning-experiment-os-normalize-and-optimize-typed-query-expression-trees",
-      "direction_id": "experiment-os",
-      "title": "Add normalization and optimization passes for typed query expression trees",
-      "description": "Introduce canonicalization, simplification, and execution-oriented optimization for typed query expression trees so semantically equivalent reusable or quantified expressions can be normalized, validated, cached, or evaluated efficiently instead of remaining raw user-supplied JSON shapes.",
-      "status": "proposed",
-      "base_priority": 89,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply still calls out normalization or optimization as unfinished work, but the most direct next queue head is broader quantified-predicate support over nested object collections. Keep normalization proposed behind that contract expansion so canonicalization targets the fuller expression vocabulary instead of another partial intermediate form.",
-      "depends_on": [
-        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-21T04:15:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Supports experiment-os queryability by turning the richer expression contract into a stable canonical form that discovery, caching, and runtime evaluation can rely on without duplicated route-local simplification rules."
-    },
-    {
-      "id": "planning-experiment-os-adopt-shared-runtime-id-contract-in-additional-artifact-producers",
-      "direction_id": "experiment-os",
-      "title": "Adopt shared runtime id contracts in additional artifact producers",
-      "description": "Now that upstream runtime id alias handling lives in the shared `BenchmarkArtifact` helper, apply that contract to any additional artifact producers that emit benchmark artifacts or source-location bindings beyond freqtrade, so new producer integrations preserve native runtime candidate ids by default instead of reintroducing adapter-local alias parsing.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply says the shared contract is generalized but only freqtrade currently uses it. This follow-up is real, but it remains producer-adoption work that depends on other artifact producers or new benchmark binding integrations becoming active, so keep it proposed rather than forcing speculative implementation.",
-      "depends_on": [
-        "planning-experiment-os-generalize-upstream-runtime-id-preservation-across-artifact-producers"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T10:55:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os replay identity contracts from drifting back into producer-local logic by making future benchmark-artifact producers adopt the shared runtime-id helper once those producer paths exist."
-    },
-    {
-      "id": "planning-experiment-os-add-retained-artifact-storage-and-pruning-for-replay-audit-export-jobs",
-      "direction_id": "experiment-os",
-      "title": "Add retained artifact storage and pruning controls for replay audit export jobs",
-      "description": "Build the next replay alias audit export operations pass by persisting generated JSON or CSV or zip artifacts as server-managed binary export job outputs, defining explicit retention metadata and pruning controls for those artifacts and their job records, and surfacing enough operator-visible lifecycle state that downloads remain recoverable and governable beyond one immediate response body.",
-      "status": "ready",
-      "base_priority": 88,
-      "dynamic_priority_delta": 10,
-      "priority_reason": "The latest main-session reply says managed export jobs and server-side audit trail are done, and names export job-specific pruning or retention controls plus server-side binary artifact storage as the remaining operating gaps. That makes retained artifact lifecycle the clearest immediate executable follow-up, because true background execution will need durable artifact storage and cleanup semantics instead of ephemeral download generation.",
-      "depends_on": [
-        "planning-experiment-os-add-managed-export-jobs-for-server-replay-alias-audits"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T13:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay governance from observable export jobs into a governed artifact system where exported evidence has durable storage, explicit lifetime, and operator-manageable cleanup semantics."
-    },
-    {
-      "id": "planning-experiment-os-execute-replay-audit-export-jobs-in-background-workers",
-      "direction_id": "experiment-os",
-      "title": "Execute replay audit export jobs in background workers",
-      "description": "Move replay alias audit export job fulfillment off the request path into asynchronous background execution with job state transitions, failure reporting, and operator-visible progress semantics, so heavier exports do not depend on synchronous API request lifetimes once retained artifact storage exists.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 8,
-      "priority_reason": "The latest main-session reply explicitly calls out async background execution as unfinished, but retained artifact storage and pruning are the more immediate foundation for a credible worker-backed export contract. Keep background execution proposed behind that storage or lifecycle pass so worker results have somewhere durable and governable to land.",
-      "depends_on": [
-        "planning-experiment-os-add-retained-artifact-storage-and-pruning-for-replay-audit-export-jobs"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T13:35:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay export operations from server-managed job records into recoverable asynchronous execution, which is necessary once export volume or latency exceeds one foreground request."
-    },
-    {
-      "id": "planning-experiment-os-persist-server-replay-audit-admin-ui-state",
-      "direction_id": "experiment-os",
-      "title": "Persist server replay audit admin UI state across reloads",
-      "description": "Add explicit persistence for the new replay alias audit admin surface so operator-entered admin tokens, filters, selected audit rows, and related review context restore intentionally across reload or resume flows instead of resetting as transient session state.",
-      "status": "proposed",
-      "base_priority": 84,
-      "dynamic_priority_delta": 7,
-      "priority_reason": "The latest main-session reply calls out separate persistence for the new server audit admin UI as remaining work, but the export contract is the clearer immediate next executable step. Keep persistence proposed until the team decides which admin state should survive reload and whether that state belongs in local browser storage, URL state, or another operator-visible retention path.",
-      "depends_on": [
-        "planning-experiment-os-add-web-admin-ui-and-scoped-access-for-server-replay-alias-audits"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T13:12:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay governance from a usable live admin panel into a deliberate resumeable workspace contract, so operators do not lose audit review context between sessions."
-    },
-    {
-      "id": "planning-experiment-os-integrate-replay-audit-admin-with-role-aware-auth",
-      "direction_id": "experiment-os",
-      "title": "Integrate replay audit admin access with role-aware auth",
-      "description": "Replace or complement the newly shipped read and write replay audit admin tokens with role-aware authentication and authorization integration, so audit listing and prune capabilities can align with broader operator identity and permission models instead of remaining only header-token gated.",
-      "status": "proposed",
-      "base_priority": 85,
-      "dynamic_priority_delta": 6,
-      "priority_reason": "The latest main-session reply explicitly says role-aware auth integration is still missing, but the current token-scoped boundary is already operational and there is no evidence yet that the broader auth model is settled enough to make this the immediate queue head. Keep it proposed behind the clearer export follow-up and pending alignment with the product's wider operator-auth contract.",
-      "depends_on": [
-        "planning-experiment-os-add-web-admin-ui-and-scoped-access-for-server-replay-alias-audits"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T13:14:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Advances experiment-os replay governance from scoped shared-secret administration toward identity-aware operator permissions, which will matter once replay audit controls join the broader admin access model."
-    },
-    {
-      "id": "planning-experiment-os-add-portable-retention-for-replay-apply-history",
-      "direction_id": "experiment-os",
-      "title": "Add export/import or profile-scoped retention for replay apply history",
-      "description": "Extend the durable replay apply history beyond one browser's localStorage bucket by supporting explicit export or import, profile-scoped sync, or another portable retention contract for replay apply confirmation history and rollback snapshots, so operators can preserve or transfer replay mutation audit context across browser profiles, devices, or longer-lived sessions.",
-      "status": "proposed",
-      "base_priority": 85,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply now narrows the direct next gap to conflict-aware governance for same-entry override collisions. Portable replay-history retention remains valid follow-up work, but it still needs a product-shape choice between export/import, profile-scoped sync, and retention posture, so keep it proposed behind the executable conflict-governance pass.",
-      "depends_on": [
-        "planning-experiment-os-coordinate-persisted-replay-apply-history-across-tabs"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T06:25:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends experiment-os replay-apply durability from local browser persistence into a portable or account-scoped audit artifact, helping replay rollback evidence survive beyond one device or browser context."
-    },
-    {
-      "id": "planning-experiment-os-richen-subtree-template-help-note-formatting",
-      "direction_id": "experiment-os",
-      "title": "Richen subtree template help-note formatting beyond plain text",
-      "description": "Follow the completed parameter-level help-note persistence by deciding and implementing a richer note representation for subtree template authoring, such as lightweight formatting or structured emphasis, so operator guidance can remain expressive once group-level authoring metadata exists instead of staying constrained to flat plain-text note strings.",
-      "status": "proposed",
-      "base_priority": 88,
+      "base_priority": 74,
       "dynamic_priority_delta": 1,
-      "priority_reason": "Richer note formatting remains valid follow-up work, but the latest main-session reply now makes the next executable subtree gap more specific: bundle priority, conditional auto-selection, and later composition behavior. Keep note-formatting proposed behind those deeper bundle semantics.",
-      "depends_on": [
-        "planning-experiment-os-add-priority-and-conditional-auto-selection-for-subtree-group-bundles"
-      ],
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-20T20:40:00Z",
+      "updated_at": "2026-04-21T00:00:00+09:00",
       "source_turn_id": null,
-      "direction_relation_note": "Keeps experiment-os template authoring guidance usable as subtree metadata becomes more structured by ensuring help notes can express richer operator context than a single flat string."
-    },
-    {
-      "id": "planning-experiment-os-add-collection-path-aliases-and-shortcodes-to-typed-query-contract",
-      "direction_id": "experiment-os",
-      "title": "Add collection path aliases and shortcodes to the typed query contract",
-      "description": "Introduce discoverable aliases or shortcode bindings for verbose collection paths so clients can reference common nested collection filters more ergonomically once the richer collection schema contract is in place, without weakening explicit validation or schema discovery.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 3,
-      "priority_reason": "The latest main-session reply still lists consumer-friendly alias expansion for parameterized collection paths as a remaining follow-up, but it remains an ergonomics layer behind the new shared capability-contract and parameter-domain discovery work. Keep it proposed until the reusable collection-query contract settles.",
       "depends_on": [
-        "planning-experiment-os-advertise-element-and-parameterized-collection-schemas-in-typed-query-discovery"
+        "task-b1-strategy-lifecycle-durability",
+        "task-b1-experiment-summary-artifacts"
       ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T01:59:57Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Improves experiment-os typed query ergonomics by layering reusable path shorthand on top of the validated collection schema contract, making common nested filters easier to author after the discovery model is stable."
-    },
-    {
-      "id": "planning-experiment-os-add-expression-macro-expansion-to-typed-query-trees",
-      "direction_id": "experiment-os",
-      "title": "Add expression macro expansion to typed query trees",
-      "description": "Introduce explicit macro or shorthand expansion for typed query expressions so common higher-level filter patterns can compile into reusable predicate trees, keeping client payloads smaller while centralizing supported expansion rules inside the typed query contract.",
-      "status": "proposed",
-      "base_priority": 88,
-      "dynamic_priority_delta": 5,
-      "priority_reason": "The latest main-session reply explicitly keeps expression macro reuse on the table, but parameterized predicate templates are the more direct next executable layer after subtree promotion and root negation shipped. Keep macro expansion proposed behind that parameterized reuse pass so macro rules can target a stronger templateable expression foundation instead of bypassing it.",
-      "depends_on": [
-        "planning-experiment-os-add-reusable-and-quantified-predicates-to-typed-query-expression-trees"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-20T03:17:23Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Supports experiment-os queryability by offering higher-level reusable query shorthands once the lower-level expression contract is expressive enough to serve as the expansion target."
-    },
-    {
-      "id": "planning-experiment-os-unify-non-standalone-endpoints-under-shared-runtime-binding-contracts",
-      "direction_id": "experiment-os",
-      "title": "Unify non-standalone endpoints under shared runtime-binding contracts",
-      "description": "After the standalone surface rollout reaches the remaining complex mutation families, evaluate and execute the larger convergence step of moving non-standalone endpoints onto the same or a closely related contract-driven runtime binding abstraction, so API execution semantics stop diverging between standalone and non-standalone route families.",
-      "status": "proposed",
-      "base_priority": 87,
-      "dynamic_priority_delta": 4,
-      "priority_reason": "The broader unfinished convergence is still unifying non-standalone endpoints under the same runtime-binding contract, but the latest main-session reply narrows the immediate gap again: arbitrary nested paths and grouped filters shipped, yet nested grouped expressions or a more general boolean AST still need contract and evaluator work. Keep this larger architectural pass proposed behind that concrete expression-model follow-up and the later discovery step.",
-      "depends_on": [
-        "planning-experiment-os-connect-typed-query-schema-to-runtime-sort-and-filter-evaluation"
-      ],
-      "created_by": "llm",
-      "last_updated_by": "llm",
-      "updated_at": "2026-04-21T03:18:00Z",
-      "source_turn_id": null,
-      "direction_relation_note": "Extends the experiment-os contract-driven runtime-binding model from standalone surfaces toward a more uniform API execution architecture, but likely needs a broader boundary decision about how far non-standalone routes should share the same abstraction."
+      "direction_relation_note": "Completes the final unfinished Experiment OS item listed under Batch 1 exit work.",
+      "priority_reason": "This should remain downstream because benchmark-pack and promotion-review artifacts depend on the durable lifecycle and normalized artifact model."
     }
   ]
 }
