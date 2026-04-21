@@ -182,6 +182,11 @@ class CoreWorkflowProviderMixin:
       payload=payload,
       workflow_reference=workflow_reference,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="pagerduty",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -336,6 +341,11 @@ class CoreWorkflowProviderMixin:
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="incidentio",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -553,6 +563,11 @@ class CoreWorkflowProviderMixin:
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="firehydrant",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -777,6 +792,11 @@ class CoreWorkflowProviderMixin:
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="rootly",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -1013,6 +1033,11 @@ class CoreWorkflowProviderMixin:
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="opsgenie",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:

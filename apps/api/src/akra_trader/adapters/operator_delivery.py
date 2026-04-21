@@ -2062,6 +2062,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="blameless",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -2301,6 +2306,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="xmatters",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -2539,6 +2549,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="servicenow",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -2793,6 +2808,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="squadcast",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -3049,6 +3069,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="bigpanda",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -3303,6 +3328,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="grafana_oncall",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -3559,6 +3589,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="zenduty",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -3813,6 +3848,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="splunk_oncall",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -4071,6 +4111,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="jira_service_management",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -4336,6 +4381,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="pagertree",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -4598,6 +4648,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="alertops",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -4862,6 +4917,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="signl4",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -5124,6 +5184,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="ilert",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -5391,6 +5456,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="betterstack",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -5656,6 +5726,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="onpage",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -5923,6 +5998,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="allquiet",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -6188,6 +6268,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="moogsoft",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -6455,6 +6540,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="spikesh",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -6720,6 +6810,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="dutycalls",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -6987,6 +7082,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="incidenthub",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -7252,6 +7352,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="resolver",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -7519,6 +7624,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="openduty",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -7784,6 +7894,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="cabot",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -8051,6 +8166,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="haloitsm",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -8316,6 +8436,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="incidentmanagerio",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -9095,6 +9220,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="oneuptime",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -9188,6 +9318,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="squzy",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -9283,6 +9418,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="crisescontrol",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -9376,6 +9516,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="freshservice",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -9471,6 +9616,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="freshdesk",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -9564,6 +9714,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="happyfox",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -9659,6 +9814,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="zendesk",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -9753,6 +9913,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="zohodesk",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -9846,6 +10011,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="servicedeskplus",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -10881,6 +11051,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="helpscout",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -11151,6 +11326,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="kayako",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -11423,6 +11603,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="intercom",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -11693,6 +11878,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="front",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -12073,6 +12263,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="sysaid",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -12338,6 +12533,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="bmchelix",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -12605,6 +12805,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="solarwindsservicedesk",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -12870,6 +13075,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="topdesk",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -13139,6 +13349,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       reference=reference,
       reference_type=reference_type,
     )
+    request = self._project_workflow_market_context_into_request(
+      provider="invgateservicedesk",
+      request=request,
+      payload=payload,
+    )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
         status_code = getattr(response, "status", 202)
@@ -13406,6 +13621,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       payload=payload,
       reference=reference,
       reference_type=reference_type,
+    )
+    request = self._project_workflow_market_context_into_request(
+      provider="opsramp",
+      request=request,
+      payload=payload,
     )
     try:
       with self._urlopen(request, timeout=self._webhook_timeout_seconds) as response:
@@ -28636,6 +28856,68 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       "timeframe": timeframe,
       "primary_focus": primary_focus,
     }
+
+  @staticmethod
+  def _resolve_workflow_market_context_vendor_field(provider: str) -> str:
+    normalized = provider.strip().lower().replace(" ", "_")
+    if normalized == "pagerduty":
+      return "custom_details"
+    if normalized in {"opsgenie", "firehydrant"}:
+      return "details"
+    return "metadata"
+
+  @classmethod
+  def _merge_workflow_market_context_vendor_fields(
+    cls,
+    *,
+    provider: str,
+    body: dict[str, Any],
+    payload: dict[str, Any] | None,
+  ) -> dict[str, Any]:
+    market_context = cls._extract_workflow_market_context_payload(payload)
+    if market_context is None:
+      return body
+    vendor_field = cls._resolve_workflow_market_context_vendor_field(provider)
+    merged = dict(body)
+    existing_vendor_payload = dict(cls._extract_mapping(merged.get(vendor_field)))
+    existing_vendor_payload["market_context"] = market_context
+    merged[vendor_field] = existing_vendor_payload
+    return merged
+
+  @classmethod
+  def _project_workflow_market_context_into_request(
+    cls,
+    *,
+    provider: str,
+    request: urllib_request.Request,
+    payload: dict[str, Any] | None,
+  ) -> urllib_request.Request:
+    raw_body = getattr(request, "data", None)
+    if raw_body is None:
+      return request
+    if isinstance(raw_body, bytes):
+      body_text = raw_body.decode("utf-8")
+    elif isinstance(raw_body, str):
+      body_text = raw_body
+    else:
+      return request
+    if not body_text:
+      return request
+    try:
+      parsed_body = json.loads(body_text)
+    except (TypeError, ValueError, json.JSONDecodeError):
+      return request
+    if not isinstance(parsed_body, dict):
+      return request
+    updated_body = cls._merge_workflow_market_context_vendor_fields(
+      provider=provider,
+      body=parsed_body,
+      payload=payload,
+    )
+    if updated_body == parsed_body:
+      return request
+    request.data = json.dumps(updated_body).encode("utf-8")
+    return request
 
   @classmethod
   def _format_workflow_payload_context(cls, payload: dict[str, Any] | None) -> str:

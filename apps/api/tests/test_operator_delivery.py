@@ -393,6 +393,8 @@ def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> N
   remediate_payload = json.loads(remediate_request[2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["note"]["content"]
   assert "market_data.sync_recent" in remediate_payload["note"]["content"]
+  assert remediate_payload["custom_details"]["market_context"]["symbol"] == "ETH/USDT"
+  assert remediate_payload["custom_details"]["market_context"]["timeframe"] == "5m"
   assert "Market context:" in remediate_payload["note"]["content"]
   assert '"symbol": "ETH/USDT"' in remediate_payload["note"]["content"]
   assert '"timeframe": "5m"' in remediate_payload["note"]["content"]
@@ -936,7 +938,15 @@ def test_operator_alert_delivery_adapter_syncs_blameless_workflow_actions() -> N
     action="resolve",
     actor="operator",
     detail="fixed",
-    payload={"job_id": "bl-job-1", "verification": {"state": "passed"}},
+    payload={
+      "job_id": "bl-job-1",
+      "verification": {"state": "passed"},
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
   remediate = adapter.sync_incident_workflow(
     incident=incident,
@@ -944,7 +954,15 @@ def test_operator_alert_delivery_adapter_syncs_blameless_workflow_actions() -> N
     action="remediate",
     actor="operator",
     detail="restart_sync_and_verify_checkpoint",
-    payload={"job_id": "bl-job-2", "channels": ["kline", "depth"]},
+    payload={
+      "job_id": "bl-job-2",
+      "channels": ["kline", "depth"],
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
 
   assert adapter.list_supported_workflow_providers() == ("blameless",)
@@ -964,8 +982,10 @@ def test_operator_alert_delivery_adapter_syncs_blameless_workflow_actions() -> N
   remediate_payload = json.loads(requests[3][2].decode("utf-8"))
   assert "level 2" in escalate_payload["note"]
   assert '"job_id": "bl-job-1"' in resolve_payload["note"]
+  assert resolve_payload["metadata"]["market_context"]["symbol"] == "ETH/USDT"
   assert "requested remediation" in remediate_payload["note"]
   assert "market_data.sync_recent" in remediate_payload["note"]
+  assert remediate_payload["metadata"]["market_context"]["timeframe"] == "5m"
   assert '"job_id": "bl-job-2"' in remediate_payload["note"]
 
 
@@ -13453,7 +13473,15 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     action="resolve",
     actor="operator",
     detail="fixed",
-    payload={"job_id": "og-job-1", "verification": {"state": "passed"}},
+    payload={
+      "job_id": "og-job-1",
+      "verification": {"state": "passed"},
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
   remediate = adapter.sync_incident_workflow(
     incident=incident,
@@ -13461,7 +13489,15 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
     action="remediate",
     actor="operator",
     detail="restart_sync_and_verify_checkpoint",
-    payload={"job_id": "og-job-2", "channels": ["kline", "depth"]},
+    payload={
+      "job_id": "og-job-2",
+      "channels": ["kline", "depth"],
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
 
   assert adapter.list_supported_workflow_providers() == ("opsgenie",)
@@ -13482,6 +13518,8 @@ def test_operator_alert_delivery_adapter_syncs_opsgenie_workflow_actions() -> No
   resolve_payload = json.loads(requests[2][2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["note"]
   assert "market_data.sync_recent" in remediate_payload["note"]
+  assert resolve_payload["details"]["market_context"]["symbol"] == "ETH/USDT"
+  assert remediate_payload["details"]["market_context"]["timeframe"] == "5m"
   assert '"job_id": "og-job-2"' in remediate_payload["note"]
   assert '"job_id": "og-job-1"' in resolve_payload["note"]
   assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
@@ -13728,7 +13766,15 @@ def test_operator_alert_delivery_adapter_syncs_incidentio_workflow_actions() -> 
     action="resolve",
     actor="operator",
     detail="fixed",
-    payload={"job_id": "io-job-1", "verification": {"state": "passed"}},
+    payload={
+      "job_id": "io-job-1",
+      "verification": {"state": "passed"},
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
   remediate = adapter.sync_incident_workflow(
     incident=incident,
@@ -13736,7 +13782,15 @@ def test_operator_alert_delivery_adapter_syncs_incidentio_workflow_actions() -> 
     action="remediate",
     actor="operator",
     detail="restart_sync_and_verify_checkpoint",
-    payload={"job_id": "io-job-2", "channels": ["kline", "depth"]},
+    payload={
+      "job_id": "io-job-2",
+      "channels": ["kline", "depth"],
+      "market_context": {
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+      },
+    },
   )
 
   assert adapter.list_supported_workflow_providers() == ("incidentio",)
@@ -13757,6 +13811,8 @@ def test_operator_alert_delivery_adapter_syncs_incidentio_workflow_actions() -> 
   resolve_payload = json.loads(requests[2][2].decode("utf-8"))
   assert "requested remediation" in remediate_payload["message"]
   assert "market_data.sync_recent" in remediate_payload["message"]
+  assert resolve_payload["metadata"]["market_context"]["symbol"] == "ETH/USDT"
+  assert remediate_payload["metadata"]["market_context"]["timeframe"] == "5m"
   assert '"job_id": "io-job-2"' in remediate_payload["message"]
   assert '"job_id": "io-job-1"' in resolve_payload["message"]
   assert incident.remediation.provider_recovery.status_machine.state == "not_requested"
