@@ -2160,6 +2160,11 @@ class TradingApplication:
       ):
         filter_tokens.append("resolved alert reconstruction")
       if (
+        isinstance(query_payload.get("narrative_mode"), str)
+        and query_payload.get("narrative_mode").strip() == "mixed_status_post_resolution"
+      ):
+        filter_tokens.append("mixed-status narrative")
+      if (
         isinstance(query_payload.get("alert_category"), str)
         and query_payload.get("alert_category").strip()
       ):
@@ -27279,6 +27284,17 @@ class TradingApplication:
     return normalized_category
 
   @staticmethod
+  def _normalize_provider_provenance_scheduler_narrative_mode(
+    narrative_mode: str | None,
+  ) -> str:
+    if not isinstance(narrative_mode, str):
+      return "matched_status"
+    normalized_mode = narrative_mode.strip().lower()
+    if normalized_mode in {"matched_status", "mixed_status_post_resolution"}:
+      return normalized_mode
+    raise ValueError("Unsupported scheduler historical export narrative mode.")
+
+  @staticmethod
   def _normalize_provider_provenance_scheduler_export_datetime(
     value: datetime,
     *,
@@ -27321,12 +27337,74 @@ class TradingApplication:
       issues=record.issues,
     )
 
+  @staticmethod
+  def _build_provider_provenance_scheduler_narrative_phase(
+    *,
+    record: ProviderProvenanceSchedulerHealthRecord,
+    resolution_at: datetime | None,
+  ) -> str:
+    if resolution_at is not None and record.recorded_at >= resolution_at:
+      return "post_resolution"
+    return "occurrence"
+
+  @classmethod
+  def _build_provider_provenance_scheduler_status_narrative_segments(
+    cls,
+    *,
+    records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
+    resolution_at: datetime | None,
+  ) -> tuple[dict[str, Any], ...]:
+    if not records:
+      return ()
+    ordered_records = tuple(
+      sorted(
+        records,
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    segments: list[dict[str, Any]] = []
+    start_index = 0
+    while start_index < len(ordered_records):
+      end_index = start_index
+      while (
+        end_index + 1 < len(ordered_records)
+        and ordered_records[end_index + 1].status == ordered_records[start_index].status
+      ):
+        end_index += 1
+      segment_records = ordered_records[start_index:end_index + 1]
+      latest_record = segment_records[-1]
+      segments.append(
+        {
+          "status": latest_record.status,
+          "phase": cls._build_provider_provenance_scheduler_narrative_phase(
+            record=segment_records[0],
+            resolution_at=resolution_at,
+          ),
+          "started_at": segment_records[0].recorded_at.isoformat(),
+          "ended_at": latest_record.recorded_at.isoformat(),
+          "record_count": len(segment_records),
+          "latest_record_id": latest_record.record_id,
+          "latest_summary": latest_record.summary,
+          "peak_lag_seconds": max(
+            (record.max_due_lag_seconds for record in segment_records),
+            default=0,
+          ),
+          "peak_due_report_count": max(
+            (record.due_report_count for record in segment_records),
+            default=0,
+          ),
+        }
+      )
+      start_index = end_index + 1
+    return tuple(segments)
+
   def reconstruct_provider_provenance_scheduler_health_export(
     self,
     *,
     alert_category: str,
     detected_at: datetime,
     resolved_at: datetime | None = None,
+    narrative_mode: str = "matched_status",
     export_format: str = "json",
     history_limit: int = 25,
     drilldown_history_limit: int = 24,
@@ -27335,6 +27413,9 @@ class TradingApplication:
     if normalized_format not in {"json", "csv"}:
       raise ValueError("Unsupported provider provenance scheduler health export format.")
     normalized_category = self._normalize_provider_provenance_scheduler_alert_category(alert_category)
+    normalized_narrative_mode = self._normalize_provider_provenance_scheduler_narrative_mode(
+      narrative_mode,
+    )
     target_status = "failed" if normalized_category == "scheduler_failure" else "lagging"
     detected_at_utc = self._normalize_provider_provenance_scheduler_export_datetime(
       detected_at,
@@ -27350,20 +27431,27 @@ class TradingApplication:
     )
     if resolved_at_utc is not None and resolved_at_utc < detected_at_utc:
       raise ValueError("resolved_at must be on or after detected_at for scheduler export reconstruction.")
+    if normalized_narrative_mode == "mixed_status_post_resolution" and resolved_at_utc is None:
+      raise ValueError("mixed_status_post_resolution requires a resolved scheduler alert row.")
     self._prune_provider_provenance_scheduler_health_records()
-    all_records = tuple(self._list_provider_provenance_scheduler_health_records())
-    window_end = resolved_at_utc or max(
+    all_records = tuple(
+      sorted(
+        self._list_provider_provenance_scheduler_health_records(),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+    )
+    occurrence_window_end = resolved_at_utc or max(
       (record.recorded_at for record in all_records),
       default=detected_at_utc,
     )
-    window_records = tuple(
+    occurrence_records = tuple(
       record
       for record in all_records
-      if detected_at_utc <= record.recorded_at <= window_end
+      if detected_at_utc <= record.recorded_at <= occurrence_window_end
     )
     matching_records = tuple(
       record
-      for record in window_records
+      for record in occurrence_records
       if record.status == target_status
     )
     if not matching_records:
@@ -27377,14 +27465,14 @@ class TradingApplication:
     )
     normalized_history_limit = max(1, min(history_limit, 200))
     normalized_drilldown_history_limit = max(1, min(drilldown_history_limit, 100))
-    window_days = max(
+    occurrence_window_days = max(
       3,
       min(
-        int((window_end.date() - detected_at_utc.date()).days) + 1,
+        int((occurrence_window_end.date() - detected_at_utc.date()).days) + 1,
         90,
       ),
     )
-    drilldown_bucket_key = latest_matching_record.recorded_at.date().isoformat()
+    occurrence_drilldown_bucket_key = latest_matching_record.recorded_at.date().isoformat()
     recent_matching_records = tuple(
       sorted(
         matching_records,
@@ -27392,26 +27480,14 @@ class TradingApplication:
         reverse=True,
       )
     )
-    recent_window_records = tuple(
+    recent_occurrence_records = tuple(
       sorted(
-        window_records,
+        occurrence_records,
         key=lambda record: (record.recorded_at, record.record_id),
         reverse=True,
       )
     )
-    time_series = self._build_provider_provenance_scheduler_health_time_series(
-      records=matching_records,
-      window_days=window_days,
-      now=window_end,
-    )
-    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
-      records=matching_records,
-      bucket_key=drilldown_bucket_key,
-      history_limit=normalized_drilldown_history_limit,
-    )
-    all_statuses = tuple(sorted({record.status for record in window_records if record.status}))
-    exported_at = self._clock().isoformat()
-    history_payload = {
+    selected_occurrence_history_payload = {
       "query": {
         "status": target_status,
         "limit": normalized_history_limit,
@@ -27424,10 +27500,166 @@ class TradingApplication:
       "next_offset": normalized_history_limit if len(matching_records) > normalized_history_limit else None,
       "previous_offset": None,
     }
+    selected_occurrence_payload = {
+      "status": target_status,
+      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "history_page": serialize_provider_provenance_scheduler_health_history(
+        current_snapshot,
+        selected_occurrence_history_payload,
+      ),
+      "record_count": len(matching_records),
+      "window_record_count": len(occurrence_records),
+    }
+
+    export_records = matching_records
+    export_status: str | None = target_status
+    export_window_end = occurrence_window_end
+    export_snapshot = current_snapshot
+    export_window_days = occurrence_window_days
+    export_drilldown_bucket_key = occurrence_drilldown_bucket_key
+    next_occurrence_detected_at: datetime | None = None
+    mixed_status_narrative_payload: dict[str, Any] | None = None
+
+    if normalized_narrative_mode == "mixed_status_post_resolution":
+      next_target_status_record = next(
+        (
+          record
+          for record in all_records
+          if record.recorded_at > resolved_at_utc
+          and record.status == target_status
+        ),
+        None,
+      )
+      next_occurrence_detected_at = (
+        next_target_status_record.recorded_at
+        if next_target_status_record is not None
+        else None
+      )
+      export_records = tuple(
+        record
+        for record in all_records
+        if detected_at_utc <= record.recorded_at
+        and (
+          next_occurrence_detected_at is None
+          or record.recorded_at < next_occurrence_detected_at
+        )
+      )
+      latest_export_record = max(
+        export_records,
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+      export_snapshot = self._provider_provenance_scheduler_health_snapshot_from_record(
+        latest_export_record,
+      )
+      export_status = None
+      export_window_end = latest_export_record.recorded_at
+      export_window_days = max(
+        3,
+        min(
+          int((export_window_end.date() - detected_at_utc.date()).days) + 1,
+          90,
+        ),
+      )
+      export_drilldown_bucket_key = latest_export_record.recorded_at.date().isoformat()
+      post_resolution_records = tuple(
+        record
+        for record in export_records
+        if resolved_at_utc is not None and record.recorded_at >= resolved_at_utc
+      )
+      recent_post_resolution_records = tuple(
+        sorted(
+          post_resolution_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+          reverse=True,
+        )
+      )
+      post_resolution_history_payload = {
+        "query": {
+          "status": None,
+          "limit": normalized_history_limit,
+          "offset": 0,
+        },
+        "items": recent_post_resolution_records[:normalized_history_limit],
+        "total": len(post_resolution_records),
+        "returned": min(len(post_resolution_records), normalized_history_limit),
+        "has_more": len(post_resolution_records) > normalized_history_limit,
+        "next_offset": (
+          normalized_history_limit
+          if len(post_resolution_records) > normalized_history_limit
+          else None
+        ),
+        "previous_offset": None,
+      }
+      mixed_status_narrative_payload = {
+        "mode": "mixed_status_post_resolution",
+        "window_started_at": detected_at_utc.isoformat(),
+        "window_ended_at": export_window_end.isoformat(),
+        "resolution_at": resolved_at_utc.isoformat(),
+        "next_occurrence_detected_at": (
+          next_occurrence_detected_at.isoformat()
+          if next_occurrence_detected_at is not None
+          else None
+        ),
+        "available_statuses": list(
+          sorted(
+            {
+              record.status
+              for record in export_records
+              if isinstance(record.status, str) and record.status
+            }
+          )
+        ),
+        "latest_status": latest_export_record.status,
+        "latest_summary": latest_export_record.summary,
+        "current": serialize_provider_provenance_scheduler_health(export_snapshot),
+        "selected_occurrence": selected_occurrence_payload,
+        "status_sequence": list(
+          self._build_provider_provenance_scheduler_status_narrative_segments(
+            records=export_records,
+            resolution_at=resolved_at_utc,
+          )
+        ),
+        "post_resolution_history": serialize_provider_provenance_scheduler_health_history(
+          export_snapshot,
+          post_resolution_history_payload,
+        ),
+      }
+
+    time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=export_records,
+      window_days=export_window_days,
+      now=export_window_end,
+    )
+    drill_down = self._build_provider_provenance_scheduler_health_hourly_drill_down(
+      records=export_records,
+      bucket_key=export_drilldown_bucket_key,
+      history_limit=normalized_drilldown_history_limit,
+    )
+    all_statuses = tuple(sorted({record.status for record in export_records if record.status}))
+    exported_at = self._clock().isoformat()
+    history_payload = {
+      "query": {
+        "status": export_status,
+        "limit": normalized_history_limit,
+        "offset": 0,
+      },
+      "items": tuple(
+        sorted(
+          export_records,
+          key=lambda record: (record.recorded_at, record.record_id),
+          reverse=True,
+        )
+      )[:normalized_history_limit],
+      "total": len(export_records),
+      "returned": min(len(export_records), normalized_history_limit),
+      "has_more": len(export_records) > normalized_history_limit,
+      "next_offset": normalized_history_limit if len(export_records) > normalized_history_limit else None,
+      "previous_offset": None,
+    }
     analytics_payload = {
       "generated_at": exported_at,
       "query": {
-        "status": target_status,
+        "status": export_status,
         "window_days": time_series["window_days"],
         "history_limit": min(normalized_history_limit, 50),
         "drilldown_bucket_key": (
@@ -27437,21 +27669,29 @@ class TradingApplication:
         ),
         "drilldown_history_limit": normalized_drilldown_history_limit,
         "reconstruction_mode": "resolved_alert_row",
+        "narrative_mode": normalized_narrative_mode,
         "alert_category": normalized_category,
+        "occurrence_status": target_status,
         "alert_detected_at": detected_at_utc.isoformat(),
-        "alert_resolved_at": window_end.isoformat(),
+        "alert_resolved_at": occurrence_window_end.isoformat(),
+        "narrative_window_ended_at": export_window_end.isoformat(),
+        "next_occurrence_detected_at": (
+          next_occurrence_detected_at.isoformat()
+          if next_occurrence_detected_at is not None
+          else None
+        ),
       },
-      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "current": serialize_provider_provenance_scheduler_health(export_snapshot),
       "totals": {
-        "record_count": len(matching_records),
-        "healthy_count": sum(1 for record in matching_records if record.status == "healthy"),
-        "lagging_count": sum(1 for record in matching_records if record.status == "lagging"),
-        "failed_count": sum(1 for record in matching_records if record.status == "failed"),
-        "disabled_count": sum(1 for record in matching_records if record.status == "disabled"),
-        "starting_count": sum(1 for record in matching_records if record.status == "starting"),
-        "executed_report_count": sum(record.last_executed_count for record in matching_records),
-        "peak_lag_seconds": max((record.max_due_lag_seconds for record in matching_records), default=0),
-        "peak_due_report_count": max((record.due_report_count for record in matching_records), default=0),
+        "record_count": len(export_records),
+        "healthy_count": sum(1 for record in export_records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in export_records if record.status == "lagging"),
+        "failed_count": sum(1 for record in export_records if record.status == "failed"),
+        "disabled_count": sum(1 for record in export_records if record.status == "disabled"),
+        "starting_count": sum(1 for record in export_records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in export_records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in export_records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in export_records), default=0),
       },
       "available_filters": {
         "statuses": list(all_statuses),
@@ -27460,41 +27700,53 @@ class TradingApplication:
       "drill_down": drill_down,
       "recent_history": [
         serialize_provider_provenance_scheduler_health_record(record)
-        for record in recent_matching_records[:min(normalized_history_limit, 50)]
+        for record in history_payload["items"][:min(normalized_history_limit, 50)]
       ],
     }
     reconstruction_payload = {
       "mode": "resolved_alert_row",
+      "narrative_mode": normalized_narrative_mode,
       "alert_category": normalized_category,
       "alert_status": target_status,
       "alert_detected_at": detected_at_utc.isoformat(),
-      "alert_resolved_at": window_end.isoformat(),
+      "alert_resolved_at": occurrence_window_end.isoformat(),
       "matched_record_count": len(matching_records),
-      "window_record_count": len(window_records),
-      "current_record_id": latest_matching_record.record_id,
+      "occurrence_window_record_count": len(occurrence_records),
+      "window_record_count": len(export_records),
+      "current_record_id": (
+        history_payload["items"][0].record_id
+        if history_payload["items"]
+        else latest_matching_record.record_id
+      ),
       "latest_window_status": (
-        recent_window_records[0].status
-        if recent_window_records
+        history_payload["items"][0].status
+        if history_payload["items"]
         else target_status
       ),
+      "next_occurrence_detected_at": (
+        next_occurrence_detected_at.isoformat()
+        if next_occurrence_detected_at is not None
+        else None
+      ),
+      "selected_occurrence_record_count": len(matching_records),
     }
     if normalized_format == "json":
-      content = json.dumps(
-        {
-          "export_scope": "provider_provenance_scheduler_health",
-          "exported_at": exported_at,
-          "query": analytics_payload["query"],
-          "reconstruction": reconstruction_payload,
-          "current": analytics_payload["current"],
-          "history_page": serialize_provider_provenance_scheduler_health_history(
-            current_snapshot,
-            history_payload,
-          ),
-          "analytics": analytics_payload,
-        },
-        indent=2,
-        sort_keys=True,
-      )
+      payload: dict[str, Any] = {
+        "export_scope": "provider_provenance_scheduler_health",
+        "exported_at": exported_at,
+        "query": analytics_payload["query"],
+        "reconstruction": reconstruction_payload,
+        "current": analytics_payload["current"],
+        "history_page": serialize_provider_provenance_scheduler_health_history(
+          export_snapshot,
+          history_payload,
+        ),
+        "analytics": analytics_payload,
+      }
+      if mixed_status_narrative_payload is not None:
+        payload["mixed_status_narrative"] = mixed_status_narrative_payload
+        payload["selected_occurrence"] = selected_occurrence_payload
+      content = json.dumps(payload, indent=2, sort_keys=True)
       return {
         "content": content,
         "content_type": "application/json; charset=utf-8",
@@ -27518,6 +27770,7 @@ class TradingApplication:
       "last_error",
       "source_tab_id",
       "source_tab_label",
+      "narrative_phase",
       "issues",
     )
     writer = csv.DictWriter(buffer, fieldnames=fieldnames)
@@ -27538,6 +27791,14 @@ class TradingApplication:
           "last_error": serialized["last_error"],
           "source_tab_id": serialized["source_tab_id"],
           "source_tab_label": serialized["source_tab_label"],
+          "narrative_phase": (
+            self._build_provider_provenance_scheduler_narrative_phase(
+              record=item,
+              resolution_at=resolved_at_utc,
+            )
+            if normalized_narrative_mode == "mixed_status_post_resolution"
+            else ""
+          ),
           "issues": " | ".join(serialized["issues"]),
         }
       )

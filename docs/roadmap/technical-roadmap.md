@@ -119,6 +119,9 @@ creation.
 - scheduler automation now also has a dedicated paginated alert-occurrence surface, so repeated
   lag/failure timelines can be queried without relying on the global operator alert-history panel
   handoff
+- resolved scheduler exports can now switch into a mixed-status post-resolution narrative, so the
+  exported artifact can carry recovery and stabilization context instead of only the original
+  alert-status slice
 
 ### Remaining work
 

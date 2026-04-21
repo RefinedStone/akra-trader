@@ -172,6 +172,9 @@ It is not yet a finished live trading product:
 - provider provenance analytics now also exposes a paginated scheduler-only alert timeline surface
   with category/status filters, so occurrence review no longer depends on the global operator
   alert-history table
+- resolved scheduler occurrences can now export mixed-status post-resolution narratives, so the
+  shared scheduler artifact can capture recovery, healthy stabilization, and other intervening
+  statuses instead of only the original lag/failure rows
 
 ### Operator discipline baseline
 

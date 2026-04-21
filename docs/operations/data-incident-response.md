@@ -70,6 +70,8 @@ unclear dataset lineage.
 - the scheduler automation workspace now has its own paginated alert-occurrence table with
   category/status filters, so teams can review or reconstruct scheduler incidents without paging
   through unrelated operator alerts
+- resolved scheduler exports now also support a mixed-status post-resolution narrative mode, so
+  operator handoff can include the recovery path and stabilization history after the alert closed
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

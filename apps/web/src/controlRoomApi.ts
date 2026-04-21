@@ -428,6 +428,7 @@ export async function reconstructProviderProvenanceSchedulerHealthExport(params:
   alertCategory: string;
   detectedAt: string;
   resolvedAt?: string | null;
+  narrativeMode?: "matched_status" | "mixed_status_post_resolution";
   format?: "json" | "csv";
   historyLimit?: number;
   drilldownHistoryLimit?: number;
@@ -440,6 +441,7 @@ export async function reconstructProviderProvenanceSchedulerHealthExport(params:
         alert_category: params.alertCategory,
         detected_at: params.detectedAt,
         resolved_at: params.resolvedAt ?? null,
+        narrative_mode: params.narrativeMode ?? "matched_status",
         format: params.format ?? "json",
         history_limit:
           typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)

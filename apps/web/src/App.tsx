@@ -5525,6 +5525,7 @@ export default function App() {
           alertCategory: alert.category,
           detectedAt: alert.detected_at,
           resolvedAt: alert.resolved_at ?? null,
+          narrativeMode: "mixed_status_post_resolution",
           format: "json",
           historyLimit: 8,
           drilldownHistoryLimit: 12,
@@ -5543,13 +5544,13 @@ export default function App() {
       });
       if (!options?.escalate) {
         setProviderProvenanceWorkspaceFeedback(
-          `${useHistoricalAlertRow ? "Reconstructed" : "Started"} scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
+          `${useHistoricalAlertRow ? "Reconstructed scheduler narrative" : "Started scheduler export"} workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}.`,
         );
         return;
       }
       if (sharedEntry.approval_required && sharedEntry.approval_state !== "approved") {
         setProviderProvenanceWorkspaceFeedback(
-          `${useHistoricalAlertRow ? "Reconstructed" : "Started"} scheduler export workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}, but the saved route still requires approval before escalation.`,
+          `${useHistoricalAlertRow ? "Reconstructed scheduler narrative" : "Started scheduler export"} workflow ${shortenIdentifier(sharedEntry.job_id, 10)} from ${sourceLabel}, but the saved route still requires approval before escalation.`,
         );
         return;
       }
@@ -9101,7 +9102,7 @@ export default function App() {
                                                     }}
                                                     type="button"
                                                   >
-                                                    {alert.status === "resolved" ? "Reconstruct export" : "Start current workflow"}
+                                                    {alert.status === "resolved" ? "Reconstruct narrative export" : "Start current workflow"}
                                                   </button>
                                                   <button
                                                     className="ghost-button"
@@ -9114,7 +9115,7 @@ export default function App() {
                                                     type="button"
                                                   >
                                                     {alert.status === "resolved"
-                                                      ? "Escalate reconstructed export"
+                                                      ? "Escalate narrative export"
                                                       : "Escalate current snapshot"}
                                                   </button>
                                                 </div>
@@ -10306,7 +10307,7 @@ export default function App() {
                                     }}
                                     type="button"
                                   >
-                                    {alert.status === "resolved" ? "Reconstruct export" : "Start current workflow"}
+                                    {alert.status === "resolved" ? "Reconstruct narrative export" : "Start current workflow"}
                                   </button>
                                   <button
                                     className="ghost-button"
@@ -10318,7 +10319,7 @@ export default function App() {
                                     }}
                                     type="button"
                                   >
-                                    {alert.status === "resolved" ? "Escalate reconstructed export" : "Escalate current snapshot"}
+                                    {alert.status === "resolved" ? "Escalate narrative export" : "Escalate current snapshot"}
                                   </button>
                                 </div>
                               ) : null}

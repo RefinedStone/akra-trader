@@ -226,6 +226,7 @@ class OperatorProviderProvenanceSchedulerHistoricalExportRequest(BaseModel):
   alert_category: str
   detected_at: datetime
   resolved_at: datetime | None = None
+  narrative_mode: str = "matched_status"
   format: str = "json"
   history_limit: int = 25
   drilldown_history_limit: int = 24
@@ -1336,6 +1337,7 @@ def create_router(container: Container) -> APIRouter:
         alert_category=request.alert_category,
         detected_at=request.detected_at,
         resolved_at=request.resolved_at,
+        narrative_mode=request.narrative_mode,
         export_format=request.format,
         history_limit=request.history_limit,
         drilldown_history_limit=request.drilldown_history_limit,
