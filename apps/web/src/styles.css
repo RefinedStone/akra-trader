@@ -2469,6 +2469,10 @@ select {
   background: linear-gradient(90deg, rgba(33, 173, 109, 0.84), rgba(19, 117, 236, 0.86));
 }
 
+.market-data-provenance-timeseries-bar.is-warning {
+  background: linear-gradient(90deg, rgba(238, 181, 23, 0.84), rgba(214, 92, 18, 0.86));
+}
+
 .market-data-inline-focus-button {
   margin-top: 10px;
   padding: 8px 12px;

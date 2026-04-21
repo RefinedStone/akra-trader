@@ -31,6 +31,7 @@ from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
@@ -281,6 +282,7 @@ class InMemoryRunRepository(RunRepositoryPort):
     self._provider_provenance_dashboard_views: OrderedDict[str, ProviderProvenanceDashboardViewRecord] = OrderedDict()
     self._provider_provenance_scheduled_reports: OrderedDict[str, ProviderProvenanceScheduledReportRecord] = OrderedDict()
     self._provider_provenance_scheduled_report_audit_records: OrderedDict[str, ProviderProvenanceScheduledReportAuditRecord] = OrderedDict()
+    self._provider_provenance_scheduler_health_records: OrderedDict[str, ProviderProvenanceSchedulerHealthRecord] = OrderedDict()
     self._replay_intent_alias_signing_secret: str | None = None
 
   def save_run(self, run: RunRecord) -> RunRecord:
@@ -744,6 +746,36 @@ class InMemoryRunRepository(RunRepositoryPort):
       if record.expires_at is None or record.expires_at > current_time
     )
     return original_count - len(self._provider_provenance_scheduled_report_audit_records)
+
+  def save_provider_provenance_scheduler_health_record(
+    self,
+    record: ProviderProvenanceSchedulerHealthRecord,
+  ) -> ProviderProvenanceSchedulerHealthRecord:
+    self._provider_provenance_scheduler_health_records[record.record_id] = record
+    return record
+
+  def list_provider_provenance_scheduler_health_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerHealthRecord, ...]:
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_health_records.values(),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+
+  def prune_provider_provenance_scheduler_health_records(self, current_time: datetime) -> int:
+    original_count = len(self._provider_provenance_scheduler_health_records)
+    self._provider_provenance_scheduler_health_records = OrderedDict(
+      (
+        record_id,
+        record,
+      )
+      for record_id, record in self._provider_provenance_scheduler_health_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    )
+    return original_count - len(self._provider_provenance_scheduler_health_records)
 
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     return self._replay_intent_alias_signing_secret

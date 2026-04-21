@@ -129,6 +129,10 @@ def serialize_provider_provenance_scheduled_report_run_due_result(*args, **kwarg
   return _application_symbol('serialize_provider_provenance_scheduled_report_run_due_result')(*args, **kwargs)
 
 
+def serialize_provider_provenance_scheduler_health_history(*args, **kwargs):
+  return _application_symbol('serialize_provider_provenance_scheduler_health_history')(*args, **kwargs)
+
+
 def serialize_strategy(*args, **kwargs):
   return _application_symbol('serialize_strategy')(*args, **kwargs)
 
@@ -590,6 +594,24 @@ def execute_standalone_surface_binding(
     return serialize_provider_provenance_scheduled_report_history(
       report,
       app.list_provider_provenance_scheduled_report_history(resolved_path_params["report_id"]),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_health_history":
+    current = app.get_provider_provenance_scheduler_health()
+    records = app.list_provider_provenance_scheduler_health_history(
+      status=resolved_filters.get("status"),
+      limit=resolved_filters.get("limit", 25),
+    )
+    return serialize_provider_provenance_scheduler_health_history(
+      current,
+      records,
+      status=resolved_filters.get("status"),
+      limit=resolved_filters.get("limit", 25),
+    )
+  if binding.binding_kind == "operator_provider_provenance_scheduler_health_analytics":
+    return app.get_provider_provenance_scheduler_health_analytics(
+      status=resolved_filters.get("status"),
+      window_days=resolved_filters.get("window_days", 14),
+      history_limit=resolved_filters.get("history_limit", 12),
     )
   if binding.binding_kind == "guarded_live_status":
     return asdict(app.get_guarded_live_status())

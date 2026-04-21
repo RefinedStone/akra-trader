@@ -38,6 +38,7 @@ from akra_trader.domain.models import RunComparison
 from akra_trader.domain.models import RunComparisonNarrative
 from akra_trader.domain.models import RunComparisonRun
 from akra_trader.domain.models import RunSurfaceCapabilities
+from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
 from akra_trader.domain.models import SignalAction
 from akra_trader.domain.models import SignalDecision
 from akra_trader.domain.models import StrategyDecisionEnvelope
@@ -52,6 +53,7 @@ def build_client(
   *,
   guarded_live_execution_enabled: bool = False,
   guarded_live_venue: str | None = None,
+  provider_provenance_report_scheduler_enabled: bool = True,
   operator_alert_external_sync_token: str | None = None,
   replay_alias_audit_admin_read_token: str | None = None,
   replay_alias_audit_admin_write_token: str | None = None,
@@ -61,6 +63,7 @@ def build_client(
     market_data_provider="seeded",
     guarded_live_execution_enabled=guarded_live_execution_enabled,
     guarded_live_venue=guarded_live_venue,
+    provider_provenance_report_scheduler_enabled=provider_provenance_report_scheduler_enabled,
     operator_alert_external_sync_token=operator_alert_external_sync_token,
     replay_alias_audit_admin_read_token=replay_alias_audit_admin_read_token,
     replay_alias_audit_admin_write_token=replay_alias_audit_admin_write_token,
@@ -607,6 +610,21 @@ def test_standalone_binding_routes_expose_generated_signatures(tmp_path: Path) -
   )
   assert tuple(inspect.signature(routes["get_operator_provider_provenance_scheduled_report_history"].endpoint).parameters) == (
     "report_id",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["list_operator_provider_provenance_scheduler_health_history"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "status",
+    "limit",
+    "app",
+  )
+  assert tuple(inspect.signature(routes["get_operator_provider_provenance_scheduler_health_analytics"].endpoint).parameters) == (
+    "request",
+    "filter_expr",
+    "status",
+    "window_days",
+    "history_limit",
     "app",
   )
   assert tuple(inspect.signature(routes["create_preset"].endpoint).parameters) == ("request", "app")
@@ -3172,12 +3190,24 @@ def test_operator_visibility_endpoint_reports_worker_failures(tmp_path: Path) ->
 def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
   tmp_path: Path,
 ) -> None:
-  with build_client(tmp_path / "runs.sqlite3") as client:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
     app = client.app.state.container.app
     fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
     app._clock = lambda: fixed_time
     app._provider_provenance_report_scheduler_interval_seconds = 60
     app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
 
     report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
     report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
@@ -3208,6 +3238,89 @@ def test_operator_visibility_endpoint_reports_provider_provenance_scheduler_lag(
     event["kind"] == "provider_provenance_scheduler_lagging"
     for event in payload["audit_events"]
   )
+
+
+def test_provider_provenance_scheduler_health_endpoints_expose_history_and_trends(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  with build_client(
+    tmp_path / "runs.sqlite3",
+    provider_provenance_report_scheduler_enabled=False,
+  ) as client:
+    app = client.app.state.container.app
+    fixed_time = datetime(2026, 4, 22, 10, 0, tzinfo=UTC)
+    app._clock = lambda: fixed_time
+    app._provider_provenance_report_scheduler_interval_seconds = 60
+    app._provider_provenance_report_scheduler_batch_limit = 1
+    app._provider_provenance_scheduler_health_records = {}
+    app._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
+      generated_at=fixed_time,
+      enabled=True,
+      status="starting",
+      summary="Background scheduler has not completed a provider provenance automation cycle yet.",
+      interval_seconds=60,
+      batch_limit=1,
+    )
+
+    report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
+    report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
+    overdue_at = fixed_time - timedelta(minutes=10)
+    app._save_provider_provenance_scheduled_report_record(replace(report_a, next_run_at=overdue_at))
+    app._save_provider_provenance_scheduled_report_record(replace(report_b, next_run_at=overdue_at))
+
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    for record in app.list_provider_provenance_scheduled_reports(limit=10):
+      app._save_provider_provenance_scheduled_report_record(
+        replace(record, next_run_at=fixed_time + timedelta(days=7))
+      )
+    fixed_time = fixed_time + timedelta(days=1)
+    app._clock = lambda: fixed_time
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+    fixed_time = fixed_time + timedelta(days=1)
+    app._clock = lambda: fixed_time
+
+    def fail_scheduler(*args, **kwargs):
+      raise RuntimeError("scheduler crash")
+
+    monkeypatch.setattr(app, "run_due_provider_provenance_scheduled_reports", fail_scheduler)
+    try:
+      app.execute_provider_provenance_scheduler_cycle(
+        source_tab_id="system:provider-provenance-scheduler",
+        source_tab_label="Background scheduler",
+      )
+    except RuntimeError:
+      pass
+    else:
+      raise AssertionError("expected scheduler failure to be recorded")
+
+    history_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-health",
+      params={"limit": 10},
+    )
+    analytics_response = client.get(
+      "/api/operator/provider-provenance-analytics/scheduler-health/analytics",
+      params={"window_days": 3, "history_limit": 5},
+    )
+
+  assert history_response.status_code == 200
+  history_payload = history_response.json()
+  assert history_payload["current"]["status"] == "failed"
+  assert [entry["status"] for entry in history_payload["items"]] == ["failed", "healthy", "lagging"]
+
+  assert analytics_response.status_code == 200
+  analytics_payload = analytics_response.json()
+  assert analytics_payload["totals"]["record_count"] == 3
+  assert analytics_payload["totals"]["peak_lag_seconds"] == 600
+  assert analytics_payload["time_series"]["health_status"]["summary"]["latest_status"] == "failed"
+  assert analytics_payload["time_series"]["lag_trend"]["summary"]["peak_lag_seconds"] == 600
+  assert analytics_payload["recent_history"][0]["status"] == "failed"
 
 
 def test_operator_visibility_endpoint_persists_guarded_live_alert_history(tmp_path: Path) -> None:

@@ -149,6 +149,9 @@ It is not yet a finished live trading product:
   report audit history so the analytics workbench is no longer browser-local only
 - operator visibility now also exposes provider-provenance scheduler health with lag/failure
   alerts and audit events, so background report automation is observable alongside runtime faults
+- provider provenance analytics now also persists scheduler health-cycle history and exposes
+  daily health/lag trend surfaces in the control room, so provenance automation can be reviewed as
+  an operational timeline rather than only a point-in-time alert snapshot
 
 ### Operator discipline baseline
 

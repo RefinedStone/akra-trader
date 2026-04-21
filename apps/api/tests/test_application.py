@@ -1210,6 +1210,103 @@ def test_operator_visibility_surfaces_provider_provenance_scheduler_failure(
   )
 
 
+def test_provider_provenance_scheduler_history_and_analytics_persist(
+  monkeypatch,
+  tmp_path: Path,
+) -> None:
+  runs = build_runs_repository(tmp_path)
+  presets = build_preset_catalog(tmp_path)
+  clock = MutableClock(datetime(2025, 1, 3, 12, 0, tzinfo=UTC))
+  app = TradingApplication(
+    market_data=SeededMarketDataAdapter(),
+    strategies=LocalStrategyCatalog(),
+    references=build_references(),
+    runs=runs,
+    presets=presets,
+    clock=clock,
+    provider_provenance_report_scheduler_interval_seconds=60,
+    provider_provenance_report_scheduler_batch_limit=1,
+  )
+
+  report_a = app.create_provider_provenance_scheduled_report(name="Drift watch A")
+  report_b = app.create_provider_provenance_scheduled_report(name="Drift watch B")
+  overdue_at = clock.current - timedelta(minutes=10)
+  app._save_provider_provenance_scheduled_report_record(replace(report_a, next_run_at=overdue_at))
+  app._save_provider_provenance_scheduled_report_record(replace(report_b, next_run_at=overdue_at))
+
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  for record in app.list_provider_provenance_scheduled_reports(limit=10):
+    app._save_provider_provenance_scheduled_report_record(
+      replace(record, next_run_at=clock.current + timedelta(days=7))
+    )
+  clock.advance(timedelta(days=1))
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+  clock.advance(timedelta(days=1))
+
+  def fail_scheduler(*args, **kwargs):
+    raise RuntimeError("scheduler crash")
+
+  monkeypatch.setattr(app, "run_due_provider_provenance_scheduled_reports", fail_scheduler)
+  with pytest.raises(RuntimeError, match="scheduler crash"):
+    app.execute_provider_provenance_scheduler_cycle(
+      source_tab_id="system:provider-provenance-scheduler",
+      source_tab_label="Background scheduler",
+    )
+
+  history = app.list_provider_provenance_scheduler_health_history(limit=10)
+
+  assert [record.status for record in history] == ["failed", "healthy", "lagging"]
+  assert history[0].last_error == "scheduler crash"
+  assert history[1].last_executed_count == 0
+  assert history[2].due_report_count == 1
+
+  analytics = app.get_provider_provenance_scheduler_health_analytics(window_days=3, history_limit=5)
+
+  assert analytics["totals"] == {
+    "record_count": 3,
+    "healthy_count": 1,
+    "lagging_count": 1,
+    "failed_count": 1,
+    "disabled_count": 0,
+    "starting_count": 0,
+    "executed_report_count": 1,
+    "peak_lag_seconds": 600,
+    "peak_due_report_count": 1,
+  }
+  assert [bucket["bucket_key"] for bucket in analytics["time_series"]["health_status"]["series"]] == [
+    "2025-01-03",
+    "2025-01-04",
+    "2025-01-05",
+  ]
+  assert analytics["time_series"]["health_status"]["summary"] == {
+    "peak_cycle_bucket_key": "2025-01-05",
+    "peak_cycle_bucket_label": "Jan 05",
+    "peak_cycle_count": 1,
+    "latest_bucket_key": "2025-01-05",
+    "latest_bucket_label": "Jan 05",
+    "latest_status": "failed",
+    "latest_cycle_count": 1,
+  }
+  assert analytics["time_series"]["lag_trend"]["summary"] == {
+    "peak_lag_bucket_key": "2025-01-03",
+    "peak_lag_bucket_label": "Jan 03",
+    "peak_lag_seconds": 600,
+    "latest_bucket_key": "2025-01-05",
+    "latest_bucket_label": "Jan 05",
+    "latest_lag_seconds": 0,
+    "latest_due_report_count": 0,
+    "latest_failure_count": 1,
+  }
+  assert analytics["recent_history"][0]["status"] == "failed"
+  assert analytics["current"]["status"] == "failed"
+
+
 def test_guarded_live_alert_history_persists_and_resolves_reconciliation_alerts(
   tmp_path: Path,
 ) -> None:
@@ -14419,6 +14516,8 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduled_report_run",
     "operator_provider_provenance_scheduled_report_run_due",
     "operator_provider_provenance_scheduled_report_history",
+    "operator_provider_provenance_scheduler_health_history",
+    "operator_provider_provenance_scheduler_health_analytics",
     "guarded_live_status",
     "strategy_catalog_discovery",
     "reference_catalog_discovery",
@@ -14539,6 +14638,18 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
   assert bindings_by_key["operator_provider_provenance_scheduled_report_run_due"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduled_report_history"].route_path == (
     "/operator/provider-provenance-analytics/reports/{report_id}/history"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_history"].route_path == (
+    "/operator/provider-provenance-analytics/scheduler-health"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_history"].filter_param_specs[-1].key == (
+    "limit"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_analytics"].route_path == (
+    "/operator/provider-provenance-analytics/scheduler-health/analytics"
+  )
+  assert bindings_by_key["operator_provider_provenance_scheduler_health_analytics"].filter_param_specs[-1].key == (
+    "history_limit"
   )
   assert bindings_by_key["guarded_live_status"].route_path == "/guarded-live"
   assert bindings_by_key["strategy_catalog_discovery"].route_path == "/strategies"
@@ -15591,6 +15702,32 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   )
   assert due_payload["executed_count"] == 1
   assert due_payload["items"][0]["report"]["report_id"] == report_payload["report_id"]
+
+  clock.advance(timedelta(days=1))
+  app.execute_provider_provenance_scheduler_cycle(
+    source_tab_id="system:provider-provenance-scheduler",
+    source_tab_label="Background scheduler",
+  )
+
+  scheduler_history_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_health_history"],
+    app=app,
+    filters={"limit": 10},
+  )
+  assert scheduler_history_payload["current"]["status"] == "healthy"
+  assert scheduler_history_payload["total"] == 1
+  assert scheduler_history_payload["items"][0]["status"] == "healthy"
+
+  scheduler_analytics_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_health_analytics"],
+    app=app,
+    filters={"window_days": 3, "history_limit": 5},
+  )
+  assert scheduler_analytics_payload["totals"]["record_count"] == 1
+  assert scheduler_analytics_payload["time_series"]["health_status"]["summary"]["latest_status"] == "healthy"
+  assert scheduler_analytics_payload["recent_history"][0]["record_id"] == (
+    scheduler_history_payload["items"][0]["record_id"]
+  )
 
 
 def test_reference_backtest_records_external_provenance(tmp_path: Path) -> None:

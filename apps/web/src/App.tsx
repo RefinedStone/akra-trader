@@ -63,6 +63,7 @@ import {
   fetchJson,
   getProviderProvenanceExportAnalytics,
   getProviderProvenanceExportJobHistory,
+  getProviderProvenanceSchedulerHealthAnalytics,
   getProviderProvenanceScheduledReportHistory,
   getRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobHistory,
   listProviderProvenanceAnalyticsPresets,
@@ -70,6 +71,7 @@ import {
   listMarketDataIngestionJobs,
   listMarketDataLineageHistory,
   listProviderProvenanceExportJobs,
+  listProviderProvenanceSchedulerHealthHistory,
   listProviderProvenanceScheduledReports,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAuditExportJobs,
   listRunSurfaceCollectionQueryBuilderServerReplayLinkAudits,
@@ -274,6 +276,8 @@ import type {
   ProviderProvenanceExportAnalyticsPayload,
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
+  ProviderProvenanceSchedulerHealthAnalyticsPayload,
+  ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProvenanceArtifactLineDetailView,
@@ -2198,6 +2202,25 @@ function formatProviderDriftIntensity(value: number) {
   return `${value.toFixed(2)} incidents/export`;
 }
 
+function formatSchedulerLagSeconds(value: number) {
+  if (value <= 0) {
+    return "0s";
+  }
+  if (value < 60) {
+    return `${Math.round(value)}s`;
+  }
+  const minutes = value / 60;
+  if (minutes < 60) {
+    return `${minutes.toFixed(minutes >= 10 ? 0 : 1)}m`;
+  }
+  const hours = minutes / 60;
+  if (hours < 24) {
+    return `${hours.toFixed(hours >= 10 ? 0 : 1)}h`;
+  }
+  const days = hours / 24;
+  return `${days.toFixed(days >= 10 ? 0 : 1)}d`;
+}
+
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -2814,6 +2837,18 @@ export default function App() {
     useState(false);
   const [providerProvenanceScheduledReportHistoryError, setProviderProvenanceScheduledReportHistoryError] =
     useState<string | null>(null);
+  const [providerProvenanceSchedulerAnalytics, setProviderProvenanceSchedulerAnalytics] =
+    useState<ProviderProvenanceSchedulerHealthAnalyticsPayload | null>(null);
+  const [providerProvenanceSchedulerAnalyticsLoading, setProviderProvenanceSchedulerAnalyticsLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerAnalyticsError, setProviderProvenanceSchedulerAnalyticsError] =
+    useState<string | null>(null);
+  const [providerProvenanceSchedulerHistory, setProviderProvenanceSchedulerHistory] =
+    useState<ProviderProvenanceSchedulerHealthHistoryPayload | null>(null);
+  const [providerProvenanceSchedulerHistoryLoading, setProviderProvenanceSchedulerHistoryLoading] =
+    useState(false);
+  const [providerProvenanceSchedulerHistoryError, setProviderProvenanceSchedulerHistoryError] =
+    useState<string | null>(null);
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -2967,6 +3002,8 @@ export default function App() {
   const skipNextControlRoomUiPersistRef = useRef(false);
   const marketDataWorkflowRequestIdRef = useRef(0);
   const providerProvenanceAnalyticsRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerAnalyticsRequestIdRef = useRef(0);
+  const providerProvenanceSchedulerHistoryRequestIdRef = useRef(0);
   const comparisonSelection = useMemo(
     () =>
       normalizeControlRoomComparisonSelection({
@@ -4220,6 +4257,10 @@ export default function App() {
   }, [activeMarketInstrument, marketStatus, providerProvenanceAnalyticsQuery]);
 
   useEffect(() => {
+    void loadProviderProvenanceSchedulerSurfaces();
+  }, [providerProvenanceAnalyticsQuery.window_days]);
+
+  useEffect(() => {
     void loadProviderProvenanceWorkspaceRegistry();
   }, []);
 
@@ -4247,6 +4288,30 @@ export default function App() {
         ),
       ),
     [providerProvenanceAnalytics],
+  );
+
+  const providerProvenanceSchedulerLagBarMax = useMemo(
+    () =>
+      Math.max(
+        0,
+        ...(providerProvenanceSchedulerAnalytics?.time_series.lag_trend.series ?? []).map((bucket) =>
+          Math.max(bucket.peak_lag_seconds, bucket.latest_lag_seconds),
+        ),
+      ),
+    [providerProvenanceSchedulerAnalytics],
+  );
+
+  const providerProvenanceSchedulerCurrent = useMemo(
+    () => providerProvenanceSchedulerAnalytics?.current ?? providerProvenanceSchedulerHistory?.current ?? null,
+    [providerProvenanceSchedulerAnalytics, providerProvenanceSchedulerHistory],
+  );
+
+  const providerProvenanceSchedulerRecentHistory = useMemo(
+    () =>
+      providerProvenanceSchedulerHistory?.items.length
+        ? providerProvenanceSchedulerHistory.items
+        : (providerProvenanceSchedulerAnalytics?.recent_history ?? []),
+    [providerProvenanceSchedulerAnalytics, providerProvenanceSchedulerHistory],
   );
 
   const focusedMarketIncidentHistory = useMemo(() => {
@@ -4879,6 +4944,49 @@ export default function App() {
     } finally {
       if (providerProvenanceAnalyticsRequestIdRef.current === requestId) {
         setProviderProvenanceAnalyticsLoading(false);
+      }
+    }
+  }
+
+  async function loadProviderProvenanceSchedulerSurfaces() {
+    const analyticsRequestId = providerProvenanceSchedulerAnalyticsRequestIdRef.current + 1;
+    providerProvenanceSchedulerAnalyticsRequestIdRef.current = analyticsRequestId;
+    const historyRequestId = providerProvenanceSchedulerHistoryRequestIdRef.current + 1;
+    providerProvenanceSchedulerHistoryRequestIdRef.current = historyRequestId;
+    setProviderProvenanceSchedulerAnalyticsLoading(true);
+    setProviderProvenanceSchedulerHistoryLoading(true);
+    setProviderProvenanceSchedulerAnalyticsError(null);
+    setProviderProvenanceSchedulerHistoryError(null);
+    try {
+      const [analyticsPayload, historyPayload] = await Promise.all([
+        getProviderProvenanceSchedulerHealthAnalytics({
+          windowDays: providerProvenanceAnalyticsQuery.window_days,
+          historyLimit: 8,
+        }),
+        listProviderProvenanceSchedulerHealthHistory({ limit: 8 }),
+      ]);
+      if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
+        setProviderProvenanceSchedulerAnalytics(analyticsPayload);
+      }
+      if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
+        setProviderProvenanceSchedulerHistory(historyPayload);
+      }
+    } catch (error) {
+      const message = (error as Error).message;
+      if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
+        setProviderProvenanceSchedulerAnalytics(null);
+        setProviderProvenanceSchedulerAnalyticsError(message);
+      }
+      if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
+        setProviderProvenanceSchedulerHistory(null);
+        setProviderProvenanceSchedulerHistoryError(message);
+      }
+    } finally {
+      if (providerProvenanceSchedulerAnalyticsRequestIdRef.current === analyticsRequestId) {
+        setProviderProvenanceSchedulerAnalyticsLoading(false);
+      }
+      if (providerProvenanceSchedulerHistoryRequestIdRef.current === historyRequestId) {
+        setProviderProvenanceSchedulerHistoryLoading(false);
       }
     }
   }
@@ -7775,6 +7883,247 @@ export default function App() {
                                   ) : null}
                                 </div>
                               </div>
+                              {providerProvenanceSchedulerAnalyticsLoading && !providerProvenanceSchedulerAnalytics ? (
+                                <p className="empty-state">Loading scheduler automation trends…</p>
+                              ) : null}
+                              {providerProvenanceSchedulerAnalyticsError ? (
+                                <p className="market-data-workflow-feedback">
+                                  Scheduler automation analytics failed: {providerProvenanceSchedulerAnalyticsError}
+                                </p>
+                              ) : null}
+                              {providerProvenanceSchedulerHistoryError ? (
+                                <p className="market-data-workflow-feedback">
+                                  Scheduler automation history failed: {providerProvenanceSchedulerHistoryError}
+                                </p>
+                              ) : null}
+                              {providerProvenanceSchedulerCurrent ? (
+                                <div className="market-data-provenance-shared-history">
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Scheduler automation</strong>
+                                    <p>
+                                      Persisted health history and daily trend buckets for provenance report
+                                      automation.
+                                    </p>
+                                  </div>
+                                  <div className="status-grid">
+                                    <div className="metric-tile">
+                                      <span>Current status</span>
+                                      <strong>{formatWorkflowToken(providerProvenanceSchedulerCurrent.status)}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Due backlog</span>
+                                      <strong>{providerProvenanceSchedulerCurrent.due_report_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Peak lag</span>
+                                      <strong>{formatSchedulerLagSeconds(providerProvenanceSchedulerCurrent.max_due_lag_seconds)}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Total executed</span>
+                                      <strong>{providerProvenanceSchedulerCurrent.total_executed_count}</strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Success / failure</span>
+                                      <strong>
+                                        {providerProvenanceSchedulerCurrent.success_count} / {providerProvenanceSchedulerCurrent.failure_count}
+                                      </strong>
+                                    </div>
+                                    <div className="metric-tile">
+                                      <span>Last success</span>
+                                      <strong>{formatTimestamp(providerProvenanceSchedulerCurrent.last_success_at)}</strong>
+                                    </div>
+                                  </div>
+                                  <p className="market-data-workflow-export-copy">
+                                    {providerProvenanceSchedulerCurrent.summary}
+                                  </p>
+                                  <div className="run-filter-summary-chip-row">
+                                    <span className="run-filter-summary-chip">
+                                      Interval {providerProvenanceSchedulerCurrent.interval_seconds}s · batch {providerProvenanceSchedulerCurrent.batch_limit}
+                                    </span>
+                                    <span className="run-filter-summary-chip">
+                                      Last cycle {formatTimestamp(providerProvenanceSchedulerCurrent.last_cycle_finished_at)}
+                                    </span>
+                                    {providerProvenanceSchedulerCurrent.oldest_due_at ? (
+                                      <span className="run-filter-summary-chip">
+                                        Oldest due {formatTimestamp(providerProvenanceSchedulerCurrent.oldest_due_at)}
+                                      </span>
+                                    ) : null}
+                                    {providerProvenanceSchedulerCurrent.last_error ? (
+                                      <span className="run-filter-summary-chip">
+                                        Last error {providerProvenanceSchedulerCurrent.last_error}
+                                      </span>
+                                    ) : null}
+                                    {providerProvenanceSchedulerCurrent.issues.map((issue) => (
+                                      <span className="run-filter-summary-chip" key={`provider-scheduler-issue-${issue}`}>
+                                        {issue}
+                                      </span>
+                                    ))}
+                                  </div>
+                                  {providerProvenanceSchedulerAnalytics ? (
+                                    <div className="status-grid-two-column market-data-provenance-time-series-grid">
+                                      <div className="market-data-provenance-time-series-panel">
+                                        <div className="market-data-provenance-history-head">
+                                          <strong>Health status by day</strong>
+                                          <p>
+                                            Daily scheduler-cycle mix across the current provenance automation window.
+                                          </p>
+                                        </div>
+                                        <div className="run-filter-summary-chip-row">
+                                          <span className="run-filter-summary-chip">
+                                            Peak cycle day {providerProvenanceSchedulerAnalytics.time_series.health_status.summary.peak_cycle_bucket_label ?? "n/a"} · {" "}
+                                            {providerProvenanceSchedulerAnalytics.time_series.health_status.summary.peak_cycle_count} cycle(s)
+                                          </span>
+                                          <span className="run-filter-summary-chip">
+                                            Latest {providerProvenanceSchedulerAnalytics.time_series.health_status.summary.latest_bucket_label ?? "n/a"} · {" "}
+                                            {formatWorkflowToken(providerProvenanceSchedulerAnalytics.time_series.health_status.summary.latest_status)}
+                                          </span>
+                                        </div>
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Day</th>
+                                              <th>Cycles</th>
+                                              <th>Status mix</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceSchedulerAnalytics.time_series.health_status.series.map((bucket) => (
+                                              <tr key={`provider-scheduler-health-${bucket.bucket_key}`}>
+                                                <td>
+                                                  <strong>{bucket.bucket_label}</strong>
+                                                  <p className="run-lineage-symbol-copy">{bucket.bucket_key}</p>
+                                                </td>
+                                                <td>
+                                                  <strong>{bucket.cycle_count} cycle(s)</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Executed {bucket.executed_report_count} report(s)
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{formatWorkflowToken(bucket.dominant_status)}</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Healthy {bucket.healthy_count} · lagging {bucket.lagging_count} · failed {bucket.failed_count}
+                                                  </p>
+                                                  <p className="run-lineage-symbol-copy">{bucket.latest_summary || "No scheduler events recorded."}</p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                      <div className="market-data-provenance-time-series-panel">
+                                        <div className="market-data-provenance-history-head">
+                                          <strong>Lag and backlog trend</strong>
+                                          <p>
+                                            Daily peak lag, due backlog, and failure pressure for scheduler cycles.
+                                          </p>
+                                        </div>
+                                        <div className="run-filter-summary-chip-row">
+                                          <span className="run-filter-summary-chip">
+                                            Peak lag {providerProvenanceSchedulerAnalytics.time_series.lag_trend.summary.peak_lag_bucket_label ?? "n/a"} · {" "}
+                                            {formatSchedulerLagSeconds(providerProvenanceSchedulerAnalytics.time_series.lag_trend.summary.peak_lag_seconds)}
+                                          </span>
+                                          <span className="run-filter-summary-chip">
+                                            Latest lag {formatSchedulerLagSeconds(providerProvenanceSchedulerAnalytics.time_series.lag_trend.summary.latest_lag_seconds)} · {" "}
+                                            {providerProvenanceSchedulerAnalytics.time_series.lag_trend.summary.latest_due_report_count} due
+                                          </span>
+                                        </div>
+                                        <table className="data-table">
+                                          <thead>
+                                            <tr>
+                                              <th>Day</th>
+                                              <th>Lag</th>
+                                              <th>Backlog</th>
+                                            </tr>
+                                          </thead>
+                                          <tbody>
+                                            {providerProvenanceSchedulerAnalytics.time_series.lag_trend.series.map((bucket) => (
+                                              <tr key={`provider-scheduler-lag-${bucket.bucket_key}`}>
+                                                <td>
+                                                  <strong>{bucket.bucket_label}</strong>
+                                                  <p className="run-lineage-symbol-copy">{bucket.bucket_key}</p>
+                                                </td>
+                                                <td>
+                                                  <strong>{formatSchedulerLagSeconds(bucket.peak_lag_seconds)}</strong>
+                                                  <div className="market-data-provenance-timeseries-track">
+                                                    <div
+                                                      className="market-data-provenance-timeseries-bar is-warning"
+                                                      style={{
+                                                        width: resolveProviderProvenanceSeriesBarWidth(
+                                                          bucket.peak_lag_seconds,
+                                                          providerProvenanceSchedulerLagBarMax,
+                                                        ),
+                                                      }}
+                                                    />
+                                                  </div>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Latest {formatSchedulerLagSeconds(bucket.latest_lag_seconds)} · avg {formatSchedulerLagSeconds(bucket.average_lag_seconds)}
+                                                  </p>
+                                                </td>
+                                                <td>
+                                                  <strong>{bucket.peak_due_report_count} due report(s)</strong>
+                                                  <p className="run-lineage-symbol-copy">
+                                                    Failures {bucket.failure_count} · executed {bucket.executed_report_count}
+                                                  </p>
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  <div className="market-data-provenance-history-head">
+                                    <strong>Recent scheduler cycles</strong>
+                                    <p>
+                                      Review the persisted automation history that backs the trend surfaces.
+                                    </p>
+                                  </div>
+                                  {providerProvenanceSchedulerHistoryLoading && !providerProvenanceSchedulerRecentHistory.length ? (
+                                    <p className="empty-state">Loading scheduler cycle history…</p>
+                                  ) : null}
+                                  {providerProvenanceSchedulerRecentHistory.length ? (
+                                    <table className="data-table">
+                                      <thead>
+                                        <tr>
+                                          <th>Recorded</th>
+                                          <th>Status</th>
+                                          <th>Detail</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {providerProvenanceSchedulerRecentHistory.map((entry) => (
+                                          <tr key={entry.record_id}>
+                                            <td>
+                                              <strong>{formatTimestamp(entry.recorded_at)}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.source_tab_label ?? entry.source_tab_id ?? "scheduler"}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{formatWorkflowToken(entry.status)}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Lag {formatSchedulerLagSeconds(entry.max_due_lag_seconds)} · due {entry.due_report_count}
+                                              </p>
+                                            </td>
+                                            <td>
+                                              <strong>{entry.summary}</strong>
+                                              <p className="run-lineage-symbol-copy">
+                                                Executed {entry.last_executed_count} report(s) · cycle {entry.cycle_count}
+                                              </p>
+                                              <p className="run-lineage-symbol-copy">
+                                                {entry.last_error ?? (entry.issues.join(" · ") || "No blocking issues recorded.")}
+                                              </p>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  ) : (
+                                    <p className="empty-state">No scheduler cycle history recorded yet.</p>
+                                  )}
+                                </div>
+                              ) : null}
                               {providerProvenanceAnalyticsLoading ? (
                                 <p className="empty-state">Loading provider provenance analytics…</p>
                               ) : null}

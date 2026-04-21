@@ -32,6 +32,7 @@ from akra_trader.domain.models import ProviderProvenanceAnalyticsPresetRecord
 from akra_trader.domain.models import ProviderProvenanceDashboardViewRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
+from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunRecord
@@ -202,6 +203,16 @@ provider_provenance_scheduled_report_audit_records = Table(
   Column("expires_at", String, nullable=True, index=True),
   Column("payload", JSON, nullable=False),
 )
+provider_provenance_scheduler_health_records = Table(
+  "provider_provenance_scheduler_health_records",
+  metadata,
+  Column("record_id", String, primary_key=True),
+  Column("scheduler_key", String, nullable=False, index=True),
+  Column("status", String, nullable=False, index=True),
+  Column("recorded_at", String, nullable=False, index=True),
+  Column("expires_at", String, nullable=True, index=True),
+  Column("payload", JSON, nullable=False),
+)
 replay_intent_alias_state = Table(
   "replay_intent_alias_state",
   metadata,
@@ -238,6 +249,7 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
   _provider_provenance_dashboard_view_adapter = TypeAdapter(ProviderProvenanceDashboardViewRecord)
   _provider_provenance_scheduled_report_adapter = TypeAdapter(ProviderProvenanceScheduledReportRecord)
   _provider_provenance_scheduled_report_audit_adapter = TypeAdapter(ProviderProvenanceScheduledReportAuditRecord)
+  _provider_provenance_scheduler_health_record_adapter = TypeAdapter(ProviderProvenanceSchedulerHealthRecord)
 
   def __init__(self, database_url: str) -> None:
     self._database_url = database_url
@@ -1108,6 +1120,59 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
       )
     return result.rowcount or 0
 
+  def save_provider_provenance_scheduler_health_record(
+    self,
+    record: ProviderProvenanceSchedulerHealthRecord,
+  ) -> ProviderProvenanceSchedulerHealthRecord:
+    payload = self._provider_provenance_scheduler_health_record_adapter.dump_python(record, mode="json")
+    row = {
+      "record_id": record.record_id,
+      "scheduler_key": record.scheduler_key,
+      "status": record.status,
+      "recorded_at": record.recorded_at.isoformat(),
+      "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+      "payload": payload,
+    }
+    with self._engine.begin() as connection:
+      existing = connection.execute(
+        select(provider_provenance_scheduler_health_records.c.record_id).where(
+          provider_provenance_scheduler_health_records.c.record_id == record.record_id
+        )
+      ).first()
+      if existing is None:
+        connection.execute(insert(provider_provenance_scheduler_health_records).values(**row))
+      else:
+        connection.execute(
+          update(provider_provenance_scheduler_health_records)
+          .where(provider_provenance_scheduler_health_records.c.record_id == record.record_id)
+          .values(**row)
+        )
+    return record
+
+  def list_provider_provenance_scheduler_health_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerHealthRecord, ...]:
+    statement = select(provider_provenance_scheduler_health_records.c.payload).order_by(
+      provider_provenance_scheduler_health_records.c.recorded_at.desc(),
+      provider_provenance_scheduler_health_records.c.record_id.desc(),
+    )
+    with self._engine.connect() as connection:
+      rows = connection.execute(statement).mappings().all()
+    return tuple(
+      self._provider_provenance_scheduler_health_record_adapter.validate_python(row["payload"])
+      for row in rows
+    )
+
+  def prune_provider_provenance_scheduler_health_records(self, current_time: datetime) -> int:
+    with self._engine.begin() as connection:
+      result = connection.execute(
+        delete(provider_provenance_scheduler_health_records).where(
+          provider_provenance_scheduler_health_records.c.expires_at.is_not(None),
+          provider_provenance_scheduler_health_records.c.expires_at <= current_time.isoformat(),
+        )
+      )
+    return result.rowcount or 0
+
   def load_replay_intent_alias_signing_secret(self) -> str | None:
     with self._engine.connect() as connection:
       row = connection.execute(
@@ -1231,8 +1296,15 @@ class SqlAlchemyRunRepository(RunRepositoryPort):
         ("ix_provider_provenance_scheduled_report_audit_records_action", "action"),
         ("ix_provider_provenance_scheduled_report_audit_records_recorded_at", "recorded_at"),
         ("ix_provider_provenance_scheduled_report_audit_records_expires_at", "expires_at"),
+        ("ix_provider_provenance_scheduler_health_records_scheduler_key", "scheduler_key"),
+        ("ix_provider_provenance_scheduler_health_records_status", "status"),
+        ("ix_provider_provenance_scheduler_health_records_recorded_at", "recorded_at"),
+        ("ix_provider_provenance_scheduler_health_records_expires_at", "expires_at"),
       ):
         table_name = (
+          "provider_provenance_scheduler_health_records"
+          if index_name.startswith("ix_provider_provenance_scheduler_health_records_")
+          else
           "provider_provenance_scheduled_report_audit_records"
           if index_name.startswith("ix_provider_provenance_scheduled_report_audit_records_")
           else "provider_provenance_scheduled_reports"

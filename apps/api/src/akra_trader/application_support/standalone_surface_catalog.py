@@ -1567,6 +1567,83 @@ def build_standalone_surface_runtime_bindings(
     binding_kind="operator_provider_provenance_scheduled_report_history",
     path_param_keys=("report_id",),
   )
+  operator_provider_provenance_scheduler_health_history_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_health_history",
+    route_path="/operator/provider-provenance-analytics/scheduler-health",
+    route_name="list_operator_provider_provenance_scheduler_health_history",
+    response_title="Provider provenance scheduler health history",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_health_history",
+    filter_keys=("status", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Status",
+          description="Filter scheduler health history by health status.",
+          examples=("lagging",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=25,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler health records to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
+  operator_provider_provenance_scheduler_health_analytics_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_health_analytics",
+    route_path="/operator/provider-provenance-analytics/scheduler-health/analytics",
+    route_name="get_operator_provider_provenance_scheduler_health_analytics",
+    response_title="Provider provenance scheduler health analytics",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_health_analytics",
+    filter_keys=("status", "window_days", "history_limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "status",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Status",
+          description="Filter scheduler health analytics by health status.",
+          examples=("failed",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "window_days",
+        int,
+        default=14,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=3, le=90),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Window days",
+          description="Rolling day window for scheduler health analytics buckets.",
+          examples=(14,),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "history_limit",
+        int,
+        default=12,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=50),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="History limit",
+          description="Maximum number of recent scheduler health records to embed in analytics.",
+          examples=(12,),
+        ),
+      ),
+    ),
+  )
   guarded_live_status_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="guarded_live_status",
     route_path="/guarded-live",
@@ -2817,6 +2894,8 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduled_report_run_binding,
     operator_provider_provenance_scheduled_report_run_due_binding,
     operator_provider_provenance_scheduled_report_history_binding,
+    operator_provider_provenance_scheduler_health_history_binding,
+    operator_provider_provenance_scheduler_health_analytics_binding,
     guarded_live_status_binding,
     strategy_discovery_binding,
     reference_discovery_binding,

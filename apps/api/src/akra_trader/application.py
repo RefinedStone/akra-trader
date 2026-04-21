@@ -36,6 +36,7 @@ from akra_trader.domain.models import ProviderProvenanceExportArtifactRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobAuditRecord
 from akra_trader.domain.models import ProviderProvenanceExportJobRecord
 from akra_trader.domain.models import ProviderProvenanceSchedulerHealth
+from akra_trader.domain.models import ProviderProvenanceSchedulerHealthRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportAuditRecord
 from akra_trader.domain.models import ProviderProvenanceScheduledReportRecord
 from akra_trader.domain.models import RunSurfaceCapabilities
@@ -420,6 +421,7 @@ class TradingApplication:
     self._provider_provenance_dashboard_views: dict[str, ProviderProvenanceDashboardViewRecord] = {}
     self._provider_provenance_scheduled_reports: dict[str, ProviderProvenanceScheduledReportRecord] = {}
     self._provider_provenance_scheduled_report_audit_records: dict[str, ProviderProvenanceScheduledReportAuditRecord] = {}
+    self._provider_provenance_scheduler_health_records: dict[str, ProviderProvenanceSchedulerHealthRecord] = {}
     self._provider_provenance_scheduler_health_lock = Lock()
     self._provider_provenance_scheduler_health = ProviderProvenanceSchedulerHealth(
       generated_at=self._clock(),
@@ -1637,6 +1639,87 @@ class TradingApplication:
       if record.expires_at is None or record.expires_at > current_time
     }
     return original_count - len(self._provider_provenance_scheduled_report_audit_records)
+
+  def _save_provider_provenance_scheduler_health_record(
+    self,
+    record: ProviderProvenanceSchedulerHealthRecord,
+  ) -> ProviderProvenanceSchedulerHealthRecord:
+    save_record = getattr(self._runs, "save_provider_provenance_scheduler_health_record", None)
+    if callable(save_record):
+      return save_record(record)
+    self._provider_provenance_scheduler_health_records[record.record_id] = record
+    return record
+
+  def _list_provider_provenance_scheduler_health_records(
+    self,
+  ) -> tuple[ProviderProvenanceSchedulerHealthRecord, ...]:
+    list_records = getattr(self._runs, "list_provider_provenance_scheduler_health_records", None)
+    if callable(list_records):
+      return tuple(list_records())
+    return tuple(
+      sorted(
+        self._provider_provenance_scheduler_health_records.values(),
+        key=lambda record: (record.recorded_at, record.record_id),
+        reverse=True,
+      )
+    )
+
+  def _prune_provider_provenance_scheduler_health_records(self) -> int:
+    current_time = self._clock()
+    prune_records = getattr(self._runs, "prune_provider_provenance_scheduler_health_records", None)
+    if callable(prune_records):
+      return int(prune_records(current_time))
+    original_count = len(self._provider_provenance_scheduler_health_records)
+    self._provider_provenance_scheduler_health_records = {
+      record_id: record
+      for record_id, record in self._provider_provenance_scheduler_health_records.items()
+      if record.expires_at is None or record.expires_at > current_time
+    }
+    return original_count - len(self._provider_provenance_scheduler_health_records)
+
+  def _record_provider_provenance_scheduler_health(
+    self,
+    *,
+    snapshot: ProviderProvenanceSchedulerHealth,
+    source_tab_id: str | None = None,
+    source_tab_label: str | None = None,
+  ) -> ProviderProvenanceSchedulerHealthRecord:
+    self._prune_provider_provenance_scheduler_health_records()
+    record = ProviderProvenanceSchedulerHealthRecord(
+      record_id=uuid4().hex[:12],
+      recorded_at=snapshot.generated_at,
+      expires_at=self._build_replay_intent_alias_audit_expiry(
+        retention_policy="90d",
+        recorded_at=snapshot.generated_at,
+      ),
+      enabled=snapshot.enabled,
+      status=snapshot.status,
+      summary=snapshot.summary,
+      interval_seconds=snapshot.interval_seconds,
+      batch_limit=snapshot.batch_limit,
+      last_cycle_started_at=snapshot.last_cycle_started_at,
+      last_cycle_finished_at=snapshot.last_cycle_finished_at,
+      last_success_at=snapshot.last_success_at,
+      last_failure_at=snapshot.last_failure_at,
+      last_error=snapshot.last_error,
+      cycle_count=snapshot.cycle_count,
+      success_count=snapshot.success_count,
+      failure_count=snapshot.failure_count,
+      consecutive_failure_count=snapshot.consecutive_failure_count,
+      last_executed_count=snapshot.last_executed_count,
+      total_executed_count=snapshot.total_executed_count,
+      due_report_count=snapshot.due_report_count,
+      oldest_due_at=snapshot.oldest_due_at,
+      max_due_lag_seconds=snapshot.max_due_lag_seconds,
+      source_tab_id=source_tab_id.strip() if isinstance(source_tab_id, str) and source_tab_id.strip() else None,
+      source_tab_label=(
+        source_tab_label.strip()
+        if isinstance(source_tab_label, str) and source_tab_label.strip()
+        else None
+      ),
+      issues=tuple(snapshot.issues),
+    )
+    return self._save_provider_provenance_scheduler_health_record(record)
 
   def _record_provider_provenance_scheduled_report_event(
     self,
@@ -3802,9 +3885,12 @@ class TradingApplication:
       )
     except Exception as exc:
       finished_at = self._clock()
+      due_report_count, oldest_due_at, max_due_lag_seconds = (
+        self._summarize_provider_provenance_scheduler_due_reports(reference_time=finished_at)
+      )
       with self._provider_provenance_scheduler_health_lock:
         snapshot = self._provider_provenance_scheduler_health
-        self._provider_provenance_scheduler_health = replace(
+        updated_snapshot = replace(
           snapshot,
           generated_at=finished_at,
           status="failed",
@@ -3815,8 +3901,18 @@ class TradingApplication:
           cycle_count=snapshot.cycle_count + 1,
           failure_count=snapshot.failure_count + 1,
           consecutive_failure_count=snapshot.consecutive_failure_count + 1,
+          last_executed_count=0,
+          due_report_count=due_report_count,
+          oldest_due_at=oldest_due_at,
+          max_due_lag_seconds=max_due_lag_seconds,
           issues=("Scheduler cycle raised an exception before due reports completed.",),
         )
+        self._provider_provenance_scheduler_health = updated_snapshot
+      self._record_provider_provenance_scheduler_health(
+        snapshot=updated_snapshot,
+        source_tab_id=source_tab_id,
+        source_tab_label=source_tab_label,
+      )
       raise
 
     finished_at = self._clock()
@@ -3838,7 +3934,7 @@ class TradingApplication:
           f"{due_report_count} due report(s) remain after the latest cycle; oldest due lag is {max_due_lag_seconds}s."
         )
       executed_count = int(result.get("executed_count", 0))
-      self._provider_provenance_scheduler_health = replace(
+      updated_snapshot = replace(
         snapshot,
         generated_at=finished_at,
         status=status,
@@ -3857,6 +3953,12 @@ class TradingApplication:
         max_due_lag_seconds=max_due_lag_seconds,
         issues=tuple(issues),
       )
+      self._provider_provenance_scheduler_health = updated_snapshot
+    self._record_provider_provenance_scheduler_health(
+      snapshot=updated_snapshot,
+      source_tab_id=source_tab_id,
+      source_tab_label=source_tab_label,
+    )
     return result
 
   def list_provider_provenance_scheduled_report_history(
@@ -25587,6 +25689,247 @@ class TradingApplication:
       issues=tuple(issues),
     )
 
+  @staticmethod
+  def _normalize_provider_provenance_scheduler_health_status(
+    status: str | None,
+  ) -> str | None:
+    if not isinstance(status, str):
+      return None
+    normalized = status.strip().lower()
+    if normalized in {"healthy", "lagging", "failed", "disabled", "starting"}:
+      return normalized
+    return None
+
+  def list_provider_provenance_scheduler_health_history(
+    self,
+    *,
+    status: str | None = None,
+    limit: int = 25,
+  ) -> tuple[ProviderProvenanceSchedulerHealthRecord, ...]:
+    self._prune_provider_provenance_scheduler_health_records()
+    normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
+    normalized_limit = max(1, min(limit, 200))
+    records = [
+      record
+      for record in self._list_provider_provenance_scheduler_health_records()
+      if normalized_status is None or record.status == normalized_status
+    ]
+    return tuple(records[:normalized_limit])
+
+  @classmethod
+  def _build_provider_provenance_scheduler_health_time_series(
+    cls,
+    *,
+    records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
+    window_days: int,
+    now: datetime,
+  ) -> dict[str, Any]:
+    normalized_window_days = max(3, min(window_days, 90))
+    anchor_candidates = [now]
+    anchor_candidates.extend(record.recorded_at for record in records)
+    window_anchor = cls._normalize_provider_provenance_export_bucket_start(max(anchor_candidates))
+    window_started_at = window_anchor - timedelta(days=normalized_window_days - 1)
+    window_ended_at = window_anchor + timedelta(days=1)
+
+    record_buckets: dict[datetime, list[ProviderProvenanceSchedulerHealthRecord]] = {}
+    for record in records:
+      bucket_start = cls._normalize_provider_provenance_export_bucket_start(record.recorded_at)
+      if not (window_started_at <= bucket_start < window_ended_at):
+        continue
+      record_buckets.setdefault(bucket_start, []).append(record)
+
+    health_status_series: list[dict[str, Any]] = []
+    lag_trend_series: list[dict[str, Any]] = []
+
+    for offset in range(normalized_window_days):
+      bucket_start = window_started_at + timedelta(days=offset)
+      bucket_end = bucket_start + timedelta(days=1)
+      bucket_records = sorted(
+        record_buckets.get(bucket_start, []),
+        key=lambda record: (record.recorded_at, record.record_id),
+      )
+      counts_by_status = {
+        "healthy": 0,
+        "lagging": 0,
+        "failed": 0,
+        "disabled": 0,
+        "starting": 0,
+      }
+      for record in bucket_records:
+        counts_by_status[record.status] = counts_by_status.get(record.status, 0) + 1
+      dominant_status, dominant_count = max(
+        counts_by_status.items(),
+        key=lambda item: (item[1], item[0]),
+      )
+      latest_record = bucket_records[-1] if bucket_records else None
+      cycle_count = len(bucket_records)
+      executed_report_count = sum(record.last_executed_count for record in bucket_records)
+      failure_count = sum(1 for record in bucket_records if record.status == "failed")
+      lag_values = [max(record.max_due_lag_seconds, 0) for record in bucket_records]
+      due_counts = [max(record.due_report_count, 0) for record in bucket_records]
+      bucket_key = bucket_start.date().isoformat()
+      bucket_label = bucket_start.strftime("%b %d")
+
+      health_status_series.append(
+        {
+          "bucket_key": bucket_key,
+          "bucket_label": bucket_label,
+          "started_at": bucket_start.isoformat(),
+          "ended_at": bucket_end.isoformat(),
+          "cycle_count": cycle_count,
+          "healthy_count": counts_by_status["healthy"],
+          "lagging_count": counts_by_status["lagging"],
+          "failed_count": counts_by_status["failed"],
+          "disabled_count": counts_by_status["disabled"],
+          "starting_count": counts_by_status["starting"],
+          "dominant_status": dominant_status if dominant_count > 0 else "no_data",
+          "dominant_count": dominant_count,
+          "latest_status": latest_record.status if latest_record is not None else "no_data",
+          "latest_summary": latest_record.summary if latest_record is not None else "",
+          "executed_report_count": executed_report_count,
+        }
+      )
+      lag_trend_series.append(
+        {
+          "bucket_key": bucket_key,
+          "bucket_label": bucket_label,
+          "started_at": bucket_start.isoformat(),
+          "ended_at": bucket_end.isoformat(),
+          "cycle_count": cycle_count,
+          "peak_lag_seconds": max(lag_values) if lag_values else 0,
+          "latest_lag_seconds": lag_values[-1] if lag_values else 0,
+          "average_lag_seconds": round(sum(lag_values) / len(lag_values), 1) if lag_values else 0.0,
+          "peak_due_report_count": max(due_counts) if due_counts else 0,
+          "latest_due_report_count": due_counts[-1] if due_counts else 0,
+          "failure_count": failure_count,
+          "executed_report_count": executed_report_count,
+        }
+      )
+
+    peak_cycle_bucket = max(
+      health_status_series,
+      key=lambda item: (
+        int(item["cycle_count"]),
+        int(item["failed_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    peak_lag_bucket = max(
+      lag_trend_series,
+      key=lambda item: (
+        int(item["peak_lag_seconds"]),
+        int(item["peak_due_report_count"]),
+        item["bucket_key"],
+      ),
+      default=None,
+    )
+    latest_health_bucket = health_status_series[-1] if health_status_series else None
+    latest_lag_bucket = lag_trend_series[-1] if lag_trend_series else None
+
+    return {
+      "bucket_size": "day",
+      "window_days": normalized_window_days,
+      "window_started_at": window_started_at.isoformat(),
+      "window_ended_at": window_ended_at.isoformat(),
+      "health_status": {
+        "series": health_status_series,
+        "summary": {
+          "peak_cycle_bucket_key": peak_cycle_bucket["bucket_key"] if peak_cycle_bucket is not None else None,
+          "peak_cycle_bucket_label": (
+            peak_cycle_bucket["bucket_label"]
+            if peak_cycle_bucket is not None
+            else None
+          ),
+          "peak_cycle_count": int(peak_cycle_bucket["cycle_count"]) if peak_cycle_bucket is not None else 0,
+          "latest_bucket_key": latest_health_bucket["bucket_key"] if latest_health_bucket is not None else None,
+          "latest_bucket_label": (
+            latest_health_bucket["bucket_label"]
+            if latest_health_bucket is not None
+            else None
+          ),
+          "latest_status": latest_health_bucket["latest_status"] if latest_health_bucket is not None else "no_data",
+          "latest_cycle_count": int(latest_health_bucket["cycle_count"]) if latest_health_bucket is not None else 0,
+        },
+      },
+      "lag_trend": {
+        "series": lag_trend_series,
+        "summary": {
+          "peak_lag_bucket_key": peak_lag_bucket["bucket_key"] if peak_lag_bucket is not None else None,
+          "peak_lag_bucket_label": peak_lag_bucket["bucket_label"] if peak_lag_bucket is not None else None,
+          "peak_lag_seconds": int(peak_lag_bucket["peak_lag_seconds"]) if peak_lag_bucket is not None else 0,
+          "latest_bucket_key": latest_lag_bucket["bucket_key"] if latest_lag_bucket is not None else None,
+          "latest_bucket_label": latest_lag_bucket["bucket_label"] if latest_lag_bucket is not None else None,
+          "latest_lag_seconds": int(latest_lag_bucket["latest_lag_seconds"]) if latest_lag_bucket is not None else 0,
+          "latest_due_report_count": (
+            int(latest_lag_bucket["latest_due_report_count"])
+            if latest_lag_bucket is not None
+            else 0
+          ),
+          "latest_failure_count": int(latest_lag_bucket["failure_count"]) if latest_lag_bucket is not None else 0,
+        },
+      },
+    }
+
+  def get_provider_provenance_scheduler_health_analytics(
+    self,
+    *,
+    status: str | None = None,
+    window_days: int = 14,
+    history_limit: int = 12,
+  ) -> dict[str, Any]:
+    self._prune_provider_provenance_scheduler_health_records()
+    normalized_status = self._normalize_provider_provenance_scheduler_health_status(status)
+    records = tuple(
+      record
+      for record in self._list_provider_provenance_scheduler_health_records()
+      if normalized_status is None or record.status == normalized_status
+    )
+    normalized_history_limit = max(1, min(history_limit, 50))
+    time_series = self._build_provider_provenance_scheduler_health_time_series(
+      records=records,
+      window_days=window_days,
+      now=self._clock(),
+    )
+    all_statuses = tuple(
+      sorted(
+        {
+          record.status
+          for record in self._list_provider_provenance_scheduler_health_records()
+          if isinstance(record.status, str) and record.status
+        }
+      )
+    )
+    current_snapshot = self.get_provider_provenance_scheduler_health()
+    return {
+      "generated_at": self._clock().isoformat(),
+      "query": {
+        "status": normalized_status,
+        "window_days": time_series["window_days"],
+        "history_limit": normalized_history_limit,
+      },
+      "current": serialize_provider_provenance_scheduler_health(current_snapshot),
+      "totals": {
+        "record_count": len(records),
+        "healthy_count": sum(1 for record in records if record.status == "healthy"),
+        "lagging_count": sum(1 for record in records if record.status == "lagging"),
+        "failed_count": sum(1 for record in records if record.status == "failed"),
+        "disabled_count": sum(1 for record in records if record.status == "disabled"),
+        "starting_count": sum(1 for record in records if record.status == "starting"),
+        "executed_report_count": sum(record.last_executed_count for record in records),
+        "peak_lag_seconds": max((record.max_due_lag_seconds for record in records), default=0),
+        "peak_due_report_count": max((record.due_report_count for record in records), default=0),
+      },
+      "available_filters": {
+        "statuses": list(all_statuses),
+      },
+      "time_series": time_series,
+      "recent_history": [
+        serialize_provider_provenance_scheduler_health_record(record)
+        for record in records[:normalized_history_limit]
+      ],
+    }
+
   def _collect_provider_provenance_scheduler_operator_visibility(
     self,
     *,
@@ -26814,6 +27157,105 @@ def serialize_provider_provenance_scheduled_report_record(
     "last_export_job_id": record.last_export_job_id,
     "created_by_tab_id": record.created_by_tab_id,
     "created_by_tab_label": record.created_by_tab_label,
+  }
+
+
+def serialize_provider_provenance_scheduler_health(
+  record: ProviderProvenanceSchedulerHealth,
+) -> dict[str, Any]:
+  return {
+    "generated_at": record.generated_at.isoformat(),
+    "enabled": record.enabled,
+    "status": record.status,
+    "summary": record.summary,
+    "interval_seconds": record.interval_seconds,
+    "batch_limit": record.batch_limit,
+    "last_cycle_started_at": (
+      record.last_cycle_started_at.isoformat()
+      if record.last_cycle_started_at is not None
+      else None
+    ),
+    "last_cycle_finished_at": (
+      record.last_cycle_finished_at.isoformat()
+      if record.last_cycle_finished_at is not None
+      else None
+    ),
+    "last_success_at": record.last_success_at.isoformat() if record.last_success_at is not None else None,
+    "last_failure_at": record.last_failure_at.isoformat() if record.last_failure_at is not None else None,
+    "last_error": record.last_error,
+    "cycle_count": record.cycle_count,
+    "success_count": record.success_count,
+    "failure_count": record.failure_count,
+    "consecutive_failure_count": record.consecutive_failure_count,
+    "last_executed_count": record.last_executed_count,
+    "total_executed_count": record.total_executed_count,
+    "due_report_count": record.due_report_count,
+    "oldest_due_at": record.oldest_due_at.isoformat() if record.oldest_due_at is not None else None,
+    "max_due_lag_seconds": record.max_due_lag_seconds,
+    "issues": list(record.issues),
+  }
+
+
+def serialize_provider_provenance_scheduler_health_record(
+  record: ProviderProvenanceSchedulerHealthRecord,
+) -> dict[str, Any]:
+  return {
+    "record_id": record.record_id,
+    "scheduler_key": record.scheduler_key,
+    "recorded_at": record.recorded_at.isoformat(),
+    "expires_at": record.expires_at.isoformat() if record.expires_at is not None else None,
+    "enabled": record.enabled,
+    "status": record.status,
+    "summary": record.summary,
+    "interval_seconds": record.interval_seconds,
+    "batch_limit": record.batch_limit,
+    "last_cycle_started_at": (
+      record.last_cycle_started_at.isoformat()
+      if record.last_cycle_started_at is not None
+      else None
+    ),
+    "last_cycle_finished_at": (
+      record.last_cycle_finished_at.isoformat()
+      if record.last_cycle_finished_at is not None
+      else None
+    ),
+    "last_success_at": record.last_success_at.isoformat() if record.last_success_at is not None else None,
+    "last_failure_at": record.last_failure_at.isoformat() if record.last_failure_at is not None else None,
+    "last_error": record.last_error,
+    "cycle_count": record.cycle_count,
+    "success_count": record.success_count,
+    "failure_count": record.failure_count,
+    "consecutive_failure_count": record.consecutive_failure_count,
+    "last_executed_count": record.last_executed_count,
+    "total_executed_count": record.total_executed_count,
+    "due_report_count": record.due_report_count,
+    "oldest_due_at": record.oldest_due_at.isoformat() if record.oldest_due_at is not None else None,
+    "max_due_lag_seconds": record.max_due_lag_seconds,
+    "source_tab_id": record.source_tab_id,
+    "source_tab_label": record.source_tab_label,
+    "issues": list(record.issues),
+  }
+
+
+def serialize_provider_provenance_scheduler_health_history(
+  current: ProviderProvenanceSchedulerHealth,
+  records: tuple[ProviderProvenanceSchedulerHealthRecord, ...],
+  *,
+  status: str | None = None,
+  limit: int,
+) -> dict[str, Any]:
+  return {
+    "generated_at": current.generated_at.isoformat(),
+    "query": {
+      "status": status,
+      "limit": limit,
+    },
+    "current": serialize_provider_provenance_scheduler_health(current),
+    "items": [
+      serialize_provider_provenance_scheduler_health_record(record)
+      for record in records
+    ],
+    "total": len(records),
   }
 
 

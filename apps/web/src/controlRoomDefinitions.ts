@@ -1157,6 +1157,161 @@ export type ProviderProvenanceExportTimeSeriesPayload = {
   };
 };
 
+export type ProviderProvenanceSchedulerHealthSnapshot = {
+  generated_at: string;
+  enabled: boolean;
+  status: string;
+  summary: string;
+  interval_seconds: number;
+  batch_limit: number;
+  last_cycle_started_at?: string | null;
+  last_cycle_finished_at?: string | null;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+  last_error?: string | null;
+  cycle_count: number;
+  success_count: number;
+  failure_count: number;
+  consecutive_failure_count: number;
+  last_executed_count: number;
+  total_executed_count: number;
+  due_report_count: number;
+  oldest_due_at?: string | null;
+  max_due_lag_seconds: number;
+  issues: string[];
+};
+
+export type ProviderProvenanceSchedulerHealthHistoryEntry = {
+  record_id: string;
+  scheduler_key: string;
+  recorded_at: string;
+  expires_at?: string | null;
+  enabled: boolean;
+  status: string;
+  summary: string;
+  interval_seconds: number;
+  batch_limit: number;
+  last_cycle_started_at?: string | null;
+  last_cycle_finished_at?: string | null;
+  last_success_at?: string | null;
+  last_failure_at?: string | null;
+  last_error?: string | null;
+  cycle_count: number;
+  success_count: number;
+  failure_count: number;
+  consecutive_failure_count: number;
+  last_executed_count: number;
+  total_executed_count: number;
+  due_report_count: number;
+  oldest_due_at?: string | null;
+  max_due_lag_seconds: number;
+  source_tab_id?: string | null;
+  source_tab_label?: string | null;
+  issues: string[];
+};
+
+export type ProviderProvenanceSchedulerHealthHistoryPayload = {
+  generated_at: string;
+  query: {
+    status?: string | null;
+    limit: number;
+  };
+  current: ProviderProvenanceSchedulerHealthSnapshot;
+  items: ProviderProvenanceSchedulerHealthHistoryEntry[];
+  total: number;
+};
+
+export type ProviderProvenanceSchedulerHealthStatusSeriesEntry = {
+  bucket_key: string;
+  bucket_label: string;
+  started_at: string;
+  ended_at: string;
+  cycle_count: number;
+  healthy_count: number;
+  lagging_count: number;
+  failed_count: number;
+  disabled_count: number;
+  starting_count: number;
+  dominant_status: string;
+  dominant_count: number;
+  latest_status: string;
+  latest_summary: string;
+  executed_report_count: number;
+};
+
+export type ProviderProvenanceSchedulerLagTrendSeriesEntry = {
+  bucket_key: string;
+  bucket_label: string;
+  started_at: string;
+  ended_at: string;
+  cycle_count: number;
+  peak_lag_seconds: number;
+  latest_lag_seconds: number;
+  average_lag_seconds: number;
+  peak_due_report_count: number;
+  latest_due_report_count: number;
+  failure_count: number;
+  executed_report_count: number;
+};
+
+export type ProviderProvenanceSchedulerHealthTimeSeriesPayload = {
+  bucket_size: string;
+  window_days: number;
+  window_started_at: string;
+  window_ended_at: string;
+  health_status: {
+    series: ProviderProvenanceSchedulerHealthStatusSeriesEntry[];
+    summary: {
+      peak_cycle_bucket_key?: string | null;
+      peak_cycle_bucket_label?: string | null;
+      peak_cycle_count: number;
+      latest_bucket_key?: string | null;
+      latest_bucket_label?: string | null;
+      latest_status: string;
+      latest_cycle_count: number;
+    };
+  };
+  lag_trend: {
+    series: ProviderProvenanceSchedulerLagTrendSeriesEntry[];
+    summary: {
+      peak_lag_bucket_key?: string | null;
+      peak_lag_bucket_label?: string | null;
+      peak_lag_seconds: number;
+      latest_bucket_key?: string | null;
+      latest_bucket_label?: string | null;
+      latest_lag_seconds: number;
+      latest_due_report_count: number;
+      latest_failure_count: number;
+    };
+  };
+};
+
+export type ProviderProvenanceSchedulerHealthAnalyticsPayload = {
+  generated_at: string;
+  query: {
+    status?: string | null;
+    window_days: number;
+    history_limit: number;
+  };
+  current: ProviderProvenanceSchedulerHealthSnapshot;
+  totals: {
+    record_count: number;
+    healthy_count: number;
+    lagging_count: number;
+    failed_count: number;
+    disabled_count: number;
+    starting_count: number;
+    executed_report_count: number;
+    peak_lag_seconds: number;
+    peak_due_report_count: number;
+  };
+  available_filters: {
+    statuses: string[];
+  };
+  time_series: ProviderProvenanceSchedulerHealthTimeSeriesPayload;
+  recent_history: ProviderProvenanceSchedulerHealthHistoryEntry[];
+};
+
 export type ProviderProvenanceExportAnalyticsPayload = {
   generated_at: string;
   query: {

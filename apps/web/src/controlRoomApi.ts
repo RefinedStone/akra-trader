@@ -11,6 +11,8 @@ import type {
   ProviderProvenanceExportJobEntry,
   ProviderProvenanceExportJobHistoryPayload,
   ProviderProvenanceExportJobListPayload,
+  ProviderProvenanceSchedulerHealthAnalyticsPayload,
+  ProviderProvenanceSchedulerHealthHistoryPayload,
   ProviderProvenanceScheduledReportEntry,
   ProviderProvenanceScheduledReportHistoryPayload,
   ProviderProvenanceScheduledReportListPayload,
@@ -229,6 +231,44 @@ export async function getProviderProvenanceExportAnalytics(params: {
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceExportAnalyticsPayload>(
     `/operator/provider-provenance-exports/analytics${suffix}`,
+  );
+}
+
+export async function getProviderProvenanceSchedulerHealthAnalytics(params: {
+  status?: string;
+  windowDays?: number;
+  historyLimit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (typeof params.windowDays === "number" && Number.isFinite(params.windowDays)) {
+    searchParams.set("window_days", `${Math.max(3, Math.min(Math.round(params.windowDays), 90))}`);
+  }
+  if (typeof params.historyLimit === "number" && Number.isFinite(params.historyLimit)) {
+    searchParams.set("history_limit", `${Math.max(1, Math.min(Math.round(params.historyLimit), 50))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerHealthAnalyticsPayload>(
+    `/operator/provider-provenance-analytics/scheduler-health/analytics${suffix}`,
+  );
+}
+
+export async function listProviderProvenanceSchedulerHealthHistory(params: {
+  status?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.status?.trim()) {
+    searchParams.set("status", params.status.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", `${Math.max(1, Math.min(Math.round(params.limit), 200))}`);
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerHealthHistoryPayload>(
+    `/operator/provider-provenance-analytics/scheduler-health${suffix}`,
   );
 }
 
