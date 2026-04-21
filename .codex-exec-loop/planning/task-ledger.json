@@ -58,55 +58,56 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Consume lineage and ingestion history in control room workflows",
       "description": "Use the new lineage-history and ingestion-jobs surfaces in the control room so operators can inspect recent sync attempts, failures, validation claims, and dataset boundaries without leaving the main operational UI.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 86,
       "dynamic_priority_delta": 16,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:15:00+09:00",
+      "updated_at": "2026-04-21T21:24:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-query-surfaces",
         "task-b1-lineage-category-ui"
       ],
-      "direction_relation_note": "The latest main-session reply says the main missing operational slice is full control-room consumption of lineage and ingestion history, making this the clearest next executable task after commit f0bac34.",
-      "priority_reason": "This should become the queue head because the backend history surfaces are now shipped and the operator requested the next queued task to continue immediately."
+      "direction_relation_note": "Completed on main in commit fb583c2 with control-room data incident triage wired to /market-data/lineage-history and /market-data/ingestion-jobs, including triage focus switching and matching operator docs updates.",
+      "priority_reason": "Closed after the operator-facing workflow, docs, typecheck, commit, and push all landed, so the next queue head should move to the remaining alert-correlation follow-up."
     },
     {
       "id": "task-b1-lineage-history-retention-pagination",
       "direction_id": "data-trust-and-lineage",
-      "title": "Define retention and pagination policy for lineage and ingestion history",
-      "description": "Add the retention boundaries, pagination contract, and query limits needed to keep lineage-history and ingestion-jobs usable as append-only operational records rather than unbounded payload dumps.",
+      "title": "Define retention, pagination, and action-guidance surfaces for lineage history",
+      "description": "Add the retention boundaries, pagination contract, query limits, and operator action-guidance surface needed to keep lineage-history and ingestion-jobs usable as durable operational records rather than unbounded payload dumps.",
       "status": "proposed",
       "base_priority": 80,
-      "dynamic_priority_delta": 10,
+      "dynamic_priority_delta": 11,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:15:00+09:00",
+      "updated_at": "2026-04-21T21:24:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-lineage-query-surfaces"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly identifies retention and pagination as missing follow-up work on the new lineage and ingestion history surfaces.",
-      "priority_reason": "This is important for durability and operator usability, but it can stay proposed while the control-room consumer is built first."
+      "direction_relation_note": "The latest main-session reply explicitly says pagination, retention, and operator action guidance for lineage and ingestion history still need a separate product surface after the new control-room triage view landed.",
+      "priority_reason": "This remains important for durability and operator usability, but it can stay proposed while the next operator workflow step focuses on alert-driven triage entry."
     },
     {
       "id": "task-b1-alert-lineage-correlation",
       "direction_id": "runtime-ops",
-      "title": "Correlate alerts with lineage and ingestion incident history",
-      "description": "Expose direct alert-to-lineage and alert-to-ingestion-history correlations so stale-data and failure alerts point operators to the exact boundary, checkpoint, and failed sync job context.",
-      "status": "proposed",
-      "base_priority": 78,
-      "dynamic_priority_delta": 9,
+      "title": "Auto-link alerts into instrument triage focus and lineage incident history",
+      "description": "Expose direct alert-to-lineage and alert-to-ingestion-history correlations so stale-data and failure alerts automatically open the exact instrument, timeframe, boundary, checkpoint, and failed sync job context in operator triage workflows.",
+      "status": "ready",
+      "base_priority": 82,
+      "dynamic_priority_delta": 14,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-21T21:15:00+09:00",
+      "updated_at": "2026-04-21T21:24:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-lineage-query-surfaces"
+        "task-b1-lineage-query-surfaces",
+        "task-b1-control-room-lineage-operations"
       ],
-      "direction_relation_note": "The latest main-session reply calls out missing direct correlation between alerts and the new lineage or ingestion history, which makes this a distinct runtime-ops follow-up rather than part of the base API surface task.",
-      "priority_reason": "Keep this proposed until the core control-room history view lands, then connect alert workflows to the same operator-visible records."
+      "direction_relation_note": "The latest main-session reply says the next operator workflow step is to automatically connect alerts to the new instrument triage focus and lineage or ingestion history that now exists in the control room.",
+      "priority_reason": "This becomes the queue head because the operator requested the next queued task immediately and alert-driven entry is the clearest executable follow-up now that control-room triage consumption is complete."
     },
     {
       "id": "task-b1-lineage-category-ui",
