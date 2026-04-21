@@ -511,38 +511,38 @@
       "direction_id": "runtime-ops",
       "title": "Auto-run scheduler export escalation workflow from lag and failure alerts",
       "description": "Extend scheduler lag and failure alert evaluation so qualifying alerts can automatically create scheduler export artifacts and start governed escalation delivery without requiring an operator click from the alert surface.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:10:00+09:00",
+      "updated_at": "2026-04-22T14:22:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-health-alerting",
         "task-b1-provider-market-context-scheduler-routing-approval-policy",
         "task-b1-provider-market-context-scheduler-alert-trigger-linking"
       ],
-      "direction_relation_note": "The latest main-session reply says alert surfaces now trigger the workflow only through operator-clicked actions, so the next direct runtime gap is wiring alert evaluation itself into governed export creation and escalation attempts while preserving the existing per-export routing and approval policy.",
-      "priority_reason": "Promoted to ready because the latest main-session reply lists unattended alert-triggered workflow execution as the first remaining executable follow-up after commit 03449af, making it the correct builtin next task."
+      "direction_relation_note": "Completed on main in commit 2cf6dd5 with scheduler lag and failure evaluation now deduplicating active alert keys, auto-opening or reusing shared scheduler-health export workflows under system:provider-provenance-scheduler-alerts, and escalating immediately when the saved policy already allows it while exposing alert_workflow_job_id, alert_workflow_state, and alert_workflow_summary in scheduler health views.",
+      "priority_reason": "Closed after targeted application and API pytest coverage plus compileall verification, docs status updates, commit, and push all landed; the latest main-session reply leaves reusable policy catalogs/templates and historical reconstruction for resolved alert rows as the remaining follow-ups."
     },
     {
       "id": "task-b1-provider-market-context-historical-alert-export-reconstruction",
       "direction_id": "operator-trust-and-discipline",
       "title": "Reconstruct historical scheduler exports for resolved alert rows",
       "description": "Add historical snapshot reconstruction or equivalent export replay so older resolved scheduler lag or failure alerts can open an export artifact tied to the alert-time scheduler-health state instead of always snapshotting current scheduler health.",
-      "status": "proposed",
+      "status": "ready",
       "base_priority": 73,
-      "dynamic_priority_delta": 20,
+      "dynamic_priority_delta": 22,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:10:00+09:00",
+      "updated_at": "2026-04-22T14:22:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-alert-trigger-linking"
+        "task-b1-provider-market-context-scheduler-alert-auto-run"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says direct alert-triggered workflow actions still snapshot current scheduler health only, leaving resolved alert rows unable to reopen a historically accurate export artifact tied to the older alert state.",
-      "priority_reason": "This is a concrete follow-up, but it stays proposed behind unattended alert-triggered automation because historical reconstruction is the second remaining gap rather than the next builtin task."
+      "direction_relation_note": "The latest main-session reply says automatic scheduler alert workflows now ship, but generated artifacts still snapshot current scheduler health only, so resolved alert rows still cannot reopen a historically accurate export tied to the original alert-time state.",
+      "priority_reason": "Promoted to ready because the latest main-session reply narrows the remaining executable follow-ups to two items and historical reconstruction is the clearest next product gap for builtin next-task after auto-run shipped."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -551,16 +551,16 @@
       "description": "Build a shared team-level catalog of named routing and approval policies or escalation templates for scheduler health exports so operators can apply reusable defaults above one-off per-export policy configuration.",
       "status": "proposed",
       "base_priority": 74,
-      "dynamic_priority_delta": 19,
+      "dynamic_priority_delta": 20,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T14:10:00+09:00",
+      "updated_at": "2026-04-22T14:22:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-routing-approval-policy"
+        "task-b1-provider-market-context-scheduler-alert-auto-run"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says routing policy is still defined per export artifact only, leaving no reusable team policy catalog or named escalation templates above the newly shipped per-export rules.",
-      "priority_reason": "This remains clear follow-up work, but it stays proposed behind the newer explicit gaps from commit 03449af so builtin next-task advances through unattended alert execution before higher-level reusable policy productization."
+      "direction_relation_note": "The latest main-session reply says auto-created scheduler alert workflows now honor per-export routing and approval, but there is still no reusable team policy catalog or named escalation template layer above those artifact-level rules.",
+      "priority_reason": "This remains clear executable follow-up work, but it stays proposed behind historical reconstruction so builtin next-task advances through the alert-row fidelity gap before higher-level policy productization."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
