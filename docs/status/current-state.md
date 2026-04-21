@@ -128,6 +128,8 @@ It is not yet a finished live trading product:
   heuristic parsing
 - external operator webhook payloads and provider remediation payloads now carry the same
   normalized `symbol`/`symbols`/`timeframe` plus `primary_focus` context for downstream routing
+- provider workflow pull snapshots and remediation sync now restore returned `primary_focus`
+  market context back into normalized incident and provider-recovery fields
 
 ### Operator discipline baseline
 

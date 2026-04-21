@@ -2672,6 +2672,7 @@ class OperatorIncidentProviderRecoveryState:
   channels: tuple[str, ...] = ()
   symbols: tuple[str, ...] = ()
   timeframe: str | None = None
+  primary_focus: OperatorAlertPrimaryFocus | None = None
   verification: OperatorIncidentProviderRecoveryVerification = field(
     default_factory=OperatorIncidentProviderRecoveryVerification
   )

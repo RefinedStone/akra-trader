@@ -198,6 +198,91 @@ def test_operator_alert_delivery_adapter_carries_primary_focus_market_context_to
   assert provider_recovery["primary_focus"] == webhook_payload["primary_focus"]
 
 
+def test_operator_alert_delivery_adapter_restores_primary_focus_market_context_from_provider_pull_payload() -> None:
+  requests: list[tuple[str, str, dict[str, str], float]] = []
+
+  def fake_urlopen(request, timeout: float):
+    requests.append((request.full_url, request.method, dict(request.headers), timeout))
+    if request.full_url == "https://api.pagerduty.com/incidents/PDINC-PRIMARY-1":
+      return FakeResponse(
+        200,
+        json.dumps(
+          {
+            "incident": {
+              "id": "PDINC-PRIMARY-1",
+              "incident_key": "guarded-live:market-data:5m",
+              "status": "acknowledged",
+              "title": "Guarded-live market-data incident",
+              "updated_at": "2025-01-03T14:05:00Z",
+              "custom_details": {
+                "remediation_state": "provider_recovered",
+                "remediation_provider_recovery": {
+                  "lifecycle_state": "recovered",
+                  "job_id": "pd-job-primary-1",
+                  "channels": ["depth", "kline"],
+                  "symbol": "btc/usdt",
+                  "symbols": ["btc/usdt", "eth/usdt"],
+                  "timeframe": "5M",
+                  "primary_focus": {
+                    "symbol": "btc/usdt",
+                    "timeframe": "5M",
+                    "candidate_symbols": ["btc/usdt", "eth/usdt"],
+                    "candidate_count": 2,
+                    "policy": "market_data_risk_order",
+                    "reason": "Selected BTC/USDT as the highest-risk market-data candidate from 2 symbols.",
+                  },
+                  "verification_state": "passed",
+                },
+              },
+            }
+          }
+        ).encode("utf-8"),
+      )
+    raise AssertionError(f"unexpected request: {request.full_url}")
+
+  adapter = OperatorAlertDeliveryAdapter(
+    targets=("pagerduty",),
+    pagerduty_api_token="pagerduty-api-token",
+    pagerduty_from_email="akra-ops@example.com",
+    urlopen=fake_urlopen,
+  )
+  incident = OperatorIncidentEvent(
+    event_id="incident-opened-primary-focus-pull-1",
+    alert_id="guarded-live:market-data:5m",
+    timestamp=datetime(2025, 1, 3, 14, 6, tzinfo=UTC),
+    kind="incident_opened",
+    severity="warning",
+    summary="Guarded-live market-data incident",
+    detail="market-data freshness degraded",
+    external_provider="pagerduty",
+    external_reference="guarded-live:market-data:5m",
+    provider_workflow_reference="PDINC-PRIMARY-1",
+  )
+
+  snapshot = adapter.pull_incident_workflow_state(
+    incident=incident,
+    provider="pagerduty",
+  )
+
+  assert snapshot is not None
+  assert snapshot.payload["symbol"] == "BTC/USDT"
+  assert snapshot.payload["symbols"] == ["BTC/USDT", "ETH/USDT"]
+  assert snapshot.payload["timeframe"] == "5m"
+  assert snapshot.payload["primary_focus"] == {
+    "symbol": "BTC/USDT",
+    "timeframe": "5m",
+    "candidate_symbols": ["BTC/USDT", "ETH/USDT"],
+    "candidate_count": 2,
+    "policy": "market_data_risk_order",
+    "reason": "Selected BTC/USDT as the highest-risk market-data candidate from 2 symbols.",
+  }
+  assert snapshot.payload["targets"]["symbol"] == "BTC/USDT"
+  assert snapshot.payload["targets"]["symbols"] == ["BTC/USDT", "ETH/USDT"]
+  assert snapshot.payload["targets"]["timeframe"] == "5m"
+  assert snapshot.payload["targets"]["primary_focus"] == snapshot.payload["primary_focus"]
+  assert requests[0][2]["From"] == "akra-ops@example.com"
+
+
 def test_operator_alert_delivery_adapter_syncs_pagerduty_workflow_actions() -> None:
   requests: list[tuple[str, str, bytes, dict[str, str], float]] = []
 

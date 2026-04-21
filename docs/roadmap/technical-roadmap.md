@@ -79,6 +79,8 @@ creation.
   selected symbol/timeframe directly instead of rebuilding that choice from raw symbol lists
 - external webhook delivery and provider remediation payload builders now pass through that same
   normalized market context for downstream incident tooling
+- provider workflow pull normalization now restores returned `primary_focus` market context into
+  incident and provider-recovery state rather than keeping only raw target lists
 
 ### Remaining work
 

@@ -25,6 +25,8 @@ unclear dataset lineage.
   runtime knows it
 - external webhook and provider remediation payloads now carry the same normalized market context
   so downstream incident systems do not need to reconstruct the lead symbol from free-form text
+- when a provider returns that market context during workflow pull or remediation sync, Akra now
+  restores it into normalized incident fields instead of dropping the selected focus on re-entry
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

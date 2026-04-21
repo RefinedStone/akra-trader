@@ -2341,7 +2341,30 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
       payload={
         "job_id": "pd-job-77",
         "channels": ["kline", "depth"],
-        "targets": {"symbols": ["ETH/USDT"], "timeframe": "5m"},
+        "symbol": "ETH/USDT",
+        "symbols": ["ETH/USDT"],
+        "timeframe": "5m",
+        "primary_focus": {
+          "symbol": "ETH/USDT",
+          "timeframe": "5m",
+          "candidate_symbols": ["ETH/USDT"],
+          "candidate_count": 1,
+          "policy": "single_symbol_context",
+          "reason": "Alert context resolved to one market-data instrument.",
+        },
+        "targets": {
+          "symbol": "ETH/USDT",
+          "symbols": ["ETH/USDT"],
+          "timeframe": "5m",
+          "primary_focus": {
+            "symbol": "ETH/USDT",
+            "timeframe": "5m",
+            "candidate_symbols": ["ETH/USDT"],
+            "candidate_count": 1,
+            "policy": "single_symbol_context",
+            "reason": "Alert context resolved to one market-data instrument.",
+          },
+        },
         "verification": {"state": "passed"},
         "telemetry": {
           "state": "completed",
@@ -2379,6 +2402,13 @@ def test_provider_pull_sync_reconciles_recovery_state_and_closes_market_data_inc
   assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.incident_phase == "acknowledged"
   assert updated_incident.remediation.provider_recovery.pagerduty.phase_graph.workflow_phase == "verified_pending_resolve"
   assert updated_incident.remediation.provider_recovery.channels == ("kline", "depth")
+  assert updated_incident.symbol == "ETH/USDT"
+  assert updated_incident.symbols == ("ETH/USDT",)
+  assert updated_incident.timeframe == "5m"
+  assert updated_incident.primary_focus is not None
+  assert updated_incident.primary_focus.symbol == "ETH/USDT"
+  assert updated_incident.primary_focus.timeframe == "5m"
+  assert updated_incident.remediation.provider_recovery.primary_focus == updated_incident.primary_focus
   assert updated_incident.remediation.provider_recovery.telemetry.state == "completed"
   assert updated_incident.remediation.provider_recovery.telemetry.progress_percent == 100
   assert updated_incident.remediation.provider_recovery.telemetry.attempt_count == 2

@@ -14894,6 +14894,11 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       provider_payload.get("telemetry"),
       provider_recovery.get("telemetry"),
     )
+    market_context = self._build_provider_pull_market_context_payload(
+      remediation_payload=remediation_payload,
+      provider_payload=provider_payload,
+      provider_recovery=provider_recovery,
+    )
     provider_specific_recovery = self._extract_mapping(provider_recovery.get(provider))
     status_machine_payload = self._extract_mapping(
       provider_recovery.get("status_machine"),
@@ -20359,15 +20364,15 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
         provider_recovery.get("channels"),
         provider_payload.get("channels"),
       ),
+      "symbol": market_context["symbol"],
+      "symbols": market_context["symbols"],
+      "timeframe": market_context["timeframe"],
+      "primary_focus": market_context["primary_focus"],
       "targets": {
-        "symbols": self._extract_string_list(
-          provider_recovery.get("symbols"),
-          provider_payload.get("symbols"),
-        ),
-        "timeframe": self._first_non_empty_string(
-          provider_recovery.get("timeframe"),
-          provider_payload.get("timeframe"),
-        ),
+        "symbol": market_context["symbol"],
+        "symbols": market_context["symbols"],
+        "timeframe": market_context["timeframe"],
+        "primary_focus": market_context["primary_focus"],
       },
       "verification": {
         "state": self._first_non_empty_string(
@@ -21863,6 +21868,158 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     }
 
   @staticmethod
+  def _normalize_market_context_symbol(symbol: Any) -> str | None:
+    if not isinstance(symbol, str):
+      return None
+    normalized = symbol.strip().upper()
+    return normalized or None
+
+  @classmethod
+  def _normalize_market_context_symbols(cls, *candidates: Any) -> list[str]:
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+      if isinstance(candidate, str):
+        resolved = cls._normalize_market_context_symbol(candidate)
+        if resolved is not None and resolved not in seen:
+          seen.add(resolved)
+          normalized.append(resolved)
+        continue
+      if not isinstance(candidate, (list, tuple)):
+        continue
+      for item in candidate:
+        resolved = cls._normalize_market_context_symbol(item)
+        if resolved is None or resolved in seen:
+          continue
+        seen.add(resolved)
+        normalized.append(resolved)
+    return normalized
+
+  @staticmethod
+  def _normalize_market_context_timeframe(timeframe: Any) -> str | None:
+    if not isinstance(timeframe, str):
+      return None
+    normalized = timeframe.strip().lower()
+    return normalized or None
+
+  @classmethod
+  def _build_primary_focus_payload_from_sources(
+    cls,
+    *candidates: Any,
+  ) -> dict[str, Any] | None:
+    payload = cls._extract_mapping(*candidates)
+    if not payload:
+      return None
+    symbol = cls._normalize_market_context_symbol(payload.get("symbol"))
+    timeframe = cls._normalize_market_context_timeframe(payload.get("timeframe"))
+    candidate_symbols = cls._normalize_market_context_symbols(
+      payload.get("candidate_symbols"),
+      payload.get("candidateSymbols"),
+      payload.get("symbols"),
+      payload.get("symbol"),
+    )
+    if symbol is not None and symbol not in candidate_symbols:
+      candidate_symbols = [symbol, *[candidate for candidate in candidate_symbols if candidate != symbol]]
+    if symbol is None and candidate_symbols:
+      symbol = candidate_symbols[0]
+    if not candidate_symbols and symbol is not None:
+      candidate_symbols = [symbol]
+    if symbol is None and timeframe is None and not candidate_symbols:
+      return None
+    return {
+      "symbol": symbol,
+      "timeframe": timeframe,
+      "candidate_symbols": candidate_symbols,
+      "candidate_count": (
+        int(payload.get("candidate_count"))
+        if isinstance(payload.get("candidate_count"), int)
+        else len(candidate_symbols)
+      ),
+      "policy": (
+        cls._first_non_empty_string(payload.get("policy"))
+        or ("single_symbol_context" if len(candidate_symbols) <= 1 else "symbol_order")
+      ),
+      "reason": cls._first_non_empty_string(payload.get("reason")),
+    }
+
+  @classmethod
+  def _build_provider_pull_market_context_payload(
+    cls,
+    *,
+    remediation_payload: dict[str, Any],
+    provider_payload: dict[str, Any],
+    provider_recovery: dict[str, Any],
+  ) -> dict[str, Any]:
+    targets_payload = cls._extract_mapping(
+      remediation_payload.get("targets"),
+      provider_payload.get("targets"),
+      provider_recovery.get("targets"),
+    )
+    target_payload = cls._extract_mapping(
+      remediation_payload.get("target"),
+      provider_payload.get("target"),
+      provider_recovery.get("target"),
+    )
+    primary_focus = cls._build_primary_focus_payload_from_sources(
+      provider_recovery.get("primary_focus"),
+      provider_payload.get("primary_focus"),
+      targets_payload.get("primary_focus"),
+      target_payload.get("primary_focus"),
+    )
+    symbols = cls._normalize_market_context_symbols(
+      provider_recovery.get("symbols"),
+      provider_recovery.get("symbol"),
+      provider_payload.get("symbols"),
+      provider_payload.get("symbol"),
+      remediation_payload.get("symbols"),
+      remediation_payload.get("symbol"),
+      targets_payload.get("symbols"),
+      targets_payload.get("symbol"),
+      target_payload.get("symbols"),
+      target_payload.get("symbol"),
+      primary_focus.get("candidate_symbols") if primary_focus is not None else (),
+      primary_focus.get("symbol") if primary_focus is not None else None,
+    )
+    symbol = cls._normalize_market_context_symbol(
+      cls._first_non_empty_string(
+        provider_recovery.get("symbol"),
+        provider_payload.get("symbol"),
+        remediation_payload.get("symbol"),
+        targets_payload.get("symbol"),
+        target_payload.get("symbol"),
+        primary_focus.get("symbol") if primary_focus is not None else None,
+      )
+    )
+    if symbol is None and len(symbols) == 1:
+      symbol = symbols[0]
+    timeframe = cls._normalize_market_context_timeframe(
+      cls._first_non_empty_string(
+        provider_recovery.get("timeframe"),
+        provider_payload.get("timeframe"),
+        provider_payload.get("target_timeframe"),
+        remediation_payload.get("timeframe"),
+        remediation_payload.get("target_timeframe"),
+        targets_payload.get("timeframe"),
+        target_payload.get("timeframe"),
+        primary_focus.get("timeframe") if primary_focus is not None else None,
+      )
+    )
+    if primary_focus is None and (symbol is not None or timeframe is not None or symbols):
+      primary_focus = cls._build_primary_focus_payload_from_sources(
+        {
+          "symbol": symbol,
+          "timeframe": timeframe,
+          "candidate_symbols": symbols,
+        }
+      )
+    return {
+      "symbol": symbol,
+      "symbols": symbols,
+      "timeframe": timeframe,
+      "primary_focus": primary_focus,
+    }
+
+  @staticmethod
   def _build_primary_focus_payload(
     primary_focus: OperatorAlertPrimaryFocus | None,
   ) -> dict[str, Any] | None:
@@ -21882,6 +22039,7 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
     cls,
     incident: OperatorIncidentEvent,
   ) -> dict[str, Any]:
+    provider_recovery = incident.remediation.provider_recovery
     candidate_symbols = (
       incident.symbols
       or (
@@ -21889,10 +22047,20 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
         if incident.primary_focus is not None
         else ()
       )
+      or provider_recovery.symbols
+      or (
+        provider_recovery.primary_focus.candidate_symbols
+        if provider_recovery.primary_focus is not None
+        else ()
+      )
     )
     symbol = incident.symbol or (
       incident.primary_focus.symbol
       if incident.primary_focus is not None
+      else None
+    ) or (
+      provider_recovery.primary_focus.symbol
+      if provider_recovery.primary_focus is not None
       else None
     )
     if symbol is None and len(candidate_symbols) == 1:
@@ -21901,12 +22069,18 @@ class OperatorAlertDeliveryAdapter(CoreWorkflowProviderMixin, OperatorAlertDeliv
       incident.primary_focus.timeframe
       if incident.primary_focus is not None
       else None
+    ) or (
+      provider_recovery.primary_focus.timeframe
+      if provider_recovery.primary_focus is not None
+      else provider_recovery.timeframe
     )
     return {
       "symbol": symbol,
       "symbols": candidate_symbols,
       "timeframe": timeframe,
-      "primary_focus": cls._build_primary_focus_payload(incident.primary_focus),
+      "primary_focus": cls._build_primary_focus_payload(
+        incident.primary_focus or provider_recovery.primary_focus
+      ),
     }
 
   @staticmethod

@@ -2549,6 +2549,20 @@ class TradingApplication:
       provider_workflow_reference=provider_workflow_reference or incident.provider_workflow_reference,
       external_last_synced_at=synced_at,
     )
+    incident_market_context = self._extract_operator_alert_market_context_from_workflow_payload(
+      payload=normalized_payload,
+      existing_symbol=updated_incident.symbol,
+      existing_symbols=updated_incident.symbols,
+      existing_timeframe=updated_incident.timeframe,
+      existing_primary_focus=updated_incident.primary_focus,
+    )
+    updated_incident = replace(
+      updated_incident,
+      symbol=incident_market_context["symbol"],
+      symbols=incident_market_context["symbols"],
+      timeframe=incident_market_context["timeframe"],
+      primary_focus=incident_market_context["primary_focus"],
+    )
     delivery_history = state.delivery_history
     local_results: tuple[MarketDataRemediationResult, ...] = ()
     workflow_reference_for_delivery = (
@@ -11846,6 +11860,108 @@ class TradingApplication:
       existing.ilert,
     )
 
+  def _extract_operator_alert_market_context_from_workflow_payload(
+    self,
+    *,
+    payload: dict[str, Any],
+    existing_symbol: str | None = None,
+    existing_symbols: tuple[str, ...] = (),
+    existing_timeframe: str | None = None,
+    existing_primary_focus: OperatorAlertPrimaryFocus | None = None,
+  ) -> dict[str, str | tuple[str, ...] | OperatorAlertPrimaryFocus | None]:
+    verification_payload = self._extract_payload_mapping(payload.get("verification"))
+    target_payload = self._extract_payload_mapping(payload.get("target"))
+    targets_payload = self._extract_payload_mapping(payload.get("targets"))
+    provider_recovery_payload = self._merge_payload_mappings(
+      payload.get("remediation_provider_recovery"),
+      payload.get("provider_recovery"),
+      payload.get("recovery"),
+    )
+    primary_focus_payload = self._merge_payload_mappings(
+      payload.get("primary_focus"),
+      targets_payload.get("primary_focus"),
+      target_payload.get("primary_focus"),
+      provider_recovery_payload.get("primary_focus"),
+    )
+    symbols = self._extract_string_tuple(
+      payload.get("symbols"),
+      payload.get("symbol"),
+      targets_payload.get("symbols"),
+      targets_payload.get("symbol"),
+      target_payload.get("symbols"),
+      target_payload.get("symbol"),
+      provider_recovery_payload.get("symbols"),
+      provider_recovery_payload.get("symbol"),
+      primary_focus_payload.get("candidate_symbols"),
+      primary_focus_payload.get("candidateSymbols"),
+      primary_focus_payload.get("symbols"),
+      primary_focus_payload.get("symbol"),
+      existing_primary_focus.candidate_symbols if existing_primary_focus is not None else (),
+      existing_primary_focus.symbol if existing_primary_focus is not None else None,
+      existing_symbols,
+      existing_symbol,
+    )
+    candidate_symbols = self._extract_string_tuple(
+      primary_focus_payload.get("candidate_symbols"),
+      primary_focus_payload.get("candidateSymbols"),
+      primary_focus_payload.get("symbols"),
+      primary_focus_payload.get("symbol"),
+      symbols,
+      existing_primary_focus.candidate_symbols if existing_primary_focus is not None else (),
+    )
+    primary_focus = self._build_operator_alert_primary_focus(
+      primary_symbol=self._first_non_empty_string(
+        primary_focus_payload.get("symbol"),
+        payload.get("symbol"),
+        targets_payload.get("symbol"),
+        target_payload.get("symbol"),
+        provider_recovery_payload.get("symbol"),
+        existing_primary_focus.symbol if existing_primary_focus is not None else None,
+        existing_symbol,
+      ),
+      symbols=symbols,
+      candidate_symbols=candidate_symbols,
+      timeframe=self._first_non_empty_string(
+        primary_focus_payload.get("timeframe"),
+        payload.get("timeframe"),
+        payload.get("target_timeframe"),
+        targets_payload.get("timeframe"),
+        target_payload.get("timeframe"),
+        provider_recovery_payload.get("timeframe"),
+        verification_payload.get("timeframe"),
+        existing_primary_focus.timeframe if existing_primary_focus is not None else None,
+        existing_timeframe,
+      ),
+      policy=self._first_non_empty_string(
+        primary_focus_payload.get("policy"),
+      ),
+      reason=self._first_non_empty_string(
+        primary_focus_payload.get("reason"),
+      ),
+    )
+    return self._build_operator_alert_market_context(
+      symbol=self._first_non_empty_string(
+        payload.get("symbol"),
+        targets_payload.get("symbol"),
+        target_payload.get("symbol"),
+        provider_recovery_payload.get("symbol"),
+        primary_focus.symbol if primary_focus is not None else None,
+        existing_symbol,
+      ),
+      symbols=symbols,
+      timeframe=self._first_non_empty_string(
+        payload.get("timeframe"),
+        payload.get("target_timeframe"),
+        targets_payload.get("timeframe"),
+        target_payload.get("timeframe"),
+        provider_recovery_payload.get("timeframe"),
+        verification_payload.get("timeframe"),
+        primary_focus.timeframe if primary_focus is not None else None,
+        existing_timeframe,
+      ),
+      primary_focus=primary_focus or existing_primary_focus,
+    )
+
   def _build_provider_recovery_state(
     self,
     *,
@@ -11859,6 +11975,12 @@ class TradingApplication:
     event_kind: str | None = None,
   ) -> OperatorIncidentProviderRecoveryState:
     existing = remediation.provider_recovery
+    market_context = self._extract_operator_alert_market_context_from_workflow_payload(
+      payload=payload,
+      existing_symbols=existing.symbols,
+      existing_timeframe=existing.timeframe,
+      existing_primary_focus=existing.primary_focus,
+    )
     verification_payload = self._extract_payload_mapping(payload.get("verification"))
     target_payload = self._extract_payload_mapping(payload.get("target"))
     targets_payload = self._extract_payload_mapping(payload.get("targets"))
@@ -14892,22 +15014,9 @@ class TradingApplication:
         target_payload.get("channels"),
         existing.channels,
       ),
-      symbols=self._extract_string_tuple(
-        payload.get("symbols"),
-        payload.get("symbol"),
-        targets_payload.get("symbols"),
-        target_payload.get("symbols"),
-        target_payload.get("symbol"),
-        existing.symbols,
-      ),
-      timeframe=self._first_non_empty_string(
-        payload.get("timeframe"),
-        payload.get("target_timeframe"),
-        targets_payload.get("timeframe"),
-        target_payload.get("timeframe"),
-        verification_payload.get("timeframe"),
-        existing.timeframe,
-      ),
+      symbols=market_context["symbols"],
+      timeframe=market_context["timeframe"],
+      primary_focus=market_context["primary_focus"],
       verification=verification,
       telemetry=telemetry,
       status_machine=status_machine,
@@ -15727,7 +15836,21 @@ class TradingApplication:
       ),
       provider_recovery=provider_recovery,
     )
-    return replace(incident, remediation=next_remediation)
+    incident_market_context = self._extract_operator_alert_market_context_from_workflow_payload(
+      payload=merged_payload,
+      existing_symbol=incident.symbol,
+      existing_symbols=incident.symbols,
+      existing_timeframe=incident.timeframe,
+      existing_primary_focus=incident.primary_focus,
+    )
+    return replace(
+      incident,
+      symbol=incident_market_context["symbol"],
+      symbols=incident_market_context["symbols"],
+      timeframe=incident_market_context["timeframe"],
+      primary_focus=incident_market_context["primary_focus"],
+      remediation=next_remediation,
+    )
 
   def _build_incident_provider_workflow_payload(
     self,
@@ -21685,6 +21808,20 @@ class TradingApplication:
       provider_workflow_state=pull_sync.workflow_state or incident.provider_workflow_state,
       provider_workflow_action=provider_action,
       provider_workflow_last_attempted_at=synced_at,
+    )
+    incident_market_context = self._extract_operator_alert_market_context_from_workflow_payload(
+      payload=payload,
+      existing_symbol=updated_incident.symbol,
+      existing_symbols=updated_incident.symbols,
+      existing_timeframe=updated_incident.timeframe,
+      existing_primary_focus=updated_incident.primary_focus,
+    )
+    updated_incident = replace(
+      updated_incident,
+      symbol=incident_market_context["symbol"],
+      symbols=incident_market_context["symbols"],
+      timeframe=incident_market_context["timeframe"],
+      primary_focus=incident_market_context["primary_focus"],
     )
     effective_delivery_history = delivery_history
     executed = False
