@@ -20,7 +20,9 @@ import type {
   ProviderProvenanceSchedulerNarrativeBulkGovernanceResult,
   ProviderProvenanceSchedulerNarrativeGovernancePlan,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload,
+  ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionListPayload,
   ProviderProvenanceSchedulerNarrativeGovernancePlanListPayload,
   ProviderProvenanceSchedulerNarrativeRegistryEntry,
   ProviderProvenanceSchedulerNarrativeRegistryListPayload,
@@ -1033,6 +1035,115 @@ export async function listProviderProvenanceSchedulerNarrativeGovernancePolicyTe
   const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
   return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateListPayload>(
     `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates${suffix}`,
+  );
+}
+
+export async function updateProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate(params: {
+  policyTemplateId: string;
+  name?: string;
+  description?: string;
+  itemTypeScope?: string;
+  actionScope?: string;
+  approvalLane?: string;
+  approvalPriority?: string;
+  guidance?: string | null;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/${encodeURIComponent(params.policyTemplateId)}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        ...(params.name !== undefined ? { name: params.name } : {}),
+        ...(params.description !== undefined ? { description: params.description } : {}),
+        ...(params.itemTypeScope !== undefined ? { item_type_scope: params.itemTypeScope } : {}),
+        ...(params.actionScope !== undefined ? { action_scope: params.actionScope } : {}),
+        ...(params.approvalLane !== undefined ? { approval_lane: params.approvalLane } : {}),
+        ...(params.approvalPriority !== undefined ? { approval_priority: params.approvalPriority } : {}),
+        ...(params.guidance !== undefined ? { guidance: params.guidance } : {}),
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function deleteProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate(params: {
+  policyTemplateId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/${encodeURIComponent(params.policyTemplateId)}/delete`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisions(
+  policyTemplateId: string,
+) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/${encodeURIComponent(policyTemplateId)}/revisions`,
+  );
+}
+
+export async function restoreProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevision(params: {
+  policyTemplateId: string;
+  revisionId: string;
+  actorTabId?: string;
+  actorTabLabel?: string;
+  reason?: string;
+}) {
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplate>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/${encodeURIComponent(params.policyTemplateId)}/revisions/${encodeURIComponent(params.revisionId)}/restore`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        ...(params.actorTabId?.trim() ? { actor_tab_id: params.actorTabId.trim() } : {}),
+        ...(params.actorTabLabel?.trim() ? { actor_tab_label: params.actorTabLabel.trim() } : {}),
+        ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
+      }),
+    },
+  );
+}
+
+export async function listProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAudits(params: {
+  policyTemplateId?: string;
+  action?: string;
+  actorTabId?: string;
+  search?: string;
+  limit?: number;
+} = {}) {
+  const searchParams = new URLSearchParams();
+  if (params.policyTemplateId?.trim()) {
+    searchParams.set("policy_template_id", params.policyTemplateId.trim());
+  }
+  if (params.action?.trim()) {
+    searchParams.set("action", params.action.trim());
+  }
+  if (params.actorTabId?.trim()) {
+    searchParams.set("actor_tab_id", params.actorTabId.trim());
+  }
+  if (params.search?.trim()) {
+    searchParams.set("search", params.search.trim());
+  }
+  if (typeof params.limit === "number" && Number.isFinite(params.limit)) {
+    searchParams.set("limit", String(Math.max(1, Math.min(Math.round(params.limit), 200))));
+  }
+  const suffix = searchParams.size ? `?${searchParams.toString()}` : "";
+  return fetchJson<ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditListPayload>(
+    `/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/audits${suffix}`,
   );
 }
 

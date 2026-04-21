@@ -90,6 +90,8 @@ unclear dataset lineage.
 - the scheduler governance layer now also supports reusable policy templates and an approval queue,
   so shift leads can stage named lane/priority defaults for repeated handoff flows and review
   pending vs ready-to-apply narrative plans without scanning a flat plan registry
+- those policy templates now also have revision history and a shared team audit trail, so review
+  defaults can be edited, deleted, restored, and traced without leaving the control room
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

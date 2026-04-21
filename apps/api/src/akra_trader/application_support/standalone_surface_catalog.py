@@ -1849,6 +1849,114 @@ def build_standalone_surface_runtime_bindings(
       ),
     ),
   )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_update_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_update",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{policy_template_id}",
+    route_name="update_operator_provider_provenance_scheduler_narrative_governance_policy_template",
+    response_title="Update provider provenance scheduler narrative governance policy template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_update",
+    methods=("PATCH",),
+    path_param_keys=("policy_template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_update",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_delete_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_delete",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{policy_template_id}/delete",
+    route_name="delete_operator_provider_provenance_scheduler_narrative_governance_policy_template",
+    response_title="Delete provider provenance scheduler narrative governance policy template",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_delete",
+    methods=("POST",),
+    path_param_keys=("policy_template_id",),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_delete",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{policy_template_id}/revisions",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_policy_template_revisions",
+    response_title="List provider provenance scheduler narrative governance policy template revisions",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list",
+    path_param_keys=("policy_template_id",),
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{policy_template_id}/revisions/{revision_id}/restore",
+    route_name="restore_operator_provider_provenance_scheduler_narrative_governance_policy_template_revision",
+    response_title="Restore provider provenance scheduler narrative governance policy template revision",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore",
+    methods=("POST",),
+    path_param_keys=("policy_template_id", "revision_id"),
+    request_payload_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore",
+  )
+  operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list_binding = StandaloneSurfaceRuntimeBinding(
+    surface_key="operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list",
+    route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/audits",
+    route_name="list_operator_provider_provenance_scheduler_narrative_governance_policy_template_audits",
+    response_title="List provider provenance scheduler narrative governance policy template audits",
+    scope="app",
+    binding_kind="operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list",
+    filter_keys=("policy_template_id", "action", "actor_tab_id", "search", "limit"),
+    filter_param_specs=(
+      StandaloneSurfaceFilterParamSpec(
+        "policy_template_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Policy template ID",
+          description="Filter scheduler governance policy template audits by template.",
+          examples=("tmpl_123",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "action",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Action",
+          description="Filter scheduler governance policy template audits by action.",
+          examples=("updated",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "actor_tab_id",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Actor tab ID",
+          description="Filter scheduler governance policy template audits by actor tab identity.",
+          examples=("tab_ops",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "search",
+        str | None,
+        default=None,
+        constraints=StandaloneSurfaceFilterConstraintSpec(min_length=1),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Search",
+          description="Search scheduler governance policy template audits by template, action, actor, or guidance.",
+          examples=("shift_lead",),
+        ),
+      ),
+      StandaloneSurfaceFilterParamSpec(
+        "limit",
+        int,
+        default=50,
+        constraints=StandaloneSurfaceFilterConstraintSpec(ge=1, le=200),
+        openapi=StandaloneSurfaceFilterOpenAPISpec(
+          title="Limit",
+          description="Maximum number of scheduler governance policy template audit records to return.",
+          examples=(25,),
+        ),
+      ),
+    ),
+  )
   operator_provider_provenance_scheduler_narrative_governance_plan_create_binding = StandaloneSurfaceRuntimeBinding(
     surface_key="operator_provider_provenance_scheduler_narrative_governance_plan_create",
     route_path="/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -3623,6 +3731,11 @@ def build_standalone_surface_runtime_bindings(
     operator_provider_provenance_scheduler_narrative_registry_revision_restore_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_template_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_policy_template_list_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_update_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_delete_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore_binding,
+    operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_create_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_list_binding,
     operator_provider_provenance_scheduler_narrative_governance_plan_approve_binding,

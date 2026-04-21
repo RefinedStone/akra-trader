@@ -1052,10 +1052,57 @@ class ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRecord:
   approval_lane: str = "general"
   approval_priority: str = "normal"
   guidance: str | None = None
+  status: str = "active"
   created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
   updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  current_revision_id: str | None = None
+  revision_count: int = 0
   created_by_tab_id: str | None = None
   created_by_tab_label: str | None = None
+  deleted_at: datetime | None = None
+  deleted_by_tab_id: str | None = None
+  deleted_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRecord:
+  revision_id: str
+  policy_template_id: str
+  action: str
+  reason: str
+  name: str
+  description: str = ""
+  item_type_scope: str = "any"
+  action_scope: str = "any"
+  approval_lane: str = "general"
+  approval_priority: str = "normal"
+  guidance: str | None = None
+  status: str = "active"
+  recorded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+  source_revision_id: str | None = None
+  recorded_by_tab_id: str | None = None
+  recorded_by_tab_label: str | None = None
+
+
+@dataclass(frozen=True)
+class ProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateAuditRecord:
+  audit_id: str
+  policy_template_id: str
+  action: str
+  recorded_at: datetime
+  reason: str
+  detail: str = ""
+  revision_id: str | None = None
+  source_revision_id: str | None = None
+  name: str = ""
+  status: str = "active"
+  item_type_scope: str = "any"
+  action_scope: str = "any"
+  approval_lane: str = "general"
+  approval_priority: str = "normal"
+  guidance: str | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
 
 
 @dataclass(frozen=True)

@@ -345,6 +345,31 @@ class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateCreate
   created_by_tab_label: str | None = None
 
 
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateUpdateRequest(BaseModel):
+  name: str | None = None
+  description: str | None = None
+  item_type_scope: str | None = None
+  action_scope: str | None = None
+  approval_lane: str | None = None
+  approval_priority: str | None = None
+  guidance: str | None = None
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_policy_template_updated"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDeleteRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_policy_template_deleted"
+
+
+class OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRestoreRequest(BaseModel):
+  actor_tab_id: str | None = None
+  actor_tab_label: str | None = None
+  reason: str = "scheduler_narrative_governance_policy_template_revision_restored"
+
+
 class OperatorProviderProvenanceSchedulerNarrativeGovernancePlanCreateRequest(BaseModel):
   item_type: str
   item_ids: list[str] = Field(default_factory=list)
@@ -462,6 +487,18 @@ REQUEST_PAYLOAD_MODELS: dict[str, tuple[type[BaseModel], dict[str, Any]]] = {
   ),
   "operator_provider_provenance_scheduler_narrative_governance_policy_template_create": (
     OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateCreateRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_template_update": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateUpdateRequest,
+    {"exclude_unset": True},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_template_delete": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateDeleteRequest,
+    {},
+  ),
+  "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore": (
+    OperatorProviderProvenanceSchedulerNarrativeGovernancePolicyTemplateRevisionRestoreRequest,
     {},
   ),
   "operator_provider_provenance_scheduler_narrative_governance_plan_create": (

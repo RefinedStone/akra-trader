@@ -139,6 +139,8 @@ creation.
 - that staged governance layer now also has reusable policy templates and an approval queue view,
   so lane/priority defaults can be reused across scheduler plan previews and pending work can be
   reviewed as a queue instead of only an undifferentiated plan table
+- those governance policy templates now also carry revision history and a shared audit surface, so
+  template edits and restores are durable and team-visible instead of being create/list only
 
 ### Remaining work
 

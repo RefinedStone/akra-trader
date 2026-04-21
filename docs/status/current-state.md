@@ -194,6 +194,8 @@ It is not yet a finished live trading product:
 - scheduler narrative governance now also has reusable approval-policy templates plus a control-room
   approval queue view, so staged plans can carry named lane/priority defaults and be reviewed as a
   queue instead of a flat unprioritized plan list
+- those governance policy templates now also support edit/delete/version workflow plus a shared
+  audit trail, so lane/priority defaults are no longer opaque create-once records
 
 ### Operator discipline baseline
 

@@ -15158,6 +15158,11 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     "operator_provider_provenance_scheduler_narrative_registry_revision_restore",
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_create",
     "operator_provider_provenance_scheduler_narrative_governance_policy_template_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_update",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_delete",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore",
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_create",
     "operator_provider_provenance_scheduler_narrative_governance_plan_list",
     "operator_provider_provenance_scheduler_narrative_governance_plan_approve",
@@ -15333,6 +15338,19 @@ def test_standalone_surface_runtime_bindings_cover_capabilities_and_run_subresou
     bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_list"].filter_param_specs[0].key
     == "item_type_scope"
   )
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_update"].methods == ("PATCH",)
+  assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_delete"].path_param_keys == (
+    "policy_template_id",
+  )
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list"
+  ].route_path.endswith("/scheduler-narrative-governance/policy-templates/{policy_template_id}/revisions")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore"
+  ].path_param_keys == ("policy_template_id", "revision_id")
+  assert bindings_by_key[
+    "operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list"
+  ].filter_param_specs[0].key == "policy_template_id"
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"].methods == ("POST",)
   assert bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_list"].filter_param_specs[0].key == (
     "item_type"
@@ -16797,6 +16815,78 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert governance_policy_template_list_payload["items"][0]["policy_template_id"] == (
     governance_policy_template_payload["policy_template_id"]
   )
+  assert governance_policy_template_list_payload["items"][0]["revision_count"] == 1
+
+  updated_governance_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_update"],
+    app=app,
+    path_params={"policy_template_id": governance_policy_template_payload["policy_template_id"]},
+    request_payload={
+      "description": "Reusable high-priority update lane with team review.",
+      "approval_priority": "critical",
+      "guidance": "Review with the active shift lead and incident commander before apply.",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_manual_update",
+    },
+  )
+  assert updated_governance_policy_template_payload["approval_priority"] == "critical"
+  assert updated_governance_policy_template_payload["revision_count"] == 2
+
+  governance_policy_template_revision_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_list"],
+    app=app,
+    path_params={"policy_template_id": governance_policy_template_payload["policy_template_id"]},
+  )
+  assert governance_policy_template_revision_payload["policy_template"]["policy_template_id"] == (
+    governance_policy_template_payload["policy_template_id"]
+  )
+  assert governance_policy_template_revision_payload["history"][0]["action"] == "updated"
+  assert governance_policy_template_revision_payload["history"][-1]["action"] == "created"
+
+  deleted_governance_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_delete"],
+    app=app,
+    path_params={"policy_template_id": governance_policy_template_payload["policy_template_id"]},
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_manual_delete",
+    },
+  )
+  assert deleted_governance_policy_template_payload["status"] == "deleted"
+  assert deleted_governance_policy_template_payload["revision_count"] == 3
+
+  restored_governance_policy_template_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_revision_restore"],
+    app=app,
+    path_params={
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "revision_id": governance_policy_template_revision_payload["history"][0]["revision_id"],
+    },
+    request_payload={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_restore_latest_revision",
+    },
+  )
+  assert restored_governance_policy_template_payload["status"] == "active"
+  assert restored_governance_policy_template_payload["revision_count"] == 4
+
+  governance_policy_template_audit_payload = execute_standalone_surface_binding(
+    binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_policy_template_audit_list"],
+    app=app,
+    filters={
+      "policy_template_id": governance_policy_template_payload["policy_template_id"],
+      "limit": 10,
+    },
+  )
+  assert [item["action"] for item in governance_policy_template_audit_payload["items"][:4]] == [
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
 
   template_governance_plan_payload = execute_standalone_surface_binding(
     binding=bindings_by_key["operator_provider_provenance_scheduler_narrative_governance_plan_create"],
@@ -16820,7 +16910,7 @@ def test_operator_provider_provenance_workspace_bindings_round_trip(tmp_path: Pa
   assert template_governance_plan_payload["rollback_ready_count"] == 2
   assert template_governance_plan_payload["policy_template_id"] == governance_policy_template_payload["policy_template_id"]
   assert template_governance_plan_payload["approval_lane"] == "shift_lead"
-  assert template_governance_plan_payload["approval_priority"] == "high"
+  assert template_governance_plan_payload["approval_priority"] == "critical"
   assert any("name" in item["changed_fields"] for item in template_governance_plan_payload["preview_items"])
 
   governance_plan_list_payload = execute_standalone_surface_binding(

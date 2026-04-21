@@ -1779,6 +1779,70 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert governance_policy_template_list_payload["items"][0]["policy_template_id"] == (
     governance_policy_template_payload["policy_template_id"]
   )
+  assert governance_policy_template_list_payload["items"][0]["revision_count"] == 1
+
+  updated_governance_policy_template_response = client.patch(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{governance_policy_template_payload['policy_template_id']}",
+    json={
+      "description": "Reusable high-priority update lane with team review.",
+      "approval_priority": "critical",
+      "guidance": "Review with the active shift lead and incident commander before apply.",
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_manual_update",
+    },
+  )
+  assert updated_governance_policy_template_response.status_code == 200
+  updated_governance_policy_template_payload = updated_governance_policy_template_response.json()
+  assert updated_governance_policy_template_payload["approval_priority"] == "critical"
+  assert updated_governance_policy_template_payload["revision_count"] == 2
+
+  governance_policy_template_revision_response = client.get(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{governance_policy_template_payload['policy_template_id']}/revisions",
+  )
+  assert governance_policy_template_revision_response.status_code == 200
+  governance_policy_template_revision_payload = governance_policy_template_revision_response.json()
+  assert governance_policy_template_revision_payload["history"][0]["action"] == "updated"
+  assert governance_policy_template_revision_payload["history"][-1]["action"] == "created"
+
+  deleted_governance_policy_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{governance_policy_template_payload['policy_template_id']}/delete",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_manual_delete",
+    },
+  )
+  assert deleted_governance_policy_template_response.status_code == 200
+  deleted_governance_policy_template_payload = deleted_governance_policy_template_response.json()
+  assert deleted_governance_policy_template_payload["status"] == "deleted"
+  assert deleted_governance_policy_template_payload["revision_count"] == 3
+
+  restored_governance_policy_template_response = client.post(
+    f"/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/{governance_policy_template_payload['policy_template_id']}/revisions/{governance_policy_template_revision_payload['history'][0]['revision_id']}/restore",
+    json={
+      "actor_tab_id": "tab_ops",
+      "actor_tab_label": "Ops desk",
+      "reason": "scheduler_governance_policy_template_restore_latest_revision",
+    },
+  )
+  assert restored_governance_policy_template_response.status_code == 200
+  restored_governance_policy_template_payload = restored_governance_policy_template_response.json()
+  assert restored_governance_policy_template_payload["status"] == "active"
+  assert restored_governance_policy_template_payload["revision_count"] == 4
+
+  governance_policy_template_audit_response = client.get(
+    "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/policy-templates/audits",
+    params={"policy_template_id": governance_policy_template_payload["policy_template_id"], "limit": 10},
+  )
+  assert governance_policy_template_audit_response.status_code == 200
+  governance_policy_template_audit_payload = governance_policy_template_audit_response.json()
+  assert [item["action"] for item in governance_policy_template_audit_payload["items"][:4]] == [
+    "restored",
+    "deleted",
+    "updated",
+    "created",
+  ]
 
   template_governance_plan_response = client.post(
     "/api/operator/provider-provenance-analytics/scheduler-narrative-governance/plans",
@@ -1802,7 +1866,7 @@ def test_operator_provider_provenance_workspace_endpoints_round_trip(tmp_path: P
   assert template_governance_plan_payload["preview_changed_count"] == 2
   assert template_governance_plan_payload["rollback_ready_count"] == 2
   assert template_governance_plan_payload["approval_lane"] == "shift_lead"
-  assert template_governance_plan_payload["approval_priority"] == "high"
+  assert template_governance_plan_payload["approval_priority"] == "critical"
   assert template_governance_plan_payload["policy_template_id"] == governance_policy_template_payload["policy_template_id"]
 
   list_governance_plans_response = client.get(
