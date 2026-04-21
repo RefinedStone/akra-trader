@@ -2384,6 +2384,29 @@ select {
   line-height: 1.45;
 }
 
+.market-data-provenance-workbench {
+  margin-top: 10px;
+}
+
+.market-data-provenance-copy,
+.market-data-provenance-history-head {
+  display: grid;
+  gap: 4px;
+}
+
+.market-data-provenance-copy p,
+.market-data-provenance-history-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.market-data-provenance-history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .market-data-inline-focus-button {
   margin-top: 10px;
   padding: 8px 12px;

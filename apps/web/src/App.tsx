@@ -111,9 +111,12 @@ import {
   DEFAULT_COMPARISON_TOOLTIP_TUNING,
   DEFAULT_CONTROL_ROOM_DOCUMENT_TITLE,
   LEGACY_GAP_WINDOW_EXPANSION_STORAGE_KEY,
+  MARKET_DATA_PROVENANCE_EXPORT_STORAGE_KEY,
+  MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION,
   MAX_COMPARISON_HISTORY_PANEL_ENTRIES,
   MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES,
   MAX_COMPARISON_RUNS,
+  MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES,
   MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_CONFLICT_ENTRIES,
   MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_ENTRIES,
   MAX_RUN_SURFACE_QUERY_BUILDER_REPLAY_HISTORY_SYNC_AUDIT_ENTRIES,
@@ -235,6 +238,10 @@ import type {
   GapWindowDragSelectionState,
   GuardedLiveStatus,
   MarketDataIngestionJobRecord,
+  MarketDataProvenanceExportFilterState,
+  MarketDataProvenanceExportHistoryEntry,
+  MarketDataProvenanceExportSort,
+  MarketDataProvenanceExportStateV1,
   MarketDataLineageHistoryRecord,
   MarketDataStatus,
   OperatorAlertMarketContextProvenance,
@@ -317,6 +324,13 @@ const defaultPresetForm = {
 const defaultPresetRevisionFilter: PresetRevisionFilterState = {
   action: "all",
   query: "",
+};
+
+const defaultMarketDataProvenanceExportFilterState: MarketDataProvenanceExportFilterState = {
+  provider: ALL_FILTER_VALUE,
+  vendor_field: ALL_FILTER_VALUE,
+  search_query: "",
+  sort: "newest",
 };
 
 function buildPresetFormFromPreset(preset: ExperimentPreset) {
@@ -1783,6 +1797,18 @@ type ProviderRecoveryMarketContextSummary = {
   fieldSummaries: string[];
 };
 
+type MarketDataProviderProvenanceEventRecord = {
+  event: OperatorVisibility["incident_events"][number];
+  link: LinkedMarketInstrumentContext | null;
+  provider: string;
+  vendorField: string;
+  provenanceSummary: string;
+  fieldSummaries: string[];
+  severityRank: number;
+  occurredAtMs: number;
+  searchText: string;
+};
+
 type MarketDataPrimaryFocusSelection = {
   instrument: MarketDataStatus["instruments"][number];
   candidateCount: number;
@@ -1850,6 +1876,167 @@ function serializeLinkedMarketInstrumentContext(link: LinkedMarketInstrumentCont
     primary_focus_policy: link.primaryFocusPolicy,
     primary_focus_reason: link.primaryFocusReason,
   };
+}
+
+function getOperatorSeverityRank(severity: string) {
+  switch (severity) {
+    case "critical":
+      return 3;
+    case "warning":
+      return 2;
+    case "info":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+function normalizeMarketDataProvenanceExportSort(
+  value: unknown,
+): MarketDataProvenanceExportSort {
+  return value === "oldest" || value === "provider" || value === "severity" || value === "newest"
+    ? value
+    : defaultMarketDataProvenanceExportFilterState.sort;
+}
+
+function normalizeMarketDataProvenanceExportFilterState(
+  value: unknown,
+): MarketDataProvenanceExportFilterState {
+  if (!value || typeof value !== "object") {
+    return { ...defaultMarketDataProvenanceExportFilterState };
+  }
+  const candidate = value as Partial<MarketDataProvenanceExportFilterState>;
+  return {
+    provider:
+      typeof candidate.provider === "string" && candidate.provider.trim().length
+        ? candidate.provider
+        : defaultMarketDataProvenanceExportFilterState.provider,
+    vendor_field:
+      typeof candidate.vendor_field === "string" && candidate.vendor_field.trim().length
+        ? candidate.vendor_field
+        : defaultMarketDataProvenanceExportFilterState.vendor_field,
+    search_query:
+      typeof candidate.search_query === "string"
+        ? candidate.search_query
+        : defaultMarketDataProvenanceExportFilterState.search_query,
+    sort: normalizeMarketDataProvenanceExportSort(candidate.sort),
+  };
+}
+
+function normalizeMarketDataProvenanceExportHistoryEntry(
+  value: unknown,
+): MarketDataProvenanceExportHistoryEntry | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const candidate = value as Partial<MarketDataProvenanceExportHistoryEntry>;
+  if (
+    typeof candidate.export_id !== "string"
+    || typeof candidate.exported_at !== "string"
+    || typeof candidate.focus_key !== "string"
+    || typeof candidate.focus_label !== "string"
+    || typeof candidate.symbol !== "string"
+    || typeof candidate.timeframe !== "string"
+    || typeof candidate.provider !== "string"
+    || typeof candidate.venue !== "string"
+    || typeof candidate.result_count !== "number"
+    || typeof candidate.provider_provenance_count !== "number"
+    || !Array.isArray(candidate.provider_labels)
+    || typeof candidate.content !== "string"
+  ) {
+    return null;
+  }
+  return {
+    export_id: candidate.export_id,
+    exported_at: candidate.exported_at,
+    focus_key: candidate.focus_key,
+    focus_label: candidate.focus_label,
+    symbol: candidate.symbol,
+    timeframe: candidate.timeframe,
+    provider: candidate.provider,
+    venue: candidate.venue,
+    result_count: candidate.result_count,
+    provider_provenance_count: candidate.provider_provenance_count,
+    provider_labels: candidate.provider_labels.filter((label): label is string => typeof label === "string"),
+    filter: normalizeMarketDataProvenanceExportFilterState(candidate.filter),
+    content: candidate.content,
+  };
+}
+
+function loadPersistedMarketDataProvenanceExportState(): {
+  activeFilter: MarketDataProvenanceExportFilterState;
+  history: MarketDataProvenanceExportHistoryEntry[];
+} {
+  if (typeof window === "undefined") {
+    return {
+      activeFilter: { ...defaultMarketDataProvenanceExportFilterState },
+      history: [],
+    };
+  }
+  try {
+    const raw = window.localStorage.getItem(MARKET_DATA_PROVENANCE_EXPORT_STORAGE_KEY);
+    if (!raw) {
+      return {
+        activeFilter: { ...defaultMarketDataProvenanceExportFilterState },
+        history: [],
+      };
+    }
+    const parsed = JSON.parse(raw) as Partial<MarketDataProvenanceExportStateV1> | null;
+    if (parsed?.version !== MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION) {
+      return {
+        activeFilter: { ...defaultMarketDataProvenanceExportFilterState },
+        history: [],
+      };
+    }
+    return {
+      activeFilter: normalizeMarketDataProvenanceExportFilterState(parsed.active_filter),
+      history: Array.isArray(parsed.history)
+        ? parsed.history
+            .map((entry) => normalizeMarketDataProvenanceExportHistoryEntry(entry))
+            .filter((entry): entry is MarketDataProvenanceExportHistoryEntry => entry !== null)
+            .slice(0, MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES)
+        : [],
+    };
+  } catch {
+    return {
+      activeFilter: { ...defaultMarketDataProvenanceExportFilterState },
+      history: [],
+    };
+  }
+}
+
+function persistMarketDataProvenanceExportState(state: {
+  activeFilter: MarketDataProvenanceExportFilterState;
+  history: MarketDataProvenanceExportHistoryEntry[];
+}) {
+  if (typeof window === "undefined") {
+    return;
+  }
+  try {
+    const nextState: MarketDataProvenanceExportStateV1 = {
+      version: MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION,
+      active_filter: normalizeMarketDataProvenanceExportFilterState(state.activeFilter),
+      history: state.history.slice(0, MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES),
+    };
+    window.localStorage.setItem(
+      MARKET_DATA_PROVENANCE_EXPORT_STORAGE_KEY,
+      JSON.stringify(nextState),
+    );
+  } catch {
+    // Ignore localStorage failures for provider provenance export state.
+  }
+}
+
+function formatMarketDataProvenanceExportFilterSummary(
+  filter: MarketDataProvenanceExportFilterState,
+) {
+  const parts = [
+    filter.provider !== ALL_FILTER_VALUE ? `provider ${filter.provider}` : null,
+    filter.vendor_field !== ALL_FILTER_VALUE ? `vendor field ${filter.vendor_field}` : null,
+    filter.search_query.trim() ? `search ${filter.search_query.trim()}` : null,
+    filter.sort !== "newest" ? `sort ${filter.sort}` : null,
+  ].filter((value): value is string => Boolean(value));
+  return parts.length ? parts.join(" / ") : "All providers · newest first";
 }
 
 function escapeRegExp(value: string) {
@@ -2398,6 +2585,20 @@ export default function App() {
   const [marketDataWorkflowLoading, setMarketDataWorkflowLoading] = useState(false);
   const [marketDataWorkflowError, setMarketDataWorkflowError] = useState<string | null>(null);
   const [marketDataWorkflowExportFeedback, setMarketDataWorkflowExportFeedback] = useState<string | null>(null);
+  const initialMarketDataProvenanceExportStateRef = useRef<ReturnType<
+    typeof loadPersistedMarketDataProvenanceExportState
+  > | null>(null);
+  if (!initialMarketDataProvenanceExportStateRef.current) {
+    initialMarketDataProvenanceExportStateRef.current = loadPersistedMarketDataProvenanceExportState();
+  }
+  const [marketDataProvenanceExportFilter, setMarketDataProvenanceExportFilter] =
+    useState<MarketDataProvenanceExportFilterState>(
+      () => initialMarketDataProvenanceExportStateRef.current?.activeFilter ?? defaultMarketDataProvenanceExportFilterState,
+    );
+  const [marketDataProvenanceExportHistory, setMarketDataProvenanceExportHistory] =
+    useState<MarketDataProvenanceExportHistoryEntry[]>(
+      () => initialMarketDataProvenanceExportStateRef.current?.history ?? [],
+    );
   const [operatorVisibility, setOperatorVisibility] = useState<OperatorVisibility | null>(null);
   const [guardedLive, setGuardedLive] = useState<GuardedLiveStatus | null>(null);
   const [statusText, setStatusText] = useState("Loading control room...");
@@ -2835,6 +3036,13 @@ export default function App() {
       comparisonHistorySyncAuditTrail,
     );
   }, [comparisonHistorySyncAuditTrail, comparisonHistoryTabIdentity.tabId]);
+
+  useEffect(() => {
+    persistMarketDataProvenanceExportState({
+      activeFilter: marketDataProvenanceExportFilter,
+      history: marketDataProvenanceExportHistory,
+    });
+  }, [marketDataProvenanceExportFilter, marketDataProvenanceExportHistory]);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -3951,19 +4159,152 @@ export default function App() {
     marketDataLineageHistory,
   ]);
 
-  const focusedMarketProviderProvenanceCount = useMemo(
+  const focusedMarketProviderProvenanceEvents = useMemo(
     () =>
-      focusedLinkedOperatorIncidentEvents.filter(
-        ({ event }) => summarizeProviderRecoveryMarketContextProvenance(event.remediation.provider_recovery) !== null,
-      ).length,
+      focusedLinkedOperatorIncidentEvents.flatMap(({ event, link }) => {
+        const provenanceSummary = summarizeProviderRecoveryMarketContextProvenance(
+          event.remediation.provider_recovery,
+        );
+        if (!provenanceSummary) {
+          return [];
+        }
+        const provider =
+          event.remediation.provider_recovery.market_context_provenance?.provider?.trim()
+          || event.remediation.provider_recovery.provider?.trim()
+          || event.external_provider?.trim()
+          || "unknown";
+        const vendorField =
+          event.remediation.provider_recovery.market_context_provenance?.vendor_field?.trim()
+          || "unknown";
+        const occurredAtMs = Date.parse(event.timestamp);
+        return [
+          {
+            event,
+            link,
+            provider,
+            vendorField,
+            provenanceSummary: provenanceSummary.summary,
+            fieldSummaries: provenanceSummary.fieldSummaries,
+            severityRank: getOperatorSeverityRank(event.severity),
+            occurredAtMs: Number.isFinite(occurredAtMs) ? occurredAtMs : Number.NEGATIVE_INFINITY,
+            searchText: [
+              provider,
+              vendorField,
+              event.kind,
+              event.severity,
+              event.summary,
+              event.detail,
+              event.source,
+              event.external_provider ?? "",
+              event.external_reference ?? "",
+              event.provider_workflow_reference ?? "",
+              event.remediation.provider_recovery.symbols.join(" "),
+              event.remediation.provider_recovery.timeframe ?? "",
+              provenanceSummary.summary,
+              provenanceSummary.fieldSummaries.join(" "),
+            ]
+              .join(" ")
+              .toLowerCase(),
+          } satisfies MarketDataProviderProvenanceEventRecord,
+        ];
+      }),
     [focusedLinkedOperatorIncidentEvents],
   );
+
+  const focusedMarketProviderProvenanceCount = focusedMarketProviderProvenanceEvents.length;
+
+  const marketDataProvenanceExportProviderOptions = useMemo(
+    () => Array.from(new Set(focusedMarketProviderProvenanceEvents.map((record) => record.provider))).sort(),
+    [focusedMarketProviderProvenanceEvents],
+  );
+
+  const marketDataProvenanceExportVendorFieldOptions = useMemo(
+    () => Array.from(new Set(focusedMarketProviderProvenanceEvents.map((record) => record.vendorField))).sort(),
+    [focusedMarketProviderProvenanceEvents],
+  );
+
+  useEffect(() => {
+    setMarketDataProvenanceExportFilter((current) => {
+      const nextProvider =
+        current.provider !== ALL_FILTER_VALUE
+        && !marketDataProvenanceExportProviderOptions.includes(current.provider)
+          ? ALL_FILTER_VALUE
+          : current.provider;
+      const nextVendorField =
+        current.vendor_field !== ALL_FILTER_VALUE
+        && !marketDataProvenanceExportVendorFieldOptions.includes(current.vendor_field)
+          ? ALL_FILTER_VALUE
+          : current.vendor_field;
+      if (nextProvider === current.provider && nextVendorField === current.vendor_field) {
+        return current;
+      }
+      return {
+        ...current,
+        provider: nextProvider,
+        vendor_field: nextVendorField,
+      };
+    });
+  }, [
+    marketDataProvenanceExportProviderOptions,
+    marketDataProvenanceExportVendorFieldOptions,
+  ]);
+
+  const filteredFocusedMarketProviderProvenanceEvents = useMemo(() => {
+    const normalizedSearch = marketDataProvenanceExportFilter.search_query.trim().toLowerCase();
+    return focusedMarketProviderProvenanceEvents
+      .filter((record) => {
+        if (
+          marketDataProvenanceExportFilter.provider !== ALL_FILTER_VALUE
+          && record.provider !== marketDataProvenanceExportFilter.provider
+        ) {
+          return false;
+        }
+        if (
+          marketDataProvenanceExportFilter.vendor_field !== ALL_FILTER_VALUE
+          && record.vendorField !== marketDataProvenanceExportFilter.vendor_field
+        ) {
+          return false;
+        }
+        if (normalizedSearch && !record.searchText.includes(normalizedSearch)) {
+          return false;
+        }
+        return true;
+      })
+      .slice()
+      .sort((left, right) => {
+        switch (marketDataProvenanceExportFilter.sort) {
+          case "oldest":
+            return left.occurredAtMs - right.occurredAtMs || left.event.event_id.localeCompare(right.event.event_id);
+          case "provider":
+            return (
+              left.provider.localeCompare(right.provider)
+              || right.occurredAtMs - left.occurredAtMs
+              || left.event.event_id.localeCompare(right.event.event_id)
+            );
+          case "severity":
+            return (
+              right.severityRank - left.severityRank
+              || right.occurredAtMs - left.occurredAtMs
+              || left.provider.localeCompare(right.provider)
+            );
+          case "newest":
+          default:
+            return right.occurredAtMs - left.occurredAtMs || left.event.event_id.localeCompare(right.event.event_id);
+        }
+      });
+  }, [focusedMarketProviderProvenanceEvents, marketDataProvenanceExportFilter]);
 
   const focusedMarketWorkflowExportPayload = useMemo(() => {
     if (!activeMarketInstrument || !marketStatus) {
       return null;
     }
     return {
+      export_scope: "provider_market_context_provenance",
+      export_filter: marketDataProvenanceExportFilter,
+      export_filter_summary: formatMarketDataProvenanceExportFilterSummary(
+        marketDataProvenanceExportFilter,
+      ),
+      export_result_count: filteredFocusedMarketProviderProvenanceEvents.length,
       focus: {
         provider: marketStatus.provider,
         venue: marketStatus.venue,
@@ -3975,8 +4316,13 @@ export default function App() {
         linked_alert_history_count: focusedLinkedOperatorAlertHistory.length,
         linked_incident_count: focusedLinkedOperatorIncidentEvents.length,
         provider_provenance_incident_count: focusedMarketProviderProvenanceCount,
+        filtered_provider_provenance_incident_count: filteredFocusedMarketProviderProvenanceEvents.length,
         lineage_snapshot_count: marketDataLineageHistory.length,
         ingestion_job_count: marketDataIngestionJobs.length,
+      },
+      provider_provenance_available_filters: {
+        providers: marketDataProvenanceExportProviderOptions,
+        vendor_fields: marketDataProvenanceExportVendorFieldOptions,
       },
       alerts: focusedLinkedOperatorAlerts.map(({ alert, link }) => ({
         alert_id: alert.alert_id,
@@ -4048,6 +4394,32 @@ export default function App() {
             ?? null,
         },
       })),
+      provider_provenance_incidents: filteredFocusedMarketProviderProvenanceEvents.map((record) => ({
+        event_id: record.event.event_id,
+        alert_id: record.event.alert_id,
+        timestamp: record.event.timestamp,
+        kind: record.event.kind,
+        severity: record.event.severity,
+        summary: record.event.summary,
+        detail: record.event.detail,
+        source: record.event.source,
+        external_provider: record.event.external_provider ?? null,
+        external_reference: record.event.external_reference ?? null,
+        provider_workflow_reference: record.event.provider_workflow_reference ?? null,
+        triage_focus_link: serializeLinkedMarketInstrumentContext(record.link),
+        provider: record.provider,
+        vendor_field: record.vendorField,
+        provenance_summary: record.provenanceSummary,
+        provenance_fields: record.fieldSummaries,
+        remediation_provider_recovery: {
+          lifecycle_state: record.event.remediation.provider_recovery.lifecycle_state,
+          reference: record.event.remediation.provider_recovery.reference ?? null,
+          workflow_reference: record.event.remediation.provider_recovery.workflow_reference ?? null,
+          symbols: record.event.remediation.provider_recovery.symbols,
+          timeframe: record.event.remediation.provider_recovery.timeframe ?? null,
+          channels: record.event.remediation.provider_recovery.channels,
+        },
+      })),
       lineage_history: marketDataLineageHistory,
       ingestion_jobs: marketDataIngestionJobs,
       merged_incident_history: focusedMarketIncidentHistory,
@@ -4057,8 +4429,12 @@ export default function App() {
     focusedLinkedOperatorAlertHistory,
     focusedLinkedOperatorAlerts,
     focusedLinkedOperatorIncidentEvents,
+    filteredFocusedMarketProviderProvenanceEvents,
     focusedMarketIncidentHistory,
     focusedMarketProviderProvenanceCount,
+    marketDataProvenanceExportFilter,
+    marketDataProvenanceExportProviderOptions,
+    marketDataProvenanceExportVendorFieldOptions,
     marketDataIngestionJobs,
     marketDataLineageHistory,
     marketStatus,
@@ -4245,7 +4621,7 @@ export default function App() {
   }
 
   async function copyFocusedMarketWorkflowExport() {
-    if (!focusedMarketWorkflowExportPayload || !focusedMarketWorkflowSummary) {
+    if (!activeMarketInstrument || !focusedMarketWorkflowExportPayload || !focusedMarketWorkflowSummary) {
       setMarketDataWorkflowExportFeedback("Select a triage focus before exporting provider provenance.");
       return;
     }
@@ -4254,22 +4630,80 @@ export default function App() {
       return;
     }
     try {
-      await navigator.clipboard.writeText(
-        JSON.stringify(
-          {
-            exported_at: new Date().toISOString(),
-            ...focusedMarketWorkflowExportPayload,
-          },
-          null,
-          2,
-        ),
+      const exportedAt = new Date().toISOString();
+      const content = JSON.stringify(
+        {
+          exported_at: exportedAt,
+          ...focusedMarketWorkflowExportPayload,
+        },
+        null,
+        2,
       );
+      await navigator.clipboard.writeText(
+        content,
+      );
+      setMarketDataProvenanceExportHistory((current) => [
+        {
+          export_id: `${buildMarketDataInstrumentFocusKey(activeMarketInstrument)}:${Date.now()}`,
+          exported_at: exportedAt,
+          focus_key: buildMarketDataInstrumentFocusKey(activeMarketInstrument),
+          focus_label: focusedMarketWorkflowSummary.focusLabel,
+          symbol: resolveMarketDataSymbol(activeMarketInstrument.instrument_id),
+          timeframe: activeMarketInstrument.timeframe,
+          provider: focusedMarketWorkflowExportPayload.focus.provider,
+          venue: focusedMarketWorkflowExportPayload.focus.venue,
+          result_count: filteredFocusedMarketProviderProvenanceEvents.length,
+          provider_provenance_count: focusedMarketProviderProvenanceCount,
+          provider_labels: Array.from(
+            new Set(filteredFocusedMarketProviderProvenanceEvents.map((record) => record.provider)),
+          ),
+          filter: marketDataProvenanceExportFilter,
+          content,
+        },
+        ...current,
+      ].slice(0, MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES));
       setMarketDataWorkflowExportFeedback(
-        `Copied triage export for ${focusedMarketWorkflowSummary.focusLabel} with ${focusedMarketProviderProvenanceCount} provider provenance incident(s).`,
+        `Copied filtered triage export for ${focusedMarketWorkflowSummary.focusLabel} with ${filteredFocusedMarketProviderProvenanceEvents.length} result(s).`,
       );
     } catch {
       setMarketDataWorkflowExportFeedback("Clipboard copy failed for the triage export.");
     }
+  }
+
+  async function copySavedMarketDataProvenanceExport(
+    entry: MarketDataProvenanceExportHistoryEntry,
+  ) {
+    if (!navigator.clipboard?.writeText) {
+      setMarketDataWorkflowExportFeedback("Clipboard is unavailable. Copy the saved export from dev tools instead.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(entry.content);
+      setMarketDataWorkflowExportFeedback(
+        `Copied saved export from ${formatTimestamp(entry.exported_at)} for ${entry.focus_label}.`,
+      );
+    } catch {
+      setMarketDataWorkflowExportFeedback("Clipboard copy failed for the saved export.");
+    }
+  }
+
+  function restoreMarketDataProvenanceExportFilter(
+    entry: MarketDataProvenanceExportHistoryEntry,
+  ) {
+    setMarketDataProvenanceExportFilter(entry.filter);
+    setMarketDataWorkflowExportFeedback(
+      `Restored export filters from ${formatTimestamp(entry.exported_at)} for ${entry.focus_label}.`,
+    );
+  }
+
+  function resetMarketDataProvenanceExportFilter() {
+    setMarketDataProvenanceExportFilter({ ...defaultMarketDataProvenanceExportFilterState });
+    setMarketDataWorkflowExportFeedback("Reset provider provenance export filters.");
+  }
+
+  function clearMarketDataProvenanceExportHistory() {
+    setMarketDataProvenanceExportHistory([]);
+    setMarketDataWorkflowExportFeedback("Cleared persisted provider provenance export history.");
   }
 
   async function handlePresetSubmit(event: FormEvent) {
@@ -5382,11 +5816,11 @@ export default function App() {
                             }}
                             type="button"
                           >
-                            Copy triage export
+                            Copy filtered export
                           </button>
                           <span className="market-data-workflow-export-copy">
                             {focusedMarketProviderProvenanceCount
-                              ? `${focusedMarketProviderProvenanceCount} linked incident(s) include provider market-context provenance.`
+                              ? `${filteredFocusedMarketProviderProvenanceEvents.length} filtered result(s) from ${focusedMarketProviderProvenanceCount} linked provider-provenance incident(s).`
                               : "No linked incident currently exposes provider market-context provenance."}
                           </span>
                         </div>
@@ -5435,6 +5869,13 @@ export default function App() {
                           <div className="metric-tile">
                             <span>Incident history</span>
                             <strong>{focusedMarketWorkflowSummary.incidentHistoryCount}</strong>
+                          </div>
+                          <div className="metric-tile">
+                            <span>Provenance incidents</span>
+                            <strong>
+                              {filteredFocusedMarketProviderProvenanceEvents.length}
+                              {` / ${focusedMarketProviderProvenanceCount}`}
+                            </strong>
                           </div>
                         </div>
                         <div className="status-grid-two-column">
@@ -5557,6 +5998,239 @@ export default function App() {
                           ) : (
                             <p className="empty-state">No alert-linked lineage incident history recorded for this focus.</p>
                           )}
+                        </div>
+                        <div>
+                          <h3>Provider provenance export</h3>
+                          <div className="run-filter-workbench market-data-provenance-workbench">
+                            <div className="run-filter-workbench-head">
+                              <div className="market-data-provenance-copy">
+                                <strong>Filtered provider readback incidents</strong>
+                                <p>
+                                  Export the incidents whose selected market context came back from a provider-native
+                                  field path. Filters and history stay local to this browser.
+                                </p>
+                              </div>
+                              <div className="run-filter-workbench-actions">
+                                <button
+                                  className="ghost-button"
+                                  onClick={() => {
+                                    void copyFocusedMarketWorkflowExport();
+                                  }}
+                                  type="button"
+                                >
+                                  Copy filtered export
+                                </button>
+                                <button
+                                  className="ghost-button"
+                                  onClick={resetMarketDataProvenanceExportFilter}
+                                  type="button"
+                                >
+                                  Reset filters
+                                </button>
+                                {marketDataProvenanceExportHistory.length ? (
+                                  <button
+                                    className="ghost-button"
+                                    onClick={clearMarketDataProvenanceExportHistory}
+                                    type="button"
+                                  >
+                                    Clear history
+                                  </button>
+                                ) : null}
+                              </div>
+                            </div>
+                            <div className="filter-bar">
+                              <label>
+                                <span>Provider</span>
+                                <select
+                                  onChange={(event) =>
+                                    setMarketDataProvenanceExportFilter((current) => ({
+                                      ...current,
+                                      provider: event.target.value,
+                                    }))
+                                  }
+                                  value={marketDataProvenanceExportFilter.provider}
+                                >
+                                  <option value={ALL_FILTER_VALUE}>All providers</option>
+                                  {marketDataProvenanceExportProviderOptions.map((provider) => (
+                                    <option key={provider} value={provider}>
+                                      {provider}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                <span>Vendor field</span>
+                                <select
+                                  onChange={(event) =>
+                                    setMarketDataProvenanceExportFilter((current) => ({
+                                      ...current,
+                                      vendor_field: event.target.value,
+                                    }))
+                                  }
+                                  value={marketDataProvenanceExportFilter.vendor_field}
+                                >
+                                  <option value={ALL_FILTER_VALUE}>All vendor fields</option>
+                                  {marketDataProvenanceExportVendorFieldOptions.map((vendorField) => (
+                                    <option key={vendorField} value={vendorField}>
+                                      {vendorField}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+                              <label>
+                                <span>Sort</span>
+                                <select
+                                  onChange={(event) =>
+                                    setMarketDataProvenanceExportFilter((current) => ({
+                                      ...current,
+                                      sort: normalizeMarketDataProvenanceExportSort(event.target.value),
+                                    }))
+                                  }
+                                  value={marketDataProvenanceExportFilter.sort}
+                                >
+                                  <option value="newest">Newest first</option>
+                                  <option value="oldest">Oldest first</option>
+                                  <option value="provider">Provider</option>
+                                  <option value="severity">Severity</option>
+                                </select>
+                              </label>
+                              <label>
+                                <span>Search</span>
+                                <input
+                                  onChange={(event) =>
+                                    setMarketDataProvenanceExportFilter((current) => ({
+                                      ...current,
+                                      search_query: event.target.value,
+                                    }))
+                                  }
+                                  placeholder="summary, provider, path"
+                                  type="search"
+                                  value={marketDataProvenanceExportFilter.search_query}
+                                />
+                              </label>
+                            </div>
+                            <div className="run-filter-summary-chip-row">
+                              <span className="run-filter-summary-chip">
+                                {filteredFocusedMarketProviderProvenanceEvents.length} filtered result(s)
+                              </span>
+                              <span className="run-filter-summary-chip">
+                                {focusedMarketProviderProvenanceCount} total provenance incident(s)
+                              </span>
+                              <span className="run-filter-summary-chip">
+                                {formatMarketDataProvenanceExportFilterSummary(marketDataProvenanceExportFilter)}
+                              </span>
+                            </div>
+                            {filteredFocusedMarketProviderProvenanceEvents.length ? (
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>When</th>
+                                    <th>Provider</th>
+                                    <th>Signal</th>
+                                    <th>Provenance</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {filteredFocusedMarketProviderProvenanceEvents.slice(0, 8).map((record) => (
+                                    <tr key={`provider-provenance-${record.event.event_id}`}>
+                                      <td>{formatTimestamp(record.event.timestamp)}</td>
+                                      <td>
+                                        <strong>{record.provider}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          Vendor field: {record.vendorField}
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <strong>{record.event.summary}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          {formatWorkflowToken(record.event.kind)} / {formatWorkflowToken(record.event.severity)}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          {record.event.external_reference
+                                            ? `External ref: ${record.event.external_reference}`
+                                            : "No external reference recorded."}
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <strong>{record.provenanceSummary}</strong>
+                                        {record.fieldSummaries.map((fieldSummary) => (
+                                          <p className="run-lineage-symbol-copy" key={fieldSummary}>
+                                            {fieldSummary}
+                                          </p>
+                                        ))}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : (
+                              <p className="empty-state">
+                                No provider provenance incidents match the current export filters.
+                              </p>
+                            )}
+                            <div className="market-data-provenance-history-head">
+                              <strong>Persisted export history</strong>
+                              <p>
+                                {marketDataProvenanceExportHistory.length
+                                  ? `${marketDataProvenanceExportHistory.length} saved export snapshot(s) are available in this browser.`
+                                  : "No persisted provider provenance exports recorded yet."}
+                              </p>
+                            </div>
+                            {marketDataProvenanceExportHistory.length ? (
+                              <table className="data-table">
+                                <thead>
+                                  <tr>
+                                    <th>Exported</th>
+                                    <th>Focus</th>
+                                    <th>Filter</th>
+                                    <th>Action</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {marketDataProvenanceExportHistory.slice(0, 8).map((entry) => (
+                                    <tr key={entry.export_id}>
+                                      <td>{formatTimestamp(entry.exported_at)}</td>
+                                      <td>
+                                        <strong>{entry.focus_label}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          {entry.provider} / {entry.venue} / {entry.symbol} · {entry.timeframe}
+                                        </p>
+                                        <p className="run-lineage-symbol-copy">
+                                          {entry.result_count} result(s) from {entry.provider_provenance_count} provenance incident(s)
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <strong>{formatMarketDataProvenanceExportFilterSummary(entry.filter)}</strong>
+                                        <p className="run-lineage-symbol-copy">
+                                          Providers: {entry.provider_labels.length ? entry.provider_labels.join(", ") : "n/a"}
+                                        </p>
+                                      </td>
+                                      <td>
+                                        <div className="market-data-provenance-history-actions">
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => {
+                                              void copySavedMarketDataProvenanceExport(entry);
+                                            }}
+                                            type="button"
+                                          >
+                                            Copy export
+                                          </button>
+                                          <button
+                                            className="ghost-button"
+                                            onClick={() => restoreMarketDataProvenanceExportFilter(entry)}
+                                            type="button"
+                                          >
+                                            Load filters
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            ) : null}
+                          </div>
                         </div>
                       </>
                     ) : (

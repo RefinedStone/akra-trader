@@ -140,6 +140,8 @@ It is not yet a finished live trading product:
   normalized `symbol`, `symbols`, `timeframe`, and `primary_focus` fields carried in provider
   recovery state, and the control-room incident drill-down plus triage export now surface that
   provenance directly to operators
+- provider provenance export in the control room now has operator-facing provider/vendor-field
+  filters, sort modes, and persisted local export history instead of a one-off clipboard action
 
 ### Operator discipline baseline
 

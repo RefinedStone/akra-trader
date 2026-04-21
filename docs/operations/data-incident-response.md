@@ -36,6 +36,9 @@ unclear dataset lineage.
 - the normalized provider recovery state now keeps provider-specific source provenance for restored
   market-context fields so operators can see which vendor payload path last supplied that focus,
   and the control-room incident drill-down plus triage export now carry that provenance forward
+- provider provenance export in the triage panel now supports provider/vendor-field filtering,
+  sort controls, and persisted local export history so repeated incident handoff does not start
+  from an empty clipboard
 - run provenance and rerun-boundary views
 - lineage posture summaries that collapse rerun taxonomy into exact-match, drift-aware, or unresolved
   operator guidance

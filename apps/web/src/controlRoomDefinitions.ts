@@ -982,6 +982,41 @@ export type MarketDataIngestionJobRecord = {
   last_error?: string | null;
 };
 
+export type MarketDataProvenanceExportSort =
+  | "newest"
+  | "oldest"
+  | "provider"
+  | "severity";
+
+export type MarketDataProvenanceExportFilterState = {
+  provider: string;
+  vendor_field: string;
+  search_query: string;
+  sort: MarketDataProvenanceExportSort;
+};
+
+export type MarketDataProvenanceExportHistoryEntry = {
+  export_id: string;
+  exported_at: string;
+  focus_key: string;
+  focus_label: string;
+  symbol: string;
+  timeframe: string;
+  provider: string;
+  venue: string;
+  result_count: number;
+  provider_provenance_count: number;
+  provider_labels: string[];
+  filter: MarketDataProvenanceExportFilterState;
+  content: string;
+};
+
+export type MarketDataProvenanceExportStateV1 = {
+  version: typeof MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION;
+  active_filter: MarketDataProvenanceExportFilterState;
+  history: MarketDataProvenanceExportHistoryEntry[];
+};
+
 export type OperatorAlertMarketContextFieldProvenance = {
   scope?: string | null;
   path?: string | null;
@@ -3372,6 +3407,9 @@ export const MAX_COMPARISON_HISTORY_SYNC_AUDIT_ENTRIES = 8;
 export const CONTROL_ROOM_UI_STATE_STORAGE_KEY = "akra-trader-control-room-ui-state";
 export const CONTROL_ROOM_UI_STATE_VERSION = 4;
 export const RUN_HISTORY_SAVED_FILTER_STORAGE_KEY_PREFIX = "akra-trader-run-history-saved-filters";
+export const MARKET_DATA_PROVENANCE_EXPORT_STORAGE_KEY = "akra-trader-market-data-provenance-exports";
+export const MARKET_DATA_PROVENANCE_EXPORT_STORAGE_VERSION = 1;
+export const MAX_MARKET_DATA_PROVENANCE_EXPORT_HISTORY_ENTRIES = 12;
 export const COMPARISON_HISTORY_BROWSER_STATE_KEY = "akraTraderComparisonHistory";
 export const COMPARISON_HISTORY_BROWSER_STATE_VERSION = 1;
 export const COMPARISON_HISTORY_TAB_ID_SESSION_KEY = "akra-trader-comparison-history-tab-id";

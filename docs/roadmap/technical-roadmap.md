@@ -89,6 +89,8 @@ creation.
 - normalized provider recovery state now preserves provider-specific source provenance for restored
   market-context fields so downstream audit and export surfaces can distinguish vendor paths, and
   the control room now shows and exports that provenance during incident triage
+- provider provenance export in the control room now includes filter/sort controls and persisted
+  local export history, moving it closer to a real operator handoff surface
 
 ### Remaining work
 
