@@ -750,10 +750,10 @@
       "description": "Extend the new mixed-status scheduler narrative workflow beyond one occurrence window by adding stitched multi-occurrence artifacts and cross-incident reporting so operators can review longer recovery patterns and repeated scheduler incidents in one narrative output.",
       "status": "proposed",
       "base_priority": 74,
-      "dynamic_priority_delta": 24,
+      "dynamic_priority_delta": 25,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T18:18:00+09:00",
+      "updated_at": "2026-04-22T18:32:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-mixed-status-narrative-artifact",
@@ -762,8 +762,8 @@
         "task-b1-provider-market-context-scheduler-narrative-governance-bulk-ops",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply says scheduler narrative review remains occurrence or facet centered even after commit 5586f0f shipped policy catalog lifecycle, audit, and bulk governance, so stitched multi-occurrence artifacts and cross-incident reporting are still missing from the operator narrative lane.",
-      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted policy-catalog governance-hierarchy continuation so builtin next-task finishes the remaining catalog-layer gap before broader narrative stitching."
+      "direction_relation_note": "The latest main-session reply after commit 6269416 says scheduler narrative review is still occurrence or facet centered even after policy catalogs became queue-aware hierarchy sources, so stitched multi-occurrence artifacts and cross-incident reporting remain missing from the operator narrative lane.",
+      "priority_reason": "This remains an explicit executable follow-up from the latest main-session reply, but it stays proposed behind the newly promoted hierarchy-step lifecycle continuation so builtin next-task clears the remaining catalog-governance gap before broader narrative stitching."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
@@ -806,18 +806,36 @@
       "direction_id": "operator-trust-and-discipline",
       "title": "Promote policy catalogs into staged approval queues and reusable governance-plan hierarchies",
       "description": "Extend the newly revision-aware policy catalog layer above lifecycle and bulk governance by introducing staged approval queue workflows and reusable governance-plan template hierarchies so catalogs become governable rollout objects rather than flat reusable presets.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 76,
       "dynamic_priority_delta": 27,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T18:18:00+09:00",
+      "updated_at": "2026-04-22T18:32:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-policy-catalog-management"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says policy catalogs now cover lifecycle, audit, and bulk governance after commit 5586f0f, but catalog-level staged approval queues and reusable governance-plan template hierarchy workflows are still missing from the scheduler governance lane.",
-      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and this is the first remaining executable follow-up named in the latest main-session reply, ahead of the scheduler narrative stitching and deeper search follow-ups."
+      "direction_relation_note": "Completed on main in commit 6269416 with policy catalogs promoted into queue-aware rollout sources that can capture reusable governance-plan hierarchies and stage them back into approval queues with policy_catalog_id plus hierarchy metadata across backend and control-room workflows.",
+      "priority_reason": "Closed after targeted application and API pytest coverage, compileall verification, web typecheck and build, docs status updates, commit, and push all landed; the latest main-session reply now leaves hierarchy-step lifecycle management and broader scheduler narrative stitching or deeper search as the direct follow-ups."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-policy-catalog-hierarchy-step-lifecycle",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add edit, versioning, and bulk governance workflows for policy-catalog hierarchy steps",
+      "description": "Extend the new queue-aware policy catalog hierarchy model with first-class hierarchy-step edit, revision, and bulk-governance workflows so reusable rollout trees can be managed directly instead of only being captured and staged as catalog snapshots.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 29,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T18:32:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
+      ],
+      "direction_relation_note": "The latest main-session reply after commit 6269416 says hierarchy can now be captured and staged inside policy catalogs, but hierarchy steps still lack a separate edit or version or bulk-governance lifecycle surface, making this the remaining direct catalog-governance gap.",
+      "priority_reason": "Promoted to ready because the operator asked to continue with one queued task and the latest main-session reply lists hierarchy-step lifecycle management as the first immediate follow-up ahead of stitched multi-occurrence narrative artifacts and deeper server-side search."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
@@ -880,10 +898,10 @@
       "description": "Extend the new scheduler-only occurrence history surface with deeper server-side search and narrative-oriented query controls beyond category or status filters so operators can isolate specific occurrence windows, recovery stories, and related scheduler records without relying on oversized client-side scans.",
       "status": "proposed",
       "base_priority": 75,
-      "dynamic_priority_delta": 18,
+      "dynamic_priority_delta": 19,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T18:18:00+09:00",
+      "updated_at": "2026-04-22T18:32:00+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-only-history-surface",
@@ -891,8 +909,8 @@
         "task-b1-provider-market-context-scheduler-narrative-registry-templates",
         "task-b1-provider-market-context-scheduler-policy-catalog-governance-hierarchy"
       ],
-      "direction_relation_note": "The latest main-session reply still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after commit 5586f0f extended policy catalogs through lifecycle, audit, and bulk governance.",
-      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted policy-catalog governance-hierarchy slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
+      "direction_relation_note": "The latest main-session reply after commit 6269416 still calls out deeper server-side narrative search across scheduler occurrence timelines as missing even after policy catalogs became queue-aware hierarchy sources.",
+      "priority_reason": "This remains executable follow-up work, but it stays proposed behind the promoted hierarchy-step lifecycle slice and the stitched multi-occurrence artifact gap so builtin next-task follows the latest explicit continuation order from the main session."
     },
     {
       "id": "task-b1-provider-market-context-export-retention-controls",
