@@ -474,37 +474,93 @@
       "direction_id": "runtime-ops",
       "title": "Add per-export routing and approval policy for scheduler health escalations",
       "description": "Extend the new scheduler-health export delivery and escalation workflow with per-export routing policy plus optional approval or escalation policy controls so automation stalls do not rely only on globally configured operator delivery targets.",
-      "status": "ready",
+      "status": "done",
       "base_priority": 77,
       "dynamic_priority_delta": 23,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:32:00+09:00",
+      "updated_at": "2026-04-22T03:01:39+09:00",
       "source_turn_id": null,
       "depends_on": [
         "task-b1-provider-market-context-scheduler-escalation-delivery-linking"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says scheduler export escalation currently uses configured operator delivery targets only, leaving per-export routing policy and approval or escalation policy layering as the first direct follow-up on top of the newly shipped workflow.",
-      "priority_reason": "Promoted to ready because the main-session reply lists this policy-layer gap first in the Remains section, making it the clearest deterministic continuation for builtin next-task after export delivery and escalation productization shipped."
+      "direction_relation_note": "Completed on main in commit 15c6635 with persisted scheduler export routing_policy, routing_targets, approval_policy, approval_state, and approval provenance across backend models, API actions, audit records, and the control-room policy workbench so escalation now enforces per-export routing and approval gates.",
+      "priority_reason": "Closed after targeted pytest coverage for provider provenance scheduler exports, compileall verification, web typecheck/build, commit, and push all landed; the latest main-session reply now makes automatic alert-triggered escalation the next direct runtime continuation, with reusable team policy catalogs remaining a separate higher-order follow-up."
     },
     {
       "id": "task-b1-provider-market-context-scheduler-alert-trigger-linking",
       "direction_id": "runtime-ops",
       "title": "Trigger scheduler export escalation workflows directly from lag and failure alerts",
       "description": "Connect scheduler lag and failure alert evaluation to the new shared export and escalation workflow so repeated or severe automation issues can automatically generate handoff artifacts and escalation attempts without waiting for manual operator action.",
-      "status": "proposed",
+      "status": "done",
       "base_priority": 76,
-      "dynamic_priority_delta": 21,
+      "dynamic_priority_delta": 24,
       "created_by": "llm",
       "last_updated_by": "llm",
-      "updated_at": "2026-04-22T02:32:00+09:00",
+      "updated_at": "2026-04-22T14:10:00+09:00",
       "source_turn_id": null,
       "depends_on": [
-        "task-b1-provider-market-context-scheduler-escalation-delivery-linking",
-        "task-b1-provider-market-context-scheduler-health-alerting"
+        "task-b1-provider-market-context-scheduler-health-alerting",
+        "task-b1-provider-market-context-scheduler-routing-approval-policy"
       ],
-      "direction_relation_note": "The latest main-session reply explicitly says automatic lag or failure alerting still does not directly trigger the newly productized export-escalation workflow, so alert-to-handoff linking remains a separate executable follow-up.",
-      "priority_reason": "This is clear executable follow-up work, but it stays proposed behind the policy-layer routing task so the queue hardens escalation governance before enabling automatic trigger paths."
+      "direction_relation_note": "Completed on main in commit 03449af with scheduler lag and failure alerts in the control-room now exposing Start export workflow and Escalate snapshot actions that create shared scheduler exports from the current scheduler-health snapshot, load the export workbench and audit trail, and run escalation delivery immediately when the saved routing policy allows it.",
+      "priority_reason": "Closed because the direct alert-surface handoff workflow now ships end-to-end with docs and web validation; the remaining gap is unattended auto-run from alert evaluation rather than operator-clicked alert actions."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-alert-auto-run",
+      "direction_id": "runtime-ops",
+      "title": "Auto-run scheduler export escalation workflow from lag and failure alerts",
+      "description": "Extend scheduler lag and failure alert evaluation so qualifying alerts can automatically create scheduler export artifacts and start governed escalation delivery without requiring an operator click from the alert surface.",
+      "status": "ready",
+      "base_priority": 77,
+      "dynamic_priority_delta": 24,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:10:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-health-alerting",
+        "task-b1-provider-market-context-scheduler-routing-approval-policy",
+        "task-b1-provider-market-context-scheduler-alert-trigger-linking"
+      ],
+      "direction_relation_note": "The latest main-session reply says alert surfaces now trigger the workflow only through operator-clicked actions, so the next direct runtime gap is wiring alert evaluation itself into governed export creation and escalation attempts while preserving the existing per-export routing and approval policy.",
+      "priority_reason": "Promoted to ready because the latest main-session reply lists unattended alert-triggered workflow execution as the first remaining executable follow-up after commit 03449af, making it the correct builtin next task."
+    },
+    {
+      "id": "task-b1-provider-market-context-historical-alert-export-reconstruction",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Reconstruct historical scheduler exports for resolved alert rows",
+      "description": "Add historical snapshot reconstruction or equivalent export replay so older resolved scheduler lag or failure alerts can open an export artifact tied to the alert-time scheduler-health state instead of always snapshotting current scheduler health.",
+      "status": "proposed",
+      "base_priority": 73,
+      "dynamic_priority_delta": 20,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:10:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-alert-trigger-linking"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says direct alert-triggered workflow actions still snapshot current scheduler health only, leaving resolved alert rows unable to reopen a historically accurate export artifact tied to the older alert state.",
+      "priority_reason": "This is a concrete follow-up, but it stays proposed behind unattended alert-triggered automation because historical reconstruction is the second remaining gap rather than the next builtin task."
+    },
+    {
+      "id": "task-b1-provider-market-context-scheduler-policy-catalog-templates",
+      "direction_id": "operator-trust-and-discipline",
+      "title": "Add reusable team policy catalog and escalation templates above per-export scheduler rules",
+      "description": "Build a shared team-level catalog of named routing and approval policies or escalation templates for scheduler health exports so operators can apply reusable defaults above one-off per-export policy configuration.",
+      "status": "proposed",
+      "base_priority": 74,
+      "dynamic_priority_delta": 19,
+      "created_by": "llm",
+      "last_updated_by": "llm",
+      "updated_at": "2026-04-22T14:10:00+09:00",
+      "source_turn_id": null,
+      "depends_on": [
+        "task-b1-provider-market-context-scheduler-routing-approval-policy"
+      ],
+      "direction_relation_note": "The latest main-session reply explicitly says routing policy is still defined per export artifact only, leaving no reusable team policy catalog or named escalation templates above the newly shipped per-export rules.",
+      "priority_reason": "This remains clear follow-up work, but it stays proposed behind the newer explicit gaps from commit 03449af so builtin next-task advances through unattended alert execution before higher-level reusable policy productization."
     },
     {
       "id": "task-b1-provider-market-context-dashboard-board",
