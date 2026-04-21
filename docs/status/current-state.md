@@ -116,6 +116,14 @@ It is not yet a finished live trading product:
 - guarded-live panels for candidacy blockers, venue snapshots, recovery state, and audit history
 - operator surfaces for replay-link alias governance and audit export administration
 
+### Operator discipline baseline
+
+- baseline runbook set now exists under `docs/operations/*` for daily operations, data incidents,
+  sandbox incidents, guarded-live reconciliation, kill-switch handling, and release-time docs
+  discipline
+- operations documentation now links operator checks and escalation rules back to product-visible
+  runtime and guarded-live surfaces
+
 ## Partial Or Fragile Areas
 
 - custom strategy registration exists, but registration metadata is still process-local rather than a
@@ -141,7 +149,8 @@ It is not yet a finished live trading product:
   yet resume a full venue-native session lifecycle in all cases
 - incident delivery and provider sync are broad, but provider-owned policy management and external
   incident ownership remain incomplete
-- deployment guidance, backups, secret governance, and runbooks are not yet product-grade
+- deployment guidance, backups, and secret governance are not yet product-grade, and the runbook
+  baseline still needs drill validation against fuller venue and recovery coverage
 - the LLM lane still stops at `DecisionEnginePort`, template strategy shapes, and trace-capable
   envelopes
 

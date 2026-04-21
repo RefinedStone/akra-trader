@@ -10,12 +10,12 @@ defines the minimum set that should exist as the platform matures.
 
 | Runbook | Purpose | Current status |
 | --- | --- | --- |
-| Daily operations checklist | What to inspect before and after normal use | missing |
-| Data incident response | Stale sync, repeated failures, gap escalation | missing |
-| Sandbox runtime incident | Worker failure, heartbeat loss, unexplained drift | missing |
-| Guarded-live reconciliation drill | How to verify venue state and respond to mismatches | missing |
-| Kill-switch procedure | When and how to engage, verify, and release emergency stop | missing |
-| Release and docs checklist | How to keep docs aligned with feature changes | missing |
+| [Daily operations checklist](daily-operations-checklist.md) | What to inspect before and after normal use | baseline implemented |
+| [Data incident response](data-incident-response.md) | Stale sync, repeated failures, gap escalation | baseline implemented |
+| [Sandbox runtime incident](sandbox-runtime-incident.md) | Worker failure, heartbeat loss, unexplained drift | baseline implemented |
+| [Guarded-live reconciliation drill](guarded-live-reconciliation-drill.md) | How to verify venue state and respond to mismatches | baseline implemented |
+| [Kill-switch procedure](kill-switch-procedure.md) | When and how to engage, verify, and release emergency stop | baseline implemented |
+| [Release and docs checklist](release-and-docs-checklist.md) | How to keep docs aligned with feature changes | baseline implemented |
 
 ## Minimum Daily Checklist
 
@@ -31,6 +31,24 @@ defines the minimum set that should exist as the platform matures.
 - record what to inspect, what actions are allowed, and what must be escalated
 - link each runbook to the relevant product surface and blocking condition
 - keep guarded-live procedures stricter than sandbox procedures
+
+## Current Baseline
+
+The required runbook set now exists as a baseline package under `docs/operations/*`.
+
+What this baseline is good enough for:
+
+- single-operator daily inspection
+- first-pass incident triage
+- guarded-live reconciliation and stop discipline
+- release-time documentation alignment
+
+What is still not complete:
+
+- deployment and backup runbooks
+- secret rotation and credential-governance procedures
+- venue-specific live drills beyond the current guarded-live baseline
+- evidence that every runbook step is fully represented by product UX without fallback shell work
 
 ## Related Docs
 
